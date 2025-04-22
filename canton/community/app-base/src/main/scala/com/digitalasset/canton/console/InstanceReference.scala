@@ -1,59 +1,64 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
 
 import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.commands.SequencerAdminCommands.LocatePruningTimestampCommand
-import com.digitalasset.canton.admin.api.client.data.topology.ListParticipantDomainPermissionResult
+import com.digitalasset.canton.admin.api.client.data.topology.ListParticipantSynchronizerPermissionResult
 import com.digitalasset.canton.admin.api.client.data.{
   MediatorStatus,
   NodeStatus,
   ParticipantStatus,
   SequencerStatus,
-  StaticDomainParameters as ConsoleStaticDomainParameters,
+  StaticSynchronizerParameters as ConsoleStaticSynchronizerParameters,
 }
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{ExistingFile, NonNegativeInt, Port, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.console.CommandErrors.NodeNotStarted
+import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.console.commands.*
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.domain.mediator.{
-  MediatorNode,
-  MediatorNodeBootstrap,
-  MediatorNodeConfigCommon,
-  RemoteMediatorConfig,
-}
-import com.digitalasset.canton.domain.sequencing.config.{
-  RemoteSequencerConfig,
-  SequencerNodeConfigCommon,
-}
-import com.digitalasset.canton.domain.sequencing.sequencer.block.bftordering.admin.EnterpriseSequencerBftAdminData.{
-  OrderingTopology,
-  PeerNetworkStatus,
-}
-import com.digitalasset.canton.domain.sequencing.sequencer.{
-  SequencerClients,
-  SequencerPruningStatus,
-}
-import com.digitalasset.canton.domain.sequencing.{SequencerNode, SequencerNodeBootstrap}
 import com.digitalasset.canton.environment.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.metrics.MetricValue
-import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.participant.config.{
   BaseParticipantConfig,
-  LocalParticipantConfig,
+  ParticipantNodeConfig,
   RemoteParticipantConfig,
 }
 import com.digitalasset.canton.participant.{ParticipantNode, ParticipantNodeBootstrap}
 import com.digitalasset.canton.sequencer.admin.v30.SequencerPruningAdministrationServiceGrpc
 import com.digitalasset.canton.sequencer.admin.v30.SequencerPruningAdministrationServiceGrpc.SequencerPruningAdministrationServiceStub
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.synchronizer.mediator.{
+  MediatorNode,
+  MediatorNodeBootstrap,
+  MediatorNodeConfig,
+  RemoteMediatorConfig,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.{
+  OrderingTopology,
+  PeerNetworkStatus,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  RemoteSequencerConfig,
+  SequencerNodeConfig,
+}
+import com.digitalasset.canton.synchronizer.sequencer.{
+  SequencerClients,
+  SequencerNode,
+  SequencerNodeBootstrap,
+  SequencerPruningStatus,
+}
+import com.digitalasset.canton.time.{DelegatingSimClock, SimClock}
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ErrorUtil
@@ -138,8 +143,8 @@ object InstanceReference {
   }
 }
 
-/** Pointer for a potentially running instance by instance type (domain/participant) and its id.
-  * These methods define the REPL interface for these instances (e.g. participant1 start)
+/** Pointer for a potentially running instance by instance type (sequencer/mediator/participant) and
+  * its id. These methods define the REPL interface for these instances (e.g. participant1 start)
   */
 trait LocalInstanceReference extends InstanceReference with NoTracing {
 
@@ -213,7 +218,7 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
 
     private def getOne(
         metricName: String,
-        attributes: Map[String, String] = Map(),
+        attributes: Map[String, String],
     ): Either[String, MetricValue] = check(FeatureFlag.Testing) {
       val candidates = consoleEnvironment.environment.configuredOpenTelemetry.onDemandMetricsReader
         .read()
@@ -383,14 +388,18 @@ trait RemoteInstanceReference extends InstanceReference {
 
 /** Bare, Canton agnostic parts of the ledger-api client
   *
-  * This implementation allows to access any kind of ledger-api client, which does not need to be Canton based.
-  * However, this comes at some cost, as some of the synchronization between nodes during transaction submission
-  * is not supported
+  * This implementation allows to access any kind of ledger-api client, which does not need to be
+  * Canton based. However, this comes at some cost, as some of the synchronization between nodes
+  * during transaction submission is not supported
   *
-  * @param hostname the hostname of the ledger api server
-  * @param port the port of the ledger api server
-  * @param tls the tls config to use on the client
-  * @param token the jwt token to use on the client
+  * @param hostname
+  *   the hostname of the ledger api server
+  * @param port
+  *   the port of the ledger api server
+  * @param tls
+  *   the tls config to use on the client
+  * @param token
+  *   the jwt token to use on the client
   */
 class ExternalLedgerApiClient(
     hostname: String,
@@ -412,49 +421,38 @@ class ExternalLedgerApiClient(
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcLedgerCommandRunner
-      .runCommand("sourceLedger", command, ClientConfig(hostname, port, tls), token)
+      .runCommand("sourceLedger", command, FullClientConfig(hostname, port, tls), token)
 
   override def optionallyAwait[Tx](
       tx: Tx,
       txId: String,
-      txDomainId: String,
+      txSynchronizerId: String,
       optTimeout: Option[NonNegativeDuration],
   ): Tx = tx
 
 }
 
 /** Allows to query the public api of a sequencer (e.g., sequencer connect service).
-  *
-  * @param trustCollectionFile a file containing certificates of all nodes the client trusts. If none is specified, defaults to the JVM trust store
   */
 class SequencerPublicApiClient(
-    sequencerConnection: GrpcSequencerConnection,
-    trustCollectionFile: Option[ExistingFile],
+    instanceName: String,
+    sequencerApiClientConfig: SequencerApiClientConfig,
 )(implicit val consoleEnvironment: ConsoleEnvironment)
     extends PublicApiCommandRunner
     with NamedLogging {
 
-  private val endpoint = sequencerConnection.endpoints.head1
-
-  private val name: String = endpoint.toString
-
   override val loggerFactory: NamedLoggerFactory =
-    consoleEnvironment.environment.loggerFactory.append("sequencer-public-api", name)
+    consoleEnvironment.environment.loggerFactory
+      .append("sequencer-public-api", sequencerApiClientConfig.endpointAsString)
 
   protected[console] def publicApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
   ): ConsoleCommandResult[Result] =
-    consoleEnvironment.grpcDomainCommandRunner
+    consoleEnvironment.grpcSequencerCommandRunner
       .runCommand(
-        sequencerConnection.sequencerAlias.unwrap,
+        instanceName,
         command,
-        ClientConfig(
-          endpoint.host,
-          endpoint.port,
-          tls = trustCollectionFile.map(f =>
-            TlsClientConfig(trustCollectionFile = Some(f), clientCert = None)
-          ),
-        ),
+        sequencerApiClientConfig,
         token = None,
       )
 }
@@ -549,29 +547,33 @@ abstract class ParticipantReference(
   lazy private val replicationGroup =
     new ParticipantReplicationAdministrationGroup(this, consoleEnvironment)
 
+  private lazy val repair_ =
+    new ParticipantRepairAdministration(consoleEnvironment, this, loggerFactory)
+
   @Help.Summary("Commands to repair the participant contract state", FeatureFlag.Repair)
   @Help.Group("Repair")
-  def repair: ParticipantRepairAdministration
+  def repair: ParticipantRepairAdministration = repair_
 
-  /** Waits until for every participant p (drawn from consoleEnvironment.participants.all) that is running and initialized
-    * and for each domain to which both this participant and p are connected
-    * the vetted_package transactions in the authorized store are the same as in the domain store.
+  /** Waits until for every participant p (drawn from consoleEnvironment.participants.all) that is
+    * running and initialized and for each synchronizer to which both this participant and p are
+    * connected the vetted_package transactions in the authorized store are the same as in the
+    * synchronizer store.
     */
   override protected def waitPackagesVetted(timeout: NonNegativeDuration): Unit = {
-    val connected = domains.list_connected().map(_.domainId).toSet
+    val connected = synchronizers.list_connected().map(_.synchronizerId).toSet
     // for every participant
     consoleEnvironment.participants.all
       .filter(p => p.health.is_running() && p.health.initialized())
       .foreach { participant =>
-        // for every domain this participant is connected to as well
-        participant.domains.list_connected().foreach {
-          case item if connected.contains(item.domainId) =>
+        // for every synchronizer this participant is connected to as well
+        participant.synchronizers.list_connected().foreach {
+          case item if connected.contains(item.synchronizerId) =>
             ConsoleMacros.utils.retry_until_true(timeout)(
               {
-                // ensure that vetted packages on the domain match the ones in the authorized store
-                val onDomain = participant.topology.vetted_packages
+                // ensure that vetted packages on the synchronizer match the ones in the authorized store
+                val onSynchronizer = participant.topology.vetted_packages
                   .list(
-                    filterStore = item.domainId.filterString,
+                    store = item.synchronizerId,
                     filterParticipant = id.filterString,
                     timeQuery = TimeQuery.HeadState,
                   )
@@ -580,52 +582,56 @@ abstract class ParticipantReference(
 
                 // Vetted packages from the participant's authorized store
                 val onParticipantAuthorizedStore = topology.vetted_packages
-                  .list(filterStore = "Authorized", filterParticipant = id.filterString)
+                  .list(
+                    store = TopologyStoreId.Authorized,
+                    filterParticipant = id.filterString,
+                  )
                   .flatMap(_.item.packages)
                   .toSet
 
-                val ret = onParticipantAuthorizedStore == onDomain
+                val ret = onParticipantAuthorizedStore == onSynchronizer
                 if (!ret) {
                   logger.debug(
-                    show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.domainId}: vetted -- onDomain is ${onParticipantAuthorizedStore -- onDomain} while onDomain -- vetted is ${onDomain -- onParticipantAuthorizedStore}"
+                    show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.synchronizerId}: vetted -- onSynchronizer is ${onParticipantAuthorizedStore -- onSynchronizer} while onSynchronizer -- vetted is ${onSynchronizer -- onParticipantAuthorizedStore}"
                   )
                 }
                 ret
               },
-              show"Participant ${participant.name} has not observed all vetting txs of $id on domain ${item.domainId} within the given timeout.",
+              show"Participant ${participant.name} has not observed all vetting txs of $id on synchronizer ${item.synchronizerId} within the given timeout.",
             )
           case _ =>
         }
       }
   }
-  override protected def participantIsActiveOnDomain(
-      domainId: DomainId,
+  override protected def participantIsActiveOnSynchronizer(
+      synchronizerId: SynchronizerId,
       participantId: ParticipantId,
   ): Boolean = {
-    val hasDomainTrustCertificate =
-      topology.domain_trust_certificates.active(domainId, participantId)
-    val isDomainRestricted = topology.domain_parameters
-      .get_dynamic_domain_parameters(domainId)
+    val hasSynchronizerTrustCertificate =
+      topology.synchronizer_trust_certificates.active(synchronizerId, participantId)
+    val isSynchronizerRestricted = topology.synchronizer_parameters
+      .get_dynamic_synchronizer_parameters(synchronizerId)
       .onboardingRestriction
       .isRestricted
-    val domainPermission = topology.participant_domain_permissions.find(domainId, participantId)
+    val synchronizerPermission =
+      topology.participant_synchronizer_permissions.find(synchronizerId, participantId)
 
     // notice the `exists`, expressing the requirement of a permission to exist
-    val hasRequiredDomainPermission = domainPermission.exists(noLoginRestriction)
+    val hasRequiredSynchronizerPermission = synchronizerPermission.exists(noLoginRestriction)
     // notice the forall, expressing optionality for the permission to exist
-    val hasOptionalDomainPermission = domainPermission.forall(noLoginRestriction)
+    val hasOptionalSynchronizerPermission = synchronizerPermission.forall(noLoginRestriction)
 
-    // for a participant to be considered active, it must have a domain trust certificate
-    hasDomainTrustCertificate &&
+    // for a participant to be considered active, it must have a synchronizer trust certificate
+    hasSynchronizerTrustCertificate &&
     (
-      // if the domain is restricted, the participant MUST have the permission
-      (isDomainRestricted && hasRequiredDomainPermission) ||
-        // if the domain is UNrestricted, the participant may still be restricted by the domain
-        (!isDomainRestricted && hasOptionalDomainPermission)
+      // if the synchronizer is restricted, the participant MUST have the permission
+      (isSynchronizerRestricted && hasRequiredSynchronizerPermission) ||
+        // if the synchronizer is UNrestricted, the participant may still be restricted by the synchronizer
+        (!isSynchronizerRestricted && hasOptionalSynchronizerPermission)
     )
   }
 
-  private def noLoginRestriction(result: ListParticipantDomainPermissionResult): Boolean =
+  private def noLoginRestriction(result: ListParticipantSynchronizerPermissionResult): Boolean =
     result.item.loginAfter
       .forall(
         _ <= consoleEnvironment.environment.clock.now
@@ -663,13 +669,6 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
   @Help.Group("Testing")
   override def testing: ParticipantTestingGroup = testing_
 
-  private lazy val repair_ =
-    new ParticipantRepairAdministration(consoleEnvironment, this, loggerFactory)
-
-  @Help.Summary("Commands to repair the participant contract state", FeatureFlag.Repair)
-  @Help.Group("Repair")
-  def repair: ParticipantRepairAdministration = repair_
-
   override def equals(obj: Any): Boolean =
     obj match {
       case x: RemoteParticipantReference =>
@@ -686,10 +685,33 @@ class LocalParticipantReference(
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
+  @Help.Summary(
+    "Returns the node specific simClock, possible race condition if using environment.SimClock as well."
+  )
+  def simClock: Option[DelegatingSimClock] = cantonConfig.parameters.clock match {
+    case ClockConfig.SimClock =>
+      runningNode match {
+        case Some(node) =>
+          node.clock match {
+            case c: SimClock =>
+              Some(
+                new DelegatingSimClock(
+                  () => Seq(c),
+                  loggerFactory = loggerFactory,
+                )
+              )
+            case _ => None
+          }
+        case _ => None
+      }
+    case ClockConfig.WallClock(_) => None
+    case ClockConfig.RemoteClock(_) => None
+  }
+
   override protected[console] val nodes = consoleEnvironment.environment.participants
 
   @Help.Summary("Return participant config")
-  def config: LocalParticipantConfig =
+  def config: ParticipantNodeConfig =
     consoleEnvironment.environment.config.participantsByString(name)
 
   override def runningNode: Option[ParticipantNodeBootstrap] =
@@ -712,16 +734,6 @@ class LocalParticipantReference(
   @Help.Summary("Commands to inspect and extract bilateral commitments", FeatureFlag.Preview)
   @Help.Group("Commitments")
   def commitments: LocalCommitmentsAdministrationGroup = commitments_
-
-  private lazy val repair_ =
-    new LocalParticipantRepairAdministration(consoleEnvironment, this, loggerFactory) {
-      override protected def access[T](handler: ParticipantNode => T): T =
-        LocalParticipantReference.this.access(handler)
-    }
-
-  @Help.Summary("Commands to repair the local participant contract state", FeatureFlag.Repair)
-  @Help.Group("Repair")
-  def repair: LocalParticipantRepairAdministration = repair_
 
   override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
@@ -780,11 +792,12 @@ abstract class SequencerReference(
 
   override def parties: PartiesAdministrationGroup = parties_
 
-  private val staticDomainParameters: AtomicReference[Option[ConsoleStaticDomainParameters]] =
-    new AtomicReference[Option[ConsoleStaticDomainParameters]](None)
+  private val staticSynchronizerParameters
+      : AtomicReference[Option[ConsoleStaticSynchronizerParameters]] =
+    new AtomicReference[Option[ConsoleStaticSynchronizerParameters]](None)
 
-  private val domainId: AtomicReference[Option[DomainId]] =
-    new AtomicReference[Option[DomainId]](None)
+  private val synchronizerId: AtomicReference[Option[SynchronizerId]] =
+    new AtomicReference[Option[SynchronizerId]](None)
 
   @Help.Summary(
     "Yields the globally unique id of this sequencer. " +
@@ -823,15 +836,15 @@ abstract class SequencerReference(
   override def traffic_control: TrafficControlSequencerAdministrationGroup =
     sequencerTrafficControl
 
-  @Help.Summary("Return domain id of the domain")
-  def domain_id: DomainId =
-    domainId.get() match {
+  @Help.Summary("Return synchronizer id of the synchronizer")
+  def synchronizer_id: SynchronizerId =
+    synchronizerId.get() match {
       case Some(id) => id
       case None =>
         val id = consoleEnvironment.run(
-          publicApiClient.publicApiCommand(SequencerPublicCommands.GetDomainId)
+          publicApiClient.publicApiCommand(SequencerPublicCommands.GetSynchronizerId)
         )
-        domainId.set(Some(id))
+        synchronizerId.set(Some(id))
 
         id
     }
@@ -852,19 +865,23 @@ abstract class SequencerReference(
           observers: Seq[MediatorReference] = Nil,
       ): Unit = {
 
-        val domainId = domain_id
+        val synchronizerId = synchronizer_id
 
         val mediators = active ++ observers
 
         mediators.foreach { mediator =>
           val identityState = mediator.topology.transactions.identity_transactions()
 
-          topology.transactions.load(identityState, domainId.filterString, ForceFlag.AlienMember)
+          topology.transactions.load(
+            identityState,
+            TopologyStoreId.Synchronizer(synchronizerId),
+            ForceFlag.AlienMember,
+          )
         }
 
         topology.mediators
           .propose(
-            domainId = domainId,
+            synchronizerId = synchronizerId,
             threshold = threshold,
             active = active.map(_.id),
             observers = observers.map(_.id),
@@ -874,7 +891,7 @@ abstract class SequencerReference(
 
         mediators.foreach(
           _.setup.assign(
-            domainId,
+            synchronizerId,
             SequencerConnections.single(sequencerConnection),
           )
         )
@@ -893,10 +910,10 @@ abstract class SequencerReference(
           additionalActive: Seq[MediatorReference],
           additionalObservers: Seq[MediatorReference] = Nil,
       ): Unit = {
-        val domainId = domain_id
+        val synchronizerId = synchronizer_id
 
         val currentMediators = topology.mediators
-          .list(filterStore = domainId.filterString, group = Some(group))
+          .list(synchronizerId, group = Some(group))
           .maxByOption(_.context.serial)
           .getOrElse(throw new IllegalArgumentException(s"Unknown mediator group $group"))
 
@@ -911,12 +928,16 @@ abstract class SequencerReference(
         newMediators.foreach { med =>
           val identityState = med.topology.transactions.identity_transactions()
 
-          topology.transactions.load(identityState, domainId.filterString, ForceFlag.AlienMember)
+          topology.transactions.load(
+            identityState,
+            TopologyStoreId.Synchronizer(synchronizerId),
+            ForceFlag.AlienMember,
+          )
         }
 
         topology.mediators
           .propose(
-            domainId = domainId,
+            synchronizerId = synchronizerId,
             threshold = threshold,
             active = (currentActive ++ additionalActive.map(_.id)).distinct,
             observers = (currentObservers ++ additionalObservers.map(_.id)).distinct,
@@ -927,7 +948,7 @@ abstract class SequencerReference(
 
         newMediators.foreach(
           _.setup.assign(
-            domainId,
+            synchronizerId,
             SequencerConnections.single(sequencerConnection),
           )
         )
@@ -935,20 +956,22 @@ abstract class SequencerReference(
     }
   }
 
-  @Help.Summary("Domain parameters related commands")
-  @Help.Group("Domain parameters")
-  object domain_parameters {
+  @Help.Summary("Synchronizer parameters related commands")
+  @Help.Group("Synchronizer parameters")
+  object synchronizer_parameters {
     object static {
-      @Help.Summary("Return static domain parameters of the domain")
-      def get(): ConsoleStaticDomainParameters =
-        staticDomainParameters.get() match {
+      @Help.Summary("Return static synchronizer parameters of the synchronizer")
+      def get(): ConsoleStaticSynchronizerParameters =
+        staticSynchronizerParameters.get() match {
           case Some(parameters) => parameters
           case None =>
             val parameters = consoleEnvironment.run(
-              publicApiClient.publicApiCommand(SequencerPublicCommands.GetStaticDomainParameters)
+              publicApiClient.publicApiCommand(
+                SequencerPublicCommands.GetStaticSynchronizerParameters
+              )
             )
 
-            staticDomainParameters.set(Some(parameters))
+            staticSynchronizerParameters.set(Some(parameters))
             parameters
         }
     }
@@ -975,7 +998,7 @@ abstract class SequencerReference(
     @Help.Description(
       """Provides a detailed breakdown of information required for pruning:
         | - the current time according to this sequencer instance
-        | - domain members that the sequencer supports
+        | - synchronizer members that the sequencer supports
         | - for each member when they were registered and whether they are enabled
         | - a list of clients for each member, their last acknowledgement, and whether they are enabled
         |"""
@@ -996,7 +1019,7 @@ abstract class SequencerReference(
         |If no data is being removed it could indicate that clients are not reading or acknowledging data
         |in a timely fashion (typically due to nodes going offline for long periods).
         |You have the option of disabling the members running on these nodes to allow removal of this data,
-        |however this will mean that they will be unable to reconnect to the domain in the future.
+        |however this will mean that they will be unable to reconnect to the synchronizer in the future.
         |To do this run `force_prune(dryRun = true)` to return a description of which members would be
         |disabled in order to prune the Sequencer.
         |If you are happy to disable the described clients then run `force_prune(dryRun = false)` to
@@ -1017,8 +1040,8 @@ abstract class SequencerReference(
     @Help.Description(
       """Will force pruning up until the default retention period by potentially disabling clients
         |that have not yet read data we would like to remove.
-        |Disabling these clients will prevent them from ever reconnecting to the Domain so should only be
-        |used if the Domain operator is confident they can be permanently ignored.
+        |Disabling these clients will prevent them from ever reconnecting to the Synchronizer so should only be
+        |used if the Synchronizer operator is confident they can be permanently ignored.
         |Run with `dryRun = true` to review a description of which clients will be disabled first.
         |Run with `dryRun = false` to disable these clients and perform a forced pruning.
         |"""
@@ -1144,8 +1167,8 @@ abstract class SequencerReference(
   @Help.Summary("Methods used for repairing the node")
   object repair {
 
-    /** Disable the provided member at the sequencer preventing them from reading and writing, and allowing their
-      * data to be pruned.
+    /** Disable the provided member at the sequencer preventing them from reading and writing, and
+      * allowing their data to be pruned.
       */
     @Help.Summary(
       "Disable the provided member at the Sequencer that will allow any unread data for them to be removed"
@@ -1153,7 +1176,7 @@ abstract class SequencerReference(
     @Help.Description(
       """This will prevent any client for the given member to reconnect the Sequencer
         |and allow any unread/unacknowledged data they have to be removed.
-        |This should only be used if the domain operation is confident the member will never need
+        |This should only be used if the synchronizer operation is confident the member will never need
         |to reconnect as there is no way to re-enable the member.
         |To view members using the sequencer run `sequencer.status()`.""""
     )
@@ -1166,26 +1189,45 @@ abstract class SequencerReference(
   object bft {
 
     @Help.Summary("Add a new peer endpoint")
-    def add_peer_endpoint(endpoint: Endpoint): Unit = consoleEnvironment.run {
-      runner.adminCommand(EnterpriseSequencerBftAdminCommands.AddPeerEndpoint(endpoint))
-    }
+    def add_peer_endpoint(
+        endpointConfig: BftBlockOrdererConfig.P2PEndpointConfig
+    ): Unit =
+      consoleEnvironment.run {
+        runner.adminCommand(
+          SequencerBftAdminCommands.AddPeerEndpoint(
+            P2PEndpoint.fromEndpointConfig(endpointConfig)
+          )
+        )
+      }
 
     @Help.Summary("Remove a peer endpoint")
-    def remove_peer_endpoint(endpoint: Endpoint): Unit = consoleEnvironment.run {
-      runner.adminCommand(EnterpriseSequencerBftAdminCommands.RemovePeerEndpoint(endpoint))
-    }
+    def remove_peer_endpoint(peerEndpointId: BftBlockOrdererConfig.EndpointId): Unit =
+      consoleEnvironment.run {
+        runner.adminCommand(
+          SequencerBftAdminCommands.RemovePeerEndpoint(
+            toInternal(peerEndpointId)
+          )
+        )
+      }
 
     @Help.Summary("Get peer network status")
-    def get_peer_network_status(endpoints: Option[Iterable[Endpoint]]): PeerNetworkStatus =
+    def get_peer_network_status(
+        endpoints: Option[Iterable[BftBlockOrdererConfig.EndpointId]]
+    ): PeerNetworkStatus =
       consoleEnvironment.run {
-        runner.adminCommand(EnterpriseSequencerBftAdminCommands.GetPeerNetworkStatus(endpoints))
+        runner.adminCommand(
+          SequencerBftAdminCommands.GetPeerNetworkStatus(endpoints.map(_.map(toInternal)))
+        )
       }
 
     @Help.Summary("Get the currently active ordering topology")
     def get_ordering_topology(): OrderingTopology =
       consoleEnvironment.run {
-        runner.adminCommand(EnterpriseSequencerBftAdminCommands.GetOrderingTopology())
+        runner.adminCommand(SequencerBftAdminCommands.GetOrderingTopology())
       }
+
+    private def toInternal(endpoint: BftBlockOrdererConfig.EndpointId): P2PEndpoint.Id =
+      P2PEndpoint.Id(endpoint.address, endpoint.port, endpoint.tls)
   }
 }
 
@@ -1202,14 +1244,13 @@ class LocalSequencerReference(
   override def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
 
   @Help.Summary("Returns the sequencer configuration")
-  override def config: SequencerNodeConfigCommon =
+  override def config: SequencerNodeConfig =
     consoleEnvironment.environment.config.sequencersByString(name)
 
   override lazy val sequencerConnection: GrpcSequencerConnection =
-    config.publicApi.toSequencerConnectionConfig.toConnection
-      .fold(err => sys.error(s"Sequencer $name has invalid connection config: $err"), identity)
+    config.publicApi.clientConfig.asSequencerConnection()
 
-  protected[console] val nodes: SequencerNodes[?] =
+  val nodes: SequencerNodes =
     consoleEnvironment.environment.sequencers
 
   override protected[console] def runningNode: Option[SequencerNodeBootstrap] =
@@ -1219,8 +1260,8 @@ class LocalSequencerReference(
     nodes.getStarting(name)
 
   protected lazy val publicApiClient: SequencerPublicApiClient = new SequencerPublicApiClient(
-    sequencerConnection = sequencerConnection,
-    trustCollectionFile = config.publicApi.tls.map(_.certChainFile),
+    name,
+    config.publicApi.clientConfig,
   )(consoleEnvironment)
 }
 
@@ -1238,12 +1279,11 @@ class RemoteSequencerReference(val environment: ConsoleEnvironment, val name: St
     environment.environment.config.remoteSequencersByString(name)
 
   override def sequencerConnection: GrpcSequencerConnection =
-    config.publicApi.toConnection
-      .fold(err => sys.error(s"Sequencer $name has invalid connection config: $err"), identity)
+    config.publicApi.asSequencerConnection()
 
   protected lazy val publicApiClient: SequencerPublicApiClient = new SequencerPublicApiClient(
-    sequencerConnection = sequencerConnection,
-    trustCollectionFile = config.publicApi.customTrustCertificates.map(_.pemFile),
+    name,
+    config.publicApi,
   )(consoleEnvironment)
 }
 
@@ -1321,6 +1361,9 @@ abstract class MediatorReference(val consoleEnvironment: ConsoleEnvironment, nam
   @Help.Summary("Pruning functionality for the mediator")
   @Help.Group("Testing")
   def pruning: MediatorPruningAdministrationGroup = pruning_
+
+  private lazy val scan_ = new MediatorScanGroup(runner, consoleEnvironment, name, loggerFactory)
+  def scan: MediatorScanGroup = scan_
 }
 
 class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: String)
@@ -1335,10 +1378,10 @@ class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: S
   override def adminToken: Option[String] = runningNode.flatMap(_.getAdminToken)
 
   @Help.Summary("Returns the mediator configuration")
-  override def config: MediatorNodeConfigCommon =
+  override def config: MediatorNodeConfig =
     consoleEnvironment.environment.config.mediatorsByString(name)
 
-  protected[console] val nodes: MediatorNodes[?] = consoleEnvironment.environment.mediators
+  val nodes: MediatorNodes = consoleEnvironment.environment.mediators
 
   override protected[console] def runningNode: Option[MediatorNodeBootstrap] =
     nodes.getRunning(name)
@@ -1349,7 +1392,8 @@ class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: S
 
 class RemoteMediatorReference(val environment: ConsoleEnvironment, val name: String)
     extends MediatorReference(environment, name)
-    with RemoteInstanceReference {
+    with RemoteInstanceReference
+    with SequencerConnectionAdministration {
 
   def adminToken: Option[String] = config.token
 

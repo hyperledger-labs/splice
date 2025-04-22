@@ -11,7 +11,11 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerConnection, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  RetryProvider,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -27,10 +31,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
-import com.digitalasset.canton.lifecycle.RunOnShutdown
+import com.digitalasset.canton.lifecycle.RunOnClosing
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.util.ShowUtil.*
 
@@ -43,6 +47,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
     clock: Clock,
     config: SvAppBackendConfig,
     appLevelRetryProvider: RetryProvider,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -64,25 +69,26 @@ class RestartDsoDelegateBasedAutomationTrigger(
   private var epochStateVar: Option[EpochState] = None
 
   private def closeRetryProvider(): Unit =
-    epochStateVar.foreach(epochState => Lifecycle.close(epochState.retryProvider)(logger))
+    epochStateVar.foreach(epochState => LifeCycle.close(epochState.retryProvider)(logger))
 
   private def closeService(): Unit =
     epochStateVar.foreach(epochState =>
-      Lifecycle.close(epochState.dsoDelegateBasedAutomation)(logger)
+      LifeCycle.close(epochState.dsoDelegateBasedAutomation)(logger)
     )
 
   def epochState: Option[EpochState] = epochStateVar
 
-  appLevelRetryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
+  appLevelRetryProvider.runOnShutdownWithPriority_(new RunOnClosing {
     override def name = s"set per-epoch retry provider as closing"
     override def done = false
-    override def run() = epochStateVar.foreach(_.retryProvider.setAsClosing())
-  })(TraceContext.empty)
+    override def run()(implicit tc: TraceContext) =
+      epochStateVar.foreach(_.retryProvider.setAsClosing())
+  })
 
-  appLevelRetryProvider.runOnShutdown_(new RunOnShutdown {
+  appLevelRetryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name = s"shutdown per-epoch retry provider"
     override def done = false
-    override def run() = closeRetryProvider()
+    override def run()(implicit tc: TraceContext) = closeRetryProvider()
   })(TraceContext.empty)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
@@ -159,6 +165,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
          svTaskContext,
          retryProvider,
          leaderLoggerFactory,
+         packageVersionSupport,
        )
 
        epochStateVar = Some(

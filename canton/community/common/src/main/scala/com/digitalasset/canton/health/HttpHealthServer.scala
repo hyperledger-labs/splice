@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.health
@@ -46,11 +46,12 @@ class HttpHealthServer(
 object HttpHealthServer {
 
   /** Routes for powering the health server.
+    *
     * Provides:
-    *   GET /health => calls check and returns:
-    *     200 if healthy
-    *     503 if unhealthy
-    *     500 if the check fails
+    *   - GET /health => calls check and returns:
+    *     - 200 if healthy
+    *     - 503 if unhealthy
+    *     - 500 if the check fails
     */
   @VisibleForTesting
   private[health] def route(service: DependenciesHealthService): Route = {

@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.client.transports
@@ -8,18 +8,17 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.domain.api.v30
 import com.digitalasset.canton.health.HealthComponent.AlwaysHealthyComponent
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.SequencerClientMetrics
 import com.digitalasset.canton.networking.grpc.GrpcError
 import com.digitalasset.canton.networking.grpc.GrpcError.GrpcServiceUnavailable
+import com.digitalasset.canton.sequencer.api.v30
 import com.digitalasset.canton.sequencing.OrdinarySerializedEvent
 import com.digitalasset.canton.sequencing.client.{
   SequencerSubscriptionPekko,
   SubscriptionErrorRetryPolicyPekko,
 }
-import com.digitalasset.canton.sequencing.protocol.{SubscriptionRequest, SubscriptionResponse}
+import com.digitalasset.canton.sequencing.protocol.{SubscriptionRequestV2, SubscriptionResponse}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext, TraceContextGrpc}
@@ -37,7 +36,6 @@ class GrpcSequencerClientTransportPekko(
     channel: ManagedChannel,
     callOptions: CallOptions,
     clientAuth: GrpcSequencerClientAuth,
-    metrics: SequencerClientMetrics,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
     protocolVersion: ProtocolVersion,
@@ -51,7 +49,6 @@ class GrpcSequencerClientTransportPekko(
       channel,
       callOptions,
       clientAuth,
-      metrics,
       timeouts,
       loggerFactory,
       protocolVersion,
@@ -62,19 +59,19 @@ class GrpcSequencerClientTransportPekko(
 
   override type SubscriptionError = GrpcSequencerSubscriptionError
 
-  override def subscribe(subscriptionRequest: SubscriptionRequest)(implicit
+  override def subscribe(subscriptionRequest: SubscriptionRequestV2)(implicit
       traceContext: TraceContext
   ): SequencerSubscriptionPekko[SubscriptionError] = {
 
     val subscriptionRequestP = subscriptionRequest.toProtoV30
 
     def mkSubscription[Resp: HasProtoTraceContext](
-        subscriber: (v30.SubscriptionRequest, StreamObserver[Resp]) => Unit
+        subscriber: (v30.SubscriptionRequestV2, StreamObserver[Resp]) => Unit
     )(
         parseResponse: (Resp, TraceContext) => ParsingResult[SubscriptionResponse]
     ): SequencerSubscriptionPekko[SubscriptionError] = {
       val source = ClientAdapter
-        .serverStreaming[v30.SubscriptionRequest, Resp](
+        .serverStreaming[v30.SubscriptionRequestV2, Resp](
           subscriptionRequestP,
           stubWithFreshContext(subscriber),
         )
@@ -122,7 +119,7 @@ class GrpcSequencerClientTransportPekko(
       )
     }
 
-    val subscriber = sequencerServiceClient.subscribeVersioned _
+    val subscriber = sequencerServiceClient.service.subscribeV2 _
 
     mkSubscription(subscriber)(SubscriptionResponse.fromVersionedProtoV30(protocolVersion)(_)(_))
   }

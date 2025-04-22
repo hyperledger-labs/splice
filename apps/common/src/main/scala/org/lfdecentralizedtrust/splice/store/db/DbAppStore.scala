@@ -91,8 +91,8 @@ abstract class DbAppStore(
       handleIngestionSummary,
     )
 
-  override lazy val domains: InMemoryDomainStore =
-    new InMemoryDomainStore(
+  override lazy val domains: InMemorySynchronizerStore =
+    new InMemorySynchronizerStore(
       acsContractFilter.ingestionFilter.primaryParty,
       loggerFactory,
       retryProvider,

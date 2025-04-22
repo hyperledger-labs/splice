@@ -1,8 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{
   AnsFrontendTestUtil,
@@ -11,8 +9,7 @@ import org.lfdecentralizedtrust.splice.util.{
   SvTestUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -29,8 +26,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.svPreflightTopology(
       this.getClass.getSimpleName()
     )
@@ -295,13 +291,13 @@ abstract class RunbookSvPreflightIntegrationTestBase
       svValidatorClient.dumpParticipantIdentities().id
     }
     val activeSynchronizer = clue("Can get active domain from Scan") {
-      val svActiveDomain = DomainId.tryFromString(
+      val svActiveDomain = SynchronizerId.tryFromString(
         svScanClient
           .getAmuletConfigAsOf(env.environment.clock.now)
           .decentralizedSynchronizer
           .activeSynchronizer
       )
-      val sv1ActiveDomain = DomainId.tryFromString(
+      val sv1ActiveDomain = SynchronizerId.tryFromString(
         sv1ScanClient
           .getAmuletConfigAsOf(env.environment.clock.now)
           .decentralizedSynchronizer

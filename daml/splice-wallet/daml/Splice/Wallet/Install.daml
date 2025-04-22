@@ -3,6 +3,8 @@
 
 module Splice.Wallet.Install where
 
+import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
+
 import DA.Action (void)
 import DA.Exception
 import DA.Time
@@ -242,6 +244,7 @@ mkMergeAmuletAndRewardsTransfer endUserP inputs = do
         provider = endUserP
         inputs = inputs
         outputs = []
+        beneficiaries = None
   transfer
 
 -- Enum of the possible ways amulets can be manipulated through the wallet.
@@ -565,3 +568,7 @@ template WalletAppInstall
       do result <- exercise amuletRulesCid $ AmuletRules_DevNet_FeatureApp endUserParty
          return WalletAppInstall_FeaturedAppRights_SelfGrantResult with
            featuredAppRight = result.featuredAppRightCid
+
+unpackCid : AnyValue -> AnyContractId
+unpackCid (AV_ContractId cid) = cid
+unpackCid _ = error "Wrong type"

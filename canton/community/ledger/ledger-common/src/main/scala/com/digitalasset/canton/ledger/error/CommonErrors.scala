@@ -1,10 +1,17 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.error
 
-import com.daml.error.*
+import com.digitalasset.base.error.{
+  DamlErrorWithDefiniteAnswer,
+  ErrorCategory,
+  ErrorCode,
+  Explanation,
+  Resolution,
+}
 import com.digitalasset.canton.ledger.error.ParticipantErrorGroup.CommonErrorGroup
+import com.digitalasset.canton.logging.ErrorLoggingContext
 
 import scala.concurrent.duration.Duration
 
@@ -26,9 +33,28 @@ object CommonErrors extends CommonErrorGroup {
         ErrorCategory.InternalUnsupportedOperation,
       ) {
 
-    final case class Reject(message: String)(implicit errorLogger: ContextualizedErrorLogger)
+    final case class Reject(message: String)(implicit errorLogger: ErrorLoggingContext)
         extends DamlErrorWithDefiniteAnswer(
           cause = s"The request exercised an unsupported operation: $message"
+        )
+  }
+
+  @Explanation(
+    "Another request with the same id is already being processed."
+  )
+  @Resolution(
+    """Listen to the appropriate stream until a result for the in-flight request is published.
+      |Alternatively, resubmit the request.
+      |"""
+  )
+  object RequestAlreadyInFlight
+      extends ErrorCode(
+        id = "REQUEST_ALREADY_IN_FLIGHT",
+        ErrorCategory.ContentionOnSharedResources,
+      ) {
+    final case class Reject(requestId: String)(implicit errorLogger: ErrorLoggingContext)
+        extends DamlErrorWithDefiniteAnswer(
+          cause = s"The request $requestId is already in flight"
         )
   }
 
@@ -44,7 +70,7 @@ object CommonErrors extends CommonErrorGroup {
         ErrorCategory.DeadlineExceededRequestStateUnknown,
       ) {
     final case class Reject(message: String, override val definiteAnswer: Boolean)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = message,
           definiteAnswer = definiteAnswer,
@@ -61,7 +87,7 @@ object CommonErrors extends CommonErrorGroup {
         ErrorCategory.DeadlineExceededRequestStateUnknown,
       ) {
     final case class Reject(deadlineExceededBy: Duration, commandId: String, submissionId: String)(
-        implicit loggingContext: ContextualizedErrorLogger
+        implicit loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause =
             s"The gRPC deadline for request with commandId=$commandId and submissionId=$submissionId has expired by $deadlineExceededBy. The request will not be processed further.",
@@ -81,7 +107,7 @@ object CommonErrors extends CommonErrorGroup {
         ErrorCategory.TransientServerFailure,
       ) {
     final case class Reject(serviceName: String)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = s"$serviceName is not running.",
           extraContext = Map("service_name" -> serviceName),
@@ -96,7 +122,7 @@ object CommonErrors extends CommonErrorGroup {
         ErrorCategory.TransientServerFailure,
       ) {
     final case class Reject()(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = "Server is shutting down"
         )
@@ -111,7 +137,7 @@ object CommonErrors extends CommonErrorGroup {
       ) {
 
     final case class UnexpectedOrUnknownException(t: Throwable)(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = "Unexpected or unknown exception occurred.",
           throwableO = Some(t),
@@ -121,7 +147,7 @@ object CommonErrors extends CommonErrorGroup {
         message: String,
         override val throwableO: Option[Throwable] = None,
     )(implicit
-        loggingContext: ContextualizedErrorLogger
+        loggingContext: ErrorLoggingContext
     ) extends DamlErrorWithDefiniteAnswer(
           cause = message,
           extraContext = Map("throwableO" -> throwableO.toString),

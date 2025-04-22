@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -10,7 +10,7 @@ import com.digitalasset.canton.concurrent.{
   Threading,
 }
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -18,9 +18,9 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.AtomicReference
 
-/** Mixin that adds an executor that can be used by tests.
-  * The executor supports blocking operations, provided they are wrapped in [[scala.concurrent.blocking]]
-  * or [[scala.concurrent.Await]].
+/** Mixin that adds an executor that can be used by tests. The executor supports blocking
+  * operations, provided they are wrapped in [[scala.concurrent.blocking]] or
+  * [[scala.concurrent.Await]].
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var"))
 trait HasExecutorService extends BeforeAndAfterAll with HasExecutorServiceGeneric { this: Suite =>
@@ -116,6 +116,6 @@ trait HasExecutorServiceGeneric extends NamedLogging {
         None
       }
     }
-    Lifecycle.close(executorStateClose)(logger)
+    LifeCycle.close(executorStateClose)(logger)
   }
 }

@@ -1,9 +1,10 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.indexer
 
 import com.daml.ledger.resources.ResourceOwner
+import com.digitalasset.canton.ledger.participant.state.Update
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.InMemoryState
@@ -38,7 +39,6 @@ object JdbcIndexer {
       participantId: Ref.ParticipantId,
       participantDataSourceConfig: ParticipantDataSourceConfig,
       config: IndexerConfig,
-      excludedPackageIds: Set[Ref.PackageId],
       metrics: LedgerApiServerMetrics,
       inMemoryState: InMemoryState,
       apiUpdaterFlow: InMemoryStateUpdater.UpdaterFlow,
@@ -51,6 +51,7 @@ object JdbcIndexer {
       clock: Clock,
       reassignmentOffsetPersistence: ReassignmentOffsetPersistence,
       postProcessor: (Vector[PostPublishData], TraceContext) => Future[Unit],
+      sequentialPostProcessor: Update => Unit,
   )(implicit materializer: Materializer) {
 
     def initialized()(implicit traceContext: TraceContext): ResourceOwner[Indexer] = {
@@ -60,10 +61,8 @@ object JdbcIndexer {
       )
       val dataSourceStorageBackend = factory.createDataSourceStorageBackend
       val ingestionStorageBackend = factory.createIngestionStorageBackend
-      val meteringStoreBackend = factory.createMeteringStorageWriteBackend
       val parameterStorageBackend =
         factory.createParameterStorageBackend(inMemoryState.stringInterningView)
-      val meteringParameterStorageBackend = factory.createMeteringParameterStorageBackend
       val DBLockStorageBackend = factory.createDBLockStorageBackend
       val stringInterningStorageBackend = factory.createStringInterningStorageBackend
       val completionStorageBackend =
@@ -115,22 +114,16 @@ object JdbcIndexer {
           maxTailerBatchSize = config.maxTailerBatchSize,
           postProcessingParallelism = config.postProcessingParallelism,
           maxOutputBatchedBufferSize = config.maxOutputBatchedBufferSize,
-          excludedPackageIds = excludedPackageIds,
           metrics = metrics,
           inMemoryStateUpdaterFlow = apiUpdaterFlow,
           inMemoryState = inMemoryState,
           reassignmentOffsetPersistence = reassignmentOffsetPersistence,
           postProcessor = postProcessor,
+          sequentialPostProcessor = sequentialPostProcessor,
+          disableMonotonicityChecks = config.disableMonotonicityChecks,
           tracer = tracer,
           loggerFactory = loggerFactory,
         ),
-        meteringAggregator = new MeteringAggregator.Owner(
-          meteringStore = meteringStoreBackend,
-          meteringParameterStore = meteringParameterStorageBackend,
-          parameterStore = parameterStorageBackend,
-          metrics = metrics,
-          loggerFactory = loggerFactory,
-        ).apply,
         mat = materializer,
         executionContext = executionContext,
         initializeInMemoryState = inMemoryState.initializeTo,

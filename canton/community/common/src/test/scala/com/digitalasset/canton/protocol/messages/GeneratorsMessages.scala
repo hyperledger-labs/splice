@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.messages
 
-import com.digitalasset.canton.config.GeneratorsConfig
+import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.crypto.{
   AsymmetricEncrypted,
   Encrypted,
@@ -21,17 +21,19 @@ import com.digitalasset.canton.data.{
   ViewPosition,
   ViewType,
 }
-import com.digitalasset.canton.protocol.messages.TopologyTransactionsBroadcast.Broadcast
 import com.digitalasset.canton.protocol.{GeneratorsProtocol, RequestId, RootHash, ViewHash}
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.transaction.GeneratorsTransaction
-import com.digitalasset.canton.topology.{DomainId, GeneratorsTopology, ParticipantId}
+import com.digitalasset.canton.topology.transaction.{
+  GeneratorsTransaction,
+  SignedTopologyTransaction,
+  TopologyChangeOp,
+  TopologyMapping,
+}
+import com.digitalasset.canton.topology.{GeneratorsTopology, ParticipantId, SynchronizerId}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{Generators, LfPartyId}
 import magnolify.scalacheck.auto.*
 import org.scalacheck.{Arbitrary, Gen}
-
-import scala.concurrent.ExecutionContext
 
 final class GeneratorsMessages(
     protocolVersion: ProtocolVersion,
@@ -52,16 +54,9 @@ final class GeneratorsMessages(
   import generatorsVerdict.*
   import generatorTransactions.*
 
-  @SuppressWarnings(Array("com.digitalasset.canton.GlobalExecutionContext"))
-  /*
-   Execution context is needed for crypto operations. Since wiring a proper ec would be
-   too complex here, using the global one.
-   */
-  private implicit val ec: ExecutionContext = ExecutionContext.global
-
   implicit val acsCommitmentArb: Arbitrary[AcsCommitment] = Arbitrary(
     for {
-      domainId <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       sender <- Arbitrary.arbitrary[ParticipantId]
       counterParticipant <- Arbitrary.arbitrary[ParticipantId]
 
@@ -71,7 +66,7 @@ final class GeneratorsMessages(
 
       commitment <- byteStringArb.arbitrary
     } yield AcsCommitment.create(
-      domainId,
+      synchronizerId,
       sender,
       counterParticipant,
       period,
@@ -82,62 +77,65 @@ final class GeneratorsMessages(
 
   implicit val confirmationResultMessageArb: Arbitrary[ConfirmationResultMessage] = Arbitrary(
     for {
-      domainId <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       viewType <- Arbitrary.arbitrary[ViewType]
       requestId <- Arbitrary.arbitrary[RequestId]
       rootHash <- Arbitrary.arbitrary[RootHash]
       verdict <- verdictArb.arbitrary
-      informees <- Arbitrary.arbitrary[Set[LfPartyId]]
 
       // TODO(#14515) Also generate instance that makes pv above cover all the values
     } yield ConfirmationResultMessage.create(
-      domainId,
+      synchronizerId,
       viewType,
       requestId,
       rootHash,
       verdict,
-      informees,
       protocolVersion,
     )
   )
 
   implicit val confirmationResponseArb: Arbitrary[ConfirmationResponse] = Arbitrary(
     for {
-      requestId <- Arbitrary.arbitrary[RequestId]
-      sender <- Arbitrary.arbitrary[ParticipantId]
       localVerdict <- localVerdictArb.arbitrary
-
-      domainId <- Arbitrary.arbitrary[DomainId]
-
       confirmingParties <-
         if (localVerdict.isMalformed) Gen.const(Set.empty[LfPartyId])
         else nonEmptySet(implicitly[Arbitrary[LfPartyId]]).arbitrary.map(_.forgetNE)
-
-      rootHash <- Arbitrary.arbitrary[RootHash]
-
       viewPositionO <- localVerdict match {
         case _: LocalApprove | _: LocalReject =>
           Gen.some(Arbitrary.arbitrary[ViewPosition])
         case _ => Gen.option(Arbitrary.arbitrary[ViewPosition])
       }
-
     } yield ConfirmationResponse.tryCreate(
-      requestId,
-      sender,
       viewPositionO,
       localVerdict,
-      rootHash,
       confirmingParties,
-      domainId,
-      protocolVersion,
     )
+  )
+
+  implicit val confirmationResponsesArb: Arbitrary[ConfirmationResponses] = Arbitrary(
+    for {
+      requestId <- Arbitrary.arbitrary[RequestId]
+      rootHash <- Arbitrary.arbitrary[RootHash]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      sender <- Arbitrary.arbitrary[ParticipantId]
+      responses <- Gen.nonEmptyListOf(confirmationResponseArb.arbitrary)
+      responsesNE = NonEmptyUtil.fromUnsafe(responses)
+      confirmationResponses = ConfirmationResponses.tryCreate(
+        requestId,
+        rootHash,
+        synchronizerId,
+        sender,
+        responsesNE,
+        protocolVersion,
+      )
+    } yield confirmationResponses
   )
 
   // TODO(#14515) Check that the generator is exhaustive
   implicit val signedProtocolMessageContentArb: Arbitrary[SignedProtocolMessageContent] = Arbitrary(
     Gen.oneOf[SignedProtocolMessageContent](
       Arbitrary.arbitrary[AcsCommitment],
-      Arbitrary.arbitrary[ConfirmationResponse],
+      Arbitrary.arbitrary[ConfirmationResponses],
       Arbitrary.arbitrary[ConfirmationResultMessage],
     )
   )
@@ -198,14 +196,14 @@ final class GeneratorsMessages(
       sessionKey <- Generators.nonEmptyListGen[AsymmetricEncrypted[SecureRandomness]]
       viewType <- viewTypeArb.arbitrary
       encryptedView = EncryptedView(viewType)(Encrypted.fromByteString(encryptedViewBytestring))
-      domainId <- Arbitrary.arbitrary[DomainId]
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
       viewEncryptionScheme <- genArbitrary[SymmetricKeyScheme].arbitrary
     } yield EncryptedViewMessage.apply(
       submittingParticipantSignature = signatureO,
       viewHash = viewHash,
       sessionKeys = sessionKey,
       encryptedView = encryptedView,
-      domainId = domainId,
+      synchronizerId = synchronizerId,
       viewEncryptionScheme = viewEncryptionScheme,
       protocolVersion = protocolVersion,
     )
@@ -215,27 +213,30 @@ final class GeneratorsMessages(
     for {
       tree <- Arbitrary.arbitrary[AssignmentViewTree]
       submittingParticipantSignature <- Arbitrary.arbitrary[Signature]
-    } yield AssignmentMediatorMessage(tree, submittingParticipantSignature)
+    } yield AssignmentMediatorMessage(tree, submittingParticipantSignature)(
+      AssignmentMediatorMessage.protocolVersionRepresentativeFor(protocolVersion)
+    )
   )
 
   private val unassignmentMediatorMessageArb: Arbitrary[UnassignmentMediatorMessage] = Arbitrary(
     for {
       tree <- Arbitrary.arbitrary[UnassignmentViewTree]
       submittingParticipantSignature <- Arbitrary.arbitrary[Signature]
-    } yield UnassignmentMediatorMessage(tree, submittingParticipantSignature)
+      rpv = UnassignmentMediatorMessage.protocolVersionRepresentativeFor(protocolVersion)
+    } yield UnassignmentMediatorMessage(tree, submittingParticipantSignature)(rpv)
   )
 
   implicit val rootHashMessageArb: Arbitrary[RootHashMessage[RootHashMessagePayload]] =
     Arbitrary(
       for {
         rootHash <- Arbitrary.arbitrary[RootHash]
-        domainId <- Arbitrary.arbitrary[DomainId]
+        synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
         viewType <- viewTypeArb.arbitrary
         submissionTopologyTime <- Arbitrary.arbitrary[CantonTimestamp]
         payload <- Arbitrary.arbitrary[RootHashMessagePayload]
       } yield RootHashMessage.apply(
         rootHash,
-        domainId,
+        synchronizerId,
         protocolVersion,
         viewType,
         submissionTopologyTime,
@@ -243,24 +244,19 @@ final class GeneratorsMessages(
       )
     )
 
-  implicit val broadcast: Arbitrary[Broadcast] = Arbitrary(
-    for {
-      id <- GeneratorsConfig.string255Arb.arbitrary
-      transactions <- Gen.listOfN(10, signedTopologyTransactionArb.arbitrary)
-    } yield Broadcast(id, transactions)
-  )
-
   implicit val topologyTransactionsBroadcast: Arbitrary[TopologyTransactionsBroadcast] = Arbitrary(
     for {
-      domainId <- Arbitrary.arbitrary[DomainId]
-      broadcast <- broadcast.arbitrary
-    } yield TopologyTransactionsBroadcast.create(domainId, Seq(broadcast), protocolVersion)
+      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      transactions <- Gen.listOf(
+        Arbitrary.arbitrary[SignedTopologyTransaction[TopologyChangeOp, TopologyMapping]]
+      )
+    } yield TopologyTransactionsBroadcast(synchronizerId, transactions, protocolVersion)
   )
 
   // TODO(#14515) Check that the generator is exhaustive
   implicit val unsignedProtocolMessageArb: Arbitrary[UnsignedProtocolMessage] =
     Arbitrary(
-      Gen.oneOf(
+      Gen.oneOf[UnsignedProtocolMessage](
         rootHashMessageArb.arbitrary,
         informeeMessageArb.arbitrary,
         encryptedViewMessage.arbitrary,

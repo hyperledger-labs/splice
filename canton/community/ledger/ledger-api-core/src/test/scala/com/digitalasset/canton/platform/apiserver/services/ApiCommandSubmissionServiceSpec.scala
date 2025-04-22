@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services
@@ -12,8 +12,10 @@ import com.digitalasset.canton.ledger.api.messages.command.submission.SubmitRequ
 import com.digitalasset.canton.ledger.api.services.CommandSubmissionService
 import com.digitalasset.canton.ledger.api.validation.{
   CommandsValidator,
+  ValidateDisclosedContracts,
   ValidateUpgradingPackageResolutions,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
@@ -27,7 +29,6 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.{Duration, Instant}
-import scala.concurrent.Future
 
 class ApiCommandSubmissionServiceSpec
     extends AsyncWordSpec
@@ -55,7 +56,7 @@ class ApiCommandSubmissionServiceSpec
           .submit(aSubmitRequest)
           .map { _ =>
             val spanAttributes = testTelemetrySetup.reportedSpanAttributes
-            spanAttributes should contain(SpanAttribute.ApplicationId -> applicationId)
+            spanAttributes should contain(SpanAttribute.UserId -> userId)
             spanAttributes should contain(SpanAttribute.CommandId -> commandId)
             spanAttributes should contain(SpanAttribute.Submitter -> party)
             spanAttributes should contain(SpanAttribute.WorkflowId -> workflowId)
@@ -77,7 +78,7 @@ class ApiCommandSubmissionServiceSpec
         mockCommandSubmissionService
           .submit(any[SubmitRequest])(any[LoggingContextWithTrace])
       )
-        .thenReturn(Future.unit)
+        .thenReturn(FutureUnlessShutdown.unit)
 
       grpcCommandSubmissionService(mockCommandSubmissionService)
         .submit(requestWithSubmissionId)
@@ -97,7 +98,7 @@ class ApiCommandSubmissionServiceSpec
         mockCommandSubmissionService
           .submit(any[SubmitRequest])(any[LoggingContextWithTrace])
       )
-        .thenReturn(Future.unit)
+        .thenReturn(FutureUnlessShutdown.unit)
 
       grpcCommandSubmissionService(mockCommandSubmissionService)
         .submit(aSubmitRequest)
@@ -130,9 +131,10 @@ class ApiCommandSubmissionServiceSpec
     new ApiCommandSubmissionService(
       commandSubmissionService = commandSubmissionService,
       commandsValidator = new CommandsValidator(
-        validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty
+        validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty,
+        validateDisclosedContracts = ValidateDisclosedContracts.WithContractIdVerificationDisabled,
       ),
-      writeService = null,
+      submissionSyncService = null,
       currentLedgerTime = () => Instant.EPOCH,
       currentUtcTime = () => Instant.EPOCH,
       maxDeduplicationDuration = Duration.ZERO,
@@ -171,7 +173,7 @@ object ApiCommandSubmissionServiceSpec {
       mockCommandSubmissionService
         .submit(any[SubmitRequest])(any[LoggingContextWithTrace])
     )
-      .thenReturn(Future.unit)
+      .thenReturn(FutureUnlessShutdown.unit)
     mockCommandSubmissionService
   }
 }

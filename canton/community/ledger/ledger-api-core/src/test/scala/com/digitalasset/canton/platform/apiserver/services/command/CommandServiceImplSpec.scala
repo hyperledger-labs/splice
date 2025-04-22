@@ -1,12 +1,16 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.grpc.RpcProtoExtractors
 import com.daml.ledger.api.v2.command_service.{CommandServiceGrpc, SubmitAndWaitRequest}
-import com.daml.ledger.api.v2.command_submission_service.{SubmitRequest, SubmitResponse}
+import com.daml.ledger.api.v2.command_submission_service.{
+  SubmitReassignmentRequest,
+  SubmitReassignmentResponse,
+  SubmitRequest,
+  SubmitResponse,
+}
 import com.daml.ledger.api.v2.commands.{Command, Commands, CreateCommand}
 import com.daml.ledger.api.v2.completion.Completion
 import com.daml.ledger.api.v2.value.{Identifier, Record, RecordField, Value}
@@ -14,15 +18,13 @@ import com.daml.ledger.resources.{ResourceContext, ResourceOwner}
 import com.daml.tracing.DefaultOpenTelemetry
 import com.digitalasset.canton.ledger.api.validation.{
   CommandsValidator,
+  ValidateDisclosedContracts,
   ValidateUpgradingPackageResolutions,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, LoggingContextWithTrace}
 import com.digitalasset.canton.platform.apiserver.services.command.CommandServiceImplSpec.*
-import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.SubmissionKey
-import com.digitalasset.canton.platform.apiserver.services.tracking.{
-  CompletionResponse,
-  SubmissionTracker,
-}
+import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker
 import com.digitalasset.canton.platform.apiserver.services.{ApiCommandService, tracking}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -63,20 +65,23 @@ class CommandServiceImplSpec
       openChannel(
         new CommandServiceImpl(
           UnimplementedTransactionServices,
-          submissionTracker,
+          transactionSubmissionTracker,
+          reassignmentSubmissionTracker,
           submit,
+          submitReassignment,
           config.NonNegativeFiniteDuration.ofSeconds(1000L),
           loggerFactory,
         )
       ).use { stub =>
-        val request = SubmitAndWaitRequest.of(Some(commands))
+        val request =
+          SubmitAndWaitRequest.of(Some(commands))
         stub.submitAndWait(request).map { response =>
-          verify(submissionTracker).track(
+          verify(transactionSubmissionTracker).track(
             eqTo(expectedSubmissionKey),
             eqTo(config.NonNegativeFiniteDuration.ofSeconds(1000L)),
-            any[TraceContext => Future[Any]],
-          )(any[ContextualizedErrorLogger], any[TraceContext])
-          response.updateId should be("transaction ID")
+            any[TraceContext => FutureUnlessShutdown[Any]],
+          )(any[ErrorLoggingContext], any[TraceContext])
+          response.updateId should be("update ID")
           response.completionOffset shouldBe offset
         }
       }
@@ -94,8 +99,10 @@ class CommandServiceImplSpec
       openChannel(
         new CommandServiceImpl(
           UnimplementedTransactionServices,
-          submissionTracker,
+          transactionSubmissionTracker,
+          reassignmentSubmissionTracker,
           submit,
+          submitReassignment,
           config.NonNegativeFiniteDuration.ofSeconds(1L),
           loggerFactory,
         ),
@@ -106,12 +113,12 @@ class CommandServiceImplSpec
           .withDeadline(Deadline.after(3600L, TimeUnit.SECONDS, deadlineTicker))
           .submitAndWait(request)
           .map { response =>
-            verify(submissionTracker).track(
+            verify(transactionSubmissionTracker).track(
               eqTo(expectedSubmissionKey),
               eqTo(config.NonNegativeFiniteDuration.ofSeconds(3600L)),
-              any[TraceContext => Future[Any]],
-            )(any[ContextualizedErrorLogger], any[TraceContext])
-            response.updateId should be("transaction ID")
+              any[TraceContext => FutureUnlessShutdown[Any]],
+            )(any[ErrorLoggingContext], any[TraceContext])
+            response.updateId should be("update ID")
             succeed
           }
       }
@@ -122,8 +129,10 @@ class CommandServiceImplSpec
 
       val service = new CommandServiceImpl(
         UnimplementedTransactionServices,
-        submissionTracker,
+        transactionSubmissionTracker,
+        reassignmentSubmissionTracker,
         submit,
+        submitReassignment,
         config.NonNegativeFiniteDuration.ofSeconds(1L),
         loggerFactory,
       )
@@ -136,16 +145,17 @@ class CommandServiceImplSpec
         .call { () =>
           service
             .submitAndWait(
-              SubmitAndWaitRequest.of(Some(commands.copy(submissionId = submissionId)))
+              SubmitAndWaitRequest
+                .of(Some(commands.copy(submissionId = submissionId)))
             )(
               LoggingContextWithTrace.ForTesting
             )
             .transform { response =>
-              verify(submissionTracker, never).track(
-                any[SubmissionKey],
+              verify(transactionSubmissionTracker, never).track(
+                any[SubmissionTracker.SubmissionKey],
                 any[config.NonNegativeFiniteDuration],
-                any[TraceContext => Future[Any]],
-              )(any[ContextualizedErrorLogger], any[TraceContext])
+                any[TraceContext => FutureUnlessShutdown[Any]],
+              )(any[ErrorLoggingContext], any[TraceContext])
 
               response.failed.map(inside(_) { case RpcProtoExtractors.Exception(status) =>
                 status.getCode shouldBe Code.DEADLINE_EXCEEDED.getNumber
@@ -160,29 +170,24 @@ class CommandServiceImplSpec
       import testContext.*
 
       when(
-        submissionTracker.track(
+        transactionSubmissionTracker.track(
           eqTo(expectedSubmissionKey),
           any[config.NonNegativeFiniteDuration],
-          any[TraceContext => Future[Any]],
+          any[TraceContext => FutureUnlessShutdown[Any]],
         )(
-          any[ContextualizedErrorLogger],
+          any[ErrorLoggingContext],
           any[TraceContext],
         )
       ).thenReturn(
-        Future.fromTry(
-          CompletionResponse.timeout("some-cmd-id", "some-submission-id")(
-            ErrorLoggingContext(
-              loggerFactory.getTracedLogger(this.getClass),
-              LoggingContextWithTrace.ForTesting,
-            )
-          )
-        )
+        Future.failed(SubmissionTracker.Errors.timedOut(expectedSubmissionKey))
       )
 
       val service = new CommandServiceImpl(
         UnimplementedTransactionServices,
-        submissionTracker,
+        transactionSubmissionTracker,
+        reassignmentSubmissionTracker,
         submit,
+        submitReassignment,
         config.NonNegativeFiniteDuration.ofSeconds(1337L),
         loggerFactory,
       )
@@ -204,16 +209,20 @@ class CommandServiceImplSpec
 
       val service = new CommandServiceImpl(
         UnimplementedTransactionServices,
-        submissionTracker,
+        transactionSubmissionTracker,
+        reassignmentSubmissionTracker,
         submit,
+        submitReassignment,
         config.NonNegativeFiniteDuration.ofSeconds(1337L),
         loggerFactory,
       )
 
-      verifyZeroInteractions(submissionTracker)
+      verifyZeroInteractions(transactionSubmissionTracker)
+      verifyZeroInteractions(reassignmentSubmissionTracker)
 
       service.close()
-      verify(submissionTracker).close()
+      verify(transactionSubmissionTracker).close()
+      verify(reassignmentSubmissionTracker).close()
       succeed
     }
   }
@@ -223,15 +232,18 @@ class CommandServiceImplSpec
       completion = completion
     )
     val commands = someCommands()
-    val submissionTracker = mock[SubmissionTracker]
-    val submit = mock[Traced[SubmitRequest] => Future[SubmitResponse]]
+    val transactionSubmissionTracker = mock[SubmissionTracker]
+    val reassignmentSubmissionTracker = mock[SubmissionTracker]
+    val submit = mock[Traced[SubmitRequest] => FutureUnlessShutdown[SubmitResponse]]
+    val submitReassignment =
+      mock[Traced[SubmitReassignmentRequest] => FutureUnlessShutdown[SubmitReassignmentResponse]]
     when(
-      submissionTracker.track(
+      transactionSubmissionTracker.track(
         eqTo(expectedSubmissionKey),
         any[config.NonNegativeFiniteDuration],
-        any[TraceContext => Future[Any]],
+        any[TraceContext => FutureUnlessShutdown[Any]],
       )(
-        any[ContextualizedErrorLogger],
+        any[ErrorLoggingContext],
         any[TraceContext],
       )
     ).thenReturn(Future.successful(trackerCompletionResponse))
@@ -245,7 +257,8 @@ class CommandServiceImplSpec
       deadlineTicker: Deadline.Ticker = Deadline.getSystemTicker,
   ): ResourceOwner[CommandServiceGrpc.CommandServiceStub] = {
     val commandsValidator = new CommandsValidator(
-      validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty
+      validateUpgradingPackageResolutions = ValidateUpgradingPackageResolutions.Empty,
+      validateDisclosedContracts = ValidateDisclosedContracts.WithContractIdVerificationDisabled,
     )
     val apiService = new ApiCommandService(
       service = service,
@@ -275,16 +288,16 @@ class CommandServiceImplSpec
 }
 
 object CommandServiceImplSpec {
-  private val UnimplementedTransactionServices = new CommandServiceImpl.TransactionServices(
+  private val UnimplementedTransactionServices = new CommandServiceImpl.UpdateServices(
     getTransactionTreeById = _ =>
       Future.failed(new RuntimeException("This should never be called.")),
-    getTransactionById = _ => Future.failed(new RuntimeException("This should never be called.")),
+    getUpdateById = _ => Future.failed(new RuntimeException("This should never be called.")),
   )
 
   private val OkStatus = StatusProto.of(Status.Code.OK.value, "", Seq.empty)
 
   val commandId = "command ID"
-  val applicationId = "application ID"
+  val userId = "userID"
   val submissionId = Ref.SubmissionId.assertFromString("submissionId")
   val maxDeduplicationDuration = java.time.Duration.ofDays(1)
   val party = "Alice"
@@ -305,23 +318,23 @@ object CommandServiceImplSpec {
 
   val offset: Long = 12345678L
 
-  val completion = Completion(
+  val completion = Completion.defaultInstance.copy(
     commandId = "command ID",
     status = Some(OkStatus),
-    updateId = "transaction ID",
+    updateId = "update ID",
     offset = offset,
   )
 
-  val expectedSubmissionKey = SubmissionKey(
+  val expectedSubmissionKey = SubmissionTracker.SubmissionKey(
     commandId = commandId,
     submissionId = submissionId,
-    applicationId = applicationId,
+    userId = userId,
     parties = Set(party),
   )
 
-  private def someCommands() = Commands(
+  private def someCommands() = Commands.defaultInstance.copy(
     commandId = commandId,
-    applicationId = applicationId,
+    userId = userId,
     actAs = Seq(party),
     commands = Seq(command),
   )

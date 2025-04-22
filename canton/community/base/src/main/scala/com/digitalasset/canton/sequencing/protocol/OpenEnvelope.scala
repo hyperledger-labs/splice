@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -11,7 +11,8 @@ import com.digitalasset.canton.version.ProtocolVersion
 
 /** An [[OpenEnvelope]] contains a not serialized protocol message
   *
-  * @tparam M The type of the protocol message
+  * @tparam M
+  *   The type of the protocol message
   */
 final case class OpenEnvelope[+M <: ProtocolMessage](
     protocolMessage: M,

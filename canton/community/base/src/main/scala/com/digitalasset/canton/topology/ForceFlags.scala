@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.topology
@@ -9,17 +9,22 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.admin.v30
 
 import scala.annotation.nowarn
+import scala.language.implicitConversions
 
 /** A force flag is used to override specific safety checks in the topology manager.
   */
-sealed abstract class ForceFlag(val toProtoV30: v30.ForceFlag)
+sealed abstract class ForceFlag(val toProtoV30: v30.ForceFlag) {
+  def and(forceFlag: ForceFlag): ForceFlags = ForceFlags(forceFlag)
+}
 
 object ForceFlag {
 
+  implicit def forceFlagIsForceFlags(forceFlag: ForceFlag): ForceFlags = ForceFlags(forceFlag)
+
   case object AlienMember extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALIEN_MEMBER)
 
-  /** Deprecated. Increasing LedgerTimeRecordTimeTolerance does not require a force flag from PV >= 32
-    * Instead increasing SubmissionTimeRecordTimeTolerance does
+  /** Deprecated. Increasing LedgerTimeRecordTimeTolerance does not require a force flag from PV >=
+    * 32 Instead increasing SubmissionTimeRecordTimeTolerance does
     */
   @deprecated(
     message =
@@ -45,15 +50,23 @@ object ForceFlag {
   case object DisablePartyWithActiveContracts
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_DISABLE_PARTY_WITH_ACTIVE_CONTRACTS)
 
+  case object AllowInsufficientParticipantPermissionForSignatoryParty
+      extends ForceFlag(
+        v30.ForceFlag.FORCE_FLAG_ALLOW_INSUFFICIENT_PARTICIPANT_PERMISSION_FOR_SIGNATORY_PARTY
+      )
+
+  case object AllowInsufficientSignatoryAssigningParticipantsForParty
+      extends ForceFlag(
+        v30.ForceFlag.FORCE_FLAG_ALLOW_INSUFFICIENT_SIGNATORY_ASSIGNING_PARTICIPANTS_FOR_PARTY
+      )
+
   case object AllowUnvalidatedSigningKeys
       extends ForceFlag(v30.ForceFlag.FORCE_FLAG_ALLOW_UNVALIDATED_SIGNING_KEYS)
 
   /** This should only be used internally in situations where
-    * <ul>
-    *   <li>the caller knows what they are doing</li>
-    *  <li>it's not necessarily clear which specific flags to use, but there also isn't really any
-    *   other choice, eg. when importing a topology snapshot.</li>
-    * </ul>
+    *   - the caller knows what they are doing
+    *   - it's not necessarily clear which specific flags to use, but there also isn't really any
+    *     other choice, eg. when importing a topology snapshot.
     */
   @nowarn("cat=deprecation")
   // We need to keep LedgerTimeRecordTimeToleranceIncrease around to not break backwards compatibility
@@ -69,6 +82,8 @@ object ForceFlag {
       AllowUnvalidatedSigningKeys,
       AllowUnvetPackageWithActiveContracts,
       SubmissionTimeRecordTimeToleranceIncrease,
+      AllowInsufficientParticipantPermissionForSignatoryParty,
+      AllowInsufficientSignatoryAssigningParticipantsForParty,
     )
       .map(ff => ff.toProtoV30 -> ff)
       .toMap

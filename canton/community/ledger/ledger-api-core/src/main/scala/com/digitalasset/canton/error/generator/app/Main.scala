@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.error.generator.app
 
-import com.daml.error.Grouping
+import com.digitalasset.base.error.Grouping
 import com.digitalasset.canton.error.generator.ErrorCodeDocumentationGenerator.DeprecatedItem
 import com.digitalasset.canton.error.generator.{
   ErrorCodeDocItem,
@@ -15,7 +15,8 @@ import io.circe.syntax.*
 
 import java.nio.file.{Files, Paths, StandardOpenOption}
 
-/** Outputs information about self-service error codes needed for generating documentation to a json file.
+/** Outputs information about self-service error codes needed for generating documentation to a json
+  * file.
   */
 object Main {
 

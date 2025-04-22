@@ -1,0 +1,90 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Types and interfaces for retrieving metadata about tokens.
+module Splice.Api.Token.MetadataV1 where
+
+import DA.TextMap as TextMap
+import DA.Time (RelTime)
+
+-- | A generic representation of serializable Daml values.
+--
+-- Used to pass arbitrary data across interface boundaries. For example to pass
+-- data from an an app backend to an interface choice implementation.
+data AnyValue =
+    AV_Text Text
+  | AV_Int Int
+  | AV_Decimal Decimal
+  | AV_Bool Bool
+  | AV_Date Date
+  | AV_Time Time
+  | AV_RelTime RelTime
+  | AV_Party Party
+  | AV_ContractId AnyContractId
+  | AV_List [AnyValue]
+  | AV_Map (TextMap.TextMap AnyValue)
+  deriving (Show, Eq)
+
+-- | Interface used to represent arbitrary contracts.
+-- Note that this is not expected to be implemented by any template,
+-- so it should only be used in the form `ContractId AnyContract` and through `coerceContractId`
+-- but not through any of the interface functions like `fetchFromInterface` that check whether the template actually implements the interface.
+interface AnyContract where viewtype AnyContractView
+
+-- | Not used. See the `AnyContract` interface for more information.
+data AnyContractView = AnyContractView {}
+
+-- | A reference to some contract id. Use `coerceContractId` to convert from and to this type.
+type AnyContractId = ContractId AnyContract
+
+-- | A type for passing extra data from an app's backends to the choices of that app
+-- exercised in commands submitted by app users.
+data ChoiceContext = ChoiceContext with
+    values : TextMap AnyValue
+      -- ^ The values passed in by the app backend to the choice.
+      -- The keys are considered internal to the app and should not be read by
+      -- third-party code.
+  deriving (Show, Eq)
+
+-- | Empty choice context.
+emptyChoiceContext : ChoiceContext
+emptyChoiceContext = ChoiceContext TextMap.empty
+
+-- | Machine-readable metadata intended for communicating additional information
+-- using well-known keys between systems. This is mainly used to allow for the post-hoc
+-- expansion of the information associated with contracts and choice arguments and results.
+--
+-- Modeled after by k8s support for annotations: <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>.
+--
+-- Implementors SHOULD follow the same conventions for allocating keys as used by k8s; i.e.,
+-- they SHOULD be prefixed using the DNS name of the app defining the key.
+--
+-- Implementors SHOULD keep metadata small, as on-ledger data is costly.
+data Metadata = Metadata with
+    values : TextMap Text
+      -- ^ Key-value pairs of metadata entries.
+  deriving (Eq,Ord, Show)
+
+-- | Empty metadata.
+emptyMetadata : Metadata
+emptyMetadata = Metadata with values = mempty
+
+-- | A common type for passing both the choice context and the metadata to a choice.
+data ExtraArgs = ExtraArgs with
+    context : ChoiceContext
+      -- ^ Extra arguments to be passed to the implementation of an interface choice.
+      -- These are provided via an off-ledger API by the app implementing the interface.
+    meta : Metadata
+      -- ^ Additional metadata to pass in.
+      --
+      -- In contrast to the `extraArgs`, these are provided by the caller of the choice.
+      -- The expectation is that the meaning of metadata fields will be agreed on
+      -- in later standards, or on a case-by-case basis between the caller and the
+      -- implementer of the interface.
+  deriving (Show, Eq)
+
+-- | A generic result for choices that do not need to return specific data.
+data ChoiceExecutionMetadata = ChoiceExecutionMetadata with
+    meta : Metadata
+      -- ^ Additional metadata specific to the result of exercising the choice, used for extensibility.
+  deriving (Show, Eq)

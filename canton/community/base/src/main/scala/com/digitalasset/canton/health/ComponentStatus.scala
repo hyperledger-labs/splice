@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.health
@@ -12,7 +12,8 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
 
-/** Simple representation of the health state of a component, easily (de)serializable (from)to protobuf or JSON
+/** Simple representation of the health state of a component, easily (de)serializable (from)to
+  * protobuf or JSON
   */
 final case class ComponentStatus(name: String, state: ComponentHealthState) extends PrettyPrinting {
   def toProtoV30: proto.ComponentStatus =

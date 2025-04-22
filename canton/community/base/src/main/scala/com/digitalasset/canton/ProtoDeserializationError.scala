@@ -1,12 +1,12 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
 
-import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
+import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.config.RequireTypes.InvariantViolation as PureInvariantViolation
 import com.digitalasset.canton.error.CantonErrorGroups.ProtoDeserializationErrorGroup
-import com.digitalasset.canton.error.{BaseCantonError, CantonError}
+import com.digitalasset.canton.error.{CantonBaseError, CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.version.ProtoVersion
@@ -80,8 +80,8 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
 
   /** Common Deserialization error code
     *
-    * USE THIS ERROR CODE ONLY WITHIN A GRPC SERVICE, PARSING THE INITIAL REQUEST.
-    * Don't used it for something like transaction processing or reading from the database.
+    * USE THIS ERROR CODE ONLY WITHIN A GRPC SERVICE, PARSING THE INITIAL REQUEST. Don't used it for
+    * something like transaction processing or reading from the database.
     */
   @Explanation(
     """This error indicates that an incoming administrative command could not be processed due to a malformed message."""
@@ -98,15 +98,15 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
     ) extends CantonError.Impl(
           cause = "Deserialization of protobuf message failed"
         )
-        with CantonError
+        with ContextualizedCantonError
 
     final case class WrapNoLogging(reason: ProtoDeserializationError)
-        extends BaseCantonError.Impl(
+        extends CantonBaseError.Impl(
           cause = "Deserialization of protobuf message failed"
         )
 
     final case class WrapNoLoggingStr(reason: String)
-        extends BaseCantonError.Impl(
+        extends CantonBaseError.Impl(
           cause = "Deserialization of protobuf message failed"
         )
   }

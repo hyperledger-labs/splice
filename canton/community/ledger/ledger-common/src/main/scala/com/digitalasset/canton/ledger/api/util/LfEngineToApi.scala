@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.util
@@ -19,10 +19,12 @@ import java.time.Instant
   * All conversion functions are pure and total.
   *
   * Most conversion functions have a verbose flag:
-  * - If verbose mode is disabled, then all resulting Api values have missing type identifiers and record field names.
-  * - If verbose mode is enabled, then type identifiers and record field names are copied from the input Daml-LF values.
-  *   The caller is responsible for filling in missing type information using [[com.digitalasset.daml.lf.engine.ValueEnricher]],
-  *   which may involve loading Daml-LF packages.
+  *   - If verbose mode is disabled, then all resulting Api values have missing type identifiers and
+  *     record field names.
+  *   - If verbose mode is enabled, then type identifiers and record field names are copied from the
+  *     input Daml-LF values. The caller is responsible for filling in missing type information
+  *     using [[com.digitalasset.daml.lf.engine.ValueEnricher]], which may involve loading Daml-LF
+  *     packages.
   */
 object LfEngineToApi {
 

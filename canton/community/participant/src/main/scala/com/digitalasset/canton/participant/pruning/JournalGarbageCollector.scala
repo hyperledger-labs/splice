@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.pruning
@@ -8,12 +8,12 @@ import cats.syntax.foldable.*
 import com.daml.nameof.NameOf.functionFullName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestampSecond
-import com.digitalasset.canton.ledger.participant.state.DomainIndex
+import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, HasCloseContext}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureUtil
 import com.digitalasset.canton.util.Thereafter.syntax.*
@@ -23,19 +23,20 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 
 /** Canton synchronisation journals garbage collectors
   *
-  * The difference between the normal ledger pruning feature and the journal garbage collector is that
-  * the ledger pruning is configured and invoked by the user, whereas the journal garbage collector runs
-  * periodically in the background, where the retention period is generally not configurable.
+  * The difference between the normal ledger pruning feature and the journal garbage collector is
+  * that the ledger pruning is configured and invoked by the user, whereas the journal garbage
+  * collector runs periodically in the background, where the retention period is generally not
+  * configurable.
   */
 private[participant] class JournalGarbageCollector(
     requestJournalStore: RequestJournalStore,
-    domainIndexF: TraceContext => Future[DomainIndex],
+    synchronizerIndexF: TraceContext => FutureUnlessShutdown[Option[SynchronizerIndex]],
     sortedReconciliationIntervalsProvider: SortedReconciliationIntervalsProvider,
     acsCommitmentStore: AcsCommitmentStore,
     acs: ActiveContractStore,
     submissionTrackerStore: SubmissionTrackerStore,
     inFlightSubmissionStore: Eval[InFlightSubmissionStore],
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     journalGarbageCollectionDelay: NonNegativeFiniteDuration,
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
@@ -49,15 +50,15 @@ private[participant] class JournalGarbageCollector(
   override protected def run()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
     performUnlessClosingUSF(functionFullName) {
       for {
-        domainIndex <- FutureUnlessShutdown.outcomeF(domainIndexF(implicitly))
+        synchronizerIndex <- synchronizerIndexF(implicitly)
         safeToPruneTsO <-
           PruningProcessor.latestSafeToPruneTick(
             requestJournalStore,
-            domainIndex,
+            synchronizerIndex,
             sortedReconciliationIntervalsProvider,
             acsCommitmentStore,
             inFlightSubmissionStore.value,
-            domainId,
+            synchronizerId,
             checkForOutstandingCommitments = false,
           )
         _ <- safeToPruneTsO.fold(FutureUnlessShutdown.unit) { ts =>
@@ -95,9 +96,14 @@ private[pruning] object JournalGarbageCollector {
 
     /** Manage internal state of the collector
       *
-      * @param request if true, then the acs commitment processor completed a commitment period and suggested to kick off pruning
-      * @param locks number of locks that are currently active preventing pruning
-      * @param running if set, then a prune is currently running and the promise will be completed once it is done
+      * @param request
+      *   if true, then the acs commitment processor completed a commitment period and suggested to
+      *   kick off pruning
+      * @param locks
+      *   number of locks that are currently active preventing pruning
+      * @param running
+      *   if set, then a prune is currently running and the promise will be completed once it is
+      *   done
       */
     private case class State(requested: Boolean, locks: Int, running: Option[Promise[Unit]]) {
       def incrementLock: State = copy(locks = locks + 1)
@@ -120,8 +126,8 @@ private[pruning] object JournalGarbageCollector {
 
     /** Temporarily turn off journal pruning (in order to download an ACS)
       *
-      * This will add one lock. The lock will be removed when [[removeOneLock]] is called.
-      * Journal cleaning will resume once all locks are removed
+      * This will add one lock. The lock will be removed when [[removeOneLock]] is called. Journal
+      * cleaning will resume once all locks are removed
       */
     def addOneLock()(implicit traceContext: TraceContext): Future[Unit] = {
       val old = state.getAndUpdate(_.incrementLock)
@@ -160,6 +166,7 @@ private[pruning] object JournalGarbageCollector {
             runningF,
             "Periodic background journal pruning failed",
             logPassiveInstanceAtInfo = true,
+            closeContext = Some(closeContext),
           )
         }
       }

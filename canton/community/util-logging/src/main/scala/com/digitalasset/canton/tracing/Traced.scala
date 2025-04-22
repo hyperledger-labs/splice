@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.tracing
@@ -9,8 +9,8 @@ trait HasTraceContext {
   def traceContext: TraceContext
 }
 
-/** Wrapper for items that have a related trace context.
-  * Intended for where the TraceContext cannot be passed explicitly (e.g. function types or pekko-streams).
+/** Wrapper for items that have a related trace context. Intended for where the TraceContext cannot
+  * be passed explicitly (e.g. function types or pekko-streams).
   */
 final case class Traced[+A](value: A)(implicit override val traceContext: TraceContext)
     extends HasTraceContext {

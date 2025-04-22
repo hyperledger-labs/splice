@@ -1,24 +1,29 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.config
 
 import cats.syntax.option.*
 import com.digitalasset.canton.admin.time.v30
+import com.digitalasset.canton.config.semiauto.CantonConfigValidatorDerivation
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 
-/** @param initialRetryDelay The initial retry delay if the request to send a sequenced event fails
-  * @param maxRetryDelay The max retry delay if the request to send a sequenced event fails
-  * @param maxSequencingDelay If our request for a sequenced event was successful, how long should we wait
-  *                                      to observe it from the sequencer before starting a new request.
+/** @param initialRetryDelay
+  *   The initial retry delay if the request to send a sequenced event fails
+  * @param maxRetryDelay
+  *   The max retry delay if the request to send a sequenced event fails
+  * @param maxSequencingDelay
+  *   If our request for a sequenced event was successful, how long should we wait to observe it
+  *   from the sequencer before starting a new request.
   */
 final case class TimeProofRequestConfig(
     initialRetryDelay: NonNegativeFiniteDuration = TimeProofRequestConfig.defaultInitialRetryDelay,
     maxRetryDelay: NonNegativeFiniteDuration = TimeProofRequestConfig.defaultMaxRetryDelay,
     maxSequencingDelay: NonNegativeFiniteDuration = TimeProofRequestConfig.defaultMaxSequencingDelay,
-) extends PrettyPrinting {
+) extends PrettyPrinting
+    with UniformCantonConfigValidation {
   private[config] def toProtoV30: v30.TimeProofRequestConfig = v30.TimeProofRequestConfig(
     initialRetryDelay.toProtoPrimitive.some,
     maxRetryDelay.toProtoPrimitive.some,
@@ -45,6 +50,10 @@ final case class TimeProofRequestConfig(
 }
 
 object TimeProofRequestConfig {
+
+  implicit val timeProofRequestConfigCantonConfigValidator
+      : CantonConfigValidator[TimeProofRequestConfig] =
+    CantonConfigValidatorDerivation[TimeProofRequestConfig]
 
   private val defaultInitialRetryDelay: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMillis(200)

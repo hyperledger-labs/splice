@@ -1,11 +1,13 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.validation
 
-import com.daml.error.{ContextualizedErrorLogger, NoLogging}
+import com.daml.ledger.api.v2.command_service.SubmitAndWaitForTransactionRequest
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod as DeduplicationPeriodProto
-import com.daml.ledger.api.v2.commands.{Command, Commands, CreateCommand}
+import com.daml.ledger.api.v2.commands.{Command, Commands, CreateCommand, PrefetchContractKey}
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_ACS_DELTA
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, Filters, TransactionFormat}
 import com.daml.ledger.api.v2.value.Value.Sum
 import com.daml.ledger.api.v2.value.{
   List as ApiList,
@@ -14,18 +16,17 @@ import com.daml.ledger.api.v2.value.{
   *,
 }
 import com.digitalasset.canton.data.{DeduplicationPeriod, Offset}
-import com.digitalasset.canton.ledger.api.DomainMocks
-import com.digitalasset.canton.ledger.api.DomainMocks.{
-  applicationId,
-  commandId,
-  submissionId,
-  workflowId,
-}
-import com.digitalasset.canton.ledger.api.domain.{Commands as ApiCommands, DisclosedContract}
+import com.digitalasset.canton.ledger.api.ApiMocks.{commandId, submissionId, userId, workflowId}
 import com.digitalasset.canton.ledger.api.util.{DurationConversion, TimestampConversion}
+import com.digitalasset.canton.ledger.api.{ApiMocks, Commands as ApiCommands, DisclosedContract}
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
-import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.daml.lf.command.{ApiCommand as LfCommand, ApiCommands as LfCommands}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NoLogging}
+import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.daml.lf.command.{
+  ApiCommand as LfCommand,
+  ApiCommands as LfCommands,
+  ApiContractKey,
+}
 import com.digitalasset.daml.lf.data.*
 import com.digitalasset.daml.lf.data.Ref.TypeConRef
 import com.digitalasset.daml.lf.language.LanguageVersion
@@ -49,7 +50,7 @@ class SubmitRequestValidatorTest
     with TableDrivenPropertyChecks
     with MockitoSugar
     with ArgumentMatchersSugar {
-  private implicit val contextualizedErrorLogger: ContextualizedErrorLogger = NoLogging
+  private implicit val errorLoggingContext: ErrorLoggingContext = NoLogging
 
   private object api {
     private val packageId = "package"
@@ -61,7 +62,7 @@ class SubmitRequestValidatorTest
     val constructor = "constructor"
     val submitter = "party"
     val deduplicationDuration = new Duration().withSeconds(10)
-    val domainId = "x::domainId"
+    val synchronizerId = "x::synchronizerId"
 
     private def commandDef(createPackageId: String, moduleName: String = moduleName) =
       Command.of(
@@ -79,20 +80,27 @@ class SubmitRequestValidatorTest
       )
 
     val command = commandDef(packageId)
-    val commandWithPackageNameScoping = commandDef(Ref.PackageRef.Name(packageName).toString)
+    val packageNameEncoded = Ref.PackageRef.Name(packageName).toString
+    val commandWithPackageNameScoping = commandDef(packageNameEncoded)
+    val prefetchKey = PrefetchContractKey(Some(identifier), Some(ApiMocks.values.validApiParty))
+    val prefetchKeyWithPackageNameScoping =
+      prefetchKey.copy(templateId = Some(Identifier(packageNameEncoded, moduleName, entityName)))
 
     val commands = Commands(
       workflowId = workflowId.unwrap,
-      applicationId = applicationId,
+      userId = userId,
       submissionId = submissionId.unwrap,
       commandId = commandId.unwrap,
+      readAs = Nil,
       actAs = Seq(submitter),
       commands = Seq(command),
       deduplicationPeriod = DeduplicationPeriodProto.DeduplicationDuration(deduplicationDuration),
       minLedgerTimeAbs = None,
       minLedgerTimeRel = None,
       packageIdSelectionPreference = Seq.empty,
-      domainId = domainId,
+      synchronizerId = synchronizerId,
+      prefetchContractKeys = Seq.empty,
+      disclosedContracts = Nil,
     )
   }
 
@@ -107,11 +115,19 @@ class SubmitRequestValidatorTest
     )
 
     val templateId: Ref.Identifier = Ref.Identifier(
-      Ref.PackageId.assertFromString("package"),
+      Ref.PackageId.assertFromString(api.identifier.packageId),
       Ref.QualifiedName(
         Ref.ModuleName.assertFromString("module"),
         Ref.DottedName.assertFromString("entity"),
       ),
+    )
+    val templateRef: TypeConRef = TypeConRef(
+      Ref.PackageRef.Id(templateId.packageId),
+      templateId.qualifiedName,
+    )
+    val templateRefByName: TypeConRef = TypeConRef(
+      Ref.PackageRef.Name(packageName),
+      templateId.qualifiedName,
     )
 
     val disclosedContracts: ImmArray[DisclosedContract] = ImmArray(
@@ -120,7 +136,6 @@ class SubmitRequestValidatorTest
           create = LfNode.Create(
             coid = Lf.ContractId.V1.assertFromString("00" + "00" * 32),
             packageName = Ref.PackageName.assertFromString("package"),
-            packageVersion = Some(Ref.PackageVersion.assertFromString("1.0.0")),
             templateId = templateId,
             arg = ValueRecord(
               Some(templateId),
@@ -134,7 +149,7 @@ class SubmitRequestValidatorTest
           createTime = Time.Timestamp.now(),
           cantonData = Bytes.Empty,
         ),
-        domainIdO = Some(DomainId.tryFromString(api.domainId)),
+        synchronizerIdO = Some(SynchronizerId.tryFromString(api.synchronizerId)),
       )
     )
 
@@ -143,12 +158,13 @@ class SubmitRequestValidatorTest
         packageRef: Ref.PackageRef,
         packagePreferenceSet: Set[Ref.PackageId] = Set.empty,
         packageMap: Map[Ref.PackageId, (Ref.PackageName, Ref.PackageVersion)] = Map.empty,
+        prefetchKeys: Seq[ApiContractKey] = Seq.empty,
     ) = ApiCommands(
       workflowId = Some(workflowId),
-      applicationId = applicationId,
+      userId = userId,
       commandId = commandId,
       submissionId = Some(submissionId),
-      actAs = Set(DomainMocks.party),
+      actAs = Set(ApiMocks.party),
       readAs = Set.empty,
       submittedAt = Time.Timestamp.assertFromInstant(submittedAt),
       deduplicationPeriod = DeduplicationPeriod.DeduplicationDuration(deduplicationDuration),
@@ -169,8 +185,9 @@ class SubmitRequestValidatorTest
       ),
       disclosedContracts,
       packagePreferenceSet = packagePreferenceSet,
-      domainId = Some(DomainId.tryFromString(api.domainId)),
+      synchronizerId = Some(SynchronizerId.tryFromString(api.synchronizerId)),
       packageMap = packageMap,
+      prefetchKeys = prefetchKeys,
     )
   }
 
@@ -186,7 +203,7 @@ class SubmitRequestValidatorTest
   private val testedCommandValidator = {
     val validateDisclosedContractsMock = mock[ValidateDisclosedContracts]
 
-    when(validateDisclosedContractsMock(any[Commands])(any[ContextualizedErrorLogger]))
+    when(validateDisclosedContractsMock(any[Commands])(any[ErrorLoggingContext]))
       .thenReturn(Right(internal.disclosedContracts))
 
     new CommandsValidator(
@@ -195,9 +212,74 @@ class SubmitRequestValidatorTest
     )
   }
 
+  private val testedSubmitAndWaitRequestValidator = new SubmitAndWaitRequestValidator(
+    testedCommandValidator
+  )
+
   private val testedValueValidator = ValueValidator
 
   "CommandSubmissionRequestValidator" when {
+    "validating SubmitAndWaitRequestValidator" should {
+      "validate a request with transaction format" in {
+        testedSubmitAndWaitRequestValidator.validate(
+          req = SubmitAndWaitForTransactionRequest(
+            commands = Some(api.commands),
+            transactionFormat = Some(
+              TransactionFormat(
+                eventFormat = Some(EventFormat(Map.empty, Some(Filters(Nil)), verbose = false)),
+                transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+              )
+            ),
+          ),
+          currentLedgerTime = internal.ledgerTime,
+          currentUtcTime = internal.submittedAt,
+          maxDeduplicationDuration = internal.maxDeduplicationDuration,
+        ) shouldEqual Right(())
+      }
+
+      "validate a request with empty by party and any party filters" in {
+        requestMustFailWith(
+          testedSubmitAndWaitRequestValidator.validate(
+            req = SubmitAndWaitForTransactionRequest(
+              commands = Some(api.commands),
+              transactionFormat = Some(
+                TransactionFormat(
+                  eventFormat = Some(EventFormat(Map.empty, None, verbose = false)),
+                  transactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+                )
+              ),
+            ),
+            currentLedgerTime = internal.ledgerTime,
+            currentUtcTime = internal.submittedAt,
+            maxDeduplicationDuration = internal.maxDeduplicationDuration,
+          ),
+          code = INVALID_ARGUMENT,
+          description =
+            "INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: filtersByParty and filtersForAnyParty " +
+              "cannot be empty simultaneously",
+          metadata = Map.empty,
+        )
+      }
+
+      "reject a request without transaction format" in {
+        requestMustFailWith(
+          testedSubmitAndWaitRequestValidator.validate(
+            req = SubmitAndWaitForTransactionRequest(
+              commands = Some(api.commands),
+              transactionFormat = None,
+            ),
+            currentLedgerTime = internal.ledgerTime,
+            currentUtcTime = internal.submittedAt,
+            maxDeduplicationDuration = internal.maxDeduplicationDuration,
+          ),
+          code = INVALID_ARGUMENT,
+          description =
+            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: transaction_format",
+          metadata = Map.empty,
+        )
+      }
+    }
+
     "validating command submission requests" should {
       "validate a complete request" in {
         testedCommandValidator.validateCommands(
@@ -246,28 +328,28 @@ class SubmitRequestValidatorTest
         )
       }
 
-      "tolerate a missing domainId" in {
+      "tolerate a missing synchronizerId" in {
         testedCommandValidator.validateCommands(
-          api.commands.withDomainId(""),
+          api.commands.withSynchronizerId(""),
           internal.ledgerTime,
           internal.submittedAt,
           internal.maxDeduplicationDuration,
         ) shouldEqual Right(
-          internal.emptyCommands.copy(domainId = None)
+          internal.emptyCommands.copy(synchronizerId = None)
         )
       }
 
-      "not allow missing applicationId" in {
+      "not allow missing userId" in {
         requestMustFailWith(
           request = testedCommandValidator.validateCommands(
-            api.commands.withApplicationId(""),
+            api.commands.withUserId(""),
             internal.ledgerTime,
             internal.submittedAt,
             internal.maxDeduplicationDuration,
           ),
           code = INVALID_ARGUMENT,
           description =
-            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: application_id",
+            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: user_id",
           metadata = Map.empty,
         )
       }
@@ -381,7 +463,7 @@ class SubmitRequestValidatorTest
           Table[DeduplicationPeriodProto, DeduplicationPeriod](
             ("input proto deduplication", "valid model deduplication"),
             DeduplicationPeriodProto.DeduplicationOffset(12345678L) -> DeduplicationPeriod
-              .DeduplicationOffset(Offset.fromLong(12345678L)),
+              .DeduplicationOffset(Some(Offset.tryFromLong(12345678L))),
             DeduplicationPeriodProto.DeduplicationDuration(
               deduplicationDuration
             ) -> DeduplicationPeriod
@@ -473,7 +555,7 @@ class SubmitRequestValidatorTest
       "fail when disclosed contracts validation fails" in {
         val validateDisclosedContractsMock = mock[ValidateDisclosedContracts]
 
-        when(validateDisclosedContractsMock(any[Commands])(any[ContextualizedErrorLogger]))
+        when(validateDisclosedContractsMock(any[Commands])(any[ErrorLoggingContext]))
           .thenReturn(
             Left(
               RequestValidationErrors.InvalidField
@@ -505,14 +587,14 @@ class SubmitRequestValidatorTest
       "when upgrading" should {
         val validateDisclosedContractsMock = mock[ValidateDisclosedContracts]
 
-        when(validateDisclosedContractsMock(any[Commands])(any[ContextualizedErrorLogger]))
+        when(validateDisclosedContractsMock(any[Commands])(any[ErrorLoggingContext]))
           .thenReturn(Right(internal.disclosedContracts))
 
         val packageMap =
           Map(packageId -> (packageName, Ref.PackageVersion.assertFromString("1.0.0")))
         val validateUpgradingPackageResolutions = new ValidateUpgradingPackageResolutions {
           override def apply(userPackageIdPreferences: Seq[String])(implicit
-              contextualizedErrorLogger: ContextualizedErrorLogger
+              errorLoggingContext: ErrorLoggingContext
           ): Either[
             StatusRuntimeException,
             ValidateUpgradingPackageResolutions.ValidatedCommandPackageResolutionsSnapshot,
@@ -534,12 +616,20 @@ class SubmitRequestValidatorTest
         "allow package name reference instead of package id" in {
           commandsValidatorForUpgrading
             .validateCommands(
-              api.commands.copy(commands = Seq(api.commandWithPackageNameScoping)),
+              api.commands.copy(
+                commands = Seq(api.commandWithPackageNameScoping),
+                prefetchContractKeys = Seq(api.prefetchKeyWithPackageNameScoping),
+              ),
               internal.ledgerTime,
               internal.submittedAt,
               internal.maxDeduplicationDuration,
             ) shouldBe Right(
-            internal.emptyCommandsBuilder(Ref.PackageRef.Name(packageName), packageMap = packageMap)
+            internal.emptyCommandsBuilder(
+              Ref.PackageRef.Name(packageName),
+              packageMap = packageMap,
+              prefetchKeys =
+                Seq(ApiContractKey(internal.templateRefByName, ApiMocks.values.validLfParty)),
+            )
           )
         }
 
@@ -563,6 +653,51 @@ class SubmitRequestValidatorTest
       }
     }
 
+    "validating prefetched contract keys" should {
+      "allow complete keys" in {
+        testedCommandValidator.validateCommands(
+          api.commands.copy(prefetchContractKeys = Seq(api.prefetchKey)),
+          internal.ledgerTime,
+          internal.submittedAt,
+          internal.maxDeduplicationDuration,
+        ) shouldEqual Right(
+          internal.emptyCommands.copy(
+            prefetchKeys = Seq(ApiContractKey(internal.templateRef, ApiMocks.values.validLfParty))
+          )
+        )
+      }
+
+      "reject keys with missing template ID" in {
+        requestMustFailWith(
+          request = testedCommandValidator.validateCommands(
+            api.commands.copy(prefetchContractKeys = Seq(api.prefetchKey.copy(templateId = None))),
+            internal.ledgerTime,
+            internal.submittedAt,
+            internal.maxDeduplicationDuration,
+          ),
+          code = INVALID_ARGUMENT,
+          description =
+            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: template_id",
+          metadata = Map.empty,
+        )
+      }
+
+      "reject keys with missing key value" in {
+        requestMustFailWith(
+          request = testedCommandValidator.validateCommands(
+            api.commands.copy(prefetchContractKeys = Seq(api.prefetchKey.copy(contractKey = None))),
+            internal.ledgerTime,
+            internal.submittedAt,
+            internal.maxDeduplicationDuration,
+          ),
+          code = INVALID_ARGUMENT,
+          description =
+            "MISSING_FIELD(8,0): The submitted command is missing a mandatory field: contract_key",
+          metadata = Map.empty,
+        )
+      }
+    }
+
     "validating contractId values" should {
       "succeed" in {
 
@@ -577,14 +712,14 @@ class SubmitRequestValidatorTest
 
     "validating party values" should {
       "convert valid party" in {
-        testedValueValidator.validateValue(DomainMocks.values.validApiParty) shouldEqual Right(
-          DomainMocks.values.validLfParty
+        testedValueValidator.validateValue(ApiMocks.values.validApiParty) shouldEqual Right(
+          ApiMocks.values.validLfParty
         )
       }
 
       "reject non valid party" in {
         requestMustFailWith(
-          request = testedValueValidator.validateValue(DomainMocks.values.invalidApiParty),
+          request = testedValueValidator.validateValue(ApiMocks.values.invalidApiParty),
           code = INVALID_ARGUMENT,
           description =
             """INVALID_ARGUMENT(8,0): The submitted request has invalid arguments: non expected character 0x40 in Daml-LF Party "p@rty"""",
@@ -794,8 +929,8 @@ class SubmitRequestValidatorTest
           )
         val expected =
           Lf.ValueRecord(
-            Some(DomainMocks.identifier),
-            ImmArray(Some(DomainMocks.label) -> DomainMocks.values.int64),
+            Some(ApiMocks.identifier),
+            ImmArray(Some(ApiMocks.label) -> ApiMocks.values.int64),
           )
         testedValueValidator.validateValue(record) shouldEqual Right(expected)
       }
@@ -804,7 +939,7 @@ class SubmitRequestValidatorTest
         val record =
           Value(Sum.Record(Record(None, Seq(RecordField(api.label, Some(Value(api.int64)))))))
         val expected =
-          Lf.ValueRecord(None, ImmArray(Some(DomainMocks.label) -> DomainMocks.values.int64))
+          Lf.ValueRecord(None, ImmArray(Some(ApiMocks.label) -> ApiMocks.values.int64))
         testedValueValidator.validateValue(record) shouldEqual Right(expected)
       }
 
@@ -812,7 +947,7 @@ class SubmitRequestValidatorTest
         val record =
           Value(Sum.Record(Record(None, Seq(RecordField("", Some(Value(api.int64)))))))
         val expected =
-          ValueRecord(None, ImmArray(None -> DomainMocks.values.int64))
+          ValueRecord(None, ImmArray(None -> ApiMocks.values.int64))
         testedValueValidator.validateValue(record) shouldEqual Right(expected)
       }
 
@@ -836,9 +971,9 @@ class SubmitRequestValidatorTest
         val variant =
           Value(Sum.Variant(Variant(Some(api.identifier), api.constructor, Some(Value(api.int64)))))
         val expected = Lf.ValueVariant(
-          Some(DomainMocks.identifier),
-          DomainMocks.values.constructor,
-          DomainMocks.values.int64,
+          Some(ApiMocks.identifier),
+          ApiMocks.values.constructor,
+          ApiMocks.values.int64,
         )
         testedValueValidator.validateValue(variant) shouldEqual Right(expected)
       }
@@ -846,7 +981,7 @@ class SubmitRequestValidatorTest
       "tolerate missing identifiers" in {
         val variant = Value(Sum.Variant(Variant(None, api.constructor, Some(Value(api.int64)))))
         val expected =
-          Lf.ValueVariant(None, DomainMocks.values.constructor, DomainMocks.values.int64)
+          Lf.ValueVariant(None, ApiMocks.values.constructor, ApiMocks.values.int64)
 
         testedValueValidator.validateValue(variant) shouldEqual Right(expected)
       }
@@ -887,14 +1022,14 @@ class SubmitRequestValidatorTest
       "convert valid lists" in {
         val list = Value(Sum.List(ApiList(Seq(Value(api.int64), Value(api.int64)))))
         val expected =
-          Lf.ValueList(FrontStack(DomainMocks.values.int64, DomainMocks.values.int64))
+          Lf.ValueList(FrontStack(ApiMocks.values.int64, ApiMocks.values.int64))
         testedValueValidator.validateValue(list) shouldEqual Right(expected)
       }
 
       "reject lists containing invalid values" in {
         val input = Value(
           Sum.List(
-            ApiList(Seq(DomainMocks.values.validApiParty, DomainMocks.values.invalidApiParty))
+            ApiList(Seq(ApiMocks.values.validApiParty, ApiMocks.values.invalidApiParty))
           )
         )
         requestMustFailWith(
@@ -916,13 +1051,13 @@ class SubmitRequestValidatorTest
       }
 
       "convert valid non-empty optionals" in {
-        val list = Value(Sum.Optional(ApiOptional(Some(DomainMocks.values.validApiParty))))
-        val expected = Lf.ValueOptional(Some(DomainMocks.values.validLfParty))
+        val list = Value(Sum.Optional(ApiOptional(Some(ApiMocks.values.validApiParty))))
+        val expected = Lf.ValueOptional(Some(ApiMocks.values.validLfParty))
         testedValueValidator.validateValue(list) shouldEqual Right(expected)
       }
 
       "reject optional containing invalid values" in {
-        val input = Value(Sum.Optional(ApiOptional(Some(DomainMocks.values.invalidApiParty))))
+        val input = Value(Sum.Optional(ApiOptional(Some(ApiMocks.values.invalidApiParty))))
         requestMustFailWith(
           request = testedValueValidator.validateValue(input),
           code = INVALID_ARGUMENT,
@@ -979,8 +1114,8 @@ class SubmitRequestValidatorTest
       "reject maps containing invalid value" in {
         val apiEntries =
           List(
-            ApiTextMap.Entry("1", Some(DomainMocks.values.validApiParty)),
-            ApiTextMap.Entry("2", Some(DomainMocks.values.invalidApiParty)),
+            ApiTextMap.Entry("1", Some(ApiMocks.values.validApiParty)),
+            ApiTextMap.Entry("2", Some(ApiMocks.values.invalidApiParty)),
           )
         val input = Value(Sum.TextMap(ApiTextMap(apiEntries)))
         requestMustFailWith(

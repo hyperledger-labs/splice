@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.admin.traffic
@@ -12,7 +12,8 @@ import com.digitalasset.canton.sequencing.protocol.TrafficState
 import io.scalaland.chimney.Transformer
 import io.scalaland.chimney.dsl.*
 
-/** Conversion utilities between the sequencing TrafficState and the participant admin API TrafficState protos
+/** Conversion utilities between the sequencing TrafficState and the participant admin API
+  * TrafficState protos
   */
 object TrafficStateAdmin {
   implicit val nonNegativeLongToLong: Transformer[NonNegativeLong, Long] = _.value

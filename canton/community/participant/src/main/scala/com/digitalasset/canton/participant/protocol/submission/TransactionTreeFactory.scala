@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol.submission
@@ -35,8 +35,10 @@ trait TransactionTreeFactory {
 
   /** Converts a `transaction: LfTransaction` to the corresponding transaction tree, if possible.
     *
-    * @param keyResolver The key resolutions recorded while interpreting the transaction.
-    * @see TransactionTreeConversionError for error cases
+    * @param keyResolver
+    *   The key resolutions recorded while interpreting the transaction.
+    * @see
+    *   TransactionTreeConversionError for error cases
     */
   def createTransactionTree(
       transaction: WellFormedTransaction[WithoutSuffixes],
@@ -54,11 +56,13 @@ trait TransactionTreeFactory {
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransactionTreeConversionError, GenTransactionTree]
 
-  /** Reconstructs a transaction view from a reinterpreted action description,
-    * using the supplied salts.
+  /** Reconstructs a transaction view from a reinterpreted action description, using the supplied
+    * salts.
     *
-    * @param keyResolver The key resolutions recorded while re-interpreting the subaction.
-    * @throws java.lang.IllegalArgumentException if `subaction` does not contain exactly one root node
+    * @param keyResolver
+    *   The key resolutions recorded while re-interpreting the subaction.
+    * @throws java.lang.IllegalArgumentException
+    *   if `subaction` does not contain exactly one root node
     */
   def tryReconstruct(
       subaction: WellFormedTransaction[WithoutSuffixes],
@@ -72,13 +76,13 @@ trait TransactionTreeFactory {
       rbContext: RollbackContext,
       keyResolver: LfKeyResolver,
   )(implicit traceContext: TraceContext): EitherT[
-    Future,
+    FutureUnlessShutdown,
     TransactionTreeConversionError,
     (TransactionView, WellFormedTransaction[WithSuffixes]),
   ]
 
-  /** Extracts the salts for the view from a transaction view tree.
-    * The salts appear in the same order as they are needed by [[tryReconstruct]].
+  /** Extracts the salts for the view from a transaction view tree. The salts appear in the same
+    * order as they are needed by [[tryReconstruct]].
     */
   def saltsFromView(view: TransactionView): Iterable[Salt]
 
@@ -101,12 +105,15 @@ object TransactionTreeFactory {
       contract <- contractStore
         .lookupContract(id)
         .toRight(ContractLookupError(id, "Unknown contract"))
+        .failOnShutdownToAbortException("TransactionTreeFactory.contractInstanceLookup")
     } yield contract
 
   /** Supertype for all errors than may arise during the conversion. */
   sealed trait TransactionTreeConversionError extends Product with Serializable with PrettyPrinting
 
-  /** Indicates that a contract instance could not be looked up by an instance of [[SerializableContractOfId]]. */
+  /** Indicates that a contract instance could not be looked up by an instance of
+    * [[SerializableContractOfId]].
+    */
   final case class ContractLookupError(id: LfContractId, message: String)
       extends TransactionTreeConversionError {
     override protected def pretty: Pretty[ContractLookupError] = prettyOfClass(

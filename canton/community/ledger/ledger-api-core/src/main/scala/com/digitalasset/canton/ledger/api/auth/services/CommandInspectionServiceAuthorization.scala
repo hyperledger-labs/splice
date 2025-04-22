@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.ledger.api.auth.services
@@ -9,7 +9,7 @@ import com.daml.ledger.api.v2.admin.command_inspection_service.{
   GetCommandStatusRequest,
   GetCommandStatusResponse,
 }
-import com.digitalasset.canton.auth.Authorizer
+import com.digitalasset.canton.auth.{Authorizer, RequiredClaim}
 import com.digitalasset.canton.ledger.api.ProxyCloseable
 import com.digitalasset.canton.ledger.api.grpc.GrpcApiService
 import io.grpc.ServerServiceDefinition
@@ -27,10 +27,8 @@ final class CommandInspectionServiceAuthorization(
   override def bindService(): ServerServiceDefinition =
     CommandInspectionServiceGrpc.bindService(this, executionContext)
 
-  override def close(): Unit = service.close()
-
   override def getCommandStatus(
       request: GetCommandStatusRequest
   ): Future[GetCommandStatusResponse] =
-    authorizer.requireAdminClaims(service.getCommandStatus)(request)
+    authorizer.rpc(service.getCommandStatus)(RequiredClaim.Admin())(request)
 }

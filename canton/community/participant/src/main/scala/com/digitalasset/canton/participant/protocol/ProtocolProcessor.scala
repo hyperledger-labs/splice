@@ -1,27 +1,26 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.{EitherT, NonEmptyChain}
-import cats.implicits.catsStdInstancesForFuture
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
-import cats.syntax.parallel.*
+import cats.syntax.traverse.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.crypto.{
-  DomainSnapshotSyncCryptoApi,
-  DomainSyncCryptoClient,
   Signature,
+  SynchronizerCryptoClient,
+  SynchronizerSnapshotSyncCryptoApi,
 }
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.TransactionError
-import com.digitalasset.canton.ledger.participant.state.Update
+import com.digitalasset.canton.ledger.participant.state.{CommitSetUpdate, SequencedUpdate}
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
   PromiseUnlessShutdownFactory,
@@ -48,7 +47,7 @@ import com.digitalasset.canton.participant.protocol.submission.*
 import com.digitalasset.canton.participant.protocol.submission.CommandDeduplicator.DeduplicationFailed
 import com.digitalasset.canton.participant.protocol.validation.RecipientsValidator
 import com.digitalasset.canton.participant.store
-import com.digitalasset.canton.participant.store.SyncDomainEphemeralState
+import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
@@ -57,8 +56,8 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{AsyncResult, HandlerResult}
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, SubmissionTopologyHelper}
-import com.digitalasset.canton.tracing.{TraceContext, Traced}
+import com.digitalasset.canton.topology.{ParticipantId, SubmissionTopologyHelper, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
 import com.digitalasset.canton.util.EitherUtil.RichEither
@@ -69,18 +68,23 @@ import com.google.common.annotations.VisibleForTesting
 
 import java.util.UUID
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, blocking}
 import scala.util.{Failure, Success}
 
-/** The [[ProtocolProcessor]] orchestrates Phase 3, 4, and 7 of the synchronization protocol.
-  * For this, it combines [[ProcessingSteps]] specific to a particular kind of request (transaction / reassignment)
-  * with the common processing steps.
+/** The [[ProtocolProcessor]] orchestrates Phase 3, 4, and 7 of the synchronization protocol. For
+  * this, it combines [[ProcessingSteps]] specific to a particular kind of request (transaction /
+  * reassignment) with the common processing steps.
   *
-  * @param steps The specific processing steps
-  * @tparam SubmissionParam  The bundled submission parameters
-  * @tparam SubmissionResult The bundled submission results
-  * @tparam RequestViewType     The type of view trees used by the request
-  * @tparam SubmissionError  The type of errors that occur during submission processing
+  * @param steps
+  *   The specific processing steps
+  * @tparam SubmissionParam
+  *   The bundled submission parameters
+  * @tparam SubmissionResult
+  *   The bundled submission results
+  * @tparam RequestViewType
+  *   The type of view trees used by the request
+  * @tparam SubmissionError
+  *   The type of errors that occur during submission processing
   */
 abstract class ProtocolProcessor[
     SubmissionParam,
@@ -94,11 +98,11 @@ abstract class ProtocolProcessor[
       RequestViewType,
       SubmissionError,
     ],
-    inFlightSubmissionTracker: InFlightSubmissionTracker,
-    ephemeral: SyncDomainEphemeralState,
-    crypto: DomainSyncCryptoClient,
+    inFlightSubmissionSynchronizerTracker: InFlightSubmissionSynchronizerTracker,
+    ephemeral: SyncEphemeralState,
+    crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClientSend,
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
@@ -110,6 +114,7 @@ abstract class ProtocolProcessor[
       crypto,
       sequencerClient,
       protocolVersion,
+      synchronizerId,
     )
     with RequestProcessor[RequestViewType] {
 
@@ -126,13 +131,11 @@ abstract class ProtocolProcessor[
 
   private[this] def withKind(message: String): String = s"${steps.requestKind}: $message"
 
-  /** Stores a counter for the submissions.
-    * Incremented whenever we pick a mediator for a submission
+  /** Stores a counter for the submissions. Incremented whenever we pick a mediator for a submission
     * so that we use mediators round-robin.
     *
-    * Every processor picks the mediators independently,
-    * so it may be that the participant picks the same mediator several times in a row,
-    * but for different kinds of requests.
+    * Every processor picks the mediators independently, so it may be that the participant picks the
+    * same mediator several times in a row, but for different kinds of requests.
     */
   private val submissionCounter: AtomicInteger = new AtomicInteger(0)
 
@@ -141,34 +144,37 @@ abstract class ProtocolProcessor[
     */
   protected def preSubmissionValidations(
       params: SubmissionParam,
-      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       protocolVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SubmissionError, Unit]
 
-  /** Submits the request to the sequencer, using a recent topology snapshot and the current persisted state
-    * as an approximation to the future state at the assigned request timestamp.
+  /** Submits the request to the sequencer, using a recent topology snapshot and the current
+    * persisted state as an approximation to the future state at the assigned request timestamp.
     *
-    * @param submissionParam The bundled submission parameters
-    * @return The submission error or a future with the submission result.
-    *         With submission tracking, the outer future completes after the submission is registered as in-flight,
-    *         and the inner future after the submission has been sequenced or if it will never be sequenced.
-    *         Without submission tracking, both futures complete after the submission has been sequenced
-    *         or if it will not be sequenced.
+    * @param submissionParam
+    *   The bundled submission parameters
+    * @param topologySnapshot
+    *   A recent topology snapshot
+    * @return
+    *   The submission error or a future with the submission result. With submission tracking, the
+    *   outer future completes after the submission is registered as in-flight, and the inner future
+    *   after the submission has been sequenced or if it will never be sequenced. Without submission
+    *   tracking, both futures complete after the submission has been sequenced or if it will not be
+    *   sequenced.
     */
-  def submit(submissionParam: SubmissionParam)(implicit
+  def submit(submissionParam: SubmissionParam, topologySnapshot: TopologySnapshot)(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SubmissionError, FutureUnlessShutdown[SubmissionResult]] = {
     logger.debug(withKind(s"Preparing request ${steps.submissionDescription(submissionParam)}"))
 
-    val recentSnapshot = crypto.currentSnapshotApproximation
+    val recentSnapshot = crypto.create(topologySnapshot)
     val explicitMediatorGroupIndex = steps.explicitMediatorGroup(submissionParam)
     for {
       _ <- preSubmissionValidations(submissionParam, recentSnapshot, protocolVersion)
       mediator <- chooseMediator(recentSnapshot.ipsSnapshot, explicitMediatorGroupIndex)
         .leftMap(steps.embedNoMediatorError)
-        .mapK(FutureUnlessShutdown.outcomeK)
       submission <- steps.createSubmission(submissionParam, mediator, ephemeral, recentSnapshot)
       _ = logger.debug(
         s"Topology snapshot timestamp at submission: ${recentSnapshot.ipsSnapshot.timestamp}"
@@ -179,7 +185,8 @@ abstract class ProtocolProcessor[
             submitWithoutTracking(submissionParam, untracked).tapLeft(submissionError =>
               logger.warn(s"Failed to submit submission due to $submissionError")
             )
-          case tracked: steps.TrackedSubmission => submitWithTracking(submissionParam, tracked)
+          case tracked: steps.TrackedSubmission =>
+            submitWithTracking(submissionParam, tracked)
         }
       }
     } yield result
@@ -190,7 +197,7 @@ abstract class ProtocolProcessor[
       explicitMediatorGroupIndex: Option[MediatorGroupIndex],
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, NoMediatorError, MediatorGroupRecipient] = {
+  ): EitherT[FutureUnlessShutdown, NoMediatorError, MediatorGroupRecipient] = {
     val fut = for {
       allMediatorGroups <- recentSnapshot.mediatorGroups()
       allActiveMediatorGroups = allMediatorGroups.filter(_.isActive)
@@ -212,7 +219,7 @@ abstract class ProtocolProcessor[
             // When the number of mediators changes, this strategy may result in the same mediator being picked twice in a row.
             // This is acceptable as mediator changes are rare.
             //
-            // This selection strategy assumes that the `mediators` method in the `MediatorDomainStateClient`
+            // This selection strategy assumes that the `mediators` method in the `MediatorSynchronizerStateClient`
             // returns the mediators in a consistent order. This assumption holds mostly because the cache
             // usually returns the fixed `Seq` in the cache.
             val newSubmissionCounter = submissionCounter.incrementAndGet()
@@ -231,7 +238,8 @@ abstract class ProtocolProcessor[
     EitherT(fut)
   }
 
-  /** Submits the batch without registering as in-flight and reports send errors as [[scala.Left$]] */
+  /** Submits the batch without registering as in-flight and reports send errors as [[scala.Left$]]
+    */
   private def submitWithoutTracking(
       submissionParam: SubmissionParam,
       untracked: steps.UntrackedSubmission,
@@ -245,7 +253,6 @@ abstract class ProtocolProcessor[
           untracked.maxSequencingTimeO
             .getOrElse(sequencerClient.generateMaxSequencingTime)
         )
-        .mapK(FutureUnlessShutdown.outcomeK)
 
       sendResultAndResultArgs <- submitInternal(
         submissionParam,
@@ -267,11 +274,12 @@ abstract class ProtocolProcessor[
     result.bimap(untracked.toSubmissionError, FutureUnlessShutdown.pure)
   }
 
-  /** Register the submission at the [[submission.InFlightSubmissionTracker]] as in-flight, deduplicate it, and submit it.
-    * Errors after the registration are reported asynchronously only and return a [[scala.Right$]].
-    * This ensures that every submission generates at most one rejection reason, namely through the
-    * timely rejection mechanism. In-flight tracking may concurrently remove the submission at any time
-    * and publish the timely rejection event instead of the actual error.
+  /** Register the submission at the [[submission.InFlightSubmissionTracker]] as in-flight,
+    * deduplicate it, and submit it. Errors after the registration are reported asynchronously only
+    * and return a [[scala.Right$]]. This ensures that every submission generates at most one
+    * rejection reason, namely through the timely rejection mechanism. In-flight tracking may
+    * concurrently remove the submission at any time and publish the timely rejection event instead
+    * of the actual error.
     */
   private def submitWithTracking(
       submissionParam: SubmissionParam,
@@ -281,7 +289,6 @@ abstract class ProtocolProcessor[
   ): EitherT[FutureUnlessShutdown, SubmissionError, FutureUnlessShutdown[SubmissionResult]] = {
     val maxSequencingTimeF =
       tracked.maxSequencingTimeO
-        .mapK(FutureUnlessShutdown.outcomeK)
         .getOrElse(sequencerClient.generateMaxSequencingTime)
 
     EitherT.right(maxSequencingTimeF).flatMap(submitWithTracking(submissionParam, tracked, _))
@@ -298,7 +305,7 @@ abstract class ProtocolProcessor[
     val inFlightSubmission = InFlightSubmission(
       changeIdHash = tracked.changeIdHash,
       submissionId = tracked.submissionId,
-      submissionDomain = domainId,
+      submissionSynchronizerId = synchronizerId,
       messageUuid = messageUuid,
       rootHashO = None,
       sequencingInfo =
@@ -309,13 +316,13 @@ abstract class ProtocolProcessor[
     val specifiedDeduplicationPeriod = tracked.specifiedDeduplicationPeriod
     logger.debug(s"Registering the submission as in-flight")
 
-    val registeredF = inFlightSubmissionTracker
+    val registeredF = inFlightSubmissionSynchronizerTracker
       .register(inFlightSubmission, specifiedDeduplicationPeriod)
       .leftMap(tracked.embedInFlightSubmissionTrackerError)
       .onShutdown {
         // If we abort due to a shutdown, we don't know whether the submission was registered.
-        // The SyncDomain should guard this method call with a performUnlessClosing,
-        // so we should see a shutdown here only if the SyncDomain close timeout was exceeded.
+        // The ConnectedSynchronizer should guard this method call with a performUnlessClosing,
+        // so we should see a shutdown here only if the ConnectedSynchronizer close timeout was exceeded.
         // Therefore, WARN makes sense as a logging level.
         logger.warn(s"Shutdown while registering the submission as in-flight.")
         Left(tracked.shutdownDuringInFlightRegistration)
@@ -323,39 +330,14 @@ abstract class ProtocolProcessor[
 
     def observeSubmissionError(
         newTrackingData: SubmissionTrackingData
-    ): FutureUnlessShutdown[SubmissionResult] = {
-      // Assign the currently observed domain timestamp so that the error will be published soon.
-      // Cap it by the max sequencing time so that the timeout field can move only backwards.
-      val timestamp = ephemeral.observedTimestampLookup.highWatermark min maxSequencingTime
-      val newUnsequencedSubmission = UnsequencedSubmission(timestamp, newTrackingData)
-      for {
-        _unit <- inFlightSubmissionTracker.observeSubmissionError(
+    ): FutureUnlessShutdown[SubmissionResult] =
+      inFlightSubmissionSynchronizerTracker
+        .observeSubmissionError(
           tracked.changeIdHash,
-          domainId,
-          messageId,
-          newUnsequencedSubmission,
+          inFlightSubmission.messageId,
+          newTrackingData,
         )
-        // The new timestamp is the sequencing timestamp of the most recently received sequencer message.
-        // If this message has already been fully processed and triggered the timely rejections
-        // before we updated the UnsequencedSubmission,
-        // then the rejection will be emitted only upon the next sequencer message that triggers such a timely rejection.
-        // However, it may be an arbitrary long time until this happens.
-        // Therefore, we notify the in-flight submission tracker again
-        // if it had already been notified for the chosen timestamp or a later one.
-        // This should happen only if the domain is idle and no messages are in-flight between time observation
-        // and notification of the in-flight submission tracker (via the clean sequencer counter tracking).
-        // Because the domain is idle, another DB access does not hurt much.
-        //
-        // There is no point in notifying the in-flight submission tracker if we did not change the timestamp,
-        // because the regular timely rejection mechanism has already emitted the command timeout
-        // or ongoing processing of the message that triggers the timeout will anyway pick up the old or the updated
-        // tracking data.
-        _ = if (maxSequencingTime > timestamp) {
-          logger.debug(s"Renotifying the in-flight submission tracker for timestamp $timestamp")
-          ephemeral.timelyRejectNotifier.notifyIfInPastAsync(timestamp)
-        }
-      } yield tracked.onDefinitiveFailure
-    }
+        .map(_ => tracked.onDefinitiveFailure)
 
     // After in-flight registration, Make sure that all errors get a chance to update the tracking data and
     // instead return a `SubmissionResult` so that the submission will be acknowledged over the ledger API.
@@ -429,29 +411,21 @@ abstract class ProtocolProcessor[
           }
         }
 
-        // There's no point to attempt to send the submission to the sequencer
-        // if we've already observed the max sequencing time or something later
-        // Rather, we notify the timely rejection mechanism so that the timeout completion
-        // is emitted. This should only happen if the max sequencing time was observed
-        // after the high watermark check in the InFlightSubmissionTracker.
-        val maxSequencingTimeHasElapsed =
-          ephemeral.timelyRejectNotifier.notifyIfInPastAsync(maxSequencingTime)
-        if (maxSequencingTimeHasElapsed) {
-          FutureUnlessShutdown.pure(tracked.onDefinitiveFailure)
-        } else {
-          val batchF = for {
-            batch <- tracked.prepareBatch(
-              actualDeduplicationOffset,
-              maxSequencingTime,
-              ephemeral.sessionKeyStore,
-            )
-            _ <- EitherT
-              .right[SubmissionTrackingData](
-                inFlightSubmissionTracker.updateRegistration(inFlightSubmission, batch.rootHash)
+        val batchF = for {
+          batch <- tracked.prepareBatch(
+            actualDeduplicationOffset,
+            maxSequencingTime,
+            ephemeral.sessionKeyStore,
+          )
+          _ <- EitherT
+            .right[SubmissionTrackingData](
+              inFlightSubmissionSynchronizerTracker.updateRegistration(
+                inFlightSubmission,
+                batch.rootHash,
               )
-          } yield batch
-          unlessError(batchF, mayHaveBeenSent = false)(sendBatch)
-        }
+            )
+        } yield batch
+        unlessError(batchF, mayHaveBeenSent = false)(sendBatch)
     }
 
     registeredF.mapK(FutureUnlessShutdown.outcomeK).map(afterRegistration)
@@ -459,8 +433,7 @@ abstract class ProtocolProcessor[
 
   protected def metricsContextForSubmissionParam(submissionParam: SubmissionParam): MetricsContext
 
-  /** Submit the batch to the sequencer.
-    * Also registers `submissionParam` as pending submission.
+  /** Submit the batch to the sequencer. Also registers `submissionParam` as pending submission.
     */
   private def submitInternal(
       submissionParam: SubmissionParam,
@@ -500,7 +473,7 @@ abstract class ProtocolProcessor[
 
       // use the send callback and a promise to capture the eventual sequenced event read by the submitter
       // We use a promise produced by the passed-in promise factory instead of `SendCallback.future` so that
-      // we stop waiting for the result as soon as the promise factory (typically the sync domain) is closed.
+      // we stop waiting for the result as soon as the promise factory (typically the connected synchronizer) is closed.
       // This way, we can safely wrap the submission in a `performUnlessClosing*F` call without getting into
       // tricky shutdown order dependencies.
       sendResultP = promiseFactory.mkPromise[SendResult](
@@ -548,8 +521,9 @@ abstract class ProtocolProcessor[
     }
   }
 
-  /** Schedules removal of the pending submission once the request tracker has advanced to the decision time.
-    * This happens if the request times out (w.r.t. the submission timestamp) or the sequencer never delivers a request.
+  /** Schedules removal of the pending submission once the request tracker has advanced to the
+    * decision time. This happens if the request times out (w.r.t. the submission timestamp) or the
+    * sequencer never delivers a request.
     */
   private def schedulePendingSubmissionRemoval(
       submissionTimestamp: CantonTimestamp,
@@ -557,12 +531,12 @@ abstract class ProtocolProcessor[
   )(implicit traceContext: TraceContext): Unit = {
 
     val removeF = for {
-      domainParameters <- crypto.ips
-        .awaitSnapshotUS(submissionTimestamp)
-        .flatMap(snapshot => FutureUnlessShutdown.outcomeF(snapshot.findDynamicDomainParameters()))
+      synchronizerParameters <- crypto.ips
+        .awaitSnapshot(submissionTimestamp)
+        .flatMap(snapshot => snapshot.findDynamicSynchronizerParameters())
         .flatMap(_.toFutureUS(new RuntimeException(_)))
 
-      decisionTime <- domainParameters.decisionTimeForF(submissionTimestamp)
+      decisionTime <- synchronizerParameters.decisionTimeForF(submissionTimestamp)
       _ = ephemeral.timeTracker.requestTick(decisionTime)
       _ <- ephemeral.requestTracker
         .awaitTimestampUS(decisionTime)
@@ -587,7 +561,7 @@ abstract class ProtocolProcessor[
       }
     }
 
-    FutureUtil.doNotAwaitUnlessShutdown(
+    FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
       removeF,
       s"Failed to remove the pending submission $submissionId",
     )
@@ -601,10 +575,16 @@ abstract class ProtocolProcessor[
         EitherT[FutureUnlessShutdown, steps.RequestError, Unit],
       ],
   )(implicit traceContext: TraceContext): HandlerResult =
-    // We discard the lefts because they are logged by `logRequestWarnings`
+    // We transform the lefts into exceptions to abort the application handler and prevent further execution
     logRequestWarnings(ts, result)
-      .map(innerAsync => AsyncResult(innerAsync.getOrElse(())))
-      .getOrElse(AsyncResult.immediate)
+      .map(innerAsync =>
+        AsyncResult(
+          innerAsync.valueOr(err =>
+            ErrorUtil.invalidState(s"Asynchronous failure in application handler: $err")
+          )
+        )
+      )
+      .valueOr(err => ErrorUtil.invalidState(s"Synchronous failure in application handler: $err"))
 
   private[this] def logRequestWarnings(
       resultTimestamp: CantonTimestamp,
@@ -658,12 +638,12 @@ abstract class ProtocolProcessor[
       val rootHash = batch.rootHashMessage.rootHash
       val freshOwnTimelyTxF = ephemeral.submissionTracker.register(rootHash, requestId)
 
-      val processedET = performUnlessClosingEitherU(
+      val processedET = performUnlessClosingEitherUSF(
         s"ProtocolProcess.processRequest(rc=$rc, sc=$sc, traceId=${traceContext.traceId})"
       ) {
         // registering the request has to be done synchronously
         EitherT
-          .rightT[Future, ProtocolProcessor.this.steps.RequestError](
+          .rightT[FutureUnlessShutdown, ProtocolProcessor.this.steps.RequestError](
             ephemeral.phase37Synchronizer
               .registerRequest(steps.requestType)(RequestId(ts))
           )
@@ -721,8 +701,8 @@ abstract class ProtocolProcessor[
         // This looks like a preplay attack, and we mark the request as sequenced in the in-flight
         // submission tracker to avoid the situation that our original submission never gets sequenced
         // and gets picked up by a timely rejection, which would emit a duplicate command completion.
-        val sequenced = SequencedSubmission(sc, ts)
-        inFlightSubmissionTracker.observeSequencedRootHash(
+        val sequenced = SequencedSubmission(ts)
+        inFlightSubmissionSynchronizerTracker.observeSequencedRootHash(
           rootHash,
           sequenced,
         )
@@ -735,30 +715,30 @@ abstract class ProtocolProcessor[
         snapshot <- EitherT.right(
           crypto.awaitSnapshotUSSupervised(s"await crypto snapshot $ts")(ts)
         )
-        domainParameters <- EitherT(
+        synchronizerParameters <- EitherT(
           snapshot.ipsSnapshot
-            .findDynamicDomainParameters()
+            .findDynamicSynchronizerParameters()
             .map(
               _.leftMap(_ =>
                 steps.embedRequestError(
-                  UnableToGetDynamicDomainParameters(
-                    snapshot.domainId,
+                  UnableToGetDynamicSynchronizerParameters(
+                    snapshot.synchronizerId,
                     snapshot.ipsSnapshot.timestamp,
                   )
                 )
               )
             )
-        ).mapK(FutureUnlessShutdown.outcomeK)
+        )
         decryptedViews <- steps
           .decryptViews(viewMessages, snapshot, ephemeral.sessionKeyStore.convertStore)
-      } yield (snapshot, decryptedViews, domainParameters)
+      } yield (snapshot, decryptedViews, synchronizerParameters)
 
       for {
         preliminaryChecks <- preliminaryChecksET.leftMap { err =>
           ephemeral.submissionTracker.cancelRegistration(rootHash, requestId)
           err
         }
-        (snapshot, uncheckedDecryptedViews, domainParameters) = preliminaryChecks
+        (snapshot, uncheckedDecryptedViews, synchronizerParameters) = preliminaryChecks
 
         steps.DecryptedViews(decryptedViewsWithSignatures, rawDecryptionErrors) =
           uncheckedDecryptedViews
@@ -774,9 +754,10 @@ abstract class ProtocolProcessor[
           logger.warn(s"Request $rc: Found malformed payload: $incorrectRootHash")
         }
 
-        (submitterMetadataO, submissionDataForTrackerO) = steps.getSubmitterInformation(
+        submitterMetadataO = steps.getSubmitterInformation(
           viewsWithCorrectRootHash.map { case (view, _) => view.unwrap }
         )
+        submissionDataForTrackerO = submitterMetadataO.flatMap(_.submissionTrackerData)
 
         submissionTopologyTimestamp = rootHashMessage.submissionTopologyTimestamp
         submissionTopologySnapshotO <- EitherT.right(
@@ -790,13 +771,11 @@ abstract class ProtocolProcessor[
         )
 
         checkRecipientsResult <- EitherT.right(
-          FutureUnlessShutdown.outcomeF(
-            recipientsValidator.retainInputsWithValidRecipients(
-              requestId,
-              viewsWithCorrectRootHash,
-              snapshot.ipsSnapshot,
-              submissionTopologySnapshotO,
-            )
+          recipientsValidator.retainInputsWithValidRecipients(
+            requestId,
+            viewsWithCorrectRootHash,
+            snapshot.ipsSnapshot,
+            submissionTopologySnapshotO,
           )
         )
         (incorrectRecipients, viewsWithCorrectRootHashAndRecipients) = checkRecipientsResult
@@ -906,10 +885,9 @@ abstract class ProtocolProcessor[
                       malformedPayloads,
                       mediator,
                       snapshot,
-                      domainParameters,
+                      synchronizerParameters,
                     )
                   )
-                  .mapK(FutureUnlessShutdown.outcomeK)
 
                 _ <- processRequestWithGoodViews(
                   parsedRequest,
@@ -961,7 +939,6 @@ abstract class ProtocolProcessor[
         .map { submitterMetadata =>
           steps.eventAndSubmissionIdForRejectedCommand(
             ts,
-            rc,
             sc,
             submitterMetadata,
             rootHash,
@@ -1008,7 +985,6 @@ abstract class ProtocolProcessor[
     for {
       mediatorIsActive <- EitherT
         .right(parsedRequest.snapshot.ipsSnapshot.isMediatorActive(mediator))
-        .mapK(FutureUnlessShutdown.outcomeK)
       _ <-
         if (mediatorIsActive)
           for {
@@ -1049,7 +1025,9 @@ abstract class ProtocolProcessor[
     } yield ()
   }
 
-  /** Updates trackers and sends confirmation responses in the case that at least one view is wellformed. */
+  /** Updates trackers and sends confirmation responses in the case that at least one view is
+    * wellformed.
+    */
   private def trackAndSendResponsesWellformed(
       parsedRequest: steps.ParsedRequestType,
       activenessSet: ActivenessSet,
@@ -1097,16 +1075,16 @@ abstract class ProtocolProcessor[
               engineAbortStatusF = FutureUnlessShutdown.pure(EngineAbortStatus.notAborted),
             )
           val responses = EitherT.pure[FutureUnlessShutdown, steps.RequestError](
-            Seq.empty[(ConfirmationResponse, Recipients)]
+            Option.empty[(ConfirmationResponses, Recipients)]
           )
-          val timeoutEvent = Either.right(Option.empty[Traced[Update]])
+          val timeoutEvent = Either.right(Option.empty[SequencedUpdate])
           EitherT.pure[FutureUnlessShutdown, steps.RequestError](
             (pendingData, responses, () => timeoutEvent)
           )
         } else {
           for {
             _ <- EitherT.right(
-              FutureUnlessShutdown.outcomeF(ephemeral.requestJournal.insert(rc, ts))
+              ephemeral.requestJournal.insert(rc, ts)
             )
 
             pendingDataAndResponses <- steps.constructPendingDataAndResponse(
@@ -1164,9 +1142,13 @@ abstract class ProtocolProcessor[
       _ = EitherTUtil.doNotAwaitUS(timeoutET, "Handling timeout failed")
 
       responsesTo <- responsesToET
-      signedResponsesTo <- EitherT.right(responsesTo.parTraverse { case (response, recipients) =>
-        signResponse(parsedRequest.snapshot, response).map(_ -> recipients)
-      })
+
+      signedResponsesTo <- EitherT.right[steps.RequestError](
+        responsesTo.traverse { case (responses, recipients) =>
+          signResponses(parsedRequest.snapshot, responses).map(_ -> recipients)
+        }
+      )
+
       engineAbortStatus <- EitherT.right(pendingData.engineAbortStatusF)
       _ <-
         if (engineAbortStatus.isAborted) {
@@ -1175,29 +1157,30 @@ abstract class ProtocolProcessor[
             s"Phase 4: Finished validation for request=${requestId.unwrap} with abort."
           )
           EitherTUtil.unitUS[steps.RequestError]
-        } else if (signedResponsesTo.nonEmpty) {
-          val messageId = sequencerClient.generateMessageId
-          logger.info(
-            s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId ${val (approved, rejected) =
-                signedResponsesTo
-                  .foldLeft((0, 0)) { case ((app, rej), (response, _)) =>
-                    response.message.localVerdict match {
-                      case LocalApprove() => (app + 1, rej)
-                      case _: LocalReject => (app, rej + 1)
-                    }
-                  }
-              s"approved=$approved, rejected=$rejected" }"
-          )
-          EitherT.right[steps.RequestError](
-            sendResponses(requestId, signedResponsesTo, Some(messageId))
-          )
         } else {
-          logger.info(
-            s"Phase 4: Finished validation for request=${requestId.unwrap} with nothing to approve."
-          )
-          EitherTUtil.unitUS[steps.RequestError]
+          signedResponsesTo match {
+            case Some((spm, recipients)) =>
+              val messageId = sequencerClient.generateMessageId
+              logger.info(
+                s"Phase 4: Sending for request=${requestId.unwrap} with msgId=$messageId ${val (approved, rejected) =
+                    spm.message.responses.foldLeft((0, 0)) { case ((app, rej), response) =>
+                      response.localVerdict match {
+                        case LocalApprove() => (app + 1, rej)
+                        case _: LocalReject => (app, rej + 1)
+                      }
+                    }
+                  s"approved=$approved, rejected=$rejected" }"
+              )
+              EitherT.right[steps.RequestError](
+                sendResponses(requestId, Seq(spm -> recipients), Some(messageId))
+              )
+            case _ =>
+              logger.info(
+                s"Phase 4: Finished validation for request=${requestId.unwrap} with nothing to approve."
+              )
+              EitherTUtil.unitUS[steps.RequestError]
+          }
         }
-
     } yield ()
 
   }
@@ -1212,7 +1195,7 @@ abstract class ProtocolProcessor[
         steps.requestType.PendingRequestData
       ],
       mediatorGroup: MediatorGroupRecipient,
-      snapshot: DomainSnapshotSyncCryptoApi,
+      snapshot: SynchronizerSnapshotSyncCryptoApi,
       malformedPayloads: Seq[MalformedPayload],
   )(implicit
       traceContext: TraceContext
@@ -1227,28 +1210,26 @@ abstract class ProtocolProcessor[
       for {
         _ <- EitherT
           .right(ephemeral.requestJournal.insert(rc, ts))
-          .mapK(FutureUnlessShutdown.outcomeK)
 
         _ = ephemeral.requestTracker.tick(sc, ts)
 
-        responses = steps.constructResponsesForMalformedPayloads(
+        confirmationResponsesO = steps.constructResponsesForMalformedPayloads(
           requestId,
           rootHash,
           malformedPayloads,
         )
-        recipients = Recipients.cc(mediatorGroup)
-        messages <- EitherT
-          .right(responses.parTraverse { response =>
-            signResponse(snapshot, response).map(_ -> recipients)
-          })
-
-        _ <- EitherT.right(sendResponses(requestId, messages))
-
+        _ <- confirmationResponsesO match {
+          case Some(responses) =>
+            val recipients = Recipients.cc(mediatorGroup)
+            EitherT.right(
+              signResponses(snapshot, responses)
+                .map(message => sendResponses(requestId, Seq(message -> recipients)))
+            )
+          case None => EitherTUtil.unitUS
+        }
         _ = requestDataHandle.complete(None)
 
-        _ <- EitherT.right[steps.RequestError](
-          FutureUnlessShutdown.outcomeF(terminateRequest(rc, sc, ts, ts, None))
-        )
+        _ <- EitherT.right[steps.RequestError](terminateRequest(rc, sc, ts, ts, None))
       } yield ()
     }
   }
@@ -1273,7 +1254,7 @@ abstract class ProtocolProcessor[
     val ts = content.timestamp
     val sc = content.counter
 
-    val processedET = performUnlessClosingEitherU(
+    val processedET = performUnlessClosingEitherUSFAsync(
       s"ProtocolProcess.processResult(sc=$sc, traceId=${traceContext.traceId}"
     ) {
       val resultEnvelopes =
@@ -1292,7 +1273,7 @@ abstract class ProtocolProcessor[
       )
 
       processResultInternal1(event, result, requestId, ts, sc)
-    }
+    }(_.value)
 
     handlerResultForConfirmationResult(ts, processedET)
   }
@@ -1306,26 +1287,26 @@ abstract class ProtocolProcessor[
       sc: SequencerCounter,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, steps.ResultError, EitherT[FutureUnlessShutdown, steps.ResultError, Unit]] = {
+  ): EitherT[FutureUnlessShutdown, steps.ResultError, EitherT[
+    FutureUnlessShutdown,
+    steps.ResultError,
+    Unit,
+  ]] = {
     val snapshotTs = requestId.unwrap
 
     for {
-      _ <- EitherT.right(
-        ephemeral.recordOrderPublisher.tick(sc, resultTs, eventO = None, requestCounterO = None)
-      )
-
       snapshot <- EitherT.right(
-        crypto.ips.awaitSnapshotSupervised(s"await crypto snapshot $snapshotTs")(snapshotTs)
+        crypto.ips.awaitSnapshotUSSupervised(s"await crypto snapshot $snapshotTs")(snapshotTs)
       )
 
-      domainParameters <- EitherT(
+      synchronizerParameters <- EitherT(
         snapshot
-          .findDynamicDomainParameters()
+          .findDynamicSynchronizerParameters()
           .map(
             _.leftMap(_ =>
               steps.embedResultError(
-                UnableToGetDynamicDomainParameters(
-                  domainId,
+                UnableToGetDynamicSynchronizerParameters(
+                  synchronizerId,
                   requestId.unwrap,
                 )
               )
@@ -1333,21 +1314,21 @@ abstract class ProtocolProcessor[
           )
       )
 
-      decisionTime = domainParameters
+      decisionTime = synchronizerParameters
         .decisionTimeFor(requestId.unwrap)
         .valueOr(err =>
-          // This should not happen as domainParameters come from snapshot at requestId
+          // This should not happen as synchronizerParameters come from snapshot at requestId
           throw new IllegalStateException(err)
         )
 
-      participantDeadline = domainParameters
+      participantDeadline = synchronizerParameters
         .participantResponseDeadlineFor(requestId.unwrap)
         .valueOr(err =>
-          // This should not happen as domainParameters come from snapshot at requestId
+          // This should not happen as synchronizerParameters come from snapshot at requestId
           throw new IllegalStateException(err)
         )
 
-      _ <- condUnitET[Future](
+      _ <- condUnitET[FutureUnlessShutdown](
         resultTs <= decisionTime, {
           ephemeral.requestTracker.tick(sc, resultTs)
           steps.embedResultError(DecisionTimeElapsed(requestId, resultTs))
@@ -1357,7 +1338,7 @@ abstract class ProtocolProcessor[
            */
         },
       )
-      _ <- EitherT.cond[Future](
+      _ <- EitherT.cond[FutureUnlessShutdown](
         resultTs > participantDeadline || !result.message.verdict.isTimeoutDeterminedByMediator,
         (), {
           SyncServiceAlarm
@@ -1378,18 +1359,17 @@ abstract class ProtocolProcessor[
             requestId,
             resultTs,
             sc,
-            domainParameters,
+            synchronizerParameters,
           )
         else
-          EitherT.pure[Future, steps.ResultError](
+          EitherT.pure[FutureUnlessShutdown, steps.ResultError](
             EitherT.pure[FutureUnlessShutdown, steps.ResultError](())
           )
     } yield asyncResult
   }
 
-  /** This processing step corresponds to the end of the synchronous part of the processing
-    * of confirmation result.
-    * The inner `EitherT` corresponds to the subsequent async stage.
+  /** This processing step corresponds to the end of the synchronous part of the processing of
+    * confirmation result. The inner `EitherT` corresponds to the subsequent async stage.
     */
   private[this] def processResultInternal2(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
@@ -1397,20 +1377,23 @@ abstract class ProtocolProcessor[
       requestId: RequestId,
       resultTs: CantonTimestamp,
       sc: SequencerCounter,
-      domainParameters: DynamicDomainParametersWithValidity,
+      synchronizerParameters: DynamicSynchronizerParametersWithValidity,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, steps.ResultError, EitherT[FutureUnlessShutdown, steps.ResultError, Unit]] = {
+  ): EitherT[FutureUnlessShutdown, steps.ResultError, EitherT[
+    FutureUnlessShutdown,
+    steps.ResultError,
+    Unit,
+  ]] = {
     val unsignedResult = result.message
 
     def filterInvalidSignature(
         pendingRequestData: PendingRequestData
     ): FutureUnlessShutdown[Boolean] =
       for {
-        snapshot <- crypto.awaitSnapshotUS(requestId.unwrap)
-        res <- FutureUnlessShutdown.outcomeF(
-          result.verifyMediatorSignatures(snapshot, pendingRequestData.mediator.group).value
-        )
+        snapshot <- crypto.awaitSnapshot(requestId.unwrap)
+        res <- result.verifyMediatorSignatures(snapshot, pendingRequestData.mediator.group).value
+
       } yield {
         res match {
           case Left(err) =>
@@ -1496,7 +1479,7 @@ abstract class ProtocolProcessor[
           requestId,
           resultTs,
           sc,
-          domainParameters,
+          synchronizerParameters,
           pendingRequestDataOrReplayData,
         )
       }
@@ -1513,7 +1496,7 @@ abstract class ProtocolProcessor[
       requestId: RequestId,
       resultTs: CantonTimestamp,
       sc: SequencerCounter,
-      domainParameters: DynamicDomainParametersWithValidity,
+      synchronizerParameters: DynamicSynchronizerParametersWithValidity,
       pendingRequestDataOrReplayData: ReplayDataOr[
         steps.requestType.PendingRequestData
       ],
@@ -1559,7 +1542,8 @@ abstract class ProtocolProcessor[
             (commitSetOF, contractsToBeStored, eventO)
           }
         case _: CleanReplayData =>
-          val commitSetOF = Option.when(verdict.isApprove)(Future.successful(CommitSet.empty))
+          val commitSetOF =
+            Option.when(verdict.isApprove)(FutureUnlessShutdown.pure(CommitSet.empty))
           val eventO = None
 
           EitherT.pure[FutureUnlessShutdown, steps.ResultError](
@@ -1576,42 +1560,32 @@ abstract class ProtocolProcessor[
         resultTs,
         commitTime,
         commitSetOF,
-        domainParameters,
+        synchronizerParameters,
       ).leftMap(err => steps.embedResultError(RequestTrackerError(err)))
-        .mapK(FutureUnlessShutdown.outcomeK)
 
-      _ <- EitherT.right(
-        FutureUnlessShutdown.outcomeF(
-          ephemeral.contractStore.storeCreatedContracts(
-            contractsToBeStored.map((_, requestCounter))
-          )
-        )
-      )
+      _ <- EitherT.right(ephemeral.contractStore.storeContracts(contractsToBeStored))
 
       _ <- ifThenET(!cleanReplay) {
         logger.info(
-          show"Finalizing ${steps.requestKind.unquoted} request=${requestId.unwrap} with event ${eventO
-              .map(_.value)}."
+          show"Finalizing ${steps.requestKind.unquoted} request=${requestId.unwrap} with event $eventO."
         )
         for {
           commitSet <- EitherT.right[steps.ResultError](commitSetF)
-          _ = ephemeral.recordOrderPublisher.scheduleAcsChangePublication(
-            requestSequencerCounter,
-            requestId.unwrap,
-            requestCounter,
-            commitSet,
-          )
+          eventWithCommitSetO = eventO.map {
+            case commitSetUpdate: CommitSetUpdate =>
+              commitSetUpdate.withCommitSet(commitSet)
+
+            case u: SequencedUpdate => u
+          }
           _ = logger.info(show"About to wrap up request $requestId")
           requestTimestamp = requestId.unwrap
           _unit <- EitherT.right[steps.ResultError](
-            FutureUnlessShutdown.outcomeF(
-              terminateRequest(
-                requestCounter,
-                requestSequencerCounter,
-                requestTimestamp,
-                commitTime,
-                eventO,
-              )
+            terminateRequest(
+              requestCounter,
+              requestSequencerCounter,
+              requestTimestamp,
+              commitTime,
+              eventWithCommitSetO,
             )
           )
         } yield pendingSubmissionDataO.foreach(steps.postProcessResult(verdict, _))
@@ -1701,19 +1675,21 @@ abstract class ProtocolProcessor[
       requestId: RequestId,
       resultTimestamp: CantonTimestamp,
       commitTime: CantonTimestamp,
-      commitSetOF: Option[Future[CommitSet]],
-      domainParameters: DynamicDomainParametersWithValidity,
+      commitSetOF: Option[FutureUnlessShutdown[CommitSet]],
+      synchronizerParameters: DynamicSynchronizerParametersWithValidity,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): EitherT[Future, RequestTracker.RequestTrackerError, FutureUnlessShutdown[CommitSet]] = {
+  ): EitherT[FutureUnlessShutdown, RequestTracker.RequestTrackerError, FutureUnlessShutdown[
+    CommitSet
+  ]] = {
 
     def withRc(rc: RequestCounter, msg: String): String = s"Request $rc: $msg"
 
     val requestTimestamp = requestId.unwrap
 
     ErrorUtil.requireArgument(
-      resultTimestamp <= domainParameters
+      resultTimestamp <= synchronizerParameters
         .decisionTimeFor(requestTimestamp)
         .valueOr(e =>
           throw new IllegalStateException(s"Cannot enforce decision time constraint: $e")
@@ -1723,15 +1699,17 @@ abstract class ProtocolProcessor[
 
     for {
       _ <- EitherT
-        .fromEither[Future](ephemeral.requestTracker.addResult(rc, sc, resultTimestamp, commitTime))
+        .fromEither[FutureUnlessShutdown](
+          ephemeral.requestTracker.addResult(rc, sc, resultTimestamp, commitTime)
+        )
         .leftMap { e =>
           SyncServiceAlarm.Warn(s"Failed to add result for $requestId. $e").report()
           e
         }
-      commitSetF = commitSetOF.getOrElse(Future.successful(CommitSet.empty))
-      commitSetT <- EitherT.right(commitSetF.transform(Success(_)))
+      commitSetF = commitSetOF.getOrElse(FutureUnlessShutdown.pure(CommitSet.empty))
+      commitSetT <- EitherT.right(commitSetF.transform(ap => Success(UnlessShutdown.Outcome(ap))))
       commitFuture <- EitherT
-        .fromEither[Future](ephemeral.requestTracker.addCommitSet(rc, commitSetT))
+        .fromEither[FutureUnlessShutdown](ephemeral.requestTracker.addCommitSet(rc, commitSetT))
         .leftMap { e =>
           SyncServiceAlarm
             .Warn(s"Unexpected confirmation result message for $requestId. $e")
@@ -1745,7 +1723,12 @@ abstract class ProtocolProcessor[
             .Warn(withRc(rc, s"An error occurred while persisting commit set: $e"))
             .report()
         )
-        .flatMap(_ => FutureUnlessShutdown.fromTry(commitSetT))
+        .flatMap(_ =>
+          commitSetT match {
+            case Success(result) => FutureUnlessShutdown.lift(result)
+            case Failure(ex) => FutureUnlessShutdown.failed(ex)
+          }
+        )
     }
   }
 
@@ -1753,7 +1736,7 @@ abstract class ProtocolProcessor[
       parsedRequest: steps.ParsedRequestType,
       sequencerCounter: SequencerCounter,
       decisionTime: CantonTimestamp,
-      timeoutEvent: => Either[steps.ResultError, Option[Traced[Update]]],
+      timeoutEvent: => Either[steps.ResultError, Option[SequencedUpdate]],
   )(
       result: TimeoutResult
   )(implicit
@@ -1767,11 +1750,11 @@ abstract class ProtocolProcessor[
         show"${steps.requestKind.unquoted} request at $requestId timed out without a transaction result message."
       )
 
-      def publishEvent(): EitherT[Future, steps.ResultError, Unit] =
+      def publishEvent(): EitherT[FutureUnlessShutdown, steps.ResultError, Unit] =
         for {
-          maybeEvent <- EitherT.fromEither[Future](timeoutEvent)
+          maybeEvent <- EitherT.fromEither[FutureUnlessShutdown](timeoutEvent)
           requestTimestamp = requestId.unwrap
-          _unit <- EitherT.right[steps.ResultError](
+          _ <- EitherT.right[steps.ResultError](
             terminateRequest(
               requestCounter,
               sequencerCounter,
@@ -1804,7 +1787,7 @@ abstract class ProtocolProcessor[
 
         _ <- steps.handleTimeout(parsedRequest)
 
-        _ <- ifThenET(!cleanReplay)(publishEvent()).mapK(FutureUnlessShutdown.outcomeK)
+        _ <- ifThenET(!cleanReplay)(publishEvent())
       } yield ()
     } else EitherT.pure[FutureUnlessShutdown, steps.ResultError](())
 
@@ -1821,8 +1804,8 @@ abstract class ProtocolProcessor[
   }
 
   /** A request precedes the clean replay if it came before the
-    * [[com.digitalasset.canton.participant.store.SyncDomainEphemeralState.startingPoints]]'s
-    * [[com.digitalasset.canton.participant.store.SyncDomainEphemeralStateFactory.StartingPoints.cleanReplay]].
+    * [[com.digitalasset.canton.participant.sync.SyncEphemeralState.startingPoints]]'s
+    * [[com.digitalasset.canton.participant.sync.SyncEphemeralStateFactory.StartingPoints.cleanReplay]].
     */
   private[this] def precedesCleanReplay(requestId: RequestId): Boolean =
     requestId.unwrap <= ephemeral.startingPoints.cleanReplay.prenextTimestamp
@@ -1833,7 +1816,7 @@ object ProtocolProcessor {
   private val testsAllowedToDisableApprovalContradictionCheck = Seq(
     "LedgerAuthorizationReferenceIntegrationTestDefault",
     "LedgerAuthorizationBftOrderingIntegrationTestDefault",
-    "PackageVettingIntegrationTestDefault",
+    "PackageVettingIntegrationTestInMemory",
   )
 
   private[protocol] def isApprovalContradictionCheckEnabled(loggerName: String): Boolean = {
@@ -1900,7 +1883,8 @@ object ProtocolProcessor {
   }
 
   /** The sequencer did not sequence our event within the allotted time
-    * @param timestamp sequencer time when the timeout occurred
+    * @param timestamp
+    *   sequencer time when the timeout occurred
     */
   final case class SequencerTimeoutError(timestamp: CantonTimestamp)
       extends SubmissionProcessingError
@@ -1910,11 +1894,13 @@ object ProtocolProcessor {
     )
   }
 
-  final case class UnableToGetDynamicDomainParameters(domainId: DomainId, ts: CantonTimestamp)
-      extends RequestProcessingError
+  final case class UnableToGetDynamicSynchronizerParameters(
+      synchronizerId: SynchronizerId,
+      ts: CantonTimestamp,
+  ) extends RequestProcessingError
       with ResultProcessingError {
-    override protected def pretty: Pretty[UnableToGetDynamicDomainParameters] = prettyOfClass(
-      param("domain id", _.domainId),
+    override protected def pretty: Pretty[UnableToGetDynamicSynchronizerParameters] = prettyOfClass(
+      param("synchronizer id", _.synchronizerId),
       param("timestamp", _.ts),
     )
   }
@@ -1955,14 +1941,6 @@ object ProtocolProcessor {
   final case class TimeoutResultTooEarly(requestId: RequestId) extends ResultProcessingError {
     override protected def pretty: Pretty[TimeoutResultTooEarly] = prettyOfClass(
       unnamedParam(_.requestId)
-    )
-  }
-
-  final case class DomainParametersError(domainId: DomainId, context: String)
-      extends ProcessorError {
-    override protected def pretty: Pretty[DomainParametersError] = prettyOfClass(
-      param("domain", _.domainId),
-      param("context", _.context.unquoted),
     )
   }
 

@@ -1,9 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.admin
 
-import com.daml.error.ErrorsAssertions
+import cats.data.EitherT
 import com.daml.ledger.api.testing.utils.PekkoBeforeAndAfterAll
 import com.daml.ledger.api.v2.admin.package_management_service.{
   PackageManagementServiceGrpc,
@@ -11,27 +11,34 @@ import com.daml.ledger.api.v2.admin.package_management_service.{
   ValidateDarFileRequest,
   ValidateDarFileResponse,
 }
+import com.daml.nonempty.NonEmpty
 import com.daml.tracing.DefaultOpenTelemetry
 import com.daml.tracing.TelemetrySpecBase.*
-import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.data.{Offset, ProcessedDisclosedContract}
+import com.digitalasset.base.error.ErrorsAssertions
+import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.error.{TransactionError, TransactionRoutingError}
 import com.digitalasset.canton.ledger.api.health.HealthStatus
 import com.digitalasset.canton.ledger.participant.state
 import com.digitalasset.canton.ledger.participant.state.{
   InternalStateService,
   PruningResult,
   ReassignmentCommand,
+  RoutingSynchronizerState,
   SubmissionResult,
   SubmitterInfo,
+  SynchronizerRank,
   TransactionMeta,
 }
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.protocol.{LfContractId, LfSubmittedTransaction}
+import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.{TestTelemetrySetup, TraceContext}
-import com.digitalasset.daml.lf.data.Ref.{ApplicationId, CommandId, Party, SubmissionId, WorkflowId}
+import com.digitalasset.canton.util.Thereafter.syntax.*
+import com.digitalasset.canton.{BaseTest, LfKeyResolver, LfPackageId, LfPartyId}
+import com.digitalasset.daml.lf.data.Ref.{CommandId, Party, SubmissionId, UserId, WorkflowId}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref}
-import com.digitalasset.daml.lf.transaction.{GlobalKey, SubmittedTransaction}
-import com.digitalasset.daml.lf.value.Value
+import com.digitalasset.daml.lf.transaction.{FatContractInstance, SubmittedTransaction}
 import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.sdk.OpenTelemetrySdk
@@ -74,12 +81,12 @@ class ApiPackageManagementServiceSpec
       val scope = span.makeCurrent()
       apiService
         .uploadDarFile(UploadDarFileRequest(ByteString.EMPTY, aSubmissionId))
-        .andThen { case _ =>
+        .thereafter { _ =>
           scope.close()
           span.end()
         }
         .map { _ =>
-          testTelemetrySetup.reportedSpanAttributes should contain(anApplicationIdSpanAttribute)
+          testTelemetrySetup.reportedSpanAttributes should contain(anUserIdSpanAttribute)
           succeed
         }
     }
@@ -114,7 +121,7 @@ class ApiPackageManagementServiceSpec
 
   private def createApiService(): PackageManagementServiceGrpc.PackageManagementService =
     ApiPackageManagementService.createApiService(
-      TestWriteService(testTelemetrySetup.tracer),
+      TestSyncService(testTelemetrySetup.tracer),
       telemetry = new DefaultOpenTelemetry(OpenTelemetrySdk.builder().build()),
       loggerFactory = loggerFactory,
     )
@@ -123,17 +130,17 @@ class ApiPackageManagementServiceSpec
 object ApiPackageManagementServiceSpec {
   private val aSubmissionId = "aSubmission"
 
-  private final case class TestWriteService(tracer: Tracer) extends state.WriteService {
+  private final case class TestSyncService(tracer: Tracer) extends state.SyncService {
     override def uploadDar(
-        dar: ByteString,
+        dar: Seq[ByteString],
         submissionId: Ref.SubmissionId,
     )(implicit
         traceContext: TraceContext
     ): Future[SubmissionResult] = {
       val telemetryContext = traceContext.toDamlTelemetryContext(tracer)
       telemetryContext.setAttribute(
-        anApplicationIdSpanAttribute._1,
-        anApplicationIdSpanAttribute._2,
+        anUserIdSpanAttribute._1,
+        anUserIdSpanAttribute._2,
       )
       Future.successful(state.SubmissionResult.Acknowledged)
     }
@@ -143,8 +150,8 @@ object ApiPackageManagementServiceSpec {
     ): Future[SubmissionResult] = {
       val telemetryContext = traceContext.toDamlTelemetryContext(tracer)
       telemetryContext.setAttribute(
-        anApplicationIdSpanAttribute._1,
-        anApplicationIdSpanAttribute._2,
+        anUserIdSpanAttribute._1,
+        anUserIdSpanAttribute._2,
       )
       Future.successful(state.SubmissionResult.Acknowledged)
     }
@@ -162,29 +169,32 @@ object ApiPackageManagementServiceSpec {
       throw new UnsupportedOperationException()
 
     override def submitTransaction(
-        submitterInfo: SubmitterInfo,
-        optDomainId: Option[DomainId],
-        transactionMeta: TransactionMeta,
         transaction: SubmittedTransaction,
-        estimatedInterpretationCost: Long,
-        globalKeyMapping: Map[GlobalKey, Option[Value.ContractId]],
-        processedDisclosedContracts: ImmArray[ProcessedDisclosedContract],
-    )(implicit traceContext: TraceContext): CompletionStage[SubmissionResult] =
+        synchronizerRank: SynchronizerRank,
+        routingSynchronizerState: RoutingSynchronizerState,
+        submitterInfo: SubmitterInfo,
+        transactionMeta: TransactionMeta,
+        // Currently, the estimated interpretation cost is not used
+        _estimatedInterpretationCost: Long,
+        keyResolver: LfKeyResolver,
+        processedDisclosedContracts: ImmArray[FatContractInstance],
+    )(implicit
+        traceContext: TraceContext
+    ): CompletionStage[SubmissionResult] =
       throw new UnsupportedOperationException()
 
     override def submitReassignment(
         submitter: Party,
-        applicationId: ApplicationId,
+        userId: UserId,
         commandId: CommandId,
         submissionId: Option[SubmissionId],
         workflowId: Option[WorkflowId],
-        reassignmentCommand: ReassignmentCommand,
+        reassignmentCommands: Seq[ReassignmentCommand],
     )(implicit traceContext: TraceContext): CompletionStage[SubmissionResult] =
       throw new UnsupportedOperationException()
 
     override def allocateParty(
-        hint: Option[Party],
-        displayName: Option[String],
+        hint: Party,
         submissionId: SubmissionId,
     )(implicit traceContext: TraceContext): CompletionStage[SubmissionResult] =
       throw new UnsupportedOperationException()
@@ -194,6 +204,47 @@ object ApiPackageManagementServiceSpec {
         submissionId: SubmissionId,
         pruneAllDivulgedContracts: Boolean,
     ): CompletionStage[PruningResult] =
+      throw new UnsupportedOperationException()
+
+    override def packageMapFor(
+        submitters: Set[LfPartyId],
+        informees: Set[LfPartyId],
+        vettingValidityTimestamp: CantonTimestamp,
+        prescribedSynchronizer: Option[SynchronizerId],
+        routingSynchronizerState: RoutingSynchronizerState,
+    )(implicit
+        traceContext: TraceContext
+    ): FutureUnlessShutdown[Map[SynchronizerId, Map[LfPartyId, Set[LfPackageId]]]] =
+      throw new UnsupportedOperationException()
+
+    override def computeHighestRankedSynchronizerFromAdmissible(
+        submitterInfo: SubmitterInfo,
+        transaction: LfSubmittedTransaction,
+        transactionMeta: TransactionMeta,
+        admissibleSynchronizers: NonEmpty[Set[SynchronizerId]],
+        disclosedContractIds: List[LfContractId],
+        routingSynchronizerState: RoutingSynchronizerState,
+    )(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, TransactionRoutingError, SynchronizerId] =
+      throw new UnsupportedOperationException()
+
+    override def selectRoutingSynchronizer(
+        submitterInfo: SubmitterInfo,
+        transaction: LfSubmittedTransaction,
+        transactionMeta: TransactionMeta,
+        disclosedContractIds: List[LfContractId],
+        optSynchronizerId: Option[SynchronizerId],
+        transactionUsedForExternalSigning: Boolean,
+        routingSynchronizerState: RoutingSynchronizerState,
+    )(implicit
+        traceContext: TraceContext
+    ): EitherT[FutureUnlessShutdown, TransactionError, SynchronizerRank] =
+      throw new UnsupportedOperationException()
+
+    override def getRoutingSynchronizerState(implicit
+        traceContext: TraceContext
+    ): RoutingSynchronizerState =
       throw new UnsupportedOperationException()
   }
 }

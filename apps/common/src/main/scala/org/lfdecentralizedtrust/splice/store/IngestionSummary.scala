@@ -13,11 +13,11 @@ import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 final case class IngestionSummary(
     updateId: Option[String],
-    synchronizerId: Option[DomainId],
+    synchronizerId: Option[SynchronizerId],
     offset: Option[Long],
     recordTime: Option[CantonTimestamp],
     newAcsSize: Int,

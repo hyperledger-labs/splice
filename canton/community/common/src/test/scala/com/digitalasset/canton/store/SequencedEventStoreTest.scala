@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.store
@@ -6,23 +6,22 @@ package com.digitalasset.canton.store
 import cats.data.Validated.Valid
 import cats.syntax.parallel.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.crypto.{Signature, SigningPublicKey, TestHash}
+import com.digitalasset.canton.crypto.{Signature, SigningKeyUsage, SigningPublicKey, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.pruning.{PruningPhase, PruningStatus}
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, SequencerTestUtils}
 import com.digitalasset.canton.store.SequencedEventStore.*
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.{BaseTest, CloseableTest, SequencerCounter}
+import com.digitalasset.canton.{BaseTest, CloseableTest, FailOnShutdown, SequencerCounter}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.ExecutionContext
 
-trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
+trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest with FailOnShutdown {
   this: AsyncWordSpec with BaseTest =>
 
   private lazy val crypto: SymbolicCrypto =
@@ -32,12 +31,13 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       loggerFactory,
     )
 
-  private lazy val sequencerKey: SigningPublicKey = crypto.generateSymbolicSigningKey()
+  private lazy val sequencerKey: SigningPublicKey =
+    crypto.generateSymbolicSigningKey(usage = SigningKeyUsage.ProtocolOnly)
 
-  private def sign(str: String): Signature =
-    crypto.sign(TestHash.digest(str), sequencerKey.id)
+  def sign(str: String): Signature =
+    crypto.sign(TestHash.digest(str), sequencerKey.id, SigningKeyUsage.ProtocolOnly)
 
-  private lazy val domainId: DomainId = DomainId(
+  private lazy val synchronizerId: SynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("da::default")
   )
 
@@ -59,8 +59,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       SignedContent(
         Deliver.create(
           SequencerCounter(counter),
+          None, // TODO(#11834): Make sure that tests using mkDeliver are not affected by this after counters are gone
           ts,
-          domainId,
+          synchronizerId,
           Some(MessageId.tryCreate("deliver")),
           mkBatch(closedEnvelope),
           None,
@@ -75,15 +76,18 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
     )
 
   private lazy val singleDeliver: OrdinarySerializedEvent =
-    mkDeliver(99, CantonTimestamp.ofEpochMilli(-1))
+    mkDeliver(0, CantonTimestamp.ofEpochMilli(-1))
 
   private lazy val singleMaxDeliverPositive: OrdinarySerializedEvent =
     mkOrdinaryEvent(
       SignedContent(
         Deliver.create(
-          SequencerCounter.MaxValue,
+          counter = SequencerCounter(2),
+          Some(
+            CantonTimestamp.MaxValue
+          ), // TODO(#11834): Make sure that tests are not affected by this after counters are gone
           CantonTimestamp.MaxValue,
-          domainId,
+          synchronizerId,
           Some(MessageId.tryCreate("single-max-positive-deliver")),
           mkBatch(closedEnvelope),
           Some(CantonTimestamp.MaxValue),
@@ -101,12 +105,13 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
     mkOrdinaryEvent(
       SignedContent(
         Deliver.create(
-          SequencerCounter(Long.MinValue),
-          CantonTimestamp.MinValue,
-          domainId,
+          counter = SequencerCounter(0),
+          None, // TODO(#11834): Make sure that tests are not affected by this after counters are gone
+          CantonTimestamp.MinValue.immediateSuccessor,
+          synchronizerId,
           Some(MessageId.tryCreate("single-min-deliver")),
           mkBatch(closedEnvelope),
-          Some(CantonTimestamp.MinValue),
+          Some(CantonTimestamp.MinValue.immediateSuccessor),
           testedProtocolVersion,
           Option.empty[TrafficReceipt],
         ),
@@ -117,30 +122,10 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       nonEmptyTraceContext2,
     )
 
-  private val modifiedSingleDeliver: OrdinarySerializedEvent =
-    mkOrdinaryEvent(
-      SignedContent(
-        Deliver.create(
-          SequencerCounter(99),
-          CantonTimestamp.ofEpochMilli(-1),
-          domainId,
-          Some(MessageId.tryCreate("single-deliver")),
-          mkBatch(closedEnvelope),
-          None,
-          testedProtocolVersion,
-          Option.empty[TrafficReceipt],
-        ),
-        singleDeliver.signedEvent.signature,
-        None,
-        testedProtocolVersion,
-      ),
-      nonEmptyTraceContext2,
-    )
-
   private def mkDeliverEventTc1(sc: Long, ts: CantonTimestamp): OrdinarySerializedEvent =
     mkOrdinaryEvent(
       SignedContent(
-        SequencerTestUtils.mockDeliver(sc, ts, domainId),
+        SequencerTestUtils.mockDeliver(sc = sc, timestamp = ts, synchronizerId = synchronizerId),
         sign("Mock deliver signature"),
         None,
         testedProtocolVersion,
@@ -148,15 +133,16 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       nonEmptyTraceContext1,
     )
 
-  private val event: OrdinarySerializedEvent = mkDeliverEventTc1(100, CantonTimestamp.Epoch)
+  private val event: OrdinarySerializedEvent = mkDeliverEventTc1(1, CantonTimestamp.Epoch)
 
   private val emptyDeliver: OrdinarySerializedEvent =
     mkOrdinaryEvent(
       SignedContent(
         Deliver.create(
-          SequencerCounter(101),
+          SequencerCounter(2),
+          None, // TODO(#11834): Make sure that tests using emptyDeliver are not affected by this after counters are gone
           CantonTimestamp.ofEpochMilli(1),
-          domainId,
+          synchronizerId,
           Some(MessageId.tryCreate("empty-deliver")),
           mkBatch(),
           None,
@@ -174,8 +160,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       SignedContent(
         DeliverError.create(
           SequencerCounter(sc),
+          Some(
+            ts.immediatePredecessor
+          ), // TODO(#11834): Make sure that tests using mkDeliverError are not affected by this after counters are gone
           ts,
-          domainId,
+          synchronizerId,
           MessageId.tryCreate("deliver-error"),
           SequencerErrors.SubmissionRequestRefused("paniertes schnitzel"),
           testedProtocolVersion,
@@ -227,14 +216,14 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       val store = mk()
 
       val events = List[OrdinarySerializedEvent](
+        singleDeliver,
         event,
         emptyDeliver,
-        singleDeliver,
       )
       val criteria = List(
+        ByTimestamp(CantonTimestamp.ofEpochMilli(-1)),
         ByTimestamp(CantonTimestamp.Epoch),
         ByTimestamp(CantonTimestamp.ofEpochMilli(1)),
-        ByTimestamp(CantonTimestamp.ofEpochMilli(-1)),
       )
 
       for {
@@ -249,15 +238,24 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
     "store is idempotent" in {
       val store = mk()
 
-      val events = List[OrdinarySerializedEvent](
-        event,
-        event,
+      val events1 = List[OrdinarySerializedEvent](
         singleDeliver,
-        singleDeliver,
-        modifiedSingleDeliver,
+        event,
+      )
+      val events2 = List[OrdinarySerializedEvent](
+        event,
+        emptyDeliver,
       )
 
-      store.store(events).map(_ => succeed)
+      for {
+        _ <- store.store(events1).onShutdown(())
+        _ <- loggerFactory.assertLogs(
+          store.store(events2).onShutdown(()),
+          _.warningMessage should include(
+            "Skipping 1 events with timestamp <= 1970-01-01T00:00:00Z (presumed already processed)"
+          ),
+        )
+      } yield succeed
     }
 
     "store works for no events" in {
@@ -268,11 +266,15 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
     "find works for many events" in {
       val store = mk()
 
-      val events = (1L to 100L).toList.map { i =>
+      val events = (0L to 99L).toList.map { i =>
         mkOrdinaryEvent(
           SignedContent(
             SequencerTestUtils
-              .mockDeliver(2 * i + 1000, CantonTimestamp.ofEpochMilli(i * 2), domainId),
+              .mockDeliver(
+                sc = i,
+                timestamp = CantonTimestamp.ofEpochMilli(i * 2),
+                synchronizerId = synchronizerId,
+              ),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -282,7 +284,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
       for {
         _ <- store.store(events)
-        found <- (1L to 200L).toList
+        found <- (0L to 199L).toList
           .parTraverse { i =>
             store.find(ByTimestamp(CantonTimestamp.ofEpochMilli(i))).value
           }
@@ -298,6 +300,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "get a range by timestamp" in {
       val store = mk()
+      val startingCounter = 1000
       val eventCount = 100L
       val firstIndex = 10
       val lastIndex = 90
@@ -305,7 +308,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         mkOrdinaryEvent(
           SignedContent(
             SequencerTestUtils
-              .mockDeliver(2 * i + 1000, CantonTimestamp.Epoch.plusMillis(i * 2), domainId),
+              .mockDeliver(
+                sc = startingCounter + i,
+                timestamp = CantonTimestamp.Epoch.plusMillis(i * 2),
+                synchronizerId = synchronizerId,
+              ),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -314,13 +321,16 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       }
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(events)
         found <- store
           .findRange(
             ByTimestampRange(events(firstIndex).timestamp, events(lastIndex).timestamp),
             None,
           )
-          .failOnShutdown
+          .valueOrFail("")
       } yield {
         assert(found.toList == events.slice(firstIndex, lastIndex + 1))
       }
@@ -328,6 +338,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "get a range with a limit" in {
       val store = mk()
+      val startingCounter = 1000
       val eventCount = 100L
       val firstIndex = 10
       val limit = 90
@@ -335,7 +346,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         mkOrdinaryEvent(
           SignedContent(
             SequencerTestUtils
-              .mockDeliver(2 * i + 1000, CantonTimestamp.Epoch.plusMillis(i * 2), domainId),
+              .mockDeliver(
+                sc = startingCounter + i,
+                timestamp = CantonTimestamp.Epoch.plusMillis(i * 2),
+                synchronizerId = synchronizerId,
+              ),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -344,13 +359,16 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       }
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(events)
         foundByTs <- store
           .findRange(
             ByTimestampRange(events(firstIndex).timestamp, events.lastOption.value.timestamp),
             Some(limit),
           )
-          .failOnShutdown
+          .valueOrFail("")
       } yield {
         assert(foundByTs.toList == events.slice(firstIndex, firstIndex + limit))
       }
@@ -358,6 +376,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "returns all values within a range when range bounds are not in the store" in {
       val store = mk()
+      val startingCounter = 1000
       val eventCount = 100L
       val firstIndex = 10
       val lastIndex = 90
@@ -366,7 +385,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         mkOrdinaryEvent(
           SignedContent(
             SequencerTestUtils
-              .mockDeliver(delta * i, CantonTimestamp.Epoch.plusMillis(i * delta), domainId),
+              .mockDeliver(
+                sc = startingCounter + i,
+                timestamp = CantonTimestamp.Epoch.plusMillis(i * delta),
+                synchronizerId = synchronizerId,
+              ),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -375,6 +398,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       }
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(events)
         foundByTs1 <- store
           .findRange(
@@ -384,7 +410,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
             ),
             None,
           )
-          .failOnShutdown
+          .valueOrFail("")
         foundByTs2 <- store
           .findRange(
             ByTimestampRange(
@@ -393,7 +419,8 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
             ),
             None,
           )
-          .failOnShutdown
+          .valueOrFail("")
+
       } yield {
         assert(foundByTs1.toList == events.slice(firstIndex, lastIndex + 1))
         assert(foundByTs2.toList == events)
@@ -410,20 +437,22 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       } yield {
         assert(foundByTs.toList == List.empty)
       }
-    }.failOnShutdown
+    }.valueOrFail("")
 
     "find range returns no values when range outside store values" in {
       val store = mk()
+      val startingCounter = 149
       val min = 50L
       val max = 100L
-      val getSc = { (i: Long) => i * 2 + 100 }
+      val getSc = { (i: Long) => 100 + i }
       val getTs = { (i: Long) =>
         CantonTimestamp.Epoch.plusMillis(i * 2 + 200)
       }
       val events = (min to max).toList.map { i =>
         mkOrdinaryEvent(
           SignedContent(
-            SequencerTestUtils.mockDeliver(getSc(i), getTs(i), domainId),
+            SequencerTestUtils
+              .mockDeliver(sc = getSc(i), timestamp = getTs(i), synchronizerId = synchronizerId),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -432,14 +461,18 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       }
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(events)
         foundByTsAbove <- store
           .findRange(ByTimestampRange(getTs(max + 5), getTs(max + 10)), None)
-          .failOnShutdown
+          .valueOrFail("")
 
         foundByTsBelow <- store
           .findRange(ByTimestampRange(getTs(min - 10), getTs(min - 5)), None)
-          .failOnShutdown
+          .valueOrFail("")
+
       } yield {
         assert(foundByTsAbove.toList == List.empty)
         assert(foundByTsBelow.toList == List.empty)
@@ -448,11 +481,16 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "find range requires that the start of the range is not after the end" in {
       val store = mk()
+      val startingCounter = 1000
       val events = (1L to 100L).toList.map { i =>
         mkOrdinaryEvent(
           SignedContent(
             SequencerTestUtils
-              .mockDeliver(2 * i + 1000, CantonTimestamp.Epoch.plusMillis(i * 2), domainId),
+              .mockDeliver(
+                sc = 1000 + i,
+                timestamp = CantonTimestamp.Epoch.plusMillis(i * 2),
+                synchronizerId = synchronizerId,
+              ),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -461,6 +499,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       }
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(events)
       } yield {
         assertThrows[IllegalArgumentException](
@@ -474,10 +515,16 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "find range checks overlap with pruning" in {
       val store = mk()
+      val startingCounter = 0
       val events = (1L to 5L).toList.map { i =>
         mkOrdinaryEvent(
           SignedContent(
-            SequencerTestUtils.mockDeliver(i, CantonTimestamp.ofEpochSecond(i), domainId),
+            SequencerTestUtils
+              .mockDeliver(
+                sc = i,
+                timestamp = CantonTimestamp.ofEpochSecond(i),
+                synchronizerId = synchronizerId,
+              ),
             sign(s"signature $i"),
             None,
             testedProtocolVersion,
@@ -489,16 +536,18 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       val criterionAt = ByTimestampRange(tsPrune, CantonTimestamp.MaxValue)
       val criterionBelow = ByTimestampRange(CantonTimestamp.MinValue, CantonTimestamp.Epoch)
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(events)
-        _ <- store.prune(tsPrune).failOnShutdown
-        succeed <- store
+        _ <- store.prune(tsPrune)
+        _ <- store
           .findRange(ByTimestampRange(tsPrune.immediateSuccessor, ts4), None)
           .valueOrFail("successful range query")
-          .failOnShutdown
-        fail2 <- leftOrFail(store.findRange(criterionAt, None))("at pruning point").failOnShutdown
+        fail2 <- leftOrFail(store.findRange(criterionAt, None))("at pruning point")
         failBelow <- leftOrFail(store.findRange(criterionBelow, None))(
           "before pruning point"
-        ).failOnShutdown
+        )
       } yield {
         val pruningStatus = PruningStatus(PruningPhase.Completed, tsPrune, Some(tsPrune))
         fail2 shouldBe SequencedEventRangeOverlapsWithPruning(
@@ -516,25 +565,39 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "find returns the latest event" in {
       val store = mk()
-
+      val startingCounter = 99
       val firstDeliver =
         mkOrdinaryEvent(
           signDeliver(
-            SequencerTestUtils.mockDeliver(100, CantonTimestamp.Epoch, domainId)
+            SequencerTestUtils
+              .mockDeliver(
+                sc = 100,
+                timestamp = CantonTimestamp.Epoch,
+                synchronizerId = synchronizerId,
+              )
           ),
           nonEmptyTraceContext1,
         )
       val secondDeliver =
         mkOrdinaryEvent(
           signDeliver(
-            SequencerTestUtils.mockDeliver(101, CantonTimestamp.ofEpochSecond(1), domainId)
+            SequencerTestUtils
+              .mockDeliver(
+                sc = 101,
+                timestamp = CantonTimestamp.ofEpochSecond(1),
+                synchronizerId = synchronizerId,
+              )
           ),
           nonEmptyTraceContext2,
         )
       val thirdDeliver =
         mkOrdinaryEvent(
           signDeliver(
-            SequencerTestUtils.mockDeliver(103, CantonTimestamp.ofEpochSecond(100000), domainId)
+            SequencerTestUtils.mockDeliver(
+              sc = 103,
+              timestamp = CantonTimestamp.ofEpochSecond(100000),
+              synchronizerId = synchronizerId,
+            )
           )
         )
       val emptyBatch = mkBatch()
@@ -543,8 +606,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
           signDeliver(
             Deliver.create(
               SequencerCounter(102),
+              Some(
+                CantonTimestamp.ofEpochSecond(1)
+              ), // TODO(#11834): Make sure that tests are not affected by this after counters are gone
               CantonTimestamp.ofEpochSecond(2),
-              domainId,
+              synchronizerId,
               Some(MessageId.tryCreate("deliver1")),
               emptyBatch,
               None,
@@ -557,8 +623,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         signDeliver(
           Deliver.create(
             SequencerCounter(104),
+            Some(
+              deliver1.timestamp
+            ), // TODO(#11834): Make sure that tests are not affected by this after counters are gone
             CantonTimestamp.ofEpochSecond(200000),
-            domainId,
+            synchronizerId,
             Some(MessageId.tryCreate("deliver2")),
             emptyBatch,
             None,
@@ -569,6 +638,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       )
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(Seq(firstDeliver))
         findDeliver <- store
           .find(LatestUpto(CantonTimestamp.MaxValue))
@@ -592,6 +664,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "delete old sequenced events when pruned" in {
       val store = mk()
+      val startingCounter = 99
 
       val ts0 = CantonTimestamp.Epoch
       val ts1 = ts0.plusSeconds(1)
@@ -600,19 +673,44 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       val ts4 = ts0.plusSeconds(20)
 
       val firstDeliver =
-        mkOrdinaryEvent(signDeliver(SequencerTestUtils.mockDeliver(100, ts0, domainId)))
+        mkOrdinaryEvent(
+          signDeliver(
+            SequencerTestUtils.mockDeliver(
+              sc = 100,
+              timestamp = ts0,
+              synchronizerId = synchronizerId,
+            )
+          )
+        )
       val secondDeliver =
-        mkOrdinaryEvent(signDeliver(SequencerTestUtils.mockDeliver(101, ts1, domainId)))
+        mkOrdinaryEvent(
+          signDeliver(
+            SequencerTestUtils.mockDeliver(
+              sc = 101,
+              timestamp = ts1,
+              synchronizerId = synchronizerId,
+            )
+          )
+        )
       val thirdDeliver =
-        mkOrdinaryEvent(signDeliver(SequencerTestUtils.mockDeliver(103, ts3, domainId)))
+        mkOrdinaryEvent(
+          signDeliver(
+            SequencerTestUtils.mockDeliver(
+              sc = 103,
+              timestamp = ts3,
+              synchronizerId = synchronizerId,
+            )
+          )
+        )
       val emptyBatch = mkBatch()
       val deliver1 =
         mkOrdinaryEvent(
           signDeliver(
             Deliver.create(
               SequencerCounter(102),
+              None, // TODO(#11834): Make sure that tests are not affected by this after counters are gone
               ts2,
-              domainId,
+              synchronizerId,
               Some(MessageId.tryCreate("deliver1")),
               emptyBatch,
               None,
@@ -626,8 +724,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
           signDeliver(
             Deliver.create(
               SequencerCounter(104),
+              Some(
+                deliver1.timestamp
+              ), // TODO(#11834): Make sure that tests are not affected by this after counters are gone
               ts4,
-              domainId,
+              synchronizerId,
               Some(MessageId.tryCreate("deliver2")),
               emptyBatch,
               None,
@@ -638,8 +739,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         )
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(Seq(firstDeliver, secondDeliver, deliver1, thirdDeliver, deliver2))
-        _ <- store.prune(ts2).failOnShutdown
+        _ <- store.prune(ts2)
         eventsAfterPruningOrPurging <- store.sequencedEvents()
       } yield {
         assert(
@@ -651,6 +755,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
 
     "delete all sequenced events when purged" in {
       val store = mk()
+      val startingCounter = 99
 
       val ts0 = CantonTimestamp.Epoch
       val ts1 = ts0.plusSeconds(1)
@@ -659,19 +764,44 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       val ts4 = ts0.plusSeconds(20)
 
       val firstDeliver =
-        mkOrdinaryEvent(signDeliver(SequencerTestUtils.mockDeliver(100, ts0, domainId)))
+        mkOrdinaryEvent(
+          signDeliver(
+            SequencerTestUtils.mockDeliver(
+              sc = 100,
+              timestamp = ts0,
+              synchronizerId = synchronizerId,
+            )
+          )
+        )
       val secondDeliver =
-        mkOrdinaryEvent(signDeliver(SequencerTestUtils.mockDeliver(101, ts1, domainId)))
+        mkOrdinaryEvent(
+          signDeliver(
+            SequencerTestUtils.mockDeliver(
+              sc = 101,
+              timestamp = ts1,
+              synchronizerId = synchronizerId,
+            )
+          )
+        )
       val thirdDeliver =
-        mkOrdinaryEvent(signDeliver(SequencerTestUtils.mockDeliver(103, ts3, domainId)))
+        mkOrdinaryEvent(
+          signDeliver(
+            SequencerTestUtils.mockDeliver(
+              sc = 103,
+              timestamp = ts3,
+              synchronizerId = synchronizerId,
+            )
+          )
+        )
       val emptyBatch = mkBatch()
       val deliver1 =
         mkOrdinaryEvent(
           signDeliver(
             Deliver.create(
               SequencerCounter(102),
+              None, // TODO(#11834): Make sure that tests are not affected by this after counters are gone
               ts2,
-              domainId,
+              synchronizerId,
               Some(MessageId.tryCreate("deliver1")),
               emptyBatch,
               None,
@@ -685,8 +815,11 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
           signDeliver(
             Deliver.create(
               SequencerCounter(104),
+              Some(
+                deliver1.timestamp
+              ), // TODO(#11834): Make sure that tests are not affected by this after counters are gone
               ts4,
-              domainId,
+              synchronizerId,
               Some(MessageId.tryCreate("deliver2")),
               emptyBatch,
               None,
@@ -697,6 +830,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         )
 
       for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
         _ <- store.store(Seq(firstDeliver, secondDeliver, deliver1, thirdDeliver, deliver2))
         _ <- store.purge()
         eventsAfterPruningOrPurging <- store.sequencedEvents()
@@ -709,14 +845,14 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
       val store = mk()
 
       val events = List[OrdinarySerializedEvent](
+        singleMinDeliver,
         event,
         singleMaxDeliverPositive,
-        singleMinDeliver,
       )
       val criteria = List(
+        ByTimestamp(CantonTimestamp.MinValue.immediateSuccessor),
         ByTimestamp(CantonTimestamp.Epoch),
         ByTimestamp(CantonTimestamp.MaxValue),
-        ByTimestamp(CantonTimestamp.MinValue),
       )
 
       for {
@@ -729,6 +865,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
     }
 
     {
+      val startingCounter = 9
       lazy val deliver = mkDeliver(10, ts(10))
       lazy val secondDeliver = mkDeliverEventTc1(11, ts(11))
       lazy val deliverError = mkDeliverError(12, ts(12))
@@ -737,14 +874,15 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
-          _ <- store.store(Seq(deliver, secondDeliver, deliverError))
-          _ <- valueOrFail(store.ignoreEvents(SequencerCounter(11), SequencerCounter(11)))(
-            "ignoreEvents"
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
           )
+          _ <- store.store(Seq(deliver, secondDeliver, deliverError))
+          _ <- store.ignoreEvents(SequencerCounter(11), SequencerCounter(11)).valueOrFail("")
           events <- store.sequencedEvents()
           range <- valueOrFail(store.findRange(ByTimestampRange(ts(11), ts(12)), limit = None))(
             "findRange"
-          ).failOnShutdown
+          )
           byTimestamp <- valueOrFail(store.find(ByTimestamp(ts(11))))("find by timestamp")
           latestUpTo <- valueOrFail(store.find(LatestUpto(ts(11))))("find latest up to")
         } yield {
@@ -759,6 +897,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(13), SequencerCounter(14)))(
             "ignoreEvents"
@@ -766,7 +907,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
           events <- store.sequencedEvents()
           range <- valueOrFail(store.findRange(ByTimestampRange(ts(12), ts(14)), limit = None))(
             "findRange"
-          ).failOnShutdown
+          )
           ignoredEventByTimestamp <- valueOrFail(store.find(ByTimestamp(ts(13))))(
             "find by timestamp"
           )
@@ -789,6 +930,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(11), SequencerCounter(14)))(
             "ignoreEvents"
@@ -796,7 +940,7 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
           events <- store.sequencedEvents()
           range <- valueOrFail(store.findRange(ByTimestampRange(ts(11), ts(13)), limit = None))(
             "findRange"
-          ).failOnShutdown
+          )
           deliverByTimestamp <- valueOrFail(store.find(ByTimestamp(ts(10))))("find by timestamp")
           deliverLatestUpTo <- valueOrFail(store.find(LatestUpto(ts(10))))("find latest up to")
         } yield {
@@ -838,6 +982,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(0), SequencerCounter(14)))(
             "ignoreEvents"
@@ -858,6 +1005,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(1), SequencerCounter(0)))(
             "ignoreEvents1"
@@ -878,6 +1028,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(12), SequencerCounter(13)))(
             "ignoreEvents1"
@@ -901,6 +1054,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           err <- store.ignoreEvents(SequencerCounter(20), SequencerCounter(21)).value
           events <- store.sequencedEvents()
@@ -914,6 +1070,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(11), SequencerCounter(14)))(
             "ignoreEvents"
@@ -982,6 +1141,9 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         val store = mk()
 
         for {
+          _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+            SequencerCounter(startingCounter)
+          )
           _ <- store.store(Seq(deliver, secondDeliver, deliverError))
           _ <- valueOrFail(store.ignoreEvents(SequencerCounter(11), SequencerCounter(14)))(
             "ignoreEvents"
@@ -1013,5 +1175,28 @@ trait SequencedEventStoreTest extends PrunableByTimeTest with CloseableTest {
         }
       }
     }
+
+    "store and retrieve trace context" in {
+      val store = mk()
+      val startingCounter = 0
+      val events = List[OrdinarySerializedEvent](
+        mkDeliver(1, CantonTimestamp.ofEpochMilli(100)),
+        mkDeliverEventTc1(2, CantonTimestamp.ofEpochMilli(110)),
+      )
+      for {
+        _ <- store.reinitializeFromDbOrSetLowerBound(counterIfEmpty =
+          SequencerCounter(startingCounter)
+        )
+        _ <- store.store(events)
+        tc1 <- store.traceContext(CantonTimestamp.ofEpochMilli(100))
+        tc2 <- store.traceContext(CantonTimestamp.ofEpochMilli(110))
+        tc3 <- store.traceContext(CantonTimestamp.ofEpochMilli(111))
+      } yield {
+        tc1 shouldBe Some(nonEmptyTraceContext2)
+        tc2 shouldBe Some(nonEmptyTraceContext1)
+        tc3 shouldBe None
+      }
+    }
+
   }
 }

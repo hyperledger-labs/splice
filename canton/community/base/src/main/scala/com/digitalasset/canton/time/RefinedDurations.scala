@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.time
@@ -6,7 +6,11 @@ package com.digitalasset.canton.time
 import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
 import com.digitalasset.canton.checked
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveNumeric}
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeInt,
+  NonNegativeNumeric,
+  PositiveNumeric,
+}
 import com.digitalasset.canton.config.{
   NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
   PositiveDurationSeconds as PositiveDurationSecondsConfig,
@@ -30,6 +34,27 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.*
 
+object RefinedDuration {
+
+  /** Returns the duration in seconds truncated to the size of Int, returns as a maximum
+    * Int.MaxValue.
+    *
+    * Usage: On the database/jdbc level many timeouts require to be specified in seconds as an
+    * integer, not a long.
+    */
+  def toSecondsTruncated(duration: Duration, logger: TracedLogger)(implicit
+      traceContext: TraceContext
+  ): Int = {
+    val seconds = duration.getSeconds
+
+    if (seconds > Int.MaxValue) {
+      logger.info(s"Truncating $duration to integer")
+      Int.MaxValue
+    } else
+      seconds.toInt
+  }
+}
+
 sealed trait RefinedDuration extends Ordered[RefinedDuration] {
   def duration: Duration
   def unwrap: Duration = duration
@@ -45,7 +70,8 @@ sealed trait RefinedDuration extends Ordered[RefinedDuration] {
 trait RefinedDurationCompanion[RD <: RefinedDuration] {
 
   /** Factory method for creating the [[RefinedDuration]] from a [[java.time.Duration]]
-    * @throws java.lang.IllegalArgumentException if the duration does not satisfy the refinement predicate
+    * @throws java.lang.IllegalArgumentException
+    *   if the duration does not satisfy the refinement predicate
     */
   def tryCreate(duration: Duration): RD =
     create(duration).valueOr(err => throw new IllegalArgumentException(err))
@@ -127,24 +153,17 @@ final case class PositiveFiniteDuration private (duration: Duration)
 
   override protected def pretty: Pretty[PositiveFiniteDuration] = prettyOfParam(_.duration)
 
-  /** Returns the duration in seconds truncated to the size of Int, returns as a maximum Int.MaxValue.
+  /** Returns the duration in seconds truncated to the size of Int, returns as a maximum
+    * Int.MaxValue.
     *
-    * Usage: On the database/jdbc level many timeouts require to be specified in seconds as an integer, not a long.
+    * Usage: On the database/jdbc level many timeouts require to be specified in seconds as an
+    * integer, not a long.
     */
   def toSecondsTruncated(
       logger: TracedLogger
-  )(implicit traceContext: TraceContext): PositiveNumeric[Int] = {
-    val seconds = duration.getSeconds
-
-    val result = if (seconds > Int.MaxValue) {
-      logger.info(s"Truncating $duration to integer")
-      Int.MaxValue
-    } else
-      seconds.toInt
-
+  )(implicit traceContext: TraceContext): PositiveNumeric[Int] =
     // Result must be positive due to assertion on duration
-    checked(PositiveNumeric.tryCreate(result))
-  }
+    checked(PositiveNumeric.tryCreate(RefinedDuration.toSecondsTruncated(duration, logger)))
 
   def toConfig: PositiveFiniteDurationConfig = checked(
     PositiveFiniteDurationConfig.tryFromJavaDuration(duration)
@@ -191,6 +210,18 @@ final case class NonNegativeFiniteDuration private (duration: Duration)
   def toConfig: NonNegativeFiniteDurationConfig = checked(
     NonNegativeFiniteDurationConfig.tryFromJavaDuration(duration)
   )
+
+  /** Returns the duration in seconds truncated to the size of Int, returns as a maximum
+    * Int.MaxValue.
+    *
+    * Usage: On the database/jdbc level many timeouts require to be specified in seconds as an
+    * integer, not a long.
+    */
+  def toSecondsTruncated(
+      logger: TracedLogger
+  )(implicit traceContext: TraceContext): NonNegativeNumeric[Int] =
+    // Result must be positive due to assertion on duration
+    checked(NonNegativeNumeric.tryCreate(RefinedDuration.toSecondsTruncated(duration, logger)))
 }
 
 object NonNegativeFiniteDuration extends RefinedDurationCompanion[NonNegativeFiniteDuration] {
@@ -260,6 +291,7 @@ final case class PositiveSeconds private (duration: Duration)
     val newDuration = duration.plus(i.duration)
     checked(PositiveSeconds(newDuration))
   }
+
 }
 
 object PositiveSeconds extends RefinedDurationCompanion[PositiveSeconds] {
@@ -283,20 +315,4 @@ object PositiveSeconds extends RefinedDurationCompanion[PositiveSeconds] {
 
   def fromConfig(config: PositiveDurationSecondsConfig): PositiveSeconds =
     PositiveSeconds(config.asJava)
-}
-
-object EnrichedDurations {
-  import com.digitalasset.canton.config
-
-  implicit class RichNonNegativeFiniteDurationConfig(duration: config.NonNegativeFiniteDuration) {
-    def toInternal: NonNegativeFiniteDuration = checked(
-      NonNegativeFiniteDuration.tryCreate(duration.asJava)
-    )
-  }
-
-  implicit class RichPositiveFiniteDurationConfig(duration: config.PositiveFiniteDuration) {
-    def toInternal: PositiveFiniteDuration = checked(
-      PositiveFiniteDuration.tryCreate(duration.asJava)
-    )
-  }
 }

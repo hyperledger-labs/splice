@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.store.backend.common
@@ -12,12 +12,8 @@ import com.digitalasset.canton.platform.store.backend.localstore.{
   UserManagementStorageBackend,
   UserManagementStorageBackendImpl,
 }
-import com.digitalasset.canton.platform.store.cache.LedgerEndCache
 
 trait CommonStorageBackendFactory extends StorageBackendFactory {
-
-  override val createMeteringParameterStorageBackend: MeteringParameterStorageBackend =
-    MeteringParameterStorageBackendImpl
 
   override val createIntegrityStorageBackend: IntegrityStorageBackend =
     IntegrityStorageBackendImpl
@@ -30,14 +26,6 @@ trait CommonStorageBackendFactory extends StorageBackendFactory {
 
   override val createIdentityProviderConfigStorageBackend: IdentityProviderStorageBackend =
     IdentityProviderStorageBackendImpl
-
-  override def createMeteringStorageReadBackend(
-      ledgerEndCache: LedgerEndCache
-  ): MeteringStorageReadBackend =
-    MeteringStorageBackendReadTemplate
-
-  def createMeteringStorageWriteBackend: MeteringStorageWriteBackend =
-    MeteringStorageBackendWriteTemplate
 
   override def createPartyRecordStorageBackend: PartyRecordStorageBackend =
     PartyRecordStorageBackendImpl

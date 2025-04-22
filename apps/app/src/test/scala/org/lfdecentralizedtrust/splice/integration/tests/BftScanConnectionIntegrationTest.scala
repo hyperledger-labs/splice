@@ -1,13 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
@@ -16,8 +11,7 @@ import scala.jdk.OptionConverters.*
 
 class BftScanConnectionIntegrationTest extends IntegrationTest with WalletTestUtil with SvTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart

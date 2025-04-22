@@ -53,7 +53,7 @@ class ValidatorRightTrigger(
     val party = PartyId.tryFromProtoPrimitive(validatorRight.payload.user)
     for {
       partyToKeyMappings <- participantAdminConnection.listPartyToKey(
-        filterStore = TopologyStoreId.DomainStore(validatorRight.domain),
+        filterStore = TopologyStoreId.SynchronizerStore(validatorRight.domain),
         filterParty = Some(party),
       )
       r <-

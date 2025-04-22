@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol
@@ -12,11 +12,13 @@ import com.google.common.annotations.VisibleForTesting
 import monocle.Lens
 import monocle.macros.GenLens
 
-/** @param consumedInCore Whether the contract is consumed in the core of the view.
-  *   [[com.digitalasset.canton.protocol.WellFormedTransaction]] checks that a created contract
-  *   can only be used in the same or deeper rollback scopes as the create, so if `rolledBack` is true
+/** @param consumedInCore
+  *   Whether the contract is consumed in the core of the view.
+  *   [[com.digitalasset.canton.protocol.WellFormedTransaction]] checks that a created contract can
+  *   only be used in the same or deeper rollback scopes as the create, so if `rolledBack` is true
   *   then `consumedInCore` is false.
-  * @param rolledBack Whether the contract creation has a different rollback scope than the view.
+  * @param rolledBack
+  *   Whether the contract creation has a different rollback scope than the view.
   */
 final case class CreatedContract private (
     contract: SerializableContract,
@@ -49,15 +51,8 @@ object CreatedContract {
       rolledBack: Boolean,
   ): Either[String, CreatedContract] =
     CantonContractIdVersion
-      .ensureCantonContractId(contract.contractId)
+      .extractCantonContractIdVersion(contract.contractId)
       .leftMap(err => s"Encountered invalid Canton contract id: ${err.toString}")
-      .flatMap { _ =>
-        // Contracts created with the "authenticated" contract id prefix-of-suffix
-        // must have contract_salt present in order to be properly authenticated (and used for explicit disclosure)
-        ProtoConverter
-          .required("contract_salt", contract.contractSalt)
-          .leftMap(err => s"Failed instantiating created contract: ${err.message}")
-      }
       .map(_ => new CreatedContract(contract, consumedInCore, rolledBack))
 
   def tryCreate(
@@ -94,11 +89,13 @@ object CreatedContract {
     GenLens[CreatedContract](_.contract)
 }
 
-/** @param consumedInView Whether the contract is consumed in the view.
-  *   [[com.digitalasset.canton.protocol.WellFormedTransaction]] checks that a created contract
-  *   can only be used in the same or deeper rollback scopes as the create, so if `rolledBack` is true
+/** @param consumedInView
+  *   Whether the contract is consumed in the view.
+  *   [[com.digitalasset.canton.protocol.WellFormedTransaction]] checks that a created contract can
+  *   only be used in the same or deeper rollback scopes as the create, so if `rolledBack` is true
   *   then `consumedInView` is false.
-  * @param rolledBack Whether the contract creation has a different rollback scope than the view.
+  * @param rolledBack
+  *   Whether the contract creation has a different rollback scope than the view.
   */
 final case class CreatedContractInView(
     contract: SerializableContract,

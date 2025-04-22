@@ -37,7 +37,7 @@ object HttpSvSoftDomainMigrationPocAppClient {
       )
   }
 
-  case class ReconcileSynchronizerDamlState(domainIdPrefix: String)
+  case class ReconcileSynchronizerDamlState(synchronizerIdPrefix: String)
       extends BaseCommand[http.ReconcileSynchronizerDamlStateResponse, Unit] {
     override def submitRequest(
         client: Client,
@@ -46,19 +46,19 @@ object HttpSvSoftDomainMigrationPocAppClient {
       Throwable,
       HttpResponse,
     ], http.ReconcileSynchronizerDamlStateResponse] =
-      client.reconcileSynchronizerDamlState(domainIdPrefix, headers = headers)
+      client.reconcileSynchronizerDamlState(synchronizerIdPrefix, headers = headers)
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ReconcileSynchronizerDamlStateResponse.OK => Right(())
     }
   }
 
-  case class SignDsoPartyToParticipant(domainIdPrefix: String)
+  case class SignDsoPartyToParticipant(synchronizerIdPrefix: String)
       extends BaseCommand[http.SignDsoPartyToParticipantResponse, Unit] {
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.SignDsoPartyToParticipantResponse] =
-      client.signDsoPartyToParticipant(domainIdPrefix, headers = headers)
+      client.signDsoPartyToParticipant(synchronizerIdPrefix, headers = headers)
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.SignDsoPartyToParticipantResponse.OK => Right(())
     }
