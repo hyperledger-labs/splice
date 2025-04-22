@@ -362,3 +362,11 @@ components:
           description: |
             When requesting the next page of results, pass this as URL query parameter `after`.
             If absent or `null`, there are no more pages.
+
+    FeatureSupportResponse:
+      type: object
+      required:
+        - new_governance_flow
+      properties:
+        new_governance_flow:
+          type: boolean

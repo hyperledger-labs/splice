@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.validator.store.db
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, AcsTables, IndexColumnValue}
 import org.lfdecentralizedtrust.splice.util.Contract
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 
 object ValidatorTables extends AcsTables {
 
@@ -17,7 +17,7 @@ object ValidatorTables extends AcsTables {
       userName: Option[String] = None,
       providerParty: Option[PartyId] = None,
       validatorParty: Option[PartyId] = None,
-      trafficDomainId: Option[DomainId] = None,
+      trafficSynchronizerId: Option[SynchronizerId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] =
       Seq[(String, IndexColumnValue[?])](
@@ -25,7 +25,7 @@ object ValidatorTables extends AcsTables {
         "user_name" -> userName.map(lengthLimited),
         "provider_party" -> providerParty,
         "validator_party" -> validatorParty,
-        "traffic_domain_id" -> trafficDomainId,
+        "traffic_domain_id" -> trafficSynchronizerId,
       )
   }
 

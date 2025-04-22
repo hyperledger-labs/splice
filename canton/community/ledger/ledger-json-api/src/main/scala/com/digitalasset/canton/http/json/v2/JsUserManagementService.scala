@@ -1,22 +1,22 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.http.json.v2
 
 import com.daml.ledger.api.v2.admin.user_management_service
+import com.digitalasset.canton.http.json.v2.CirceRelaxedCodec.deriveRelaxedCodec
 import com.digitalasset.canton.http.json.v2.Endpoints.{CallerContext, TracedInput}
-import com.digitalasset.daml.lf.data.Ref.UserId
-import com.digitalasset.canton.ledger.client.services.admin.UserManagementClient
 import com.digitalasset.canton.http.json.v2.JsSchema.DirectScalaPbRwImplicits.*
 import com.digitalasset.canton.http.json.v2.JsSchema.JsCantonError
+import com.digitalasset.canton.ledger.client.services.admin.UserManagementClient
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.InvalidArgument
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.generic.semiauto.deriveCodec
+import com.digitalasset.daml.lf.data.Ref.UserId
 import io.circe.Codec
-import sttp.model.QueryParams
-import sttp.tapir.generic.auto.*
+import io.circe.generic.extras.semiauto.deriveConfiguredCodec
 import sttp.tapir.*
+import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.jsonBody
 
 import scala.concurrent.Future
@@ -28,11 +28,12 @@ class JsUserManagementService(
     with NamedLogging {
   import JsUserManagementService.*
 
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   def endpoints() = List(
-    withServerLogic(
+    asPagedList(
       JsUserManagementService.listUsersEndpoint,
       listUsers,
-    ), // TODO (i19538) paging
+    ),
     withServerLogic(
       JsUserManagementService.createUserEndpoint,
       createUser,
@@ -78,14 +79,16 @@ class JsUserManagementService(
 
   private def listUsers(
       callerContext: CallerContext
-  ): TracedInput[QueryParams] => Future[
+  ): TracedInput[PagedList[Unit]] => Future[
     Either[JsCantonError, user_management_service.ListUsersResponse]
   ] = req =>
     userManagementClient
       .serviceStub(callerContext.token())(req.traceContext)
-      .listUsers(user_management_service.ListUsersRequest())
+      .listUsers(
+        user_management_service
+          .ListUsersRequest(req.in.pageToken.getOrElse(""), req.in.pageSize.getOrElse(0), "")
+      )
       .resultToRight
-  // TODO (i19538) paging
 
   private def getUser(
       callerContext: CallerContext
@@ -95,7 +98,12 @@ class JsUserManagementService(
         case Right(userId) =>
           userManagementClient
             .serviceStub(callerContext.token())(req.traceContext)
-            .getUser(user_management_service.GetUserRequest(userId = userId))
+            .getUser(
+              user_management_service.GetUserRequest(
+                userId = userId,
+                identityProviderId = "",
+              )
+            )
             .resultToRight
         case Left(error) => malformedUserId(error)(req.traceContext)
 
@@ -136,7 +144,12 @@ class JsUserManagementService(
       case Right(userId) =>
         userManagementClient
           .serviceStub(callerContext.token())(req.traceContext)
-          .listUserRights(new user_management_service.ListUserRightsRequest(userId = userId))
+          .listUserRights(
+            new user_management_service.ListUserRightsRequest(
+              userId = userId,
+              identityProviderId = "",
+            )
+          )
           .resultToRight
       case Left(error) => malformedUserId(error)(req.traceContext)
     }
@@ -202,7 +215,7 @@ class JsUserManagementService(
     )
 }
 
-object JsUserManagementService {
+object JsUserManagementService extends DocumentationEndpoints {
   import Endpoints.*
   import JsUserManagementCodecs.*
 
@@ -210,8 +223,8 @@ object JsUserManagementService {
   private val userIdPath = "user-id"
   val listUsersEndpoint =
     users.get
-      .in(queryParams)
       .out(jsonBody[user_management_service.ListUsersResponse])
+      .inPagedListParams()
       .description("List all users.")
 
   val createUserEndpoint =
@@ -269,44 +282,65 @@ object JsUserManagementService {
       .out(jsonBody[user_management_service.UpdateUserIdentityProviderIdResponse])
       .description("Update user identity provider.")
 
+  override def documentation: Seq[AnyEndpoint] = List(
+    listUsersEndpoint,
+    createUserEndpoint,
+    getUserEndpoint,
+    updateUserEndpoint,
+    deleteUserEndpoint,
+    grantUserRightsEndpoint,
+    revokeUserRightsEndpoint,
+    listUserRightsEndpoint,
+    updateUserIdentityProviderEndpoint,
+  )
 }
 
 object JsUserManagementCodecs {
+  import JsSchema.config
+  import io.circe.generic.extras.auto.*
 
-  implicit val user: Codec[user_management_service.User] = deriveCodec
+  implicit val user: Codec[user_management_service.User] = deriveRelaxedCodec
   implicit val participantAdmin: Codec[user_management_service.Right.ParticipantAdmin] =
-    deriveCodec
-  implicit val canActAs: Codec[user_management_service.Right.CanActAs] = deriveCodec
-  implicit val canReadAs: Codec[user_management_service.Right.CanReadAs] = deriveCodec
+    deriveRelaxedCodec
+  implicit val canActAs: Codec[user_management_service.Right.CanActAs] = deriveRelaxedCodec
+  implicit val canReadAs: Codec[user_management_service.Right.CanReadAs] = deriveRelaxedCodec
   implicit val identityProviderAdmin: Codec[user_management_service.Right.IdentityProviderAdmin] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val canReadAsAnyParty: Codec[user_management_service.Right.CanReadAsAnyParty] =
-    deriveCodec
-  implicit val king: Codec[user_management_service.Right.Kind] = deriveCodec
-  implicit val right: Codec[user_management_service.Right] = deriveCodec
-  implicit val createUserRequest: Codec[user_management_service.CreateUserRequest] = deriveCodec
-  implicit val updateUserRequest: Codec[user_management_service.UpdateUserRequest] = deriveCodec
-  implicit val listUserResponse: Codec[user_management_service.ListUsersResponse] = deriveCodec
-  implicit val createUserResponse: Codec[user_management_service.CreateUserResponse] = deriveCodec
-  implicit val updateUserResponse: Codec[user_management_service.UpdateUserResponse] = deriveCodec
-  implicit val getUserResponse: Codec[user_management_service.GetUserResponse] = deriveCodec
+    deriveRelaxedCodec
+  implicit val kind: Codec[user_management_service.Right.Kind] = deriveConfiguredCodec // ADT
+
+  implicit val right: Codec[user_management_service.Right] = deriveRelaxedCodec
+  implicit val createUserRequest: Codec[user_management_service.CreateUserRequest] =
+    deriveRelaxedCodec
+  implicit val updateUserRequest: Codec[user_management_service.UpdateUserRequest] =
+    deriveRelaxedCodec
+  implicit val listUserResponse: Codec[user_management_service.ListUsersResponse] =
+    deriveRelaxedCodec
+  implicit val createUserResponse: Codec[user_management_service.CreateUserResponse] =
+    deriveRelaxedCodec
+  implicit val updateUserResponse: Codec[user_management_service.UpdateUserResponse] =
+    deriveRelaxedCodec
+  implicit val getUserResponse: Codec[user_management_service.GetUserResponse] = deriveRelaxedCodec
   implicit val grantUserRightsRequest: Codec[user_management_service.GrantUserRightsRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val grantUserRightsResponse: Codec[user_management_service.GrantUserRightsResponse] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val revokeUserRightsRequest: Codec[user_management_service.RevokeUserRightsRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val revokeUserRightsResponse: Codec[user_management_service.RevokeUserRightsResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val listUserRightsRequest: Codec[user_management_service.ListUserRightsRequest] =
-    deriveCodec
+    deriveRelaxedCodec
   implicit val listUserRightsResponse: Codec[user_management_service.ListUserRightsResponse] =
-    deriveCodec
+    deriveRelaxedCodec
 
   implicit val updateIdentityProviderRequest
-      : Codec[user_management_service.UpdateUserIdentityProviderIdRequest] = deriveCodec
+      : Codec[user_management_service.UpdateUserIdentityProviderIdRequest] = deriveRelaxedCodec
   implicit val updateIdentityProviderResponse
-      : Codec[user_management_service.UpdateUserIdentityProviderIdResponse] = deriveCodec
+      : Codec[user_management_service.UpdateUserIdentityProviderIdResponse] = deriveRelaxedCodec
 
+  // Schema mappings are added to align generated tapir docs with a circe mapping of ADTs
+  implicit val kindSchema: Schema[user_management_service.Right.Kind] = Schema.oneOfWrapped
 }

@@ -1,0 +1,328 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Common utilities for implementing the token APIs for Amulet.
+
+module Splice.Amulet.TokenApiUtils where
+
+import DA.Optional
+import DA.Monoid ()
+import DA.Time
+import DA.TextMap (TextMap)
+import DA.TextMap qualified as TextMap
+import DA.Text qualified as T
+
+import Splice.Api.Token.MetadataV1
+import Splice.Api.FeaturedAppRightV1
+import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+
+
+splicePrefix : Text
+splicePrefix = "splice.lfdecentralizedtrust.org/"
+
+amuletPrefix : Text
+amuletPrefix = "amulet." <> splicePrefix
+
+-- | Shared definition of the instrument-id used for amulets.
+amuletInstrumentId : Party -> Api.Token.HoldingV1.InstrumentId
+amuletInstrumentId dso =
+  Api.Token.HoldingV1.InstrumentId with admin = dso; id = "Amulet"
+
+-- | Add an optional metadata entry.
+optionalMetadata : Text -> (a -> Text) -> Optional a -> TextMap Text -> TextMap Text
+optionalMetadata k f optValue m =
+  case optValue of
+    None -> m
+    Some v -> TextMap.insert k (f v) m
+
+-- | Add an metadata entry if it is non-zero number.
+nonZeroMetadata : (Eq a, Additive a, Show a) => Text -> a -> TextMap Text -> TextMap Text
+nonZeroMetadata k n m
+  | n == aunit = m
+  | otherwise = TextMap.insert k (show n) m
+
+
+-- Amulet Metadata keys
+-----------------------
+
+createdInRoundMetaKey : Text
+createdInRoundMetaKey = amuletPrefix <> "created-in-round"
+
+ratePerRoundMetaKey : Text
+ratePerRoundMetaKey = amuletPrefix <> "rate-per-round"
+
+svRewardAmountMetaKey : Text
+svRewardAmountMetaKey = amuletPrefix <> "sv-rewards"
+
+appRewardAmountMetaKey : Text
+appRewardAmountMetaKey = amuletPrefix <> "app-rewards"
+
+validatorRewardAmountMetaKey : Text
+validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"
+
+appRewardBeneficiariesMetaKey : Text
+appRewardBeneficiariesMetaKey = amuletPrefix <> "app-reward-beneficiaries"
+
+appRewardBeneficiaryWeightsMetaKey : Text
+appRewardBeneficiaryWeightsMetaKey = amuletPrefix <> "app-reward-beneficiary-weights"
+
+
+-- Splice API Metadata keys
+---------------------------
+
+-- | Short, human-readable reason for the transaction.
+reasonMetaKey : Text
+reasonMetaKey = splicePrefix <> "reason"
+
+-- | Kind of the transaction.
+txKindMetaKey : Text
+txKindMetaKey = splicePrefix <> "tx-kind"
+
+-- | The sender of a transfer.
+senderMetaKey : Text
+senderMetaKey = splicePrefix <> "sender"
+
+-- | The amount of token holdings burned as part of a transaction.
+burnedMetaKey : Text
+burnedMetaKey = splicePrefix <> "burned"
+
+-- | Build the metadata for a transaction affecting the amulet holdings.
+holdingTxMeta : TxKind -> Optional Text -> Optional Party -> Optional Decimal -> Metadata
+holdingTxMeta kind reason sender burned =
+  Metadata with
+    values =
+      nonZeroMetadata burnedMetaKey (fromOptional 0.0 burned) $
+      optionalMetadata senderMetaKey partyToText sender $
+      optionalMetadata reasonMetaKey identity reason $
+      TextMap.fromList [(txKindMetaKey, txKindToText kind)]
+
+-- | Exported for testing only
+txKindToText : TxKind -> Text
+txKindToText kind = case kind of
+  TxKind_Transfer -> "transfer"
+  TxKind_Unlock -> "unlock"
+  TxKind_MergeSplit -> "merge-split"
+  TxKind_Burn -> "burn"
+  TxKind_Mint -> "mint"
+  TxKind_ExpireDust -> "expire-dust"
+
+-- | Simplified version for a few of the common cases.
+simpleHoldingTxMeta : TxKind -> Optional Text -> Optional Decimal -> Metadata
+simpleHoldingTxMeta kind reason burned = holdingTxMeta kind reason None burned
+
+-- | Internal type for the transaction kind.
+data TxKind
+  = TxKind_Transfer
+  | TxKind_Unlock
+  | TxKind_MergeSplit
+  | TxKind_Burn
+  | TxKind_Mint
+  | TxKind_ExpireDust
+  deriving (Eq) -- intentionally no Show to avoid SCU contraints on code changes
+
+-- helper instances: defined here as they are not part of the API
+instance Semigroup Metadata  where
+  (<>) (Metadata a) (Metadata b) = Metadata with values = a <> b
+
+instance Monoid Metadata  where
+  mempty = emptyMetadata
+
+
+-- Choice context keys for splice
+---------------------------------
+
+amuletRulesContextKey : Text
+amuletRulesContextKey = "amulet-rules"
+
+openRoundContextKey : Text
+openRoundContextKey = "open-round"
+
+featuredAppRightContextKey : Text
+featuredAppRightContextKey = "featured-app-right"
+
+transferPreapprovalContextKey : Text
+transferPreapprovalContextKey = "transfer-preapproval"
+
+-- | The key used to embed all the lock specification in the choice context.
+lockContextKey : Text
+lockContextKey = "lock"
+
+lockExpiresAtContextKey : Text
+lockExpiresAtContextKey = "expires-at"
+
+lockHoldersContextKey : Text
+lockHoldersContextKey = "holders"
+
+-- | The context description of a lock.
+lockContextContextKey : Text
+lockContextContextKey = "lock-context"
+
+-- | Key used to signal to a choice whether an expired locked amulet should be
+-- unlocked.
+expireLockKey : Text
+expireLockKey = "expire-lock"
+
+
+-- Metadata utilities
+---------------------
+
+-- | Copy only the burn metadata. Used for token standard choices to copy the burn
+-- from a transfer result.
+copyOnlyBurnMeta : Optional Metadata -> Metadata
+copyOnlyBurnMeta optOrigMeta = fromOptional emptyMetadata $ do
+  origMeta <- optOrigMeta
+  origValue <- TextMap.lookup burnedMetaKey origMeta.values
+  pure $ Metadata with
+    values =
+      TextMap.singleton burnedMetaKey origValue
+
+beneficiariesFromMetadata : Metadata -> Either Text (Optional [AppRewardBeneficiary])
+beneficiariesFromMetadata meta = do
+  let optBs = TextMap.lookup appRewardBeneficiariesMetaKey meta.values
+  let optWeights = TextMap.lookup appRewardBeneficiaryWeightsMetaKey meta.values
+  case (optBs, optWeights) of
+    (None, None) -> pure None
+    (Some bsText, Some weightsText) -> do
+      bs <- parseCommaSeparated "beneficiaries" partyFromText bsText
+      weights <- parseCommaSeparated "weights" T.parseDecimal weightsText
+      if length bs /= length weights
+        then fail $ "Number of beneficiaries (" <> show (length bs) <> ") does not match number of weights (" <> show (length weights) <> ")"
+        else pure $ Some (zipWith AppRewardBeneficiary bs weights)
+    _ -> fail $ "Expected both beneficiaries and weights to be present, but got: " <> show (optBs, optWeights)
+
+parseCommaSeparated : Text -> (Text -> Optional a) -> Text -> Either Text [a]
+parseCommaSeparated desc parser txt = do
+  let parts = T.splitOn "," txt
+  let parsedParts = mapA parser parts
+  case parsedParts of
+    None -> fail $ "Failed to parse " <> desc <> ": " <> show txt
+    Some ps -> pure ps
+
+
+-- Choice context creation and parsing
+--------------------------------------
+
+-- | Values that can be converted to AnyValue
+class ToAnyValue a where
+  toAnyValue : a -> AnyValue
+
+-- | Convenience function to create maps that contain an optional value if it is
+-- set. See its use sites for examples.
+addOptionalAnyValue : ToAnyValue a => Text -> Optional a -> TextMap AnyValue -> TextMap AnyValue
+addOptionalAnyValue _k None m = m
+addOptionalAnyValue k (Some value) m = TextMap.insert k (toAnyValue value) m
+
+-- | Attempt to parse a value from AnyValue.
+--
+-- If a type implements both `ToAnyValue` and `FromAnyValue` then it must hold that
+-- `fromAnyValue (toAnyValue x) = Right x` for all `x`.
+class FromAnyValue a where
+  fromAnyValue : AnyValue -> Either Text a
+
+-- | Lookup and decode a value within a choice context.
+lookupFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text (Optional a)
+lookupFromContext context k = do
+  case TextMap.lookup k context.values of
+    None -> pure None
+    Some av -> case fromAnyValue av of
+      Left err -> fail $ "Failed to decode context value for '" <> k <> "': " <> err
+      Right v -> pure (Some v)
+
+-- | Get a value from a choice context, failing if it is not present or fails to parse.
+getFromContext : FromAnyValue a => ChoiceContext -> Text -> Either Text a
+getFromContext context k = do
+  optValue <- lookupFromContext context k
+  case optValue of
+    None -> fail $ "Missing context entry for: " <> k
+    Some v -> pure v
+
+-- | Convenience version of `lookupFromContext` that raises the failure within the `Update`.
+lookupFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update (Optional a)
+lookupFromContextU context k = either fail pure $ lookupFromContext context k
+
+-- | Convenience version of `getFromContext` that raises the failure within the `Update`.
+getFromContextU : FromAnyValue a => ChoiceContext -> Text -> Update a
+getFromContextU context k = either fail pure $ getFromContext context k
+
+
+-- instances for ToAnyValue
+---------------------------
+
+instance ToAnyValue Text where
+  toAnyValue t = AV_Text t
+
+instance ToAnyValue Int where
+  toAnyValue x = AV_Int x
+
+instance ToAnyValue Decimal where
+  toAnyValue t = AV_Decimal t
+
+instance ToAnyValue Bool where
+  toAnyValue x = AV_Bool x
+
+instance ToAnyValue Date where
+  toAnyValue x = AV_Date x
+
+instance ToAnyValue Time where
+  toAnyValue x = AV_Time x
+
+instance ToAnyValue RelTime where
+  toAnyValue x = AV_RelTime x
+instance ToAnyValue Party where
+  toAnyValue p = AV_Party p
+
+instance ToAnyValue (ContractId t) where
+  toAnyValue x = AV_ContractId $ coerceContractId x
+
+instance ToAnyValue a => ToAnyValue [a] where
+  toAnyValue = AV_List . map toAnyValue
+
+instance ToAnyValue ChoiceContext where
+  toAnyValue (ChoiceContext values) = AV_Map values
+
+
+-- FromAnyValue instances
+-------------------------
+
+instance FromAnyValue Text where
+  fromAnyValue (AV_Text t) = Right t
+  fromAnyValue av = Left $ "expected Text, got: " <> show av
+
+instance FromAnyValue Int where
+  fromAnyValue (AV_Int i) = Right i
+  fromAnyValue av = Left $ "expected Int, got: " <> show av
+
+instance FromAnyValue Decimal where
+  fromAnyValue (AV_Decimal i) = Right i
+  fromAnyValue av = Left $ "expected Decimal, got: " <> show av
+
+instance FromAnyValue Bool where
+  fromAnyValue (AV_Bool b) = Right b
+  fromAnyValue av = Left $ "expected bool, got: " <> show av
+
+instance FromAnyValue Date where
+  fromAnyValue (AV_Date p) = Right p
+  fromAnyValue av = Left $ "expected Date, got: " <> show av
+
+instance FromAnyValue Time where
+  fromAnyValue (AV_Time t) = Right t
+  fromAnyValue av = Left $ "expected Time, got: " <> show av
+instance FromAnyValue RelTime where
+  fromAnyValue (AV_RelTime t) = Right t
+  fromAnyValue av = Left $ "expected RelTime, got: " <> show av
+
+instance FromAnyValue Party where
+  fromAnyValue (AV_Party p) = Right p
+  fromAnyValue av = Left $ "expected Party, got: " <> show av
+
+instance Template t => FromAnyValue (ContractId t) where
+  fromAnyValue (AV_ContractId av) = Right (coerceContractId av)
+  fromAnyValue av = Left $ "expected contract id, got: " <> show av
+
+instance FromAnyValue a => FromAnyValue [a] where
+  fromAnyValue (AV_List avs) = mapA fromAnyValue avs
+  fromAnyValue av = Left $ "expected list, got: " <> show av
+
+instance FromAnyValue ChoiceContext where
+  fromAnyValue (AV_Map values) = Right $ ChoiceContext with values
+  fromAnyValue av = Left $ "expected map, got: " <> show av

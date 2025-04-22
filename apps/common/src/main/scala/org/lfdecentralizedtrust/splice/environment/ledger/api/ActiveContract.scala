@@ -8,16 +8,16 @@ import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.ledger.api.v2.state_service as lapi
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.SynchronizerId
 
 final case class ActiveContract(
-    domainId: DomainId,
+    synchronizerId: SynchronizerId,
     createdEvent: CreatedEvent,
     reassignmentCounter: Long,
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(
-      param("domainId", _.domainId),
+      param("synchronizerId", _.synchronizerId),
       param("createdEvent", _.createdEvent),
       param("reassignmentCounter", _.reassignmentCounter),
     )
@@ -26,7 +26,7 @@ final case class ActiveContract(
 object ActiveContract {
   def fromProto(proto: lapi.ActiveContract): ActiveContract = {
     ActiveContract(
-      DomainId.tryFromString(proto.domainId),
+      SynchronizerId.tryFromString(proto.synchronizerId),
       CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
       proto.reassignmentCounter,
     )

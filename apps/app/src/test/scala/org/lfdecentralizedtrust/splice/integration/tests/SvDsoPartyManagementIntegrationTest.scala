@@ -142,16 +142,16 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
 
       sv1WalletClient.tap(2.0)
 
-      val decentralizedSynchronizerId = inside(sv3Participant.domains.list_connected()) {
+      val decentralizedSynchronizerId = inside(sv3Participant.synchronizers.list_connected()) {
         case Seq(domain) =>
-          domain.domainId
+          domain.synchronizerId
       }
 
       eventually() {
         sv1Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOp.Replace),
-            domain = decentralizedSynchronizerId,
+            synchronizerId = decentralizedSynchronizerId,
             filterParty = dsoPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1
@@ -159,7 +159,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
         sv3Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOp.Replace),
-            domain = decentralizedSynchronizerId,
+            synchronizerId = decentralizedSynchronizerId,
             filterParty = dsoPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1

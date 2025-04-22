@@ -17,4 +17,7 @@
 {{- else if eq .Values.sequencer.driver.type "cometbft"}}
 {{ $_ := required ".Values.sequencer.driver.host is required." (.Values.sequencer.driver).host }}
 {{ $_ := required ".Values.sequencer.driver.port is required." (.Values.sequencer.driver).port }}
+  {{- else if eq .Values.sequencer.driver.type "cantonbft"}}
+{{ $_ := required ".Values.sequencer.driver.externalAddress is required." (.Values.sequencer.driver).externalAddress }}
+{{ $_ := required ".Values.sequencer.driver.externalPort is required." (.Values.sequencer.driver).externalPort }}
 {{- end}}

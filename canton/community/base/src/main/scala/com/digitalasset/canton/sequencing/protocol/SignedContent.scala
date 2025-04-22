@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.sequencing.protocol
@@ -24,19 +24,23 @@ import com.digitalasset.canton.serialization.{
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{
-  HasMemoizedProtocolVersionedWrapperCompanion2,
   HasProtocolVersionedWrapper,
+  OriginalByteString,
   ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
+  VersionedProtoCodec,
+  VersioningCompanionMemoization2,
 }
 import com.google.protobuf.ByteString
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
-/** @param timestampOfSigningKey The timestamp of the topology snapshot that was used for signing the content.
-  *                              [[scala.None$]] if the signing timestamp can be derived from the content.
-  * @param signatures            Signatures of the content provided by the different sequencers.
+/** @param timestampOfSigningKey
+  *   The timestamp of the topology snapshot that was used for signing the content. [[scala.None$]]
+  *   if the signing timestamp can be derived from the content.
+  * @param signatures
+  *   Signatures of the content provided by the different sequencers.
   */
 final case class SignedContent[+A <: HasCryptographicEvidence] private (
     content: A,
@@ -44,7 +48,7 @@ final case class SignedContent[+A <: HasCryptographicEvidence] private (
     timestampOfSigningKey: Option[CantonTimestamp],
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[SignedContent.type],
-    override val deserializedFrom: Option[ByteString] = None,
+    override val deserializedFrom: Option[ByteString],
 ) extends HasProtocolVersionedWrapper[SignedContent[HasCryptographicEvidence]]
     with ProtocolVersionedMemoizedEvidence
     with Serializable
@@ -72,9 +76,11 @@ final case class SignedContent[+A <: HasCryptographicEvidence] private (
       snapshot: SyncCryptoApi,
       member: Member,
       purpose: HashPurpose,
-  )(implicit traceContext: TraceContext): EitherT[Future, SignatureCheckError, Unit] = {
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit] = {
     val hash = SignedContent.hashContent(snapshot.pureCrypto, content, purpose)
-    snapshot.verifySignature(hash, member, signature)
+    snapshot.verifySignature(hash, member, signature, SigningKeyUsage.ProtocolOnly)
   }
 
   def deserializeContent[B <: HasCryptographicEvidence](
@@ -102,17 +108,17 @@ final case class SignedContent[+A <: HasCryptographicEvidence] private (
 }
 
 object SignedContent
-    extends HasMemoizedProtocolVersionedWrapperCompanion2[
+    extends VersioningCompanionMemoization2[
       SignedContent[HasCryptographicEvidence],
       SignedContent[BytestringWithCryptographicEvidence],
     ] {
 
   override def name: String = "SignedContent"
 
-  override def supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v32)(v30.SignedContent)(
+  override def versioningTable: VersioningTable = VersioningTable(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.SignedContent)(
       supportedProtoVersionMemoized(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+      _.toProtoV30,
     )
   )
 
@@ -148,7 +154,8 @@ object SignedContent
       )
     }
 
-  /** Creates a new signed content from scratch. Use when creating without having an existing serialized SignedContent.
+  /** Creates a new signed content from scratch. Use when creating without having an existing
+    * serialized SignedContent.
     */
   def create[A <: HasCryptographicEvidence](
       content: A,
@@ -188,7 +195,7 @@ object SignedContent
     // so fine to call once for the hash here and then again when serializing to protobuf
     val hash = hashContent(cryptoApi, content, purpose)
     cryptoPrivateApi
-      .sign(hash)
+      .sign(hash, SigningKeyUsage.ProtocolOnly)
       .map(signature => SignedContent(content, signature, timestampOfSigningKey, protocolVersion))
   }
 

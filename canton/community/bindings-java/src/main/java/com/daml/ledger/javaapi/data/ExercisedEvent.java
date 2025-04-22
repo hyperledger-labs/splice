@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -9,11 +9,13 @@ import java.util.Objects;
 import java.util.Optional;
 import org.checkerframework.checker.nullness.qual.NonNull;
 
-public final class ExercisedEvent implements TreeEvent {
+public final class ExercisedEvent implements TreeEvent, Event {
 
   private final List<String> witnessParties;
 
-  private final String eventId;
+  private final Long offset;
+
+  private final Integer nodeId;
 
   private final Identifier templateId;
 
@@ -31,13 +33,16 @@ public final class ExercisedEvent implements TreeEvent {
 
   private final boolean consuming;
 
-  private final List<String> childEventIds;
+  private final Integer lastDescendantNodeId;
 
   private final Value exerciseResult;
 
+  private final List<Identifier> implementedInterfaces;
+
   public ExercisedEvent(
       @NonNull List<@NonNull String> witnessParties,
-      @NonNull String eventId,
+      @NonNull Long offset,
+      @NonNull Integer nodeId,
       @NonNull Identifier templateId,
       @NonNull String packageName,
       @NonNull Optional<Identifier> interfaceId,
@@ -46,10 +51,12 @@ public final class ExercisedEvent implements TreeEvent {
       @NonNull Value choiceArgument,
       @NonNull List<@NonNull String> actingParties,
       boolean consuming,
-      @NonNull List<@NonNull String> childEventIds,
-      @NonNull Value exerciseResult) {
+      @NonNull Integer lastDescendantNodeId,
+      @NonNull Value exerciseResult,
+      @NonNull List<@NonNull Identifier> implementedInterfaces) {
     this.witnessParties = witnessParties;
-    this.eventId = eventId;
+    this.offset = offset;
+    this.nodeId = nodeId;
     this.templateId = templateId;
     this.packageName = packageName;
     this.interfaceId = interfaceId;
@@ -58,8 +65,9 @@ public final class ExercisedEvent implements TreeEvent {
     this.choiceArgument = choiceArgument;
     this.actingParties = actingParties;
     this.consuming = consuming;
-    this.childEventIds = childEventIds;
+    this.lastDescendantNodeId = lastDescendantNodeId;
     this.exerciseResult = exerciseResult;
+    this.implementedInterfaces = implementedInterfaces;
   }
 
   @NonNull
@@ -70,8 +78,14 @@ public final class ExercisedEvent implements TreeEvent {
 
   @NonNull
   @Override
-  public String getEventId() {
-    return eventId;
+  public Long getOffset() {
+    return offset;
+  }
+
+  @NonNull
+  @Override
+  public Integer getNodeId() {
+    return nodeId;
   }
 
   @NonNull
@@ -103,8 +117,8 @@ public final class ExercisedEvent implements TreeEvent {
   }
 
   @NonNull
-  public List<@NonNull String> getChildEventIds() {
-    return childEventIds;
+  public Integer getLastDescendantNodeId() {
+    return lastDescendantNodeId;
   }
 
   @NonNull
@@ -125,6 +139,11 @@ public final class ExercisedEvent implements TreeEvent {
     return exerciseResult;
   }
 
+  @NonNull
+  public List<Identifier> getImplementedInterfaces() {
+    return implementedInterfaces;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -132,7 +151,8 @@ public final class ExercisedEvent implements TreeEvent {
     ExercisedEvent that = (ExercisedEvent) o;
     return consuming == that.consuming
         && Objects.equals(witnessParties, that.witnessParties)
-        && Objects.equals(eventId, that.eventId)
+        && Objects.equals(offset, that.offset)
+        && Objects.equals(nodeId, that.nodeId)
         && Objects.equals(templateId, that.templateId)
         && Objects.equals(packageName, that.packageName)
         && Objects.equals(interfaceId, that.interfaceId)
@@ -140,8 +160,9 @@ public final class ExercisedEvent implements TreeEvent {
         && Objects.equals(choice, that.choice)
         && Objects.equals(choiceArgument, that.choiceArgument)
         && Objects.equals(actingParties, that.actingParties)
-        && Objects.equals(childEventIds, that.childEventIds)
-        && Objects.equals(exerciseResult, that.exerciseResult);
+        && Objects.equals(lastDescendantNodeId, that.lastDescendantNodeId)
+        && Objects.equals(exerciseResult, that.exerciseResult)
+        && Objects.equals(implementedInterfaces, that.implementedInterfaces);
   }
 
   @Override
@@ -149,7 +170,8 @@ public final class ExercisedEvent implements TreeEvent {
 
     return Objects.hash(
         witnessParties,
-        eventId,
+        offset,
+        nodeId,
         templateId,
         packageName,
         interfaceId,
@@ -157,9 +179,10 @@ public final class ExercisedEvent implements TreeEvent {
         choice,
         choiceArgument,
         actingParties,
-        childEventIds,
+        lastDescendantNodeId,
         consuming,
-        exerciseResult);
+        exerciseResult,
+        implementedInterfaces);
   }
 
   @Override
@@ -167,9 +190,10 @@ public final class ExercisedEvent implements TreeEvent {
     return "ExercisedEvent{"
         + "witnessParties="
         + witnessParties
-        + ", eventId='"
-        + eventId
-        + '\''
+        + ", offset="
+        + offset
+        + ", nodeId="
+        + nodeId
         + ", templateId="
         + templateId
         + ", packageName="
@@ -188,34 +212,41 @@ public final class ExercisedEvent implements TreeEvent {
         + actingParties
         + ", consuming="
         + consuming
-        + ", childEventIds="
-        + childEventIds
+        + ", lastDescendantNodeId="
+        + lastDescendantNodeId
         + ", exerciseResult="
         + exerciseResult
+        + ", implementedInterfaces='"
+        + implementedInterfaces
         + '}';
   }
 
   public EventOuterClass.@NonNull ExercisedEvent toProto() {
-    EventOuterClass.ExercisedEvent.Builder builder = EventOuterClass.ExercisedEvent.newBuilder();
-    builder.setEventId(getEventId());
-    builder.setChoice(getChoice());
-    builder.setChoiceArgument(getChoiceArgument().toProto());
-    builder.setConsuming(isConsuming());
-    builder.setContractId(getContractId());
-    builder.setTemplateId(getTemplateId().toProto());
-    builder.setPackageName(getPackageName());
+    EventOuterClass.ExercisedEvent.Builder builder =
+        EventOuterClass.ExercisedEvent.newBuilder()
+            .setOffset(getOffset())
+            .setNodeId(getNodeId())
+            .setChoice(getChoice())
+            .setChoiceArgument(getChoiceArgument().toProto())
+            .setConsuming(isConsuming())
+            .setContractId(getContractId())
+            .setTemplateId(getTemplateId().toProto())
+            .setPackageName(getPackageName())
+            .addAllActingParties(getActingParties())
+            .addAllWitnessParties(getWitnessParties())
+            .setLastDescendantNodeId(getLastDescendantNodeId())
+            .setExerciseResult(getExerciseResult().toProto())
+            .addAllImplementedInterfaces(
+                getImplementedInterfaces().stream().map(Identifier::toProto).toList());
     interfaceId.ifPresent(i -> builder.setInterfaceId(i.toProto()));
-    builder.addAllActingParties(getActingParties());
-    builder.addAllWitnessParties(getWitnessParties());
-    builder.addAllChildEventIds(getChildEventIds());
-    builder.setExerciseResult(getExerciseResult().toProto());
     return builder.build();
   }
 
   public static ExercisedEvent fromProto(EventOuterClass.ExercisedEvent exercisedEvent) {
     return new ExercisedEvent(
         exercisedEvent.getWitnessPartiesList(),
-        exercisedEvent.getEventId(),
+        exercisedEvent.getOffset(),
+        exercisedEvent.getNodeId(),
         Identifier.fromProto(exercisedEvent.getTemplateId()),
         exercisedEvent.getPackageName(),
         exercisedEvent.hasInterfaceId()
@@ -226,7 +257,8 @@ public final class ExercisedEvent implements TreeEvent {
         Value.fromProto(exercisedEvent.getChoiceArgument()),
         exercisedEvent.getActingPartiesList(),
         exercisedEvent.getConsuming(),
-        exercisedEvent.getChildEventIdsList(),
-        Value.fromProto(exercisedEvent.getExerciseResult()));
+        exercisedEvent.getLastDescendantNodeId(),
+        Value.fromProto(exercisedEvent.getExerciseResult()),
+        exercisedEvent.getImplementedInterfacesList().stream().map(Identifier::fromProto).toList());
   }
 }

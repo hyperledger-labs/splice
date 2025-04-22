@@ -1,21 +1,14 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.SvTestUtil
-
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 /** Integration test that onboards an SV then starts a clone without the onboarding config.
   */
 class SvOnboardingConfigIntegrationTest extends IntegrationTest with SvTestUtil {
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[EnvironmentImpl, SpliceTestConsoleEnvironment] =
+  override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .fromResources(
         Seq("simple-topology.conf", "include/svs/sv2-onboarded.conf"),

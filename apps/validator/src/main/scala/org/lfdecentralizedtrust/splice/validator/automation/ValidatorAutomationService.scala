@@ -47,7 +47,6 @@ class ValidatorAutomationService(
     grpcDeadline: Option[NonNegativeFiniteDuration],
     transferPreapprovalConfig: TransferPreapprovalConfig,
     sequencerConnectionFromScan: Boolean,
-    prevetDuration: NonNegativeFiniteDuration,
     isSvValidator: Boolean,
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
@@ -69,7 +68,9 @@ class ValidatorAutomationService(
     contactPoint: String,
     supportsSoftDomainMigrationPoc: Boolean,
     initialSynchronizerTime: Option[CantonTimestamp],
+    enableCantonPackageSelection: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -80,7 +81,8 @@ class ValidatorAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       store,
-      PackageIdResolver.inferFromAmuletRules(
+      PackageIdResolver.inferFromAmuletRulesIfEnabled(
+        enableCantonPackageSelection,
         clock,
         scanConnection,
         loggerFactory,
@@ -137,6 +139,7 @@ class ValidatorAutomationService(
           validatorTopupConfig,
           connection,
           clock,
+          packageVersionSupport,
         )
       )
     }
@@ -206,7 +209,6 @@ class ValidatorAutomationService(
     new ValidatorPackageVettingTrigger(
       participantAdminConnection,
       scanConnection,
-      prevetDuration,
       triggerContext,
     )
   )
@@ -216,8 +218,8 @@ class ValidatorAutomationService(
       triggerContext,
       connection,
       store,
-      scanConnection,
       contactPoint,
+      packageVersionSupport,
     )
   )
 
@@ -226,7 +228,7 @@ class ValidatorAutomationService(
       triggerContext,
       connection,
       store,
-      scanConnection,
+      packageVersionSupport,
     )
   )
 

@@ -1,16 +1,24 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.command
 
-import com.daml.error.ContextualizedErrorLogger
 import com.daml.ledger.api.v2.command_service.*
-import com.daml.ledger.api.v2.command_submission_service.{SubmitRequest, SubmitResponse}
+import com.daml.ledger.api.v2.command_submission_service.{
+  SubmitReassignmentRequest,
+  SubmitReassignmentResponse,
+  SubmitRequest,
+  SubmitResponse,
+}
 import com.daml.ledger.api.v2.commands.Commands
+import com.daml.ledger.api.v2.reassignment_commands.ReassignmentCommands
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS
+import com.daml.ledger.api.v2.transaction_filter.{Filters, UpdateFormat}
 import com.daml.ledger.api.v2.update_service.{
   GetTransactionByIdRequest,
-  GetTransactionResponse,
   GetTransactionTreeResponse,
+  GetUpdateByIdRequest,
+  GetUpdateResponse,
 }
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.config
@@ -20,8 +28,10 @@ import com.digitalasset.canton.ledger.api.services.CommandService
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.api.validation.CommandsValidator
 import com.digitalasset.canton.ledger.error.CommonErrors
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{
-  LedgerErrorLoggingContext,
+  ErrorLoggingContext,
   LoggingContextWithTrace,
   NamedLoggerFactory,
   NamedLogging,
@@ -34,7 +44,7 @@ import com.digitalasset.canton.platform.apiserver.services.tracking.{
 }
 import com.digitalasset.canton.platform.apiserver.services.{ApiCommandService, logging}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import io.grpc.{Context, Deadline}
+import io.grpc.{Context, Deadline, Status}
 
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -44,9 +54,13 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
 private[apiserver] final class CommandServiceImpl private[services] (
-    transactionServices: TransactionServices,
-    submissionTracker: SubmissionTracker,
-    submit: Traced[SubmitRequest] => Future[SubmitResponse],
+    updateServices: UpdateServices,
+    transactionSubmissionTracker: SubmissionTracker,
+    reassignmentSubmissionTracker: SubmissionTracker,
+    submit: Traced[SubmitRequest] => FutureUnlessShutdown[SubmitResponse],
+    submitReassignment: Traced[SubmitReassignmentRequest] => FutureUnlessShutdown[
+      SubmitReassignmentResponse
+    ],
     defaultTrackingTimeout: config.NonNegativeFiniteDuration,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -60,14 +74,15 @@ private[apiserver] final class CommandServiceImpl private[services] (
   override def close(): Unit = {
     logger.info("Shutting down Command Service.")(TraceContext.empty)
     running.set(false)
-    submissionTracker.close()
+    transactionSubmissionTracker.close()
+    reassignmentSubmissionTracker.close()
   }
 
   def submitAndWait(
       request: SubmitAndWaitRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).map { response =>
+      submitAndWaitInternal(request.commands)(errorLogger, traceContext).map { response =>
         SubmitAndWaitResponse.of(
           updateId = response.completion.updateId,
           completionOffset = response.completion.offset,
@@ -76,46 +91,115 @@ private[apiserver] final class CommandServiceImpl private[services] (
     }
 
   def submitAndWaitForTransaction(
-      request: SubmitAndWaitRequest
+      request: SubmitAndWaitForTransactionRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForTransactionResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).flatMap { resp =>
-        val effectiveActAs = CommandsValidator.effectiveSubmitters(request.getCommands).actAs
-        val txRequest = GetTransactionByIdRequest(
-          updateId = resp.completion.updateId,
-          requestingParties = effectiveActAs.toList,
+      submitAndWaitInternal(request.commands)(errorLogger, traceContext).flatMap { resp =>
+        val updateId = resp.completion.updateId
+        val txRequest = GetUpdateByIdRequest(
+          updateId = updateId,
+          updateFormat = Some(
+            UpdateFormat(
+              includeTransactions = request.transactionFormat,
+              includeReassignments = None,
+              includeTopologyEvents = None,
+            )
+          ),
         )
-        transactionServices
-          .getTransactionById(txRequest)
-          .map(transactionResponse =>
+        updateServices
+          .getUpdateById(txRequest)
+          .recoverWith {
+            case e: io.grpc.StatusRuntimeException
+                if e.getStatus.getCode == Status.Code.NOT_FOUND
+                  && e.getStatus.getDescription.contains(
+                    RequestValidationErrors.NotFound.Update.id
+                  ) =>
+              logger.debug(
+                s"Transaction not found in update lookup for updateId $updateId, falling back to LedgerEffects lookup without events."
+              )(traceContext)
+              // When a command submission completes successfully,
+              // the submitters can end up getting an UPDATE_NOT_FOUND when querying its corresponding AcsDelta
+              // transaction that either:
+              // * has only non-consuming events
+              // * has only events of contracts which have stakeholders that are not amongst the requesting parties
+              // or in general when filters defined in the transactionFormat exclude all the events from the
+              // transaction.
+              // In these situations, we fallback to a LedgerEffects transaction lookup with a wildcard filter and
+              // populate the transaction response  with its details but no events.
+              updateServices
+                .getUpdateById(
+                  txRequest
+                    .update(
+                      _.updateFormat.includeTransactions.transactionShape := TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                      _.updateFormat.includeTransactions.eventFormat.filtersForAnyParty := Filters(
+                        Nil
+                      ),
+                    )
+                )
+                .map(_.update(_.transaction.modify(_.clearEvents)))
+          }
+          .map(updateResponse =>
             SubmitAndWaitForTransactionResponse
               .of(
-                transactionResponse.transaction
+                updateResponse.update.transaction
               )
           )
       }
+    }
+
+  def submitAndWaitForReassignment(
+      request: SubmitAndWaitForReassignmentRequest
+  )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForReassignmentResponse] =
+    withReassignmentCommandsLoggingContext(request.getReassignmentCommands, loggingContext) {
+      (errorLogger, traceContext) =>
+        submitAndWaitForReassignmentInternal(request.reassignmentCommands)(
+          errorLogger,
+          traceContext,
+        )
+          .flatMap { resp =>
+            val updateId = resp.completion.updateId
+            val txRequest = GetUpdateByIdRequest(
+              updateId = updateId,
+              updateFormat = Some(
+                UpdateFormat(
+                  includeTransactions = None,
+                  includeReassignments = request.eventFormat,
+                  includeTopologyEvents = None,
+                )
+              ),
+            )
+            updateServices
+              .getUpdateById(txRequest)
+              .map(updateResponse =>
+                SubmitAndWaitForReassignmentResponse
+                  .of(
+                    updateResponse.update.reassignment
+                  )
+              )
+          }
     }
 
   def submitAndWaitForTransactionTree(
       request: SubmitAndWaitRequest
   )(loggingContext: LoggingContextWithTrace): Future[SubmitAndWaitForTransactionTreeResponse] =
     withCommandsLoggingContext(request.getCommands, loggingContext) { (errorLogger, traceContext) =>
-      submitAndWaitInternal(request)(errorLogger, traceContext).flatMap { resp =>
+      submitAndWaitInternal(request.commands)(errorLogger, traceContext).flatMap { resp =>
         val effectiveActAs = CommandsValidator.effectiveSubmitters(request.getCommands).actAs
         val txRequest = GetTransactionByIdRequest(
           updateId = resp.completion.updateId,
           requestingParties = effectiveActAs.toList,
+          transactionFormat = None,
         )
-        transactionServices
+        updateServices
           .getTransactionTreeById(txRequest)
           .map(resp => SubmitAndWaitForTransactionTreeResponse.of(resp.transaction))
       }
     }
 
   private def submitAndWaitInternal(
-      request: SubmitAndWaitRequest
+      commands: Option[Commands]
   )(implicit
-      errorLogger: ContextualizedErrorLogger,
+      errorLogger: ErrorLoggingContext,
       traceContext: TraceContext,
   ): Future[CompletionResponse] = {
     def ifServiceRunning: Future[Unit] =
@@ -126,7 +210,7 @@ private[apiserver] final class CommandServiceImpl private[services] (
       else Future.unit
 
     def ensureCommandsPopulated: Commands =
-      request.commands.getOrElse(
+      commands.getOrElse(
         throw new IllegalArgumentException("Missing commands field in request")
       )
 
@@ -134,11 +218,11 @@ private[apiserver] final class CommandServiceImpl private[services] (
         commands: Commands,
         nonNegativeTimeout: config.NonNegativeFiniteDuration,
     ): Future[CompletionResponse] =
-      submissionTracker.track(
+      transactionSubmissionTracker.track(
         submissionKey = SubmissionKey(
           commandId = commands.commandId,
           submissionId = commands.submissionId,
-          applicationId = commands.applicationId,
+          userId = commands.userId,
           parties = commands.actAs.toSet,
         ),
         timeout = nonNegativeTimeout,
@@ -164,11 +248,59 @@ private[apiserver] final class CommandServiceImpl private[services] (
     } yield result
   }
 
+  private def submitAndWaitForReassignmentInternal(
+      commands: Option[ReassignmentCommands]
+  )(implicit
+      errorLogger: ErrorLoggingContext,
+      traceContext: TraceContext,
+  ): Future[CompletionResponse] = {
+    def ifServiceRunning: Future[Unit] =
+      if (!running.get())
+        Future.failed(
+          CommonErrors.ServiceNotRunning.Reject("Command Service")(errorLogger).asGrpcError
+        )
+      else Future.unit
+
+    def ensureCommandsPopulated: ReassignmentCommands =
+      commands.getOrElse(
+        throw new IllegalArgumentException("Missing commands field in request")
+      )
+
+    def submitAndTrack(
+        commands: ReassignmentCommands,
+        nonNegativeTimeout: config.NonNegativeFiniteDuration,
+    ): Future[CompletionResponse] =
+      reassignmentSubmissionTracker.track(
+        submissionKey = SubmissionKey.fromReassignmentCommands(commands),
+        timeout = nonNegativeTimeout,
+        submit = childContext =>
+          submitReassignment(Traced(SubmitReassignmentRequest(Some(commands)))(childContext)),
+      )(errorLogger, traceContext)
+
+    // Capture deadline before thread switching in Future for-comprehension
+    val deadlineO = Option(Context.current().getDeadline)
+    for {
+      _ <- ifServiceRunning
+      commands = ensureCommandsPopulated
+      nonNegativeTimeout <- Future.fromTry(
+        validateRequestTimeout(
+          deadlineO,
+          commands.commandId,
+          commands.submissionId,
+          defaultTrackingTimeout,
+        )(
+          errorLogger
+        )
+      )
+      result <- submitAndTrack(commands, nonNegativeTimeout)
+    } yield result
+  }
+
   private def withCommandsLoggingContext[T](
       commands: Commands,
       loggingContextWithTrace: LoggingContextWithTrace,
   )(
-      submitWithContext: (ContextualizedErrorLogger, TraceContext) => Future[T]
+      submitWithContext: (ErrorLoggingContext, TraceContext) => Future[T]
   ): Future[T] =
     LoggingContextWithTrace.withEnrichedLoggingContext(
       logging.submissionId(commands.submissionId),
@@ -177,7 +309,29 @@ private[apiserver] final class CommandServiceImpl private[services] (
       logging.readAsStrings(commands.readAs),
     ) { loggingContext =>
       submitWithContext(
-        LedgerErrorLoggingContext(
+        ErrorLoggingContext.withExplicitCorrelationId(
+          logger,
+          loggingContext.toPropertiesMap,
+          loggingContext.traceContext,
+          commands.submissionId,
+        ),
+        loggingContext.traceContext,
+      )
+    }(loggingContextWithTrace)
+
+  private def withReassignmentCommandsLoggingContext[T](
+      commands: ReassignmentCommands,
+      loggingContextWithTrace: LoggingContextWithTrace,
+  )(
+      submitWithContext: (ErrorLoggingContext, TraceContext) => Future[T]
+  ): Future[T] =
+    LoggingContextWithTrace.withEnrichedLoggingContext(
+      logging.submissionId(commands.submissionId),
+      logging.commandId(commands.commandId),
+      logging.submitter(commands.submitter),
+    ) { loggingContext =>
+      submitWithContext(
+        ErrorLoggingContext.withExplicitCorrelationId(
           logger,
           loggingContext.toPropertiesMap,
           loggingContext.traceContext,
@@ -191,11 +345,15 @@ private[apiserver] final class CommandServiceImpl private[services] (
 private[apiserver] object CommandServiceImpl {
 
   def createApiService(
-      submissionTracker: SubmissionTracker,
+      transactionSubmissionTracker: SubmissionTracker,
+      reassignmentSubmissionTracker: SubmissionTracker,
       commandsValidator: CommandsValidator,
-      submit: Traced[SubmitRequest] => Future[SubmitResponse],
+      submit: Traced[SubmitRequest] => FutureUnlessShutdown[SubmitResponse],
+      submitReassignment: Traced[SubmitReassignmentRequest] => FutureUnlessShutdown[
+        SubmitReassignmentResponse
+      ],
       defaultTrackingTimeout: config.NonNegativeFiniteDuration,
-      transactionServices: TransactionServices,
+      updateServices: UpdateServices,
       timeProvider: TimeProvider,
       maxDeduplicationDuration: config.NonNegativeFiniteDuration,
       telemetry: Telemetry,
@@ -205,9 +363,11 @@ private[apiserver] object CommandServiceImpl {
   ): CommandServiceGrpc.CommandService & GrpcApiService =
     new ApiCommandService(
       service = new CommandServiceImpl(
-        transactionServices,
-        submissionTracker,
+        updateServices,
+        transactionSubmissionTracker,
+        reassignmentSubmissionTracker,
         submit,
+        submitReassignment,
         defaultTrackingTimeout,
         loggerFactory,
       ),
@@ -220,9 +380,9 @@ private[apiserver] object CommandServiceImpl {
       loggerFactory = loggerFactory,
     )
 
-  final class TransactionServices(
+  final class UpdateServices(
       val getTransactionTreeById: GetTransactionByIdRequest => Future[GetTransactionTreeResponse],
-      val getTransactionById: GetTransactionByIdRequest => Future[GetTransactionResponse],
+      val getUpdateById: GetUpdateByIdRequest => Future[GetUpdateResponse],
   )
 
   private[apiserver] def validateRequestTimeout(
@@ -230,7 +390,7 @@ private[apiserver] object CommandServiceImpl {
       commandId: String,
       submissionId: String,
       defaultTrackingTimeout: config.NonNegativeFiniteDuration,
-  )(implicit errorLogger: ContextualizedErrorLogger): Try[config.NonNegativeFiniteDuration] =
+  )(implicit errorLogger: ErrorLoggingContext): Try[config.NonNegativeFiniteDuration] =
     grpcRequestDeadline.map(_.timeRemaining(TimeUnit.NANOSECONDS)) match {
       case None => Success(defaultTrackingTimeout)
       case Some(remainingDeadlineNanos) if remainingDeadlineNanos >= 0 =>

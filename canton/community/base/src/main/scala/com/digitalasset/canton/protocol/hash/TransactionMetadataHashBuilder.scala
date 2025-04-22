@@ -1,13 +1,13 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.protocol.hash
 
 import com.digitalasset.canton.crypto.{Hash, HashPurpose}
+import com.digitalasset.canton.data.LedgerTimeBoundaries
 import com.digitalasset.canton.protocol.LfHash
 import com.digitalasset.canton.protocol.hash.HashTracer
 import com.digitalasset.canton.protocol.hash.TransactionHash.NodeHashingError
-import com.digitalasset.canton.version.HashingSchemeVersion
 import com.digitalasset.daml.lf.data.{Ref, Time}
 import com.digitalasset.daml.lf.transaction.FatContractInstance
 import com.digitalasset.daml.lf.value.Value.ContractId
@@ -21,8 +21,8 @@ object TransactionMetadataHashBuilder {
       commandId: Ref.CommandId,
       transactionUUID: UUID,
       mediatorGroup: Int,
-      domainId: String,
-      ledgerEffectiveTime: Option[Time.Timestamp],
+      synchronizerId: String,
+      timeBoundaries: LedgerTimeBoundaries,
       submissionTime: Time.Timestamp,
       disclosedContracts: SortedMap[ContractId, FatContractInstance],
   )
@@ -40,18 +40,24 @@ object TransactionMetadataHashBuilder {
       hashTracer,
       enforceNodeSeedForCreateNodes = false,
     ).addPurpose
-      .addHashVersion(HashingSchemeVersion.V1)
+      .addMetadataEncodingVersion(1)
       .withContext("Act As Parties")(
         _.iterateOver(metadata.actAs.iterator, metadata.actAs.size)(_ add _)
       )
       .withContext("Command Id")(_.add(metadata.commandId))
       .withContext("Transaction UUID")(_.add(metadata.transactionUUID.toString))
       .withContext("Mediator Group")(_.add(metadata.mediatorGroup))
-      .withContext("Domain Id")(_.add(metadata.domainId))
-      .withContext("Ledger Effective Time")(
+      .withContext("Synchronizer Id")(_.add(metadata.synchronizerId))
+      .withContext("Min Time Boundary")(
         _.addOptional(
-          metadata.ledgerEffectiveTime.map(_.micros),
-          builder => (value: Long) => builder.add(value),
+          metadata.timeBoundaries.minConstraint,
+          b => (v: Time.Timestamp) => b.add(v.micros),
+        )
+      )
+      .withContext("Max Time Boundary")(
+        _.addOptional(
+          metadata.timeBoundaries.maxConstraint,
+          b => (v: Time.Timestamp) => b.add(v.micros),
         )
       )
       .withContext("Submission Time")(_.add(metadata.submissionTime.micros))

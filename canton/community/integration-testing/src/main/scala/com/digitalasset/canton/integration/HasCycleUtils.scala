@@ -1,24 +1,25 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.integration
 
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedCreatedEvent
+import com.digitalasset.canton.config
+import com.digitalasset.canton.config.{ConsoleCommandTimeout, CantonConfig}
 import com.digitalasset.canton.console.ParticipantReference
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.examples.java.cycle as M
 import com.digitalasset.canton.topology.PartyId
 
 /** Adds the ability to run cycles to integration tests
-  *
-  * Please note that you need to upload CantonExamples.dar to the ledger before you can use this test
   */
-trait HasCycleUtils[E <: Environment, TCE <: TestConsoleEnvironment[E]] {
-  this: BaseIntegrationTest[E, TCE] =>
+trait HasCycleUtils {
+  this: BaseIntegrationTest[CantonConfig, CantonEnvironment] =>
 
-  /** @param partyId assumes that the party is hosted on participant1 AND participant2 (in the simplest case
-    * this could simply mean that participant1 == participant2)
+  /** @param partyId
+    *   assumes that the party is hosted on participant1 AND participant2 (in the simplest case this
+    *   could simply mean that participant1 == participant2)
     */
   def runCycle(
       partyId: PartyId,
@@ -28,7 +29,7 @@ trait HasCycleUtils[E <: Environment, TCE <: TestConsoleEnvironment[E]] {
   ): Unit = {
 
     Seq(participant2, participant1).map { participant =>
-      if (participant.packages.find("Cycle").isEmpty) {
+      if (participant.packages.find_by_module("Cycle").isEmpty) {
         participant.dars.upload(CantonExamplesPath)
       }
     }
@@ -63,12 +64,15 @@ trait HasCycleUtils[E <: Environment, TCE <: TestConsoleEnvironment[E]] {
       partyId: PartyId,
       id: String,
       commandId: String = "",
+      optTimeout: Option[config.NonNegativeDuration] = Some(
+        ConsoleCommandTimeout.defaultLedgerCommandsTimeout
+      ),
   ): Unit = {
-    if (participant.packages.find("Cycle").isEmpty) {
+    if (participant.packages.find_by_module("Cycle").isEmpty) {
       participant.dars.upload(CantonExamplesPath)
     }
     val cycle = new M.Cycle(id, partyId.toProtoPrimitive).create.commands.loneElement
     participant.ledger_api.javaapi.commands
-      .submit(Seq(partyId), Seq(cycle), commandId = commandId)
+      .submit(Seq(partyId), Seq(cycle), commandId = commandId, optTimeout = optTimeout)
   }
 }

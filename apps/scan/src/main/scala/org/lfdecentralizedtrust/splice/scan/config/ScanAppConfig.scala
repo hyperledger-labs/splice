@@ -3,34 +3,33 @@
 
 package org.lfdecentralizedtrust.splice.scan.config
 
+import com.digitalasset.canton.config.*
 import org.lfdecentralizedtrust.splice.config.{
   AutomationConfig,
-  SpliceDbConfig,
-  SpliceBackendConfig,
-  SpliceParametersConfig,
-  SpliceInstanceNamesConfig,
-  ParticipantClientConfig,
   HttpClientConfig,
   NetworkAppClientConfig,
+  ParticipantClientConfig,
+  SpliceBackendConfig,
+  SpliceInstanceNamesConfig,
+  SpliceParametersConfig,
 }
-import com.digitalasset.canton.config.*
 
 trait BaseScanAppConfig {}
 
 final case class ScanSynchronizerConfig(
-    sequencer: ClientConfig,
-    mediator: ClientConfig,
+    sequencer: FullClientConfig,
+    mediator: FullClientConfig,
 )
 
 /** @param miningRoundsCacheTimeToLiveOverride Intended only for testing!
   *                                            By default depends on the `tickDuration` of rounds. This setting overrides that.
   */
 case class ScanAppBackendConfig(
-    override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: SpliceDbConfig,
+    override val adminApi: AdminServerConfig = AdminServerConfig(),
+    override val storage: DbConfig,
     svUser: String,
     override val participantClient: ParticipantClientConfig,
-    sequencerAdminClient: ClientConfig,
+    sequencerAdminClient: FullClientConfig,
     // Map from domain id prefix to sequencer/mediator config
     // This is for the Poc from #13301
     synchronizers: Map[String, ScanSynchronizerConfig] = Map.empty,

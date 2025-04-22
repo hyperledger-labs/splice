@@ -22,7 +22,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,13 +38,15 @@ trait SplitwellStore extends AppStore {
 
   private[this] final def defaultAcsDomain = domainConfig.splitwell.preferred.alias
 
-  private[splitwell] final def defaultAcsDomainIdF(implicit tc: TraceContext): Future[DomainId] =
+  private[splitwell] final def defaultAcsSynchronizerIdF(implicit
+      tc: TraceContext
+  ): Future[SynchronizerId] =
     domains.waitForDomainConnection(defaultAcsDomain)
 
   override def multiDomainAcsStore: MultiDomainAcsStore
 
   def lookupInstallWithOffset(
-      domainId: DomainId,
+      synchronizerId: SynchronizerId,
       user: PartyId,
   )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[splitwellCodegen.SplitwellInstall.ContractId, splitwellCodegen.SplitwellInstall]
@@ -93,7 +95,7 @@ trait SplitwellStore extends AppStore {
     */
   def listTransferrableGroups()(implicit
       tc: TraceContext
-  ): Future[Map[DomainId, Seq[splitwellCodegen.Group.ContractId]]]
+  ): Future[Map[SynchronizerId, Seq[splitwellCodegen.Group.ContractId]]]
 
   def listSplitwellInstalls(user: PartyId)(implicit traceContext: TraceContext): Future[Seq[
     AssignedContract[
@@ -110,7 +112,7 @@ trait SplitwellStore extends AppStore {
   ]]
 
   def lookupSplitwellRules(
-      domainId: DomainId
+      synchronizerId: SynchronizerId
   )(implicit tc: TraceContext): Future[QueryResult[Option[
     Contract[
       splitwellCodegen.SplitwellRules.ContractId,

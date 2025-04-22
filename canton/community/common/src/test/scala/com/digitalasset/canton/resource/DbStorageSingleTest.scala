@@ -1,19 +1,23 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.resource
 
-import com.digitalasset.canton.config.CommunityDbConfig.Postgres
-import com.digitalasset.canton.config.{CommunityDbConfig, DbConfig, DefaultProcessingTimeouts}
+import com.digitalasset.canton.config.DbConfig.Postgres
+import com.digitalasset.canton.config.{DbConfig, DefaultProcessingTimeouts}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.metrics.CommonMockMetrics
 import com.digitalasset.canton.store.db.DbStorageSetup
 import com.digitalasset.canton.store.db.DbStorageSetup.DbBasicConfig
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.{BaseTest, CloseableTest}
+import com.digitalasset.canton.{BaseTest, CloseableTest, HasExecutionContext}
 import org.scalatest.wordspec.AsyncWordSpec
 
-trait DbStorageSingleTest extends AsyncWordSpec with BaseTest with CloseableTest {
+trait DbStorageSingleTest
+    extends AsyncWordSpec
+    with BaseTest
+    with HasExecutionContext
+    with CloseableTest {
 
   def baseConfig: DbConfig
   def modifyUser(user: String): DbConfig
@@ -107,7 +111,7 @@ class DbStorageSingleTestPostgres extends DbStorageSingleTest {
   private lazy val setup = DbStorageSetup.postgres(loggerFactory)
 
   private def modifyConfig(config: DbBasicConfig): Postgres =
-    CommunityDbConfig.Postgres(config.toPostgresConfig)
+    DbConfig.Postgres(config.toPostgresConfig)
 
   def baseConfig: Postgres = modifyConfig(setup.basicConfig)
 

@@ -199,7 +199,7 @@ testTransferCommand = script do
   map snd amulets === [Amulet app.dso externalParty (ExpiringAmount 42.0 (Round 1) (RatePerRound 0.00002))]
   None <- queryContractId app.dso transferCmd
   appRewards <- query @AppRewardCoupon aliceValidator.primaryParty
-  map snd appRewards === [AppRewardCoupon app.dso aliceValidator.primaryParty True 1.45 (Round 1)]
+  map snd appRewards === [AppRewardCoupon app.dso aliceValidator.primaryParty True 1.45 (Round 1) (Some aliceValidator.primaryParty)]
 
   ExternalPartyAmuletRules_CreateTransferCommandResult transferCmd <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
     with

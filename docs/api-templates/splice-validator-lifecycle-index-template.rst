@@ -6,4 +6,8 @@
 splice-validator-life-cycle docs
 ================================
 
+.. toctree::
+   :maxdepth: 3
+   :titlesonly:
+
 {{{body}}}

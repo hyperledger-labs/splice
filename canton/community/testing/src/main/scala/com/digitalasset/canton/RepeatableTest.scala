@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
@@ -16,9 +16,10 @@ import scala.concurrent.Future
   */
 sealed trait RepeatableTest extends NamedLogging {
 
-  /** Marker to trigger repeated runs of classes extending [[com.digitalasset.canton.RepeatableTest]],
-    * running up to n times or until failure.
-    * @param n Maximum number of runs of the test.
+  /** Marker to trigger repeated runs of classes extending
+    * [[com.digitalasset.canton.RepeatableTest]], running up to n times or until failure.
+    * @param n
+    *   Maximum number of runs of the test.
     */
   case class RepeatTest(n: Int) extends Tag(s"Repeated $n")
 

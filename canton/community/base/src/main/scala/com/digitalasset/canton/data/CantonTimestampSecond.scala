@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.data
@@ -14,10 +14,11 @@ import slick.jdbc.{GetResult, SetParameter}
 
 import java.time.{Duration, Instant}
 
-/** A timestamp implementation for canton, which currently uses a [[LfTimestamp]],
-  * which is rounded to the second.
+/** A timestamp implementation for canton, which currently uses a [[LfTimestamp]], which is rounded
+  * to the second.
   *
-  * @param underlying A [[LfTimestamp]], holding the value of this [[CantonTimestampSecond]].
+  * @param underlying
+  *   A [[LfTimestamp]], holding the value of this [[CantonTimestampSecond]].
   */
 final case class CantonTimestampSecond private (underlying: LfTimestamp)
     extends Ordered[CantonTimestampSecond]
@@ -76,6 +77,12 @@ object CantonTimestampSecond {
 
   def MinValue = CantonTimestampSecond(LfTimestamp.MinValue)
 
+  def MaxValue = {
+    val nanos = LfTimestamp.MaxValue.toInstant.getNano
+    val micros = nanos / 1000L
+    CantonTimestampSecond(LfTimestamp.MaxValue.addMicros(-1 * micros))
+  }
+
   def fromProtoTimestamp(
       ts: ProtoTimestamp,
       field: String,
@@ -113,14 +120,16 @@ object CantonTimestampSecond {
     )
 
   /** @param ts
-    * @return `ts` if `ts` is already rounded to the second, the previous rounded timestamp otherwise.
+    * @return
+    *   `ts` if `ts` is already rounded to the second, the previous rounded timestamp otherwise.
     */
   def floor(ts: CantonTimestamp): CantonTimestampSecond =
     if (ts.microsOverSecond() == 0) CantonTimestampSecond(ts.underlying)
     else CantonTimestampSecond.ofEpochSecond(ts.getEpochSecond)
 
   /** @param ts
-    * @return `ts` if `ts` is already rounded to the second, the next rounded timestamp otherwise.
+    * @return
+    *   `ts` if `ts` is already rounded to the second, the next rounded timestamp otherwise.
     */
   def ceil(ts: CantonTimestamp): CantonTimestampSecond =
     if (ts.microsOverSecond() == 0) CantonTimestampSecond(ts.underlying)

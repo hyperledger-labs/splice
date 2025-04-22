@@ -1,46 +1,39 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton
 
 import cats.syntax.option.*
 import com.digitalasset.canton.config.RequireTypes.Port
-import com.digitalasset.canton.config.{
-  CommunityAdminServerConfig,
-  CommunityCryptoConfig,
-  CommunityStorageConfig,
-}
-import com.digitalasset.canton.domain.config.CommunityPublicServerConfig
-import com.digitalasset.canton.domain.mediator.CommunityMediatorNodeConfig
-import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeConfig
-import com.digitalasset.canton.participant.config.{
-  CommunityParticipantConfig,
-  ParticipantInitConfig,
-}
+import com.digitalasset.canton.config.{AdminServerConfig, CryptoConfig, StorageConfig}
+import com.digitalasset.canton.participant.config.{ParticipantInitConfig, ParticipantNodeConfig}
+import com.digitalasset.canton.synchronizer.config.PublicServerConfig
+import com.digitalasset.canton.synchronizer.mediator.MediatorNodeConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeConfig
 
 /** Utilities for creating config objects for tests
   */
 @SuppressWarnings(Array("org.wartremover.warts.Null"))
 object ConfigStubs {
-  def participant: CommunityParticipantConfig =
-    CommunityParticipantConfig(
+  def participant: ParticipantNodeConfig =
+    ParticipantNodeConfig(
       ParticipantInitConfig(),
-      CommunityCryptoConfig(),
+      CryptoConfig(),
       null,
       None,
       adminApi,
-      CommunityStorageConfig.Memory(),
+      StorageConfig.Memory(),
     )
 
-  def sequencer: CommunitySequencerNodeConfig =
-    CommunitySequencerNodeConfig(adminApi = adminApi, publicApi = publicApi)
+  def sequencer: SequencerNodeConfig =
+    SequencerNodeConfig(adminApi = adminApi, publicApi = publicApi)
 
-  def mediator: CommunityMediatorNodeConfig =
-    CommunityMediatorNodeConfig(adminApi = adminApi)
+  def mediator: MediatorNodeConfig =
+    MediatorNodeConfig(adminApi = adminApi)
 
-  def adminApi: CommunityAdminServerConfig =
-    CommunityAdminServerConfig(internalPort = Port.tryCreate(42).some)
+  def adminApi: AdminServerConfig =
+    AdminServerConfig(internalPort = Port.tryCreate(42).some)
 
-  def publicApi: CommunityPublicServerConfig =
-    CommunityPublicServerConfig(internalPort = Port.tryCreate(42).some)
+  def publicApi: PublicServerConfig =
+    PublicServerConfig(internalPort = Port.tryCreate(42).some)
 }

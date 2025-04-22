@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util
@@ -17,7 +17,27 @@ import scala.util.control.NonFatal
 
 object FutureUtil {
 
-  /** If the future fails, log the associated error and re-throw. The returned future completes after logging.
+  def logOnFailureUS[T](
+      future: FutureUnlessShutdown[T],
+      failureMessage: => String,
+      onFailure: Throwable => Unit = _ => (),
+      level: => Level = Level.ERROR,
+      closeContext: Option[CloseContext] = None,
+      ignorePassiveInstance: Boolean = false,
+  )(implicit loggingContext: ErrorLoggingContext): FutureUnlessShutdown[T] =
+    FutureUnlessShutdown(
+      logOnFailure(
+        future.unwrap,
+        failureMessage,
+        onFailure,
+        level,
+        closeContext,
+        ignorePassiveInstance,
+      )
+    )
+
+  /** If the future fails, log the associated error and re-throw. The returned future completes
+    * after logging.
     */
   def logOnFailure[T](
       future: Future[T],
@@ -57,10 +77,10 @@ object FutureUtil {
         } catch {
           case t: Throwable => // Catching all throwables, because we are merely logging.
             // Always log at ERROR independent of `level` because we don't expect `onFailure` to throw.
-            loggingContext.logger.error(
+            loggingContext.error(
               "An unexpected exception occurred while handling a failed future.",
               t,
-            )(loggingContext.traceContext)
+            )
             t.addSuppressed(err)
             throw t
         }
@@ -68,31 +88,10 @@ object FutureUtil {
     }
   }
 
-  /** If the future fails, log the associated error and re-throw. The returned future completes after logging.
-    * @param logPassiveInstanceAtInfo: If true, log [[PassiveInstanceException]] at INFO instead of ERROR level. Default is false.
-    */
-  def logOnFailureUnlessShutdown[T](
-      future: FutureUnlessShutdown[T],
-      failureMessage: => String,
-      onFailure: Throwable => Unit = _ => (),
-      level: => Level = Level.ERROR,
-      closeContext: Option[CloseContext] = None,
-      logPassiveInstanceAtInfo: Boolean = false,
-  )(implicit loggingContext: ErrorLoggingContext): FutureUnlessShutdown[T] =
-    FutureUnlessShutdown(
-      logOnFailure(
-        future.unwrap,
-        failureMessage,
-        onFailure,
-        level,
-        closeContext,
-        logPassiveInstanceAtInfo,
-      )
-    )
-
-  /** Discard `future` and log an error if it does not complete successfully.
-    * This is useful to document that a `Future` is intentionally not being awaited upon.
-    *  @param logPassiveInstanceAtInfo: If true, log [[PassiveInstanceException]] at INFO instead of ERROR level. Default is false.
+  /** Discard `future` and log an error if it does not complete successfully. This is useful to
+    * document that a `Future` is intentionally not being awaited upon.
+    * @param logPassiveInstanceAtInfo:
+    *   If true, log [[PassiveInstanceException]] at INFO instead of ERROR level. Default is false.
     */
   def doNotAwait(
       future: Future[?],
@@ -106,18 +105,9 @@ object FutureUtil {
       logOnFailure(future, failureMessage, onFailure, level, closeContext, logPassiveInstanceAtInfo)
   }
 
-  /** [[doNotAwait]] but for FUS
+  /** Variant of [[doNotAwait]] that also catches non-fatal errors thrown while constructing the
+    * future.
     */
-  def doNotAwaitUnlessShutdown[A](
-      future: FutureUnlessShutdown[A],
-      failureMessage: => String,
-      onFailure: Throwable => Unit = _ => (),
-      level: => Level = Level.ERROR,
-      closeContext: Option[CloseContext] = None,
-  )(implicit loggingContext: ErrorLoggingContext): Unit =
-    doNotAwait(future.unwrap, failureMessage, onFailure, level, closeContext)
-
-  /** Variant of [[doNotAwait]] that also catches non-fatal errors thrown while constructing the future. */
   def catchAndDoNotAwait(
       future: => Future[?],
       failureMessage: => String,
@@ -128,10 +118,11 @@ object FutureUtil {
     doNotAwait(wrappedFuture, failureMessage, onFailure, level)
   }
 
-  /** Java libraries often wrap exceptions in a future inside a [[java.util.concurrent.CompletionException]]
-    * when they convert a Java-style future into a Scala-style future. When our code then tries to catch our own
-    * exceptions, the logic fails because we do not look inside the [[java.util.concurrent.CompletionException]].
-    * We therefore want to unwrap such exceptions
+  /** Java libraries often wrap exceptions in a future inside a
+    * [[java.util.concurrent.CompletionException]] when they convert a Java-style future into a
+    * Scala-style future. When our code then tries to catch our own exceptions, the logic fails
+    * because we do not look inside the [[java.util.concurrent.CompletionException]]. We therefore
+    * want to unwrap such exceptions
     */
   def unwrapCompletionException[A](f: Future[A])(implicit ec: ExecutionContext): Future[A] =
     f.transform(TryUtil.unwrapCompletionException)

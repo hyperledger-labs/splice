@@ -1,14 +1,15 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.platform.apiserver.services.tracking
 
-import com.daml.error.{ContextualizedErrorLogger, ErrorsAssertions}
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
 import com.daml.ledger.api.v2.completion.Completion
+import com.digitalasset.base.error.ErrorsAssertions
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors
 import com.digitalasset.canton.ledger.error.{CommonErrors, LedgerApiErrors}
-import com.digitalasset.canton.logging.LedgerErrorLoggingContext
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.apiserver.services.tracking.SubmissionTracker.{
   SubmissionKey,
@@ -68,14 +69,14 @@ class SubmissionTrackerSpec
         )
       )
 
-      // Completion with mismatching applicationId
-      completionWithMismatchingAppId = completionOk.copy(
-        applicationId = "wrongAppId",
+      // Completion with mismatching userId
+      completionWithMismatchingUserId = completionOk.copy(
+        userId = "wrongUserId",
         actAs = submitters.toSeq,
       )
       _ = submissionTracker.onCompletion(
         CompletionStreamResponse(completionResponse =
-          CompletionStreamResponse.CompletionResponse.Completion(completionWithMismatchingAppId)
+          CompletionStreamResponse.CompletionResponse.Completion(completionWithMismatchingUserId)
         )
       )
 
@@ -186,8 +187,8 @@ class SubmissionTrackerSpec
       // Expect duplicate error
       assertError(
         actual = actualStatusRuntimeException,
-        expected = ConsistencyErrors.DuplicateCommand
-          .Reject(existingCommandSubmissionId = Some(submissionId))
+        expected = ConsistencyErrors.SubmissionAlreadyInFlight
+          .Reject()
           .asGrpcError,
       )
       succeed
@@ -279,7 +280,7 @@ class SubmissionTrackerSpec
       assertError(
         actual = actualStatusRuntimeException,
         expected = LedgerApiErrors.ParticipantBackpressure
-          .Rejection("Maximum number of commands in-flight reached")
+          .Rejection("Maximum number of in-flight requests reached")
           .asGrpcError,
       )
       succeed
@@ -352,6 +353,8 @@ class SubmissionTrackerSpec
     private def concurrentSubmissionKeys =
       (1 to noConcurrentSubmissions).map(id => submissionKey.copy(commandId = s"cmd-$id"))
 
+    override def maxInFlight = 100
+
     /*
     Nested inside lead to
     Name defaultCase$ is already introduced in an enclosing scope as value defaultCase$
@@ -361,12 +364,6 @@ class SubmissionTrackerSpec
     )
     override def run: Future[Assertion] = for {
       _ <- Future.unit
-      submissionTracker = new SubmissionTrackerImpl(
-        timeoutSupport,
-        maxCommandsInFlight = 100,
-        LedgerApiServerMetrics.ForTesting,
-        loggerFactory,
-      )
       // Track concurrent submissions
       submissions = concurrentSubmissionKeys.map(sk =>
         sk -> submissionTracker.track(sk, `1 day timeout`, submitSucceeds)
@@ -418,12 +415,22 @@ class SubmissionTrackerSpec
     private val timer = new Timer("test-timer")
     def timeoutSupport: CancellableTimeoutSupport =
       new CancellableTimeoutSupportImpl(timer, loggerFactory)
+
+    def maxInFlight = 3
+
+    val streamTracker = new StreamTrackerImpl(
+      timeoutSupport,
+      SubmissionTracker.toKey,
+      InFlight.Limited(maxInFlight, LedgerApiServerMetrics.ForTesting.commands.maxInFlightLength),
+      loggerFactory,
+    )
+
     val submissionTracker =
       new SubmissionTrackerImpl(
-        timeoutSupport,
-        maxCommandsInFlight = 3,
-        LedgerApiServerMetrics.ForTesting,
-        loggerFactory,
+        streamTracker,
+        maxCommandsInFlight = maxInFlight,
+        metrics = LedgerApiServerMetrics.ForTesting,
+        loggerFactory = loggerFactory,
       )
 
     val zeroTimeout: config.NonNegativeFiniteDuration = config.NonNegativeFiniteDuration.Zero
@@ -432,32 +439,34 @@ class SubmissionTrackerSpec
 
     val submissionId = "sId_1"
     val commandId = "cId_1"
-    val applicationId = "apId_1"
+    val userId = "apId_1"
     val actAs: Seq[String] = Seq("p1", "p2")
     val party = "p3"
     val submissionKey: SubmissionKey = SubmissionKey(
       submissionId = submissionId,
       commandId = commandId,
-      applicationId = applicationId,
+      userId = userId,
       parties = Set(party) ++ actAs,
     )
     val otherSubmissionKey: SubmissionKey = submissionKey.copy(commandId = "cId_2")
     val failureInSubmit = new RuntimeException("failure in submit")
-    val submitFails: TraceContext => Future[Any] = _ => Future.failed(failureInSubmit)
-    val submitSucceeds: TraceContext => Future[Any] = _ => Future.successful(())
+    val submitFails: TraceContext => FutureUnlessShutdown[Any] = _ =>
+      FutureUnlessShutdown.failed(failureInSubmit)
+    val submitSucceeds: TraceContext => FutureUnlessShutdown[Any] = _ =>
+      FutureUnlessShutdown.pure(())
 
     val submitters: Set[String] = (actAs :+ party).toSet
 
-    val completionOk: Completion = Completion(
+    val completionOk: Completion = Completion.defaultInstance.copy(
       submissionId = submissionId,
       commandId = commandId,
       status = Some(Status(code = io.grpc.Status.Code.OK.value())),
-      applicationId = applicationId,
+      userId = userId,
       actAs = submitters.toSeq,
     )
 
-    val errorLogger: ContextualizedErrorLogger =
-      LedgerErrorLoggingContext(logger, Map(), traceContext, submissionId)
+    val errorLogger: ErrorLoggingContext =
+      ErrorLoggingContext.withExplicitCorrelationId(logger, Map(), traceContext, submissionId)
 
     val completionFailedGrpcCode = io.grpc.Status.Code.NOT_FOUND
     val completionFailedMessage: String = "ledger rejection"
@@ -473,7 +482,7 @@ class SubmissionTrackerSpec
     // We want to assert this for each test
     // Completion of futures might race with removal of the entries from the map
     eventually {
-      submissionTracker.pending shouldBe empty
+      streamTracker.pending shouldBe empty
     }
     // Stop the timer
     timer.purge()

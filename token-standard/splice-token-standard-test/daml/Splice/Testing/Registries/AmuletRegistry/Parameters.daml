@@ -1,0 +1,164 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+-- | Default configuration paramaters for the amulet registry used for testing.
+module Splice.Testing.Registries.AmuletRegistry.Parameters where
+
+import qualified DA.Set as Set
+import DA.Time
+
+
+import Splice.AmuletConfig
+import Splice.Fees
+import Splice.DecentralizedSynchronizer
+import Splice.Issuance
+import Splice.Schedule
+
+-- | Somewhat realistic fees to be used in test-code.
+defaultTransferConfig : TransferConfig USD
+defaultTransferConfig = TransferConfig with
+    -- Fee to create a new amulet.
+    -- Set to the fixed part of the transfer fee.
+    createFee = FixedFee 0.03
+
+    -- Fee for keeping a amulet around.
+    -- This is roughly equivalent to 1.05$/365 days but expressed as rounds
+    -- with one day corresponding to 24*60/10 rounds, i.e., one round
+    -- every 10 minutes.
+    -- Incentivizes users to actively merge their amulets.
+    holdingFee = RatePerRound 0.00002
+
+    -- Fee per lock holder.
+    -- Chosen to match the update to cover the cost of informing lock-holders about
+    -- actions on the locked amulet.
+    lockHolderFee = FixedFee 0.005
+
+    -- Fee for transferring some amount of amulet to a new owner.
+    transferFee = SteppedRate with
+      initialRate = 0.01
+      steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+
+    -- Extra reward amount for featured apps in USD
+    extraFeaturedAppRewardAmount = 1.0
+
+    -- These should be large enough to ensure efficient batching, but not too large
+    -- to avoid creating very large transactions.
+    maxNumInputs = 100
+    maxNumOutputs = 100
+
+    -- Maximum number of lock holders.
+    -- Chosen conservatively, but high enough to invite thinking about what's possible.
+    maxNumLockHolders = 10
+
+-- | Decentralized synchronizer config to use for testing.
+defaultAmuletDecentralizedSynchronizerConfig : AmuletDecentralizedSynchronizerConfig
+defaultAmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerConfig with
+  requiredSynchronizers = Set.fromList ["decentralized-synchronizer-id-0"]
+  activeSynchronizer = "decentralized-synchronizer-id-0"
+  fees = defaultSynchronizerFeesConfig
+
+-- default to 1.0 for testing
+defaultFeaturedAppActivityMarkerAmount : Decimal
+defaultFeaturedAppActivityMarkerAmount = 1.0
+
+-- | Default proposal for issuance curve and tickDuration
+defaultAmuletConfig : AmuletConfig USD
+defaultAmuletConfig = AmuletConfig with
+  transferConfig = defaultTransferConfig
+
+  issuanceCurve = defaultIssuanceCurve
+
+  decentralizedSynchronizer = defaultAmuletDecentralizedSynchronizerConfig
+
+  -- Duration of one tick, which is half the target duration of one round
+  tickDuration = minutes 10
+  packageConfig = PackageConfig with
+    amulet = "0.1.0"
+    amuletNameService = "0.1.0"
+    dsoGovernance = "0.1.0"
+    validatorLifecycle = "0.1.0"
+    wallet = "0.1.0"
+    walletPayments = "0.1.0"
+
+  -- Fee for keeping a transfer-preapproval around.
+  -- Similar to holding fees, it compensates the SVs for the storage cost of the contract.
+  -- Roughly equal to $1/year expressed as a daily rate.
+  transferPreapprovalFee = Some defaultTransferPreapprovalFee
+
+  -- Amount of the AppRewardCoupon contract that a FeaturedAppActivityMarker is converted to.
+  featuredAppActivityMarkerAmount = Some defaultFeaturedAppActivityMarkerAmount
+
+-- | Default configuration schedule with single current amulet config
+defaultAmuletConfigSchedule : Schedule Time (AmuletConfig USD)
+defaultAmuletConfigSchedule = Schedule with
+    initialValue = defaultAmuletConfig
+    futureValues = []
+
+-- Test issuance curve
+----------------------
+
+issuanceConfig_0_0p5 : IssuanceConfig
+issuanceConfig_0_0p5 = issuanceConfig_10plus with
+  amuletToIssuePerYear = 40e9
+  validatorRewardPercentage = 0.05
+  appRewardPercentage = 0.15
+
+issuanceConfig_0p5_1p5 : IssuanceConfig
+issuanceConfig_0p5_1p5 = issuanceConfig_10plus with
+  amuletToIssuePerYear = 20e9
+  validatorRewardPercentage = 0.12
+  appRewardPercentage = 0.40
+
+issuanceConfig_1p5_5 : IssuanceConfig
+issuanceConfig_1p5_5 = issuanceConfig_10plus with
+  amuletToIssuePerYear = 10e9
+  validatorRewardPercentage = 0.18
+  appRewardPercentage = 0.62
+
+issuanceConfig_5_10 : IssuanceConfig
+issuanceConfig_5_10 = issuanceConfig_10plus with
+  amuletToIssuePerYear = 5e9
+  validatorRewardPercentage = 0.21
+  appRewardPercentage = 0.69
+
+issuanceConfig_10plus : IssuanceConfig
+issuanceConfig_10plus = IssuanceConfig with
+  amuletToIssuePerYear = 2.5e9
+  validatorRewardPercentage = 0.2
+  appRewardPercentage = 0.75
+  -- TODO(#9350): move these params out of the `IssuanceConfig` to save space and bandwidth for txs referencing `AmuletRules`
+  validatorRewardCap = 0.2
+  featuredAppRewardCap = 100.0
+  unfeaturedAppRewardCap = 0.6
+  optValidatorFaucetCap = None -- We use the default of 2.85 USD introduced in the upgrade for CIP-3
+
+
+defaultIssuanceCurve : Schedule RelTime IssuanceConfig
+defaultIssuanceCurve =
+    Schedule with
+      initialValue = issuanceConfig_0_0p5
+      futureValues =
+        [ (hours hoursPerHalfYear, issuanceConfig_0p5_1p5)
+        , (hours (3 * hoursPerHalfYear) , issuanceConfig_1p5_5)
+        , (hours (5 * hoursPerYear), issuanceConfig_5_10)
+        , (hours (10 * hoursPerYear), issuanceConfig_10plus)
+        ]
+  where
+    hoursPerHalfYear = 12 * 365
+    hoursPerYear = 24 * 365
+
+
+-- | Default synchronizer fees configuration
+
+defaultBaseRateTrafficLimits : BaseRateTrafficLimits
+defaultBaseRateTrafficLimits = BaseRateTrafficLimits with
+    -- 10txs of 20kB each within 10 minutes
+    burstAmount = 10 * 20 * 1000
+    burstWindow = minutes 10
+
+defaultSynchronizerFeesConfig : SynchronizerFeesConfig
+defaultSynchronizerFeesConfig = SynchronizerFeesConfig with
+    baseRateTrafficLimits = defaultBaseRateTrafficLimits
+    minTopupAmount = 1_000_000 -- 1MB
+    extraTrafficPrice = 1.0
+    readVsWriteScalingFactor = 4 -- charge 4 per 10,000, i.e., 0.04% of write cost for every read

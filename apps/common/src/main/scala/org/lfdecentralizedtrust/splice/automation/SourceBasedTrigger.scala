@@ -36,10 +36,10 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     new AtomicReference(None)
 
   // When node-level shutdown is initiated, we need to kill the akka source.
-  context.retryProvider.runOnShutdown_(new RunOnShutdown {
+  context.retryProvider.runOnOrAfterClose_(new RunOnClosing {
     override def name: String = s"terminate source processing loop"
     override def done: Boolean = executionHandleRef.get().exists(_.completed.isCompleted)
-    override def run(): Unit =
+    override def run()(implicit tc: TraceContext): Unit =
       executionHandleRef
         .get()
         .foreach(handle => {
@@ -67,13 +67,13 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
             s"Starting source processing loop with parallelism ${context.config.parallelism}"
           )
           val (killSwitch: UniqueKillSwitch, completed0: Future[Done]) = PekkoUtil.runSupervised(
-            logger.error("Fatally failed to handle task", _),
             source
               .mapAsync(1) { task => waitForResumePromise.future.map(_ => task) }
               .viaMat(KillSwitches.single)(Keep.right)
               .toMat(Sink.foreachAsync[T](context.config.parallelism)(go))(
                 Keep.both
               ),
+            errorLogMessagePrefix = "Fatally failed to handle task",
           )
           val completed = completed0.transform(
             context.retryProvider

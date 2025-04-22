@@ -1,5 +1,5 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates.
-// Proprietary code. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 package com.daml.ledger.javaapi.data;
 
@@ -21,7 +21,7 @@ public final class Completion {
 
   private final @NonNull String updateId;
 
-  private final @NonNull String applicationId;
+  private final @NonNull String userId;
 
   private final @NonNull List<@NonNull String> actAs;
 
@@ -36,81 +36,81 @@ public final class Completion {
 
   private final @NonNull Long offset;
 
-  private final @NonNull DomainTime domainTime;
+  private final @NonNull SynchronizerTime synchronizerTime;
 
   private Completion(
       @NonNull String commandId,
       @NonNull Status status,
       @NonNull String updateId,
-      @NonNull String applicationId,
+      @NonNull String userId,
       @NonNull List<@NonNull String> actAs,
       @NonNull String submissionId,
       @NonNull Optional<Long> deduplicationOffset,
       @NonNull Optional<Duration> deduplicationDuration,
       TraceContextOuterClass.@NonNull TraceContext traceContext,
       @NonNull Long offset,
-      @NonNull DomainTime domainTime) {
+      @NonNull SynchronizerTime synchronizerTime) {
     this.commandId = commandId;
     this.status = status;
     this.updateId = updateId;
-    this.applicationId = applicationId;
+    this.userId = userId;
     this.actAs = List.copyOf(actAs);
     this.submissionId = submissionId;
     this.deduplicationOffset = deduplicationOffset;
     this.deduplicationDuration = deduplicationDuration;
     this.traceContext = traceContext;
     this.offset = offset;
-    this.domainTime = domainTime;
+    this.synchronizerTime = synchronizerTime;
   }
 
   public Completion(
       @NonNull String commandId,
       @NonNull Status status,
       @NonNull String updateId,
-      @NonNull String applicationId,
+      @NonNull String userId,
       @NonNull List<@NonNull String> actAs,
       @NonNull String submissionId,
       @NonNull Long deduplicationOffset,
       TraceContextOuterClass.TraceContext traceContext,
       @NonNull Long offset,
-      @NonNull DomainTime domainTime) {
+      @NonNull SynchronizerTime synchronizerTime) {
     this(
         commandId,
         status,
         updateId,
-        applicationId,
+        userId,
         actAs,
         submissionId,
         Optional.of(deduplicationOffset),
         Optional.empty(),
         traceContext,
         offset,
-        domainTime);
+        synchronizerTime);
   }
 
   public Completion(
       @NonNull String commandId,
       @NonNull Status status,
       @NonNull String updateId,
-      @NonNull String applicationId,
+      @NonNull String userId,
       @NonNull List<@NonNull String> actAs,
       @NonNull String submissionId,
       @NonNull Duration deduplicationDuration,
       TraceContextOuterClass.TraceContext traceContext,
       @NonNull Long offset,
-      @NonNull DomainTime domainTime) {
+      @NonNull SynchronizerTime synchronizerTime) {
     this(
         commandId,
         status,
         updateId,
-        applicationId,
+        userId,
         actAs,
         submissionId,
         Optional.empty(),
         Optional.of(deduplicationDuration),
         traceContext,
         offset,
-        domainTime);
+        synchronizerTime);
   }
 
   @NonNull
@@ -129,8 +129,8 @@ public final class Completion {
   }
 
   @NonNull
-  public String getApplicationId() {
-    return applicationId;
+  public String getUserId() {
+    return userId;
   }
 
   @NonNull
@@ -163,8 +163,8 @@ public final class Completion {
   }
 
   @NonNull
-  public DomainTime getDomainTime() {
-    return domainTime;
+  public SynchronizerTime getSynchronizerTime() {
+    return synchronizerTime;
   }
 
   @Override
@@ -175,14 +175,14 @@ public final class Completion {
     return Objects.equals(commandId, that.commandId)
         && Objects.equals(status, that.status)
         && Objects.equals(updateId, that.updateId)
-        && Objects.equals(applicationId, that.applicationId)
+        && Objects.equals(userId, that.userId)
         && Objects.equals(actAs, that.actAs)
         && Objects.equals(submissionId, that.submissionId)
         && Objects.equals(deduplicationOffset, that.deduplicationOffset)
         && Objects.equals(deduplicationDuration, that.deduplicationDuration)
         && Objects.equals(traceContext, that.traceContext)
         && Objects.equals(offset, that.offset)
-        && Objects.equals(domainTime, that.domainTime);
+        && Objects.equals(synchronizerTime, that.synchronizerTime);
   }
 
   @Override
@@ -191,14 +191,14 @@ public final class Completion {
         commandId,
         status,
         updateId,
-        applicationId,
+        userId,
         actAs,
         submissionId,
         deduplicationOffset,
         deduplicationDuration,
         traceContext,
         offset,
-        domainTime);
+        synchronizerTime);
   }
 
   @Override
@@ -212,8 +212,8 @@ public final class Completion {
         + ", updateId='"
         + updateId
         + '\''
-        + ", applicationId="
-        + applicationId
+        + ", userId="
+        + userId
         + ", actAs="
         + actAs
         + ", submissionId="
@@ -226,8 +226,8 @@ public final class Completion {
         + traceContext
         + ", offset='"
         + offset
-        + ", domainTime="
-        + domainTime
+        + ", synchronizerTime="
+        + synchronizerTime
         + '\''
         + '}';
   }
@@ -238,12 +238,12 @@ public final class Completion {
             .setCommandId(commandId)
             .setStatus(status)
             .setUpdateId(updateId)
-            .setApplicationId(applicationId)
+            .setUserId(userId)
             .addAllActAs(actAs)
             .setSubmissionId(submissionId)
             .setTraceContext(traceContext)
             .setOffset(offset)
-            .setDomainTime(domainTime.toProto());
+            .setSynchronizerTime(synchronizerTime.toProto());
     deduplicationOffset.ifPresent(builder::setDeduplicationOffset);
     deduplicationDuration.ifPresent(
         duration -> builder.setDeduplicationDuration(Utils.durationToProto(duration)));
@@ -255,7 +255,7 @@ public final class Completion {
         completion.getCommandId(),
         completion.getStatus(),
         completion.getUpdateId(),
-        completion.getApplicationId(),
+        completion.getUserId(),
         completion.getActAsList(),
         completion.getSubmissionId(),
         completion.hasDeduplicationOffset()
@@ -266,6 +266,6 @@ public final class Completion {
             : Optional.empty(),
         completion.getTraceContext(),
         completion.getOffset(),
-        DomainTime.fromProto(completion.getDomainTime()));
+        SynchronizerTime.fromProto(completion.getSynchronizerTime()));
   }
 }

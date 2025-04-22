@@ -1,10 +1,9 @@
-// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.util.retry
 
 import cats.Eval
-import cats.syntax.flatMap.*
 import com.digitalasset.canton.concurrent.DirectExecutionContext
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{
@@ -16,7 +15,15 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryWithDelay.{RetryOutcome, RetryTermination}
-import com.digitalasset.canton.util.{DelayUtil, LoggerUtil}
+import com.digitalasset.canton.util.retry.{
+  AllExceptionRetryPolicy,
+  ErrorKind,
+  ExceptionRetryPolicy,
+  Jitter,
+  Success,
+}
+import com.digitalasset.canton.util.{DelayUtil, LoggerUtil, retry}
+import com.google.common.annotations.VisibleForTesting
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -25,17 +32,58 @@ import scala.jdk.DurationConverters.*
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try}
 
-/** A retry [[com.digitalasset.canton.util.retry.Policy]] defines an interface for retrying a future-based task with
-  * retry semantics specific to implementations. If the task throws a non-fatal exceptions synchronously, the exception is
-  * converted into an asynchronous one, i.e., it is returned as a failed future or retried.
+/** A retry [[com.digitalasset.canton.util.retry.Policy]] defines an interface for retrying a
+  * future-based task with retry semantics specific to implementations. If the task throws a
+  * non-fatal exceptions synchronously, the exception is converted into an asynchronous one, i.e.,
+  * it is returned as a failed future or retried.
   *
-  * If unsure about what retry policy to pick, [[com.digitalasset.canton.util.retry.Backoff]] is a good default.
+  * If unsure about what retry policy to pick, [[com.digitalasset.canton.util.retry.Backoff]] is a
+  * good default.
   */
+
+sealed trait PolicyEffect[F[_]] {
+  def app[T](p: Policy, task: => F[T], retryOk: ExceptionRetryPolicy)(implicit
+      success: Success[T],
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+  ): F[T]
+}
+
+object PolicyEffect {
+
+  implicit object FuturePolicyEffect extends PolicyEffect[Future] {
+    override def app[T](p: Policy, task: => Future[T], retryOk: ExceptionRetryPolicy)(implicit
+        success: Success[T],
+        executionContext: ExecutionContext,
+        traceContext: TraceContext,
+    ): Future[T] =
+      p.applyFut(task, retryOk)
+
+  }
+  implicit object FusPolicyEffect extends PolicyEffect[FutureUnlessShutdown] {
+    override def app[T](p: Policy, task: => FutureUnlessShutdown[T], retryOk: ExceptionRetryPolicy)(
+        implicit
+        success: Success[T],
+        executionContext: ExecutionContext,
+        traceContext: TraceContext,
+    ): FutureUnlessShutdown[T] =
+      p.unlessShutdown(task, retryOk)
+  }
+}
+
 abstract class Policy(logger: TracedLogger) {
 
   protected val directExecutionContext: DirectExecutionContext = DirectExecutionContext(logger)
 
-  def apply[T](task: => Future[T], retryOk: ExceptionRetryPolicy)(implicit
+  def apply[F[_], T](task: => F[T], retryOk: ExceptionRetryPolicy)(implicit
+      success: Success[T],
+      executionContext: ExecutionContext,
+      traceContext: TraceContext,
+      effect: PolicyEffect[F],
+  ): F[T] =
+    effect.app(this, task, retryOk)
+
+  def applyFut[T](task: => Future[T], retryOk: ExceptionRetryPolicy)(implicit
       success: Success[T],
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -51,7 +99,9 @@ abstract class Policy(logger: TracedLogger) {
 
 object Policy {
 
-  /** Repeatedly execute the task until it doesn't throw an exception or the `flagCloseable` is closing. */
+  /** Repeatedly execute the task until it doesn't throw an exception or the `flagCloseable` is
+    * closing.
+    */
   def noisyInfiniteRetry[A](
       task: => Future[A],
       performUnlessClosing: PerformUnlessClosing,
@@ -70,7 +120,9 @@ object Policy {
       actionable,
     )
 
-  /** Repeatedly execute the task until it returns an abort due to shutdown, doesn't throw an exception, or the `flagCloseable` is closing. */
+  /** Repeatedly execute the task until it returns an abort due to shutdown, doesn't throw an
+    * exception, or the `flagCloseable` is closing.
+    */
   def noisyInfiniteRetryUS[A](
       task: => FutureUnlessShutdown[A],
       performUnlessClosing: PerformUnlessClosing,
@@ -108,18 +160,19 @@ abstract class RetryWithDelay(
     suspendRetries: Eval[FiniteDuration],
 ) extends Policy(logger) {
 
-  private val complainAfterRetries: Int = 60
+  import RetryWithDelay.complainAfterRetries
 
   private val actionableMessage: String = actionable.map(" " + _).getOrElse("")
 
   protected def nextDelay(nextCount: Int, delay: FiniteDuration): FiniteDuration
 
-  /** A [[com.digitalasset.canton.util.retry.Success]] criteria is supplied
-    * to determine whether the future-based task has succeeded, or if it should perhaps be retried. Retries are not
-    * performed after the [[com.digitalasset.canton.lifecycle.FlagCloseable]] has been closed. In that case, the
-    * Future is completed with the last result (even if it is an outcome that doesn't satisfy the `success` predicate).
+  /** A [[com.digitalasset.canton.util.retry.Success]] criteria is supplied to determine whether the
+    * future-based task has succeeded, or if it should perhaps be retried. Retries are not performed
+    * after the [[com.digitalasset.canton.lifecycle.FlagCloseable]] has been closed. In that case,
+    * the Future is completed with the last result (even if it is an outcome that doesn't satisfy
+    * the `success` predicate).
     */
-  override def apply[T](
+  override def applyFut[T](
       task: => Future[T],
       retryable: ExceptionRetryPolicy,
   )(implicit
@@ -135,14 +188,14 @@ abstract class RetryWithDelay(
         Failure(failure)
     }(directExecutionContext)
 
-  /** In contrast to [[com.digitalasset.canton.util.retry.RetryWithDelay.apply]], this Policy completes the returned
-    * future with `AbortedDueToShutdown` if the retry is aborted due to the corresponding
-    * [[com.digitalasset.canton.lifecycle.FlagCloseable]] being closed or if the task itself reports a shutdown (and
-    * not with the last result).
+  /** In contrast to [[com.digitalasset.canton.util.retry.RetryWithDelay.apply]], this Policy
+    * completes the returned future with `AbortedDueToShutdown` if the retry is aborted due to the
+    * corresponding [[com.digitalasset.canton.lifecycle.FlagCloseable]] being closed or if the task
+    * itself reports a shutdown (and not with the last result).
     *
     * Unless your task does already naturally return a `FutureUnlessShutdown[T]`, using
-    * [[com.digitalasset.canton.util.retry.RetryWithDelay.apply]] is likely sufficient to make it robust against
-    * shutdowns.
+    * [[com.digitalasset.canton.util.retry.RetryWithDelay.apply]] is likely sufficient to make it
+    * robust against shutdowns.
     */
   override def unlessShutdown[T](
       task: => FutureUnlessShutdown[T],
@@ -231,15 +284,24 @@ abstract class RetryWithDelay(
                   DelayUtil
                     .delayIfNotClosing(operationName, suspendDuration, performUnlessClosing)
                     .onShutdown(())(directExecutionContext)
-                    .flatMap(_ => run(previousResult, 0, Some(errorKind), 0, initialDelay))(
-                      directExecutionContext
-                    )
+                    .flatMap(_ =>
+                      run(
+                        previousResult,
+                        totalRetries = 0,
+                        lastErrorKind = Some(errorKind),
+                        retriesOfLastErrorKind = 0,
+                        delay = initialDelay,
+                      )
+                    )(directExecutionContext)
                 } else {
                   val level = retryLogLevel.getOrElse {
-                    if (totalRetries < complainAfterRetries || totalMaxRetries != Int.MaxValue) {
-                      // Check if a different log level has been configured by default for the outcome, otherwise log to INFO
-                      retryable.retryLogLevel(outcome).getOrElse(Level.INFO)
-                    } else Level.WARN
+                    // If a different log level has been configured by default for the outcome, use that one.
+                    // Otherwise, log to INFO, or WARN if we are retrying forever and we have already retried many times.
+                    retryable.retryLogLevel(outcome).getOrElse {
+                      if (totalMaxRetries == retry.Forever && totalRetries >= complainAfterRetries)
+                        Level.WARN
+                      else Level.INFO
+                    }
                   }
                   val change = if (lastErrorKind.contains(errorKind)) {
                     ""
@@ -296,11 +358,11 @@ abstract class RetryWithDelay(
 
                         FutureUnlessShutdown.outcomeF(
                           run(
-                            nextRunF,
-                            nextTotalRetries,
-                            Some(errorKind),
-                            retriesOfErrorKind + 1,
-                            nextDelayIs,
+                            previousResult = nextRunF,
+                            totalRetries = nextTotalRetries,
+                            lastErrorKind = Some(errorKind),
+                            retriesOfLastErrorKind = retriesOfErrorKind + 1,
+                            delay = nextDelayIs,
                           )
                         )(executionContext)
                       }
@@ -370,12 +432,16 @@ abstract class RetryWithDelay(
 
 object RetryWithDelay {
 
-  /** The outcome of the last run of the task,
-    * along with the condition that stopped the retry.
+  @VisibleForTesting
+  private[retry] val complainAfterRetries: Int = 10
+
+  /** The outcome of the last run of the task, along with the condition that stopped the retry.
     */
   private final case class RetryOutcome[A](outcome: Try[A], termination: RetryTermination) {
 
-    /** @throws java.lang.Throwable Rethrows the exception if [[outcome]] is a [[scala.util.Failure]] */
+    /** @throws java.lang.Throwable
+      *   Rethrows the exception if [[outcome]] is a [[scala.util.Failure]]
+      */
     @SuppressWarnings(Array("org.wartremover.warts.TryPartial"))
     def toUnlessShutdown: UnlessShutdown[A] =
       if (termination == RetryTermination.Shutdown) AbortedDueToShutdown
@@ -447,38 +513,37 @@ final case class Pause(
   override def nextDelay(nextCount: Int, delay: FiniteDuration): FiniteDuration = delay
 }
 
-/** A retry policy which will back off using a configurable policy which
-  *  incorporates random jitter. This has the advantage of reducing contention
-  *  if you have threaded clients using the same service.
+/** A retry policy which will back off using a configurable policy which incorporates random jitter.
+  * This has the advantage of reducing contention if you have threaded clients using the same
+  * service.
   *
-  *  {{{
+  * {{{
   *  val policy = retry.Backoff()
   *  val future = policy(issueRequest)
-  *  }}}
+  * }}}
   *
-  *  The following pre-made jitter algorithms are available for you to use:
+  * The following pre-made jitter algorithms are available for you to use:
   *
-  *  - [[Jitter.none]]
-  *  - [[Jitter.full]]
-  *  - [[Jitter.equal]]
-  *  - [[Jitter.decorrelated]]
+  *   - [[Jitter.none]]
+  *   - [[Jitter.full]]
+  *   - [[Jitter.equal]]
+  *   - [[Jitter.decorrelated]]
   *
-  *  You can choose one like this:
-  *  {{{
+  * You can choose one like this:
+  * {{{
   *  implicit val jitter = retry.Jitter.full(cap = 5.minutes)
   *  val policy = retry.Backoff(1 second)
   *  val future = policy(issueRequest)
-  *  }}}
+  * }}}
   *
-  *  If a jitter policy isn't in scope, it will use [[Jitter.full]] by
-  *  default which tends to cause clients slightly less work at the cost of
-  *  slightly more time.
+  * If a jitter policy isn't in scope, it will use [[Jitter.full]] by default which tends to cause
+  * clients slightly less work at the cost of slightly more time.
   *
-  *  For more information about the algorithms, see the following article:
+  * For more information about the algorithms, see the following article:
   *
-  *  [[https://www.awsarchitectureblog.com/2015/03/backoff.html]]
+  * [[https://www.awsarchitectureblog.com/2015/03/backoff.html]]
   *
-  *  If the retry is not successful after `maxRetries`, the future is completed with its last result.
+  * If the retry is not successful after `maxRetries`, the future is completed with its last result.
   */
 final case class Backoff(
     logger: TracedLogger,
@@ -510,26 +575,25 @@ final case class Backoff(
     jitter(initialDelay, delay, nextCount)
 }
 
-/** A retry policy in which the failure determines the way a future should be retried.
-  *  The partial function `depends` provided may define the domain of both the success OR exceptional
-  *  failure of a future fails explicitly.
+/** A retry policy in which the failure determines the way a future should be retried. The partial
+  * function `depends` provided may define the synchronizer of both the success OR exceptional
+  * failure of a future fails explicitly.
   *
-  *  {{{
+  * {{{
   *  val policy = retry.When {
   *    case RetryAfter(retryAt) => retry.Pause(delay = retryAt)
   *  }
   *  val future = policy(issueRequest)
-  *  }}}
+  * }}}
   *
-  *  If the result is not defined for the depends block, the future will not
-  *  be retried.
+  * If the result is not defined for the depends block, the future will not be retried.
   */
 final case class When(
     logger: TracedLogger,
     depends: PartialFunction[Any, Policy],
 ) extends Policy(logger) {
 
-  override def apply[T](task: => Future[T], retryable: ExceptionRetryPolicy)(implicit
+  override def applyFut[T](task: => Future[T], retryable: ExceptionRetryPolicy)(implicit
       success: Success[T],
       executionContext: ExecutionContext,
       traceContext: TraceContext,
@@ -538,7 +602,7 @@ final case class When(
     fut
       .flatMap { res =>
         if (success.predicate(res) || !depends.isDefinedAt(res)) fut
-        else depends(res)(task, retryable)
+        else depends(res).applyFut(task, retryable)
       }(directExecutionContext)
       .recoverWith { case NonFatal(e) =>
         if (
@@ -547,7 +611,7 @@ final case class When(
             .logAndDetermineErrorKind(Failure(e), logger, None)
             .maxRetries > 0
         )
-          depends(e)(task, retryable)
+          depends(e).applyFut(task, retryable)
         else fut
       }(directExecutionContext)
   }
@@ -558,5 +622,5 @@ final case class When(
       executionContext: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[T] =
-    FutureUnlessShutdown(apply(task.unwrap, retryOk)(Success.onShutdown, implicitly, implicitly))
+    FutureUnlessShutdown(applyFut(task.unwrap, retryOk)(Success.onShutdown, implicitly, implicitly))
 }
