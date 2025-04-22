@@ -30,37 +30,21 @@ parameters:
     enum:
       [
         build,
-        deploy-cidaily,
         deploy-upgrade,
-        deploy-hdm-operator,
-        determine-ciperiodic-migration-operator-work,
-        deploy-ciperiodic-sv-reonboard,
-        deploy-ciperiodic-non-devnet,
-        healthcheck-cidaily,
         healthcheck-devnet,
-        redeploy-sv-runbook-cidaily,
-        redeploy-validator-runbook-cidaily,
-        reset-sv-runbook-devnet,
         healthcheck-sv-runbook-devnet,
-        reset-validator-runbook-devnet,
         healthcheck-validator-runbook-devnet,
-        backup-cidaily,
-        restore-sv-cidaily,
-        restore-validator-cidaily,
         backup-devnet,
         backup-testnet,
         backup-mainnet,
         copy-mainnet-backup,
         publish-public-artifacts,
-        apply-infra,
         deploy-operator,
         preview-operator,
         backup-status-devnet,
         backup-status-testnet,
         backup-status-mainnet,
         bump-configs,
-        update-serverless-workflows,
-        update-gcp-projects
       ]
     default: build
   # Whether the cluster should be reset before deploying.
@@ -3923,41 +3907,6 @@ jobs:
           path: log
           destination: log
 
-  deploy_serverless:
-    executor: self_hosted
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Deploy serverless workflows
-          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
-          cmd: |
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            ./cluster/serverless/deploy.sh
-
-  update_gcp_project:
-    executor: self_hosted
-    parameters:
-      <<: *cluster-parameter
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted
-      - run_bash_command_in_nix:
-          cmd_name: Build Helm & Pulumi artifacts
-          cmd: |
-            make -j cluster/pulumi/build
-          cmd_retry_count: 2
-      - run_bash_command_in_nix:
-          cmd_name: Update GCP projects
-          gce_authenticate: true
-          cluster: << parameters.cluster >>
-          cmd: |
-            cncluster pulumi gcp-project up --skip-preview --yes
-
   deploy_operator:
     executor: self_hosted
     environment:
@@ -5388,41 +5337,6 @@ workflows:
             - slack-context
             - canton-network-vpn
 
-  update_gcp_projects:
-    when:
-      equal: [ update-gcp-projects, << pipeline.parameters.run-job >> ]
-    jobs:
-      - update_gcp_project:
-          <<: *main-branch-only
-          name: Update da-cn-scratchnets
-          cluster: scratchneta
-          context:
-            - artifactory
-      - update_gcp_project:
-          <<: *main-branch-only
-          name: Update da-cn-ci
-          cluster: cimain
-          context:
-            - artifactory
-      - update_gcp_project:
-          <<: *main-branch-only
-          name: Update da-cn-ci-2
-          cluster: cidaily
-          context:
-            - artifactory
-      - update_gcp_project:
-          <<: *main-branch-only
-          name: Update da-cn-devnet
-          cluster: devnet
-          context:
-            - artifactory
-      - update_gcp_project:
-          <<: *main-branch-only
-          name: Update da-cn-mainnet
-          cluster: mainnet
-          context:
-            - artifactory
-
   deploy_hdm_operator:
     when:
       equal: [ deploy-hdm-operator, << pipeline.parameters.run-job >> ]
@@ -5628,16 +5542,6 @@ workflows:
           requires:
             - archive_legacy_migration
 
-  apply_infra:
-    when:
-      equal: [ apply-infra, << pipeline.parameters.run-job >> ]
-    jobs:
-      - deploy_infra:
-          context:
-            - artifactory
-            - slack-context
-          cluster: << pipeline.parameters.cluster >>
-
   backup_mainnet:
     when:
       equal: [ backup-mainnet, << pipeline.parameters.run-job >> ]
@@ -5806,12 +5710,6 @@ workflows:
           deployment_only: true
           requires:
             - set_previews_deployment
-
-  update_serverless_workflows:
-    when:
-      equal: [ update-serverless-workflows, << pipeline.parameters.run-job >> ]
-    jobs:
-      - deploy_serverless
 
   backup_testnet:
     when:
