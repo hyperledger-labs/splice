@@ -18,6 +18,7 @@ const PulumiProjectConfigSchema = z.object({
       .default({ day: 2, hour: 8 }),
     protected: z.boolean(),
     tier: z.string(),
+    enterprisePlus: z.boolean(),
   }),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;

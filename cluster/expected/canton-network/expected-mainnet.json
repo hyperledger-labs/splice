@@ -422,12 +422,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": true
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE_PLUS",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -443,7 +448,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "db-perf-optimized-N-4",
         "userLabels": {
           "cluster": "mainzrh"
         }
@@ -680,12 +685,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": true
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE_PLUS",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -701,7 +711,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "db-perf-optimized-N-4",
         "userLabels": {
           "cluster": "mainzrh",
           "migration_id": "1"
@@ -745,12 +755,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": true
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE_PLUS",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -766,7 +781,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "db-perf-optimized-N-4",
         "userLabels": {
           "cluster": "mainzrh",
           "migration_id": "1"
@@ -886,12 +901,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": true
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE_PLUS",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -907,7 +927,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "db-perf-optimized-N-4",
         "userLabels": {
           "cluster": "mainzrh",
           "migration_id": "1"

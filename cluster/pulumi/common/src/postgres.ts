@@ -14,6 +14,7 @@ import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils
 const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
 const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
 const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
+const cloudSqlEnterprisePlus = spliceConfig.pulumiProjectConfig.cloudSql.enterprisePlus;
 
 const project = gcp.organizations.getProjectOutput({});
 
@@ -63,8 +64,9 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
   ) {
     const instanceLogicalName = xns.logicalName + '-' + instanceName;
     const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
+    const deletionProtection = disableProtection ? false : protectCloudSql;
     const baseOpts = {
-      protect: disableProtection ? false : protectCloudSql,
+      protect: deletionProtection,
       aliases: [{ name: instanceLogicalNameAlias }],
     };
     super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
@@ -75,9 +77,10 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       instanceLogicalName,
       {
         databaseVersion: 'POSTGRES_14',
-        deletionProtection: disableProtection ? false : protectCloudSql,
+        deletionProtection: deletionProtection,
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
+          deletionProtectionEnabled: deletionProtection,
           activationPolicy: 'ALWAYS', // TODO(#15974): set to NEVER when enabling archived instance
           databaseFlags: [{ name: 'temp_file_limit', value: '2147483647' }],
           backupConfiguration: {
@@ -88,6 +91,10 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
             queryInsightsEnabled: true,
           },
           tier: cloudSqlDbInstance,
+          edition: cloudSqlEnterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
+          dataCacheConfig: {
+            dataCacheEnabled: cloudSqlEnterprisePlus,
+          },
           ipConfiguration: {
             ipv4Enabled: false,
             privateNetwork: privateNetwork.id,
@@ -122,14 +129,14 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
       {
         parent: this,
         deletedWith: this.pgSvc,
-        protect: disableProtection ? false : protectCloudSql,
+        protect: deletionProtection,
         aliases: [{ name: `${this.namespace.logicalName}-db-${alias}-cantonnet` }],
       }
     );
 
     const password = generatePassword(`${instanceLogicalName}-passwd`, {
       parent: this,
-      protect: disableProtection ? false : protectCloudSql,
+      protect: deletionProtection,
       aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
     }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
@@ -146,7 +153,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         parent: this,
         deletedWith: this.pgSvc,
         dependsOn: [passwordSecret],
-        protect: disableProtection ? false : protectCloudSql,
+        protect: deletionProtection,
         aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
       }
     );
