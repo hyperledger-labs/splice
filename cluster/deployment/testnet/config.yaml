@@ -44,10 +44,10 @@ pulumiProjectConfig:
     isExternalCluster: true
     cloudSql:
       enabled: true
-      enterprisePlus: true
   canton-network:
     cloudSql:
       tier: 'db-perf-optimized-N-4'
+      enterprisePlus: true
 monitoring:
   alerting:
     enableNoDataAlerts: true

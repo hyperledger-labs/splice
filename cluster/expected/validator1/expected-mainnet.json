@@ -483,7 +483,7 @@
           "pointInTimeRecoveryEnabled": true
         },
         "dataCacheConfig": {
-          "dataCacheEnabled": true
+          "dataCacheEnabled": false
         },
         "databaseFlags": [
           {
@@ -492,7 +492,7 @@
           }
         ],
         "deletionProtectionEnabled": true,
-        "edition": "ENTERPRISE_PLUS",
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -552,7 +552,7 @@
           "pointInTimeRecoveryEnabled": true
         },
         "dataCacheConfig": {
-          "dataCacheEnabled": true
+          "dataCacheEnabled": false
         },
         "databaseFlags": [
           {
@@ -561,7 +561,7 @@
           }
         ],
         "deletionProtectionEnabled": true,
-        "edition": "ENTERPRISE_PLUS",
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
