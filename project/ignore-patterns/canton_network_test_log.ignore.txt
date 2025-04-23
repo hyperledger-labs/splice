@@ -29,12 +29,10 @@ Could not verify JWT token: The provided Algorithm doesn't match the one defined
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 .*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 
-# TODO(#2196) Figure out why we get that error
-ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when attempting to fetch resource.
-
 ErrorBoundary caught an unhandled promise rejection AbortError: The operation was aborted
 ErrorBoundary caught an unhandled promise rejection AbortError: Aborted
 AbortError: The operation was aborted
+TypeError: NetworkError when attempting to fetch resource
 
 # Testcontainers tries to read the configuration file but it's not available on CI
 Attempted to read Testcontainers configuration file at file:
@@ -94,12 +92,6 @@ Instrument daml.cache.* has recorded multiple values for the same attributes
 
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 
-# TODO(#13301) Handle in-flight contracts without logging warnings
-Cannot read contract.*AssignedContract, it is in flight.*SoftDomainMigrationIntegrationTest
-
-# TODO(#13301) This is BftScanConnection.refreshAction failing to fetch the scan list while the DsoRules contract is in flight
-SoftDomainMigrationIntegrationTest.*The global domain global-domain-new.* is not present in the scans response.*getPeerScansFromStore
-
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
 
@@ -109,16 +101,13 @@ Vetted state contains multiple entries
 # TODO(#17311) Remove conversion from future with shutdown to future
 Splice unsafe shutdown future
 
-# TODO(#17605) Investigate this and fix it
-SignSynchronizerBootstrappingStateTrigger.*SoftDomainMigrationIntegrationTest.*NOT_FOUND: No SynchronizerParametersState state domain global-domain-new
-
 # TODO(#19057) - Figure out a proper way to fix this
 BootstrapPackageConfigIntegrationTest.*ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead.*
 
 # Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
 .*No data has been made available yet.*
 
-# Make sure to have a trailing newline
-
 # TODO(#19139): Remove it once BoostrapPackageConfigIntegrationTest is fixed
 .*INVALID_ARGUMENT: COMMAND_PREPROCESSING_FAILED.*unknown constructor SRARC_CreateExternalPartyAmuletRules.*
+
+# Make sure to have a trailing newline

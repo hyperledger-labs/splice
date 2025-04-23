@@ -181,10 +181,10 @@ class BootstrapPackageConfigIntegrationTest
     sv2PackageVettingTrigger.pause().futureValue
     sv2ValidatorPackageVettingTrigger.pause().futureValue
 
+    val vettingScheduledTime = CantonTimestamp.assertFromInstant(
+      scheduledTime
+    )
     clue("Change AmuletConfig to latest packages") {
-      val vettingScheduledTime = CantonTimestamp.assertFromInstant(
-        scheduledTime
-      )
       val amuletRules = sv2ScanBackend.getAmuletRules()
       val amuletConfig = amuletRules.payload.configSchedule.initialValue
       val newAmuletConfig = new AmuletConfig(
@@ -290,15 +290,21 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    sv2PackageVettingTrigger.runOnce().futureValue
-    sv2ValidatorPackageVettingTrigger.runOnce().futureValue
+    val amuletCreateTime =
+      CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+    sv2PackageVettingTrigger.resume()
+    sv2ValidatorPackageVettingTrigger.resume()
 
     clue(s"Vetting state for slow sv is updated after the trigger runs") {
       eventually() {
         vettingIsUpdatedForTheNewConfig(
           sv2Backend.participantClient,
+          // it depends if the amulet rules contract was pruned or not by the time vetting ran
           Some(
-            CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+            vettingScheduledTime
+          ),
+          Some(
+            amuletCreateTime
           ),
         )
       }
@@ -322,6 +328,7 @@ class BootstrapPackageConfigIntegrationTest
   private def vettingIsUpdatedForTheNewConfig(
       participantClient: ParticipantClientReference,
       scheduledTimeO: Option[CantonTimestamp],
+      alternativeScheduledTime: Option[CantonTimestamp] = None,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val vettingTopologyState = participantClient.topology.vetted_packages.list(
       store = Some(
@@ -346,7 +353,9 @@ class BootstrapPackageConfigIntegrationTest
       val newAmuletVettedPackage = vettingState.packages
         .find(_.packageId == expectedVettedVersion.packageId)
         .value
-      newAmuletVettedPackage.validFrom shouldBe scheduledTimeO
+      newAmuletVettedPackage.validFrom should (equal(scheduledTimeO) or equal(
+        alternativeScheduledTime
+      ))
     }
   }
 
