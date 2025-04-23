@@ -50,11 +50,11 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 #. Start only the postgres container: ``docker compose up -d postgres-splice``
 
-#. Check whether postgres is ready with: ``docker exec compose-postgres-splice-1 pg_isready`` (rerun this command until it succeeds)
+#. Check whether postgres is ready with: ``docker exec splice-validator-postgres-splice-1 pg_isready`` (rerun this command until it succeeds)
 
-#. Restore the validator database (assuming `validator_dump_file` contains the filename of the dump from which you wish to restore): ``docker exec -i compose-postgres-splice-1 psql -U cnadmin validator < $validator_dump_file``
+#. Restore the validator database (assuming `validator_dump_file` contains the filename of the dump from which you wish to restore): ``docker exec -i splice-validator-postgres-splice-1 psql -U cnadmin validator < $validator_dump_file``
 
-#. Restore the participant database (assuming `participant_dump_file` contains the filename of the dump from which you wish to restore, and `migration_id` contains the latest migration ID): ``docker exec -i compose-postgres-splice-1 psql -U cnadmin participant-$migration_id < $participant_dump_file``
+#. Restore the participant database (assuming `participant_dump_file` contains the filename of the dump from which you wish to restore, and `migration_id` contains the latest migration ID): ``docker exec -i splice-validator-postgres-splice-1 psql -U cnadmin participant-$migration_id < $participant_dump_file``
 
 #. Stop the postgres instance: ``docker compose down``
 
