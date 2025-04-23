@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
 
 import java.time.{Instant, ZoneOffset}
@@ -203,7 +204,7 @@ sealed trait ScanHttpEncodings {
         )
     }
     TreeUpdateWithMigrationId(
-      ledgerApi.LedgerClient.GetTreeUpdatesResponse(
+      UpdateHistoryResponse(
         update = ledgerApi.TransactionTreeUpdate(
           new javaApi.TransactionTree(
             http.updateId,
@@ -232,7 +233,7 @@ sealed trait ScanHttpEncodings {
     http.event match {
       case httpApi.UpdateHistoryReassignment.Event.members.UpdateHistoryAssignment(assignment) =>
         TreeUpdateWithMigrationId(
-          ledgerApi.LedgerClient.GetTreeUpdatesResponse(
+          UpdateHistoryResponse(
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
@@ -255,7 +256,7 @@ sealed trait ScanHttpEncodings {
       case httpApi.UpdateHistoryReassignment.Event.members
             .UpdateHistoryUnassignment(unassignment) =>
         TreeUpdateWithMigrationId(
-          ledgerApi.LedgerClient.GetTreeUpdatesResponse(
+          UpdateHistoryResponse(
             update = ledgerApi.ReassignmentUpdate(
               transfer = ledgerApi.Reassignment(
                 updateId = http.updateId,
@@ -454,6 +455,12 @@ object ScanHttpEncodings {
   def makeConsistentAcrossSvs(
       response: ledgerApi.LedgerClient.GetTreeUpdatesResponse
   ): ledgerApi.LedgerClient.GetTreeUpdatesResponse = {
+    response.copy(update = makeConsistentAcrossSvs(response.update))
+  }
+
+  def makeConsistentAcrossSvs(
+      response: UpdateHistoryResponse
+  ): UpdateHistoryResponse = {
     response.copy(update = makeConsistentAcrossSvs(response.update))
   }
 

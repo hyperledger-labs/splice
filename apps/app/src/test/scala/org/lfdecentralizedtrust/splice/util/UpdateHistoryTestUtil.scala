@@ -7,7 +7,6 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics.MetricsPrefix
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -34,6 +33,7 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{
   LostInStoreIngestion,
 }
 import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
   TransactionTreeWrapper,
@@ -53,7 +53,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
       beginExclusive: Long,
       partyId: PartyId,
       participant: ParticipantClientReference,
-  ): Seq[GetTreeUpdatesResponse] = {
+  ): Seq[UpdateHistoryResponse] = {
     val ledgerEnd = participant.ledger_api.state.end()
 
     participant.ledger_api.updates
@@ -66,17 +66,17 @@ trait UpdateHistoryTestUtil extends TestCommon {
       )
       .collect {
         case TransactionTreeWrapper(protoTree) =>
-          GetTreeUpdatesResponse(
+          UpdateHistoryResponse(
             TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
             SynchronizerId.tryFromString(protoTree.synchronizerId),
           )
         case UnassignedWrapper(protoReassignment, Seq(protoUnassignEvent)) =>
-          GetTreeUpdatesResponse(
+          UpdateHistoryResponse(
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
             SynchronizerId.tryFromString(protoUnassignEvent.source),
           )
         case AssignedWrapper(protoReassignment, Seq(protoAssignEvent)) =>
-          GetTreeUpdatesResponse(
+          UpdateHistoryResponse(
             ReassignmentUpdate(Reassignment.fromProto(protoReassignment)),
             SynchronizerId.tryFromString(protoAssignEvent.target),
           )
@@ -109,14 +109,12 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     if (mustIncludeReassignments) {
       recordedUpdates.filter(_.update match {
-        case LedgerClient
-              .GetTreeUpdatesResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Assign)), _) =>
+        case UpdateHistoryResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Assign)), _) =>
           true
         case _ => false
       }) should not be empty
       recordedUpdates.filter(_.update match {
-        case LedgerClient
-              .GetTreeUpdatesResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Unassign)), _) =>
+        case UpdateHistoryResponse(ReassignmentUpdate(Reassignment(_, _, _, _: Unassign)), _) =>
           true
         case _ => false
       }) should not be empty
@@ -202,7 +200,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
 
     updatesFromScanApi should have length updatesFromHistory.size.toLong
 
-    def responseSynchronizerId(update: GetTreeUpdatesResponse): String =
+    def responseSynchronizerId(update: UpdateHistoryResponse): String =
       update.synchronizerId.toProtoPrimitive
     val recordedUpdatesBySynchronizerId = updatesFromScanApi.groupBy(responseSynchronizerId)
     val actualUpdatesBySynchronizerId = updatesFromHistory.groupBy(responseSynchronizerId)
@@ -272,7 +270,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     u.map(shortDebugDescription).mkString("[\n", ",\n", "\n]")
   }
 
-  def dropTrailingNones(u: GetTreeUpdatesResponse): GetTreeUpdatesResponse =
+  def dropTrailingNones(u: UpdateHistoryResponse): UpdateHistoryResponse =
     u.copy(update = dropTrailingNones(u.update))
 
   def dropTrailingNones(u: TreeUpdate): TreeUpdate =

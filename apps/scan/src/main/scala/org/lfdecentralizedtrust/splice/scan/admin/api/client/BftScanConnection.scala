@@ -23,7 +23,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
   RetryFor,
@@ -48,6 +47,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -384,7 +384,7 @@ class BftScanConnection(
       before: CantonTimestamp,
       atOrAfter: Option[CantonTimestamp],
       count: Int,
-  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
+  )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] = {
     require(atOrAfter.isEmpty, "atOrAfter is chosen by BftScanConnection")
     val connections = scanList.scanConnections
     for {
@@ -413,7 +413,7 @@ class BftScanConnection(
         // scans return different updates. In the more unlikely case where scans disagree on the payload of
         // a given update, we would need to fetch the update payload from the update history database.
         shortenResponsesForLog =
-          (responses: Seq[LedgerClient.GetTreeUpdatesResponse]) => responses.map(_.update.updateId),
+          (responses: Seq[UpdateHistoryResponse]) => responses.map(_.update.updateId),
       )
     } yield {
       result

@@ -1,10 +1,10 @@
 package org.lfdecentralizedtrust.splice.store
 
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.scan.store.ScanHistoryBackfilling
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.SynchronizerId
@@ -271,7 +271,7 @@ class ScanHistoryBackfillingTest extends UpdateHistoryTestBase {
         before: CantonTimestamp,
         atOrAfter: Option[CantonTimestamp],
         count: Int,
-    )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
+    )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] =
       history
         .getUpdatesBefore(
           migrationId,

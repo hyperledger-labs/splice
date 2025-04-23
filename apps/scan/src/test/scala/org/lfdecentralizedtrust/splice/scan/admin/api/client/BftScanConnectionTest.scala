@@ -16,7 +16,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
-import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.environment.{
   BaseAppConnection,
   RetryProvider,
@@ -30,6 +30,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAp
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
@@ -132,7 +133,7 @@ class BftScanConnectionTest
       migrationId: Long,
       before: CantonTimestamp,
       atOrAfter: CantonTimestamp,
-      updates: Seq[LedgerClient.GetTreeUpdatesResponse],
+      updates: Seq[UpdateHistoryResponse],
       count: Int,
   ): Unit = {
     when(mock.getUpdatesBefore(migrationId, synchronizerId, before, Some(atOrAfter), count))
@@ -148,8 +149,8 @@ class BftScanConnectionTest
   }
   private def jtime(n: Int) = Instant.EPOCH.plusSeconds(n.toLong)
   private def ctime(n: Int) = CantonTimestamp.assertFromInstant(jtime(n))
-  private def testUpdate(n: Int): LedgerClient.GetTreeUpdatesResponse = {
-    LedgerClient.GetTreeUpdatesResponse(
+  private def testUpdate(n: Int): UpdateHistoryResponse = {
+    UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         tree = new javaApi.TransactionTree(
           s"updateId$n",

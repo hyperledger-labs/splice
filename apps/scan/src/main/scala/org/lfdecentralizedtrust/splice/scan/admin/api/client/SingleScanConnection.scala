@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.environment.{
   HttpAppConnection,
   RetryProvider,
@@ -39,6 +38,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -515,7 +515,7 @@ class SingleScanConnection private[client] (
       before: CantonTimestamp,
       atOrAfter: Option[CantonTimestamp],
       count: Int,
-  )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
+  )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] =
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.GetUpdatesBefore(

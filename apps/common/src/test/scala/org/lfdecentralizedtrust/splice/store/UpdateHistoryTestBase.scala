@@ -5,7 +5,6 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTr
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  LedgerClient,
   Reassignment,
   ReassignmentEvent,
   ReassignmentUpdate,
@@ -25,6 +24,8 @@ import org.scalatest.Assertion
 
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
+
+import UpdateHistory.UpdateHistoryResponse
 
 abstract class UpdateHistoryTestBase
     extends StoreTest
@@ -161,12 +162,12 @@ abstract class UpdateHistoryTestBase
     tree.getEventsById.get(rootEventId)
   }
   protected def checkUpdates(
-      actual: Seq[LedgerClient.GetTreeUpdatesResponse],
+      actual: Seq[UpdateHistoryResponse],
       expected: Seq[ExpectedUpdate],
   ): Assertion = {
     actual.length should be(expected.length)
     actual.zip(expected).foreach {
-      case (GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain), expected) =>
+      case (UpdateHistoryResponse(TransactionTreeUpdate(tree), domain), expected) =>
         val rootEvent = singleRootEvent(tree)
         (rootEvent, expected) match {
           case (rootEvent: CreatedEvent, ExpectedCreate(cid, synchronizerId)) =>
@@ -179,7 +180,7 @@ abstract class UpdateHistoryTestBase
           case (event, expected) =>
             throw new RuntimeException(s"Unexpected event type. event: $event, expected: $expected")
         }
-      case (GetTreeUpdatesResponse(ReassignmentUpdate(update), domain), expected) =>
+      case (UpdateHistoryResponse(ReassignmentUpdate(update), domain), expected) =>
         (update.event, expected) match {
           case (unassign: ReassignmentEvent.Unassign, expected: ExpectedUnassign) =>
             unassign.contractId.contractId should be(expected.cid)
@@ -307,6 +308,19 @@ object UpdateHistoryTestBase {
         GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree, mode)), domain)
       case GetTreeUpdatesResponse(ReassignmentUpdate(transfer), domain) =>
         GetTreeUpdatesResponse(ReassignmentUpdate(withoutLostData(transfer)), domain)
+      case _ => throw new RuntimeException("Invalid update type")
+    }
+  }
+
+  def withoutLostData(
+      response: UpdateHistoryResponse,
+      mode: LostDataMode,
+  ): UpdateHistoryResponse = {
+    response match {
+      case UpdateHistoryResponse(TransactionTreeUpdate(tree), domain) =>
+        UpdateHistoryResponse(TransactionTreeUpdate(withoutLostData(tree, mode)), domain)
+      case UpdateHistoryResponse(ReassignmentUpdate(transfer), domain) =>
+        UpdateHistoryResponse(ReassignmentUpdate(withoutLostData(transfer)), domain)
       case _ => throw new RuntimeException("Invalid update type")
     }
   }
