@@ -19,17 +19,6 @@
               "values": {}
             }
           },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 0,
-            "inputAmount": "0"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -48,15 +37,12 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
+            ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "200",
             "numOutputs": 1,
             "outputAmount": "200",
-            "numInputs": 0,
-            "inputAmount": "0"
+            "amountChange": "200"
           }
         }
       ]
@@ -145,17 +131,6 @@
               "values": {}
             }
           },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 0,
-            "inputAmount": "0"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -195,11 +170,11 @@
             ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-113",
+            "numInputs": 1,
+            "inputAmount": "200",
             "numOutputs": 1,
             "outputAmount": "87",
-            "numInputs": 1,
-            "inputAmount": "200"
+            "amountChange": "-113"
           }
         }
       ]
@@ -226,17 +201,6 @@
             "meta": {
               "values": {}
             }
-          },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 0,
-            "inputAmount": "0"
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -277,11 +241,11 @@
             ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-22.1",
+            "numInputs": 1,
+            "inputAmount": "87",
             "numOutputs": 1,
             "outputAmount": "64.9",
-            "numInputs": 1,
-            "inputAmount": "87"
+            "amountChange": "-22.1"
           }
         }
       ]
@@ -303,17 +267,6 @@
               "values": {}
             }
           },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 0,
-            "inputAmount": "0"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -332,15 +285,12 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
+            ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "6000",
             "numOutputs": 1,
             "outputAmount": "6000",
-            "numInputs": 0,
-            "inputAmount": "0"
+            "amountChange": "6000"
           }
         }
       ]
@@ -443,15 +393,7 @@
                   ]
                 }
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
-            "numOutputs": 1,
-            "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            ]
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -507,12 +449,17 @@
               }
             ]
           },
+          "lockedHoldingsChangeSummary": {
+            "numOutputs": 1,
+            "outputAmount": "1064.00152208",
+            "amountChange": "1064.00152208"
+          },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-1077.00152208",
+            "numInputs": 2,
+            "inputAmount": "6064.9",
             "numOutputs": 1,
             "outputAmount": "4987.89847792",
-            "numInputs": 2,
-            "inputAmount": "6064.9"
+            "amountChange": "-1077.00152208"
           }
         }
       ]
@@ -614,15 +561,7 @@
                   ]
                 }
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
-            "numOutputs": 1,
-            "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            ]
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -662,12 +601,17 @@
               }
             ]
           },
+          "lockedHoldingsChangeSummary": {
+            "numOutputs": 1,
+            "outputAmount": "1064.00152208",
+            "amountChange": "1064.00152208"
+          },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-1077.00152208",
+            "numInputs": 1,
+            "inputAmount": "4987.89847792",
             "numOutputs": 1,
             "outputAmount": "3910.89695584",
-            "numInputs": 1,
-            "inputAmount": "4987.89847792"
+            "amountChange": "-1077.00152208"
           }
         }
       ]
@@ -769,15 +713,7 @@
                   ]
                 }
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
-            "numOutputs": 1,
-            "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            ]
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -817,12 +753,17 @@
               }
             ]
           },
+          "lockedHoldingsChangeSummary": {
+            "numOutputs": 1,
+            "outputAmount": "1064.00152208",
+            "amountChange": "1064.00152208"
+          },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-1077.00152208",
+            "numInputs": 1,
+            "inputAmount": "3910.89695584",
             "numOutputs": 1,
             "outputAmount": "2833.89543376",
-            "numInputs": 1,
-            "inputAmount": "3910.89695584"
+            "amountChange": "-1077.00152208"
           }
         }
       ]
@@ -924,15 +865,7 @@
                   ]
                 }
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
-            "numOutputs": 1,
-            "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            ]
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -972,12 +905,17 @@
               }
             ]
           },
+          "lockedHoldingsChangeSummary": {
+            "numOutputs": 1,
+            "outputAmount": "1064.00152208",
+            "amountChange": "1064.00152208"
+          },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-1077.00152208",
+            "numInputs": 1,
+            "inputAmount": "2833.89543376",
             "numOutputs": 1,
             "outputAmount": "1756.89391168",
-            "numInputs": 1,
-            "inputAmount": "2833.89543376"
+            "amountChange": "-1077.00152208"
           }
         }
       ]
@@ -1079,15 +1017,7 @@
                   ]
                 }
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "1064.03044144",
-            "numOutputs": 1,
-            "outputAmount": "1064.03044144",
-            "numInputs": 0,
-            "inputAmount": "0"
+            ]
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -1127,12 +1057,17 @@
               }
             ]
           },
+          "lockedHoldingsChangeSummary": {
+            "numOutputs": 1,
+            "outputAmount": "1064.03044144",
+            "amountChange": "1064.03044144"
+          },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-1077.03044144",
+            "numInputs": 1,
+            "inputAmount": "1756.89391168",
             "numOutputs": 1,
             "outputAmount": "679.86347024",
-            "numInputs": 1,
-            "inputAmount": "1756.89391168"
+            "amountChange": "-1077.03044144"
           }
         }
       ]
@@ -1155,7 +1090,6 @@
             }
           },
           "lockedHoldingsChange": {
-            "creates": [],
             "archives": [
               {
                 "amount": "1064.0015220800",
@@ -1182,13 +1116,6 @@
               }
             ]
           },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "-1064.00152208",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 1,
-            "inputAmount": "1064.00152208"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -1207,15 +1134,17 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
+            ]
+          },
+          "lockedHoldingsChangeSummary": {
+            "numInputs": 1,
+            "inputAmount": "1064.00152208",
+            "amountChange": "-1064.00152208"
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
             "numOutputs": 1,
             "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            "amountChange": "1064.00152208"
           }
         },
         {
@@ -1234,17 +1163,6 @@
             "meta": {
               "values": {}
             }
-          },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 0,
-            "inputAmount": "0"
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -1285,11 +1203,11 @@
             ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "-1022",
+            "numInputs": 1,
+            "inputAmount": "1064.00152208",
             "numOutputs": 1,
             "outputAmount": "42.00152208",
-            "numInputs": 1,
-            "inputAmount": "1064.00152208"
+            "amountChange": "-1022"
           }
         }
       ]
@@ -1312,7 +1230,6 @@
             }
           },
           "lockedHoldingsChange": {
-            "creates": [],
             "archives": [
               {
                 "amount": "1064.0015220800",
@@ -1339,13 +1256,6 @@
               }
             ]
           },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "-1064.00152208",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 1,
-            "inputAmount": "1064.00152208"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -1364,15 +1274,17 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
+            ]
+          },
+          "lockedHoldingsChangeSummary": {
+            "numInputs": 1,
+            "inputAmount": "1064.00152208",
+            "amountChange": "-1064.00152208"
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
             "numOutputs": 1,
             "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            "amountChange": "1064.00152208"
           }
         }
       ]
@@ -1395,7 +1307,6 @@
             }
           },
           "lockedHoldingsChange": {
-            "creates": [],
             "archives": [
               {
                 "amount": "1064.0015220800",
@@ -1422,13 +1333,6 @@
               }
             ]
           },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "-1064.00152208",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 1,
-            "inputAmount": "1064.00152208"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -1447,15 +1351,17 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
+            ]
+          },
+          "lockedHoldingsChangeSummary": {
+            "numInputs": 1,
+            "inputAmount": "1064.00152208",
+            "amountChange": "-1064.00152208"
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "1064.00152208",
             "numOutputs": 1,
             "outputAmount": "1064.00152208",
-            "numInputs": 0,
-            "inputAmount": "0"
+            "amountChange": "1064.00152208"
           }
         }
       ]
@@ -1478,17 +1384,6 @@
               "values": {}
             }
           },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 0,
-            "inputAmount": "0"
-          },
           "unlockedHoldingsChange": {
             "creates": [
               {
@@ -1507,15 +1402,12 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
+            ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "200",
             "numOutputs": 1,
             "outputAmount": "200",
-            "numInputs": 0,
-            "inputAmount": "0"
+            "amountChange": "200"
           }
         }
       ]
@@ -1600,7 +1492,6 @@
             }
           },
           "lockedHoldingsChange": {
-            "creates": [],
             "archives": [
               {
                 "amount": "1064.0015220800",
@@ -1626,13 +1517,6 @@
                 }
               }
             ]
-          },
-          "lockedHoldingsChangeSummary": {
-            "amountChange": "-1064.00152208",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "numInputs": 1,
-            "inputAmount": "1064.00152208"
           },
           "unlockedHoldingsChange": {
             "creates": [
@@ -1752,12 +1636,17 @@
               }
             ]
           },
+          "lockedHoldingsChangeSummary": {
+            "numInputs": 1,
+            "inputAmount": "1064.00152208",
+            "amountChange": "-1064.00152208"
+          },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "1052.00152208",
+            "numInputs": 5,
+            "inputAmount": "3049.86803648",
             "numOutputs": 2,
             "outputAmount": "4101.86955856",
-            "numInputs": 5,
-            "inputAmount": "3049.86803648"
+            "amountChange": "1052.00152208"
           }
         }
       ]
@@ -1812,26 +1701,12 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "numInputs": 0,
-            "inputAmount": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "amountChange": "0"
+            ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "30.0000000000",
-            "numInputs": 0,
-            "inputAmount": "0",
             "numOutputs": 1,
-            "outputAmount": "30.0000000000"
+            "outputAmount": "30.0000000000",
+            "amountChange": "30.0000000000"
           }
         }
       ]
@@ -1886,26 +1761,12 @@
                 },
                 "lock": null
               }
-            ],
-            "archives": []
-          },
-          "lockedHoldingsChange": {
-            "creates": [],
-            "archives": []
-          },
-          "lockedHoldingsChangeSummary": {
-            "numInputs": 0,
-            "inputAmount": "0",
-            "numOutputs": 0,
-            "outputAmount": "0",
-            "amountChange": "0"
+            ]
           },
           "unlockedHoldingsChangeSummary": {
-            "amountChange": "40.0000000000",
-            "numInputs": 0,
-            "inputAmount": "0",
             "numOutputs": 1,
-            "outputAmount": "40.0000000000"
+            "outputAmount": "40.0000000000",
+            "amountChange": "40.0000000000"
           }
         }
       ]
