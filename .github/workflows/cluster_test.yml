@@ -16,7 +16,7 @@ jobs:
         uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
       - run: |
-          sha="${{ steps.comment-branch.outputs.head_ref }}"
+          sha="${{ steps.comment-branch.outputs.head_sha }}"
           result=$(curl --fail-with-body --request POST \
             --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-internal/pipeline \
             --header "Circle-Token: ${{secrets.CIRCLECI_TOKEN}}" \
