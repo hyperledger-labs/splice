@@ -27,7 +27,7 @@ const dsoInfoWithSynchronizerUpgrade = JSON.parse(
   JSON.stringify(dsoInfoWithoutSynchronizerUpgrade)
 );
 dsoInfoWithSynchronizerUpgrade.dso_rules.contract.payload.config.nextScheduledSynchronizerUpgrade =
-  { time: '2025-04-30T15:37:48Z', migrationId: '1' };
+  { time: '2055-04-30T15:37:48Z', migrationId: '1' };
 
 const dateFormat = 'YYYY-MM-DD HH:mm';
 
