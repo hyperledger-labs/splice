@@ -1,9 +1,10 @@
 package org.lfdecentralizedtrust.splice.store
 
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 
 import scala.concurrent.Future
+
+import UpdateHistory.UpdateHistoryResponse
 
 class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
 
@@ -171,7 +172,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
       destination: UpdateHistory,
       latestMigrationId: Long,
   ) =
-    new HistoryBackfilling[LedgerClient.GetTreeUpdatesResponse](
+    new HistoryBackfilling[UpdateHistoryResponse](
       destination.destinationHistory,
       source.sourceHistory,
       latestMigrationId,
@@ -180,7 +181,7 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
     )
 
   private def backfillAll(
-      backfiller: HistoryBackfilling[LedgerClient.GetTreeUpdatesResponse]
+      backfiller: HistoryBackfilling[UpdateHistoryResponse]
   ): Future[Unit] = {
     def go(i: Int): Future[Unit] = {
       logger.debug(s"backfill() iteration $i")

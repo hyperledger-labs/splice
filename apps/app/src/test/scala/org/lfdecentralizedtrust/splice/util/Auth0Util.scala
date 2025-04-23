@@ -13,6 +13,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.scalalogging.Logger
 import net.jodah.failsafe.FailsafeException
+import org.apache.pekko.http.scaladsl.model.StatusCodes
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.util.Auth0Util.Auth0Retry
 
 import scala.collection.mutable
@@ -49,7 +51,17 @@ class Auth0Util(
     user.setVerifyEmail(false) // avoid auth0 trying to send mails
     user.setConnection("Username-Password-Authentication")
     logger.debug(s"Creating user with username $username email $email and password $password")
-    val id = executeManagementApiRequest(api.users().create(user)).getId
+    val id =
+      try {
+        executeManagementApiRequest(api.users().create(user)).getId
+      } catch {
+        case e @ HttpErrorWithHttpCode(StatusCodes.Conflict, _) =>
+          // A "user already exists" error may be caused by our retries, try finding the user by email
+          val users = executeManagementApiRequest(api.users().listByEmail(email, null))
+          if (users.isEmpty) throw e
+          logger.debug("\"User already exists\" caught, found the user by email")
+          users.get(0).getId
+      }
     logger.debug(s"Created user ${email} with password ${password} (id: ${id})")
     new Auth0User(id, email, password, this)
   }

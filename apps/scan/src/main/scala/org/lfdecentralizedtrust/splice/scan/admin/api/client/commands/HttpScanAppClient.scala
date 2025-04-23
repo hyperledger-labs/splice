@@ -28,7 +28,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as http}
 import org.lfdecentralizedtrust.tokenstandard.{
@@ -49,6 +48,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.http.{
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   Codec,
@@ -1390,7 +1390,7 @@ object HttpScanAppClient {
       count: Int,
   ) extends InternalBaseCommand[
         http.GetUpdatesBeforeResponse,
-        Seq[LedgerClient.GetTreeUpdatesResponse],
+        Seq[UpdateHistoryResponse],
       ] {
     override def submitRequest(
         client: http.ScanClient,

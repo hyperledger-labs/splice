@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   round as roundCodegen,
 }
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  LedgerClient,
   ReassignmentEvent,
   ReassignmentUpdate,
   TransactionTreeUpdate,
@@ -21,6 +20,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members.Cre
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.members.UpdateHistoryTransaction as HttpUpdateHistoryTx
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{DamlValueEncoding, UpdateHistoryItem}
 import org.lfdecentralizedtrust.splice.store.{StoreTest, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.matchers.should.Matchers
 
@@ -60,7 +60,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
       )
 
       val original = TreeUpdateWithMigrationId(
-        update = LedgerClient.GetTreeUpdatesResponse(
+        update = UpdateHistoryResponse(
           update = TransactionTreeUpdate(javaTree),
           synchronizerId = dummyDomain,
         ),
@@ -98,7 +98,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     )
 
     val original = TreeUpdateWithMigrationId(
-      update = LedgerClient.GetTreeUpdatesResponse(
+      update = UpdateHistoryResponse(
         update = ReassignmentUpdate(lapiAssignment),
         synchronizerId = targetDomain,
       ),
@@ -135,7 +135,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     )
 
     val original = TreeUpdateWithMigrationId(
-      update = LedgerClient.GetTreeUpdatesResponse(
+      update = UpdateHistoryResponse(
         update = ReassignmentUpdate(lapiAssignment),
         synchronizerId = sourceDomain,
       ),
@@ -156,7 +156,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
     val signatories = ('a' to 'd').map(c => mkPartyId(c.toString))
     val observers = ('c' to 'f').map(c => mkPartyId(c.toString))
     val tree = TreeUpdateWithMigrationId(
-      update = LedgerClient.GetTreeUpdatesResponse(
+      update = UpdateHistoryResponse(
         update = TransactionTreeUpdate(
           mkCreateTx(
             10,
@@ -326,7 +326,7 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
 
   "return version specific event ids" in {
     val tree = TreeUpdateWithMigrationId(
-      update = LedgerClient.GetTreeUpdatesResponse(
+      update = UpdateHistoryResponse(
         update = TransactionTreeUpdate(
           mkCreateTx(
             10,

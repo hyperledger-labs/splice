@@ -9,6 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.console.ValidatorAppClientReference
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 
 import java.net.URI
@@ -91,7 +92,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     limitValidatorUsers()
   }
 
-  protected def validatorClient = {
+  protected def validatorClient: ValidatorAppClientReference = {
     val env = provideEnvironment("NotUsed")
     // retry on e.g. network errors and rate limits
     val token = eventuallySucceeds() {
@@ -106,8 +107,8 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   protected def limitValidatorUsers() = {
-    val users = eventuallySucceeds()(validatorClient.listUsers())
-
+    val client: ValidatorAppClientReference = validatorClient
+    val users = eventuallySucceeds()(client.listUsers())
     val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
     val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
     if (users.length > offboardThreshold) {
