@@ -2,10 +2,6 @@ infra:
   prometheus:
     retentionDuration: "10y"
 synchronizerMigration:
-  archived:
-    - id: 1
-      provider: internal
-      version: 0.2.8
   active:
     id: 2
     provider: external
