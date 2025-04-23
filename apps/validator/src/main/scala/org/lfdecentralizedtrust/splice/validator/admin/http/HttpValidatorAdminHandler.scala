@@ -419,6 +419,26 @@ class HttpValidatorAdminHandler(
               },
             logger,
           )
+          _ <- retryProvider.retry(
+            RetryFor.Automation,
+            "broadcast_party_to_participant",
+            "PartyToParticipant is visible in domain store",
+            participantAdminConnection
+              .listPartyToParticipant(
+                filterParty = partyId.filterString,
+                store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
+              )
+              .map { txs =>
+                txs.headOption.getOrElse(
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription(
+                      s"No PartyToParticipant mapping in domain store for $partyId"
+                    )
+                    .asRuntimeException
+                )
+              },
+            logger,
+          )
           _ <- storeWithIngestion.connection.waitForPartyOnLedgerApi(partyId)
           _ <- storeWithIngestion.connection.grantUserRights(
             config.ledgerApiUser,
