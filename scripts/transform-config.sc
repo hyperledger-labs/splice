@@ -1,5 +1,4 @@
 import org.lfdecentralizedtrust.splice.config.{SpliceConfig, ConfigTransforms}
-import com.digitalasset.canton.config.CantonCommunityConfig
 
 import java.nio.file.Paths
 
