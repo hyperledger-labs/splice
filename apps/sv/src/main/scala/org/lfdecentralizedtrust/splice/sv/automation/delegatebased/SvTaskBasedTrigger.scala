@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.PartyId
@@ -48,17 +49,29 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
       supportsSvController <- supportsSvController()
       result <-
         if (sameEpoch) {
-          // TODO(#17956): remove delegate-based automation
           if (isLeader) {
+            // TODO(#17956): remove delegate-based automation
             completeTaskAsDsoDelegate(task, dsoDelegate)
-            // need to specify supportsSvController in order to not execute old DAML as non-delegate
           } else if (svTaskContext.delegatelessAutomation && supportsSvController) {
-            completeTaskAsDsoDelegate(task, svParty)
+            val task_duration = 1_000L
+            val polling_trigger_interval = 30_000L
+            val upperBound =
+              Math.max(dsoRules.payload.svs.size().toLong * task_duration, polling_trigger_interval)
+            val delay = Random.nextLong(upperBound)
+            Threading.sleep(delay)
+            isStaleTask(task).flatMap {
+              case true =>
+                Future.successful(
+                  TaskSuccess("Skipping because task is already completed")
+                )
+              case false =>
+                completeTaskAsDsoDelegate(task, svParty)
+            }
           } else {
             monitorTaskAsFollower(task)
           }
         } else {
-          // TODO(#6856) Could this be busy-looping as well, if we are a polling trigger?
+          // TODO(#6856): Could this be busy-looping as well, if we are a polling trigger?
           Future.successful(
             TaskSuccess(
               s"Skipping because current epoch ${dsoRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
