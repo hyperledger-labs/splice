@@ -6,7 +6,7 @@ synchronizerMigration:
   active:
     id: 0
     provider: external
-    version: 0.4.0-snapshot.20250414.9012.0.vbefb9924
+    version: 0.4.0-snapshot.20250423.9136.0.v130d2648
     releaseReference:
       gitReference: "refs/tags/token-std-devnet"
       repoUrl: https://github.com/DACH-NY/canton-network-node
@@ -23,7 +23,7 @@ pulumiProjectConfig:
       protected: false
 operatorDeployment:
   reference:
-    gitReference: refs/heads/canton-3.3
+    gitReference: refs/heads/main
     repoUrl: https://github.com/DACH-NY/canton-network-node
     pulumiStacksDir: "cluster/stacks/prod"
     pulumiBaseDir: "cluster/pulumi"

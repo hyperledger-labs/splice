@@ -355,7 +355,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator1-cluster-ingress-validator1",
     "provider": "",
@@ -468,7 +468,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator1-loopback",
     "provider": "",
@@ -570,7 +570,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator1-participant-3",
     "provider": "",
@@ -609,12 +609,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -694,7 +699,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator1-splitwell-web-ui",
     "provider": "",
@@ -733,12 +738,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -897,7 +907,7 @@
           "auth0|63e3d75ff4114d87a2c1e4f5"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator1-validator-validator1",
     "provider": "",

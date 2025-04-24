@@ -190,7 +190,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-cometbft-global-domain-2",
     "provider": "",
@@ -307,7 +307,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-global-domain-2",
     "provider": "",
@@ -346,12 +346,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -411,12 +416,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -514,7 +524,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-1-participant-2",
     "provider": "",
@@ -553,12 +563,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },

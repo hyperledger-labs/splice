@@ -1,6 +1,13 @@
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  DamlRecord,
+  ExercisedEvent,
+  Int64,
+  OffsetCheckpoint,
+  Value,
+}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.MonadUtil
@@ -8,18 +15,20 @@ import com.digitalasset.daml.lf.data.Bytes
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
-  LedgerClient,
   ReassignmentUpdate,
   TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import java.time.Instant
+import java.util.Collections
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+
+import UpdateHistory.UpdateHistoryResponse
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
 
@@ -28,7 +37,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
   protected def updates(
       store: UpdateHistory,
       migrationId: Long = migration1,
-  ): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
+  ): Future[Seq[UpdateHistoryResponse]] = {
     store
       .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
       .map(_.filter(_.migrationId == migrationId).map(_.update))
@@ -136,7 +145,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           updates <- updates(store)
         } yield {
           val expectedUpdates = Seq(
-            GetTreeUpdatesResponse(
+            UpdateHistoryResponse(
               TransactionTreeUpdate(expectedTree),
               domain1,
             )
@@ -591,6 +600,25 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               )
             )
 
+        } yield succeed
+      }
+
+      "offset checkpoints can be ingested" in {
+        val store = mkStore()
+        for {
+          _ <- initStore(store)
+          o1 <- store.lookupLastIngestedOffset()
+          _ = o1 shouldBe None
+          _ <- store.testIngestionSink.ingestUpdate(
+            TreeUpdateOrOffsetCheckpoint.Checkpoint(
+              new OffsetCheckpoint(
+                5,
+                Collections.emptyList(),
+              )
+            )
+          )
+          o2 <- store.lookupLastIngestedOffset()
+          _ = o2 shouldBe Some(5)
         } yield succeed
       }
 

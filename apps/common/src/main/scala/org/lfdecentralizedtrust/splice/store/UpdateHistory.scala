@@ -18,12 +18,12 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
-  LedgerClient,
   Reassignment,
   ReassignmentEvent,
   ReassignmentUpdate,
   TransactionTreeUpdate,
   TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
@@ -280,16 +280,16 @@ class UpdateHistory(
         Future.unit
       }
 
-      override def ingestUpdate(domain: SynchronizerId, update: TreeUpdate)(implicit
+      override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        val offset: Long = update match {
-          case ReassignmentUpdate(reassignment) => reassignment.offset
-          case TransactionTreeUpdate(tree) => tree.getOffset
-        }
-        val recordTime = update match {
-          case ReassignmentUpdate(reassignment) => reassignment.recordTime
-          case TransactionTreeUpdate(tree) => CantonTimestamp.assertFromInstant(tree.getRecordTime)
+        val offset: Long = updateOrCheckpoint.offset
+        val recordTime = updateOrCheckpoint match {
+          case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+            Some(reassignment.recordTime)
+          case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+            Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
+          case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => None
         }
 
         // Note: in theory, it's enough if this action is atomic - there should only be a single
@@ -298,13 +298,15 @@ class UpdateHistory(
         // In practice, we still want to have some protection against duplicate inserts, in case
         // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
         // This is implemented with a unique index in the database schema.
-        val action = readOffset()
+        val action = readOffsetAction()
           .flatMap({
             case None =>
               logger.debug(
                 s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
               )
-              ingestUpdate_(update, domainMigrationId).andThen(updateOffset(offset))
+              ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
+                updateOffset(offset)
+              )
             case Some(lastIngestedOffset) =>
               if (offset <= lastIngestedOffset) {
                 logger.warn(
@@ -318,7 +320,9 @@ class UpdateHistory(
                 logger.debug(
                   s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
                 )
-                ingestUpdate_(update, domainMigrationId).andThen(updateOffset(offset))
+                ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
+                  updateOffset(offset)
+                )
               }
           })
           .map(_ => ())
@@ -333,17 +337,18 @@ class UpdateHistory(
         set last_ingested_offset = ${lengthLimited(LegacyOffset.Api.fromLong(offset))}
         where history_id = $historyId and migration_id = $domainMigrationId
       """
-
-      private def readOffset(): DBIOAction[Option[Long], NoStream, Effect.Read] =
-        sql"""
-        select last_ingested_offset
-        from update_history_last_ingested_offsets
-        where history_id = $historyId and migration_id = $domainMigrationId
-      """
-          .as[Option[String]]
-          .head
-          .map(_.map(LegacyOffset.Api.assertFromStringToLong))
     }
+
+  private def ingestUpdateOrCheckpoint_(
+      updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+    updateOrCheckpoint match {
+      case TreeUpdateOrOffsetCheckpoint.Update(update, _) =>
+        ingestUpdate_(update, migrationId)
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => DBIO.unit
+    }
+  }
 
   private def ingestUpdate_(
       update: TreeUpdate,
@@ -1154,7 +1159,7 @@ class UpdateHistory(
       updateRow: SelectFromTransactions,
       createRows: Seq[SelectFromCreateEvents],
       exerciseRows: Seq[SelectFromExerciseEvents],
-  ): LedgerClient.GetTreeUpdatesResponse = {
+  ): UpdateHistoryResponse = {
 
     val createEventsById = createRows
       .map(row =>
@@ -1199,7 +1204,7 @@ class UpdateHistory(
     }.toMap
     val eventsById: Map[Integer, TreeEvent] = createEventsById ++ exerciseEventsById
 
-    LedgerClient.GetTreeUpdatesResponse(
+    UpdateHistoryResponse(
       update = TransactionTreeUpdate(
         new TransactionTree(
           /*updateId = */ updateRow.updateId,
@@ -1219,8 +1224,8 @@ class UpdateHistory(
 
   private def decodeAssignment(
       row: SelectFromAssignments
-  ): LedgerClient.GetTreeUpdatesResponse = {
-    LedgerClient.GetTreeUpdatesResponse(
+  ): UpdateHistoryResponse = {
+    UpdateHistoryResponse(
       ReassignmentUpdate(
         Reassignment[Assign](
           updateId = row.updateId,
@@ -1261,8 +1266,8 @@ class UpdateHistory(
 
   private def decodeUnassignment(
       row: SelectFromUnassignments
-  ): LedgerClient.GetTreeUpdatesResponse = {
-    LedgerClient.GetTreeUpdatesResponse(
+  ): UpdateHistoryResponse = {
+    UpdateHistoryResponse(
       ReassignmentUpdate(
         Reassignment[Unassign](
           updateId = row.updateId,
@@ -1535,8 +1540,23 @@ class UpdateHistory(
       .map(_ => ())
   }
 
-  lazy val sourceHistory: HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] =
-    new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] {
+  private def readOffsetAction(): DBIOAction[Option[Long], NoStream, Effect.Read] =
+    sql"""
+        select last_ingested_offset
+        from update_history_last_ingested_offsets
+        where history_id = $historyId and migration_id = $domainMigrationId
+      """
+      .as[Option[String]]
+      .head
+      .map(_.map(LegacyOffset.Api.assertFromStringToLong))
+
+  /** Testing API: lookup last ingested offset */
+  private[store] def lookupLastIngestedOffset()(implicit tc: TraceContext): Future[Option[Long]] = {
+    storage.query(readOffsetAction(), "readOffset")
+  }
+
+  lazy val sourceHistory: HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
+    new HistoryBackfilling.SourceHistory[UpdateHistoryResponse] {
       override def isReady: Boolean = state
         .get()
         .historyId
@@ -1563,7 +1583,7 @@ class UpdateHistory(
           synchronizerId: SynchronizerId,
           before: CantonTimestamp,
           count: Int,
-      )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] = {
+      )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] = {
         getUpdatesBefore(
           migrationId = migrationId,
           synchronizerId = synchronizerId,
@@ -1574,9 +1594,8 @@ class UpdateHistory(
       }
     }
 
-  lazy val destinationHistory
-      : HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse] =
-    new HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse] {
+  lazy val destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse] =
+    new HistoryBackfilling.DestinationHistory[UpdateHistoryResponse] {
       override def isReady = state
         .get()
         .historyId
@@ -1596,7 +1615,7 @@ class UpdateHistory(
       override def insert(
           migrationId: Long,
           synchronizerId: SynchronizerId,
-          items: Seq[LedgerClient.GetTreeUpdatesResponse],
+          items: Seq[UpdateHistoryResponse],
       )(implicit
           tc: TraceContext
       ): Future[DestinationHistory.InsertResult] = {
@@ -1668,6 +1687,11 @@ class UpdateHistory(
 }
 
 object UpdateHistory {
+  final case class UpdateHistoryResponse(
+      update: TreeUpdate,
+      synchronizerId: SynchronizerId,
+  )
+
   case class State(
       historyId: Option[Long]
   ) {}
@@ -1848,15 +1872,12 @@ object UpdateHistory {
   private def missingStringSeq: Seq[String] = Seq.empty
 }
 
-case class TreeUpdateWithMigrationId(
-    update: LedgerClient.GetTreeUpdatesResponse,
+final case class TreeUpdateWithMigrationId(
+    update: UpdateHistory.UpdateHistoryResponse,
     migrationId: Long,
 )
 
 object TreeUpdateWithMigrationId {
-  def apply(update: LedgerClient.GetTreeUpdatesResponse, migrationId: Long) =
-    new TreeUpdateWithMigrationId(update, migrationId)
-
   implicit val ordering: Ordering[TreeUpdateWithMigrationId] = Ordering.by(x =>
     (x.migrationId, x.update.update.recordTime, x.update.synchronizerId.toProtoPrimitive)
   )

@@ -78,10 +78,15 @@ trait PackageVersionSupport {
     isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_5)
   }
 
-  def supportsExternalPartyAmuletRules(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
+  def supportsDsoRulesCreateExternalPartyAmuletRules(parties: Seq[PartyId], now: CantonTimestamp)(
+      implicit tc: TraceContext
   ): Future[Boolean] = {
-    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_6)
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance_0_1_9,
+    )
   }
 
   def supportsNewGovernanceFlow(parties: Seq[PartyId], now: CantonTimestamp)(implicit

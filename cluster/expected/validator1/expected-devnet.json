@@ -587,12 +587,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -711,12 +716,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },

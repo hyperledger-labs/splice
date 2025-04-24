@@ -311,7 +311,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "splitwell-cluster-ingress-splitwell-uis",
     "provider": "",
@@ -431,7 +431,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "splitwell-loopback",
     "provider": "",
@@ -506,7 +506,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "splitwell-participant-2",
     "provider": "",
@@ -545,12 +545,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -634,7 +639,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "splitwell-splitwell-app",
     "provider": "",
@@ -673,12 +678,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -737,12 +747,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -905,7 +920,7 @@
           "auth0|65de04b385816c4a38cc044f"
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "splitwell-validator-splitwell",
     "provider": "",

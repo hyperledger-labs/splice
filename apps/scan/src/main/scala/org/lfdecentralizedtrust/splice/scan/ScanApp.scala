@@ -215,22 +215,20 @@ class ScanApp(
         config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase(),
       )
       synchronizerId <- appInitStep("Get synchronizer id") {
-        store
-          .lookupAmuletRules()
-          .map(
-            _.fold(
-              throw Status.NOT_FOUND
-                .withDescription("Amulet rules not yet available")
-                .asRuntimeException()
-            )(
-              _.state.fold(
-                identity,
-                throw Status.NOT_FOUND
-                  .withDescription("Amulet rules in fllight")
-                  .asRuntimeException(),
-              )
+        retryProvider.getValueWithRetries(
+          RetryFor.WaitingOnInitDependency,
+          "amulet synchronizer id",
+          "amulet rules synchronizer id",
+          store.getAmuletRulesWithState().map {
+            _.state.fold(
+              identity,
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Amulet rules in fllight")
+                .asRuntimeException(),
             )
-          )
+          },
+          logger,
+        )
       }
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         config.parameters.enableCantonPackageSelection,

@@ -26,6 +26,8 @@ pulumiProjectConfig:
       protected: true
       # default tier is equivalent to "Standard" machine with 2 vCpus and 7.5GB RAM
       tier: 'db-custom-2-7680'
+      # enable enterprise plus for better performance and faster maintenance
+      enterprisePlus: false
   sv-runbook:
     cloudSql:
       enabled: false

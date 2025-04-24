@@ -39,7 +39,7 @@ module Splice.Util
 ) where
 
 import DA.Action (unless, when)
-import DA.Time
+import DA.Time (RelTime)
 import DA.Set (Set, difference, union)
 import qualified DA.Set as Set
 import DA.Map (Map)

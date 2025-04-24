@@ -137,7 +137,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "docs-docs",
     "provider": "",
@@ -379,12 +379,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": true
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE_PLUS",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -400,7 +405,7 @@
           "day": 2,
           "hour": 8
         },
-        "tier": "db-custom-2-7680",
+        "tier": "db-perf-optimized-N-4",
         "userLabels": {
           "cluster": "testzrh"
         }
@@ -518,7 +523,7 @@
         ],
         "withSvIngress": true
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-ingress-sv",
     "provider": "",
@@ -569,7 +574,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-loopback",
     "provider": "",
@@ -645,7 +650,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-scan",
     "provider": "",
@@ -925,7 +930,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-sv-app",
     "provider": "",
@@ -1040,7 +1045,7 @@
           }
         }
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-1-validator-sv-1",
     "provider": "",

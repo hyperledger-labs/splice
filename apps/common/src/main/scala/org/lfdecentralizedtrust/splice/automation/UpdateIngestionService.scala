@@ -94,7 +94,7 @@ class UpdateIngestionService(
   private def process(
       msg: GetTreeUpdatesResponse
   )(implicit traceContext: TraceContext) =
-    ingestionSink.ingestUpdate(msg.synchronizerId, msg.update)
+    ingestionSink.ingestUpdate(msg.updateOrCheckpoint)
 
   private def ingestAcsAndInFlight(
       offset: Long

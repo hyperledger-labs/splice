@@ -91,7 +91,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -166,72 +166,6 @@
   },
   {
     "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "mediator-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-mediator-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "participant-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-participant-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sequencer-pg-secret",
-        "namespace": "sv"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-sequencer-pg-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
     "id": "projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
@@ -300,7 +234,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "loopback",
     "provider": "",
@@ -364,7 +298,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "scan",
     "provider": "",
@@ -490,27 +424,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "splice-app-sv-canton-migration-1-ledger-api-user",
-        "namespace": "sv"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "ledger-api-user": "sv-client-id@clients"
-        }
-      }
-    },
-    "name": "splice-auth0-user-sv-sv-canton-migration-1-sv",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
@@ -575,7 +488,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -816,7 +729,7 @@
           }
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "sv-app",
     "provider": "",
@@ -863,224 +776,6 @@
     "name": "sv-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-mediator-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-mediator-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "mediator-pg",
-      "namespace": "sv",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainzrhnet"
-        },
-        "db": {
-          "volumeSize": "48Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "persistence": {
-          "secretName": "mediator-pg-secret"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.3.18"
-    },
-    "name": "sv-mediator-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-participant-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-participant-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "participant-pg",
-      "namespace": "sv",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainzrhnet"
-        },
-        "db": {},
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "persistence": {
-          "secretName": "participant-pg-secret"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.3.18"
-    },
-    "name": "sv-participant-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-sequencer-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-sequencer-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "sequencer-pg",
-      "namespace": "sv",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "global.canton.network.digitalasset.com",
-          "name": "cn-mainzrhnet"
-        },
-        "db": {},
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "persistence": {
-          "secretName": "sequencer-pg-secret"
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.3.18"
-    },
-    "name": "sv-sequencer-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -1188,7 +883,7 @@
           "auth0|64553aa683015a9687d9cc2e"
         ]
       },
-      "version": "0.3.18"
+      "version": "0.3.19"
     },
     "name": "validator",
     "provider": "",

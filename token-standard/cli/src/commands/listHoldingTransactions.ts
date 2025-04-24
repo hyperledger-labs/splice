@@ -7,13 +7,12 @@ import {
 import { CommandOptions } from "../cli";
 import { TokenStandardTransactionInterfaces } from "../constants";
 import { TransactionParser } from "../txparse/parser";
-import { Transaction } from "../txparse/types";
+import { renderTransaction, Transaction } from "../txparse/types";
 import {
   DefaultApi as LedgerJsonApi,
   JsGetUpdatesResponse,
 } from "canton-json-api-v2-openapi";
 
-// TODO (#19063): apply formatting improvements
 export async function listHoldingTransactions(
   partyId: string,
   opts: CommandOptions & { afterOffset?: string }
@@ -103,7 +102,7 @@ async function toPrettyTransactions(
       latestCheckpointOffset,
       ...transactions.map((tx) => tx.offset)
     ),
-    transactions: transactions.filter((tx) => tx.events.length > 0),
+    transactions: transactions.filter((tx) => tx.events.length > 0).map(renderTransaction),
   };
 }
 
