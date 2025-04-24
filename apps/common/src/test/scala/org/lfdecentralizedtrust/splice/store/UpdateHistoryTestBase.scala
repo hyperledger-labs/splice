@@ -2,7 +2,6 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   Reassignment,
@@ -297,19 +296,6 @@ object UpdateHistoryTestBase {
       UpdateHistoryTestBase.withoutLostData(update.update, mode),
       update.migrationId,
     )
-  }
-
-  def withoutLostData(
-      response: GetTreeUpdatesResponse,
-      mode: LostDataMode,
-  ): GetTreeUpdatesResponse = {
-    response match {
-      case GetTreeUpdatesResponse(TransactionTreeUpdate(tree), domain) =>
-        GetTreeUpdatesResponse(TransactionTreeUpdate(withoutLostData(tree, mode)), domain)
-      case GetTreeUpdatesResponse(ReassignmentUpdate(transfer), domain) =>
-        GetTreeUpdatesResponse(ReassignmentUpdate(withoutLostData(transfer)), domain)
-      case _ => throw new RuntimeException("Invalid update type")
-    }
   }
 
   def withoutLostData(

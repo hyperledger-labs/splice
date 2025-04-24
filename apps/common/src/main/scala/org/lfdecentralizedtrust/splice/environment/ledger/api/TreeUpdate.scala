@@ -9,6 +9,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 sealed abstract class TreeUpdate extends Product with Serializable {
   def recordTime: CantonTimestamp
   def updateId: String
+  def offset: Long
 }
 
 final case class TransactionTreeUpdate(
@@ -17,10 +18,12 @@ final case class TransactionTreeUpdate(
   override def recordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
 
   override def updateId: String = tree.getUpdateId
+  override def offset = tree.getOffset
 }
 
 final case class ReassignmentUpdate(transfer: Reassignment[ReassignmentEvent]) extends TreeUpdate {
   override def recordTime = transfer.recordTime
 
   override def updateId: String = transfer.updateId
+  override def offset = transfer.offset
 }

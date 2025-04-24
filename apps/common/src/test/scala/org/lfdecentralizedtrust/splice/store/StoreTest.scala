@@ -41,7 +41,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentEvent,
   ReassignmentUpdate,
   TransactionTreeUpdate,
-  TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.util.EventId
 import com.digitalasset.canton.BaseTest
@@ -949,10 +949,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         )(traceContext)
       )
 
-    override def ingestUpdate(domain: SynchronizerId, transfer: TreeUpdate)(implicit
+    override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
         traceContext: TraceContext
     ) = withoutRepeatedIngestionWarning(
-      underlying.ingestUpdate(domain, transfer)(traceContext)
+      underlying.ingestUpdate(updateOrCheckpoint)(traceContext)
     )
   }
 
