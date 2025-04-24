@@ -92,7 +92,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "cluster-ingress-sv",
     "provider": "",
@@ -235,7 +235,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "loopback",
     "provider": "",
@@ -299,7 +299,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "scan",
     "provider": "",
@@ -489,7 +489,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-apps-pg",
     "provider": "",
@@ -575,10 +575,6 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "fivenorth-testnet-1::122091d6f629977b9ef41b30e467702839d858b3ab8cadf6ac756fd2376a29d9928f",
-                "weight": "30000"
-              },
-              {
                 "beneficiary": "copper-testnetValidator-1::1220030d943f303ae8703182bc73014a62107f46086098ae89353cd969f35a1ecb31",
                 "weight": "10000"
               },
@@ -601,7 +597,7 @@
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
-            "rewardWeightBps": 405000
+            "rewardWeightBps": 375000
           },
           {
             "extraBeneficiaries": [
@@ -637,12 +633,12 @@
           {
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIyvyNX23/fxKnCkKArjOWxi+OBUtIXw4GoEGFMG4JXZBeVYYU6s4hBA5heMKDVaFszYEQQP1bBfjSQwWJ8PLDA==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 100750
           },
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJkWEYEGZXazTVemWdA9IEjV7LryooS6OsypdNi3rpfLDgGffwZJhjGcA1wWiOpxQkbM8B0VkfNLs24OCLAf1HA==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 30000
           },
           {
             "name": "Proof-Group-1",
@@ -726,7 +722,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "sv-app",
     "provider": "",
@@ -880,7 +876,7 @@
           "auth0|64553aa683015a9687d9cc2e"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator",
     "provider": "",

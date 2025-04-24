@@ -4,10 +4,11 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.daml.ledger.javaapi.data as javaApi
-import org.lfdecentralizedtrust.splice.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
 import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{Outcome, SourceMigrationInfo}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
@@ -26,7 +27,7 @@ import scala.jdk.OptionConverters.*
   */
 class ScanHistoryBackfilling(
     connection: BackfillingScanConnection,
-    destinationHistory: HistoryBackfilling.DestinationHistory[LedgerClient.GetTreeUpdatesResponse],
+    destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse],
     currentMigrationId: Long,
     batchSize: Int = 100,
     override val loggerFactory: NamedLoggerFactory,
@@ -35,7 +36,7 @@ class ScanHistoryBackfilling(
 ) extends NamedLogging {
 
   private val sourceHistory =
-    new HistoryBackfilling.SourceHistory[LedgerClient.GetTreeUpdatesResponse] {
+    new HistoryBackfilling.SourceHistory[UpdateHistoryResponse] {
       def isReady: Boolean = true
 
       def migrationInfo(migrationId: Long)(implicit
@@ -48,7 +49,7 @@ class ScanHistoryBackfilling(
           synchronizerId: SynchronizerId,
           before: CantonTimestamp,
           count: Int,
-      )(implicit tc: TraceContext): Future[Seq[LedgerClient.GetTreeUpdatesResponse]] =
+      )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] =
         connection.getUpdatesBefore(migrationId, synchronizerId, before, None, count)
     }
 
@@ -96,7 +97,7 @@ object ScanHistoryBackfilling {
     * A create event for the `DsoBootstrap` contract, and an exercise event for the `DsoBootstrap_Bootstrap` choice.
     */
   def isFoundingTransactionTreeUpdate(
-      treeUpdate: LedgerClient.GetTreeUpdatesResponse,
+      treeUpdate: UpdateHistoryResponse,
       dsoParty: String,
   ): Boolean = {
     treeUpdate.update match {
@@ -133,7 +134,7 @@ object ScanHistoryBackfilling {
     * `DsoRules_AddConfirmedSv` where the new SV is already part of the DSO.
     */
   def isJoiningTransactionTreeUpdate(
-      treeUpdate: LedgerClient.GetTreeUpdatesResponse,
+      treeUpdate: UpdateHistoryResponse,
       svParty: String,
   ): Boolean = {
     treeUpdate.update match {

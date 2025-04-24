@@ -51,7 +51,7 @@ export function installSvParticipant(
   const clusterConfiguration = clusterSvsConfiguration[xns.logicalName]?.participant;
 
   const { kmsValues, kmsDependencies } = clusterConfiguration?.kms
-    ? getParticipantKmsHelmResources(xns, clusterConfiguration.kms)
+    ? getParticipantKmsHelmResources(xns, clusterConfiguration.kms, migrationId)
     : { kmsValues: {}, kmsDependencies: [] };
 
   const participantValuesWithOverwrites: ChartValues = {

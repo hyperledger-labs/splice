@@ -3,12 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.util
 
-import cats.syntax.foldable.*
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
@@ -61,9 +61,15 @@ class PackageVetting(
         schedule,
         futureAmuletConfigFromVoteRequests,
       )
-    vettingSchedule.toSeq.traverse_ { case (validFrom, packages) =>
-      vetPackages(domainId, packages.toSeq, Some(validFrom))
-    }
+    // sort them and vet in the order of earliest first to ensure that dependencies are vetted at the earliest time as well
+    // also it doesn't really make sense to run multiple vettings in parallel as they will just race to update the topology state
+    val vettingTimeSortedDars = vettingSchedule.toSeq.sortBy(_._1)
+    logger.info(s"Vetting for schedule $vettingTimeSortedDars from amulet rules $schedule")
+    MonadUtil
+      .sequentialTraverse(vettingTimeSortedDars) { case (validFrom, packages) =>
+        vetPackages(domainId, packages.toSeq, Some(validFrom))
+      }
+      .map(_ => ())
   }
 
   private def vetPackages(

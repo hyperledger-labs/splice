@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentEvent,
   ReassignmentUpdate,
   TransactionTreeUpdate,
-  TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.*
@@ -750,20 +750,6 @@ final class DbMultiDomainAcsStore[TXE](
       )
     }
 
-    private def readOffset(): DBIOAction[Option[Long], NoStream, Effect.Read] = {
-      // Note: we only read from the acs store.
-      // Initialization makes sure that both the acs store and the txlog store start at the same offset,
-      // and we update the store_last_ingested_offsets row for both stores in the same transaction.
-      sql"""
-        select last_ingested_offset
-        from store_last_ingested_offsets
-        where store_id = $acsStoreId and migration_id = $domainMigrationId
-      """
-        .as[Option[String]]
-        .head
-        .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
-    }
-
     /** Runs the given action to update the database with changes caused at the given offset.
       * The resulting action is guaranteed to be idempotent, even if the given action is not.
       *
@@ -778,7 +764,7 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit
         tc: TraceContext
     ): DBIOAction[Unit, NoStream, Effect.Read & Effect.Write & Effect.Transactional] = {
-      readOffset()
+      readOffsetAction()
         .flatMap({
           case None =>
             action.andThen(updateOffset(offset))
@@ -911,11 +897,11 @@ final class DbMultiDomainAcsStore[TXE](
       }
     }
 
-    override def ingestUpdate(domain: SynchronizerId, transfer: TreeUpdate)(implicit
+    override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
-      transfer match {
-        case ReassignmentUpdate(reassignment) =>
+      updateOrCheckpoint match {
+        case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), domain) =>
           ingestReassignment(reassignment.offset, reassignment).map { summaryState =>
             state
               .getAndUpdate(s =>
@@ -937,7 +923,7 @@ final class DbMultiDomainAcsStore[TXE](
             logger.debug(show"Ingested reassignment $summary")
             handleIngestionSummary(summary)
           }
-        case TransactionTreeUpdate(tree) =>
+        case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), domain) =>
           val offset = tree.getOffset
           ingestTransactionTree(domain, offset, tree).map { summaryState =>
             state
@@ -960,6 +946,27 @@ final class DbMultiDomainAcsStore[TXE](
             logger.debug(show"Ingested transaction $summary")
             handleIngestionSummary(summary)
           }
+        case TreeUpdateOrOffsetCheckpoint.Checkpoint(checkpoint) =>
+          val offset = checkpoint.getOffset
+          storage
+            .queryAndUpdate(ingestUpdateAtOffset(offset, DBIO.unit), "ingestOffsetCheckpoint")
+            .map { _ =>
+              state
+                .getAndUpdate(s => s.withUpdate(s.acsSize, offset))
+                .signalOffsetChanged(offset)
+              val summary =
+                MutableIngestionSummary.empty.toIngestionSummary(
+                  updateId = None,
+                  synchronizerId = None,
+                  offset = offset,
+                  recordTime = None,
+                  newAcsSize = state.get().acsSize,
+                  metrics,
+                )
+              logger.debug(show"Ingested offset checkpoint $offset")
+              handleIngestionSummary(summary)
+            }
+
       }
     }
 
@@ -1495,6 +1502,24 @@ final class DbMultiDomainAcsStore[TXE](
       contractId = row.acsRow.contractId,
       counter = row.stateRow.reassignmentCounter,
     )
+  }
+
+  private def readOffsetAction(): DBIOAction[Option[Long], NoStream, Effect.Read] = {
+    // Note: we only read from the acs store.
+    // Initialization makes sure that both the acs store and the txlog store start at the same offset,
+    // and we update the store_last_ingested_offsets row for both stores in the same transaction.
+    sql"""
+        select last_ingested_offset
+        from store_last_ingested_offsets
+        where store_id = $acsStoreId and migration_id = $domainMigrationId
+      """
+      .as[Option[String]]
+      .head
+      .map(_.map(LegacyOffset.Api.assertFromStringToLong(_)))
+  }
+
+  private[store] def lookupLastIngestedOffset()(implicit tc: TraceContext): Future[Option[Long]] = {
+    storage.query(readOffsetAction(), "readOffset")
   }
 
   override def close(): Unit =

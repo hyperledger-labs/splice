@@ -4,16 +4,19 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, PackageVetting}
-import com.digitalasset.canton.tracing.TraceContext
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
 abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
+
+  private val previouslyRunInputRef = new AtomicReference[Set[String]](Set.empty)
 
   def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId]
 
@@ -32,11 +35,33 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
       amuletRules <- getAmuletRules()
       voteRequests <- getVoteRequests()
       dsoRules <- getDsoRules()
-      _ <- vetting.vetPackages(
-        domainId,
-        amuletRules,
-        AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
+      _ <- runIfInputChanged(
+        Seq(
+          domainId.toString,
+          amuletRules.contractId.toString,
+          dsoRules.contractId.toString,
+        ) ++ voteRequests.map(_.toString)
+      )(
+        vetting.vetPackages(
+          domainId,
+          amuletRules,
+          AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
+        )
       )
     } yield false
+  }
+
+  private def runIfInputChanged(
+      input: Seq[String]
+  )(run: => Future[Unit])(implicit tc: TraceContext) = {
+    val previoslyRunInput = previouslyRunInputRef.get()
+    if (previoslyRunInput != input.toSet) {
+      logger.info(
+        s"Running package vetting as the input has changed from $previoslyRunInput to $input"
+      )
+      run.map(_ => previouslyRunInputRef.set(input.toSet))
+    } else {
+      Future.unit
+    }
   }
 }

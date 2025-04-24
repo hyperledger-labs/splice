@@ -430,12 +430,17 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
             "value": "2147483647"
           }
         ],
+        "deletionProtectionEnabled": false,
+        "edition": "ENTERPRISE",
         "insightsConfig": {
           "queryInsightsEnabled": true
         },
@@ -561,10 +566,6 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "fivenorth-devnet-1::122036c4a4b2f3030c1e01ecbfeaf143263c9dbc49fa03992cf69cd180176b567baa",
-                "weight": "30000"
-              },
-              {
                 "beneficiary": "copper-devnetValidator-3::1220848005cbf8e3b7fd5a1736a49e8661222e7b2eb4bbde0614b06f51b972c525f5",
                 "weight": "10000"
               },
@@ -587,7 +588,7 @@
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE+2XaCekgPDPoEzXeo3yYf6Y+3zbIXKMoR2WYl/pa8CMuOloMXHUfdi6viBJcvoLij7ti5PaqLp1PHJ5tWLteVQ==",
-            "rewardWeightBps": 405000
+            "rewardWeightBps": 375000
           },
           {
             "name": "MPC-Holding-Inc",
@@ -607,12 +608,12 @@
           {
             "name": "C7-Technology-Services-Limited",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVAJEEaXnB+CU+rV5QS4I0eNH14YBXHmrl2ubLzOu7vhez3orP1MDmGSD3gLiP9oxi1XiI+D/JcNohAxlm/DDpw==",
-            "rewardWeightBps": 100000
+            "rewardWeightBps": 100750
           },
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEVSqn1J3YWij1KBWVNKKOQ8aEPeUc9SFe418mneRdV/PJOX4awAePDrG7A09SYkqP8dyg8ESMw5ltV0dJt5eqlQ==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 30000
           },
           {
             "name": "Proof-Group-1",

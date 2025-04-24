@@ -38,10 +38,11 @@ class ExternalPartyAmuletRulesTrigger(
   override def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Unit]] = {
     val now = context.clock.now
     for {
-      supportsExternalPartyAmuletRules <- packageVersionSupport.supportsExternalPartyAmuletRules(
-        Seq(svParty, dsoParty),
-        now,
-      )
+      supportsExternalPartyAmuletRules <- packageVersionSupport
+        .supportsDsoRulesCreateExternalPartyAmuletRules(
+          Seq(svParty, dsoParty),
+          now,
+        )
       tasks <-
         if (supportsExternalPartyAmuletRules) {
           for {

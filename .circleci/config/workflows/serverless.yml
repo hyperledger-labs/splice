@@ -1,6 +1,0 @@
-workflow:
-  update_serverless_workflows:
-    when:
-      equal: [ update-serverless-workflows, << pipeline.parameters.run-job >> ]
-    jobs:
-      - deploy_serverless
