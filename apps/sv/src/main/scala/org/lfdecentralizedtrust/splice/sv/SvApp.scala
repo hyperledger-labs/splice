@@ -1269,7 +1269,7 @@ object SvApp {
               logger.debug("Trying to create validator license for SV party")
               val dsoParty = store.key.dsoParty
               for {
-                supportsValidatorLicenseMetadata <- packageVersionSupport
+                validatorLicenseMetadataFeatureSupport <- packageVersionSupport
                   .supportsValidatorLicenseMetadata(
                     Seq(dsoParty, svParty),
                     clock.now,
@@ -1279,9 +1279,11 @@ object SvApp {
                     svParty.toProtoPrimitive,
                     svParty.toProtoPrimitive,
                     Some(BuildInfo.compiledVersion)
-                      .filter(_ => supportsValidatorLicenseMetadata)
+                      .filter(_ => validatorLicenseMetadataFeatureSupport.supported)
                       .toJava,
-                    Some(config.contactPoint).filter(_ => supportsValidatorLicenseMetadata).toJava,
+                    Some(config.contactPoint)
+                      .filter(_ => validatorLicenseMetadataFeatureSupport.supported)
+                      .toJava,
                   )
                 )
                 _ <- dsoStoreWithIngestion.connection
@@ -1290,6 +1292,7 @@ object SvApp {
                     readAs = Seq(dsoParty),
                     cmd,
                   )
+                  .withPrefferedPackage(validatorLicenseMetadataFeatureSupport.packageIds)
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
                       "org.lfdecentralizedtrust.splice.sv.createSvValidatorLicense",

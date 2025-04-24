@@ -101,13 +101,7 @@ Vetted state contains multiple entries
 # TODO(#17311) Remove conversion from future with shutdown to future
 Splice unsafe shutdown future
 
-# TODO(#19057) - Figure out a proper way to fix this
-BootstrapPackageConfigIntegrationTest.*ValidatorLicense_ReceiveFaucetCoupon is deprecated. Please use ValidatorLicense_RecordValidatorLivenessActivity instead.*
-
 # Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
 .*No data has been made available yet.*
-
-# TODO(#19139): Remove it once BoostrapPackageConfigIntegrationTest is fixed
-.*INVALID_ARGUMENT: COMMAND_PREPROCESSING_FAILED.*unknown constructor SRARC_CreateExternalPartyAmuletRules.*
 
 # Make sure to have a trailing newline

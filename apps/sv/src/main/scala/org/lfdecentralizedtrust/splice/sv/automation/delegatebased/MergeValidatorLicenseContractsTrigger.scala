@@ -46,7 +46,7 @@ class MergeValidatorLicenseContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
-      supportsPruneAmuletConfigSchedule <- packageVersionSupport
+      pruneAmuletConfigScheduleFeatureSupport <- packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
           Seq(
             store.key.svParty,
@@ -56,7 +56,7 @@ class MergeValidatorLicenseContractsTrigger(
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
       validatorLicenses <-
-        if (supportsPruneAmuletConfigSchedule) {
+        if (pruneAmuletConfigScheduleFeatureSupport.supported) {
           store.listValidatorLicensePerValidator(
             validator,
             MAX_VALIDATOR_LICENSE_CONTRACTS,
@@ -69,8 +69,12 @@ class MergeValidatorLicenseContractsTrigger(
           logger.warn(
             s"Validator $validator has ${validatorLicenses.length} Validator License contracts."
           )
-          mergeValidatorLicenseContracts(validator, validatorLicenses)
-        } else if (supportsPruneAmuletConfigSchedule) {
+          mergeValidatorLicenseContracts(
+            validator,
+            validatorLicenses,
+            pruneAmuletConfigScheduleFeatureSupport.packageIds,
+          )
+        } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
           Future.successful(
             TaskSuccess(s"Only one Validator License contract for $validator, nothing to merge.")
           )
@@ -87,6 +91,7 @@ class MergeValidatorLicenseContractsTrigger(
   private def mergeValidatorLicenseContracts(
       validator: String,
       validatorLicenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]],
+      preferredPackages: Seq[String],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
@@ -97,6 +102,7 @@ class MergeValidatorLicenseContractsTrigger(
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
+        .withPrefferedPackage(preferredPackages)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${validatorLicenses.length} ValidatorLicense contracts for $validator"

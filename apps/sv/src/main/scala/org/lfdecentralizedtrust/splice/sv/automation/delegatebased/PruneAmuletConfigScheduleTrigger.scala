@@ -14,8 +14,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRul
 import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.PruneAmuletConfigScheduleTrigger.implicitPrettyString
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -28,60 +30,72 @@ class PruneAmuletConfigScheduleTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends ScheduledTaskTrigger[AssignedContract[AmuletRules.ContractId, AmuletRules]]
-    with SvTaskBasedTrigger[
-      ScheduledTaskTrigger.ReadyTask[AssignedContract[AmuletRules.ContractId, AmuletRules]]
-    ] {
+) extends ScheduledTaskTrigger[PruneAmuletConfigScheduleTrigger.Task]
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[PruneAmuletConfigScheduleTrigger.Task]] {
 
   private val store = svTaskContext.dsoStore
 
   override def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[AssignedContract[AmuletRules.ContractId, AmuletRules]]] = for {
+  ): Future[Seq[PruneAmuletConfigScheduleTrigger.Task]] = for {
     amuletRules <- store.getAssignedAmuletRules()
-    supportsPruneAmuletConfigSchedule <- packageVersionSupport.supportsPruneAmuletConfigSchedule(
-      Seq(
-        store.key.svParty,
-        store.key.dsoParty,
-      ),
-      now,
-    )
+    pruneAmuletConfigScheduleFeatureSupport <- packageVersionSupport
+      .supportsPruneAmuletConfigSchedule(
+        Seq(
+          store.key.svParty,
+          store.key.dsoParty,
+        ),
+        now,
+      )
   } yield {
     if (
-      supportsPruneAmuletConfigSchedule && amuletRules.payload.configSchedule.futureValues.asScala
+      pruneAmuletConfigScheduleFeatureSupport.supported && amuletRules.payload.configSchedule.futureValues.asScala
         .exists(futureValue => CantonTimestamp.assertFromInstant(futureValue._1) <= now)
     ) {
-      Seq(amuletRules)
+      Seq(amuletRules -> pruneAmuletConfigScheduleFeatureSupport.packageIds)
     } else {
       Seq.empty
     }
   }
 
   override def completeTaskAsDsoDelegate(
-      amuletRules: ScheduledTaskTrigger.ReadyTask[
-        AssignedContract[AmuletRules.ContractId, AmuletRules]
-      ]
-  )(implicit tc: TraceContext): Future[TaskOutcome] =
+      rulesWithPreferredPackages: (
+        ScheduledTaskTrigger.ReadyTask[
+          PruneAmuletConfigScheduleTrigger.Task
+        ],
+      )
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val (amuletRules, preferredPackageIds) = rulesWithPreferredPackages.work
     for {
       dsoRules <- store.getDsoRules()
       cmd = dsoRules.exercise(
-        _.exerciseDsoRules_PruneAmuletConfigSchedule(amuletRules.work.contractId)
+        _.exerciseDsoRules_PruneAmuletConfigSchedule(amuletRules.contractId)
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
-        .withSynchronizerId(amuletRules.work.domain)
+        .withSynchronizerId(amuletRules.domain)
         .noDedup
+        .withPrefferedPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(s"Pruned AmuletRules config")
+  }
 
   override def isStaleTask(
-      task: ScheduledTaskTrigger.ReadyTask[AssignedContract[AmuletRules.ContractId, AmuletRules]]
+      task: ScheduledTaskTrigger.ReadyTask[
+        PruneAmuletConfigScheduleTrigger.Task
+      ]
   )(implicit tc: TraceContext): Future[Boolean] =
     store.multiDomainAcsStore
       .lookupContractByIdOnDomain(AmuletRules.COMPANION)(
-        task.work.domain,
-        task.work.contractId,
+        task.work._1.domain,
+        task.work._1.contractId,
       )
       .map(_.isEmpty)
 
+}
+
+object PruneAmuletConfigScheduleTrigger {
+
+  private type Task = (AssignedContract[AmuletRules.ContractId, AmuletRules], Seq[String])
+  implicit val implicitPrettyString: Pretty[String] = PrettyInstances.prettyString
 }

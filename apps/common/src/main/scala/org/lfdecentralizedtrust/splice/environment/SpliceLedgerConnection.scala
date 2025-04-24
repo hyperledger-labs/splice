@@ -876,6 +876,7 @@ class SpliceLedgerConnection(
       disclosedContracts: DisclosedContracts,
       priority: CommandPriority,
       deadline: Option[NonNegativeFiniteDuration] = None,
+      preferredPackageIds: Seq[String] = Seq.empty,
   ) {
     private type DedupNotSpecifiedYet = CmdId =:= Any
     private type SynchronizerIdRequired = DomId <:< SynchronizerId
@@ -885,6 +886,7 @@ class SpliceLedgerConnection(
         synchronizerId: DomId0 = this.synchronizerId,
         disclosedContracts: DisclosedContracts = this.disclosedContracts,
         deadline: Option[NonNegativeFiniteDuration] = this.deadline,
+        preferredPackageIds: Seq[String] = this.preferredPackageIds,
     ): submit[C, CmdId0, DomId0] =
       new submit(
         actAs,
@@ -895,6 +897,7 @@ class SpliceLedgerConnection(
         disclosedContracts,
         priority,
         deadline,
+        preferredPackageIds,
       )
 
     def withDedup(commandId: CommandId, deduplicationOffset: Long)(implicit
@@ -903,6 +906,12 @@ class SpliceLedgerConnection(
       copy(
         commandIdDeduplicationOffset = (commandId, deduplicationOffset)
       )
+
+    def withPrefferedPackage(packageIds: Seq[String]): submit[C, CmdId, DomId] = {
+      copy(
+        preferredPackageIds = packageIds
+      )
+    }
 
     def withDedup(commandId: CommandId, deduplicationConfig: DedupConfig)(implicit
         cid: DedupNotSpecifiedYet
@@ -989,6 +998,7 @@ class SpliceLedgerConnection(
                 disclosedContracts = disclosedContracts,
                 waitFor = waitFor,
                 deadline = deadline,
+                preferredPackageIds = preferredPackageIds,
               )
             )(getOffsetAndResult)
 

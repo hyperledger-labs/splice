@@ -749,17 +749,18 @@ class HttpSvHandler(
     for {
       dsoRules <- dsoStore.getDsoRules()
       now = clock.now
-      supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
-        Seq(svParty, candidateParty, dsoParty),
-        now,
-      )
+      validatorLicenseMetadataFeatureSupport <- packageVersionSupport
+        .supportsValidatorLicenseMetadata(
+          Seq(svParty, candidateParty, dsoParty),
+          now,
+        )
       cmds = Seq(
         dsoRules.exercise(
           _.exerciseDsoRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
-            version.filter(_ => supportsValidatorLicenseMetadata).toJava,
-            contactPoint.filter(_ => supportsValidatorLicenseMetadata).toJava,
+            version.filter(_ => validatorLicenseMetadataFeatureSupport.supported).toJava,
+            contactPoint.filter(_ => validatorLicenseMetadataFeatureSupport.supported).toJava,
           )
         ),
         validatorOnboarding.exercise(
@@ -769,6 +770,7 @@ class HttpSvHandler(
       _ <- dsoStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(dsoParty), cmds)
         .withSynchronizerId(dsoRules.domain)
+        .withPrefferedPackage(validatorLicenseMetadataFeatureSupport.packageIds)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()
