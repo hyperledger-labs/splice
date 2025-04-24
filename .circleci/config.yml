@@ -2044,10 +2044,10 @@ jobs:
           cluster: mainnet
       - run_bash_command_in_nix:
           cmd_name: Copy backup to bucket
-          additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY --keep ACTIVE_MIGRATION_ID"
+          additional_nix_args: "--keep GCP_DA_CN_BACKUPS_KEY --keep ACTIVE_MIGRATION_ID"
           cmd: |
-            echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
-            export GOOGLE_CLOUD_PROJECT=da-cn-shared
+            echo $GCP_DA_CN_BACKUPS_KEY | gcloud auth activate-service-account --key-file=-
+            export GOOGLE_CLOUD_PROJECT=da-cn-backups
             today=$(date +%Y-%m-%d)
             gcloud workflows execute copy-cn-backup-to-bucket --project ${GOOGLE_CLOUD_PROJECT} --location us-central1 --data "{\"migrationId\": ${ACTIVE_MIGRATION_ID}, \"beforeDate\": \"$today\"}"
       - notify-cluster-fail:
