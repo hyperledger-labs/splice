@@ -195,9 +195,7 @@ class ScanApp(
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
-          // after a HDM it can take a while until we processed the contract. Crashing
-          // is counter productive as it makes ingestion even slower so we retry forever here.
-          RetryFor.Automation,
+          RetryFor.WaitingOnInitDependency,
           "wait_open_mining",
           "there is an OpenMiningRound contract",
           store.multiDomainAcsStore
@@ -218,9 +216,7 @@ class ScanApp(
       )
       synchronizerId <- appInitStep("Get synchronizer id") {
         retryProvider.getValueWithRetries(
-          // after a HDM it can take a while until we processed the contract. Crashing
-          // is counter productive as it makes ingestion even slower so we retry forever here.
-          RetryFor.Automation,
+          RetryFor.WaitingOnInitDependency,
           "amulet synchronizer id",
           "amulet rules synchronizer id",
           store.getAmuletRulesWithState().map {
