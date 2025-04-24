@@ -1,9 +1,11 @@
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.daml.ledger.javaapi.data.OffsetCheckpoint
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.StoreTest.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
@@ -21,6 +23,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
+import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import slick.jdbc.JdbcProfile
 
@@ -310,6 +313,25 @@ class DbMultiDomainAcsStoreTest
 
           _ = store0.acsStoreId should not be store1.acsStoreId
           _ = store0.txLogStoreId should not be store1.txLogStoreId
+        } yield succeed
+      }
+
+      "offset checkpoints can be ingested" in {
+        val store = mkStore()
+        for {
+          _ <- initWithAcs(acsOffset = 0)(store)
+          o1 <- store.lookupLastIngestedOffset()
+          _ = o1 shouldBe Some(0)
+          _ <- store.testIngestionSink.ingestUpdate(
+            TreeUpdateOrOffsetCheckpoint.Checkpoint(
+              new OffsetCheckpoint(
+                5,
+                Collections.emptyList(),
+              )
+            )
+          )
+          o2 <- store.lookupLastIngestedOffset()
+          _ = o2 shouldBe Some(5)
         } yield succeed
       }
     }

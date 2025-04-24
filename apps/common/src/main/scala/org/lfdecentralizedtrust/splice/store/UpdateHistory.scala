@@ -23,6 +23,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
   TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{
@@ -279,16 +280,16 @@ class UpdateHistory(
         Future.unit
       }
 
-      override def ingestUpdate(domain: SynchronizerId, update: TreeUpdate)(implicit
+      override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
-        val offset: Long = update match {
-          case ReassignmentUpdate(reassignment) => reassignment.offset
-          case TransactionTreeUpdate(tree) => tree.getOffset
-        }
-        val recordTime = update match {
-          case ReassignmentUpdate(reassignment) => reassignment.recordTime
-          case TransactionTreeUpdate(tree) => CantonTimestamp.assertFromInstant(tree.getRecordTime)
+        val offset: Long = updateOrCheckpoint.offset
+        val recordTime = updateOrCheckpoint match {
+          case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), _) =>
+            Some(reassignment.recordTime)
+          case TreeUpdateOrOffsetCheckpoint.Update(TransactionTreeUpdate(tree), _) =>
+            Some(CantonTimestamp.assertFromInstant(tree.getRecordTime))
+          case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => None
         }
 
         // Note: in theory, it's enough if this action is atomic - there should only be a single
@@ -297,13 +298,15 @@ class UpdateHistory(
         // In practice, we still want to have some protection against duplicate inserts, in case
         // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
         // This is implemented with a unique index in the database schema.
-        val action = readOffset()
+        val action = readOffsetAction()
           .flatMap({
             case None =>
               logger.debug(
                 s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
               )
-              ingestUpdate_(update, domainMigrationId).andThen(updateOffset(offset))
+              ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
+                updateOffset(offset)
+              )
             case Some(lastIngestedOffset) =>
               if (offset <= lastIngestedOffset) {
                 logger.warn(
@@ -317,7 +320,9 @@ class UpdateHistory(
                 logger.debug(
                   s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
                 )
-                ingestUpdate_(update, domainMigrationId).andThen(updateOffset(offset))
+                ingestUpdateOrCheckpoint_(updateOrCheckpoint, domainMigrationId).andThen(
+                  updateOffset(offset)
+                )
               }
           })
           .map(_ => ())
@@ -332,17 +337,18 @@ class UpdateHistory(
         set last_ingested_offset = ${lengthLimited(LegacyOffset.Api.fromLong(offset))}
         where history_id = $historyId and migration_id = $domainMigrationId
       """
-
-      private def readOffset(): DBIOAction[Option[Long], NoStream, Effect.Read] =
-        sql"""
-        select last_ingested_offset
-        from update_history_last_ingested_offsets
-        where history_id = $historyId and migration_id = $domainMigrationId
-      """
-          .as[Option[String]]
-          .head
-          .map(_.map(LegacyOffset.Api.assertFromStringToLong))
     }
+
+  private def ingestUpdateOrCheckpoint_(
+      updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint,
+      migrationId: Long,
+  ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+    updateOrCheckpoint match {
+      case TreeUpdateOrOffsetCheckpoint.Update(update, _) =>
+        ingestUpdate_(update, migrationId)
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(_) => DBIO.unit
+    }
+  }
 
   private def ingestUpdate_(
       update: TreeUpdate,
@@ -1532,6 +1538,21 @@ class UpdateHistory(
         "initializeBackfilling",
       )
       .map(_ => ())
+  }
+
+  private def readOffsetAction(): DBIOAction[Option[Long], NoStream, Effect.Read] =
+    sql"""
+        select last_ingested_offset
+        from update_history_last_ingested_offsets
+        where history_id = $historyId and migration_id = $domainMigrationId
+      """
+      .as[Option[String]]
+      .head
+      .map(_.map(LegacyOffset.Api.assertFromStringToLong))
+
+  /** Testing API: lookup last ingested offset */
+  private[store] def lookupLastIngestedOffset()(implicit tc: TraceContext): Future[Option[Long]] = {
+    storage.query(readOffsetAction(), "readOffset")
   }
 
   lazy val sourceHistory: HistoryBackfilling.SourceHistory[UpdateHistoryResponse] =
