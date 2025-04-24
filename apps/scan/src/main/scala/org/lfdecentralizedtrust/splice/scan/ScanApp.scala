@@ -195,7 +195,9 @@ class ScanApp(
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
-          RetryFor.WaitingOnInitDependency,
+          // after a HDM it can take a while until we processed the contract. Crashing
+          // is counter productive as it makes ingestion even slower so we retry forever here.
+          RetryFor.Automation,
           "wait_open_mining",
           "there is an OpenMiningRound contract",
           store.multiDomainAcsStore
@@ -215,22 +217,22 @@ class ScanApp(
         config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase(),
       )
       synchronizerId <- appInitStep("Get synchronizer id") {
-        store
-          .lookupAmuletRules()
-          .map(
-            _.fold(
-              throw Status.NOT_FOUND
-                .withDescription("Amulet rules not yet available")
-                .asRuntimeException()
-            )(
-              _.state.fold(
-                identity,
-                throw Status.NOT_FOUND
-                  .withDescription("Amulet rules in fllight")
-                  .asRuntimeException(),
-              )
+        retryProvider.getValueWithRetries(
+          // after a HDM it can take a while until we processed the contract. Crashing
+          // is counter productive as it makes ingestion even slower so we retry forever here.
+          RetryFor.Automation,
+          "amulet synchronizer id",
+          "amulet rules synchronizer id",
+          store.getAmuletRulesWithState().map {
+            _.state.fold(
+              identity,
+              throw Status.FAILED_PRECONDITION
+                .withDescription("Amulet rules in fllight")
+                .asRuntimeException(),
             )
-          )
+          },
+          logger,
+        )
       }
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         config.parameters.enableCantonPackageSelection,
