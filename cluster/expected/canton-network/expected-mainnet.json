@@ -667,10 +667,6 @@
                 "weight": "10000"
               },
               {
-                "beneficiary": "fivenorth-mainnet1-1::12208a2c7404062865085b75b9e8a3cbca56f272c0103bc55b0e65ca7c2dd855294a",
-                "weight": "30000"
-              },
-              {
                 "beneficiary": "copper-mainnet-validator::122038dd7fcbdd68bde47034abfd582cbe38854d94dec10c18a7589706914e2b6e61",
                 "weight": "10000"
               },
@@ -693,7 +689,7 @@
             ],
             "name": "Global-Synchronizer-Foundation",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmWLDU/xZzCtl6prd15Dyi+2/zMtSbHpQh8wJ/R3J9YKDVNpkJVo+qBkmYYSdlAifLz1aymUKqZlWDBvtQCJIaA==",
-            "rewardWeightBps": 405000
+            "rewardWeightBps": 375000
           },
           {
             "name": "Digital-Asset-1",
@@ -773,7 +769,7 @@
           {
             "name": "Five-North-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGe25jhw59y0TXgGkEmWLgCjG9D3yq4GweHzGLQ7cnbNVUqiG/ndXeFLJG1rQy6a+Ky0XfJDdcs8yCvbbsV+qqg==",
-            "rewardWeightBps": 0
+            "rewardWeightBps": 30000
           }
         ],
         "auth": {
