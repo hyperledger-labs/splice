@@ -453,12 +453,6 @@ object ScanHttpEncodings {
   }
 
   def makeConsistentAcrossSvs(
-      response: ledgerApi.LedgerClient.GetTreeUpdatesResponse
-  ): ledgerApi.LedgerClient.GetTreeUpdatesResponse = {
-    response.copy(update = makeConsistentAcrossSvs(response.update))
-  }
-
-  def makeConsistentAcrossSvs(
       response: UpdateHistoryResponse
   ): UpdateHistoryResponse = {
     response.copy(update = makeConsistentAcrossSvs(response.update))

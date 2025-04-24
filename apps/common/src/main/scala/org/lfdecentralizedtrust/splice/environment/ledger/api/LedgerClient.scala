@@ -764,8 +764,7 @@ object LedgerClient {
   }
 
   final case class GetTreeUpdatesResponse(
-      update: TreeUpdate,
-      synchronizerId: SynchronizerId,
+      updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint
   )
   def lapiTreeToJavaTree(
       tree: lapi.transaction.TransactionTree
@@ -785,7 +784,14 @@ object LedgerClient {
         case TU.TransactionTree(tree) =>
           val javaTree = lapiTreeToJavaTree(tree)
           val update = TransactionTreeUpdate(javaTree)
-          Some(GetTreeUpdatesResponse(update, SynchronizerId.tryFromString(tree.synchronizerId)))
+          Some(
+            GetTreeUpdatesResponse(
+              TreeUpdateOrOffsetCheckpoint.Update(
+                update,
+                SynchronizerId.tryFromString(tree.synchronizerId),
+              )
+            )
+          )
 
         case TU.Reassignment(x) =>
           // TODO(#18782) Support reassignment batching
@@ -804,8 +810,10 @@ object LedgerClient {
           }
           Some(
             GetTreeUpdatesResponse(
-              ReassignmentUpdate(Reassignment.fromProto(x)),
-              SynchronizerId.tryFromString(synchronizerIdP),
+              TreeUpdateOrOffsetCheckpoint.Update(
+                ReassignmentUpdate(Reassignment.fromProto(x)),
+                SynchronizerId.tryFromString(synchronizerIdP),
+              )
             )
           )
 

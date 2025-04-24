@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   IncompleteReassignmentEvent,
   ReassignmentEvent,
   TreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
@@ -242,6 +243,9 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
   private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
   ): Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]]
+
+  /** Testing API: lookup last ingested offset */
+  private[store] def lookupLastIngestedOffset()(implicit tc: TraceContext): Future[Option[Long]]
 }
 
 object MultiDomainAcsStore {
@@ -597,9 +601,14 @@ object MultiDomainAcsStore {
         incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
     )(implicit traceContext: TraceContext): Future[Unit]
 
-    def ingestUpdate(domain: SynchronizerId, transfer: TreeUpdate)(implicit
+    def ingestUpdate(update: TreeUpdateOrOffsetCheckpoint)(implicit
         traceContext: TraceContext
     ): Future[Unit]
+
+    def ingestUpdate(synchronizerId: SynchronizerId, update: TreeUpdate)(implicit
+        traceContext: TraceContext
+    ): Future[Unit] =
+      ingestUpdate(TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId))
   }
 
   object IngestionSink {

@@ -1,6 +1,13 @@
 package org.lfdecentralizedtrust.splice.store
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, ExercisedEvent, Int64, Value}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  DamlRecord,
+  ExercisedEvent,
+  Int64,
+  OffsetCheckpoint,
+  Value,
+}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.MonadUtil
@@ -11,10 +18,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupo
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import java.time.Instant
+import java.util.Collections
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -591,6 +600,25 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
               )
             )
 
+        } yield succeed
+      }
+
+      "offset checkpoints can be ingested" in {
+        val store = mkStore()
+        for {
+          _ <- initStore(store)
+          o1 <- store.lookupLastIngestedOffset()
+          _ = o1 shouldBe None
+          _ <- store.testIngestionSink.ingestUpdate(
+            TreeUpdateOrOffsetCheckpoint.Checkpoint(
+              new OffsetCheckpoint(
+                5,
+                Collections.emptyList(),
+              )
+            )
+          )
+          o2 <- store.lookupLastIngestedOffset()
+          _ = o2 shouldBe Some(5)
         } yield succeed
       }
 
