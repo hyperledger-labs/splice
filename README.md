@@ -1172,16 +1172,24 @@ Check the `--help` for more options.
 
 ### Testing hard migrations
 
-To test a full hard migration flow, you need to run the custom hard migration workflow in CI. To do so, trigger a CI pipeline on the branch you want to test with the following variables:
+To test a full hard migration flow, you need to run the custom hard migration workflow in CI.
+
+To do so from a PR in this repo, comment `/hdm_test` on your PR, then head over to the `canton-network-internal`
+CCI dashboard to approve the flow and select the scratchnet cluster to run on. This will test
+a hard migration from the latest release to the head of your branch.
+
+For testing migrations between other versions, assuming you have access to `canton-network-internal`
+repo and CCI, trigger a CI pipeline (in `canton-network-internal`) with the following variables:
 
 - `run-job`: `deploy-hdm-operator`
 - `cluster`: the scratch you want to use, eg: `scratchneta`
-- `base-version`: the Git reference from which to upgrade; for testing what is currently being run on `ciperiodic`, use the output of `build-tools/find_latest_hard_migration_base_version.sh`
+- `base-splice-git-ref`: the Git reference (in *this* repo) from which to upgrade; to match the behavior of `/hdm_test`, use the output of `build-tools/find_latest_hard_migration_base_version.sh`
+- `upgrade-splice-git-ref`: the Git reference (in *this* repo) to which to upgrade
 
-The workflow will deploy everything required for the `base-version`, run the preflights, prepare and execute a hard migration to the artifacts built from the branch, and run the preflights again to ensure the migration was successful.
+The workflow will deploy everything required for the `base-splice-git-ref`, run the preflights,
+prepare and execute a hard migration to the artifacts built from the upgrade version,
+and run the preflights again to ensure the migration was successful.
 All that using the Pulumi operator, just like on `ciperiodic` and our long-running clusters.
-
-In case you want to test an upgrade to a specific (snapshot) release that is different from the latest state on your branch, you can pick this release via the optional `upgrade-version` parameter.
 
 ## Building and Running the Wallet and Splitwell Apps
 
