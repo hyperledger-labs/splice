@@ -665,7 +665,7 @@
       "deletionProtection": true,
       "region": "europe-west6",
       "settings": {
-        "activationPolicy": "ALWAYS",
+        "activationPolicy": "NEVER",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -875,7 +875,7 @@
       "deletionProtection": true,
       "region": "europe-west6",
       "settings": {
-        "activationPolicy": "ALWAYS",
+        "activationPolicy": "NEVER",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
@@ -1162,7 +1162,7 @@
       "deletionProtection": true,
       "region": "europe-west6",
       "settings": {
-        "activationPolicy": "ALWAYS",
+        "activationPolicy": "NEVER",
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
