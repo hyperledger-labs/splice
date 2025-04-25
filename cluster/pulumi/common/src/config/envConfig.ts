@@ -11,6 +11,12 @@ export class SpliceConfigContext {
     'Deployment folder must be specified'
   );
 
+  readonly splicePath = requiredValue(
+    process.env.SPLICE_ROOT,
+    'SPLICE_ROOT',
+    'Splice root must be specified'
+  );
+
   extractGcpClusterFolderName(): string {
     const gcpclusterbasename = requiredValue(
       process.env.GCP_CLUSTER_BASENAME,

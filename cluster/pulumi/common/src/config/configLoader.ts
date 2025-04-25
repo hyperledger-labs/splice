@@ -6,7 +6,7 @@ import { spliceEnvConfig } from './envConfig';
 
 function loadClusterYamlConfig() {
   const clusterBaseConfig = readAndParseYaml(
-    `${spliceEnvConfig.context.deploymentFolderPath}/config.yaml`
+    `${spliceEnvConfig.context.splicePath}/cluster/deployment/config.yaml`
   );
   const clusterOverridesConfig = readAndParseYaml(
     `${spliceEnvConfig.context.clusterPath()}/config.yaml`
