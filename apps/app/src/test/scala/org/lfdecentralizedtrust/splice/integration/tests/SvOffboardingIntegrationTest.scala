@@ -49,6 +49,8 @@ class SvOffboardingIntegrationTest
   override lazy val resetRequiredTopologyState = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
+  // the port overrides below trip the HTTP one
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)

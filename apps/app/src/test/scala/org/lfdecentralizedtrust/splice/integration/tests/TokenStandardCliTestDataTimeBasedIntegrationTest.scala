@@ -45,6 +45,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -62,6 +63,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     with HasActorSystem
     with TimeTestUtil
     with HasExecutionContext {
+
+  override protected lazy val tokenStandardCliBehavior
+      : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
+    TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreForTemplateIds(
+      Seq(DummyHolding.TEMPLATE_ID)
+    )
 
   private val dummyHoldingDarPath = Paths
     .get(
@@ -772,7 +779,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     }
   }
 
-  private val jsonApiPort = 16201
+  private val jsonApiPort = 16501
   private def makeJsonApiV2Request[R](subPath: String, payload: Json, decode: Decoder[R])(implicit
       env: SpliceTestConsoleEnvironment
   ): R =

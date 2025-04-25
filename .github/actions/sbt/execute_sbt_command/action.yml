@@ -32,7 +32,7 @@ inputs:
   timeout:
     description: "Timeout for the SBT command"
     required: false
-    default: "35m"
+    default: "40m"
   additional_nix_args:
     description: "Additional arguments to pass to the Nix command"
     required: false

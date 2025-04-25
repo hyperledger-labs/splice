@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.console.{
 }
 import org.lfdecentralizedtrust.splice.environment.{DarResources, PackageIdResolver}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
@@ -46,6 +47,12 @@ class BootstrapPackageConfigIntegrationTest
     with ProcessTestUtil
     with SplitwellTestUtil
     with StandaloneCanton {
+
+  // this test starts up on older version (see initialPackageConfig), which don't define token-standard interfaces
+  // and thus everything will show up as raw create/archives.
+  override protected lazy val tokenStandardCliBehavior
+      : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
+    TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreAll
 
   override def dbsSuffix = "bootstrapdso"
 

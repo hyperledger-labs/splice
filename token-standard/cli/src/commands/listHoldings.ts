@@ -11,7 +11,7 @@ import { JsGetActiveContractsResponse } from "canton-json-api-v2-openapi";
 
 export async function listHoldings(
   partyId: string,
-  opts: CommandOptions
+  opts: CommandOptions,
 ): Promise<void> {
   try {
     const ledgerClient = createLedgerApiClient(opts);
@@ -27,11 +27,15 @@ export async function listHoldings(
     console.log(JSON.stringify(prettyHoldings, null, 2));
   } catch (err) {
     console.error("Failed to list holdings", err);
+    throw err;
   }
 }
 
 // Make them nicer to show by excluding stuff useless to users such as the createdEventBlob
-export function toPrettyHolding(holding: JsGetActiveContractsResponse) {
+export function toPrettyHolding(holding: JsGetActiveContractsResponse): {
+  contractId: string;
+  payload: any;
+} {
   const createdEvent = holding.contractEntry.JsActiveContract.createdEvent;
   return {
     contractId: createdEvent.contractId,

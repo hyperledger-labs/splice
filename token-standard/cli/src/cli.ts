@@ -3,7 +3,6 @@
 import { listHoldingTransactions } from "./commands/listHoldingTransactions";
 import { listHoldings } from "./commands/listHoldings";
 import { transfer } from "./commands/transfer";
-import { HoldingInterface } from "./constants";
 import { Command } from "commander";
 
 export interface CommandOptions {
@@ -11,7 +10,7 @@ export interface CommandOptions {
   authToken: string;
 }
 
-export function createProgram() {
+export function createProgram(): Command {
   const program = new Command();
 
   program
@@ -22,20 +21,33 @@ export function createProgram() {
     program
       .command("list-holdings")
       .description("List the holdings of a party")
-      .argument("partyId", "The party for which to list the holdings")
+      .argument("partyId", "The party for which to list the holdings"),
   ).action(listHoldings);
 
   addSharedOptions(
     program
       .command("list-holding-txs")
       .description(
-        "List transactions where a party is involved exercising Holding contracts"
+        "List transactions where a party is involved exercising Holding contracts",
       )
       .argument("partyId", "The party for which to list the transactions")
       .option(
         "-o --after-offset <value>",
-        "Get transactions after this offset (exclusive)."
+        "Get transactions after this offset (exclusive).",
       )
+      .option(
+        "-d --debug-path <value>",
+        "Writes the original server response to this path for debugging purposes.",
+      )
+      .option(
+        "-s --strict",
+        "Fail if any creates/archives without a known parent would be returned.",
+        false,
+      )
+      .option(
+        "--strict-ignore <values...>",
+        "In strict mode only: ignore raw creates / exercises of the given entity names. Space-separated.",
+      ),
   ).action(listHoldingTransactions);
 
   addSharedOptions(
@@ -45,29 +57,29 @@ export function createProgram() {
       .requiredOption("-s, --sender <value>", "The sender party of holdings")
       .requiredOption(
         "-r --receiver <value>",
-        "The receiver party of the holdings"
+        "The receiver party of the holdings",
       )
       .requiredOption("--amount <value>", "The amount to be transferred")
       // TODO (#18611): remove this option
       .requiredOption(
         "-e --instrument-admin <value>",
-        `The expected admin of the instrument.`
+        `The expected admin of the instrument.`,
       )
       .requiredOption(
         "-d --instrument-id <value>",
-        `The instrument id of the holding, e.g. "Amulet"`
+        `The instrument id of the holding, e.g. "Amulet"`,
       )
       .requiredOption("--public-key <value>", "Path to the public key file")
       .requiredOption("--private-key <value>", "Path to the private key file")
       .requiredOption(
         "-R --transfer-factory-registry-url <value>",
-        "The URL to a transfer registry."
+        "The URL to a transfer registry.",
       )
       .requiredOption(
         "-u, --user-id <value>",
-        "The user id, must match the user in the token"
+        "The user id, must match the user in the token",
       )
-      .action(transfer)
+      .action(transfer),
   );
 
   return program;
@@ -78,10 +90,10 @@ function addSharedOptions(program: Command) {
   return program
     .requiredOption(
       "-l, --ledger-url <value>",
-      "The ledger JSON API base URL, e.g. http://localhost:6201"
+      "The ledger JSON API base URL, e.g. http://localhost:6201",
     )
     .requiredOption(
       "-a, --auth-token <value>",
-      "The ledger JSON API auth token"
+      "The ledger JSON API auth token",
     );
 }
