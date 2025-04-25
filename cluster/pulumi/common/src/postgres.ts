@@ -57,7 +57,6 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
     instanceName: string,
     alias: string,
     secretName: string,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     active: boolean = true,
     disableProtection?: boolean,
     migrationId?: string
@@ -81,7 +80,7 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
         region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
         settings: {
           deletionProtectionEnabled: deletionProtection,
-          activationPolicy: 'ALWAYS', // TODO(#15974): set to NEVER when enabling archived instance
+          activationPolicy: active ? 'ALWAYS' : 'NEVER',
           databaseFlags: [{ name: 'temp_file_limit', value: '2147483647' }],
           backupConfiguration: {
             enabled: true,
