@@ -145,7 +145,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
     val task_duration = RetryFor.Automation.initialDelay.toMillis // 200ms
     val polling_trigger_interval = context.config.pollingInterval.underlying.toMillis // 30_000ms
     val upperBound =
-      Math.max(
+      Math.min(
         dsoRules.payload.svs.size().toLong * task_duration,
         polling_trigger_interval - task_duration,
       )
