@@ -64,7 +64,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
     sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger]
 
   // created by the expiry test
-  override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
+  override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
     codegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 

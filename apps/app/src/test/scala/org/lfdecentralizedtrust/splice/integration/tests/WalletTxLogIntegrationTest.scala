@@ -35,6 +35,7 @@ import org.slf4j.event.Level
 
 import scala.jdk.OptionConverters.*
 import monocle.macros.syntax.lens.*
+
 import java.math.RoundingMode
 import java.time.Duration
 import java.util.UUID
@@ -52,11 +53,11 @@ class WalletTxLogIntegrationTest
 
   private val amuletPrice = BigDecimal(0.75).setScale(10)
 
-  override lazy val updateHistoryIgnoredRootCreates = Seq(
+  override lazy val sanityChecksIgnoredRootCreates = Seq(
     amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
-  override lazy val updateHistoryIgnoredRootExercises = Seq(
+  override lazy val sanityChecksIgnoredRootExercises = Seq(
     (amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, "Archive")
   )
 

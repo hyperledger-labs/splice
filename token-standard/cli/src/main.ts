@@ -2,4 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createProgram } from "./cli";
 
-createProgram().parse();
+try {
+  createProgram().parse();
+} catch (e) {
+  console.error("Failed to run CLI", e);
+  throw e;
+}

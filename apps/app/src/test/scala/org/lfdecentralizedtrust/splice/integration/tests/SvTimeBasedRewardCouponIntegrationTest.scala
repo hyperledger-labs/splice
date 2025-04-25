@@ -29,6 +29,7 @@ import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import monocle.macros.syntax.lens.*
+import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.slf4j.event.Level
 
 import scala.math.Ordering.Implicits.*
@@ -39,6 +40,11 @@ class SvTimeBasedRewardCouponIntegrationTest
     with WalletTestUtil
     with WalletTxLogTestUtil
     with TriggerTestUtil {
+
+  // unvetting causes fallback to older version which doesn't implement token-standard.
+  override protected lazy val tokenStandardCliBehavior
+      : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
+    TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreAll
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
