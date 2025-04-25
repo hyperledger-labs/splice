@@ -45,26 +45,6 @@ class SynchronizerNodeReconciler(
   private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
 
-  private def setConfig(
-      synchronizerId: SynchronizerId,
-      rulesAndState: DsoRulesWithSvNodeState,
-      nodeConfig: SynchronizerNodeConfig,
-  )(implicit tc: TraceContext) = {
-    logger.info(show"Setting domain node config to $nodeConfig")
-    val cmd = rulesAndState.dsoRules.exercise(
-      _.exerciseDsoRules_SetSynchronizerNodeConfig(
-        svParty.toProtoPrimitive,
-        synchronizerId.toProtoPrimitive,
-        nodeConfig,
-        rulesAndState.svNodeState.contractId,
-      )
-    )
-    connection
-      .submit(Seq(svParty), Seq(dsoParty), cmd)
-      .noDedup
-      .yieldResult()
-  }
-
   def reconcileSynchronizerNodeConfigIfRequired(
       synchronizerNode: Option[SynchronizerNode],
       synchronizerId: SynchronizerId,
@@ -99,7 +79,7 @@ class SynchronizerNodeReconciler(
         case SynchronizerNodeState.Onboarding =>
           false
       }
-      supportsLegacySequencerConfig <- packageVersionSupport.supportsLegacySequencerConfig(
+      legacySequencerConfigFeatureSupport <- packageVersionSupport.supportsLegacySequencerConfig(
         Seq(
           dsoParty,
           svParty,
@@ -108,7 +88,7 @@ class SynchronizerNodeReconciler(
       )
 
       updatedSequencerConfigUpdate =
-        if (supportsLegacySequencerConfig)
+        if (legacySequencerConfigFeatureSupport.supported)
           updateLegacySequencerConfig(
             existingLegacySequencerConfig,
             existingSequencerConfig,
@@ -126,6 +106,27 @@ class SynchronizerNodeReconciler(
           shouldMarkSequencerAsOnboarded ||
           updatedSequencerConfigUpdate.isRight
         ) {
+          def setConfig(
+              synchronizerId: SynchronizerId,
+              rulesAndState: DsoRulesWithSvNodeState,
+              nodeConfig: SynchronizerNodeConfig,
+          )(implicit tc: TraceContext) = {
+            logger.info(show"Setting domain node config to $nodeConfig")
+            val cmd = rulesAndState.dsoRules.exercise(
+              _.exerciseDsoRules_SetSynchronizerNodeConfig(
+                svParty.toProtoPrimitive,
+                synchronizerId.toProtoPrimitive,
+                nodeConfig,
+                rulesAndState.svNodeState.contractId,
+              )
+            )
+            connection
+              .submit(Seq(svParty), Seq(dsoParty), cmd)
+              .withPrefferedPackage(legacySequencerConfigFeatureSupport.packageIds)
+              .noDedup
+              .yieldResult()
+          }
+
           val nodeConfig = new SynchronizerNodeConfig(
             synchronizerNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
             localSequencerConfig.map { c =>

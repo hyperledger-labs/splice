@@ -12,15 +12,26 @@ cd "${SPLICE_ROOT}"
 
 sha=$(git rev-parse HEAD)
 
-# Always use the release version on release branches. This only matters for the ciupgrade tests.
-branch=$(git rev-parse --abbrev-ref HEAD)
-if [[ $branch == release-line-* && -z ${OVERRIDE_VERSION-} ]]; then
-    OVERRIDE_VERSION="${branch#release-line-}"
-fi
-
 if [ -n "${OVERRIDE_VERSION-}" ]; then
     echo "${OVERRIDE_VERSION}"
     exit 0
+fi
+
+# Always use the release version on release branches.
+branch=$(git rev-parse --abbrev-ref HEAD)
+if [[ $branch =~ release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    echo "${branch#release-line-}"
+    exit 0
+fi
+# Similarly, use the release version on commits that are on a release branch, but not on main branch
+# (when checking out Splice as a submodule, we might be losing the branch information).
+sha=$(git rev-parse HEAD)
+if ! (git branch -r --contains "$sha" | grep -q "\borigin/main\b"); then
+    if [[ $(git branch -r --contains "$sha") =~ origin/release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        branch=$(git branch -r --contains "$sha" | grep -o 'origin/release-line-.*' | head -n 1)
+        echo "${branch#origin/release-line-}"
+        exit 0
+    fi
 fi
 
 set +e
