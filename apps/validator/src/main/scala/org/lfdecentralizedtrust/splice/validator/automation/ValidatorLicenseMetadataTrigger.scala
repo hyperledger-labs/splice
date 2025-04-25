@@ -22,6 +22,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -41,12 +42,13 @@ class ValidatorLicenseMetadataTrigger(
       tc: TraceContext
   ): Future[Seq[ValidatorLicenseMetadataTrigger.Task]] =
     for {
-      supportsValidatorLicenseMetadata <- packageVersionSupport.supportsValidatorLicenseMetadata(
-        Seq(validator, store.key.dsoParty),
-        now,
-      )
+      validatorLicenseMetadataFeatureSupport <- packageVersionSupport
+        .supportsValidatorLicenseMetadata(
+          Seq(validator, store.key.dsoParty),
+          now,
+        )
       tasks <-
-        if (supportsValidatorLicenseMetadata) {
+        if (validatorLicenseMetadataFeatureSupport.supported) {
           for {
             licenseO <- store
               .lookupValidatorLicenseWithOffset()
@@ -65,6 +67,7 @@ class ValidatorLicenseMetadataTrigger(
                   BuildInfo.compiledVersion,
                   contactPoint,
                   license,
+                  validatorLicenseMetadataFeatureSupport,
                 )
               )
           }
@@ -88,6 +91,7 @@ class ValidatorLicenseMetadataTrigger(
         ),
       )
       .noDedup
+      .withPrefferedPackage(task.work.featureSupport.packageIds)
       .yieldUnit()
       .map(_ =>
         TaskSuccess(
@@ -114,12 +118,14 @@ object ValidatorLicenseMetadataTrigger {
       targetVersion: String,
       targetContactPoint: String,
       existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
+      featureSupport: FeatureSupport,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
         param("targetVersion", _.targetVersion.doubleQuoted),
         param("targetContactPoint", _.targetContactPoint.doubleQuoted),
         param("existingLicense", _.existingLicense),
+        param("featureSupport", _.featureSupport),
       )
     }
   }

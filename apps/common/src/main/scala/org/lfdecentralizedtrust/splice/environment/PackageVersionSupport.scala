@@ -4,12 +4,16 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.ShowStringSyntax
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.daml.lf.language.Ast
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -18,19 +22,19 @@ trait PackageVersionSupport {
 
   def supportsValidatorLicenseMetadata(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_3)
   }
 
   def supportsValidatorLicenseActivity(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_3)
   }
 
   def supportsPruneAmuletConfigSchedule(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
@@ -41,7 +45,7 @@ trait PackageVersionSupport {
 
   def supportsMergeDuplicatedValidatorLicense(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
@@ -52,7 +56,7 @@ trait PackageVersionSupport {
 
   def supportsLegacySequencerConfig(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
@@ -63,13 +67,13 @@ trait PackageVersionSupport {
 
   def supportsValidatorLivenessActivityRecord(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_5)
   }
 
   def supportsDsoRulesCreateExternalPartyAmuletRules(parties: Seq[PartyId], now: CantonTimestamp)(
       implicit tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
@@ -80,7 +84,7 @@ trait PackageVersionSupport {
 
   def supportsNewGovernanceFlow(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[FeatureSupport] = {
     isDarSupported(
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
@@ -107,7 +111,7 @@ trait PackageVersionSupport {
       metadata: Ast.PackageMetadata,
   )(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[FeatureSupport]
 
 }
 
@@ -120,18 +124,28 @@ class AmuletRulesPackageVersionSupport private[environment] (amuletRules: HasAmu
       packageId: PackageIdResolver.Package,
       at: CantonTimestamp,
       metadata: Ast.PackageMetadata,
-  )(implicit tc: TraceContext): Future[Boolean] = {
+  )(implicit tc: TraceContext): Future[FeatureSupport] = {
     basedOnCurrentAmuletRules { amuletRules =>
       val packageVersion = metadata.version
       val packageConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(at).packageConfig
       val activeVersion = PackageIdResolver.readPackageVersion(packageConfig, packageId)
-      packageVersion >= activeVersion
+      val isSupported = packageVersion >= activeVersion
+      val activePackageId = DarResources
+        .lookupPackageMetadata(
+          metadata.name,
+          activeVersion,
+        )
+        .map(_.packageId)
+      FeatureSupport(
+        isSupported,
+        activePackageId.toList,
+      )
     }
   }
 
   private def basedOnCurrentAmuletRules(
-      condition: AmuletRules => Boolean
-  )(implicit tc: TraceContext): Future[Boolean] = {
+      condition: AmuletRules => FeatureSupport
+  )(implicit tc: TraceContext): Future[FeatureSupport] = {
     amuletRules.getAmuletRules().map(amuletRules => condition(amuletRules.payload))
   }
 
@@ -148,7 +162,7 @@ class TopologyAwarePackageVersionSupport private[environment] (
       packageId: PackageIdResolver.Package,
       at: CantonTimestamp,
       metadata: Ast.PackageMetadata,
-  )(implicit tc: TraceContext): Future[Boolean] = {
+  )(implicit tc: TraceContext): Future[FeatureSupport] = {
     connection
       .getSupportedPackageVersion(
         synchronizerId,
@@ -157,14 +171,37 @@ class TopologyAwarePackageVersionSupport private[environment] (
         at,
       )
       .map(
-        _.exists { packageReference =>
+        _.filter { packageReference =>
           PackageVersion.assertFromString(packageReference.packageVersion) >= metadata.version
         }
       )
+      .map { supportedPackages =>
+        supportedPackages.fold(FeatureSupport(supported = false, Seq.empty))(packageReference =>
+          FeatureSupport(
+            supported = true,
+            Seq(
+              packageReference.packageId
+            ),
+          )
+        )
+      }
   }
 }
 
 object PackageVersionSupport {
+
+  case class FeatureSupport(
+      supported: Boolean,
+      packageIds: Seq[String],
+  )
+
+  object FeatureSupport {
+
+    implicit val featureSupportPretty: Pretty[FeatureSupport] = prettyOfClass(
+      param("supported", t => t.supported),
+      param("prefferredPackageIds", _.packageIds.map(_.singleQuoted)),
+    )
+  }
 
   def createPackageVersionSupport(
       enableCantonPackageSelection: Boolean,
