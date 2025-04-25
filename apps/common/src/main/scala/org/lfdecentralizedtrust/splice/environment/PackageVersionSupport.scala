@@ -170,19 +170,13 @@ class TopologyAwarePackageVersionSupport private[environment] (
         packageId.packageName,
         at,
       )
-      .map(
-        _.filter { packageReference =>
+      .map { optionalPackageReference =>
+        val isFeatureSupported = optionalPackageReference.exists { packageReference =>
           PackageVersion.assertFromString(packageReference.packageVersion) >= metadata.version
         }
-      )
-      .map { supportedPackages =>
-        supportedPackages.fold(FeatureSupport(supported = false, Seq.empty))(packageReference =>
-          FeatureSupport(
-            supported = true,
-            Seq(
-              packageReference.packageId
-            ),
-          )
+        FeatureSupport(
+          supported = isFeatureSupported,
+          optionalPackageReference.map(_.packageId).toList,
         )
       }
   }
