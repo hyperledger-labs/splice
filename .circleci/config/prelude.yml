@@ -108,24 +108,11 @@ cluster-parameter: &cluster-parameter
   cluster:
     type: enum
     enum: [
-        "cimain",
-        "cidaily",
         "cilr",
-        "ciperiodic",
         "ciupgrade",
         "devnet",
         "mainnet",
-        "mainnet-old",
         "testnet",
-        "testnet-preview",
-        "observability",
-        "user-selected-scratchnet",
-        # The explicit scratchnets are currently only used by the reaper.
-        "scratchneta",
-        "scratchnetb",
-        "scratchnetc",
-        "scratchnetd",
-        "scratchnete",
         "token-std-dev",
         "none",
       ]
