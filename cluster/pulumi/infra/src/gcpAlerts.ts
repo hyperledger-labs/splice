@@ -112,7 +112,16 @@ ${conditionalString(
     'jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_REQUEST.*belongs to a replayed transaction"' +
     '))'
 )}
-`,
+${conditionalString(
+  !isMainNet && !isDevNet,
+  `-- TODO(#19192): suppressed faulty validator warnings until timestamp
+-(resource.labels.container_name="participant"
+  AND resource.labels.namespace_name="sv-1"
+  AND jsonPayload.message=~"ACS_COMMITMENT_MISMATCH"
+  AND jsonPayload.remote=~"sender = PAR::tw-cn-testnet-participant-1"
+  AND timestamp <= "2025-04-30T09:00:00.000Z")
+`
+)}`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
       namespace: 'EXTRACT(resource.labels.namespace_name)',
