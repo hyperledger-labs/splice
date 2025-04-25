@@ -96,7 +96,6 @@ spec:
                 }
         {{- else if eq .Values.sequencer.driver.type "cantonbft"}}
             # TODO(#15343) - use a different database for the bft storage
-            # TODO(#15343) - re-enable auth support once it's working in canton with external tls
             - name: ADDITIONAL_CONFIG_SEQUENCER_DRIVER_BFT
               value: |
                 canton.sequencers.sequencer.sequencer {
@@ -108,7 +107,7 @@ spec:
                     storage.config.properties.databaseName = ${?CANTON_SEQUENCER_POSTGRES_DB}
                     initial-network {
                       endpoint-authentication {
-                        enabled = false
+                        enabled = true
                       }
                       server-endpoint {
                         address="0.0.0.0"
