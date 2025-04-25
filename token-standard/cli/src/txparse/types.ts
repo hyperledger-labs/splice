@@ -9,44 +9,58 @@ export interface Transaction {
 }
 
 export const renderTransaction = (t: Transaction): any => {
-  return {...t, events: t.events.map(renderTransactionEvent)};
+  return { ...t, events: t.events.map(renderTransactionEvent) };
 };
 
 const renderTransactionEvent = (e: TokenStandardEvent): any => {
-  const lockedHoldingsChangeSummary = renderHoldingsChangeSummary(e.lockedHoldingsChangeSummary);
-  const unlockedHoldingsChangeSummary = renderHoldingsChangeSummary(e.unlockedHoldingsChangeSummary);
+  const lockedHoldingsChangeSummary = renderHoldingsChangeSummary(
+    e.lockedHoldingsChangeSummary,
+  );
+  const unlockedHoldingsChangeSummary = renderHoldingsChangeSummary(
+    e.unlockedHoldingsChangeSummary,
+  );
   const lockedHoldingsChange = renderHoldingsChange(e.lockedHoldingsChange);
   const unlockedHoldingsChange = renderHoldingsChange(e.unlockedHoldingsChange);
   return {
     label: e.label,
-    ...(lockedHoldingsChange && {lockedHoldingsChange}),
-    ...(unlockedHoldingsChange && {unlockedHoldingsChange}),
-    ...(lockedHoldingsChangeSummary && {lockedHoldingsChangeSummary}),
-    ...(unlockedHoldingsChangeSummary && {unlockedHoldingsChangeSummary}),
+    ...(lockedHoldingsChange && { lockedHoldingsChange }),
+    ...(unlockedHoldingsChange && { unlockedHoldingsChange }),
+    ...(lockedHoldingsChangeSummary && { lockedHoldingsChangeSummary }),
+    ...(unlockedHoldingsChangeSummary && { unlockedHoldingsChangeSummary }),
   };
 };
 
-const renderHoldingsChangeSummary = (s: HoldingsChangeSummary): Partial<HoldingsChangeSummary> | undefined => {
-  if (s.numInputs === 0 && s.numOutputs === 0 && s.inputAmount === "0" && s.outputAmount === "0" && s.amountChange === "0") {
+const renderHoldingsChangeSummary = (
+  s: HoldingsChangeSummary,
+): Partial<HoldingsChangeSummary> | undefined => {
+  if (
+    s.numInputs === 0 &&
+    s.numOutputs === 0 &&
+    s.inputAmount === "0" &&
+    s.outputAmount === "0" &&
+    s.amountChange === "0"
+  ) {
     return undefined;
   }
   return {
-    ...(s.numInputs !== 0 && {numInputs: s.numInputs}),
-    ...(s.inputAmount !== "0" && {inputAmount: s.inputAmount}),
-    ...(s.numOutputs !== 0 && {numOutputs: s.numOutputs}),
-    ...(s.outputAmount !== "0" && {outputAmount: s.outputAmount}),
-    ...(s.amountChange !== "0" && {amountChange: s.amountChange}),
+    ...(s.numInputs !== 0 && { numInputs: s.numInputs }),
+    ...(s.inputAmount !== "0" && { inputAmount: s.inputAmount }),
+    ...(s.numOutputs !== 0 && { numOutputs: s.numOutputs }),
+    ...(s.outputAmount !== "0" && { outputAmount: s.outputAmount }),
+    ...(s.amountChange !== "0" && { amountChange: s.amountChange }),
   };
 };
 
-const renderHoldingsChange = (c: HoldingsChange): Partial<HoldingsChange> | undefined => {
+const renderHoldingsChange = (
+  c: HoldingsChange,
+): Partial<HoldingsChange> | undefined => {
   if (c.creates.length === 0 && c.archives.length === 0) {
     return undefined;
   }
   return {
-    ...(c.creates.length !== 0 && {creates: c.creates}),
-    ...(c.archives.length !== 0 && {archives: c.archives}),
-  }
+    ...(c.creates.length !== 0 && { creates: c.creates }),
+    ...(c.archives.length !== 0 && { archives: c.archives }),
+  };
 };
 
 export interface TokenStandardEvent {
@@ -153,7 +167,7 @@ interface ExpireDust extends KnownLabel {
 }
 
 interface RawArchive extends BaseLabel {
-  type: "RawArchive";
+  type: "Archive";
   parentChoice: string;
   contractId: string;
   offset: number;
@@ -164,7 +178,7 @@ interface RawArchive extends BaseLabel {
   meta: any;
 }
 interface RawCreate extends BaseLabel {
-  type: "RawCreate";
+  type: "Create";
   parentChoice: string;
   contractId: string;
   offset: number;

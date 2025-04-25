@@ -17,7 +17,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       // to create SvRewardState contracts.
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
-  override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
+  override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
     SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 

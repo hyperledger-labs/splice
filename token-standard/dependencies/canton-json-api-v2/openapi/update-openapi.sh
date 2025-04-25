@@ -8,7 +8,7 @@ echo "and will fetch the openapi definition from there."
 echo "This should run on the Canton version AFTER updating."
 
 OPENAPI_DIR="${SPLICE_ROOT}/token-standard/dependencies/canton-json-api-v2/openapi"
-TARGET_FILE="openapi.yaml"
+TARGET_FILE="$OPENAPI_DIR/openapi.yaml"
 PATCH_FILE="${OPENAPI_DIR}/openapi.patch"
 
 if [ ! -f "$PATCH_FILE" ]; then

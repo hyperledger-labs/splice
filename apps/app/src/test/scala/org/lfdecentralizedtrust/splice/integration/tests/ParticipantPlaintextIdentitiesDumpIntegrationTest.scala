@@ -37,6 +37,9 @@ class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-plaintext-id-identity-dump.json")
 
+  // manual canton startup
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition
       .fromFiles(

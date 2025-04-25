@@ -55,6 +55,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     walletVersion = "0.1.7",
     walletPaymentsVersion = "0.1.7",
   )
+  // TODO(#16139): when using the latest version, this can be removed
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition

@@ -41,6 +41,8 @@ class SvFrontendIntegrationTest
     walletVersion = "0.1.7",
     walletPaymentsVersion = "0.1.7",
   )
+  // TODO(#16139): when using the latest version, this can be removed
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   private val splitwellDarPath = "daml/dars/splitwell-0.1.7.dar"
 

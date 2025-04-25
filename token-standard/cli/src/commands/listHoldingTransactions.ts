@@ -7,15 +7,22 @@ import {
 import { CommandOptions } from "../cli";
 import { TokenStandardTransactionInterfaces } from "../constants";
 import { TransactionParser } from "../txparse/parser";
+import { validateStrict } from "../txparse/strict";
 import { renderTransaction, Transaction } from "../txparse/types";
 import {
   DefaultApi as LedgerJsonApi,
   JsGetUpdatesResponse,
 } from "canton-json-api-v2-openapi";
+import fs from "fs";
 
 export async function listHoldingTransactions(
   partyId: string,
-  opts: CommandOptions & { afterOffset?: string }
+  opts: CommandOptions & {
+    afterOffset?: string;
+    debugPath?: string;
+    strict?: boolean;
+    strictIgnore?: string[];
+  },
 ): Promise<void> {
   try {
     const ledgerClient: LedgerJsonApi = createLedgerApiClient(opts);
@@ -30,54 +37,34 @@ export async function listHoldingTransactions(
             filtersByParty: filtersByParty(
               partyId,
               TokenStandardTransactionInterfaces,
-              true
+              true,
             ),
             verbose: false,
           },
-          transactionShape: {
-            TRANSACTION_SHAPE_LEDGER_EFFECTS: {},
-            unrecognizedValue: 0,
-          },
+          transactionShape: "TRANSACTION_SHAPE_LEDGER_EFFECTS",
         },
       },
       beginExclusive: afterOffset,
       verbose: false,
     });
-    const acs = (
-      await ledgerClient.postV2StateActiveContracts({
-        filter: {
-          filtersByParty: filtersByParty(
-            partyId,
-            TokenStandardTransactionInterfaces,
-            false
-          ),
-        },
-        verbose: false,
-        activeAtOffset: afterOffset,
-      })
-    ).map((c) => c.contractEntry.JsActiveContract.createdEvent.contractId);
-    console.log(
-      JSON.stringify(
-        await toPrettyTransactions(
-          updates,
-          partyId,
-          new Set(acs),
-          ledgerClient
-        ),
-        null,
-        2
-      )
-    );
+    if (opts.debugPath) {
+      fs.writeFileSync(opts.debugPath, JSON.stringify(updates, null, 2));
+    }
+    const result = await toPrettyTransactions(updates, partyId, ledgerClient);
+    if (opts.strict) {
+      validateStrict(result, opts.strictIgnore || []);
+    }
+    console.log(JSON.stringify(result, null, 2));
   } catch (err) {
     console.error("Failed to list holding transactions.", err);
+    throw err;
   }
 }
 
 async function toPrettyTransactions(
   updates: JsGetUpdatesResponse[],
   partyId: string,
-  mutatingHoldingsAcs: Set<string>,
-  ledgerClient: LedgerJsonApi
+  ledgerClient: LedgerJsonApi,
 ): Promise<PrettyTransactions> {
   const offsetCheckpoints: number[] = updates
     .filter((update) => update.update.OffsetCheckpoint)
@@ -93,20 +80,22 @@ async function toPrettyTransactions(
         const parser = new TransactionParser(tx, ledgerClient, partyId);
 
         return await parser.parseTransaction();
-      })
+      }),
   );
 
   return {
     // OffsetCheckpoint can be anywhere... or not at all, maybe
     nextOffset: Math.max(
       latestCheckpointOffset,
-      ...transactions.map((tx) => tx.offset)
+      ...transactions.map((tx) => tx.offset),
     ),
-    transactions: transactions.filter((tx) => tx.events.length > 0).map(renderTransaction),
+    transactions: transactions
+      .filter((tx) => tx.events.length > 0)
+      .map(renderTransaction),
   };
 }
 
-interface PrettyTransactions {
+export interface PrettyTransactions {
   transactions: Transaction[];
   nextOffset: number;
 }
