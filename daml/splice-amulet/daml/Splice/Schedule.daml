@@ -10,6 +10,7 @@ import DA.List (dedupSort, head)
 import Splice.Util
 import DA.Map()
 import qualified DA.Map as Map
+import DA.Time
 
 -- | A schedule of values that change over time.
 data Schedule t a = Schedule with
