@@ -135,12 +135,8 @@ export async function transfer(
           {
             signature: signed.signedHash,
             signedBy: signed.signedBy,
-            // `unrecognizedValue`s are forced because of openapi generation, but it's not required (nor does it break anything)
-            format: { SIGNATURE_FORMAT_RAW: {}, unrecognizedValue: 0 },
-            signingAlgorithmSpec: {
-              SIGNING_ALGORITHM_SPEC_ED25519: {},
-              unrecognizedValue: 0,
-            },
+            format: "SIGNATURE_FORMAT_RAW",
+            signingAlgorithmSpec: "SIGNING_ALGORITHM_SPEC_ED25519",
           },
         ],
       },
