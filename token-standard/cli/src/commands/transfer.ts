@@ -4,8 +4,8 @@ import {
   createLedgerApiClient,
   filtersByParty,
 } from "../apis/ledger-api-utils";
-import { CommandOptions } from "../cli";
 import { HoldingInterface } from "../constants";
+import { CommandOptions } from "../token-standard-cli";
 import {
   Command,
   DeduplicationPeriod2,
