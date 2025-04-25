@@ -10,18 +10,27 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  RetryFor,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 trait SvTaskBasedTrigger[T <: PrettyPrinting] {
   this: TaskbasedTrigger[T] =>
+
+  override final val retryForAutomation: RetryFor =
+    RetryFor.Automation.copy(initialDelay = 1.seconds) // ideally should be n * t
+
   protected implicit def ec: ExecutionContext
 
   protected def svTaskContext: SvTaskBasedTrigger.Context
@@ -53,20 +62,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
             // TODO(#17956): remove delegate-based automation
             completeTaskAsDsoDelegate(task, dsoDelegate)
           } else if (svTaskContext.delegatelessAutomation && supportsSvController) {
-            val task_duration = 1_000L
-            val polling_trigger_interval = 30_000L
-            val upperBound =
-              Math.max(dsoRules.payload.svs.size().toLong * task_duration, polling_trigger_interval)
-            val delay = Random.nextLong(upperBound)
-            Threading.sleep(delay)
-            isStaleTask(task).flatMap {
-              case true =>
-                Future.successful(
-                  TaskSuccess("Skipping because task is already completed")
-                )
-              case false =>
-                completeTaskAsDsoDelegate(task, svParty)
-            }
+            completeTaskAsAnySv(task, svParty, dsoRules)
           } else {
             monitorTaskAsFollower(task)
           }
@@ -83,6 +79,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
 
   /** Handle delegate failure by voting for a new delegate
     */
+  // TODO(#17959): remove delegate election
   final protected def voteForNewDsoDelegate(
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       currentLeader: String,
@@ -138,6 +135,32 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
         }
       }
     } yield retVal
+  }
+
+  private def completeTaskAsAnySv(
+      task: T,
+      svParty: String,
+      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val task_duration = RetryFor.Automation.initialDelay.toMillis // 200ms
+    val polling_trigger_interval = context.config.pollingInterval.underlying.toMillis // 30_000ms
+    val upperBound =
+      Math.max(
+        dsoRules.payload.svs.size().toLong * task_duration,
+        polling_trigger_interval - task_duration,
+      )
+    val delay = Random.nextLong(upperBound)
+    Threading.sleep(delay)
+    isStaleTask(task).flatMap {
+      case true =>
+        Future.successful(
+          TaskSuccess(
+            s"Skipping because task is already completed after waiting a delay of $delay ms"
+          )
+        )
+      case false =>
+        completeTaskAsDsoDelegate(task, svParty)
+    }
   }
 
   protected def completeTaskAsDsoDelegate(

@@ -38,6 +38,8 @@ abstract class TaskbasedTrigger[T: Pretty](
     "trigger_type" -> "taskbased",
   ).withExtraLabels(extraMetricLabels*)
 
+  protected val retryForAutomation: RetryFor = RetryFor.Automation
+
   /** How to complete a task.
     *
     * This MUST take all the actions necessary such that 'isStaleTask' returns true after successful completion.
@@ -92,7 +94,7 @@ abstract class TaskbasedTrigger[T: Pretty](
         .flatMap(_ =>
           context.retryProvider
             .retry(
-              RetryFor.Automation,
+              retryForAutomation,
               "processTaskWithRetry",
               "processTaskWithRetry",
               // If the trigger is currently disabled, then this is delaying the retry until the trigger is enabled again.
