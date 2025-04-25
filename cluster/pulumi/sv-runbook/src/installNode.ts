@@ -206,7 +206,6 @@ async function installSvAndValidator(
     onboardingName,
     validatorWalletUserName,
     disableOnboardingParticipantPromotionDelay,
-    loopback,
     cometBftGovernanceKey,
   } = config;
 
@@ -225,14 +224,10 @@ async function installSvAndValidator(
     auth0Client,
     svUiClientId
   );
-  const svKeySecret_ = svKeySecret(xns, svKey);
-  const canton = installCanton(
-    xns,
-    auth0Client,
-    onboardingName,
-    decentralizedSynchronizerMigrationConfig,
-    imagePullDeps.concat([svKeySecret_, svAppSecret]).concat(loopback ? [loopback] : [])
-  );
+
+  svKeySecret(xns, svKey);
+
+  const canton = installCanton(onboardingName, decentralizedSynchronizerMigrationConfig);
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 

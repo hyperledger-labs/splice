@@ -7,7 +7,6 @@ validator1:
 synchronizerMigration:
   archived:
     - id: 1
-      provider: external
       version: 0.3.17
       releaseReference:
         gitReference: "refs/heads/release-line-0.3.17"
@@ -17,7 +16,6 @@ synchronizerMigration:
         deploymentDir: "cluster/deployment"
         spliceRoot: "."
     - id: 2
-      provider: external
       version: 0.3.19
       releaseReference:
         gitReference: "refs/heads/release-line-0.3.19"
@@ -28,7 +26,6 @@ synchronizerMigration:
         spliceRoot: "."
   active:
     id: 3
-    provider: external
     version: 0.3.20
     releaseReference:
       gitReference: "refs/heads/release-line-0.3.20"

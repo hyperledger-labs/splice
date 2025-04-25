@@ -31,7 +31,6 @@ sv:
 synchronizerMigration:
   archived:
   - id: 4
-    provider: external
     version: "0.3.21"
     releaseReference:
       gitReference: "refs/tags/cilr-3.2"
@@ -42,7 +41,6 @@ synchronizerMigration:
       spliceRoot: "."
   active:
     id: 5
-    provider: external
     version: "0.4.0-snapshot.20250424.9146.0.v5142d2e3"
     releaseReference:
       gitReference: "refs/tags/cilr"

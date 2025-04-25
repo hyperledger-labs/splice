@@ -9,21 +9,16 @@ import {
   SpliceCustomResourceOptions,
   withAddedDependencies,
 } from 'splice-pulumi-common';
-import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
-
 import {
-  DecentralizedSynchronizerNode,
+  InstalledMigrationSpecificSv,
+  installSvParticipant,
+  StaticCometBftConfigWithNodeName,
+} from 'splice-pulumi-common-sv';
+import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
+import {
   InStackCantonBftDecentralizedSynchronizerNode,
   InStackCometBftDecentralizedSynchronizerNode,
-  StaticCometBftConfigWithNodeName,
-  SvParticipant,
-} from './index';
-import { installSvParticipant } from './participant';
-
-export type InstalledMigrationSpecificSv = {
-  decentralizedSynchronizer: DecentralizedSynchronizerNode;
-  participant: SvParticipant;
-};
+} from 'sv-canton-pulumi-deployment/src/decentralizedSynchronizerNode';
 
 export function installCantonComponents(
   xns: ExactNamespace,

@@ -13,7 +13,7 @@ import {
 
 async function main() {
   await initDumpConfig();
-  const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
+  const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
   /**
    * Ideally we would've outputted every migration to it's own json object (or even better, it's own file).
    * But we seem to have no control over when is the whole output written, as it's fully async so there's no easy way to manage the json output.

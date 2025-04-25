@@ -55,7 +55,7 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
-import { installCanton } from './canton';
+import { buildCrossStackCantonDependencies } from './canton';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -214,10 +214,8 @@ export async function installSvNode(
   const appsPostgres =
     defaultPostgres ||
     postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true);
-  const canton = installCanton(
-    xns,
+  const canton = buildCrossStackCantonDependencies(
     decentralizedSynchronizerUpgradeConfig,
-    defaultPostgres,
     {
       name: config.nodeName,
       onboardingName: config.onboardingName,
@@ -226,8 +224,7 @@ export async function installSvNode(
         self: { ...config.cometBft, nodeName: config.nodeName },
       },
     },
-    config,
-    imagePullDeps
+    config
   );
 
   const svApp = installSvApp(

@@ -167,7 +167,6 @@ function subcmd_disaster_recovery_test() {
   migration_config=$(cat <<EOF
   upgrade:
     id: 1
-    provider: internal
 EOF
   )
   _update_cluster_config "$migration_config" "synchronizerMigration"
@@ -179,7 +178,6 @@ EOF
   migration_config=$(cat <<EOF
   active:
     id: 1
-    provider: internal
     migratingFrom: 0
 EOF
   )

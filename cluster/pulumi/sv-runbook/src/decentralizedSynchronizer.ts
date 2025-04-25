@@ -1,30 +1,18 @@
-import { Output, Resource } from '@pulumi/pulumi';
-import {
-  Auth0Client,
-  CnInput,
-  DecentralizedSynchronizerMigrationConfig,
-  ExactNamespace,
-} from 'splice-pulumi-common';
+import { Output } from '@pulumi/pulumi';
+import { DecentralizedSynchronizerMigrationConfig } from 'splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CrossStackCometBftDecentralizedSynchronizerNode,
   CrossStackDecentralizedSynchronizerNode,
-  installCantonComponents,
   InstalledMigrationSpecificSv,
   sv1Config,
   svRunbookConfig,
 } from 'splice-pulumi-common-sv';
 
-import { installPostgres } from './postgres';
-
 export function installCanton(
-  svNamespace: ExactNamespace,
-  auth0Client: Auth0Client,
   onboardingName: string,
-  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-  dependencies: CnInput<Resource>[]
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig
 ): InstalledMigrationSpecificSv {
-  const migrationsContainedInStack = decentralizedSynchronizerMigrationConfig.allInternalMigrations;
   const activeMigrationId = decentralizedSynchronizerMigrationConfig.active.id;
   const nodeConfigs = {
     self: {
@@ -37,7 +25,7 @@ export function installCanton(
     },
     peers: [],
   };
-  const externalActiveMigration = {
+  return {
     decentralizedSynchronizer: decentralizedSynchronizerMigrationConfig.active.sequencer
       .enableBftSequencer
       ? new CrossStackDecentralizedSynchronizerNode(activeMigrationId, svRunbookConfig.ingressName)
@@ -51,67 +39,4 @@ export function installCanton(
       internalClusterAddress: Output.create(`participant-${activeMigrationId}`),
     },
   };
-  if (migrationsContainedInStack.length > 0) {
-    const participantPg = installPostgres(
-      svNamespace,
-      `participant-pg`,
-      'participant-pg-secret',
-      'postgres-values-participant.yaml',
-      decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
-    );
-
-    const sequencerPg = installPostgres(
-      svNamespace,
-      `sequencer-pg`,
-      'sequencer-pg-secret',
-      'postgres-values-sequencer.yaml',
-      decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
-    );
-    const mediatorPg = installPostgres(
-      svNamespace,
-      `mediator-pg`,
-      'mediator-pg-secret',
-      'postgres-values-mediator.yaml',
-      decentralizedSynchronizerMigrationConfig.hasInternalRunningMigration
-    );
-
-    // TODO(#16751) "internal" migrations are likely broken at this point; let's remove them
-    const installedMigrations = migrationsContainedInStack.map(migration => {
-      return {
-        migration,
-        canton: installCantonComponents(
-          svNamespace,
-          migration.id,
-          auth0Client,
-          {
-            onboardingName,
-            ingressName: svRunbookConfig.ingressName,
-            // TODO(#16751) The hardcoding is not nice but we're getting rid of this code path anyway
-            auth0SvAppName: 'sv',
-            isFirstSv: false,
-            isCoreSv: false,
-          },
-          decentralizedSynchronizerMigrationConfig,
-          {
-            nodeConfigs: nodeConfigs,
-          },
-          {
-            participant: participantPg,
-            mediator: mediatorPg,
-            sequencer: sequencerPg,
-          },
-          {
-            dependsOn: dependencies,
-          }
-        ),
-      };
-    });
-    return (
-      installedMigrations.find(({ migration }) => {
-        return migration.id === activeMigrationId;
-      })?.canton || externalActiveMigration
-    );
-  } else {
-    return externalActiveMigration;
-  }
 }

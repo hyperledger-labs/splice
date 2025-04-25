@@ -1,7 +1,6 @@
 synchronizerMigration:
   active:
     id: 0
-    provider: external
     version: 0.2.8
     releaseReference:
       gitReference: "refs/heads/release-line-0.2.8"

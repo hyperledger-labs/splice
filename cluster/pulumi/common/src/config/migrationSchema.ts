@@ -5,15 +5,9 @@ import { z } from 'zod';
 import { CHARTS_VERSION, CnChartVersion, parsedVersion } from '../artifacts';
 import { spliceEnvConfig } from './envConfig';
 
-export enum MigrationProvider {
-  INTERNAL = 'internal',
-  EXTERNAL = 'external',
-}
-
 export const defaultActiveMigration = {
   id: 0,
   version: CHARTS_VERSION,
-  provider: MigrationProvider.EXTERNAL,
   sequencer: {
     enableBftSequencer: false,
   },
@@ -50,7 +44,6 @@ export const MigrationInfoSchema = z
       .lt(10, 'Migration id must be less than or equal to 10 as we use in the cometbft ports.')
       .gte(0),
     version: migrationVersion,
-    provider: z.nativeEnum(MigrationProvider).default(MigrationProvider.EXTERNAL),
     releaseReference: GitReferenceSchema.optional(),
     sequencer: z
       .object({
@@ -60,13 +53,9 @@ export const MigrationInfoSchema = z
   })
   .strict();
 
-const NonActiveMigrationSchema = MigrationInfoSchema.refine(info => {
-  return info.provider === MigrationProvider.EXTERNAL || info.releaseReference === undefined;
-}, 'For internal migrations an external reference cannot be provided, the active reference is used.').optional();
-
 export const SynchronizerMigrationSchema = z
   .object({
-    legacy: NonActiveMigrationSchema,
+    legacy: MigrationInfoSchema.optional(),
     active: MigrationInfoSchema.extend({
       migratingFrom: z.number().optional(),
       version: migrationVersion.transform((version, ctx) => {
@@ -84,7 +73,7 @@ export const SynchronizerMigrationSchema = z
     })
       .strict()
       .default(defaultActiveMigration),
-    upgrade: NonActiveMigrationSchema,
+    upgrade: MigrationInfoSchema.optional(),
     archived: z.array(MigrationInfoSchema).optional(),
     activeDatabaseId: z.number().optional(),
   })

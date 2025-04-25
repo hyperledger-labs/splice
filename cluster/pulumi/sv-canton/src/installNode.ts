@@ -8,12 +8,13 @@ import {
 } from 'splice-pulumi-common';
 import {
   coreSvsToDeploy,
-  installCantonComponents,
   InstalledMigrationSpecificSv,
   sv1Config,
   svConfigs,
   svRunbookConfig,
 } from 'splice-pulumi-common-sv';
+
+import { installCantonComponents } from './canton';
 
 export function installNode(
   migrationId: DomainMigrationIndex,

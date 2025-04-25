@@ -1,5 +1,4 @@
 import * as automation from '@pulumi/pulumi/automation';
-import { MigrationProvider } from 'splice-pulumi-common';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
 import { DeploySvRunbook, isDevNet } from 'splice-pulumi-common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
@@ -41,7 +40,7 @@ export async function stackForMigration(
   );
 }
 
-const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
+const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
 const coreSvs = Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`);
 export const svsToDeploy = coreSvs.concat(DeploySvRunbook ? ['sv'] : []);
 
@@ -87,7 +86,6 @@ export function runSvCantonForSvs<T>(
         return {
           id: id,
           version: activeVersion,
-          provider: MigrationProvider.EXTERNAL,
           // This doesn't actually matter, this is only used for down/refresh.
           sequencer: { enableBftSequencer: false },
         };
@@ -98,6 +96,7 @@ export function runSvCantonForSvs<T>(
       console.error(`Adding operation for migration ${migration.id} and sv ${sv}`);
       return {
         name: `${operation}-canton-M${migration.id}-${sv}`,
+        // eslint-disable-next-line promise/prefer-await-to-then
         promise: stackForMigration(sv, migration.id, requiresExistingStack).then(stack => {
           return runForStack(stack, migration, sv);
         }),

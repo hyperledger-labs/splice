@@ -5,7 +5,6 @@ infra:
 synchronizerMigration:
   active:
     id: 0
-    provider: external
     version: 0.4.0-snapshot.20250423.9136.0.v130d2648
     releaseReference:
       gitReference: "refs/tags/token-std-devnet"

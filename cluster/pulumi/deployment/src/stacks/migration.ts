@@ -13,7 +13,7 @@ import {
 import { createStackCR, EnvRefs } from 'splice-pulumi-common/src/operator/stack';
 
 export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
-  const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
+  const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
   return migrations
     .filter(migration => !migration.releaseReference)
     .map(migration =>
@@ -28,7 +28,7 @@ export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
 }
 
 export function installMigrationSpecificStacks(mainReference: GitFluxRef, envRefs: EnvRefs): void {
-  const migrations = DecentralizedSynchronizerUpgradeConfig.allExternalMigrations;
+  const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
   migrations.forEach(migration => {
     const reference = migration.releaseReference
       ? gitRepoForRef(

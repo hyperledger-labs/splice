@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { spliceConfig } from './config/config';
 import { Config } from './config/configSchema';
-import { MigrationInfoSchema, MigrationProvider } from './config/migrationSchema';
+import { MigrationInfoSchema } from './config/migrationSchema';
 
 export class DecentralizedSynchronizerMigrationConfig {
   // the current running migration, to which the ingresses point, and it's expected to be the active CN network
@@ -55,28 +55,12 @@ export class DecentralizedSynchronizerMigrationConfig {
     };
   }
 
-  get allExternalMigrations(): MigrationInfo[] {
-    return this.runningMigrations()
-      .concat(this.archived)
-      .filter(migration => migration.provider === MigrationProvider.EXTERNAL);
-  }
-
-  get allInternalMigrations(): MigrationInfo[] {
-    return this.runningMigrations()
-      .concat(this.archived)
-      .filter(migration => migration.provider === MigrationProvider.INTERNAL);
-  }
-
   get allMigrations(): MigrationInfo[] {
     return this.runningMigrations().concat(this.archived);
   }
 
   get highestMigrationId(): DomainMigrationIndex {
     return Math.max(...this.allMigrations.map(m => m.id));
-  }
-
-  get hasInternalRunningMigration(): boolean {
-    return this.allInternalMigrations.some(migration => this.isStillRunning(migration.id));
   }
 }
 
