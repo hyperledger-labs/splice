@@ -6,6 +6,7 @@ module Splice.Amulet where
 
 import Prelude
 import DA.Action (void)
+import DA.Assert
 import DA.Map as Map
 import DA.TextMap as TextMap
 import DA.Optional (fromOptional)

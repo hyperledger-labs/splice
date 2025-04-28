@@ -6,6 +6,7 @@ module Splice.AmuletRules where
 import Prelude hiding (forA)
 
 import DA.Action (when, void, foldlA)
+import DA.Assert
 import DA.Exception
 import DA.Foldable (forA_)
 import DA.List (dedupSort)

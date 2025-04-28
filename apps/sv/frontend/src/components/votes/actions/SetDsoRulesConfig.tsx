@@ -37,6 +37,7 @@ const SetDsoRulesConfig: React.FC<{
     undefined
   );
 
+  // This format should only be used when working with a datetime already in utc
   const dateFormat = 'YYYY-MM-DDTHH:mm:ss[Z]';
   const defaultNextScheduledSynchronizerUpgrade = {
     time: dayjs.utc().add(3, 'day').format(dateFormat),
@@ -70,7 +71,7 @@ const SetDsoRulesConfig: React.FC<{
     newConfig: DsoRulesConfig,
     baseConfig: DsoRulesConfig | null
   ) => {
-    const scheduledDateTime = dayjs(scheduledDate, dateFormat, true);
+    const scheduledDateTime = dayjs.utc(scheduledDate, dateFormat, true);
     const isFormatValid = scheduledDateTime.isValid();
     const isValidAgainstEffectivity = isEffective ? effectivity.isBefore(scheduledDateTime) : true;
     const isValidAgainstExpiration = expiration.isBefore(scheduledDateTime);
@@ -101,8 +102,9 @@ const SetDsoRulesConfig: React.FC<{
         setNextScheduledSynchronizerUpgrade(upgradeConfig);
       }
     }
+
     if (configuration && configuration.nextScheduledSynchronizerUpgrade) {
-      const nextScheduledUpgrade = dayjs(nextScheduledSynchronizerUpgrade.time);
+      const nextScheduledUpgrade = dayjs.utc(nextScheduledSynchronizerUpgrade.time);
       expiration.isBefore(nextScheduledUpgrade)
         ? setIsValidSynchronizerPauseTime(true)
         : setIsValidSynchronizerPauseTime(false);
@@ -132,35 +134,26 @@ const SetDsoRulesConfig: React.FC<{
       const baseConfig = supportsVoteEffectivityAndSetConfig
         ? dsoInfosQuery.data?.dsoRules.payload.config || null
         : null;
-      if (
-        !scheduled ||
-        (typeof scheduled === 'object' &&
-          isScheduledDateValid((scheduled as JSONObject).time as string, newConfig, baseConfig))
-      ) {
-        setIsValidSynchronizerPauseTime(true);
-        chooseAction({
-          tag: 'ARC_DsoRules',
-          value: {
-            dsoAction: {
-              tag: 'SRARC_SetConfig',
-              value: {
-                newConfig: newConfig,
-                baseConfig: baseConfig,
-              },
+
+      chooseAction({
+        tag: 'ARC_DsoRules',
+        value: {
+          dsoAction: {
+            tag: 'SRARC_SetConfig',
+            value: {
+              newConfig: newConfig,
+              baseConfig: baseConfig,
             },
           },
-        });
-      } else {
-        setIsValidSynchronizerPauseTime(false);
-        chooseAction({
-          formError: {
-            kind: 'DecoderError',
-            input: '',
-            at: '',
-            message: 'Invalid date format of nextScheduledSynchronizerUpgrade',
-          },
-        });
-      }
+        },
+      });
+
+      const isValidSynchronizerPauseTime =
+        !scheduled ||
+        (typeof scheduled === 'object' &&
+          isScheduledDateValid((scheduled as JSONObject).time as string, newConfig, baseConfig));
+
+      setIsValidSynchronizerPauseTime(isValidSynchronizerPauseTime);
     } else {
       chooseAction({ formError: decoded.error });
     }

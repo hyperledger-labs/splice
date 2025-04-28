@@ -16,6 +16,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   WildcardFilter,
 }
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent
 import com.digitalasset.canton.http.json.v2.{
   JsContractEntry,
@@ -254,12 +255,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             },
           )
           actAndCheck(
-            "Bob accepts transfer instruction #1",
-            acceptTransferInstruction(
-              bobValidatorBackend.participantClientWithAdminToken,
-              bob,
-              bobInstructionCids(0),
-            ),
+            "Bob accepts transfer instruction #1", {
+              val now = env.environment.clock.now
+              acceptTransferInstruction(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+                bobInstructionCids(0),
+                // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
+                // so the lower bound is 1min in the past.
+                expectedTimeBounds = Some((now.minusSeconds(60), now.plusSeconds(60).addMicros(-1))),
+              )
+            },
           )(
             "Bob sees the funds",
             _ =>
@@ -273,6 +279,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
                 bobInstructionCids(1),
+                expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
               )
               withdrawTransferInstruction(
                 aliceValidatorBackend.participantClientWithAdminToken,
@@ -309,12 +316,14 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val (_, aliceInstructionCids) = actAndCheck(
               "Bob creates 4 transfers to Alice who has no longer a pre-approval",
               for (_ <- 1 to 4) {
+                val now = env.environment.clock.now
                 executeTransferViaTokenStandard(
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob,
                   alice.partyId,
                   BigDecimal("200.0"),
                   transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                  expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
                 )
               },
             )(
@@ -352,6 +361,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                     bobValidatorBackend.participantClientWithAdminToken,
                     bob,
                     aliceInstructionCids(2),
+                    expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
                   )
                 }
               },
@@ -369,14 +379,17 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
           // Test self-transfer for party w/o pre-approval
           actAndCheck(
-            "Bob splits his holdings into two using a self-transfer",
-            executeTransferViaTokenStandard(
-              bobValidatorBackend.participantClientWithAdminToken,
-              bob,
-              bob.partyId,
-              BigDecimal("250.0"),
-              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
-            ),
+            "Bob splits his holdings into two using a self-transfer", {
+              val now = env.environment.clock.now
+              executeTransferViaTokenStandard(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bob,
+                bob.partyId,
+                BigDecimal("250.0"),
+                transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
+                expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
+              )
+            },
           )(
             "Bob's has three holdings and the balance remained the same (modulo fees)",
             _ => {
@@ -445,10 +458,14 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           }
           actAndCheck(
             "Bob rejects instruction #4, whose backing amulet has already been archived", {
+              val now = env.environment.clock.now
               rejectTransferInstruction(
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
                 instrAboutToExpire,
+                // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
+                // so the lower bound is 1min in the past.
+                expectedTimeBounds = Some((now.minusSeconds(60), CantonTimestamp.MaxValue)),
               )
             },
           )(

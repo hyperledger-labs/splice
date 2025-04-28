@@ -4,8 +4,8 @@ import {
   createLedgerApiClient,
   filtersByParty,
 } from "../apis/ledger-api-utils";
-import { CommandOptions } from "../cli";
 import { TokenStandardTransactionInterfaces } from "../constants";
+import { CommandOptions } from "../token-standard-cli";
 import { TransactionParser } from "../txparse/parser";
 import { validateStrict } from "../txparse/strict";
 import { renderTransaction, Transaction } from "../txparse/types";

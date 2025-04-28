@@ -328,34 +328,33 @@ class TokenStandardAllocationIntegrationTest
         },
       )(
         "There exists an OTCTrade visible as an allocation request to Alice and Bob",
-        _ => {
-          val trade =
-            splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .awaitJava(tradingapp.OTCTrade.COMPANION)(
-                venueParty
+        _ =>
+          suppressFailedClues(loggerFactory) {
+            val trade =
+              splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                .awaitJava(tradingapp.OTCTrade.COMPANION)(
+                  venueParty
+                )
+            val aliceRequest = clue("Alice sees the allocation request") {
+              val requests = listAllocationRequests(
+                aliceValidatorBackend.participantClientWithAdminToken,
+                aliceParty,
               )
-          val aliceRequest = clue("Alice sees the allocation request") {
-            val requests = listAllocationRequests(
-              aliceValidatorBackend.participantClientWithAdminToken,
-              aliceParty,
-            )
-            requests should have size (1)
-            val request = requests.head
-            request.transferLegs.asScala should have size (2)
-            request
-          }
-          val bobRequest = clue("Bob sees the allocation request") {
-            val requests = listAllocationRequests(
-              bobValidatorBackend.participantClientWithAdminToken,
-              bobParty,
-            )
-            requests should have size (1)
-            val request = requests.head
-            request.transferLegs.asScala should have size (2)
-            request
-          }
-          (trade, aliceRequest, bobRequest)
-        },
+              val request = requests.loneElement
+              request.transferLegs.asScala should have size (2)
+              request
+            }
+            val bobRequest = clue("Bob sees the allocation request") {
+              val requests = listAllocationRequests(
+                bobValidatorBackend.participantClientWithAdminToken,
+                bobParty,
+              )
+              val request = requests.loneElement
+              request.transferLegs.asScala should have size (2)
+              request
+            }
+            (trade, aliceRequest, bobRequest)
+          },
       )
 
     val (aliceAllocationId, _) =
@@ -441,32 +440,33 @@ class TokenStandardAllocationIntegrationTest
       },
     )(
       "Alice and Bob's balance reflect the trade",
-      _ => {
-        clue("Check alice's balance") {
-          checkBalance(
-            aliceWalletClient,
-            expectedRound = None,
-            expectedUnlockedQtyRange = (
-              tapAmount - aliceTransferAmount + bobTransferAmount - feesUpperBound,
-              tapAmount - aliceTransferAmount + bobTransferAmount,
-            ),
-            expectedLockedQtyRange = (0.0, 0.0),
-            expectedHoldingFeeRange = holdingFeesBound,
-          )
-        }
-        clue("Check bob's balance") {
-          checkBalance(
-            bobWalletClient,
-            expectedRound = None,
-            expectedUnlockedQtyRange = (
-              tapAmount + aliceTransferAmount - bobTransferAmount - feesUpperBound,
-              tapAmount + aliceTransferAmount - bobTransferAmount,
-            ),
-            expectedLockedQtyRange = (0.0, 0.0),
-            expectedHoldingFeeRange = holdingFeesBound,
-          )
-        }
-      },
+      _ =>
+        suppressFailedClues(loggerFactory) {
+          clue("Check alice's balance") {
+            checkBalance(
+              aliceWalletClient,
+              expectedRound = None,
+              expectedUnlockedQtyRange = (
+                tapAmount - aliceTransferAmount + bobTransferAmount - feesUpperBound,
+                tapAmount - aliceTransferAmount + bobTransferAmount,
+              ),
+              expectedLockedQtyRange = (0.0, 0.0),
+              expectedHoldingFeeRange = holdingFeesBound,
+            )
+          }
+          clue("Check bob's balance") {
+            checkBalance(
+              bobWalletClient,
+              expectedRound = None,
+              expectedUnlockedQtyRange = (
+                tapAmount + aliceTransferAmount - bobTransferAmount - feesUpperBound,
+                tapAmount + aliceTransferAmount - bobTransferAmount,
+              ),
+              expectedLockedQtyRange = (0.0, 0.0),
+              expectedHoldingFeeRange = holdingFeesBound,
+            )
+          }
+        },
     )
   }
 }
