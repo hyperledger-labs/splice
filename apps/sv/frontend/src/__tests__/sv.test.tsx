@@ -102,9 +102,12 @@ describe('An SetConfig request', () => {
       await user.type(input, '481516');
       expect(await screen.findByDisplayValue('481516')).toBeDefined();
 
-      const input2 = screen.getByTestId('create-reason-summary');
-      await user.type(input2, 'summaryABC');
+      const summaryInput = screen.getByTestId('create-reason-summary');
+      await user.type(summaryInput, 'summaryABC');
       expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const urlInput = screen.getByTestId('create-reason-url');
+      await user.type(urlInput, 'https://vote-request.url');
 
       const warning = screen.getByTestId('voterequest-creation-alert');
       expect(warning).toBeDefined();
@@ -143,6 +146,9 @@ describe('An SetConfig request', () => {
       const input2 = screen.getByTestId('create-reason-summary');
       await user.type(input2, 'summaryABC');
       expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const urlInput = screen.getByTestId('create-reason-url');
+      await user.type(urlInput, 'https://vote-request.url');
 
       const warning = screen.getByTestId('voterequest-creation-alert');
       expect(warning).toBeDefined();
@@ -187,6 +193,9 @@ describe('An SetConfig request', () => {
       const input2 = screen.getByTestId('create-reason-summary');
       await user.type(input2, 'summaryABC');
       expect(await screen.findByDisplayValue('summaryABC')).toBeDefined();
+
+      const urlInput = screen.getByTestId('create-reason-url');
+      await user.type(urlInput, 'https://vote-request.url');
 
       expect(await screen.findByText('Send Request to Super Validators')).toBeDefined();
       await user.click(screen.getByText('Send Request to Super Validators'));
