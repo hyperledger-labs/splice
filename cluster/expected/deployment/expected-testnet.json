@@ -245,7 +245,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"
@@ -305,7 +305,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"
@@ -473,7 +473,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"
@@ -512,7 +512,7 @@
         "interval": "5m",
         "recurseSubmodules": true,
         "ref": {
-          "name": "refs/heads/release-line-0.3.20"
+          "name": "refs/heads/release-line-0.3.21"
         },
         "secretRef": {
           "name": "github"

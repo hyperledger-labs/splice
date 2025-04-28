@@ -26,9 +26,9 @@ synchronizerMigration:
         spliceRoot: "."
   active:
     id: 3
-    version: 0.3.20
+    version: 0.3.21
     releaseReference:
-      gitReference: "refs/heads/release-line-0.3.20"
+      gitReference: "refs/heads/release-line-0.3.21"
       repoUrl: https://github.com/DACH-NY/canton-network-node
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "cluster/pulumi"
