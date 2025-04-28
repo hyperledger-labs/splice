@@ -4,9 +4,9 @@ infra:
 synchronizerMigration:
   active:
     id: 2
-    version: 0.3.19
+    version: 0.3.20
     releaseReference:
-      gitReference: "refs/heads/release-line-0.3.19"
+      gitReference: "refs/heads/release-line-0.3.20"
       repoUrl: https://github.com/DACH-NY/canton-network-node
       pulumiStacksDir: "cluster/stacks/prod"
       pulumiBaseDir: "cluster/pulumi"

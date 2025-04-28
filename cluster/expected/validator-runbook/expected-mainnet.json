@@ -85,7 +85,7 @@
         ],
         "withSvIngress": false
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "cluster-ingress-validator",
     "provider": "",
@@ -205,7 +205,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "loopback",
     "provider": "",
@@ -392,7 +392,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator-participant-2",
     "provider": "",
@@ -466,7 +466,7 @@
           }
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator-postgres",
     "provider": "",
@@ -579,7 +579,7 @@
           "auth0|6526fab5214c99a9a8e1e3cc"
         ]
       },
-      "version": "0.3.19"
+      "version": "0.3.20"
     },
     "name": "validator",
     "provider": "",
