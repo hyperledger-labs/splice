@@ -24,13 +24,25 @@ function bump_in_branch() {
     return
   fi
 
-  cat <<EOF > /tmp/pr-body
+  # Add full diff to the PR body if it's not too long, otherwise do --stat
+  if [ ${#diff} -lt 30000 ]; then
+    cat <<EOF > /tmp/pr-body
 Diff:
 \`\`\`
 $diff
 \`\`\`
 
 EOF
+  else
+    diffstat=$(git diff --submodule=diff --stat "refs/remotes/origin/$branch")
+    cat <<EOF > /tmp/pr-body
+Diff (--stat):
+\`\`\`
+$diffstat
+\`\`\`
+
+EOF
+  fi
 
   changed=$(git diff --name-only "refs/remotes/origin/$branch")
   for submodule in $changed; do
