@@ -30,13 +30,10 @@ parameters:
         healthcheck-sv-runbook-devnet,
         healthcheck-validator-runbook-devnet,
         backup-devnet,
-        backup-mainnet,
-        copy-mainnet-backup,
         publish-public-artifacts,
         deploy-operator,
         preview-operator,
         backup-status-devnet,
-        backup-status-mainnet,
         bump-configs,
       ]
     default: build

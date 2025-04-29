@@ -35,13 +35,10 @@ parameters:
         healthcheck-sv-runbook-devnet,
         healthcheck-validator-runbook-devnet,
         backup-devnet,
-        backup-mainnet,
-        copy-mainnet-backup,
         publish-public-artifacts,
         deploy-operator,
         preview-operator,
         backup-status-devnet,
-        backup-status-mainnet,
         bump-configs,
       ]
     default: build
@@ -2016,28 +2013,6 @@ jobs:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
 
-  copy_backup_to_bucket_mainnet:
-    executor: self_hosted
-    parameters:
-      <<: *channel-notify-parameter
-    environment:
-      <<: *env
-    steps:
-      - checkout_with_retry
-      - setup_nix_self_hosted
-      - export_migration_id:
-          cluster: mainnet
-      - run_bash_command_in_nix:
-          cmd_name: Copy backup to bucket
-          additional_nix_args: "--keep GCP_DA_CN_BACKUPS_KEY --keep ACTIVE_MIGRATION_ID"
-          cmd: |
-            echo $GCP_DA_CN_BACKUPS_KEY | gcloud auth activate-service-account --key-file=-
-            export GOOGLE_CLOUD_PROJECT=da-cn-backups
-            today=$(date +%Y-%m-%d)
-            gcloud workflows execute copy-cn-backup-to-bucket --project ${GOOGLE_CLOUD_PROJECT} --location us-central1 --data "{\"migrationId\": ${ACTIVE_MIGRATION_ID}, \"beforeDate\": \"$today\"}"
-      - notify-cluster-fail:
-          cluster: mainnet
-          channel_notify: << parameters.channel_notify >>
 
   deploy_sv_runbook:
     executor: self_hosted
@@ -4812,47 +4787,6 @@ workflows:
           context: slack-context
           requires:
             - cancel_if_current_commit_is_base_version
-
-  backup_mainnet:
-    when:
-      equal: [ backup-mainnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_cluster:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          include_splitwell: false
-          include_validator1: false
-          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
-          cluster: "mainnet"
-          internal_stack: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-
-  backup_status_mainnet:
-    when:
-      equal: [ backup-status-mainnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_status_cluster:
-          cluster: "mainnet"
-          channel_notify: C0731SHS3HB # #team-canton-network-mainnet-deployment
-          alert_threshold: "4 hours ago"
-          context:
-            - slack-context
-            - canton-network-vpn
-
-  copy_mainnet_backup:
-    when:
-      equal: [ copy-mainnet-backup, << pipeline.parameters.run-job >> ]
-    jobs:
-      - copy_backup_to_bucket_mainnet:
-          context:
-            - slack-context
-            - canton-network-vpn
 
   redeploy_operator:
     when:
