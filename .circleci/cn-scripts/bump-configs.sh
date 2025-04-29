@@ -5,10 +5,6 @@
 
 set -euo pipefail
 
-# TODO(#18449) Remove this after all clusters are on >= 0.3.16
-# Backwards compatibility for bumping old branches where make update-expected fails otherwise.
-export REPO_ROOT="$SPLICE_ROOT"
-
 function bump_in_branch() {
   branch=$1
   bump_branch="bump-$branch-$(date +%s)"
@@ -34,7 +30,7 @@ $diff
 
 EOF
   else
-    diffstat=$(git diff --submodule=diff --stat "refs/remotes/origin/$branch")
+    diffstat=$(git diff --stat "refs/remotes/origin/$branch")
     cat <<EOF > /tmp/pr-body
 Diff (--stat):
 \`\`\`
@@ -62,7 +58,7 @@ $(git --git-dir "$submodule/.git" log --oneline "$current"..HEAD)
 EOF
   done
 
-  make cluster/pulumi/update-expected -j8
+  # TODO(#17841): Consider re-introducing some form of `make cluster/pulumi/update-expected -j8`
   git add -u
   git commit -m "[static] Bump submodules to latest"
   git push origin "$bump_branch"
