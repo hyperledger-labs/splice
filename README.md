@@ -126,6 +126,8 @@ clusters.)
       ```
 1. Configure Github Container Registry (GHCR) credentials
    The build pushes images to GHCR. You need to create a personal access token if you want to push images from your local machine.
+   If you are not part of the Canton Network or the Canton team, you may also need to ask the former
+   to give you access to the appropriate repo(s).
    From your profile on github, go to Settings, Developer Settings, Personal Access Tokens, Tokens (classic), and create a new token with the `write:packages` scope.
    Best would be to add the environment variables to the `.envrc.private` file like the following:
    ```
