@@ -23,7 +23,7 @@ jobs:
             --header 'content-type: application/json' \
             --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-scratchnet-basic\", \"splice-git-ref\": \"$sha\"}}")
           number=$(echo "$result" | jq -r '.number')
-          echo "Deploy scratchnet pipeline triggered for $sha, please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+          echo "Deploy scratchnet pipeline triggered for [PR as of $sha](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/$sha), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
 
   trigger_cluster_test_hdm:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/hdm_test')
@@ -40,5 +40,5 @@ jobs:
             --header 'content-type: application/json' \
             --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-scratchnet-hdm\", \"upgrade-splice-git-ref\": \"$sha\"}}")
           number=$(echo "$result" | jq -r '.number')
-          echo "Deploy scratchnet HDM pipeline triggered for $sha, please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+          echo "Deploy scratchnet HDM pipeline triggered for [PR as of $sha](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/$sha), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
 
