@@ -4815,163 +4815,6 @@ workflows:
           requires:
             - cancel_if_current_commit_is_base_version
 
-  devnet_health_check:
-    when:
-      equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - preflight_check:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "devnet"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-
-  reset_sv_runbook_devnet:
-    when:
-      equal: [ reset-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "reset_sv_runbook_devnet"
-      - reset_sv_runbook:
-          unprotect_dbs: true
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "devnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          requires:
-            - wait_for_previous_pipeline
-
-  reset_validator_runbook_devnet:
-    when:
-      equal: [ reset-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "reset_validator_runbook_devnet"
-      - reset_validator_runbook:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "devnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          requires:
-            - wait_for_previous_pipeline
-
-  healthcheck_sv_runbook_devnet:
-    when:
-      equal: [ healthcheck-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "healthcheck_sv_runbook_devnet reset_sv_runbook_devnet"
-      - preflight_sv_check:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "devnet"
-          requires:
-            - wait_for_previous_pipeline
-
-  healthcheck_validator_runbook_devnet:
-    when:
-      equal: [ healthcheck-validator-runbook-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - wait_for_previous_pipeline:
-          <<: *notify-fail
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - slack-context
-          workflow_names: "healthcheck_validator_runbook_devnet reset_validator_runbook_devnet"
-      - preflight_validator_check:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "devnet"
-          requires:
-            - wait_for_previous_pipeline
-
-  backup_devnet:
-    when:
-      equal: [ backup-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_cluster:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "devnet"
-          internal_stack: false
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-
-  backup_status_devnet:
-    when:
-      equal: [ backup-status-devnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_status_cluster:
-          cluster: "devnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          context:
-            - slack-context
-            - canton-network-vpn
-
   backup_mainnet:
     when:
       equal: [ backup-mainnet, << pipeline.parameters.run-job >> ]
@@ -5042,10 +4885,6 @@ workflows:
       - trigger_pulumi_previews
       - set_previews:
           <<: *main-branch-never
-          name: set_previews_devnet
-          type: approval
-      - set_previews:
-          <<: *main-branch-never
           name: set_previews_testnet
           type: approval
       - set_previews:
@@ -5060,16 +4899,6 @@ workflows:
           <<: *main-branch-never
           name: set_previews_deployment
           type: approval
-      - preview_pulumi_changes:
-          name: Preview pulumi changes for DevNet
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "devnet"
-          deployment_only: false
-          requires:
-            - set_previews_devnet
       - preview_pulumi_changes:
           name: Preview pulumi changes for TestNet
           context:
@@ -5110,16 +4939,6 @@ workflows:
           deployment_only: true
           requires:
             - set_previews_cilr
-      - preview_pulumi_changes:
-          name: Preview operator pulumi changes for DevNet
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "devnet"
-          deployment_only: true
-          requires:
-            - set_previews_deployment
       - preview_pulumi_changes:
           name: Preview operator pulumi changes for TestNet
           context:
