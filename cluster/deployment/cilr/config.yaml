@@ -41,7 +41,7 @@ synchronizerMigration:
       spliceRoot: "."
   active:
     id: 5
-    version: "0.4.0-snapshot.20250425.9164.0.v76696fe7"
+    version: "0.4.0-snapshot.20250429.9182.0.v500570b1"
     releaseReference:
       gitReference: "refs/tags/cilr"
       repoUrl: https://github.com/DACH-NY/canton-network-node
