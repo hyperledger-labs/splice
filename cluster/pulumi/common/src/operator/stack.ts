@@ -71,6 +71,26 @@ export function createStackCR(
   namespaceName: string = 'operator',
   dependsOn: pulumi.Resource[] = []
 ): pulumi.CustomResource {
+  const privateConfigs = ref.config.privateConfigsDir
+    ? {
+        PRIVATE_CONFIGS_PATH: {
+          type: 'Literal',
+          literal: {
+            value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.privateConfigsDir}`,
+          },
+        },
+      }
+    : {};
+  const publicConfigs = ref.config.publicConfigsDir
+    ? {
+        PUBLIC_CONFIGS_PATH: {
+          type: 'Literal',
+          literal: {
+            value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.publicConfigsDir}`,
+          },
+        },
+      }
+    : {};
   return new k8s.apiextensions.CustomResource(
     name,
     {
@@ -95,6 +115,8 @@ export function createStackCR(
                 value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.deploymentDir}`,
               },
             },
+            ...privateConfigs,
+            ...publicConfigs,
             GCP_CLUSTER_BASENAME: {
               type: 'Literal',
               literal: {

@@ -185,6 +185,8 @@ ${indentation}pulumiStacksDir: "cluster/stacks/$(basename $PULUMI_STACKS_DIR)"
 ${indentation}pulumiBaseDir: "cluster/pulumi"
 ${indentation}deploymentDir: "cluster/deployment"
 ${indentation}spliceRoot: "."
+${indentation}privateConfigsDir: "cluster/configs-private"
+${indentation}publicConfigsDir: "cluster/configs"
 EOF
 
     elif [ "$repo" == "canton-network-internal" ]; then
@@ -204,6 +206,8 @@ ${indentation}pulumiBaseDir: "splice/cluster/pulumi"
 ${indentation}pulumiStacksDir: "cluster/stacks/$(basename $PULUMI_STACKS_DIR)"
 ${indentation}deploymentDir: "cluster/deployment"
 ${indentation}spliceRoot: "splice"
+${indentation}privateConfigsDir: "cluster/configs/configs-private"
+${indentation}publicConfigsDir: "cluster/configs/configs"
 EOF
     else
         _error "Unknown repo $repo"

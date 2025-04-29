@@ -8,6 +8,8 @@ export type GitReferenceConfig = {
   pulumiBaseDir: string;
   deploymentDir: string;
   spliceRoot: string;
+  privateConfigsDir?: string;
+  publicConfigsDir?: string;
 };
 export type GitFluxRef = {
   resource: k8s.apiextensions.CustomResource;

@@ -31,10 +31,13 @@ const migrationVersion = z
 export const GitReferenceSchema = z.object({
   repoUrl: z.string(),
   gitReference: z.string(),
-  pulumiStacksDir: z.string(), // Relative to the root of the repo pointed to by repoUrl
-  pulumiBaseDir: z.string(), // Relative to the root of the repo pointed to by repoUrl
-  deploymentDir: z.string(), // Relative to the root of the repo pointed to by repoUrl
-  spliceRoot: z.string(), // Relative to the root of the repo pointed to by repoUrl (use "." if checking out splice directly)
+  // All directory paths are relative to the root of the repo pointed to by repoUrl
+  pulumiStacksDir: z.string(),
+  pulumiBaseDir: z.string(),
+  deploymentDir: z.string(),
+  spliceRoot: z.string(), // (use "." if checking out splice directly)
+  privateConfigsDir: z.string().optional(),
+  publicConfigsDir: z.string().optional(),
 });
 
 export const MigrationInfoSchema = z
