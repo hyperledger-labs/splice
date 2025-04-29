@@ -487,30 +487,6 @@ lazy val `token-standard-cli` =
           Some(npmRootDir.value),
         )
       },
-      npmFix := {
-        val log = streams.value.log
-        npmInstall.value
-        runCommand(
-          Seq("npm", "run", "fix"),
-          log,
-          None,
-          Some(npmRootDir.value),
-        )
-      },
-      npmLint := {
-        val log = streams.value.log
-        npmInstall.value
-        runCommand(
-          Seq("npm", "run", "check"),
-          log,
-          None,
-          Some(npmRootDir.value),
-        )
-      },
-      Compile / compile := {
-        npmInstall.value
-        (Compile / compile).value
-      },
     )
 
 // Shared non-template/non-interface code

@@ -218,7 +218,6 @@ class JsUpdateService(
 object JsUpdateService extends DocumentationEndpoints {
   import Endpoints.*
   import JsUpdateServiceCodecs.*
-  import JsSchema.JsServicesCommonCodecs.*
 
   private lazy val updates = v2Endpoint.in(sttp.tapir.stringToPath("updates"))
   val getUpdatesFlatEndpoint = updates.get
@@ -349,6 +348,7 @@ final case class JsGetUpdateTreesResponse(
 object JsUpdateServiceCodecs {
   import JsSchema.config
   import JsSchema.JsServicesCommonCodecs.*
+  import io.circe.generic.extras.auto.*
 
   implicit val participantAuthorizationTopologyFormatRW
       : Codec[ParticipantAuthorizationTopologyFormat] = deriveRelaxedCodec

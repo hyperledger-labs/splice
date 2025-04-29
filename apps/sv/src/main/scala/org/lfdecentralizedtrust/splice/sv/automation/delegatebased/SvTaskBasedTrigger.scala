@@ -3,28 +3,38 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.lifecycle.UnlessShutdown
+import com.digitalasset.canton.logging.pretty.PrettyPrinting
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
-import com.digitalasset.canton.lifecycle.UnlessShutdown
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
-trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
+trait SvTaskBasedTrigger[T <: PrettyPrinting] {
+  this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
+
   protected def svTaskContext: SvTaskBasedTrigger.Context
+
   protected def enableAutomaticDsoDelegateElection: Boolean = false
+
   private val store = svTaskContext.dsoStore
+  private val packageVersionSupport = svTaskContext.packageVersionSupport
+
+  final protected def supportsSvController()(implicit tc: TraceContext): Future[Boolean] =
+    packageVersionSupport.supportsSvController(
+      Seq(store.key.svParty, store.key.dsoParty),
+      context.clock.now,
+    )
 
   final protected override def completeTask(
       task: T
@@ -32,11 +42,18 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     for {
       dsoRules <- store.getDsoRules()
       sameEpoch = dsoRules.payload.epoch == svTaskContext.epoch
-      isLeader = dsoRules.payload.dsoDelegate == store.key.svParty.toProtoPrimitive
+      dsoDelegate = dsoRules.payload.dsoDelegate
+      svParty = store.key.svParty.toProtoPrimitive
+      isLeader = dsoDelegate == svParty
+      supportsSvController <- supportsSvController()
       result <-
         if (sameEpoch) {
+          // TODO(#17956): remove delegate-based automation
           if (isLeader) {
-            completeTaskAsDsoDelegate(task)
+            completeTaskAsDsoDelegate(task, dsoDelegate)
+            // need to specify supportsSvController in order to not execute old DAML as non-delegate
+          } else if (svTaskContext.delegatelessAutomation && supportsSvController) {
+            completeTaskAsDsoDelegate(task, svParty)
           } else {
             monitorTaskAsFollower(task)
           }
@@ -111,7 +128,8 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   }
 
   protected def completeTaskAsDsoDelegate(
-      task: T
+      task: T,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome]
 
   final protected def monitorTaskAsFollower(
@@ -191,5 +209,7 @@ object SvTaskBasedTrigger {
       connection: SpliceLedgerConnection,
       dsoDelegate: PartyId,
       epoch: Long,
+      delegatelessAutomation: Boolean,
+      packageVersionSupport: PackageVersionSupport,
   )
 }

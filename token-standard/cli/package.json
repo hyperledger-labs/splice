@@ -5,15 +5,8 @@
   "scripts": {
     "build": "npx tsc",
     "cli": "npx ts-node src/main.ts",
-    "cli:compiled": "node dist/main.js",
     "test:sbt": "PORT=0 vitest --run",
-    "test": "PORT=0 vitest",
-    "check": "npm run format:check && npm run lint:check",
-    "fix": "npm run format:fix && npm run lint:fix",
-    "format:check": "prettier --check -- src",
-    "format:fix": "prettier --write -- src",
-    "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
-    "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src"
+    "test": "PORT=0 vitest"
   },
   "keywords": [],
   "author": "",
@@ -31,9 +24,6 @@
     "msw": "^2.7.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.4",
-    "eslint": "8.57.0",
-    "@typescript-eslint/eslint-plugin": "^7.7.1",
-    "prettier": "^3.5.3"
+    "vitest": "^2.1.4"
   }
 }

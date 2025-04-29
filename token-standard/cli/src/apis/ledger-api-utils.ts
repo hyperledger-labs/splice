@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { CommandOptions } from "../cli";
 import { AllKnownMetaKeys } from "../constants";
-import { CommandOptions } from "../token-standard-cli";
 import {
   createConfiguration,
   CreatedEvent as LedgerApiCreatedEvent,
@@ -25,14 +25,14 @@ export function createLedgerApiClient(opts: CommandOptions): LedgerJsonApi {
           },
         }),
       },
-    }),
+    })
   );
 }
 
 export function filtersByParty(
   party: string,
   interfaceNames: string[],
-  includeWildcard: boolean,
+  includeWildcard: boolean
 ): TransactionFilter["filtersByParty"] {
   return {
     [party]: {
@@ -63,22 +63,22 @@ export function filtersByParty(
                   },
                 },
               ]
-            : [],
+            : []
         ),
     },
   };
 }
 
 export function hasHoldingInterfaceId(
-  event: LedgerApiExercisedEvent | LedgerApiArchivedEvent,
+  event: LedgerApiExercisedEvent | LedgerApiArchivedEvent
 ): boolean {
   return (event.implementedInterfaces || []).some((interfaceId) =>
-    interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding"),
+    interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding")
   );
 }
 
 export function getInterfaceView(
-  createdEvent: LedgerApiCreatedEvent,
+  createdEvent: LedgerApiCreatedEvent
 ): JsInterfaceView | null {
   const interfaceViews = createdEvent.interfaceViews || null;
   return (interfaceViews && interfaceViews[0]) || null;
@@ -90,14 +90,14 @@ export function getInterfaceView(
  * include it, and thus is guaranteed to be returned by the API.
  */
 export function ensureHoldingViewIsPresent(
-  createdEvent: LedgerApiCreatedEvent,
+  createdEvent: LedgerApiCreatedEvent
 ): JsInterfaceView {
   const interfaceView = getInterfaceView(createdEvent);
   if (!interfaceView) {
     throw new Error(
       `Expected to have interface views, but didn't: ${JSON.stringify(
-        createdEvent,
-      )}`,
+        createdEvent
+      )}`
     );
   }
   if (
@@ -105,14 +105,14 @@ export function ensureHoldingViewIsPresent(
   ) {
     throw new Error(
       `Not a Holding but a ${interfaceView.interfaceId}: ${JSON.stringify(
-        createdEvent,
-      )}`,
+        createdEvent
+      )}`
     );
   }
   return interfaceView;
 }
 
-type Meta = { values: { [key: string]: string } } | undefined;
+type Meta = { values: {[key: string]: string;} } | undefined;
 
 export function mergeMetas(event: LedgerApiExercisedEvent): Meta {
   const lastWriteWins = [
@@ -121,20 +121,14 @@ export function mergeMetas(event: LedgerApiExercisedEvent): Meta {
     event.choiceArgument?.meta,
     event.exerciseResult?.meta,
   ];
-  const result: { [key: string]: string } = {};
+  const result: { [key: string]: string; } = {};
   lastWriteWins.forEach((meta) => {
-    const values: { [key: string]: string } = meta?.values || [];
-    Object.entries(values).forEach(([k, v]) => {
-      result[k] = v;
-    });
+    const values: {[key:string]: string } = meta?.values || [];
+    Object.entries(values).forEach(([k, v]) => {result[k] = v;});
   });
-  if (Object.keys(result).length === 0) {
-    return undefined;
-  }
+  if (Object.keys(result).length === 0) return undefined;
   // order of keys doesn't matter, but we return it consistent for test purposes (and it's nicer)
-  else {
-    return { values: result };
-  }
+  else return { values: result };
 }
 
 export function getMetaKeyValue(key: string, meta: Meta): string | null {
@@ -148,10 +142,8 @@ export function getMetaKeyValue(key: string, meta: Meta): string | null {
  */
 export function removeParsedMetaKeys(meta: Meta): Meta {
   return {
-    values: Object.fromEntries(
-      Object.entries(meta?.values || {}).filter(
-        ([k]) => !AllKnownMetaKeys.includes(k),
-      ),
-    ),
+    values: Object.fromEntries(Object.entries(meta?.values || {}).filter(
+      ([k, _]) => !AllKnownMetaKeys.includes(k)
+    )),
   };
 }

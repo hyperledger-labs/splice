@@ -22,6 +22,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -51,15 +52,19 @@ class ExpireRewardCouponsTrigger(
   )
 
   override def completeTaskAsDsoDelegate(
-      expiredRewardsTask: ExpiredRewardCouponsBatch
+      expiredRewardsTask: ExpiredRewardCouponsBatch,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      supportsSvController <- supportsSvController()
       numCoupons <- expireRewardCouponsForRound(
         expiredRewardsTask,
         dsoRules,
         amuletRules,
+        supportsSvController,
+        controller,
       )
     } yield TaskSuccess(
       show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
@@ -70,6 +75,8 @@ class ExpireRewardCouponsTrigger(
       expiredRewardsTask: ExpiredRewardCouponsBatch,
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      supportsSvController: Boolean,
+      controller: String,
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
@@ -85,6 +92,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorCoupons.nonEmpty)
@@ -100,6 +108,7 @@ class ExpireRewardCouponsTrigger(
             Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
             None.toJava,
           ),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorFaucets.nonEmpty)
@@ -115,6 +124,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             Some(expiredRewardsTask.validatorLivenessActivityRecords.asJava).toJava,
           ),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorLivenessActivityRecords.nonEmpty)
@@ -130,6 +140,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
     ).filter(_ => expiredRewardsTask.appCoupons.nonEmpty)
@@ -145,6 +156,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
+          Optional.of(controller),
         )
       )
     ).filter(_ => expiredRewardsTask.svRewardCoupons.nonEmpty)

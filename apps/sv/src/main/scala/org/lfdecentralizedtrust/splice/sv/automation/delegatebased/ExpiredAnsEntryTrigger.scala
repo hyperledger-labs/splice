@@ -12,6 +12,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class ExpiredAnsEntryTrigger(
     override protected val context: TriggerContext,
@@ -41,13 +42,17 @@ class ExpiredAnsEntryTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireAnsEntry(
           co.work.contractId,
           new AnsEntry_Expire(store.key.dsoParty.toProtoPrimitive),
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection

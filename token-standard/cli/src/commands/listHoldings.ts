@@ -5,13 +5,13 @@ import {
   ensureHoldingViewIsPresent,
   filtersByParty,
 } from "../apis/ledger-api-utils";
+import { CommandOptions } from "../cli";
 import { HoldingInterface } from "../constants";
-import { CommandOptions } from "../token-standard-cli";
 import { JsGetActiveContractsResponse } from "canton-json-api-v2-openapi";
 
 export async function listHoldings(
   partyId: string,
-  opts: CommandOptions,
+  opts: CommandOptions
 ): Promise<void> {
   try {
     const ledgerClient = createLedgerApiClient(opts);
@@ -27,15 +27,11 @@ export async function listHoldings(
     console.log(JSON.stringify(prettyHoldings, null, 2));
   } catch (err) {
     console.error("Failed to list holdings", err);
-    throw err;
   }
 }
 
 // Make them nicer to show by excluding stuff useless to users such as the createdEventBlob
-export function toPrettyHolding(holding: JsGetActiveContractsResponse): {
-  contractId: string;
-  payload: any;
-} {
+export function toPrettyHolding(holding: JsGetActiveContractsResponse) {
   const createdEvent = holding.contractEntry.JsActiveContract.createdEvent;
   return {
     contractId: createdEvent.contractId,

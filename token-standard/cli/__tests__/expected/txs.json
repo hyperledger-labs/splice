@@ -1659,7 +1659,7 @@
       "events": [
         {
           "label": {
-            "type": "Create",
+            "type": "RawCreate",
             "parentChoice": "none (root node)",
             "contractId": "4",
             "offset": 26,
@@ -1719,7 +1719,7 @@
       "events": [
         {
           "label": {
-            "type": "Create",
+            "type": "RawCreate",
             "parentChoice": "none (root node)",
             "contractId": "5",
             "offset": 27,

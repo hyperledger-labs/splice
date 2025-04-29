@@ -151,9 +151,9 @@ the ``unique_identifier`` as its components, ``identifier`` and ``namespace``.
 - The java bindings and the json api were extended accordingly.
 
 ### BREAKING CHANGE: NamespaceDelegation can be restricted to a specific set of topology mappings
-- `NamespaceDelegation.is_root_delegation` is deprecated and replaced with the `oneof` `NamespaceDelegation.restriction`. See the
+- `NamespaceDelegation.is_root_delegation` is deprecated and replaced with the `oneof` `NamespaceDelegation.restriction`. See the 
   protobuf documentation for more details. Existing `NamespaceDelegation` protobuf values can still be read and the hash of
-  existing topology transactions is also preserved. New `NamespaceDelegation`s will only make use of the `restriction` `oneof`.
+  existing topology transactions is also preserved. New `NamespaceDelegation`s will only make use of the `restriction` `oneof`. 
   transaction is also preserved.
   - The equivalent of `is_root_delegation=true` is `restriction=CanSignAllMappings`.
   - The equivalent of `is_root_delegation=false` is `restriction=CanSignAllButNamespaceDelegations`

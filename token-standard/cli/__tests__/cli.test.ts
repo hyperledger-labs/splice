@@ -1,11 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { createProgram } from "../src/token-standard-cli";
+import fs from "fs";
+import { afterAll, afterEach, beforeAll, expect, test, vi } from "vitest";
+import { createProgram } from "../src/cli";
 import expectedHoldings from "./expected/holdings.json";
 import expectedTxs from "./expected/txs.json";
 import { mockLedgerApiServer } from "./mocks/ledger-api";
-import fs from "fs";
-import { afterAll, afterEach, beforeAll, expect, test, vi } from "vitest";
 
 const ledgerUrl = "http://localhost:6201";
 
@@ -30,11 +30,11 @@ test("list holdings", async () => {
     "valid_token",
   ]);
 
-  const actualOutput = logSpy.mock.calls[0][0];
-  fs.writeFileSync("./__tests__/actual/holdings.json", actualOutput);
+  const actualOutput = logSpy.mock.calls[0][0]
+  fs.writeFileSync("./__tests__/actual/holdings.json", actualOutput)
 
   expect(logSpy).toHaveBeenCalledWith(
-    JSON.stringify(expectedHoldings, null, 2),
+    JSON.stringify(expectedHoldings, null, 2)
   );
 });
 
@@ -54,8 +54,8 @@ test("list txs", async () => {
     "valid_token",
   ]);
 
-  const actualOutput = logSpy.mock.calls[0][0];
-  fs.writeFileSync("./__tests__/actual/txs.json", actualOutput);
+  const actualOutput = logSpy.mock.calls[0][0]
+  fs.writeFileSync("./__tests__/actual/txs.json", actualOutput)
 
   expect(logSpy).toHaveBeenCalledWith(JSON.stringify(expectedTxs, null, 2));
 });

@@ -8,7 +8,7 @@ echo "and will fetch the openapi definition from there."
 echo "This should run on the Canton version BEFORE updating."
 
 OPENAPI_DIR="${SPLICE_ROOT}/token-standard/dependencies/canton-json-api-v2/openapi"
-TARGET_FILE="$OPENAPI_DIR/openapi.yaml"
+TARGET_FILE="openapi.yaml"
 
 TEMP_DIR=$(mktemp -d)
 TEMP_FILE="${TEMP_DIR}/openapi.yaml"

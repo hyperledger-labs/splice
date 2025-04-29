@@ -39,7 +39,7 @@ class SvOnboardingAddlIntegrationTest
         }(config)
       )
 
-  override lazy val sanityChecksIgnoredRootCreates = Seq(
+  override lazy val updateHistoryIgnoredRootCreates = Seq(
     amuletCodegen.Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
