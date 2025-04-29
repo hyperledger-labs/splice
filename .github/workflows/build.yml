@@ -41,10 +41,6 @@ jobs:
     uses: ./.github/workflows/build.static_tests.yml
     secrets: inherit
 
-  deployment_test:
-    uses: ./.github/workflows/build.deployment_test.yml
-    secrets: inherit
-
   daml_test:
     uses: ./.github/workflows/build.daml_test.yml
     secrets: inherit
@@ -194,7 +190,6 @@ jobs:
     needs:
     - cancel_if_not_opt_in
     - static_tests
-    - deployment_test
     - daml_test
     - scala_test_sim_time
     - scala_test_resource_intensive
@@ -231,7 +226,7 @@ jobs:
             # shellcheck disable=SC2129
             echo "FORCE=false" >> "$GITHUB_ENV"
             echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "docs", "static_tests"}' >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           else
             echo "Checking if all jobs succeeded."

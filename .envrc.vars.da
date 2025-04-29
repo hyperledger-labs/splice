@@ -122,5 +122,4 @@ export HELM_MAX_HISTORY_SIZE=10
 
 export PRIVATE_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs-private
 export PUBLIC_CONFIGS_PATH=${SPLICE_ROOT}/cluster/configs
-export EXPECTED_FILES_DIR=${SPLICE_ROOT}/cluster/expected
 export CONFIGS_DIR=${SPLICE_ROOT}/cluster/configs-internal

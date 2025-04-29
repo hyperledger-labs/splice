@@ -3,4 +3,4 @@
 
 dir := $(call current_dir)
 
-include $(dir)/../pulumi-test.mk
+include $(PULUMI_TEST_DIR)/pulumi-test.mk
