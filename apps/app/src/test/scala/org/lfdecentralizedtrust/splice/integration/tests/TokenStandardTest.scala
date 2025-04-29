@@ -37,6 +37,7 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
       expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
       timeToLife: Duration = Duration.ofMinutes(10),
       expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
+      advanceTimeBeforeExecute: Option[Duration] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -56,6 +57,7 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
             commands = factoryChoice.commands,
             disclosedContracts = factoryChoice.disclosedContracts,
             expectedTimeBounds = expectedTimeBounds,
+            advanceTimeBeforeExecute = advanceTimeBeforeExecute,
           )
         senderHoldingCids.head
       },
