@@ -58,7 +58,8 @@ $(git --git-dir "$submodule/.git" log --oneline "$current"..HEAD)
 EOF
   done
 
-  # TODO(#17841): Consider re-introducing some form of `make cluster/pulumi/update-expected -j8`
+  # TODO(#17841): Expected files still exist on some older branches; either make this non-optional in some new form, or remove entirely
+  make cluster/pulumi/update-expected -j8 || true
   git add -u
   git commit -m "[static] Bump submodules to latest"
   git push origin "$bump_branch"
