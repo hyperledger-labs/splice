@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet
@@ -80,6 +81,9 @@ class HttpTokenStandardAllocationHandler(
                 .asRuntimeException()
             )
           )
+        featuredAppRightO <- store.lookupFeaturedAppRight(
+          PartyId.tryFromProtoPrimitive(amuletAlloc.payload.allocation.settlement.executor)
+        )
       } yield {
         val activeSynchronizerId =
           AmuletConfigSchedule(amuletRules.payload.configSchedule)
@@ -91,10 +95,12 @@ class HttpTokenStandardAllocationHandler(
             choiceContextData = io.circe.parser
               .parse(
                 new metadatav1.ChoiceContext(
-                  Map(
-                    // TODO(#18575): also retrieve and serve featured app right
-                    "amulet-rules" -> amuletRules.contractId.contractId,
-                    "open-round" -> newestOpenRound.contractId.contractId,
+                  (
+                    Map(
+                      "amulet-rules" -> amuletRules.contractId.contractId,
+                      "open-round" -> newestOpenRound.contractId.contractId,
+                    )
+                      ++ featuredAppRightO.map("featured-app-right" -> _.contractId.contractId)
                   ).map[String, metadatav1.AnyValue] { case (k, v) =>
                     k -> new metadatav1.anyvalue.AV_ContractId(new AnyContract.ContractId(v))
                   }.asJava

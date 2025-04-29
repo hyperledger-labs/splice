@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.api.v2
 import com.daml.ledger.javaapi
+import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.testing.apps.tradingapp
@@ -21,6 +22,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 import org.lfdecentralizedtrust.splice.util.{
   ChoiceContextWithDisclosures,
   FactoryChoiceWithDisclosures,
+  JavaDecodeUtil,
   TriggerTestUtil,
   WalletTestUtil,
 }
@@ -31,6 +33,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.Random
 import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequestView
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -224,9 +227,16 @@ class TokenStandardAllocationIntegrationTest
     // TODO(#18561): use external parties for all of them
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-    // Allocate venue on separate participant node
-    val venueParty = splitwellValidatorBackend.participantClientWithAdminToken.parties.enable(
-      s"venue-party-${Random.nextInt()}"
+    // Allocate venue on separate participant node, we still go through the validator API instead of parties.enable
+    // so we can use the standard wallet client APIs but give the party a more useful name than splitwell.
+    val venuePartyHint = s"venue-party-${Random.nextInt()}"
+    val venueParty = splitwellValidatorBackend.onboardUser(
+      splitwellWalletClient.config.ledgerApiUser,
+      Some(
+        PartyId.tryFromProtoPrimitive(
+          s"$venuePartyHint::${splitwellValidatorBackend.participantClient.id.namespace.toProtoPrimitive}"
+        )
+      ),
     )
 
     // Setup funds for alice and bob
@@ -410,6 +420,12 @@ class TokenStandardAllocationIntegrationTest
           sv1ScanBackend.getAllocationTransferContext(aliceAllocationId)
 
         }
+        // We do this after alice gets her context so one is featured and one isn't.
+        actAndCheck("Venue self-features", splitwellWalletClient.selfGrantFeaturedAppRight())(
+          "Scan shows featured app right",
+          _ => sv1ScanBackend.lookupFeaturedAppRight(venueParty) shouldBe a[Some[_]],
+        )
+
         val bobContext = clue("Get choice context for bob's allocation") {
           sv1ScanBackend.getAllocationTransferContext(bobAllocationId)
         }
@@ -440,7 +456,7 @@ class TokenStandardAllocationIntegrationTest
       },
     )(
       "Alice and Bob's balance reflect the trade",
-      _ =>
+      tree => {
         suppressFailedClues(loggerFactory) {
           clue("Check alice's balance") {
             checkBalance(
@@ -466,7 +482,25 @@ class TokenStandardAllocationIntegrationTest
               expectedHoldingFeeRange = holdingFeesBound,
             )
           }
-        },
+        }
+        val events = tree.getEventsById().asScala.values
+        forExactly(1, events) {
+          inside(_) { case c: CreatedEvent =>
+            val decoded = JavaDecodeUtil
+              .decodeCreated(AppRewardCoupon.COMPANION)(c)
+              .value
+            decoded.data.featured shouldBe true
+          }
+        }
+        forExactly(1, events) {
+          inside(_) { case c: CreatedEvent =>
+            val decoded = JavaDecodeUtil
+              .decodeCreated(AppRewardCoupon.COMPANION)(c)
+              .value
+            decoded.data.featured shouldBe false
+          }
+        }
+      },
     )
   }
 }
