@@ -28,10 +28,6 @@ workflow:
       - trigger_pulumi_previews
       - set_previews:
           <<: *main-branch-never
-          name: set_previews_testnet
-          type: approval
-      - set_previews:
-          <<: *main-branch-never
           name: set_previews_mainnet
           type: approval
       - set_previews:
@@ -42,16 +38,6 @@ workflow:
           <<: *main-branch-never
           name: set_previews_deployment
           type: approval
-      - preview_pulumi_changes:
-          name: Preview pulumi changes for TestNet
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "testnet"
-          deployment_only: false
-          requires:
-            - set_previews_testnet
       - preview_pulumi_changes:
           name: Preview pulumi changes for MainNet
           context:
@@ -82,16 +68,6 @@ workflow:
           deployment_only: true
           requires:
             - set_previews_cilr
-      - preview_pulumi_changes:
-          name: Preview operator pulumi changes for TestNet
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "testnet"
-          deployment_only: true
-          requires:
-            - set_previews_deployment
       - preview_pulumi_changes:
           name: Preview operator pulumi changes for MainNet
           context:
