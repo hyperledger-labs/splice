@@ -35,14 +35,12 @@ parameters:
         healthcheck-sv-runbook-devnet,
         healthcheck-validator-runbook-devnet,
         backup-devnet,
-        backup-testnet,
         backup-mainnet,
         copy-mainnet-backup,
         publish-public-artifacts,
         deploy-operator,
         preview-operator,
         backup-status-devnet,
-        backup-status-testnet,
         backup-status-mainnet,
         bump-configs,
       ]
@@ -4959,34 +4957,6 @@ workflows:
           deployment_only: true
           requires:
             - set_previews_deployment
-
-  backup_testnet:
-    when:
-      equal: [ backup-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_cluster:
-          filters:
-            branches:
-              only:
-                - /release-line-.*/
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          cluster: "testnet"
-          internal_stack: false
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-
-  backup_status_testnet:
-    when:
-      equal: [ backup-status-testnet, << pipeline.parameters.run-job >> ]
-    jobs:
-      - backup_status_cluster:
-          cluster: "testnet"
-          channel_notify: C06SMCCBYQH # #team-canton-network-dev-testnet-deployment
-          context:
-            - slack-context
-            - canton-network-vpn
 
   deploy_upgrade:
     # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
