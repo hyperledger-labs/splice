@@ -10,7 +10,7 @@ info:
   version: 1.0.0
 paths:
 
-  /registry/transfer-instruction/transfer-factory:
+  /registry/transfer-instruction/v1/transfer-factory:
     post:
       operationId: "getTransferFactory"
       description: |
@@ -34,7 +34,7 @@ paths:
           $ref: "#/components/responses/404"
 
 
-  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/accept:
+  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/accept:
     post:
       operationId: "getTransferInstructionAcceptContext"
       description: |
@@ -64,7 +64,7 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/reject:
+  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/reject:
     post:
       operationId: "getTransferInstructionRejectContext"
       description: |
@@ -94,7 +94,7 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/transfer-instruction/{transferInstructionId}/choice-contexts/withdraw:
+  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/withdraw:
     post:
       operationId: "getTransferInstructionWithdrawContext"
       description: |

@@ -329,7 +329,7 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
       Compile / sourceGenerators +=
         Def.taskDyn {
           val transferInstructionOpenApiFile =
-            baseDirectory.value / "openapi/transfer-instruction.yaml"
+            baseDirectory.value / "openapi/transfer-instruction-v1.yaml"
 
           val npmName = "transfer-instruction-openapi"
 
@@ -337,7 +337,7 @@ lazy val `splice-api-token-transfer-instruction-v1-daml` =
             npmName = npmName,
             npmModuleName = npmName,
             npmProjectName = npmName,
-            openApiSpec = "transfer-instruction.yaml",
+            openApiSpec = "transfer-instruction-v1.yaml",
             cacheFileDependencies = Set(transferInstructionOpenApiFile),
             directory = "openapi-ts-client",
             subPath = "openapi",
@@ -916,7 +916,7 @@ lazy val `apps-scan` =
           ),
           ScalaServer(
             new File(
-              "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction.yaml"
+              "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction-v1.yaml"
             ),
             pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1",
             modules = List("pekko-http-v1.0.0", "circe"),
@@ -924,14 +924,14 @@ lazy val `apps-scan` =
           ),
           ScalaClient(
             new File(
-              "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction.yaml"
+              "token-standard/splice-api-token-transfer-instruction-v1/openapi/transfer-instruction-v1.yaml"
             ),
             modules = List("pekko-http-v1.0.0", "circe"),
             pkg = "org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1",
           ),
           ScalaServer(
             new File(
-              "token-standard/splice-api-token-allocation-instruction-v1/openapi/allocation-instruction.yaml"
+              "token-standard/splice-api-token-allocation-instruction-v1/openapi/allocation-instruction-v1.yaml"
             ),
             pkg = "org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1",
             modules = List("pekko-http-v1.0.0", "circe"),
@@ -939,14 +939,14 @@ lazy val `apps-scan` =
           ),
           ScalaClient(
             new File(
-              "token-standard/splice-api-token-allocation-instruction-v1/openapi/allocation-instruction.yaml"
+              "token-standard/splice-api-token-allocation-instruction-v1/openapi/allocation-instruction-v1.yaml"
             ),
             modules = List("pekko-http-v1.0.0", "circe"),
             pkg = "org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1",
           ),
           ScalaServer(
             new File(
-              "token-standard/splice-api-token-allocation-v1/openapi/allocation.yaml"
+              "token-standard/splice-api-token-allocation-v1/openapi/allocation-v1.yaml"
             ),
             pkg = "org.lfdecentralizedtrust.tokenstandard.allocation.v1",
             modules = List("pekko-http-v1.0.0", "circe"),
@@ -954,14 +954,14 @@ lazy val `apps-scan` =
           ),
           ScalaClient(
             new File(
-              "token-standard/splice-api-token-allocation-v1/openapi/allocation.yaml"
+              "token-standard/splice-api-token-allocation-v1/openapi/allocation-v1.yaml"
             ),
             modules = List("pekko-http-v1.0.0", "circe"),
             pkg = "org.lfdecentralizedtrust.tokenstandard.allocation.v1",
           ),
           ScalaServer(
             new File(
-              "token-standard/splice-api-token-metadata-v1/openapi/token-metadata.yaml"
+              "token-standard/splice-api-token-metadata-v1/openapi/token-metadata-v1.yaml"
             ),
             pkg = "org.lfdecentralizedtrust.tokenstandard.metadata.v1",
             modules = List("pekko-http-v1.0.0", "circe"),
@@ -969,7 +969,7 @@ lazy val `apps-scan` =
           ),
           ScalaClient(
             new File(
-              "token-standard/splice-api-token-metadata-v1/openapi/token-metadata.yaml"
+              "token-standard/splice-api-token-metadata-v1/openapi/token-metadata-v1.yaml"
             ),
             modules = List("pekko-http-v1.0.0", "circe"),
             pkg = "org.lfdecentralizedtrust.tokenstandard.metadata.v1",
