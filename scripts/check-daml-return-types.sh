@@ -14,7 +14,8 @@ source "${TOOLS_LIB}/libcli.source"
 # TODO (#17133): remove the exclude of TradingApp
 # - token-standard trading app example
 # - `AmuletRules_Transfer` returning `TransferResult` which seems acceptable to keep, given how common it is in the codebase
-outliers=$(rg -IN -e "^[ \\t]*(nonconsuming )?choice " -g '!daml/splitwell' -g '!daml/*test' -g '!daml/token-standard/tests/daml/Util/TradingApp.daml' "${SPLICE_ROOT}"/daml/  | sed 's/\(nonconsuming \)\?choice //g' | sed 's/ //g' | awk 'BEGIN {FS = ":"} ; {if ($2 != $1"Result" && $1 != $2"_Fetch" && $1 != "AmuletRules_Transfer") print $0 }')
+# - WalletAppInstall choices returning TransferInstructionResult
+outliers=$(rg -IN -e "^[ \\t]*(nonconsuming )?choice " -g '!daml/splitwell' -g '!daml/*test' -g '!daml/token-standard/tests/daml/Util/TradingApp.daml' "${SPLICE_ROOT}"/daml/  | sed 's/\(nonconsuming \)\?choice //g' | sed 's/ //g' | awk 'BEGIN {FS = ":"} ; {if ($2 != $1"Result" && $1 != $2"_Fetch" && $1 != "AmuletRules_Transfer" && $1 != "WalletAppInstall_TransferFactory_Transfer" && $1 != "WalletAppInstall_TransferInstruction_Accept" && $1 != "WalletAppInstall_TransferInstruction_Reject" && $1 != "WalletAppInstall_TransferInstruction_Withdraw") print $0 }')
 if [ -n "$outliers" ]; then
   _error "The following Daml choices have invalid return types:\n$outliers"
 fi

@@ -11,7 +11,9 @@ import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
+import qualified Splice.Api.Token.TransferInstructionV1
 import Splice.Amulet
+import Splice.Amulet.TokenApiUtils
 import Splice.Types
 import Splice.AmuletRules
 import Splice.DecentralizedSynchronizer
@@ -235,7 +237,6 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
 
 executeAmuletOperationRec _executionContext _inputs prevResults [] = do
   return prevResults
-
 
 mkMergeAmuletAndRewardsTransfer : Party -> [TransferInput] -> Transfer
 mkMergeAmuletAndRewardsTransfer endUserP inputs = do
@@ -568,6 +569,59 @@ template WalletAppInstall
       do result <- exercise amuletRulesCid $ AmuletRules_DevNet_FeatureApp endUserParty
          return WalletAppInstall_FeaturedAppRights_SelfGrantResult with
            featuredAppRight = result.featuredAppRightCid
+
+    -- This is a dedicated choice rather than going through AmuletOperation as it behaves a bit differently than all the other operations:
+    -- 1. We cannot use rewards as inputs.
+    -- 2. We can use expired locked amulets as inputs.
+    nonconsuming choice WalletAppInstall_TransferFactory_Transfer : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+      with
+        transferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        transfer : Splice.Api.Token.TransferInstructionV1.Transfer
+        extraArgs : ExtraArgs
+      controller validatorParty
+      do require ("sender " <> show transfer.sender <> " is endUserParty " <> show endUserParty) (transfer.sender == endUserParty)
+         require ("instrumentId " <> show transfer.instrumentId <> " is amuletInstrumentId " <> show (amuletInstrumentId dsoParty)) (transfer.instrumentId == amuletInstrumentId dsoParty)
+         exercise transferFactory Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer
+           with
+             expectedAdmin = dsoParty
+             transfer
+             extraArgs
+
+    nonconsuming choice WalletAppInstall_TransferInstruction_Accept : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+      with
+        transferInstruction : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+        extraArgs : ExtraArgs
+      controller validatorParty
+      do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstruction
+         let receiver = (view instruction).transfer.receiver
+         require ("receiver " <> show receiver <> " must match endUserParty " <> show endUserParty) (receiver == endUserParty)
+         exercise transferInstruction Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept
+           with
+             extraArgs
+
+    nonconsuming choice WalletAppInstall_TransferInstruction_Reject : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+      with
+        transferInstruction : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+        extraArgs : ExtraArgs
+      controller validatorParty
+      do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstruction
+         let receiver = (view instruction).transfer.receiver
+         require ("receiver " <> show receiver <> " must match endUserParty " <> show endUserParty) (receiver == endUserParty)
+         exercise transferInstruction Splice.Api.Token.TransferInstructionV1.TransferInstruction_Reject
+           with
+             extraArgs
+
+    nonconsuming choice WalletAppInstall_TransferInstruction_Withdraw : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
+      with
+        transferInstruction : ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction
+        extraArgs : ExtraArgs
+      controller validatorParty
+      do instruction <- fetchCheckedInterface (ForDso dsoParty) transferInstruction
+         let sender = (view instruction).transfer.sender
+         require ("sender " <> show sender <> " must match endUserParty " <> show endUserParty) (sender == endUserParty)
+         exercise transferInstruction Splice.Api.Token.TransferInstructionV1.TransferInstruction_Withdraw
+           with
+             extraArgs
 
 unpackCid : AnyValue -> AnyContractId
 unpackCid (AV_ContractId cid) = cid
