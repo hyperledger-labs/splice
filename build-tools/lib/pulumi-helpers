@@ -83,10 +83,6 @@ function _cluster_apply() {
                 sv1Only="yes"
                 shift
                 ;;
-            --fully-parallel)
-                fullyParallel="yes"
-                shift
-                ;;
             -*)
                 _error "Unknown option $1"
                 ;;
@@ -106,7 +102,7 @@ function _cluster_apply() {
 
     subcmd_install_data_export_bucket_key
 
-    if [ -n "${sv1Only:-}" ] || [ -z "${fullyParallel:-}" ]; then
+    if [ -n "${sv1Only:-}" ]; then
       _info "Applying SV1 only"
       DSO_SIZE=1 \
         SPLICE_DEPLOY_VALIDATOR1=false \
@@ -114,8 +110,7 @@ function _cluster_apply() {
         SPLICE_DEPLOY_SV_RUNBOOK=false \
         SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
         _pulumi_automation_run_up
-    fi
-    if [ -z "${sv1Only:-}" ]; then
+    else
       _info "Applying all"
       DISABLE_COMETBFT_STATE_SYNC=true \
         SPLICE_DEPLOY_SV_RUNBOOK=false \

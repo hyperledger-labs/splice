@@ -529,7 +529,10 @@ subcommands. A few highlights include the following:
   `canton-network`, `infra`, `validator1` and `splitwell` stacks to a cluster,
   as well as all `sv-canton` stacks required by the SVs that will be deployed out of `canton-network`.
   Useful flags include `--skip-infra` (to skip the infra stack)
-  and `--sv1-only` (to deploy only SV1 and no other SVs or validators).
+  and `--sv1-only` (to deploy only SV1 and no other SVs or validators;
+  **warning** this will tear down existing deployments that are not associated to `sv-1`!).
+  For big deployments it can be beneficial to run `cncluster apply --sv1-only` first,
+  followed by another round of `cncluster apply` to deploy everything else.
   The presence of all images referenced by that
   configuration is confirmed prior to application of the manifest.
 

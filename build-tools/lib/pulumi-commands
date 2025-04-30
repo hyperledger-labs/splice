@@ -97,10 +97,6 @@ function subcmd_apply() {
                 POSITIONAL_ARGS+=("$1")
                 shift
                 ;;
-            --fully-parallel)
-                POSITIONAL_ARGS+=("$1")
-                shift
-                ;;
             -*)
                 _error "Unknown option $1"
                 ;;
@@ -166,7 +162,7 @@ function subcmd_ci_apply() {
 
     _info "Applying CI deployment: $(get-snapshot-version)"
 
-    _cluster_apply "--fully-parallel" "$@"
+    _cluster_apply "$@"
 }
 
 ###
