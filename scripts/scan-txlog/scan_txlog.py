@@ -2832,7 +2832,8 @@ class State:
                      validator_activity_record for {provider} with amount {validator_reward_amount}
                      outputs:
                        sender_change_amount: {sender_change_amount}
-                         fee: {sender_change_fee}"""
+                         sender_change_fee: {sender_change_fee}
+                     output_fees: {output_fees} """
                 ),
                 "  ",
             ),
