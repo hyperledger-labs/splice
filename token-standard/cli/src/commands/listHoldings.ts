@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   createLedgerApiClient,
-  ensureHoldingViewIsPresent,
+  ensureInterfaceViewIsPresent,
   filtersByParty,
 } from "../apis/ledger-api-utils";
 import { HoldingInterface } from "../constants";
@@ -39,6 +39,7 @@ export function toPrettyHolding(holding: JsGetActiveContractsResponse): {
   const createdEvent = holding.contractEntry.JsActiveContract.createdEvent;
   return {
     contractId: createdEvent.contractId,
-    payload: ensureHoldingViewIsPresent(createdEvent).viewValue,
+    payload: ensureInterfaceViewIsPresent(createdEvent, HoldingInterface)
+      .viewValue,
   };
 }
