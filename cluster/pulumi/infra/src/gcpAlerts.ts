@@ -118,8 +118,8 @@ ${conditionalString(
 -(resource.labels.container_name="participant"
   AND resource.labels.namespace_name="sv-1"
   AND jsonPayload.message=~"ACS_COMMITMENT_MISMATCH"
-  AND jsonPayload.remote=~"sender = PAR::tw-cn-testnet-participant-1"
-  AND timestamp <= "2025-04-30T09:00:00.000Z")
+  AND jsonPayload.remote=~"sender = PAR::tw-cn-testnet-participant-1::122051b3a160"
+  AND timestamp <= "2025-05-14T09:00:00.000Z")
 `
 )}`,
     labelExtractors: {
