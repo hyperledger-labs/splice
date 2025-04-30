@@ -32,7 +32,6 @@ parameters:
         backup-devnet,
         publish-public-artifacts,
         deploy-operator,
-        preview-operator,
         backup-status-devnet,
         bump-configs,
       ]

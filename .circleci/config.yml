@@ -37,7 +37,6 @@ parameters:
         backup-devnet,
         publish-public-artifacts,
         deploy-operator,
-        preview-operator,
         backup-status-devnet,
         bump-configs,
       ]
@@ -4798,75 +4797,6 @@ workflows:
             - slack-context
           cluster: << pipeline.parameters.cluster >>
 
-  preview_operator:
-    when:
-      equal: [ preview-operator, << pipeline.parameters.run-job >> ]
-    jobs:
-      - preview_pulumi_changes:
-          name: Preview operator pulumi changes for << pipeline.parameters.cluster >>
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: << pipeline.parameters.cluster >>
-          deployment_only: true
-  preview_pulumi_changes:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - trigger_pulumi_previews
-      - set_previews:
-          <<: *main-branch-never
-          name: set_previews_mainnet
-          type: approval
-      - set_previews:
-          <<: *main-branch-never
-          name: set_previews_cilr
-          type: approval
-      - set_previews:
-          <<: *main-branch-never
-          name: set_previews_deployment
-          type: approval
-      - preview_pulumi_changes:
-          name: Preview pulumi changes for MainNet
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "mainnet"
-          deployment_only: false
-          requires:
-            - set_previews_mainnet
-      - preview_pulumi_changes:
-          name: Preview pulumi changes for CILR
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "cilr"
-          deployment_only: false
-          requires:
-            - set_previews_cilr
-      - preview_pulumi_changes:
-          name: Preview operator pulumi changes for CILR
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "cilr"
-          deployment_only: true
-          requires:
-            - set_previews_cilr
-      - preview_pulumi_changes:
-          name: Preview operator pulumi changes for MainNet
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "mainnet"
-          deployment_only: true
-          requires:
-            - set_previews_deployment
 
   deploy_upgrade:
     # the parameters run-job, run-partial-upgrade and base-version are set in launch_ciupgrade_workflow
