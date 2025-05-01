@@ -56,6 +56,8 @@ class UserWalletService(
     supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
     enableCantonPackageSelection: Boolean,
+    txLogBackfillEnabled: Boolean,
+    txLogBackfillingBatchSize: Int,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -117,6 +119,8 @@ class UserWalletService(
     autoAcceptTransfers,
     dedupDuration,
     enableCantonPackageSelection,
+    txLogBackfillEnabled = txLogBackfillEnabled,
+    txLogBackfillingBatchSize = txLogBackfillingBatchSize,
   )
 
   /** The connection to use when submitting commands based on reads from the WalletStore.

@@ -55,6 +55,7 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.resource.DbStorage.SQLActionBuilderChain
 import org.lfdecentralizedtrust.splice.store.events.SpliceCreatedEvent
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import slick.jdbc.canton.SQLActionBuilder
 
 import java.util.concurrent.atomic.AtomicReference
@@ -69,6 +70,7 @@ class UpdateHistory(
     storeName: String,
     participantId: ParticipantId,
     val updateStreamParty: PartyId,
+    val backfillingRequired: BackfillingRequirement,
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
     val oMetrics: Option[HistoryMetrics] = None,
@@ -1486,21 +1488,32 @@ class UpdateHistory(
   }
   def getBackfillingState()(implicit
       tc: TraceContext
-  ): Future[Option[BackfillingState]] =
-    storage
-      .query(
-        sql"""
+  ): Future[BackfillingState] = {
+    backfillingRequired match {
+      case BackfillingRequirement.BackfillingNotRequired =>
+        Future.successful(BackfillingState.Complete)
+      case BackfillingRequirement.NeedsBackfilling =>
+        storage
+          .query(
+            sql"""
           select complete
           from update_history_backfilling
           where history_id = $historyId
         """.as[Boolean].headOption,
-        "getBackfillingState",
-      )
-      .map(_.map(BackfillingState.apply))
+            "getBackfillingState",
+          )
+          .map {
+            case Some(true) => BackfillingState.Complete
+            case Some(false) => BackfillingState.InProgress
+            case None => BackfillingState.NotInitialized
+          }
+    }
+  }
 
   private[this] def setBackfillingComplete()(implicit
       tc: TraceContext
-  ): Future[Unit] =
+  ): Future[Unit] = {
+    assert(backfillingRequired == BackfillingRequirement.NeedsBackfilling)
     storage
       .update(
         sqlu"""
@@ -1511,6 +1524,7 @@ class UpdateHistory(
         "setBackfillingComplete",
       )
       .map(_ => ())
+  }
 
   def initializeBackfilling(
       joiningMigrationId: Long,
@@ -1520,6 +1534,7 @@ class UpdateHistory(
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
+    assert(backfillingRequired == BackfillingRequirement.NeedsBackfilling)
     logger.info(
       s"Initializing backfilling for history $historyId with joiningMigrationId=$joiningMigrationId, joiningSynchronizerId=$joiningSynchronizerId, joiningUpdateId=$joiningUpdateId, and complete=$complete"
     )
@@ -1568,15 +1583,20 @@ class UpdateHistory(
         previousMigrationId <- getPreviousMigrationId(migrationId)
         recordTimeRange <- getRecordTimeRange(migrationId)
         state <- getBackfillingState()
-      } yield state.flatMap(state =>
-        Option.when(recordTimeRange.nonEmpty)(
-          SourceMigrationInfo(
-            previousMigrationId = previousMigrationId,
-            recordTimeRange = recordTimeRange,
-            complete = state.complete,
-          )
-        )
-      )
+      } yield {
+        state match {
+          case BackfillingState.NotInitialized =>
+            None
+          case _ =>
+            Option.when(recordTimeRange.nonEmpty)(
+              SourceMigrationInfo(
+                previousMigrationId = previousMigrationId,
+                recordTimeRange = recordTimeRange,
+                complete = state == BackfillingState.Complete,
+              )
+            )
+        }
+      }
 
       override def items(
           migrationId: Long,
@@ -1604,7 +1624,8 @@ class UpdateHistory(
       override def backfillingInfo(implicit
           tc: TraceContext
       ): Future[Option[DestinationBackfillingInfo]] = (for {
-        _ <- OptionT(getBackfillingState())
+        state <- OptionT.liftF(getBackfillingState())
+        _ <- OptionT.when[Future, Unit](state != BackfillingState.NotInitialized)(())
         migrationId <- OptionT(getFirstMigrationId())
         recordTimeRange <- OptionT.liftF(getRecordTimeRange(migrationId))
       } yield DestinationBackfillingInfo(
@@ -1619,6 +1640,7 @@ class UpdateHistory(
       )(implicit
           tc: TraceContext
       ): Future[DestinationHistory.InsertResult] = {
+        assert(backfillingRequired == BackfillingRequirement.NeedsBackfilling)
         val nonEmpty = NonEmptyList
           .fromFoldable(items)
           .getOrElse(
@@ -1687,6 +1709,21 @@ class UpdateHistory(
 }
 
 object UpdateHistory {
+  sealed trait BackfillingRequirement
+  object BackfillingRequirement {
+
+    /** This history is guaranteed to have started ingestion early enough
+      * such that it didn't miss any update visible to `updateStreamParty`.
+      */
+    final case object BackfillingNotRequired extends BackfillingRequirement
+
+    /** The ingestion for this history started at a record time, where updates for `updateStreamParty`
+      * might already exist. The missing updates at the beginning of the history need to be backfilled,
+      * see for example [[ScanHistoryBackfillingTrigger]].
+      */
+    final case object NeedsBackfilling extends BackfillingRequirement
+  }
+
   final case class UpdateHistoryResponse(
       update: TreeUpdate,
       synchronizerId: SynchronizerId,
@@ -1700,9 +1737,12 @@ object UpdateHistory {
     def empty(): State = State(None)
   }
 
-  case class BackfillingState(
-      complete: Boolean
-  )
+  sealed trait BackfillingState
+  object BackfillingState {
+    case object Complete extends BackfillingState
+    case object InProgress extends BackfillingState
+    case object NotInitialized extends BackfillingState
+  }
 
   private case class SelectFromTransactions(
       rowId: Long,

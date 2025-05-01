@@ -1,27 +1,31 @@
-# Proposals for Splice Token Standards
+# Splice Token APIs
 
 ## What you see
 
-This is a proposal for a set of RFCs (Request for Comments) that we would like
-to publish via the GSF (Global Synchronizer Foundation, see
-https://sync.global/) to foster the development of a set of standards that allow
-asset registry apps, wallet apps, and trading apps to compose uniformly, but evolve
-independently.
+This is a set of APIs for [CIP-0056 - Canton Network Token Standard](https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md).
+We recommend to read their definitions jointly with the text of the CIP itself.
 
-We recommend to review this code as follows:
+As for documentation, we currently have to refer you to the source code of the
+Daml files defining the relevant Daml interfaces, and the source code of the
+OpenAPI specifications for the off-ledger APIs.
 
-1. Watch this [presentation](https://docs.google.com/presentation/d/1PNyGMfILA-AKaTRsBP82kavFWG2W_8JNVgOaIKVsgq4) to get an overview
-of the why and what.
-2. Review the code and its tests in the directories of the form `splice-api-token-*`
-jointly with the examples in `examples/`. Examples of particular interest are:
+Note that the `splice-api-token-burn-mint` API is not explained in CIP-0056. It was added
+later due to discovering the need for it when considering how to build a bridge
+leveraging an existing token implementation. See the [CHANGELOG](CHANGELOG.md)
+for  a description of that change, and other major and minor changes that were done between
+proposing CIP-0056 and releasing the APIs together with their `Amulet` implementation.
 
-    - [`examples/splice-token-amulet-test/daml/Splice/Scripts/TestAmuletTokenTransfer.daml`](examples/splice-token-amulet-test/daml/Splice/Scripts/TestAmuletTokenTransfer.daml)
-    - [`examples/splice-token-amulet-test/daml/Splice/Scripts/TestAmuletTokenDvP.daml`](examples/splice-token-amulet-test/daml/Splice/Scripts/TestAmuletTokenDvP.daml)
 
 ## Testing
 
+### Testing Daml Apps
 
-### local testing
+The Daml files in `splice-token-standard-test` provide a test harness for
+both building apps on top of the allocation interfaces and for building
+token registries implementing the interfaces. Take a copy of these files
+and modify them to your liking for testing your app.
+
+### Local Testing
 
 There is not yet a stable release containing the token
 standard. However, documentation is published at
@@ -35,7 +39,7 @@ You can use the [localnet
 instructions](https://docs.token-std-dev.global.canton.network.digitalasset.com/app_dev/testing/localnet.html)
 to spin up a local network to test your application against.
 
-### token-std-devnet
+### Testing on token-std-devnet
 
 The token standard is not yet available on dev, test or mainnet. However, there is a dedicated cluster
 operated by Digital Asset under https://token-std-dev.global.canton.network.digitalasset.com/.
@@ -165,7 +169,7 @@ The output is a JSON object containing two fields:
 
 #### Execute transfer
 
-``` 
+```
 npm run cli -- transfer --help
 
 Usage: main transfer [options]

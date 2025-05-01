@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -15,13 +14,11 @@ import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1
 import v1.{Resource, definitions}
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
-import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract, ContractWithState}
+import org.lfdecentralizedtrust.splice.scan.util
+import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, Contract}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 
 import java.time.ZoneOffset
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.jdk.CollectionConverters.*
@@ -207,95 +204,34 @@ class HttpTokenStandardTransferInstructionHandler(
               .asRuntimeException()
           )
         )
-      lockedAmuletId = amuletInstr.contract.payload.lockedAmulet
-      optLockedAmulet <- store.multiDomainAcsStore.lookupContractById(
-        splice.amulet.LockedAmulet.COMPANION
-      )(lockedAmuletId)
-      (choiceContextBuilder, _) <- getAmuletRulesTransferContext()
-    } yield {
-      if (optLockedAmulet.isEmpty) {
-        // the locked amulet did expire and was unlocked
-        if (requireLockedAmulet) {
-          val expiresAt =
-            CantonTimestamp.fromInstant(amuletInstr.contract.payload.transfer.executeBefore)
-          throw io.grpc.Status.NOT_FOUND
-            .withDescription(
-              s"LockedAmulet '$lockedAmuletId' not found for AmuletTransferInstruction '$transferInstructionId', which expires on $expiresAt"
-            )
-            .asRuntimeException()
-        } else {
-          // only communicate that the amulet does not need to be unlocked
-          new ChoiceContextBuilder(choiceContextBuilder.activeSynchronizerId)
-            .addBool("expire-lock", false)
-            .build()
-        }
-      } else {
-        optLockedAmulet.foreach(co => choiceContextBuilder.disclose(co.contract))
-        choiceContextBuilder
-          // the choice implementation should only attempt to expire the lock if it exists
-          .addBool("expire-lock", optLockedAmulet.isDefined)
-          .build()
-      }
-    }
+      context <- util.ChoiceContextBuilder.getTwoStepTransferContext[
+        definitions.DisclosedContract,
+        definitions.ChoiceContext,
+        ChoiceContextBuilder,
+      ](
+        s"AmuletTransferInstruction '$transferInstructionId'",
+        amuletInstr.contract.payload.lockedAmulet,
+        amuletInstr.contract.payload.transfer.executeBefore,
+        requireLockedAmulet,
+        None,
+        store,
+        clock,
+        new ChoiceContextBuilder(_),
+      )
+    } yield context
   }
 
 }
 
 object HttpTokenStandardTransferInstructionHandler {
 
-  final class ChoiceContextBuilder(val activeSynchronizerId: String)(implicit
+  final class ChoiceContextBuilder(activeSynchronizerId: String)(implicit
       elc: ErrorLoggingContext
-  ) {
-
-    val disclosedContracts: ListBuffer[definitions.DisclosedContract] = ListBuffer.empty
-    val contextEntries: mutable.Map[String, metadatav1.AnyValue] = mutable.Map.empty
-
-    def disclose(contract: Contract[?, ?]): ChoiceContextBuilder = {
-      disclosedContracts.addOne(toTokenStandardDisclosedContract(contract, activeSynchronizerId))
-      this
-    }
-
-    def addContract(contextKey: String, contract: Contract[?, ?]): ChoiceContextBuilder = {
-      contextEntries.addOne(
-        contextKey ->
-          new metadatav1.anyvalue.AV_ContractId(
-            new AnyContract.ContractId(contract.contractId.contractId)
-          )
-      )
-      disclose(contract)
-    }
-
-    def addContract(keyedContract: (String, Contract[?, ?])): ChoiceContextBuilder =
-      this.addContract(keyedContract._1, keyedContract._2)
-
-    def addContracts(keyedContracts: (String, Contract[?, ?])*): ChoiceContextBuilder = {
-      keyedContracts.foreach(this.addContract)
-      this
-    }
-
-    def addOptionalContract(
-        contextKey: String,
-        optContract: Option[Contract[?, ?]],
-    ): ChoiceContextBuilder = {
-      optContract.foreach(addContract(contextKey, _))
-      this
-    }
-
-    def addOptionalContract(
-        keyedContract: (String, Option[Contract[?, ?]])
-    ): ChoiceContextBuilder = addOptionalContract(keyedContract._1, keyedContract._2)
-
-    def addOptionalContracts(
-        keyedContracts: (String, Option[ContractWithState[?, ?]])*
-    ): ChoiceContextBuilder = {
-      keyedContracts.foreach(x => addOptionalContract(x._1, x._2.map(_.contract)))
-      this
-    }
-
-    def addBool(contextKey: String, value: Boolean): ChoiceContextBuilder = {
-      contextEntries.addOne(contextKey -> new metadatav1.anyvalue.AV_Bool(value))
-      this
-    }
+  ) extends util.ChoiceContextBuilder[
+        definitions.DisclosedContract,
+        definitions.ChoiceContext,
+        ChoiceContextBuilder,
+      ](activeSynchronizerId) {
 
     def build(): definitions.ChoiceContext = definitions.ChoiceContext(
       choiceContextData = io.circe.parser
@@ -307,23 +243,23 @@ object HttpTokenStandardTransferInstructionHandler {
         ),
       disclosedContracts = disclosedContracts.toVector,
     )
-  }
 
-  // The HTTP definition of the standard differs from any other
-  private def toTokenStandardDisclosedContract[TCId, T](
-      contract: Contract[TCId, T],
-      synchronizerId: String,
-  )(implicit elc: ErrorLoggingContext): definitions.DisclosedContract = {
-    val asHttp = contract.toHttp
-    definitions.DisclosedContract(
-      templateId = asHttp.templateId,
-      contractId = asHttp.contractId,
-      createdEventBlob = asHttp.createdEventBlob,
-      synchronizerId = synchronizerId,
-      debugPackageName =
-        DarResources.lookupPackageId(contract.identifier.getPackageId).map(_.metadata.name),
-      debugPayload = Some(asHttp.payload),
-      debugCreatedAt = Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
-    )
+    // The HTTP definition of the standard differs from any other
+    override protected def toTokenStandardDisclosedContract[TCId, T](
+        contract: Contract[TCId, T],
+        synchronizerId: String,
+    ): definitions.DisclosedContract = {
+      val asHttp = contract.toHttp
+      definitions.DisclosedContract(
+        templateId = asHttp.templateId,
+        contractId = asHttp.contractId,
+        createdEventBlob = asHttp.createdEventBlob,
+        synchronizerId = synchronizerId,
+        debugPackageName =
+          DarResources.lookupPackageId(contract.identifier.getPackageId).map(_.metadata.name),
+        debugPayload = Some(asHttp.payload),
+        debugCreatedAt = Some(contract.createdAt.atOffset(ZoneOffset.UTC)),
+      )
+    }
   }
 }

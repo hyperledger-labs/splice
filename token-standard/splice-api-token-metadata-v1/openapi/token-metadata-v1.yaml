@@ -10,7 +10,7 @@ info:
   version: 1.0.0
 paths:
 
-  /registry/info:
+  /registry/metadata/v1/info:
     get:
       operationId: "getRegistryInfo"
       description: |
@@ -28,7 +28,7 @@ paths:
         "500":
           $ref: "#/components/responses/500"
 
-  /registry/instruments:
+  /registry/metadata/v1/instruments:
     get:
       operationId: "listInstruments"
       description:
@@ -60,7 +60,7 @@ paths:
         "500":
           $ref: "#/components/responses/500"
 
-  /registry/instruments/{instrumentId}:
+  /registry/metadata/v1/instruments/{instrumentId}:
     get:
       operationId: "getInstrument"
       description:
@@ -144,6 +144,19 @@ components:
           description: "The timestamp when the total supply was last computed."
           type: string
           format: date-time
+        decimals:
+          description: |
+            The number of decimal places used by the instrument.
+
+            Must be a number between 0 and 10, as the Daml interfaces represent holding amounts as
+            `Decimal` values, which use 10 decimal places and are precise for 38 digits.
+            Setting this to 0 means that the instrument can only be held in whole units.
+
+            This number SHOULD be used for display purposes in a wallet to decide how many
+            decimal places to show and accept when displaying or entering amounts.
+          type: integer
+          format: int8
+          default: 10
         supportedApis:
           $ref: "#/components/schemas/SupportedApis"
       required:
@@ -151,6 +164,7 @@ components:
           "id",
           "name",
           "symbol",
+          "decimals",
           "supportedApis"
         ]
 

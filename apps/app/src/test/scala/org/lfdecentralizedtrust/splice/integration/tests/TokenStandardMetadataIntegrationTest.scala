@@ -16,10 +16,13 @@ class TokenStandardMetadataIntegrationTest extends IntegrationTestWithSharedEnvi
       id = "Amulet",
       name = "Amulet",
       symbol = "Amulet",
+      decimals = 10,
       supportedApis = Map(
         "splice-api-token-metadata-v1" -> 1,
         "splice-api-token-holding-v1" -> 1,
         "splice-api-token-transfer-instruction-v1" -> 1,
+        "splice-api-token-allocation-v1" -> 1,
+        "splice-api-token-allocation-instruction-v1" -> 1,
       ),
     )
 
