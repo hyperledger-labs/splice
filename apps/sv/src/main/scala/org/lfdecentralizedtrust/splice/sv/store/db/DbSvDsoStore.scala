@@ -57,9 +57,10 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.SQLActionBuilder
@@ -97,6 +98,7 @@ class DbSvDsoStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = false,
+      BackfillingRequirement.BackfillingNotRequired,
     )
     with SvDsoStore
     with AcsTables

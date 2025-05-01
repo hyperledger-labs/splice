@@ -18,6 +18,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalatest.{Inspectors, LoneElement}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should.Matchers
@@ -216,8 +217,7 @@ class UpdateHistorySanityCheckPlugin(
         eventually {
           scan.automation.store.updateHistory
             .getBackfillingState()
-            .futureValue
-            .exists(_.complete) should be(true)
+            .futureValue should be(BackfillingState.Complete)
         }(
           patienceConfigForBackfillingInit,
           implicitly[org.scalatest.enablers.Retrying[org.scalatest.Assertion]],

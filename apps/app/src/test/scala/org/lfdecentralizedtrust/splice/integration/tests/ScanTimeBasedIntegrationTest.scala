@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAggregationTrigger
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAnsConfig
 
@@ -438,8 +439,7 @@ class ScanTimeBasedIntegrationTest
       eventually() {
         sv1ScanBackend.automation.store.updateHistory
           .getBackfillingState()
-          .futureValue
-          .exists(_.complete) should be(true)
+          .futureValue should be(BackfillingState.Complete)
         advanceTime(sv1ScanBackend.config.automation.pollingInterval.asJava)
       }
     }

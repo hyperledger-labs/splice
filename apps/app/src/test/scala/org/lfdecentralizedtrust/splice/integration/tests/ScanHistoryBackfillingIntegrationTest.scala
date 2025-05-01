@@ -25,6 +25,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalactic.source.Position
 
 import scala.annotation.nowarn
@@ -255,15 +256,13 @@ class ScanHistoryBackfillingIntegrationTest
         clue("SV1 backfilling is complete") {
           sv1ScanBackend.appState.store.updateHistory
             .getBackfillingState()
-            .futureValue
-            .exists(_.complete) should be(true)
+            .futureValue should be(BackfillingState.Complete)
           readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
         }
         clue("SV2 backfilling is not complete") {
           sv2ScanBackend.appState.store.updateHistory
             .getBackfillingState()
-            .futureValue
-            .exists(_.complete) should be(false)
+            .futureValue should be(BackfillingState.InProgress)
           assertThrowsAndLogsCommandFailures(
             readUpdateHistoryFromScan(sv2ScanBackend),
             logEntry => {
@@ -287,12 +286,10 @@ class ScanHistoryBackfillingIntegrationTest
       _ => {
         sv1ScanBackend.appState.store.updateHistory
           .getBackfillingState()
-          .futureValue
-          .exists(_.complete) should be(true)
+          .futureValue should be(BackfillingState.Complete)
         sv2ScanBackend.appState.store.updateHistory
           .getBackfillingState()
-          .futureValue
-          .exists(_.complete) should be(true)
+          .futureValue should be(BackfillingState.Complete)
       },
     )
 

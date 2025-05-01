@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -54,6 +55,7 @@ class DbSvSvStore(
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
       enableissue12777Workaround = false,
+      BackfillingRequirement.BackfillingNotRequired,
     )
     with SvSvStore
     with AcsTables

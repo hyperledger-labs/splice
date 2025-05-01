@@ -10,6 +10,7 @@ org.lfdecentralizedtrust.splice.store.DbValidatorStoreTest
 org.lfdecentralizedtrust.splice.store.DomainTimeStoreTest
 org.lfdecentralizedtrust.splice.store.InMemorySynchronizerStoreTest
 org.lfdecentralizedtrust.splice.store.ScanHistoryBackfillingTest
+org.lfdecentralizedtrust.splice.store.TxLogBackfillingStoreTest
 org.lfdecentralizedtrust.splice.store.UpdateHistoryBackfillingTest
 org.lfdecentralizedtrust.splice.store.UpdateHistoryTest
 org.lfdecentralizedtrust.splice.store.db.AcsSnapshotStoreTest

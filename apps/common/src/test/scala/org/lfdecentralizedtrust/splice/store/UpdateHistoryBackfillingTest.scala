@@ -1,6 +1,8 @@
 package org.lfdecentralizedtrust.splice.store
 
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.BackfillingNotRequired
+import org.lfdecentralizedtrust.splice.util.DomainRecordTimeRange
 
 import scala.concurrent.Future
 
@@ -71,6 +73,30 @@ class UpdateHistoryBackfillingTest extends UpdateHistoryTestBase {
           updatesA.map(_.update.update.updateId) should contain theSameElementsAs updatesB.map(
             _.update.update.updateId
           )
+        }
+      }
+
+      "return source info if backfilling is not required" in {
+        val storeA0 = mkStore(
+          domainMigrationId = 13,
+          participantId = participant1,
+          backfillingRequired = BackfillingNotRequired,
+        )
+        for {
+          // Create a store that has ingested some updates
+          _ <- initStore(storeA0)
+          _ <- create(domain1, validContractId(1), validOffset(1), party1, storeA0, time(1))
+          _ <- create(domain2, validContractId(2), validOffset(2), party1, storeA0, time(2))
+          // If the store doesn't need backfilling, it should return the correct info
+          // without explicit initialization of backfilling
+          infoS <- storeA0.sourceHistory.migrationInfo(13)
+        } yield {
+          infoS.value.complete shouldBe true
+          infoS.value.recordTimeRange shouldBe Map(
+            domain1 -> DomainRecordTimeRange(time(1), time(1)),
+            domain2 -> DomainRecordTimeRange(time(2), time(2)),
+          )
+          infoS.value.previousMigrationId shouldBe None
         }
       }
 

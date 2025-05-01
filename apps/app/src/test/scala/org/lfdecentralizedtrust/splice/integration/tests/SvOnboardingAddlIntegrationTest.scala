@@ -385,24 +385,33 @@ class SvOnboardingAddlIntegrationTest
             }
           },
           lines => {
-            forAll(lines)(line =>
-              line.message should
-                include(
-                  "Unexpected amulet create event"
-                )
-            )
+            forAll(lines)(line => line.message should include("Unexpected amulet create event"))
             // Error emitted by every ScanTxLogParser plus the one UserWalletTxLogParser
             // associated with the owner of the coin.
             lines should have size 2
+            forExactly(1, lines)(line => line.loggerName should include("sv1Scan"))
+            forExactly(1, lines)(line => line.loggerName should include("sv1Validator"))
           },
         )
       }
 
-      startAllSync(
-        sv2ScanBackend,
-        sv2Backend,
-        sv2ValidatorBackend,
-      )
+      clue("Start SV2") {
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.ERROR))(
+          startAllSync(
+            sv2ScanBackend,
+            sv2Backend,
+            sv2ValidatorBackend,
+          ),
+          lines => {
+            forAll(lines)(line => line.message should include("Unexpected amulet create event"))
+            // Similar to above, but this time due to TxLogBackfillingTrigger backfilling entries.
+            // Only scan processes the coin owned by sv1UserParty.
+            lines should have size 1
+            forExactly(1, lines)(line => line.loggerName should include("sv2Scan"))
+          },
+          timeUntilSuccess = 60.seconds,
+        )
+      }
       sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
 
       inside(

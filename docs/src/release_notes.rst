@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Deployment
+
+  - This release includes a change to the database schema that will trigger a short database migration.
+    On DevNet and MainNet, the migration is expected to take 2min for scan applications,
+    and much less for validator and sv applications.
+
 0.3.21
 ------
 

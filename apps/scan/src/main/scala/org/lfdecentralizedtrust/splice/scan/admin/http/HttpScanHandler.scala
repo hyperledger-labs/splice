@@ -81,6 +81,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 
 class HttpScanHandler(
     svParty: PartyId,
@@ -728,20 +729,20 @@ class HttpScanHandler(
       updateHistory
         .getBackfillingState()
         .flatMap {
-          case None =>
+          case BackfillingState.NotInitialized =>
             throw Status.UNAVAILABLE
               .withDescription(
                 "This scan instance has not yet loaded its updates history. Wait a short time and retry."
               )
               .asRuntimeException()
-          case Some(state) if !state.complete =>
+          case BackfillingState.InProgress =>
             throw Status.UNAVAILABLE
               .withDescription(
                 "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
                   "Wait until replication is complete, or connect to a different scan instance."
               )
               .asRuntimeException()
-          case Some(state) =>
+          case BackfillingState.Complete =>
             for {
               txs <- updateHistory.getUpdates(
                 afterO,
