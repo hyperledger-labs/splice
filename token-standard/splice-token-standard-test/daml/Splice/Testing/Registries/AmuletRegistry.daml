@@ -70,8 +70,9 @@ data AmuletRegistry = AmuletRegistry with
 instance RegistryApi AmuletRegistry where
   getTransferFactory = registryApi_getTransferFactory
   getAllocationFactory = registryApi_getAllocationFactory
-  getAllocationTransferContext app cid _meta = registryApi_getAllocationTransferContext app cid
+  getAllocation_TransferContext app cid _meta = registryApi_getAllocationTransferContext app cid
   getAllocation_WithdrawContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
+  getAllocation_CancelContext app cid _meta = registryApi_getAllocation_abortTwoStepTransferContext app cid
   getTransferInstruction_AcceptContext app cid _meta = registryApi_getTransferInstruction_AcceptContext app cid
   getTransferInstruction_RejectContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
   getTransferInstruction_WithdrawContext app cid _meta = registryApi_getTransferInstruction_abortTwoStepTransferContext app cid
