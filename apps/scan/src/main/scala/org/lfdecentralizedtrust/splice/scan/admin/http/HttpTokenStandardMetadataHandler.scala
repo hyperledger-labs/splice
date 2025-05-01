@@ -62,6 +62,7 @@ class HttpTokenStandardMetadataHandler(
     id = "Amulet",
     name = "Amulet",
     symbol = "Amulet",
+    decimals = 10,
     // TODO(#17943) Add allocation APIs after they are properly supported
     supportedApis = Map(
       "splice-api-token-metadata-v1" -> 1,

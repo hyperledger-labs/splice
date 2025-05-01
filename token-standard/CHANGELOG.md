@@ -23,6 +23,10 @@ Polishing changes:
   harness to `1.0.0` in preparation of their first release.
 - Switched Metadata from `Map Text` to `TextMap` to improve the JSON encoding to a normal object instead
   of an array of key-value pairs.
+- Add the `/v1/` prefix to all OpenAPI specs and the paths in the specs to
+  be leave space for an eventual `/v2/` version of the API.
+- Add number of `decimals` used by an instrument as a mandatory field to the instrument
+  metadata returned by a registry's off-ledger endpoint
 
 ## 2025-04-15
 
