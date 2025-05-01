@@ -62,11 +62,15 @@ class HttpTokenStandardMetadataHandler(
     id = "Amulet",
     name = "Amulet",
     symbol = "Amulet",
-    // TODO(#17943) Add allocation APIs after they are properly supported
+    decimals = 10,
     supportedApis = Map(
       "splice-api-token-metadata-v1" -> 1,
       "splice-api-token-holding-v1" -> 1,
       "splice-api-token-transfer-instruction-v1" -> 1,
+      "splice-api-token-allocation-v1" -> 1,
+      "splice-api-token-allocation-instruction-v1" -> 1,
+      // No burn-mint API, as that's not used for Amulet
+      // No alloation-request API, as that's an API used by apps, not registries
     ),
   )
 }

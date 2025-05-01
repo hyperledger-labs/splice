@@ -15,6 +15,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   UpdateFormat,
   WildcardFilter,
 }
+import com.daml.ledger.javaapi.data.Identifier
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent
@@ -96,9 +97,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )
   }
 
-  private val interfaces =
+  private val interfaces: Seq[Identifier] =
     Seq(
       transferinstructionv1.TransferFactory.TEMPLATE_ID,
+      transferinstructionv1.TransferInstruction.TEMPLATE_ID,
       holdingv1.Holding.TEMPLATE_ID,
     )
 
@@ -502,7 +504,13 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
             GetActiveContractsRequest(
               filter = Some(
-                TransactionFilter(filtersByParty(alice.partyId, includeWildcard = false))
+                TransactionFilter(
+                  filtersByParty(
+                    alice.partyId,
+                    Seq(holdingv1.Holding.TEMPLATE_ID),
+                    includeWildcard = false,
+                  )
+                )
               ),
               activeAtOffset =
                 aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
@@ -525,8 +533,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   Some(
                     TransactionFormat(
                       transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
-                      eventFormat =
-                        Some(EventFormat(filtersByParty(alice.partyId, includeWildcard = true))),
+                      eventFormat = Some(
+                        EventFormat(
+                          filtersByParty(alice.partyId, interfaces, includeWildcard = true)
+                        )
+                      ),
                     )
                   )
                 )
@@ -757,7 +768,18 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             event_query_service.GetEventsByContractIdRequest(
               cid,
               Seq.empty,
-              Some(EventFormat(filtersByParty(alice.partyId, includeWildcard = true))),
+              Some(
+                EventFormat(
+                  filtersByParty(
+                    alice.partyId,
+                    Seq(
+                      holdingv1.Holding.TEMPLATE_ID,
+                      transferinstructionv1.TransferInstruction.TEMPLATE_ID,
+                    ),
+                    includeWildcard = true,
+                  )
+                )
+              ),
             )
           ),
           JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
@@ -832,7 +854,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     }
   }
 
-  private def filtersByParty(party: PartyId, includeWildcard: Boolean) = Map(
+  private def filtersByParty(
+      party: PartyId,
+      interfaces: Seq[Identifier],
+      includeWildcard: Boolean,
+  ) = Map(
     party.toProtoPrimitive -> Filters(
       interfaces.map(interface =>
         CumulativeFilter(

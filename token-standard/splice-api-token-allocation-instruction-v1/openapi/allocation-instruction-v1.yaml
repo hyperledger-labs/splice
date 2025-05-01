@@ -10,7 +10,7 @@ info:
   version: 1.0.0
 paths:
 
-  /registry/allocation-instruction/allocation-factory:
+  /registry/allocation-instruction/v1/allocation-factory:
     post:
       operationId: "getAllocationFactory"
       description: |
