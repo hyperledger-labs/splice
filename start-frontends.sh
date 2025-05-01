@@ -149,8 +149,11 @@ mkdir -p "${LOG_DIR}"
 function wait_for_workspace_build() {
   local workspace=$1
   local index=$2 # relative to apps/
+  # workspace typically includes a namespace and /, which will make tee fail;
+  # remove it if present
+  local log_file_suffix="${workspace##*/}"
 
-  tmux_cmd "$workspace" "$SPLICE_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$workspace.log"
+  tmux_cmd "$workspace" "$SPLICE_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$log_file_suffix.log"
 
   local count=0
   while [ ! -f "$SPLICE_ROOT/apps/$index" ]; do
