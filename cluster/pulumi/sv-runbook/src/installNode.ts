@@ -43,6 +43,7 @@ import {
   SvCometBftGovernanceKey,
   svCometBftGovernanceKeySecret,
   svCometBftGovernanceKeyFromSecret,
+  txLogBackfillingValues,
 } from 'splice-pulumi-common';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -343,6 +344,7 @@ async function installSvAndValidator(
     ...defaultScanValues,
     ...persistenceForPostgres(appsPg, defaultScanValues),
     ...spliceInstanceNames,
+    ...txLogBackfillingValues,
     metrics: {
       enable: true,
     },
@@ -391,6 +393,7 @@ async function installSvAndValidator(
       ids.concat([validatorWalletUserName])
     ),
     ...spliceInstanceNames,
+    ...txLogBackfillingValues,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

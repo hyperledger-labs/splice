@@ -36,6 +36,7 @@ import {
   ValidatorTopupConfig,
   InstalledHelmChart,
   ansDomainPrefix,
+  txLogBackfillingValues,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
@@ -263,6 +264,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
+    ...txLogBackfillingValues,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

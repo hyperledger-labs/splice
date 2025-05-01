@@ -35,6 +35,7 @@ import {
   svCometBftGovernanceKeySecret,
   SvIdKey,
   svUserIds,
+  txLogBackfillingValues,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
@@ -504,6 +505,7 @@ function installScan(
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
     enablePostgresMetrics: true,
+    ...txLogBackfillingValues,
   };
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
     dependsOn: spliceConfig.pulumiProjectConfig.interAppsDependencies
