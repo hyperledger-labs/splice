@@ -9,6 +9,7 @@ module Splice.Testing.Apps.TradingApp where
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV1 as Api.Token.AllocationV1
 import Splice.Api.Token.AllocationRequestV1
+import DA.List ((!!))
 import DA.Optional (fromOptional)
 import DA.Set as Set
 
@@ -82,7 +83,7 @@ template OTCTrade
 
     choice OTCTrade_Settle : [Allocation_ExecuteTransferResult]
       with
-        allocationInstructions : [ContractId Allocation]
+        allocations : [ContractId Allocation]
         extraArgss : [ExtraArgs]
       controller venue
       do
@@ -91,7 +92,7 @@ template OTCTrade
         require "Settlement deadline has not passed" (now < settleBefore)
         -- validate and execute transferLegs
         require "There is one context per transfer" (length extraArgss == length transferLegs)
-        require "There is one allocation instruction per transfer" (length allocationInstructions == length transferLegs)
+        require "There is one allocation per transfer" (length allocations == length transferLegs)
         let settlementInfo = SettlementInfo with
               executor = venue
               requestedAt = createdAt
@@ -100,12 +101,39 @@ template OTCTrade
               settleBefore
               meta = emptyMetadata
         let expectedAllocations = tradeAllocations settlementInfo transferLegs
-        forA (zip3 allocationInstructions extraArgss expectedAllocations) \(instrCid, extraArgs, expectedAlloc) -> do
+        forA (zip3 allocations extraArgss expectedAllocations) \(instrCid, extraArgs, expectedAlloc) -> do
           -- fetch and validate the allocation instruction
           instr <- fetch @Allocation instrCid
           let instrView = view @Allocation instr
           require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
           exercise instrCid (Allocation_ExecuteTransfer extraArgs)
+
+    choice OTCTrade_Cancel : [Allocation_CancelResult]
+      with
+        allocations : [ContractId Allocation]
+        extraArgss : [ExtraArgs]
+      controller venue
+      do -- validate and cancel transferLegs
+         require "There is one context per transfer" (length extraArgss == length transferLegs)
+         require "There are not more allocations than transfer legs" (length allocations <= length transferLegs)
+         let settlementInfo = SettlementInfo with
+               executor = venue
+               requestedAt = createdAt
+               settlementRef = makeTradeRef tradeCid
+               allocateBefore = prepareUntil
+               settleBefore
+               meta = emptyMetadata
+         let expectedAllocations = tradeAllocations settlementInfo transferLegs
+         forA (zip allocations extraArgss) \(instrCid, extraArgs) -> do
+           -- fetch and validate the allocation instruction
+           instr <- fetch @Allocation instrCid
+           let instrView = view @Allocation instr
+           require "transferLegId is valid" (0 <= instrView.allocation.transferLegId && instrView.allocation.transferLegId < length expectedAllocations)
+           -- No need to check for duplicate transferLegIds explicitly, we just let the consuming cancel choice fail.
+           let expectedAlloc = expectedAllocations !! instrView.allocation.transferLegId
+           require "Allocation matches expected allocation" (instrView.allocation == expectedAlloc)
+           exercise instrCid (Allocation_Cancel extraArgs)
+
 
     interface instance AllocationRequest for OTCTrade where
       view = AllocationRequestView with

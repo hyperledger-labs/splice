@@ -179,7 +179,7 @@ testDvP = script do
           context = context.choiceContext
           meta = beneficiaryMetadata
   results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
-    allocationInstructions = map fst allocations
+    allocations = map fst allocations
     extraArgss
 
   -- check metadata
