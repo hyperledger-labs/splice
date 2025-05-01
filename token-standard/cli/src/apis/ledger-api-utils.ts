@@ -1,6 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { AllKnownMetaKeys } from "../constants";
+import {
+  AllKnownMetaKeys,
+  HoldingInterface,
+  InterfaceId,
+  TransferInstructionInterface,
+} from "../constants";
 import { CommandOptions } from "../token-standard-cli";
 import {
   createConfiguration,
@@ -31,7 +36,7 @@ export function createLedgerApiClient(opts: CommandOptions): LedgerJsonApi {
 
 export function filtersByParty(
   party: string,
-  interfaceNames: string[],
+  interfaceNames: InterfaceId[],
   includeWildcard: boolean,
 ): TransactionFilter["filtersByParty"] {
   return {
@@ -42,7 +47,7 @@ export function filtersByParty(
             identifierFilter: {
               InterfaceFilter: {
                 value: {
-                  interfaceId: interfaceName,
+                  interfaceId: interfaceName.toString(),
                   includeInterfaceView: true,
                   includeCreatedEventBlob: true,
                 },
@@ -69,11 +74,12 @@ export function filtersByParty(
   };
 }
 
-export function hasHoldingInterfaceId(
+export function hasInterface(
+  interfaceId: InterfaceId,
   event: LedgerApiExercisedEvent | LedgerApiArchivedEvent,
 ): boolean {
-  return (event.implementedInterfaces || []).some((interfaceId) =>
-    interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding"),
+  return (event.implementedInterfaces || []).some((id) =>
+    interfaceId.matches(id),
   );
 }
 
@@ -84,13 +90,33 @@ export function getInterfaceView(
   return (interfaceViews && interfaceViews[0]) || null;
 }
 
+export type KnownInterfaceView = {
+  type: "Holding" | "TransferInstruction";
+  viewValue: any;
+};
+export function getKnownInterfaceView(
+  createdEvent: LedgerApiCreatedEvent,
+): KnownInterfaceView | null {
+  const interfaceView = getInterfaceView(createdEvent);
+  if (!interfaceView) {
+    return null;
+  } else if (HoldingInterface.matches(interfaceView.interfaceId)) {
+    return { type: "Holding", viewValue: interfaceView.viewValue };
+  } else if (TransferInstructionInterface.matches(interfaceView.interfaceId)) {
+    return { type: "TransferInstruction", viewValue: interfaceView.viewValue };
+  } else {
+    return null;
+  }
+}
+
 // TODO (#18500): handle allocations in such a way that any callers have to handle them too
 /**
- * Use this when `createdEvent` is guaranteed to have a Holding interface view because the ledger api filters
+ * Use this when `createdEvent` is guaranteed to have an interface view because the ledger api filters
  * include it, and thus is guaranteed to be returned by the API.
  */
-export function ensureHoldingViewIsPresent(
+export function ensureInterfaceViewIsPresent(
   createdEvent: LedgerApiCreatedEvent,
+  interfaceId: InterfaceId,
 ): JsInterfaceView {
   const interfaceView = getInterfaceView(createdEvent);
   if (!interfaceView) {
@@ -100,13 +126,11 @@ export function ensureHoldingViewIsPresent(
       )}`,
     );
   }
-  if (
-    !interfaceView.interfaceId.endsWith("Splice.Api.Token.HoldingV1:Holding")
-  ) {
+  if (!interfaceId.matches(interfaceView.interfaceId)) {
     throw new Error(
-      `Not a Holding but a ${interfaceView.interfaceId}: ${JSON.stringify(
-        createdEvent,
-      )}`,
+      `Not a ${interfaceId.toString()} but a ${
+        interfaceView.interfaceId
+      }: ${JSON.stringify(createdEvent)}`,
     );
   }
   return interfaceView;

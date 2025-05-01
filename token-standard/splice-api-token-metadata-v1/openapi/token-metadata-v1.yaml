@@ -10,7 +10,7 @@ info:
   version: 1.0.0
 paths:
 
-  /registry/info:
+  /registry/metadata/v1/info:
     get:
       operationId: "getRegistryInfo"
       description: |
@@ -28,7 +28,7 @@ paths:
         "500":
           $ref: "#/components/responses/500"
 
-  /registry/instruments:
+  /registry/metadata/v1/instruments:
     get:
       operationId: "listInstruments"
       description:
@@ -60,7 +60,7 @@ paths:
         "500":
           $ref: "#/components/responses/500"
 
-  /registry/instruments/{instrumentId}:
+  /registry/metadata/v1/instruments/{instrumentId}:
     get:
       operationId: "getInstrument"
       description:

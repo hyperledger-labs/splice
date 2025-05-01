@@ -25,7 +25,13 @@ import Splice.Wallet.TransferPreapproval
 import Splice.Scripts.Wallet.TestSubscriptions
 import Splice.Fees
 import Splice.Scripts.Util
+import Splice.Testing.Utils
 import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Testing.Registries.AmuletRegistry qualified as AmuletRegistry
+import Splice.Testing.TokenStandard.RegistryApi qualified as RegistryApi
+import Splice.Api.Token.TransferInstructionV1 (TransferFactory_Transfer(..))
+import qualified Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Api.Token.MetadataV1
 
 createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
@@ -944,9 +950,6 @@ testInsufficientFundsBatchSubscriptions = script do
 
   passTime (days 27)
   runNextIssuance app
-  passTimeToRoundOpen app
-  context <- getPaymentTransferContext app alice
-
   amulet <- tap app alice 5.0
   -- TODO(#2957): remove read-as DSO party.
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
@@ -965,6 +968,106 @@ testInsufficientFundsBatchSubscriptions = script do
     [COO_SubscriptionPayment _] -> pure ()
     _ -> abort $ "Expected subscription payment to succeed but got " <> show outcomes
   pure ()
+
+testTokenStandard : Script ()
+testTokenStandard = script do
+  registry <- AmuletRegistry.initialize AmuletRegistry.defaultAmuletRegistryConfig
+
+  aliceValidator <- allocateParty "aliceValidator"
+  alice <- allocateParty "alice"
+
+  bobValidator <- allocateParty "bobValidator"
+  bob <- allocateParty "bob"
+
+  aliceInstall <- submitMulti [alice, aliceValidator] [] $ createCmd $ WalletAppInstall with
+    endUserParty = alice
+    endUserName = "alice_user"
+    dsoParty = registry.dso
+    validatorParty = aliceValidator
+
+  bobInstall <- submitMulti [bob, bobValidator] [] $ createCmd $ WalletAppInstall with
+    endUserParty = bob
+    endUserName = "bob_user"
+    dsoParty = registry.dso
+    validatorParty = bobValidator
+
+
+  holdingCid <- AmuletRegistry.tapFaucet registry alice 100.0
+
+  now <- getTime
+
+  let
+    defaultTransfer = Api.Token.TransferInstructionV1.Transfer with
+      sender = alice
+      receiver = bob
+      amount = 10.0
+      instrumentId = registry.instrumentId
+      requestedAt = now
+      executeBefore = now `addRelTime` days 1
+      inputHoldingCids = []
+      meta = emptyMetadata
+
+  let transfer = defaultTransfer with
+        sender = alice
+        receiver = bob
+        inputHoldingCids = [holdingCid]
+
+  enrichedChoice <- RegistryApi.getTransferFactory registry TransferFactory_Transfer with
+    expectedAdmin = registry.dso
+    transfer
+    extraArgs = emptyExtraArgs
+
+  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall (WalletAppInstall_TransferFactory_Transfer enrichedChoice.factoryCid enrichedChoice.arg.transfer enrichedChoice.arg.extraArgs)
+  Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  let change1 = result.senderChangeCids
+
+  context <- RegistryApi.getTransferInstruction_WithdrawContext registry aliceInstrCid emptyMetadata
+  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferInstruction_Withdraw with
+    transferInstruction = aliceInstrCid
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
+  let change2 = result.senderChangeCids
+
+  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+    transferFactory = enrichedChoice.factoryCid
+    transfer = enrichedChoice.arg.transfer with
+      inputHoldingCids = change1 ++ change2
+    extraArgs = enrichedChoice.arg.extraArgs
+
+  Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  let change3 = result.senderChangeCids
+
+  result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Reject with
+    transferInstruction = aliceInstrCid
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  Api.Token.TransferInstructionV1.TransferInstructionResult_Failed === result.output
+  let change4 = result.senderChangeCids
+
+  result <- submitMulti [aliceValidator] [alice, registry.dso] $ exerciseCmd aliceInstall WalletAppInstall_TransferFactory_Transfer with
+    transferFactory = enrichedChoice.factoryCid
+    transfer = enrichedChoice.arg.transfer with
+      inputHoldingCids = change3 ++ change4
+    extraArgs = enrichedChoice.arg.extraArgs
+
+  Api.Token.TransferInstructionV1.TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+  context <- RegistryApi.getTransferInstruction_AcceptContext registry aliceInstrCid emptyMetadata
+
+  result <- submitMulti [bobValidator] [bob, registry.dso] $ exerciseCmd bobInstall WalletAppInstall_TransferInstruction_Accept with
+    transferInstruction = aliceInstrCid
+    extraArgs = ExtraArgs with
+      context = context.choiceContext
+      meta = emptyMetadata
+
+  Api.Token.TransferInstructionV1.TransferInstructionResult_Completed _ <- pure result.output
+
+  pure ()
+
 
 -- Utilities
 ------------
