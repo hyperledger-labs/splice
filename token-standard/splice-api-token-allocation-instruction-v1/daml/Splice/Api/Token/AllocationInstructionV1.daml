@@ -147,14 +147,15 @@ interface AllocationFactory where
 
 -- | The result of instructing an allocation or advancing the state of an allocation instruction.
 data AllocationInstructionResult = AllocationInstructionResult with
-  output : AllocationInstructionResult_Output
-   -- ^ The output of the step.
-  senderChangeCids : [ContractId Holding]
-    -- ^ New holdings owned by the sender created to return "change". Can be used
-    -- by callers to batch creating or updating multiple allocation instructions
-    -- in a single Daml transaction.
-  meta : Metadata
-    -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., fees charged.
+    output : AllocationInstructionResult_Output
+     -- ^ The output of the step.
+    senderChangeCids : [ContractId Holding]
+      -- ^ New holdings owned by the sender created to return "change". Can be used
+      -- by callers to batch creating or updating multiple allocation instructions
+      -- in a single Daml transaction.
+    meta : Metadata
+      -- ^ Additional metadata specific to the allocation instruction, used for extensibility; e.g., fees charged.
+  deriving (Show, Eq)
 
 -- | The output of instructing an allocation or advancing the state of an allocation instruction.
 data AllocationInstructionResult_Output
