@@ -91,10 +91,6 @@ export const sequencerTokenExpirationTime: string | undefined = config.optionalE
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );
 
-export const domainLivenessProbeInitialDelaySeconds: string | undefined = config.optionalEnv(
-  'DOMAIN_LIVENESS_PROBE_INITIAL_DELAY_SECONDS'
-);
-
 export const svOnboardingPollingInterval = config.optionalEnv('SV_ONBOARDING_POLLING_INTERVAL');
 
 /// Kubernetes Namespace

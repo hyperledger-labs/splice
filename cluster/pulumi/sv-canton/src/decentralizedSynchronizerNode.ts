@@ -5,7 +5,6 @@ import {
   ChartValues,
   CLUSTER_HOSTNAME,
   CnChartVersion,
-  domainLivenessProbeInitialDelaySeconds,
   DomainMigrationIndex,
   ExactNamespace,
   installSpliceHelmChart,
@@ -120,7 +119,6 @@ abstract class InStackDecentralizedSynchronizerNode
               id: this.migrationId,
             },
           },
-          livenessProbeInitialDelaySeconds: domainLivenessProbeInitialDelaySeconds,
           additionalJvmOptions: jmxOptions(),
           pvc: spliceConfig.configuration.persistentSequencerHeapDumps
             ? {
