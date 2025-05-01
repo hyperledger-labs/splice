@@ -1169,8 +1169,15 @@ one-by-one to the current commit's version.
 
 ### Testing cluster upgrades
 
-You can run upgrade tests like the ones in ciupgrade on CircleCI by running `cncluster cci_upgrade_test`.
-Check the `--help` for more options.
+For testing upgrades similarly to how they are tested in ciupgrade, assuming you have access to `canton-network-internal`
+repo and CCI, trigger a CI pipeline (in `canton-network-internal`) with the following variables:
+
+- `run-job`: `deploy-upgrade`
+- `cluster`: the scratch you want to use, eg: `scratchneta`
+- `base-splice-git-ref`: the Git reference (in *this* repo) from which to upgrade; to match the behavior of `/hdm_test`, use the output of `build-tools/find_latest_base_version.sh`
+- `upgrade-splice-git-ref`: the Git reference (in *this* repo) to which to upgrade
+- `run-partial-upgrade`: whether to run partial upgrades (in ciupgrade, we skip it when certain files change that are prone to failing the test)
+- `run-daml-upgrade`: whether to vote on a daml upgrade (in ciupgrade, we set this to true if there's a daml change between the versions)
 
 ### Testing hard migrations
 

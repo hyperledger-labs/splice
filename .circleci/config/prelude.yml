@@ -25,7 +25,6 @@ parameters:
     enum:
       [
         build,
-        deploy-upgrade,
         healthcheck-devnet,
         healthcheck-sv-runbook-devnet,
         healthcheck-validator-runbook-devnet,

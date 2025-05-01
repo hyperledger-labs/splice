@@ -1909,15 +1909,6 @@ function subcmd_unprotect_all() {
 }
 
 ###
-
-subcommand_whitelist[cci_upgrade_test]='Launches a CircleCI upgrade test on the current cluster'
-
-function subcmd_cci_upgrade_test() {
-  cci_cluster_name=$(basename "$PWD")
-  "$SPLICE_ROOT/.circleci/launch-upgrade.sh" --cluster "$cci_cluster_name" "$@"
-}
-
-###
 subcommand_whitelist[request_pam]="Request PAM for the current cluster"
 
 # mostly stolen from https://github.com/DACH-NY/hub-sv/blob/main/tools/bin/request-access
