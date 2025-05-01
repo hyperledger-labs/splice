@@ -35,6 +35,9 @@ class RegistryApi app where
   getAllocationTransferContext
     : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
 
+  getAllocation_WithdrawContext
+    : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
+
   getTransferInstruction_AcceptContext
     : app -> ContractId TransferInstruction -> Metadata -> Script OpenApiChoiceContext
 
