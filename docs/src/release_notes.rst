@@ -535,7 +535,7 @@ Upcoming
 Daml Changes in 0.3.0
 ~~~~~~~~~~~~~~~~~~~~~
 
-The Daml changes introduce support for the external custody of the keys of a Daml party.
+The Daml changes introduce support for the external signing of the keys of a Daml party.
 Signatures required from these external parties can be collected via a crypto custodian's system, and
 can involve multiple human confirmers. Transactions submitted in the name of these parties can thus take
 multiple hours from the creation of the transaction signing request to the final commit of the transaction on the network.

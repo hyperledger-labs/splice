@@ -32,8 +32,8 @@ which are listed below grouped as follows:
      - Users interacting with their wallets
    * - :ref:`validator-api-user-wallet-internal`
      - Internal components interacting with user wallets
-   * - :ref:`validator-api-external-custody`
-     - External custody for :term:`Canton Coin`
+   * - :ref:`validator-api-external-signing`
+     - External signing for :term:`Canton Coin`
    * - :ref:`validator-api-user-management`
      - Managing users hosted by the (super)validator node
    * - :ref:`validator-api-internal`
@@ -161,9 +161,9 @@ where the subject claim of the token is the user whose wallet the endpoint opera
    * - **POST** /v0/wallet/tap
    * - **GET** /v0/wallet/user-status
 
-.. _validator-api-external-custody:
+.. _validator-api-external-signing:
 
-External Custody API
+External Signing API
 --------------------
 
 These endpoints are used to implement external signing of :term:`Canton Coin` transactions.
@@ -328,5 +328,4 @@ then each call to one of these endpoints is simply forwarded to the scan service
    * - **GET** /v0/scan-proxy/featured-apps/{provider_party_id}
    * - **GET** /v0/scan-proxy/transfer-command-counter/{party}
    * - **GET** /v0/scan-proxy/transfer-command/status
-   * - **GET** /v0/scan-proxy/transfer-preapprovals/by-party/{party}
-
+   * - **GET** /v0/scan-proxy/transfer-preapprovals/by-party/{party
