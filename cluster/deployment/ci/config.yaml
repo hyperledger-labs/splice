@@ -1,4 +1,0 @@
-infra:
-  prometheus:
-    retentionSize: "400GB"
-    storageSize: "600Gi"

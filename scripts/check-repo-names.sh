@@ -50,6 +50,12 @@ function check_patterns_locally() {
     'apps/app/src/test/resources/dumps/.*-identity-dump.json' # encoded snapshots can randomly contain 'cn'
     'token-standard/CHANGELOG.md'
     'Canton Network Token Standard'
+    'stop-frontends\.sh'
+    'start-frontends\.sh'
+    'scripts'
+    'build-tools'
+    'support'
+    'start-canton\.sh'
   )
 
   local exception exceptions_args=()
