@@ -11,6 +11,8 @@ Release Notes
 Upcoming
 --------
 
+- Upgrade to Canton 3.3: This upgrade requires a Hard Synchronizer migration
+
 - Deployment
 
   - This release includes a change to the database schema that will trigger a short database migration.
@@ -20,6 +22,13 @@ Upcoming
 - Improve the error message when trying to use the wallet outside of
   localhost or https. Thanks to Stephane Loeuillet for contributing
   this in https://github.com/hyperledger-labs/splice/pull/322.
+
+- Docker
+
+  - Add jemalloc into the docker images. This is not enabled by
+    default but allows for easier testing. Thanks to Stanislav
+    German-Evtushenko for contributing this in
+    https://github.com/hyperledger-labs/splice/pull/318
 
 0.3.21
 ------
