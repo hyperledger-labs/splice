@@ -32,7 +32,13 @@ class RegistryApi app where
     : app -> AllocationFactory_Allocate
     -> Script (EnrichedFactoryChoice AllocationFactory AllocationFactory_Allocate)
 
-  getAllocationTransferContext
+  getAllocation_TransferContext
+    : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getAllocation_WithdrawContext
+    : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
+
+  getAllocation_CancelContext
     : app -> ContractId Allocation -> Metadata -> Script OpenApiChoiceContext
 
   getTransferInstruction_AcceptContext

@@ -14,6 +14,7 @@ export interface TokenStandardEvent {
   lockedHoldingsChangeSummary: HoldingsChangeSummary;
   unlockedHoldingsChange: HoldingsChange;
   unlockedHoldingsChangeSummary: HoldingsChangeSummary;
+  transferInstruction: TransferInstructionView | null;
 }
 
 // Same definition as HoldingView in Daml
@@ -52,6 +53,21 @@ export const EmptyHoldingsChangeSummary: HoldingsChangeSummary = {
   outputAmount: "0",
   amountChange: "0",
 };
+
+/**
+ * Same as TransferInstructionView in Daml when exercising a TransferInstruction choice,
+ * otherwise just meta and transfer.
+ */
+export interface TransferInstructionView {
+  // currentInstructionCid: string // TODO (#19379): add
+  originalInstructionCid: string | null;
+  transfer: any;
+  status: {
+    before: any;
+    // current: any; // TODO (#19379): add
+  };
+  meta: any;
+}
 
 export type Label =
   | TransferOut
@@ -119,7 +135,7 @@ interface RawArchive extends BaseLabel {
   templateId: string;
   packageName: string;
   actingParties: string[];
-  payload: Holding;
+  payload: any;
   meta: any;
 }
 interface RawCreate extends BaseLabel {
@@ -128,7 +144,7 @@ interface RawCreate extends BaseLabel {
   contractId: string;
   offset: number;
   templateId: string;
-  payload: Holding;
+  payload: any;
   packageName: string;
   meta: any;
 }
@@ -147,11 +163,19 @@ const renderTransactionEvent = (e: TokenStandardEvent): any => {
   const lockedHoldingsChange = renderHoldingsChange(e.lockedHoldingsChange);
   const unlockedHoldingsChange = renderHoldingsChange(e.unlockedHoldingsChange);
   return {
-    label: e.label,
-    ...(lockedHoldingsChange && { lockedHoldingsChange }),
-    ...(unlockedHoldingsChange && { unlockedHoldingsChange }),
-    ...(lockedHoldingsChangeSummary && { lockedHoldingsChangeSummary }),
-    ...(unlockedHoldingsChangeSummary && { unlockedHoldingsChangeSummary }),
+    ...e,
+    lockedHoldingsChange: lockedHoldingsChange
+      ? { ...lockedHoldingsChange }
+      : undefined,
+    unlockedHoldingsChange: unlockedHoldingsChange
+      ? { ...unlockedHoldingsChange }
+      : undefined,
+    lockedHoldingsChangeSummary: lockedHoldingsChangeSummary
+      ? { ...lockedHoldingsChangeSummary }
+      : undefined,
+    unlockedHoldingsChangeSummary: unlockedHoldingsChangeSummary
+      ? { ...unlockedHoldingsChangeSummary }
+      : undefined,
   };
 };
 

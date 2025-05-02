@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   TransferFollowTrigger,
+  TxLogBackfillingTrigger,
   UnassignTrigger,
 }
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
@@ -21,7 +22,7 @@ import org.lfdecentralizedtrust.splice.store.{
 }
 import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.wallet.config.{AutoAcceptTransfersConfig, WalletSweepConfig}
-import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
+import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -49,6 +50,8 @@ class UserWalletAutomationService(
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
     dedupDuration: DedupDuration,
     enableCantonPackageSelection: Boolean,
+    txLogBackfillEnabled: Boolean,
+    txLogBackfillingBatchSize: Int,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -144,6 +147,16 @@ class UserWalletAutomationService(
   }
 
   registerTrigger(new AmuletMetricsTrigger(triggerContext, store, scanConnection))
+
+  if (txLogBackfillEnabled) {
+    registerTrigger(
+      new TxLogBackfillingTrigger(
+        store,
+        txLogBackfillingBatchSize,
+        triggerContext,
+      )
+    )
+  }
 }
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
@@ -168,5 +181,6 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[WalletPreapprovalSweepTrigger],
       aTrigger[AutoAcceptTransferOffersTrigger],
       aTrigger[AmuletMetricsTrigger],
+      aTrigger[TxLogBackfillingTrigger[TxLogEntry]],
     )
 }
