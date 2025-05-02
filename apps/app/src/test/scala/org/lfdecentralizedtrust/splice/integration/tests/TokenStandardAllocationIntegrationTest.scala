@@ -94,7 +94,7 @@ class TokenStandardAllocationIntegrationTest
     new tradingapp.OTCTradeProposal(
       venue.toProtoPrimitive,
       None.toJava,
-      Seq(aliceLeg, bobLeg).asJava,
+      Map("leg0" -> aliceLeg, "leg1" -> bobLeg).asJava,
       Seq(alice.toProtoPrimitive).asJava,
     )
   }
@@ -102,14 +102,11 @@ class TokenStandardAllocationIntegrationTest
   def createAllocationCommand(
       participantClient: ParticipantClientReference,
       request: allocationrequestv1.AllocationRequestView,
-      legId: Int,
+      legId: String,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): FactoryChoiceWithDisclosures = {
-    val leg = inside(request.transferLegs)(legs => {
-      legs.size() should be > legId
-      legs.get(legId)
-    })
+    val leg = request.transferLegs.get(legId)
     clue(
       s"Creating command to request allocation for leg $legId to transfer ${leg.amount} amulets from ${leg.sender} to ${leg.receiver}"
     ) {
@@ -154,7 +151,7 @@ class TokenStandardAllocationIntegrationTest
   def createAllocation(
       participantClient: ParticipantClientReference,
       request: allocationrequestv1.AllocationRequestView,
-      legId: Int,
+      legId: String,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): allocationv1.Allocation.ContractId = {
@@ -248,11 +245,16 @@ class TokenStandardAllocationIntegrationTest
           new metadatav1.ExtraArgs(context.choiceContext, emptyMetadata)
 
         val settlementChoice = new tradingapp.OTCTrade_Settle(
-          Seq(
-            allocatedOtcTrade.aliceAllocationId,
-            allocatedOtcTrade.bobAllocationId,
-          ).asJava,
-          Seq(mkExtraArg(aliceContext), mkExtraArg(bobContext)).asJava,
+          Map(
+            "leg0" -> new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
+              allocatedOtcTrade.aliceAllocationId,
+              mkExtraArg(aliceContext),
+            ),
+            "leg1" -> new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
+              allocatedOtcTrade.bobAllocationId,
+              mkExtraArg(bobContext),
+            ),
+          ).asJava
         )
 
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -334,11 +336,16 @@ class TokenStandardAllocationIntegrationTest
           new metadatav1.ExtraArgs(context.choiceContext, emptyMetadata)
 
         val cancelChoice = new tradingapp.OTCTrade_Cancel(
-          Seq(
-            allocatedOtcTrade.aliceAllocationId,
-            allocatedOtcTrade.bobAllocationId,
-          ).asJava,
-          Seq(mkExtraArg(aliceContext), mkExtraArg(bobContext)).asJava,
+          Map(
+            "leg0" -> new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
+              allocatedOtcTrade.aliceAllocationId,
+              mkExtraArg(aliceContext),
+            ),
+            "leg1" -> new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
+              allocatedOtcTrade.bobAllocationId,
+              mkExtraArg(bobContext),
+            ),
+          ).asJava
         )
 
         splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
@@ -565,7 +572,7 @@ class TokenStandardAllocationIntegrationTest
         createAllocation(
           aliceValidatorBackend.participantClientWithAdminToken,
           aliceRequest,
-          0,
+          "leg0",
         ),
       )(
         "Alice's balance after the allocation",
@@ -589,7 +596,7 @@ class TokenStandardAllocationIntegrationTest
         createAllocation(
           bobValidatorBackend.participantClientWithAdminToken,
           bobRequest,
-          1,
+          "leg1",
         ),
       )(
         "Bob's balance after the allocation",

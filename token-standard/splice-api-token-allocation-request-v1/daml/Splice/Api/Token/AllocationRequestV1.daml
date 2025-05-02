@@ -6,6 +6,8 @@
 -- for the purpose of settling a DvP or a payment as part of an app's workflow.
 module Splice.Api.Token.AllocationRequestV1 where
 
+import DA.TextMap (TextMap)
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.AllocationV1
 
@@ -52,8 +54,9 @@ interface AllocationRequest where
 data AllocationRequestView = AllocationRequestView with
     settlement : SettlementInfo
       -- ^ Settlement for which the assets are requested to be allocated.
-    transferLegs : [TransferLeg]
-      -- ^ Transfer legs that are requested to be allocated for the execution of the settlement.
+    transferLegs : TextMap TransferLeg
+      -- ^ Transfer legs that are requested to be allocated for the execution of the settlement
+      -- keyed by their identifier.
       --
       -- This may or may not be a complete list of transfer legs that are part of the settlement,
       -- depending on the confidentiality requirements of the app.

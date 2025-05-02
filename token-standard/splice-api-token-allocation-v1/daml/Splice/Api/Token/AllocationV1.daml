@@ -69,8 +69,8 @@ data TransferLeg = TransferLeg with
 data AllocationSpecification = AllocationSpecification with
     settlement : SettlementInfo
       -- ^ The settlement for whose execution the assets are being allocated.
-    transferLegId : Int
-      -- ^ The numeric id of the transfer within the settlement.
+    transferLegId : Text
+      -- ^ A unique identifer for the transfer leg within the settlement.
     transferLeg : TransferLeg
       -- ^ The transfer for which the assets are being allocated.
   deriving (Show, Eq)
