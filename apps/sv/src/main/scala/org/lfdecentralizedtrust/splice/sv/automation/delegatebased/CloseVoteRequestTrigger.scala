@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class CloseVoteRequestTrigger(
     override protected val context: TriggerContext,
@@ -33,24 +34,30 @@ class CloseVoteRequestTrigger(
     with SvTaskBasedTrigger[CloseVoteRequestTrigger.Task] {
 
   override def completeTaskAsDsoDelegate(
-      task: CloseVoteRequestTrigger.Task
+      task: CloseVoteRequestTrigger.Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val store = svTaskContext.dsoStore
     val request = task.work
     val voteRequestCid = task.work.contractId
     for {
-      dsoRules <- svTaskContext.dsoStore.getDsoRules()
-      amuletRules <- svTaskContext.dsoStore.getAmuletRules()
+      dsoRules <- store.getDsoRules()
+      amuletRules <- store.getAmuletRules()
+      supportsSvController <- supportsSvController()
       amuletRulesId = amuletRules.contractId
       res <- for {
         outcome <- svTaskContext.connection
           .submit(
-            Seq(svTaskContext.dsoStore.key.svParty),
-            Seq(svTaskContext.dsoStore.key.dsoParty),
+            Seq(store.key.svParty),
+            Seq(store.key.dsoParty),
             dsoRules.exercise(
               _.exerciseDsoRules_CloseVoteRequest(
                 new DsoRules_CloseVoteRequest(
                   voteRequestCid,
                   java.util.Optional.of(amuletRulesId),
+                  Option
+                    .when(supportsSvController)(controller)
+                    .toJava,
                 )
               )
             ),

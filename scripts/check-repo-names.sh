@@ -49,7 +49,6 @@ function check_patterns_locally() {
     'cluster/images/splice-test-temp-runner-hook/index.js' # gha-runner-hook copied over
     'apps/app/src/test/resources/dumps/.*-identity-dump.json' # encoded snapshots can randomly contain 'cn'
     'token-standard/CHANGELOG.md'
-    'Canton Network Token Standard'
   )
 
   local exception exceptions_args=()

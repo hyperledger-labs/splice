@@ -17,8 +17,9 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import ExpireIssuingMiningRoundTrigger.*
+
+import scala.jdk.OptionConverters.RichOption
 
 class ExpireIssuingMiningRoundTrigger(
     override protected val context: TriggerContext,
@@ -40,16 +41,19 @@ class ExpireIssuingMiningRoundTrigger(
   val store = svTaskContext.dsoStore
 
   override protected def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_MiningRound_Close(
           amuletRules.contractId,
           round.contractId,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       cid <- svTaskContext.connection

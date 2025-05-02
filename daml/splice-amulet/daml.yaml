@@ -24,7 +24,6 @@ build-options:
   - --target=2.1
   - --disable-deprecated-exceptions-warning
   - -Wno-upgrade-exceptions
-  - --ghc-option=-Wno-x-ledger-time
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
