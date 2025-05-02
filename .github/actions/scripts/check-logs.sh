@@ -28,7 +28,7 @@ else
   echo "Checking $LOGFILE while ignoring: ${FILES_WITH_IGNORE_PATTERNS[*]}"
 fi
 
-# Get the full path to the .circleci directory
+# Get the full path to the script directory
 SRCDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
 
 # Load utility functions

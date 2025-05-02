@@ -92,7 +92,7 @@ commands:
 
                 <<# parameters.fail_on_error_in_output >>
                 # Check and report whether sbt has output errors
-                .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
+                .github/actions/scripts/check-sbt-output.sh "sbt_output"
                 <</ parameters.fail_on_error_in_output >>
             }
             << parameters.pre_sbt_cmd >>

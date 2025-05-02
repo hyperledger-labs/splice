@@ -380,11 +380,6 @@ commands:
           cmd_name: dump latest into << parameters.repo_name >>
           cmd: |
             scripts/copy-to-splice.sh ../<< parameters.directory >>
-      - run:
-          name: copy circleci-specific files to the << parameters.repo_name >> directory
-          command: |
-            mkdir -p ../<< parameters.directory >>/.circleci
-            cp -r .circleci/canton-scripts ../<< parameters.directory >>/.circleci
 
 
   clone_and_update_open_source:

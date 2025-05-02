@@ -73,7 +73,7 @@ runs:
               echo "After SBT"
 
               if [[ "${{ inputs.fail_on_error_in_output }}" == "true" ]]; then
-                .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
+                .github/actions/scripts/check-sbt-output.sh "sbt_output"
               fi
             }
             export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
