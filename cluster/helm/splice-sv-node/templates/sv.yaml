@@ -335,6 +335,10 @@ spec:
             - name: SPLICE_APP_DELEGATELESS_AUTOMATION
               value: {{ .Values.delegatelessAutomation | quote }}
             {{- end }}
+            {{- if .Values.expectedTaskDuration }}
+            - name: SPLICE_APP_EXPECTED_TASK_DURATION
+              value: {{ .Values.expectedTaskDuration | quote }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

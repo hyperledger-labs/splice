@@ -845,6 +845,7 @@
           "sequencerPublicUrl": "https://sequencer-3.sv-2.test.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
+        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",

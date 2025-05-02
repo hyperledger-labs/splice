@@ -1496,6 +1496,7 @@
           "sequencerPublicUrl": "https://sequencer-1.sv-2.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
+        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -2209,6 +2210,7 @@
           "sequencerPublicUrl": "https://sequencer-1.sv-2-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
+        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [],
         "failOnAppVersionMismatch": true,
         "identitiesExport": {
@@ -2887,6 +2889,7 @@
           "sequencerPublicUrl": "https://sequencer-1.sv-3-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
+        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [],
         "failOnAppVersionMismatch": true,
         "identitiesExport": {
@@ -3565,6 +3568,7 @@
           "sequencerPublicUrl": "https://sequencer-1.sv-4-eng.dev.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
+        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [],
         "failOnAppVersionMismatch": true,
         "identitiesExport": {

@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -29,8 +29,9 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
   this: TaskbasedTrigger[T] =>
 
   override final val retryForAutomation: RetryFor =
-    RetryFor.Automation.copy(initialDelay = 1.seconds) // ideally should be n * t
-
+    RetryFor.Automation.copy(initialDelay =
+      FiniteDuration.apply(svTaskContext.expectedTaskDuration, MILLISECONDS)
+    )
   protected implicit def ec: ExecutionContext
 
   protected def svTaskContext: SvTaskBasedTrigger.Context
@@ -142,12 +143,11 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
       svParty: String,
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val task_duration = RetryFor.Automation.initialDelay.toMillis // 200ms
-    val polling_trigger_interval = context.config.pollingInterval.underlying.toMillis // 30_000ms
+    val pollingTriggerInterval = context.config.pollingInterval.underlying.toMillis // 30_000ms
     val upperBound =
       Math.min(
-        dsoRules.payload.svs.size().toLong * task_duration,
-        polling_trigger_interval - task_duration,
+        dsoRules.payload.svs.size().toLong * svTaskContext.expectedTaskDuration,
+        pollingTriggerInterval - svTaskContext.expectedTaskDuration,
       )
     val delay = Random.nextLong(upperBound)
     Threading.sleep(delay)
@@ -246,6 +246,7 @@ object SvTaskBasedTrigger {
       dsoDelegate: PartyId,
       epoch: Long,
       delegatelessAutomation: Boolean,
+      expectedTaskDuration: Long,
       packageVersionSupport: PackageVersionSupport,
   )
 }

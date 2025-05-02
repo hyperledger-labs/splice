@@ -5,9 +5,10 @@ export const AutomationSchema = z.object({
   automation: z
     .object({
       delegatelessAutomation: z.boolean().default(false),
+      expectedTaskDuration: z.number().default(5000),
     })
     .optional()
-    .default({ delegatelessAutomation: false }),
+    .default({ delegatelessAutomation: false, expectedTaskDuration: 5000 }),
 });
 
 export type Config = z.infer<typeof AutomationSchema>;
@@ -16,3 +17,4 @@ export type Config = z.infer<typeof AutomationSchema>;
 // @ts-ignore
 const fullConfig = AutomationSchema.parse(clusterYamlConfig);
 export const delegatelessAutomation = fullConfig.automation.delegatelessAutomation;
+export const expectedTaskDuration = fullConfig.automation.expectedTaskDuration;

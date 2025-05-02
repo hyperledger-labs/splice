@@ -138,6 +138,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
         PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
         epoch,
         config.delegatelessAutomation,
+        config.expectedTaskDuration,
         packageVersionSupport,
       )
 

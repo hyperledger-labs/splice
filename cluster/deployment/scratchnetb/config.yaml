@@ -7,6 +7,7 @@ pulumiProjectConfig:
   default:
     cloudSql:
       protected: false
+      enabled: true
 validator1:
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min
@@ -15,3 +16,24 @@ validator1:
   deduplicationDuration: 30m
 automation:
   delegatelessAutomation: true
+  expectedTaskDuration: 3000 # millis
+synchronizerMigration:
+  active:
+    id: 0
+    provider: external
+    version: "0.4.0-snapshot.20250424.9173.0.v8196aeeb"
+    releaseReference:
+      gitReference: refs/heads/julien/17951-add-random-delays
+      repoUrl: https://github.com/DACH-NY/canton-network-node
+      pulumiStacksDir: "cluster/stacks/scratchnets"
+      pulumiBaseDir: "cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "."
+operatorDeployment:
+  reference:
+    gitReference: refs/heads/julien/17951-add-random-delays
+    repoUrl: https://github.com/DACH-NY/canton-network-node
+    pulumiStacksDir: "cluster/stacks/scratchnets"
+    pulumiBaseDir: "cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "."
