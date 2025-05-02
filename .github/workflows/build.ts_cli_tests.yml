@@ -40,7 +40,7 @@ jobs:
         with:
           cmd: "token-standard-cli/npmTest"
           fail_on_error_in_output: true
-            
+
 
       - name: Report Failures on Slack & Github
         if: failure() && github.event_name == 'push'
@@ -48,4 +48,4 @@ jobs:
         env:
           SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_ISSUES }}
-        run: ./.circleci/notification-scripts/failure_notification.py
+        run: ./.github/actions/scripts/notification-scripts/failure_notification.py

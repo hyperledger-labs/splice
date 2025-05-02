@@ -69,4 +69,4 @@ jobs:
         env:
           SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_ISSUES }}
-        run: ./.circleci/notification-scripts/failure_notification.py
+        run: ./.github/actions/scripts/notification-scripts/failure_notification.py

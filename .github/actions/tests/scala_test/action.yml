@@ -243,4 +243,4 @@ runs:
       env:
         SLACK_ACCESS_TOKEN: ${{ inputs.slack_access_token }}
         GH_TOKEN: ${{ inputs.github_token }}
-      run: ./.circleci/notification-scripts/failure_notification.py
+      run: ./.github/actions/scripts/notification-scripts/failure_notification.py

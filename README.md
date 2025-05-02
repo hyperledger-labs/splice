@@ -182,7 +182,7 @@ clusters.)
 1. On MacOS, please install the following globally:
    1. Firefox, by following the process here: <https://www.firefox.com>
 1. Configure CircleCI.
-    Open `./.circleci/cluster-lock-users.json`, and add a line of the format
+    Open `./build-tools/cluster-lock-users.json`, and add a line of the format
     ```
     "<circleci-username>": ["<local-username>"],
     ```
@@ -1418,7 +1418,7 @@ cncluster pulumi infra config
 
 ### Github Tokens
 
-The `GH_TOKEN` is used by the [TODO checker](.circleci/todo/src/checkTodos.sc) to access the issue and PR list
+The `GH_TOKEN` is used by the [TODO checker](scripts/todo/src/checkTodos.sc) to access the issue and PR list
 of the https://github.com/DACH-NY/canton-network-node repo.
 
 1. Go to https://github.com/settings/tokens, which you can reach by navigating

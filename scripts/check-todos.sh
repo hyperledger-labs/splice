@@ -11,7 +11,7 @@ export GITHUB_USER=$GH_USER
 SPLICE_ROOT=$( git rev-parse --show-toplevel )
 
 # Call the ammonite repl with the todo checker Scala script
-(cd "$SPLICE_ROOT"; amm .circleci/todo/src/checkTodos.sc)
+(cd "$SPLICE_ROOT"; amm scripts/todo/src/checkTodos.sc)
 
 echo ""
 echo "See $SPLICE_ROOT/todo-out/ for the summary of the todo check."

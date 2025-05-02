@@ -246,7 +246,7 @@ function _current_lock_age_formatted() {
 }
 
 function _get_holder_names() {
-    jq -r --arg login "$1" '.[$login][]?' "$SPLICE_ROOT/.circleci/cluster-lock-users.json"
+    jq -r --arg login "$1" '.[$login][]?' "$SPLICE_ROOT/build-tools/cluster-lock-users.json"
 }
 
 function _assert_lock() {
@@ -264,7 +264,7 @@ function _assert_lock() {
         fi
 
         # Check lock for CI...
-        if ! approver=$( "$SPLICE_ROOT/.circleci/approved-by.sh" ); then
+        if ! approver=$( "$SPLICE_ROOT/build-tools/approved-by.sh" ); then
             _error "Could not determine approver for CI workflow"
         fi
 
@@ -1175,10 +1175,10 @@ function subcmd_lock() {
         lockholder=$(whoami)
         kubectl create secret generic cluster-lock --from-literal=lockholder="$lockholder" > /dev/null
         _info "Cluster lock claimed successfully."
-        if ! jq --arg login "$lockholder" -e 'to_entries | map(.value) | flatten | any(. == $login)' "$SPLICE_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
+        if ! jq --arg login "$lockholder" -e 'to_entries | map(.value) | flatten | any(. == $login)' "$SPLICE_ROOT/build-tools/cluster-lock-users.json" >/dev/null; then
             echo
             _warning \
-                "There is no corresponding entry for $lockholder in '$SPLICE_ROOT/.circleci/cluster-lock-users.json'.\n" \
+                "There is no corresponding entry for $lockholder in '$SPLICE_ROOT/build-tools/cluster-lock-users.json'.\n" \
                 "You will not be able to run preflight checks on CI, until you add an entry with your CI username to that file."
         fi
     fi

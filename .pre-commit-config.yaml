@@ -57,11 +57,6 @@ repos:
         entry: "make cluster/pulumi/test -j8"
         files: '^cluster/pulumi/.*[.]ts$'
         pass_filenames: false
-      - id: circleci_config
-        name: check circleci config is updated
-        language: system
-        entry: ".circleci/build-config.sh --check"
-        files: '^.circleci/config/.*[.]yml$'
       - id: gha_lint
         name: static check github actions
         language: system

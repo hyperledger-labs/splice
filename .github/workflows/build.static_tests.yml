@@ -21,11 +21,6 @@ jobs:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
-      - name: Check that CCI config is up2date
-        uses: ./.github/actions/nix/run_bash_command_in_nix
-        with:
-          cmd: .circleci/build-config.sh --check
-
       - name: Check trailing whitespace
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
@@ -93,4 +88,4 @@ jobs:
         env:
           SLACK_ACCESS_TOKEN: ${{ secrets.SLACK_ACCESS_TOKEN }}
           GH_TOKEN: ${{ secrets.GH_ISSUES }}
-        run: ./.circleci/notification-scripts/failure_notification.py
+        run: ./.github/actions/scripts/notification-scripts/failure_notification.py
