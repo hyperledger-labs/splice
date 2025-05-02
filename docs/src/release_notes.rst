@@ -17,6 +17,10 @@ Upcoming
     On DevNet and MainNet, the migration is expected to take 2min for scan applications,
     and much less for validator and sv applications.
 
+- Improve the error message when trying to use the wallet outside of
+  localhost or https. Thanks to Stephane Loeuillet for contributing
+  this in https://github.com/hyperledger-labs/splice/pull/322.
+
 0.3.21
 ------
 
