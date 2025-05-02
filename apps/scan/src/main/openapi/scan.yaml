@@ -1097,7 +1097,7 @@ paths:
       x-jvm-package: scan
       operationId: "getWalletBalance"
       description: |
-        **Deprecated**. Get the Amulet balance for a specific party at the end of a closed round
+        **Deprecated**, use /v0/holdings/summary with /v0/state/acs/snapshot-timestamp instead. Get the Amulet balance for a specific party at the end of a closed round
       parameters:
         - in: query
           name: party_id
