@@ -191,6 +191,7 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
+      enableTxLogBackfilling,
     )
   }
 
@@ -795,5 +796,17 @@ object ConfigTransforms {
 
     rows.toMap
   }
+
+  def enableTxLogBackfilling: ConfigTransform =
+    combineAllTransforms(
+      updateAllValidatorConfigs((_, config) =>
+        config
+          .copy(txLogBackfillEnabled = true, txLogBackfillBatchSize = 5)
+      ),
+      updateAllScanAppConfigs((_, config) =>
+        config
+          .copy(txLogBackfillEnabled = true, txLogBackfillBatchSize = 5)
+      ),
+    )
 
 }

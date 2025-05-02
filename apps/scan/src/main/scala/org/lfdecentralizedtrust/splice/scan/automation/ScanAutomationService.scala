@@ -7,6 +7,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+  TxLogBackfillingTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{
@@ -95,6 +96,15 @@ class ScanAutomationService(
       triggerContext,
     )
   )
+  if (config.txLogBackfillEnabled) {
+    registerTrigger(
+      new TxLogBackfillingTrigger(
+        store,
+        config.txLogBackfillBatchSize,
+        triggerContext,
+      )
+    )
+  }
 }
 
 object ScanAutomationService extends AutomationServiceCompanion {

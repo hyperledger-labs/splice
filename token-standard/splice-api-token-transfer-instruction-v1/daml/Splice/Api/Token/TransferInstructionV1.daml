@@ -44,14 +44,15 @@ data Transfer = Transfer with
 
 -- | The result of instructing a transfer or advancing the state of a transfer instruction.
 data TransferInstructionResult = TransferInstructionResult with
-  output : TransferInstructionResult_Output
-   -- ^ The output of the step.
-  senderChangeCids : [ContractId Holding]
-    -- ^ New holdings owned by the sender created to return "change". Can be used
-    -- by callers to batch creating or updating multiple transfer instructions
-    -- in a single Daml transaction.
-  meta : Metadata
-    -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+    output : TransferInstructionResult_Output
+     -- ^ The output of the step.
+    senderChangeCids : [ContractId Holding]
+      -- ^ New holdings owned by the sender created to return "change". Can be used
+      -- by callers to batch creating or updating multiple transfer instructions
+      -- in a single Daml transaction.
+    meta : Metadata
+      -- ^ Additional metadata specific to the transfer instruction, used for extensibility; e.g., fees charged.
+  deriving (Show, Eq)
 
 -- | The output of instructing a transfer or advancing the state of a transfer instruction.
 data TransferInstructionResult_Output
