@@ -39,7 +39,7 @@ A _release line branch_ is branched from the _ancestor branch_.
     - Note: release branches are subject to branch protect rules. Once you push the branch, you need to open PRs to make further changes.
 - [ ] Merge a PR into the release branch (`origin/release-line-0.x.z`) with the following changes:
   - [ ] Create an empty commit with `[release]` in the commit message so it gets published as a non-snapshot version. You may have to edit the commit message when pressing the merge button in the GitHub UI.
-- [ ] Trigger a CircleCI pipeline on the release branch with `run-job: publish-public-artifacts`
+- [ ] Trigger a CircleCI pipeline from the DA-internal (on main) with `run-job: publish-release-artifacts` and `splice-git-ref: release-line-0.x.z`
 - [ ] If _ancestor branch_ is not `origin/main`, forward port all changes made to the _ancestor branch_ as part of this release to `origin/main`
 - [ ] Update the Open source repos, see https://github.com/DACH-NY/canton-network-node/blob/main/OPEN_SOURCE.md
   - [ ] Merge the auto-generated PR in https://github.com/digital-asset/decentralized-canton-sync
