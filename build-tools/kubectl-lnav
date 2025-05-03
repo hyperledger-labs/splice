@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+LOGFILE=$(mktemp cnlogXXXXXXX.clog)
+kubectl logs -f --tail=-1 "$@" >> "${LOGFILE}" &
+PID=$!
+
+lnav "${LOGFILE}"
+
+rm "${LOGFILE}"
+kill $PID >/dev/null 2>&1

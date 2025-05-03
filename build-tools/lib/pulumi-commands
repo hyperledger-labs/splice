@@ -1,0 +1,520 @@
+
+###
+
+subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the current cluster"
+
+function subcmd_pulumi() {
+
+    if [ "$#" -lt 2 ]; then
+       _error "Usage: $0 <project> <cmd> [args]"
+    fi
+
+    pulumi_project="$1"
+    pulumi_cmd="$2"
+    pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
+    shift 2
+
+    if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
+        _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
+    fi
+
+    if [ ! -d "${SPLICE_ROOT}/cluster/pulumi/${pulumi_project}" ]; then
+        _error "Unknown Pulumi project: ${pulumi_project}"
+    fi
+
+    # Only mutating operations need a production gate. Developer
+    # inspection of clusters should be permissable even in production
+    # like clusters.
+    case "${pulumi_cmd}" in
+        new|up|destroy|down|cancel|refresh|config)
+            _production_gate
+            ;;
+        *)
+            ;;
+    esac
+
+    local args=(--cwd "${PULUMI_STACKS_DIR}/${pulumi_project}")
+
+    case "${pulumi_cmd}" in
+        whoami|org)
+            ;;
+
+        *)
+            args+=(--stack "organization/${pulumi_project}/${pulumi_stack}")
+            ;;
+    esac
+
+    case "${pulumi_cmd}" in
+        up|down|destroy|refresh|preview)
+            _uses_pulumi_stack "${pulumi_project}"
+            # default 16
+            args+=(--parallel 128)
+            ;;
+        *)
+            ;;
+    esac
+
+    case "${pulumi_cmd}" in
+        up|down|config)
+            _uses_pulumi_stack "${pulumi_project}"
+            ;;
+        *)
+            ;;
+    esac
+
+    function run_pulumi() {
+        if (env-bool GCP_CLUSTER_PROD_LIKE) || [[ "$pulumi_project" == "infra" ]]
+        then
+            _pulumi "$@"
+        else
+            PULUMI_EXPERIMENTAL=true PULUMI_SKIP_CHECKPOINTS=true _pulumi "$@"
+        fi
+    }
+
+    run_pulumi "${args[@]}" "$pulumi_cmd" "$@"
+}
+
+###
+
+subcommand_whitelist[apply]="Apply the current Pulumi configuration, without the runbooks (--preview to preview only)"
+
+function subcmd_apply() {
+    _production_gate
+    _cluster_must_exist
+
+    POSITIONAL_ARGS=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --preview)
+                preview="yes"
+                shift
+                ;;
+            --skip-infra)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+            --sv1-only)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+            *)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+    set -- "${POSITIONAL_ARGS[@]}"
+
+    subcmd_install_data_export_bucket_key
+
+    if [ -n "${preview:-}" ]; then
+        make -C "${SPLICE_ROOT}" cluster/helm/build -j
+        _info "Previewing apply for cluster:"
+        subcmd_pulumi cluster preview --show-sames --json "${args[@]}"
+        _info "Previewing apply for infra:"
+        subcmd_pulumi infra preview --show-sames --json "${args[@]}"
+        _info "Previewing apply for canton-network:"
+        subcmd_pulumi canton-network preview --show-sames --json "${args[@]}"
+    else
+        _prompt_to_confirm
+        make -C "${SPLICE_ROOT}" cluster/build -j
+
+        if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
+            _docker_must_be_running
+            if ! make -C "${SPLICE_ROOT}" docker-image-reference-exists IMG_REF_EXISTS_ARG=--err-missing -j; then
+                _error "Images missing, cannot apply."
+            fi
+        else
+            _warning "docker-image-reference-exists bypassed with CNCLUSTER_SKIP_DOCKER_CHECK."
+        fi
+
+        _cluster_apply "$@"
+    fi
+}
+
+subcommand_whitelist[ci_apply]='Run only by CircleCI'
+
+function subcmd_ci_apply() {
+    _assert_lock
+
+    # A CI-specific variant of 'cncluster apply' that removes the need
+    # for manual confirmation
+    if [ -z "${CI-}" ]; then
+      _error "This subcommand is available to CI jobs only."
+    fi
+
+    # By default, this is unset and we infer the previous values based on the currently running cluster.
+    # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
+    if (env-bool RESTORE_CLUSTER) && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+        CLUSTER="$GCP_CLUSTER_BASENAME"
+        NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
+        export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
+    fi
+
+    _cluster_show
+
+    if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
+       _info "Bootstrapping cluster from ${BOOTSTRAPPING_CONFIG}"
+    fi
+
+    _info "Applying CI deployment: $(get-snapshot-version)"
+
+    _cluster_apply "$@"
+}
+
+###
+
+subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank state. Clears all data.'
+
+function subcmd_reset() {
+    _prompt_to_confirm
+
+    _cluster_reset "$@"
+}
+###
+
+subcommand_whitelist[pdown]="Take the current Pulumi configuration down"
+
+function subcmd_pdown() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _pulumi_automation_run_down
+}
+
+###
+
+subcommand_whitelist[pcancel]="Cancel a running pulumi operation on the cluster (usually relevant when an operation was interrupted and left the lock unreleased)"
+
+function subcmd_pcancel() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _pulumi_automation_run_cancel
+}
+
+###
+
+subcommand_whitelist[prefresh]="Refresh the Pulumi resources in the stack"
+
+function subcmd_prefresh() {
+    _production_gate
+    if [ -n "${CI-}" ]; then
+        _prompt_to_confirm --no-lock
+    else
+        _prompt_to_confirm
+    fi
+    _cluster_must_exist
+    _pulumi_automation_run_refresh
+}
+
+###
+
+subcommand_whitelist[apply_sv]="Apply the sv-runbook Pulumi stack"
+
+function subcmd_apply_sv(){
+    _needs_auth0_sv_management_api_creds
+
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _uses_pulumi_stack sv-runbook
+
+    subcmd_install_data_export_bucket_key
+
+    _pulumi_automation_run_up "sv-runbook"
+}
+
+###
+
+subcommand_whitelist[apply_operator]="Apply the deployment Pulumi stack"
+
+function subcmd_apply_operator(){
+
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _uses_pulumi_stack operator
+
+    subcmd_pulumi operator up --yes --skip-preview --show-sames "${args[@]}"
+}
+
+###
+
+subcommand_whitelist[ci_apply_sv]='Run only by CircleCI'
+
+function subcmd_ci_apply_sv() {
+    _needs_auth0_sv_management_api_creds
+    _assert_lock
+
+    # A CI-specific variant of 'cncluster apply_sv' that removes the need
+    # for manual confirmation, and also always uses the same target cluster
+    # as the one the sv is deployed on.
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    # By default, this is unset and we infer the previous values based on the currently running cluster.
+    # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
+    if (env-bool RESTORE_CLUSTER) && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+        CLUSTER="$GCP_CLUSTER_BASENAME"
+        NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
+        export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
+    fi
+
+    _cluster_show
+
+    if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
+       _info "Bootstrapping SV from ${BOOTSTRAPPING_CONFIG}"
+    fi
+
+    local -x CHARTS_VERSION="${1-}"
+
+    _uses_pulumi_stack sv-runbook
+
+    subcmd_install_data_export_bucket_key
+
+    _pulumi_automation_run_up "sv-runbook"
+}
+
+###
+
+subcommand_whitelist[pdown_sv]="Take the current sv-runbook Pulumi configuration down"
+
+function subcmd_pdown_sv(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _pulumi_automation_run_down "sv-runbook"
+}
+
+###
+
+subcommand_whitelist[ci_pdown_sv]="Run only by CircleCI"
+
+function subcmd_ci_pdown_sv(){
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    _pulumi_automation_run_down "sv-runbook"
+}
+
+###
+
+subcommand_whitelist[apply_validator]="Apply the validator-runbook Pulumi stack"
+
+function subcmd_apply_validator(){
+    _needs_auth0_sv_management_api_creds
+
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _uses_pulumi_stack validator-runbook
+
+    subcmd_install_data_export_bucket_key
+
+    subcmd_pulumi validator-runbook up --yes --skip-preview --show-sames "${args[@]}"
+}
+
+###
+
+subcommand_whitelist[ci_apply_validator]='Run only by CircleCI'
+
+function subcmd_ci_apply_validator() {
+    _needs_auth0_validator_management_api_creds
+    _assert_lock
+
+    # A CI-specific variant of 'cncluster apply_validator' that removes the need
+    # for manual confirmation, and also always uses the same target cluster
+    # as the one the validator is deployed on.
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    # By default, this is unset and we infer the previous values based on the currently running cluster.
+    # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
+    if (env-bool RESTORE_CLUSTER) && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+        CLUSTER="$GCP_CLUSTER_BASENAME"
+        NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
+        export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
+    fi
+
+    _cluster_show
+
+    if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
+       _info "Bootstrapping Validator from ${BOOTSTRAPPING_CONFIG}"
+    fi
+
+    local -x CHARTS_VERSION="${1-}"
+
+    _uses_pulumi_stack validator-runbook
+
+    subcmd_install_data_export_bucket_key
+
+    subcmd_pulumi validator-runbook up --yes --skip-preview "${args[@]}"
+}
+
+###
+
+subcommand_whitelist[pdown_validator]="Take the current validator-runbook Pulumi configuration down"
+
+function subcmd_pdown_validator(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi validator-runbook down --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[ci_pdown_validator]="Run only by CircleCI"
+
+function subcmd_ci_pdown_validator(){
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    subcmd_pulumi validator-runbook down --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[apply_multi]="Apply the multi-validator Pulumi stack"
+
+function subcmd_apply_multi() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    if [ -z "${MULTI_VALIDATOR_IMAGE_VERSION:-}" ]; then
+        MULTI_VALIDATOR_IMAGE_VERSION=$(get-snapshot-version)
+        export MULTI_VALIDATOR_IMAGE_VERSION
+    fi
+
+    _uses_pulumi_stack multi-validator
+    subcmd_pulumi multi-validator up --yes --skip-preview --show-sames "${args[@]}"
+}
+
+subcommand_whitelist[ci_apply_multi]='Run only by CircleCI'
+
+function subcmd_ci_apply_multi() {
+    _assert_lock
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    _uses_pulumi_stack multi-validator
+
+    subcmd_pulumi multi-validator up --yes --skip-preview "${args[@]}"
+}
+
+###
+
+subcommand_whitelist[pdown_multi]="Take the current multi-validator Pulumi configuration down"
+
+function subcmd_pdown_multi(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi multi-validator down --yes --skip-preview
+}
+
+subcommand_whitelist[ci_pdown_multi]="Run only by CircleCI"
+
+function subcmd_ci_pdown_multi(){
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    subcmd_pulumi multi-validator down --yes --skip-preview
+}
+###
+
+subcommand_whitelist[infra_up]='Apply the infra Pulumi stack.'
+
+function subcmd_infra_up() {
+    _cluster_must_exist
+    _prompt_to_confirm
+    make -C "${SPLICE_ROOT}" cluster/build -j
+    _infra_up
+}
+
+###
+
+subcommand_whitelist[infra_down]='Take the current Pulumi infra stack down.'
+
+function subcmd_infra_down() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Deactivating infrastructure Pulumi stack"
+
+    subcmd_pulumi infra down --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[gcp_up]='Apply the gcp Pulumi stack.'
+
+function subcmd_gcp_up() {
+    _info "Activating gcp Pulumi stack"
+
+    _uses_pulumi_stack gcp
+
+    subcmd_pulumi gcp up --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[gcp_down]='Take the current Pulumi gcp stack down.'
+
+function subcmd_gcp_down() {
+    _prompt_to_confirm
+
+    _info "Deactivating gcp Pulumi stack"
+
+    subcmd_pulumi gcp down --yes --skip-preview
+}
+
+
+###
+subcommand_whitelist[pulumi_preview_canton]="Preview the changes for the sv-canton migrations"
+
+function subcmd_pulumi_preview_canton() {
+  npm --prefix "${SPLICE_ROOT}/cluster/pulumi/sv-canton" run preview
+}
+
+###
+subcommand_whitelist[pulumi_down_canton]="Down the sv-canton migrations"
+
+function subcmd_pulumi_down_canton() {
+  _info "Resetting sv-canton stacks"
+  export SPLICE_DEPLOY_SV_RUNBOOK=true
+  _pulumi_automation_run_down "sv-canton"
+}
+
+###
+subcommand_whitelist[pulumi_up_canton]="Up the sv-canton migrations"
+
+function subcmd_pulumi_up_canton() {
+  _info "Updating sv-canton stacks"
+  _pulumi_automation_run_up "sv-canton"
+}
