@@ -9,6 +9,7 @@ import DA.Time
 import Daml.Script
 import DA.List
 import DA.Optional
+import DA.TextMap as TextMap
 
 import Splice.Amulet
 import Splice.AmuletRules
@@ -1109,7 +1110,7 @@ testTokenStandardAllocate = script do
   proposalCid <- submit alice $ createCmd OTCTradeProposal with
     venue = provider
     tradeCid = None
-    transferLegs = [aliceLeg]
+    transferLegs = TextMap.fromList [("leg0", aliceLeg)]
     approvers = [alice]
 
   -- provider initiates settlement

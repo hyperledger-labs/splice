@@ -18,10 +18,10 @@ import Daml.Script
 import DA.Action (unless)
 import DA.Assert
 import DA.Foldable (forA_, foldMap)
-import DA.List (sortOn)
 import DA.Optional (isSome)
-import qualified DA.TextMap as TextMap
+import DA.TextMap as TextMap hiding (filter)
 import DA.Time
+import DA.Traversable qualified as Traversable
 
 import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
@@ -91,7 +91,7 @@ setupOtcTrade  = do
   proposalCid <- submit alice $ createCmd OTCTradeProposal with
     venue = provider
     tradeCid = None
-    transferLegs = [aliceLeg, bobLeg]
+    transferLegs = TextMap.fromList [("leg0", aliceLeg), ("leg1", bobLeg)]
     approvers = [alice]
 
   -- bob accepts
@@ -150,7 +150,7 @@ setupOtcTrade  = do
         expiresAt = Some settleBefore
         expiresAfter = None
         holders = [registry.dso]
-        context = Some "allocation for transfer leg 0 to 'bob'"
+        context = Some "allocation for transfer leg \"leg0\" to 'bob'"
   lockedHolding.lock === expectedLock
 
   -- Bob sees the allocation request in his wallet as well
@@ -197,20 +197,19 @@ testDvP = script do
   -- provider runs automation that completes the settlement
   let otcTradeRef = (view $ toInterface @AllocationRequest otcTrade).settlement.settlementRef
   allocations <- appBackendListAllocations provider otcTradeRef
-  length allocations === 2
+  TextMap.size allocations === 2
 
   let beneficiaryMetadata = AmuletRegistry.beneficiariesToMetadata providerBeneficiaries
-  contexts <- forA allocations $ \(allocCid, _) ->
-     RegistryApi.getAllocation_TransferContext registry allocCid beneficiaryMetadata
-  let disclosures = foldMap (.disclosures) contexts
-  let extraArgss = do
-        context <- contexts
-        pure ExtraArgs with
+  richAllocationsWithContext <- Traversable.forA allocations $ \(allocCid, _) -> do
+    context <- RegistryApi.getAllocation_TransferContext registry allocCid beneficiaryMetadata
+    let extraArgs = ExtraArgs with
           context = context.choiceContext
           meta = beneficiaryMetadata
+    pure (context.disclosures, (allocCid, extraArgs))
+  let disclosures = foldMap fst richAllocationsWithContext
+
   results <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Settle with
-    allocations = map fst allocations
-    extraArgss
+    allocationsWithContext = fmap snd richAllocationsWithContext
 
   -- check metadata
   forA_ results $ \result -> expectBurn result.meta
@@ -264,18 +263,16 @@ testDvPCancel = script do
   -- expire the amulet for bob to test both cases where the amulet still exists for alice and where it doesn't for bob
   AmuletRegistry.expireLockAsOwner registry bobLockedHoldingCid
 
-  contexts <- forA allocations $ \(allocCid, _) ->
-     RegistryApi.getAllocation_CancelContext registry allocCid emptyMetadata
-  let disclosures = foldMap (.disclosures) contexts
-  let extraArgss = do
-        context <- contexts
-        pure ExtraArgs with
+  richAllocationsWithContext <- Traversable.forA allocations $ \(allocCid, _) -> do
+    context <- RegistryApi.getAllocation_CancelContext registry allocCid emptyMetadata
+    let extraArgs = ExtraArgs with
           context = context.choiceContext
           meta = emptyMetadata
+    pure (context.disclosures, (allocCid, extraArgs))
+  let disclosures = foldMap fst richAllocationsWithContext
 
   _ <- submitWithDisclosures' provider disclosures $ exerciseCmd otcTradeCid OTCTrade_Cancel with
-    allocations = map fst allocations
-    extraArgss
+    allocationsWithContext = fmap snd richAllocationsWithContext
 
   [] <- WalletClient.listLockedHoldings alice registry.instrumentId
   WalletClient.checkHoldingWithAmountExists alice amuletId aliceLockedHolding.amount
@@ -315,14 +312,14 @@ testDvPWithdraw = script do
 
 -- | List all allocations matching a particular settlement reference, sorted by their tradeLeg id.
 -- This function would be run on the trading app provider's backend as part of an automation loop.
-appBackendListAllocations : Party -> Reference -> Script [(ContractId Allocation, AllocationView)]
+appBackendListAllocations : Party -> Reference -> Script (TextMap (ContractId Allocation, AllocationView))
 appBackendListAllocations p ref = do
   allocs <- queryInterface @Allocation p
   let matchingAllocs = do
         (cid, Some fundedAllocation) <- allocs
         guard (fundedAllocation.allocation.settlement.settlementRef == ref)
-        pure (cid, fundedAllocation)
-  pure $ sortOn (\(_, fundedAllocation) -> fundedAllocation.allocation.transferLegId) matchingAllocs
+        pure (fundedAllocation.allocation.transferLegId, (cid, fundedAllocation))
+  pure $ TextMap.fromList matchingAllocs
 
 expectBurn : Metadata -> Script ()
 expectBurn meta =

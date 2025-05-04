@@ -1,0 +1,36 @@
+# $XDG_CONFIG_HOME/k9s/plugins.yaml
+plugins:
+
+  # Defines a plugin to provide a `ctrl-l` shortcut to tail the logs into lnav while in pod view.
+  lnav:
+    # Define a mnemonic to invoke the plugin
+    shortCut: Ctrl-L
+    # What will be shown on the K9s menu
+    description: Pod logs (lnav)
+    # Collections of views that support this shortcut. (You can use `all`)
+    scopes:
+    - pod
+    # The command to run upon invocation. Can use Krew plugins here too!
+    command: kubectl
+    # Whether or not to run the command in background mode
+    background: false
+    # Defines the command arguments
+    args:
+    - lnav
+    - -f
+    - $NAME
+    - -n
+    - $NAMESPACE
+    - --context
+    - $CONTEXT
+  watch-events:
+    shortCut: Shift-E
+    confirm: false
+    description: Get Events
+    scopes:
+      - all
+    command: sh
+    background: false
+    args:
+      - -c
+      - "kubectl events --context $CONTEXT --namespace $NAMESPACE --for $RESOURCE_NAME.$RESOURCE_GROUP/$NAME --watch"
