@@ -27,6 +27,7 @@ Polishing changes:
   be leave space for an eventual `/v2/` version of the API.
 - Add number of `decimals` used by an instrument as a mandatory field to the instrument
   metadata returned by a registry's off-ledger endpoint
+- Switch to using text for identifying transfer legs in allocation and allocation requests.
 
 ## 2025-04-15
 

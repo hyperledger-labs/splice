@@ -1,0 +1,18 @@
+#! /usr/bin/env bash
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+if [ -z "$1" ]; then
+    _error "Usage: $0 <docker-image-reference>"
+else
+    docker_image_reference=$1
+fi
+
+set -euo pipefail
+if ! digest=$(docker buildx imagetools inspect "${docker_image_reference}" | yq .Digest); then
+    _error "Failed to inspect docker image: ${docker_image_reference}"
+    exit 1
+fi
+
+echo "${digest}"

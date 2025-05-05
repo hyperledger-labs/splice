@@ -1,0 +1,15 @@
+version: "3"
+services:
+  otel-collector:
+    image: ${OTEL_COLLECTOR_IMAGE}
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+    network_mode: host
+    environment:
+      - ENVIRONMENT=$ENVIRONMENT
+      - BUILD_USER=${BUILD_USER}
+      - BUILD_BRANCH=${BUILD_BRANCH}
+      - BUILD_NUM=${BUILD_NUM}
+      - BUILD_JOB=${BUILD_JOB}
