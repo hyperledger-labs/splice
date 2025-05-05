@@ -2776,48 +2776,6 @@
                 "createdAt" : "1971-01-01T00:00:08.000090Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "1000.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "33"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "bob::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "alice::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 18,
                 "observers" : [
@@ -3329,48 +3287,6 @@
                 "createdAt" : "1971-01-01T00:00:09.000080Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "1000.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "38"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "bob::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "alice::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 15,
                 "observers" : [
@@ -3882,48 +3798,6 @@
                 "createdAt" : "1971-01-01T00:00:10.000080Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "1000.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "43"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "bob::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "alice::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 15,
                 "observers" : [
@@ -4435,48 +4309,6 @@
                 "createdAt" : "1971-01-01T00:00:11.000080Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "1000.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "48"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "bob::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "alice::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 15,
                 "observers" : [
@@ -4988,48 +4820,6 @@
                 "createdAt" : "1971-01-01T00:00:12.000080Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "1000.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "0"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "bob::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "alice::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 15,
                 "observers" : [
@@ -5117,7 +4907,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 13,
@@ -5609,7 +5398,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 4,
@@ -5791,7 +5579,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 4,
@@ -5995,48 +5782,6 @@
                 "createdAt" : "1971-01-01T00:00:17Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "200.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "63"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "alice::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "bob::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 0,
                 "observers" : [
@@ -6101,48 +5846,6 @@
                 "createdAt" : "1971-01-01T00:00:18Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "200.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "65"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "alice::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "bob::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 0,
                 "observers" : [
@@ -6207,48 +5910,6 @@
                 "createdAt" : "1971-01-01T00:00:19Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "200.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "67"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "alice::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "bob::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 0,
                 "observers" : [
@@ -6313,48 +5974,6 @@
                 "createdAt" : "1971-01-01T00:00:20Z",
                 "createdEventBlob" : "",
                 "interfaceViews" : [
-                  {
-                    "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
-                    "viewStatus" : {
-                      "code" : 0,
-                      "details" : [
-                      ],
-                      "message" : ""
-                    },
-                    "viewValue" : {
-                      "meta" : {
-                        "values" : {
-                          
-                        }
-                      },
-                      "originalInstructionCid" : null,
-                      "status" : {
-                        "tag" : "TransferPendingReceiverAcceptance",
-                        "value" : {
-                          
-                        }
-                      },
-                      "transfer" : {
-                        "amount" : "200.0000000000",
-                        "executeBefore" : "2025-06-18T00:00:00.000000Z",
-                        "inputHoldingCids" : [
-                          "69"
-                        ],
-                        "instrumentId" : {
-                          "admin" : "dso::normalized",
-                          "id" : "Amulet"
-                        },
-                        "meta" : {
-                          "values" : {
-                            
-                          }
-                        },
-                        "receiver" : "alice::normalized",
-                        "requestedAt" : "2025-06-18T00:00:00.000000Z",
-                        "sender" : "bob::normalized"
-                      }
-                    }
-                  }
                 ],
                 "nodeId" : 0,
                 "observers" : [
@@ -6442,7 +6061,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 13,
@@ -6934,7 +6552,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 4,
@@ -7116,7 +6733,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 4,
@@ -7958,7 +7574,6 @@
                   ]
                 },
                 "implementedInterfaces" : [
-                  "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction"
                 ],
                 "interfaceId" : "#package-name:Splice.Api.Token.TransferInstructionV1:TransferInstruction",
                 "lastDescendantNodeId" : 0,

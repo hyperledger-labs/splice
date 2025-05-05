@@ -1,12 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import {
-  ensureInterfaceViewIsPresent,
+  ensureHoldingViewIsPresent,
   filtersByParty,
   getInterfaceView,
-  getKnownInterfaceView,
   getMetaKeyValue,
-  hasInterface,
+  hasHoldingInterfaceId,
   mergeMetas,
   removeParsedMetaKeys,
 } from "../apis/ledger-api-utils";
@@ -15,7 +14,6 @@ import {
   HoldingInterface,
   ReasonMetaKey,
   SenderMetaKey,
-  TransferInstructionInterface,
   TxKindMetaKey,
 } from "../constants";
 import {
@@ -28,7 +26,6 @@ import {
   Transaction,
   EmptyHoldingsChangeSummary,
   TokenStandardChoice,
-  TransferInstructionView,
 } from "./types";
 import BigNumber from "bignumber.js";
 import {
@@ -41,6 +38,7 @@ import {
   JsTransaction,
 } from "canton-json-api-v2-openapi";
 
+// TODO (#18819): handle two-step transfers
 export class TransactionParser {
   private readonly ledgerClient: LedgerJsonApi;
   private readonly partyId: string;
@@ -49,7 +47,7 @@ export class TransactionParser {
   constructor(
     transaction: JsTransaction,
     ledgerClient: LedgerJsonApi,
-    partyId: string,
+    partyId: string
   ) {
     this.ledgerClient = ledgerClient;
     this.partyId = partyId;
@@ -69,7 +67,7 @@ export class TransactionParser {
   }
 
   private async parseEvents(
-    eventsStack: LedgerApiEvent[],
+    eventsStack: LedgerApiEvent[]
   ): Promise<TokenStandardEvent[]> {
     let callStack: Array<{ parentChoiceName: string; untilNodeId: number }> =
       [];
@@ -123,36 +121,93 @@ export class TransactionParser {
 
   private parseRawCreate(
     create: LedgerApiCreatedEvent,
-    parentChoice: string,
+    parentChoice: string
   ): EventParseResult | null {
-    return this.buildRawEvent(create, create.nodeId, (payload) => {
-      return {
-        type: "Create",
-        parentChoice,
-        contractId: create.contractId,
-        offset: create.offset,
-        templateId: create.templateId,
-        payload,
-        packageName: create.packageName,
-        meta: undefined,
-      };
-    });
+    const interfaceView = getInterfaceView(create);
+    if (!interfaceView || this.partyId !== interfaceView.viewValue.owner) {
+      return null;
+    }
+    const holdingView = ensureHoldingViewIsPresent(create).viewValue;
+    const payload: Holding = {
+      contractId: create.contractId,
+      owner: holdingView.owner,
+      instrumentId: holdingView.instrumentId,
+      amount: holdingView.amount,
+      meta: holdingView.meta,
+      lock: holdingView.lock,
+    };
+    const isLocked = !!holdingView.lock;
+    const summary: HoldingsChangeSummary = {
+      amountChange: holdingView.amount,
+      numInputs: 0,
+      inputAmount: "0",
+      numOutputs: 1,
+      outputAmount: holdingView.amount,
+    };
+    return {
+      continueAfterNodeId: create.nodeId,
+      event: {
+        label: {
+          type: "RawCreate",
+          parentChoice,
+          contractId: create.contractId,
+          offset: create.offset,
+          templateId: create.templateId,
+          packageName: create.packageName,
+          payload,
+          meta: undefined,
+        },
+        unlockedHoldingsChange: {
+          creates: isLocked ? [] : [payload],
+          archives: [],
+        },
+        lockedHoldingsChange: {
+          creates: isLocked ? [payload] : [],
+          archives: [],
+        },
+        lockedHoldingsChangeSummary: isLocked
+          ? summary
+          : EmptyHoldingsChangeSummary,
+        unlockedHoldingsChangeSummary: isLocked
+          ? EmptyHoldingsChangeSummary
+          : summary,
+      },
+    };
   }
 
   private async parseRawArchive(
     archive: LedgerApiArchivedEvent,
-    parentChoice: string,
+    parentChoice: string
   ): Promise<EventParseResult | null> {
     const events = await this.getEventsForArchive(archive);
     if (!events) {
       return null;
     }
-    return this.buildRawEvent(
-      events.created.createdEvent,
-      archive.nodeId,
-      (payload) => {
-        return {
-          type: "Archive",
+    const holdingView = ensureHoldingViewIsPresent(
+      events.created.createdEvent
+    ).viewValue;
+
+    const payload: Holding = {
+      contractId: archive.contractId,
+      owner: holdingView.owner,
+      instrumentId: holdingView.instrumentId,
+      amount: holdingView.amount,
+      meta: holdingView.meta,
+      lock: holdingView.lock,
+    };
+    const isLocked = !!payload.lock;
+    const summary: HoldingsChangeSummary = {
+      amountChange: holdingView.amount,
+      numInputs: 1,
+      inputAmount: holdingView.amount,
+      numOutputs: 0,
+      outputAmount: "0",
+    };
+    return {
+      continueAfterNodeId: archive.nodeId,
+      event: {
+        label: {
+          type: "RawArchive",
           parentChoice,
           contractId: archive.contractId,
           offset: archive.offset,
@@ -162,102 +217,27 @@ export class TransactionParser {
             (archive as LedgerApiExercisedEvent).actingParties || [],
           payload,
           meta: undefined,
-        };
-      },
-    );
-  }
-
-  private buildRawEvent(
-    originalCreate: LedgerApiCreatedEvent,
-    nodeId: number,
-    buildLabel: (payload: any) => Label,
-  ): EventParseResult | null {
-    const view = getKnownInterfaceView(originalCreate);
-    let result: {
-      payload: any;
-      lockedHoldingsChange: HoldingsChange;
-      lockedHoldingsChangeSummary: HoldingsChangeSummary;
-      unlockedHoldingsChange: HoldingsChange;
-      unlockedHoldingsChangeSummary: HoldingsChangeSummary;
-      transferInstruction: TransferInstructionView | null;
-    } | null;
-    switch (view?.type) {
-      case "Holding": {
-        const holdingView = view.viewValue;
-        if (this.partyId !== holdingView.owner) {
-          result = null;
-        } else {
-          const isLocked = !!holdingView.lock;
-          const summary: HoldingsChangeSummary = {
-            amountChange: holdingView.amount,
-            numInputs: 0,
-            inputAmount: "0",
-            numOutputs: 1,
-            outputAmount: holdingView.amount,
-          };
-          result = {
-            payload: holdingView,
-            unlockedHoldingsChange: {
-              creates: isLocked ? [] : [holdingView],
-              archives: [],
-            },
-            lockedHoldingsChange: {
-              creates: isLocked ? [holdingView] : [],
-              archives: [],
-            },
-            lockedHoldingsChangeSummary: isLocked
-              ? summary
-              : EmptyHoldingsChangeSummary,
-            unlockedHoldingsChangeSummary: isLocked
-              ? EmptyHoldingsChangeSummary
-              : summary,
-            transferInstruction: null,
-          };
-        }
-        break;
-      }
-      case "TransferInstruction": {
-        const transferInstructionView = view.viewValue;
-        if (
-          ![
-            transferInstructionView.transfer.sender,
-            transferInstructionView.transfer.receiver,
-          ].some((stakeholder) => stakeholder === this.partyId)
-        ) {
-          result = null;
-        } else {
-          result = {
-            payload: transferInstructionView,
-            transferInstruction: transferInstructionView,
-            unlockedHoldingsChange: { creates: [], archives: [] },
-            lockedHoldingsChange: { creates: [], archives: [] },
-            unlockedHoldingsChangeSummary: EmptyHoldingsChangeSummary,
-            lockedHoldingsChangeSummary: EmptyHoldingsChangeSummary,
-          };
-        }
-        break;
-      }
-      default:
-        result = null;
-    }
-
-    return (
-      result && {
-        continueAfterNodeId: nodeId,
-        event: {
-          label: buildLabel(result.payload),
-          unlockedHoldingsChange: result.unlockedHoldingsChange,
-          lockedHoldingsChange: result.lockedHoldingsChange,
-          lockedHoldingsChangeSummary: result.lockedHoldingsChangeSummary,
-          unlockedHoldingsChangeSummary: result.unlockedHoldingsChangeSummary,
-          transferInstruction: result.transferInstruction,
         },
-      }
-    );
+        unlockedHoldingsChange: {
+          archives: isLocked ? [] : [payload],
+          creates: [],
+        },
+        lockedHoldingsChange: {
+          archives: isLocked ? [payload] : [],
+          creates: [],
+        },
+        lockedHoldingsChangeSummary: isLocked
+          ? summary
+          : EmptyHoldingsChangeSummary,
+        unlockedHoldingsChangeSummary: isLocked
+          ? EmptyHoldingsChangeSummary
+          : summary,
+      },
+    };
   }
 
   private async parseExercise(
-    exercise: LedgerApiExercisedEvent,
+    exercise: LedgerApiExercisedEvent
   ): Promise<EventParseResult | null> {
     let result: ParsedKnownExercisedEvent | null = null;
     const tokenStandardChoice = {
@@ -269,26 +249,16 @@ export class TransactionParser {
       case "TransferFactory_Transfer":
         result = await this.buildTransfer(exercise, tokenStandardChoice);
         break;
-      case "TransferInstruction_Accept":
-      case "TransferInstruction_Reject":
-      case "TransferInstruction_Withdraw":
-      case "TransferInstruction_Update":
-        result = await this.buildFromTransferInstructionExercise(
-          exercise,
-          tokenStandardChoice,
-        );
-        break;
       case "BurnMintFactory_BurnMint":
         result = await this.buildMergeSplit(exercise, tokenStandardChoice);
         break;
-      default: {
+      default:
         const meta = mergeMetas(exercise);
         const txKind = getMetaKeyValue(TxKindMetaKey, meta);
         if (txKind) {
           result = await this.parseViaTxKind(exercise, txKind);
         }
         break;
-      }
     }
     if (!result) {
       return {
@@ -299,18 +269,18 @@ export class TransactionParser {
       // only this.partyId's holdings should be included in the response
       const lockedHoldingsChange: HoldingsChange = {
         creates: result.children.creates.filter(
-          (h) => !!h.lock && h.owner === this.partyId,
+          (h) => !!h.lock && h.owner === this.partyId
         ),
         archives: result.children.archives.filter(
-          (h) => !!h.lock && h.owner === this.partyId,
+          (h) => !!h.lock && h.owner === this.partyId
         ),
       };
       const unlockedHoldingsChange: HoldingsChange = {
         creates: result.children.creates.filter(
-          (h) => !h.lock && h.owner === this.partyId,
+          (h) => !h.lock && h.owner === this.partyId
         ),
         archives: result.children.archives.filter(
-          (h) => !h.lock && h.owner === this.partyId,
+          (h) => !h.lock && h.owner === this.partyId
         ),
       };
       return {
@@ -319,14 +289,13 @@ export class TransactionParser {
           lockedHoldingsChange,
           lockedHoldingsChangeSummary: computeSummary(
             lockedHoldingsChange,
-            this.partyId,
+            this.partyId
           ),
           unlockedHoldingsChange,
           unlockedHoldingsChangeSummary: computeSummary(
             unlockedHoldingsChange,
-            this.partyId,
+            this.partyId
           ),
-          transferInstruction: result.transferInstruction,
         },
         continueAfterNodeId: exercise.lastDescendantNodeId,
       };
@@ -335,7 +304,7 @@ export class TransactionParser {
 
   private async parseViaTxKind(
     exercisedEvent: LedgerApiExercisedEvent,
-    txKind: string,
+    txKind: string
   ): Promise<ParsedKnownExercisedEvent | null> {
     switch (txKind) {
       case "transfer":
@@ -350,26 +319,24 @@ export class TransactionParser {
         return await this.buildBasic(exercisedEvent, "ExpireDust", null);
       default:
         throw new Error(
-          `Unknown tx-kind '${txKind}' in ${JSON.stringify(exercisedEvent)}`,
+          `Unknown tx-kind '${txKind}' in ${JSON.stringify(exercisedEvent)}`
         );
     }
   }
 
   private async buildTransfer(
     exercisedEvent: LedgerApiExercisedEvent,
-    tokenStandardChoice: TokenStandardChoice | null,
-    senderFromTransferInstruction?: string,
+    tokenStandardChoice: TokenStandardChoice | null
   ): Promise<ParsedKnownExercisedEvent | null> {
     const meta = mergeMetas(exercisedEvent);
     const reason = getMetaKeyValue(ReasonMetaKey, meta);
     const sender: string =
-      senderFromTransferInstruction ||
       getMetaKeyValue(SenderMetaKey, meta) ||
       exercisedEvent.choiceArgument.transfer.sender;
     if (!sender) {
       console.error(
         `Malformed transfer didn't contain sender. Will instead attempt to parse the children.
-        Transfer: ${JSON.stringify(exercisedEvent)}`,
+        Transfer: ${JSON.stringify(exercisedEvent)}`
       );
       return null;
     }
@@ -382,12 +349,13 @@ export class TransactionParser {
         receiverAmounts.set(
           holding.owner,
           (receiverAmounts.get(holding.owner) || BigNumber("0")).plus(
-            BigNumber(holding.amount),
-          ),
-        ),
+            BigNumber(holding.amount)
+          )
+        )
       );
     const amountChanges = computeAmountChanges(children, meta, this.partyId);
 
+    // TODO (#18819): when supporting two-step transfers, use a better type as opposed to TransferX to aid readability
     let label: Label;
     if (receiverAmounts.size === 0) {
       label = {
@@ -420,25 +388,16 @@ export class TransactionParser {
         meta,
       };
     }
-    const transferInstruction: TransferInstructionView = {
-      originalInstructionCid: null,
-      transfer: exercisedEvent.choiceArgument.transfer,
-      status: {
-        before: null,
-      },
-      meta: null,
-    };
 
     return {
       label,
       children,
-      transferInstruction,
     };
   }
 
   private async buildMergeSplit(
     exercisedEvent: LedgerApiExercisedEvent,
-    tokenStandardChoice: TokenStandardChoice | null,
+    tokenStandardChoice: TokenStandardChoice | null
   ): Promise<ParsedKnownExercisedEvent> {
     let type: "MergeSplit" | "Mint" | "Burn";
     const meta = mergeMetas(exercisedEvent);
@@ -467,69 +426,13 @@ export class TransactionParser {
     return {
       label,
       children,
-      transferInstruction: null,
     };
-  }
-
-  private async buildFromTransferInstructionExercise(
-    exercisedEvent: LedgerApiExercisedEvent,
-    tokenStandardChoice: TokenStandardChoice,
-  ): Promise<ParsedKnownExercisedEvent | null> {
-    const transferInstructionEvents =
-      await this.getEventsForArchive(exercisedEvent);
-    if (!transferInstructionEvents) {
-      throw new Error(
-        `Transfer instruction events not found when looking them up for ${JSON.stringify(
-          exercisedEvent,
-        )}`,
-      );
-    }
-    const transferInstructionView = ensureInterfaceViewIsPresent(
-      transferInstructionEvents.created.createdEvent,
-      TransferInstructionInterface,
-    ).viewValue;
-    const transferInstruction: TransferInstructionView = {
-      originalInstructionCid: transferInstructionView.originalInstructionCid,
-      transfer: transferInstructionView.transfer,
-      meta: transferInstructionView.meta,
-      status: {
-        before: transferInstructionView.status,
-      },
-    };
-
-    let result: ParsedKnownExercisedEvent | null = null;
-    switch (exercisedEvent.exerciseResult.output.tag) {
-      case "TransferInstructionResult_Failed":
-      case "TransferInstructionResult_Pending":
-        result = await this.buildMergeSplit(
-          exercisedEvent,
-          tokenStandardChoice,
-        );
-        break;
-      case "TransferInstructionResult_Completed":
-        result = await this.buildTransfer(
-          exercisedEvent,
-          tokenStandardChoice,
-          transferInstruction.transfer.sender,
-        );
-        break;
-      default:
-        throw new Error(
-          `Unknown TransferInstructionResult: ${exercisedEvent.exerciseResult.output.tag}`,
-        );
-    }
-    return (
-      result && {
-        ...result,
-        transferInstruction,
-      }
-    );
   }
 
   private async buildBasic(
     exercisedEvent: LedgerApiExercisedEvent,
     type: "Unlock" | "ExpireDust",
-    tokenStandardChoice: TokenStandardChoice | null,
+    tokenStandardChoice: TokenStandardChoice | null
   ): Promise<ParsedKnownExercisedEvent> {
     const children = await this.getChildren(exercisedEvent);
     const meta = mergeMetas(exercisedEvent);
@@ -544,12 +447,11 @@ export class TransactionParser {
         meta,
       },
       children,
-      transferInstruction: null,
     };
   }
 
   private async getChildren(
-    exercisedEvent: LedgerApiExercisedEvent,
+    exercisedEvent: LedgerApiExercisedEvent
   ): Promise<HoldingsChange> {
     const mutatingResult: HoldingsChange = { creates: [], archives: [] };
     const childrenEventsSlice = (this.transaction.events || [])
@@ -557,18 +459,14 @@ export class TransactionParser {
       .filter(
         ({ nodeId }) =>
           nodeId > exercisedEvent.nodeId &&
-          nodeId <= exercisedEvent.lastDescendantNodeId,
+          nodeId <= exercisedEvent.lastDescendantNodeId
       );
 
-    if (
-      exercisedEvent.consuming &&
-      hasInterface(HoldingInterface, exercisedEvent)
-    ) {
+    if (exercisedEvent.consuming && hasHoldingInterfaceId(exercisedEvent)) {
       const selfEvent = await this.getEventsForArchive(exercisedEvent);
       if (selfEvent) {
-        const holdingView = ensureInterfaceViewIsPresent(
-          selfEvent.created.createdEvent,
-          HoldingInterface,
+        const holdingView = ensureHoldingViewIsPresent(
+          selfEvent.created.createdEvent
         ).viewValue;
         mutatingResult.archives.push({
           amount: holdingView.amount,
@@ -588,10 +486,7 @@ export class TransactionParser {
     } of childrenEventsSlice) {
       if (createdEvent) {
         const interfaceView = getInterfaceView(createdEvent);
-        if (
-          interfaceView &&
-          HoldingInterface.matches(interfaceView.interfaceId)
-        ) {
+        if (interfaceView) {
           const holdingView = interfaceView.viewValue;
           mutatingResult.creates.push({
             amount: holdingView.amount,
@@ -603,18 +498,17 @@ export class TransactionParser {
           });
         }
       } else if (
-        (archivedEvent && hasInterface(HoldingInterface, archivedEvent)) ||
+        archivedEvent ||
         (exercisedEvent &&
           exercisedEvent.consuming &&
-          hasInterface(HoldingInterface, exercisedEvent))
+          hasHoldingInterfaceId(exercisedEvent))
       ) {
         const contractEvents = await this.getEventsForArchive(
-          archivedEvent || exercisedEvent!,
+          archivedEvent || exercisedEvent!
         );
         if (contractEvents) {
-          const holdingView = ensureInterfaceViewIsPresent(
-            contractEvents.created?.createdEvent,
-            HoldingInterface,
+          const holdingView = ensureHoldingViewIsPresent(
+            contractEvents.created?.createdEvent
           ).viewValue;
           mutatingResult.archives.push({
             amount: holdingView.amount,
@@ -633,20 +527,20 @@ export class TransactionParser {
       creates: mutatingResult.creates.filter(
         (create) =>
           !mutatingResult.archives.some(
-            (archive) => create.contractId === archive.contractId,
-          ),
+            (archive) => create.contractId === archive.contractId
+          )
       ),
       archives: mutatingResult.archives.filter(
         (archive) =>
           !mutatingResult.creates.some(
-            (create) => create.contractId === archive.contractId,
-          ),
+            (create) => create.contractId === archive.contractId
+          )
       ),
     };
   }
 
   private async getEventsForArchive(
-    archivedEvent: LedgerApiArchivedEvent | LedgerApiExercisedEvent,
+    archivedEvent: LedgerApiArchivedEvent | LedgerApiExercisedEvent
   ): Promise<null | Required<JsGetEventsByContractIdResponse>> {
     if (!(archivedEvent.witnessParties || []).includes(this.partyId)) {
       return null;
@@ -657,8 +551,8 @@ export class TransactionParser {
         eventFormat: {
           filtersByParty: filtersByParty(
             this.partyId,
-            [HoldingInterface, TransferInstructionInterface],
-            true,
+            [HoldingInterface],
+            true
           ),
           verbose: false,
         },
@@ -684,8 +578,8 @@ export class TransactionParser {
         `Archival of ${
           archivedEvent.contractId
         } does not have a corresponding create/archive event: ${JSON.stringify(
-          events,
-        )}`,
+          events
+        )}`
       );
     }
     return { created, archived };
@@ -708,7 +602,6 @@ interface ParseChildren {
 interface ParsedKnownExercisedEvent {
   label: Label;
   children: HoldingsChange;
-  transferInstruction: TransferInstructionView | null;
 }
 
 // a naive implementation like event.X?.nodeId || event.Y?.nodeId || event.Z?.nodeId fails when nodeId=0
@@ -732,53 +625,51 @@ function getNodeIdAndEvent(event: LedgerApiEvent): NodeIdAndEvent {
         exercisedEvent: event.ExercisedEvent,
       };
     }
-  } else if (event.CreatedEvent) {
+  } else if (event.CreatedEvent)
     return {
       nodeId: event.CreatedEvent.nodeId,
       createdEvent: event.CreatedEvent,
     };
-  } else if (event.ArchivedEvent) {
+  else if (event.ArchivedEvent)
     return {
       nodeId: event.ArchivedEvent.nodeId,
       archivedEvent: event.ArchivedEvent,
     };
-  } else {
-    throw new Error(`Impossible event type: ${event}`);
-  }
+  else throw new Error(`Impossible event type: ${event}`);
 }
 
 function sumHoldingsChange(
   change: HoldingsChange,
-  filter: (owner: string, lock: HoldingLock | null) => boolean,
+  filter: (owner: string, lock: HoldingLock | null) => boolean
 ): BigNumber {
   return sumHoldings(
-    change.creates.filter((create) => filter(create.owner, create.lock)),
+    change.creates.filter((create) => filter(create.owner, create.lock))
   ).minus(
     sumHoldings(
-      change.archives.filter((archive) => filter(archive.owner, archive.lock)),
-    ),
+      change.archives.filter((archive) => filter(archive.owner, archive.lock))
+    )
   );
 }
 
 function sumHoldings(holdings: Holding[]): BigNumber {
   return BigNumber.sum(
-    ...holdings.map((h) => h.amount).concat(["0"]), // avoid NaN
+    ...holdings.map((h) => h.amount).concat(["0"]) // avoid NaN
   );
 }
 
 function computeAmountChanges(
   children: HoldingsChange,
   meta: any,
-  partyId: string,
+  partyId: string
 ) {
   const burnAmount = BigNumber(getMetaKeyValue(BurnedMetaKey, meta) || "0");
   const partyHoldingAmountChange = sumHoldingsChange(
     children,
-    (owner) => owner === partyId,
+    (owner) => owner === partyId
   );
   const otherPartiesHoldingAmountChange = sumHoldingsChange(
     children,
-    (owner) => owner !== partyId,
+    (owner) => owner !== partyId
   );
   const mintAmount = partyHoldingAmountChange
     .plus(burnAmount)
@@ -791,7 +682,7 @@ function computeAmountChanges(
 
 function computeSummary(
   changes: HoldingsChange,
-  partyId: string,
+  partyId: string
 ): HoldingsChangeSummary {
   const amountChange = sumHoldingsChange(changes, (owner) => owner === partyId);
   const outputAmount = sumHoldings(changes.creates);

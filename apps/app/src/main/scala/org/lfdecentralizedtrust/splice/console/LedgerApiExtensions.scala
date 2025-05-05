@@ -24,22 +24,19 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.provider.jce.JcePureCrypto
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPrivateKey}
-import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
+import com.digitalasset.canton.data.DeduplicationPeriod
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
-import org.scalatest.AppendedClues
-import org.scalatest.matchers.should.Matchers
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 
-trait LedgerApiExtensions extends AppendedClues with Matchers {
+trait LedgerApiExtensions {
   implicit class LedgerApiSyntax(
       private val ledgerApi: BaseLedgerApiAdministration with LedgerApiCommandRunner
   ) {
@@ -108,7 +105,6 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
           "Submit command for an external or a local party.",
           FeatureFlag.Testing,
         )
-        @nowarn(raw"msg=unused value of type org.scalatest.Assertion")
         def submitJavaExternalOrLocal(
             actingParty: RichPartyId,
             commands: Seq[javaapi.data.Command],
@@ -119,13 +115,9 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             minLedgerTimeAbs: Option[Instant] = None,
             userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-            expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
-            advanceTimeBeforeExecute: Option[Duration] = None,
         )(implicit tc: TraceContext): Unit = {
           actingParty.externalSigningInfo match {
             case None =>
-              expectedTimeBounds shouldBe None withClue ("Time bounds should not be set for local submissions as they are ignored")
-              advanceTimeBeforeExecute shouldBe None withClue ("advanceTimeBeforeExecute should not be set for local submissions as it is ignored")
               val _ = submitJava(
                 actAs = Seq(actingParty.partyId),
                 commands = commands,
@@ -151,8 +143,6 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 minLedgerTimeAbs = minLedgerTimeAbs,
                 userId = userId,
                 disclosedContracts = disclosedContracts,
-                expectedTimeBounds = expectedTimeBounds,
-                advanceTimeBeforeExecute = advanceTimeBeforeExecute,
               )
           }
         }
@@ -173,8 +163,6 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             minLedgerTimeAbs: Option[Instant] = None,
             userId: String = LedgerApiCommands.defaultUserId,
             disclosedContracts: Seq[CommandsOuterClass.DisclosedContract] = Seq.empty,
-            expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
-            advanceTimeBeforeExecute: Option[Duration] = None,
         )(implicit tc: TraceContext): Unit = {
           val preparedTx =
             ledgerApi.ledger_api.interactive_submission.prepare(
@@ -195,23 +183,6 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
               userPackageSelectionPreference = Seq.empty,
               verboseHashing = true,
             )
-
-          val metadata = preparedTx.getPreparedTransaction.getMetadata
-          expectedTimeBounds.foreach { case (min, max) =>
-            (
-              metadata.minLedgerEffectiveTime.fold(CantonTimestamp.MinValue)(
-                CantonTimestamp.assertFromLong(_)
-              ),
-              metadata.maxLedgerEffectiveTime.fold(CantonTimestamp.MaxValue)(
-                CantonTimestamp.assertFromLong(_)
-              ),
-            ) shouldBe (min, max)
-          }
-
-          advanceTimeBeforeExecute.foreach { duration =>
-            val now = ledgerApi.ledger_api.time.get()
-            ledgerApi.ledger_api.time.set(now, now.plus(duration))
-          }
 
           val _ = ledgerApi.ledger_api.interactive_submission.execute(
             preparedTransaction = preparedTx.getPreparedTransaction,

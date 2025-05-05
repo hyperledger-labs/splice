@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
+import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -12,10 +13,13 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider.{
   RetryableConditions,
 }
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.base.error.utils.ErrorDetails
+import io.grpc.protobuf.StatusProto
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
+import io.grpc.Status
 
 /** An abstract interface for triggers that keep track of some list of tasks.
   *
@@ -33,6 +37,8 @@ abstract class TaskbasedTrigger[T: Pretty](
     "trigger_name" -> this.getClass.getSimpleName(),
     "trigger_type" -> "taskbased",
   ).withExtraLabels(extraMetricLabels*)
+
+  protected val retryForAutomation: RetryFor = RetryFor.Automation
 
   /** How to complete a task.
     *
@@ -88,7 +94,7 @@ abstract class TaskbasedTrigger[T: Pretty](
         .flatMap(_ =>
           context.retryProvider
             .retry(
-              RetryFor.Automation,
+              retryForAutomation,
               "processTaskWithRetry",
               "processTaskWithRetry",
               // If the trigger is currently disabled, then this is delaying the retry until the trigger is enabled again.
@@ -96,7 +102,54 @@ abstract class TaskbasedTrigger[T: Pretty](
               // It does mean that the overall `processTaskWithRetry` call can take an arbitrarily long time to complete
               // if the trigger is disabled in the middle of retrying.
               waitForReadyToWork()
-                .flatMap(_ => processTaskWithStalenessCheck()),
+                .flatMap(_ => processTaskWithStalenessCheck())
+                .transform { result =>
+                  val isDsoDelegateTrigger = this.getClass.getInterfaces
+                    .map(_.getSimpleName)
+                    .contains("SvTaskBasedTrigger")
+                  result match {
+                    case Failure(ex) =>
+                      ex match {
+                        case GrpcException(status @ GrpcStatus(statusCode, _), trailers) =>
+                          val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+                          val errorDetails = ErrorDetails.from(statusProto)
+                          val errorCodeId = errorDetails
+                            .flatMap {
+                              case ed: ErrorDetails.ErrorInfoDetail =>
+                                Some(ed.errorCodeId)
+                              case _ => None
+                            }
+                            .headOption
+                            .getOrElse("none")
+                          MetricsContext.withExtraMetricLabels(
+                            ("statusCode", statusCode.toStatus.getCode.toString),
+                            ("errorCodeId", errorCodeId),
+                            ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                          ) { m =>
+                            metrics.attempted.mark()(m)
+                          }
+                          Failure(ex)
+                        case _ =>
+                          MetricsContext.withExtraMetricLabels(
+                            ("statusCode", Status.UNKNOWN.getCode.toString),
+                            ("errorCodeId", "none"),
+                            ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                          ) { m =>
+                            metrics.attempted.mark()(m)
+                          }
+                          Failure(ex)
+                      }
+                    case Success(_) =>
+                      MetricsContext.withExtraMetricLabels(
+                        ("statusCode", Status.OK.getCode.toString),
+                        ("errorCodeId", "none"),
+                        ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                      ) { m =>
+                        metrics.attempted.mark()(m)
+                      }
+                      result
+                  }
+                },
               logger,
               additionalRetryableConditions,
               mc.labels,

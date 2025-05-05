@@ -4,7 +4,6 @@
 {-# LANGUAGE MultiWayIf #-}
 module Splice.ExternalPartyAmuletRules where
 
-import DA.Assert
 import DA.Foldable (forA_)
 import DA.Optional
 

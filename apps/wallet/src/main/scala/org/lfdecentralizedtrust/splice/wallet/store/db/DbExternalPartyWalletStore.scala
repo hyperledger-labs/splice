@@ -9,13 +9,12 @@ import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescr
 import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
 import org.lfdecentralizedtrust.splice.store.LimitHelpers
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
-import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
+import org.lfdecentralizedtrust.splice.wallet.store.{ExternalPartyWalletStore}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 
 import scala.concurrent.*
 
@@ -47,7 +46,6 @@ class DbExternalPartyWalletStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = false,
-      BackfillingRequirement.BackfillingNotRequired,
     )
     with ExternalPartyWalletStore
     with AcsTables
