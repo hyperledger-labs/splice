@@ -16,7 +16,6 @@ import org.lfdecentralizedtrust.splice.store.{
   MultiDomainAcsStore,
   PageLimit,
   SortOrder,
-  TxLogAppStore,
   VotesStore,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
@@ -53,9 +52,9 @@ import java.time.Instant
 
 final case class ScanInfo(publicUrl: String, svName: String)
 
+/** Utility class grouping the two kinds of stores managed by the DsoApp. */
 trait ScanStore
     extends AppStore
-    with TxLogAppStore[TxLogEntry]
     with PackageIdResolver.HasAmuletRules
     with DsoRulesStore
     with MiningRoundsStore

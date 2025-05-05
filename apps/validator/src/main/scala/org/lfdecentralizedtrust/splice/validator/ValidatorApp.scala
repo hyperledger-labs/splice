@@ -790,8 +790,6 @@ class ValidatorApp(
             config.supportsSoftDomainMigrationPoc,
             dedupDuration,
             config.parameters.enableCantonPackageSelection,
-            txLogBackfillEnabled = config.txLogBackfillEnabled,
-            txLogBackfillingBatchSize = config.txLogBackfillBatchSize,
           )
           Some(walletManager)
         } else {

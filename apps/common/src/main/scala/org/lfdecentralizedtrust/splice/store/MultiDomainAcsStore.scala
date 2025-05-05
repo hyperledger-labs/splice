@@ -40,13 +40,12 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -247,24 +246,9 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
 
   /** Testing API: lookup last ingested offset */
   private[store] def lookupLastIngestedOffset()(implicit tc: TraceContext): Future[Option[Long]]
-
-  def initializeTxLogBackfilling()(implicit tc: TraceContext): Future[Unit]
-
-  def getTxLogBackfillingState()(implicit
-      tc: TraceContext
-  ): Future[TxLogBackfillingState]
-
-  def destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse]
 }
 
 object MultiDomainAcsStore {
-
-  sealed trait TxLogBackfillingState
-  object TxLogBackfillingState {
-    case object Complete extends TxLogBackfillingState
-    case object InProgress extends TxLogBackfillingState
-    case object NotInitialized extends TxLogBackfillingState
-  }
 
   trait HasIngestionSink {
     def ingestionSink: MultiDomainAcsStore.IngestionSink

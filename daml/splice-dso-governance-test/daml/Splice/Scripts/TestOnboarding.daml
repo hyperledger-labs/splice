@@ -247,7 +247,7 @@ testSvOnboarding = do
 
 testSvOnboardingRequestExpiry : Script ()
 testSvOnboardingRequestExpiry = do
-  (app, _, (_, sv2, _, _)) <- initMainNet
+  (app, _, (sv1, sv2, _, _)) <- initMainNet
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -262,21 +262,21 @@ testSvOnboardingRequestExpiry = do
 
   -- DSO delegate tries to expire the onboarding, but it's too early
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+    DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid (Some sv1)
 
   -- wait for the onboarding to expire
   passTime (hours 25)
 
   -- DSO delegate expires the onboarding
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+    DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid (Some sv1)
 
   pure ()
 
 
 testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV : Script ()
 testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
-  (app, dso, (_, sv2, _, _)) <- initMainNet
+  (app, dso, (sv1, sv2, _, _)) <- initMainNet
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -293,7 +293,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
 
   -- DSO delegate cannot archive the onboarding as svX is not yet added as sv
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+    DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid (Some sv1)
 
   -- create a SvOnboardingConfirmed contract
   submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
@@ -305,7 +305,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
 
   -- DSO delegate can archive the onboarding as svX is added as sv
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
-    DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
+    DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid (Some sv1)
 
   -- check status report invaraints
   checkSvContractInvariants app
@@ -313,7 +313,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
 
 testSvOnboardingConfirmedExpiry : Script ()
 testSvOnboardingConfirmedExpiry = do
-  (app, dso, (_, sv2, sv3, sv4)) <- initMainNet
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -337,7 +337,7 @@ testSvOnboardingConfirmedExpiry = do
 
   -- DSO delegate tries to expire the confirmation but it's too early
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
+    DsoRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid (Some sv1)
 
   -- wait for the confirmation to expire
   passTime (hours 25)
@@ -346,6 +346,7 @@ testSvOnboardingConfirmedExpiry = do
   _ <- dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireSvOnboardingConfirmed with
         cid = svOnboardingConfirmedCid
+        sv = Some sv1
 
   [(_, dsoRules)] <- query @DsoRules dso
   Map.keys (dsoRules.offboardedSvs) === [svX]
@@ -507,7 +508,7 @@ test_MergeValidatorLicense = do
 
   -- the license with the highest lastReceivedFor is kept
   [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid])
+  DsoRules_MergeValidatorLicenseResult validatorLicenseCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicense1Cid, validatorLicense2Cid] (Some sv1))
   validatorLicenses <- queryFilter @ValidatorLicense dso (\license -> license.validator == v1)
   length validatorLicenses === 1
   (head validatorLicenses)._2.faucetState === Some FaucetState with
@@ -516,10 +517,10 @@ test_MergeValidatorLicense = do
     numCouponsMissed = 0
 
   -- we can't merge a single contract
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3])
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3] (Some sv1))
 
   -- we can't merge contracts for different validator names
   [(validatorLicenseSv2Cid, _)] <- queryFilter @ValidatorLicense dso (\license -> license.validator == sv2)
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid])
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid] (Some sv1))
 
   pure()

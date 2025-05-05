@@ -14,7 +14,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.scalatest.Succeeded
 
 import java.time.Instant
@@ -695,7 +694,6 @@ class AcsSnapshotStoreTest
       "update_history_acs_snapshot_test",
       mkParticipantId(participantId),
       dsoParty,
-      BackfillingRequirement.BackfillingNotRequired,
       loggerFactory,
       true,
     )

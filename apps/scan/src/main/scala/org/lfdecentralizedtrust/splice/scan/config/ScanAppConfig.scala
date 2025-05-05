@@ -48,8 +48,6 @@ case class ScanAppBackendConfig(
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
-    txLogBackfillEnabled: Boolean = false,
-    txLogBackfillBatchSize: Int = 100,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

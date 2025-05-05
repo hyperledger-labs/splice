@@ -19,8 +19,8 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Codec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
-import io.circe.{Codec, Decoder, Encoder}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Flow
@@ -219,7 +219,7 @@ final case class JsGetActiveContractsResponse(
 object JsStateServiceCodecs {
 
   import JsSchema.*
-  import JsSchema.JsServicesCommonCodecs.*
+  import io.circe.generic.extras.auto.*
 
   implicit val getActiveContractsRequestRW: Codec[state_service.GetActiveContractsRequest] =
     deriveRelaxedCodec
@@ -244,11 +244,8 @@ object JsStateServiceCodecs {
   implicit val connectedSynchronizerRW
       : Codec[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
     deriveRelaxedCodec
-  implicit val participantPermissionEncoder: Encoder[state_service.ParticipantPermission] =
-    stringEncoderForEnum()
-
-  implicit val participantPermissionDecoder: Decoder[state_service.ParticipantPermission] =
-    stringDecoderForEnum()
+  implicit val participantPermissionRW: Codec[state_service.ParticipantPermission] =
+    deriveConfiguredCodec // ADT
 
   implicit val getLedgerEndRequestRW: Codec[state_service.GetLedgerEndRequest] = deriveRelaxedCodec
 
@@ -268,6 +265,6 @@ object JsStateServiceCodecs {
     Schema.oneOfWrapped
 
   implicit val participantPermissionSchema: Schema[state_service.ParticipantPermission] =
-    Schema.string
+    Schema.oneOfWrapped
 
 }

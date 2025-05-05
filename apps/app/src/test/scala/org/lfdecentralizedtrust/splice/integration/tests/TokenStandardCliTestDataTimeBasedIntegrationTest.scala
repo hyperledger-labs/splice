@@ -15,9 +15,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   UpdateFormat,
   WildcardFilter,
 }
-import com.daml.ledger.javaapi.data.Identifier
 import com.digitalasset.canton.admin.api.client.data.TemplateId
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent
 import com.digitalasset.canton.http.json.v2.{
   JsContractEntry,
@@ -47,7 +45,6 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 }
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -65,12 +62,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     with HasActorSystem
     with TimeTestUtil
     with HasExecutionContext {
-
-  override protected lazy val tokenStandardCliBehavior
-      : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
-    TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreForTemplateIds(
-      Seq(DummyHolding.TEMPLATE_ID)
-    )
 
   private val dummyHoldingDarPath = Paths
     .get(
@@ -97,10 +88,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )
   }
 
-  private val interfaces: Seq[Identifier] =
+  private val interfaces =
     Seq(
       transferinstructionv1.TransferFactory.TEMPLATE_ID,
-      transferinstructionv1.TransferInstruction.TEMPLATE_ID,
       holdingv1.Holding.TEMPLATE_ID,
     )
 
@@ -257,17 +247,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             },
           )
           actAndCheck(
-            "Bob accepts transfer instruction #1", {
-              val now = env.environment.clock.now
-              acceptTransferInstruction(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob,
-                bobInstructionCids(0),
-                // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
-                // so the lower bound is 1min in the past.
-                expectedTimeBounds = Some((now.minusSeconds(60), now.plusSeconds(60).addMicros(-1))),
-              )
-            },
+            "Bob accepts transfer instruction #1",
+            acceptTransferInstruction(
+              bobValidatorBackend.participantClientWithAdminToken,
+              bob,
+              bobInstructionCids(0),
+            ),
           )(
             "Bob sees the funds",
             _ =>
@@ -281,7 +266,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
                 bobInstructionCids(1),
-                expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
               )
               withdrawTransferInstruction(
                 aliceValidatorBackend.participantClientWithAdminToken,
@@ -318,14 +302,12 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             val (_, aliceInstructionCids) = actAndCheck(
               "Bob creates 4 transfers to Alice who has no longer a pre-approval",
               for (_ <- 1 to 4) {
-                val now = env.environment.clock.now
                 executeTransferViaTokenStandard(
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob,
                   alice.partyId,
                   BigDecimal("200.0"),
                   transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
-                  expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
                 )
               },
             )(
@@ -363,7 +345,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                     bobValidatorBackend.participantClientWithAdminToken,
                     bob,
                     aliceInstructionCids(2),
-                    expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
                   )
                 }
               },
@@ -381,17 +362,14 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
 
           // Test self-transfer for party w/o pre-approval
           actAndCheck(
-            "Bob splits his holdings into two using a self-transfer", {
-              val now = env.environment.clock.now
-              executeTransferViaTokenStandard(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob,
-                bob.partyId,
-                BigDecimal("250.0"),
-                transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
-                expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
-              )
-            },
+            "Bob splits his holdings into two using a self-transfer",
+            executeTransferViaTokenStandard(
+              bobValidatorBackend.participantClientWithAdminToken,
+              bob,
+              bob.partyId,
+              BigDecimal("250.0"),
+              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
+            ),
           )(
             "Bob's has three holdings and the balance remained the same (modulo fees)",
             _ => {
@@ -460,14 +438,10 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           }
           actAndCheck(
             "Bob rejects instruction #4, whose backing amulet has already been archived", {
-              val now = env.environment.clock.now
               rejectTransferInstruction(
                 bobValidatorBackend.participantClientWithAdminToken,
                 bob,
                 instrAboutToExpire,
-                // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
-                // so the lower bound is 1min in the past.
-                expectedTimeBounds = Some((now.minusSeconds(60), CantonTimestamp.MaxValue)),
               )
             },
           )(
@@ -504,13 +478,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
             GetActiveContractsRequest(
               filter = Some(
-                TransactionFilter(
-                  filtersByParty(
-                    alice.partyId,
-                    Seq(holdingv1.Holding.TEMPLATE_ID),
-                    includeWildcard = false,
-                  )
-                )
+                TransactionFilter(filtersByParty(alice.partyId, includeWildcard = false))
               ),
               activeAtOffset =
                 aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
@@ -533,11 +501,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                   Some(
                     TransactionFormat(
                       transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
-                      eventFormat = Some(
-                        EventFormat(
-                          filtersByParty(alice.partyId, interfaces, includeWildcard = true)
-                        )
-                      ),
+                      eventFormat =
+                        Some(EventFormat(filtersByParty(alice.partyId, includeWildcard = true))),
                     )
                   )
                 )
@@ -768,18 +733,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             event_query_service.GetEventsByContractIdRequest(
               cid,
               Seq.empty,
-              Some(
-                EventFormat(
-                  filtersByParty(
-                    alice.partyId,
-                    Seq(
-                      holdingv1.Holding.TEMPLATE_ID,
-                      transferinstructionv1.TransferInstruction.TEMPLATE_ID,
-                    ),
-                    includeWildcard = true,
-                  )
-                )
-              ),
+              Some(EventFormat(filtersByParty(alice.partyId, includeWildcard = true))),
             )
           ),
           JsEventServiceCodecs.jsGetEventsByContractIdResponseRW,
@@ -818,7 +772,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     }
   }
 
-  private val jsonApiPort = 16501
+  private val jsonApiPort = 16201
   private def makeJsonApiV2Request[R](subPath: String, payload: Json, decode: Decoder[R])(implicit
       env: SpliceTestConsoleEnvironment
   ): R =
@@ -854,11 +808,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
     }
   }
 
-  private def filtersByParty(
-      party: PartyId,
-      interfaces: Seq[Identifier],
-      includeWildcard: Boolean,
-  ) = Map(
+  private def filtersByParty(party: PartyId, includeWildcard: Boolean) = Map(
     party.toProtoPrimitive -> Filters(
       interfaces.map(interface =>
         CumulativeFilter(

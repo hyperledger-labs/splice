@@ -17,6 +17,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class TerminatedSubscriptionTrigger(
     override protected val context: TriggerContext,
@@ -41,13 +42,15 @@ class TerminatedSubscriptionTrigger(
       task: AssignedContract[
         subsCodegen.TerminatedSubscription.ContractId,
         subsCodegen.TerminatedSubscription,
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       ansEntryContextO <- svTaskContext.dsoStore.lookupAnsEntryContext(
         task.contract.payload.reference
       )
       dsoRules <- svTaskContext.dsoStore.getDsoRules()
+      supportsSvController <- supportsSvController()
       _ <- ansEntryContextO match {
         case None =>
           throw Status.NOT_FOUND
@@ -65,6 +68,9 @@ class TerminatedSubscriptionTrigger(
                   _.exerciseDsoRules_TerminateSubscription(
                     ansEntryContext.contractId,
                     task.contractId,
+                    Option
+                      .when(supportsSvController)(controller)
+                      .toJava,
                   )
                 ),
               )
@@ -76,4 +82,5 @@ class TerminatedSubscriptionTrigger(
       "Archived AnsEntryContext because corresponding subscription got terminated"
     )
   }
+
 }

@@ -24,6 +24,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class AnsSubscriptionRenewalPaymentTrigger(
     override protected val context: TriggerContext,
@@ -57,7 +58,8 @@ class AnsSubscriptionRenewalPaymentTrigger(
       subscriptionPayment: AssignedContract[
         SubscriptionPayment.ContractId,
         SubscriptionPayment,
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, _) = subscriptionPayment
     dsoStore.lookupAnsEntryContext(subscriptionPayment.contract.payload.reference).flatMap {
@@ -73,6 +75,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
                     payment.contractId,
                     entry,
                     transferContext,
+                    controller,
                   )
                 case None =>
                   if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
@@ -106,9 +109,11 @@ class AnsSubscriptionRenewalPaymentTrigger(
       paymentCid: SubscriptionPayment.ContractId,
       entry: AssignedContract[AnsEntry.ContractId, AnsEntry],
       transferContext: AppTransferContext,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
+    supportsSvController <- supportsSvController()
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_CollectEntryRenewalPayment(
         ansContextCId,
@@ -118,6 +123,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
           transferContext,
           ansRules.contractId,
         ),
+        Option.when(supportsSvController)(controller).toJava,
       )
     )
     taskOutcome <- connection

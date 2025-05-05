@@ -60,11 +60,11 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           )(config)
       )
 
-  def dsoDelegateExpiredAnsEntryTrigger(implicit env: SpliceTestConsoleEnvironment) =
-    sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger]
+  def dsoDelegateExpiredAnsEntryTriggers(implicit env: SpliceTestConsoleEnvironment) =
+    activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger])
 
   // created by the expiry test
-  override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
+  override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
     codegen.AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
@@ -154,11 +154,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           requestAndPayForEntry(aliceRefs, testEntryName)
           eventually() {
             val entry =
-              try
-                loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
-                  sv1ScanBackend.lookupEntryByName(testEntryName),
-                  forAll(_)(_.errorMessage should include("Entry with name")),
-                )
+              try sv1ScanBackend.lookupEntryByName(testEntryName)
               catch {
                 case e: CommandFailure if e.getMessage contains "Entry with name" => fail(e)
               }
@@ -360,7 +356,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
-        triggersToResumeAtStart = Seq(dsoDelegateExpiredAnsEntryTrigger),
+        triggersToResumeAtStart = dsoDelegateExpiredAnsEntryTriggers,
       ) {
 
         val ansRules = sv1ScanBackend.getAnsRules()
@@ -411,7 +407,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
         setTriggersWithin(
           Seq.empty,
           triggersToResumeAtStart =
-            Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
+            activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
         ) {
           withClue("contracts removed with subscription trigger reenabled") {
             // Wait for subscription to be expired.

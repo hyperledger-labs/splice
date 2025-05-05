@@ -44,7 +44,6 @@ import com.digitalasset.canton.util.ShowUtil.*
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import slick.jdbc.canton.SQLActionBuilder
 
@@ -97,7 +96,6 @@ class DbUserWalletStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = true,
-      BackfillingRequirement.BackfillingNotRequired,
     )
     with UserWalletStore
     with AcsTables
