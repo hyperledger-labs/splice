@@ -253,26 +253,23 @@ class ScanHistoryBackfillingIntegrationTest
     )(
       "Backfilling is complete only on the founding SV",
       _ => {
-        clue("SV1 backfilling is complete") {
-          sv1ScanBackend.appState.store.updateHistory
-            .getBackfillingState()
-            .futureValue should be(BackfillingState.Complete)
-          readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
-        }
-        clue("SV2 backfilling is not complete") {
-          sv2ScanBackend.appState.store.updateHistory
-            .getBackfillingState()
-            .futureValue should be(BackfillingState.InProgress)
-          assertThrowsAndLogsCommandFailures(
-            readUpdateHistoryFromScan(sv2ScanBackend),
-            logEntry => {
-              logEntry.errorMessage should include("HTTP 503 Service Unavailable")
-              logEntry.errorMessage should include(
-                "This scan instance has not yet replicated all data"
-              )
-            },
-          )
-        }
+        sv1ScanBackend.appState.store.updateHistory
+          .getBackfillingState()
+          .futureValue should be(BackfillingState.Complete)
+        readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
+
+        sv2ScanBackend.appState.store.updateHistory
+          .getBackfillingState()
+          .futureValue should be(BackfillingState.InProgress)
+        assertThrowsAndLogsCommandFailures(
+          readUpdateHistoryFromScan(sv2ScanBackend),
+          logEntry => {
+            logEntry.errorMessage should include("HTTP 503 Service Unavailable")
+            logEntry.errorMessage should include(
+              "This scan instance has not yet replicated all data"
+            )
+          },
+        )
       },
     )
 
