@@ -47,7 +47,7 @@ notify-fail: &notify-fail
         name: Notify on slack & create GH issue
         when: on_fail
         command: |
-          .circleci/notification-scripts/failure_notification.sh \
+          .github/actions/scripts/notification-scripts/failure_notification.sh \
               --slack_channel C05DT77QF5M \
               --branch_pattern "(deployment\\/.*|main|release-line.*)"
         # (C05DT77QF5M = team-canton-network-internal-ci)

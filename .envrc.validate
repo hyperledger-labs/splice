@@ -1,0 +1,40 @@
+
+# Ensure that expected .envrc.private variables are defined
+
+function expect_envvar() {
+    varname=$1
+
+    missing=()
+
+    for varname in "$@"; do
+        if ! declare -p "${varname}" &>/dev/null;  then
+            missing+=("${varname}")
+        fi
+    done
+
+    if (( ${#missing[@]} != 0 )); then
+        msg="Expected private environment variable(s) undefined:"
+        for varname in "${missing[@]}"; do
+            msg="${msg}\n*  ${varname}"
+        done
+
+        msg="${msg}\n\nThese should be in .envrc.private.\nSee https://github.com/DACH-NY/canton-network-node#private-environment-variables for details"
+
+        _warning "${msg}"
+    fi
+}
+
+if [[ -z "$IGNORE_PRIVATE_ENVRC" ]]; then
+    # Expected
+    expect_envvar \
+        AUTH0_CN_MANAGEMENT_API_CLIENT_ID \
+        AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET \
+        AUTH0_SV_MANAGEMENT_API_CLIENT_ID \
+        AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
+        AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID \
+        AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET \
+        AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID \
+        AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET \
+        ARTIFACTORY_USER \
+        ARTIFACTORY_PASSWORD
+fi
