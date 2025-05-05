@@ -21,6 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.PageLimit
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -44,7 +45,11 @@ class ExpireRewardCouponsTrigger(
   ): Future[Seq[ExpiredRewardCouponsBatch]] = for {
     dsoRules <- store.getDsoRules()
     batches <- store
-      .getExpiredRewards(dsoRules.domain, context.config.enableExpireValidatorFaucet)
+      .getExpiredRewards(
+        dsoRules.domain,
+        context.config.enableExpireValidatorFaucet,
+        PageLimit.tryCreate(1000),
+      )
       .map(seq => Random.shuffle(seq))
   } yield batches
 
