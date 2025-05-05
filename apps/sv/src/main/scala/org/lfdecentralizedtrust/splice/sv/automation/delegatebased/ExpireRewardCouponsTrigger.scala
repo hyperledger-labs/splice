@@ -26,6 +26,7 @@ import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import scala.util.Random
 
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
@@ -42,7 +43,9 @@ class ExpireRewardCouponsTrigger(
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = for {
     dsoRules <- store.getDsoRules()
-    batches <- store.getExpiredRewards(dsoRules.domain, context.config.enableExpireValidatorFaucet)
+    batches <- store
+      .getExpiredRewards(dsoRules.domain, context.config.enableExpireValidatorFaucet)
+      .map(seq => Random.shuffle(seq))
   } yield batches
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit

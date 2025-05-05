@@ -156,10 +156,13 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
       case true =>
         Future.successful(
           TaskSuccess(
-            s"Skipping because task is already completed after waiting a delay of $delay ms"
+            s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
           )
         )
       case false =>
+        logger.info(
+          s"Complete dso delegate task ${task.toString} after waiting a delay of $delay ms"
+        )
         completeTaskAsDsoDelegate(task, svParty)
     }
   }
