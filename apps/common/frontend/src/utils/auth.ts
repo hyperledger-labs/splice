@@ -37,6 +37,11 @@ export const generateToken = async (
   audience: string,
   scope?: string
 ): Promise<string> => {
+  if (!crypto.subtle) {
+    throw new Error(
+      'Web Crypto API is not available. Ensure you are running in a secure context (HTTPS or localhost) and using a modern browser that supports the Web Crypto API.'
+    );
+  }
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),

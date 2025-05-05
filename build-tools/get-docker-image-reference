@@ -1,0 +1,21 @@
+#! /usr/bin/env bash
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+if [ -z "$1" ]; then
+    _error "Usage: $0 <app-name>"
+else
+    appname=$1
+fi
+
+set -euo pipefail
+
+version="$(get-snapshot-version)"
+
+# the version has a v prefix hardcoded in the pulumi-kuburnetes-operator helm chart so we add one as well
+if [ "$appname" == "pulumi-kubernetes-operator" ]; then
+    version="v${version}"
+fi
+
+echo "$DEV_DOCKER_REGISTRY/${appname}:${version}"

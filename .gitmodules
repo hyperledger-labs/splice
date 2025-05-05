@@ -1,0 +1,9 @@
+[submodule "cluster/configs"]
+	path = cluster/configs
+	url = ../../global-synchronizer-foundation/configs.git
+[submodule "cluster/configs-private"]
+	path = cluster/configs-private
+	url = ../../global-synchronizer-foundation/configs-private.git
+[submodule ".github/runners/runner-container-hooks"]
+	path = .github/runners/runner-container-hooks
+	url = ../../hyperledger-labs/splice-runner-container-hooks.git

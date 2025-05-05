@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+# shellcheck disable=SC1091
+source "${TOOLS_LIB}/libcli.source"
+
+_info "Re-versioning local Daml models from x.y.z to x.y.z.123"
+find "daml" -name "daml.yaml" -exec sed -i 's/^version: \([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)/version: \1.123/g' {} \;
+find . -name "*.dar" -not -path "*/test/resources/daml/*" -not -path "*-current.dar" -not -path "./daml/dars/*" -exec rm {} \;
+
+base_version=$(cat LATEST_RELEASE)
+
+ALL_BUNDLES_DIR="${SPLICE_ROOT}/apps/app/src/test/resources/bundles"
+mkdir -p "${ALL_BUNDLES_DIR}"
+tarball="${base_version}_splice-node.tar.gz"
+releases="https://github.com/digital-asset/decentralized-canton-sync/releases"
+
+if [ -f "${ALL_BUNDLES_DIR}/${tarball}" ]; then
+  _info "Release ${base_version} exists locally already"
+else
+  url="$releases/download/v${base_version}/$tarball"
+  _info "Fetching and extracting release ${base_version} from GitHub (at $url)"
+  # Builds on main aren't serialized, so the previous release might not be available yet.
+  # The bundle step takes about 13 minutes currently, so waiting for 20 minutes should be enough.
+  curl -fsSL --retry 120 --retry-delay 10 --retry-max-time 1200 --retry-all-errors "$url" -o "${ALL_BUNDLES_DIR}/$tarball"
+fi
+
+BUNDLE_DIR="${ALL_BUNDLES_DIR}/${base_version}"
+mkdir -p "${BUNDLE_DIR}"
+tar zxf "${ALL_BUNDLES_DIR}/$tarball" -C "$BUNDLE_DIR"
+
+_info "Copying dar files into the respective daml directories"
+
+# Make sure the base Splitwell uses the base dars, and not "current" from the local repo
+mkdir -p "daml/splitwell/src/main/resources/dar/"
+cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/src/main/resources/dar/splitwell-base.dar"
+mkdir -p "daml/splitwell/.daml/dist/"
+cp "${BUNDLE_DIR}/splice-node/dars/splitwell-current.dar" "daml/splitwell/.daml/dist/splitwell-base.dar"
+sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/examples/splitwell/splitwell-validator.conf
+sed -i 's/splitwell-current.dar/splitwell-base.dar/g' "${BUNDLE_DIR}"/splice-node/testResources/include/validators/splitwell-validator.conf

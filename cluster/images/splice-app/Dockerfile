@@ -16,7 +16,7 @@ ARG TARGETPLATFORM
 
 # Install screen for running the console in a headless server,
 RUN xx-apt-get update \
-   && DEBIAN_FRONTEND=noninteractive xx-apt-get install -y screen tini \
+   && DEBIAN_FRONTEND=noninteractive xx-apt-get install -y screen tini libjemalloc2 \
    && xx-apt-get clean \
    && rm -rf /var/cache/apt/archives
 

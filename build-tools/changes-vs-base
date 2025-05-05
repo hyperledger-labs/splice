@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# This script is used in CircleCI to determine whether there's been changes in the selected file path since the latest base version.
+
+file_path="${1:-}"
+if [ -z "$file_path" ]; then
+  echo "Error: Path where to check changes not set."
+  echo "USAGE: $0 <path>"
+  exit 1
+fi
+
+latest_base_version=$("$SPLICE_ROOT"/build-tools/find_latest_base_version.sh)
+
+# 'git diff --quiet' exits with 1 if there were differences and 0 means no differences.
+if git diff --quiet "$latest_base_version" HEAD "$file_path"; then
+    echo "There's been no changes in $file_path since the latest base version ($latest_base_version)."
+    exit 0
+else
+    echo "There's been changes in $file_path since the latest base version ($latest_base_version)."
+    exit 1
+fi
