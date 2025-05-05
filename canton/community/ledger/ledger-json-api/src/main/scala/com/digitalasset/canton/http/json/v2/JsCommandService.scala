@@ -272,9 +272,7 @@ final case class JsCommands(
 )
 
 object JsCommandService extends DocumentationEndpoints {
-  import JsSchema.JsServicesCommonCodecs.*
   import JsCommandServiceCodecs.*
-
   private lazy val commands = v2Endpoint.in(sttp.tapir.stringToPath("commands"))
 
   val submitAndWaitForTransactionEndpoint = commands.post
@@ -352,6 +350,7 @@ object JsCommandService extends DocumentationEndpoints {
 object JsCommandServiceCodecs {
   import JsSchema.config
   import JsSchema.JsServicesCommonCodecs.*
+  import io.circe.generic.extras.auto.*
 
   implicit val deduplicationPeriodRW: Codec[DeduplicationPeriod] = deriveConfiguredCodec // ADT
 

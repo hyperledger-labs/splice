@@ -653,6 +653,42 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     }
   }
 
+  "list minted amulets" in { implicit env =>
+    val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+    val mintAmount = 47.0
+    clue("Mint to get some amulets") {
+      actAndCheck(
+        "sv1 mints amulets", {
+          mintAmulet(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserParty,
+            mintAmount,
+          )
+        },
+      )(
+        "Amulets should appear in sv1's wallet",
+        _ => {
+          sv1WalletClient.list().amulets should have length 1
+          sv1WalletClient.list().amulets.loneElement.effectiveAmount should be(
+            BigDecimal(mintAmount)
+          )
+        },
+      )
+    }
+    eventually() {
+      val sv1Mints = sv1ScanBackend
+        .listActivity(None, defaultPageSize)
+        .flatMap(_.mint)
+        .filter(_.amuletOwner == sv1UserParty.toProtoPrimitive)
+      BigDecimal(sv1Mints.loneElement.amuletAmount) shouldBe BigDecimal(mintAmount)
+      val sv1MintsFromHistory = sv1ScanBackend
+        .listTransactions(None, TransactionHistoryRequest.SortOrder.Desc, defaultPageSize)
+        .flatMap(_.mint)
+        .filter(_.amuletOwner == sv1UserParty.toProtoPrimitive)
+      BigDecimal(sv1MintsFromHistory.loneElement.amuletAmount) shouldBe BigDecimal(mintAmount)
+    }
+  }
+
   "getWalletBalance should return 400 for invalid party ID" in { implicit env =>
     implicit val sys = env.actorSystem
     registerHttpConnectionPoolsCleanup(env)

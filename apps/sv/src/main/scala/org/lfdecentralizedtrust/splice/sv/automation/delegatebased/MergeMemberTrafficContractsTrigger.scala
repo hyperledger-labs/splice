@@ -20,6 +20,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class MergeMemberTrafficContractsTrigger(
     override protected val context: TriggerContext,
@@ -37,7 +38,8 @@ class MergeMemberTrafficContractsTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      memberTraffic: AssignedContract[MemberTraffic.ContractId, MemberTraffic]
+      memberTraffic: AssignedContract[MemberTraffic.ContractId, MemberTraffic],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     Member
       .fromProtoPrimitive_(memberTraffic.payload.memberId)
@@ -58,7 +60,7 @@ class MergeMemberTrafficContractsTrigger(
             )
             outcome <-
               if (memberTraffics.length > threshold)
-                mergeMemberTrafficContracts(memberId, memberTraffics)
+                mergeMemberTrafficContracts(memberId, memberTraffics, controller)
               else
                 Future.successful(
                   TaskSuccess(
@@ -74,13 +76,16 @@ class MergeMemberTrafficContractsTrigger(
   def mergeMemberTrafficContracts(
       memberId: Member,
       memberTraffics: Seq[Contract[MemberTraffic.ContractId, MemberTraffic]],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       amuletRules <- store.getAmuletRules()
       arg = new DsoRules_MergeMemberTrafficContracts(
         amuletRules.contractId,
         memberTraffics.map(_.contractId).asJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeMemberTrafficContracts(arg))
       outcome <- svTaskContext.connection

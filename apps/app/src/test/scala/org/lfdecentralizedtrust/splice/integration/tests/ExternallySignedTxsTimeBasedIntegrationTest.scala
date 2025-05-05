@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.mem
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
-import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.time.Duration
 import java.util.Base64
@@ -18,16 +17,15 @@ class ExternallySignedTxsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
     with ExternallySignedPartyTestUtil
-    with TimeTestUtil
-    with TokenStandardTest {
+    with TimeTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 
-  "Externally signed transactions can tolerate a preparation/submission skew larger than ledgerTimeRecordTimeTolerance" in {
+  "Externally signed transactions can tolerate a preparation/submission skew upto the submissionTImeRecordTimeTolerance window" in {
     implicit env =>
-      aliceValidatorWalletClient.tap(200.0)
+      aliceValidatorWalletClient.tap(100.0)
 
       // Onboard external party 1
       val onboarding1 = onboardExternalParty(aliceValidatorBackend, Some("externalParty1"))
@@ -66,13 +64,13 @@ class ExternallySignedTxsTimeBasedIntegrationTest
       // Transfer some funds to external party 1
       actAndCheck(
         "Transfer some amulets to external party 1",
-        aliceValidatorWalletClient.transferPreapprovalSend(onboarding1.party, 100.0, ""),
+        aliceValidatorWalletClient.transferPreapprovalSend(onboarding1.party, 50.0, ""),
       )(
         "External party 1 sees the transfer",
         _ =>
           aliceValidatorBackend
             .getExternalPartyBalance(onboarding1.party)
-            .totalUnlockedCoin shouldBe "100.0000000000",
+            .totalUnlockedCoin shouldBe "50.0000000000",
       )
 
       // Onboard external party 2
@@ -153,22 +151,6 @@ class ExternallySignedTxsTimeBasedIntegrationTest
           }
         },
       )
-
-      val beforePrepare = env.environment.clock.now
-
-      executeTransferViaTokenStandard(
-        aliceValidatorBackend.participantClientWithAdminToken,
-        onboarding1.richPartyId,
-        onboarding2.party,
-        BigDecimal("10.0"),
-        transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
-        expectedTimeBounds =
-          Some((beforePrepare, beforePrepare.plusSeconds(10 * 60).addMicros(-1))),
-        advanceTimeBeforeExecute = Some(Duration.ofMinutes(9)),
-      )
-
-      val afterExecute = env.environment.clock.now
-      afterExecute shouldBe beforePrepare.plus(Duration.ofMinutes(9))
 
   }
 }

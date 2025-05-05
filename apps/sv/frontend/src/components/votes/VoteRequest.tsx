@@ -41,6 +41,7 @@ import {
   isExpirationBeforeEffectiveDate,
   isScheduleDateTimeValid,
   isValidUrl,
+  isValidVoteRequestUrl,
   VoteRequestValidity,
 } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
@@ -293,16 +294,8 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
   }, [conflicts]);
 
   // @ts-ignore
-  const submissionConditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
+  const conditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
     { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
-    { disabled: summary === '', reason: 'No summary', severity: 'warning' },
-    { disabled: !isValidUrl(url), reason: 'Invalid URL', severity: 'warning' },
-    {
-      disabled: !isValidSynchronizerPauseTime,
-      reason: 'Synchronizer upgrade time is before the expiry/effective date',
-      severity: 'warning',
-    },
-    // keep this as the last condition
     {
       disabled: !action || actionFromFormIsError(action),
       reason: !action
@@ -310,6 +303,13 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
         : `Action is not valid: ${
             actionFromFormIsError(action) && JSON.stringify(action.formError)
           }`,
+    },
+    { disabled: summary === '', reason: 'No summary', severity: 'warning' },
+    { disabled: !isValidVoteRequestUrl(url), reason: 'Invalid URL', severity: 'warning' },
+    {
+      disabled: !isValidSynchronizerPauseTime,
+      reason: 'Synchronizer upgrade time is before the expiry/effective date',
+      severity: 'warning',
     },
   ].concat(
     supportsVoteEffectivityAndSetConfig
@@ -562,7 +562,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           <Alerting alertState={alertMessage} />
 
           <Stack direction="column" mb={4} spacing={1}>
-            <DisableConditionally conditions={submissionConditions}>
+            <DisableConditionally conditions={conditions}>
               <Button
                 id="create-voterequest-submit-button"
                 data-testid="create-voterequest-submit-button"

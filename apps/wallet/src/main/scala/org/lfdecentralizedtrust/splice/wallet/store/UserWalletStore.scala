@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
-import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, TransferInputStore, TxLogAppStore}
+import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, TransferInputStore}
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore.*
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
@@ -44,7 +44,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore with NamedLogging {
+trait UserWalletStore extends TransferInputStore with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key

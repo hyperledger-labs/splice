@@ -18,7 +18,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -37,13 +36,12 @@ class ValidatorLicenseActivityTrigger(
       tc: TraceContext
   ): Future[Seq[ValidatorLicenseActivityTrigger.Task]] =
     for {
-      validatorLicenseActivityFeatureSupport <- packageVersionSupport
-        .supportsValidatorLicenseActivity(
-          Seq(store.key.dsoParty, validator),
-          now,
-        )
+      supportsValidatorLicenseActivity <- packageVersionSupport.supportsValidatorLicenseActivity(
+        Seq(store.key.dsoParty, validator),
+        now,
+      )
       tasks <-
-        if (validatorLicenseActivityFeatureSupport.supported) {
+        if (supportsValidatorLicenseActivity) {
           for {
             licenseO <- store
               .lookupValidatorLicenseWithOffset()
@@ -58,8 +56,7 @@ class ValidatorLicenseActivityTrigger(
               )
               .map(license =>
                 ValidatorLicenseActivityTrigger.Task(
-                  license,
-                  validatorLicenseActivityFeatureSupport,
+                  license
                 )
               )
           }
@@ -81,7 +78,6 @@ class ValidatorLicenseActivityTrigger(
         ),
       )
       .noDedup
-      .withPrefferedPackage(task.work.featureSupport.packageIds)
       .yieldUnit()
       .map(_ =>
         TaskSuccess(
@@ -105,13 +101,11 @@ object ValidatorLicenseActivityTrigger {
   private val activityReportMinInterval = java.time.Duration.ofHours(1)
 
   final case class Task(
-      existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
-      featureSupport: FeatureSupport,
+      existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense]
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
-        param("existingLicense", _.existingLicense),
-        param("featureSupport", _.featureSupport),
+        param("existingLicense", _.existingLicense)
       )
     }
   }

@@ -5,6 +5,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.MergeSvRewardStateContractsTrigger
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.resumeAllDsoDelegateTriggers
 
 import scala.jdk.CollectionConverters.*
 
@@ -17,7 +18,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       // to create SvRewardState contracts.
       .simpleTopology1Sv(this.getClass.getSimpleName)
 
-  override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
+  override protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq(
     SvRewardState.TEMPLATE_ID_WITH_PACKAGE_ID
   )
 
@@ -38,7 +39,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
     }
     setTriggersWithin(
       triggersToPauseAtStart =
-        Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[MergeSvRewardStateContractsTrigger]),
+        activeSvs.map(_.dsoDelegateBasedAutomation.trigger[MergeSvRewardStateContractsTrigger]),
       triggersToResumeAtStart = Seq.empty,
     ) {
       actAndCheck(
@@ -56,7 +57,7 @@ class SvMergeSvRewardStateIntegrationTest extends SvIntegrationTestBase with Tri
       )
       loggerFactory.assertLogs(
         {
-          sv1Backend.dsoDelegateBasedAutomation.trigger[MergeSvRewardStateContractsTrigger].resume()
+          resumeAllDsoDelegateTriggers[MergeSvRewardStateContractsTrigger]
           clue("Trigger merges SvRewardState contracts") {
             eventually() {
               val newRewardStates = getRewardStates()

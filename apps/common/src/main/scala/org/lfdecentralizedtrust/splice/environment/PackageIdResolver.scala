@@ -270,5 +270,4 @@ object PackageIdResolver {
 
     final case object FeaturedApp extends Package
   }
-
 }

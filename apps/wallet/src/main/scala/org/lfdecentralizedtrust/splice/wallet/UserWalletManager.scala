@@ -63,8 +63,6 @@ class UserWalletManager(
     supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
     enableCantonPackageSelection: Boolean,
-    txLogBackfillEnabled: Boolean,
-    txLogBackfillingBatchSize: Int,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -240,8 +238,6 @@ class UserWalletManager(
       supportsSoftDomainMigrationPoc,
       dedupDuration,
       enableCantonPackageSelection,
-      txLogBackfillEnabled = txLogBackfillEnabled,
-      txLogBackfillingBatchSize = txLogBackfillingBatchSize,
     )
     (userRetryProvider, walletService)
   }

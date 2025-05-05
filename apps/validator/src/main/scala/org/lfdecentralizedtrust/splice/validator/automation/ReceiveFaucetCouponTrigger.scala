@@ -110,7 +110,7 @@ class ReceiveFaucetCouponTrigger(
           clock,
         )
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
-      validatorLivenessActivityFeatureSupport <-
+      supportsValidatorLivenessActivityRecord <-
         packageVersionSupport
           .supportsValidatorLivenessActivityRecord(
             Seq(
@@ -123,7 +123,7 @@ class ReceiveFaucetCouponTrigger(
         .submit(
           actAs = Seq(validatorParty),
           readAs = Seq(validatorParty),
-          if (validatorLivenessActivityFeatureSupport.supported)
+          if (supportsValidatorLivenessActivityRecord)
             license.exercise(
               _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
                 unclaimedRound.contractId
@@ -137,9 +137,6 @@ class ReceiveFaucetCouponTrigger(
         )
         .noDedup
         .withDisclosedContracts(spliceLedgerConnection.disclosedContracts(unclaimedRound))
-        .withPrefferedPackage(
-          validatorLivenessActivityFeatureSupport.packageIds
-        )
         .yieldUnit()
         .map(_ =>
           TaskSuccess(s"Received faucet coupon for Round ${unclaimedRound.payload.round.number}")
