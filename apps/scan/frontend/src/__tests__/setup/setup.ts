@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { cleanup } from '@testing-library/react';
 import crypto from 'crypto';
+import { SetupServer } from 'msw/node';
 import {
   setupIntersectionMocking,
   resetIntersectionMocking,
@@ -19,7 +20,7 @@ export type Services = Config['services'];
 
 // Provide a global variable for the app config in the test environment
 window.splice_config = config;
-const server = buildServer(window.splice_config.services);
+export const server: SetupServer = buildServer(window.splice_config.services);
 
 // Start server before all tests
 beforeAll(() => {

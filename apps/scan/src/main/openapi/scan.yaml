@@ -974,6 +974,21 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
+  /v0/backfilling/status:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "getBackfillingStatus"
+      description: |
+        Retrieve the status of the backfilling process.
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetBackfillingStatusResponse"
+
   /v0/acs/{party}:
     get:
       deprecated: true
@@ -3294,3 +3309,17 @@ components:
             `firstCollected` if the validator has collected in only one round
           type: integer
           format: int64
+    GetBackfillingStatusResponse:
+      type: object
+      required: [ "complete" ]
+      properties:
+        complete:
+          description: |
+            True if ALL backfilling processes are complete, false otherwise.
+
+            Some scan endpoints return error responses if backfilling is not complete
+            (e.g., `/v1/updates`), others return partial results (e.g., `/v0/transactions`).
+            This endpoint is a simple indicator for whether historical information may be incomplete.
+
+            To determine the progress of individual backfilling processes, inspect the corresponding metrics.
+          type: boolean

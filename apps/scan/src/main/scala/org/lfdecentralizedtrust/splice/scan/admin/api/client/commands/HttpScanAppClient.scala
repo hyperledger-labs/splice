@@ -1422,6 +1422,27 @@ object HttpScanAppClient {
     }
   }
 
+  case class GetBackfillingStatus()
+      extends InternalBaseCommand[
+        http.GetBackfillingStatusResponse,
+        definitions.GetBackfillingStatusResponse,
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetBackfillingStatusResponse] = {
+      client.getBackfillingStatus(headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetBackfillingStatusResponse.OK(response) =>
+        Right(response)
+    }
+  }
+
   case class GetTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)
       extends TokenStandardTransferInstructionBaseCommand[
         transferinstruction.v1.GetTransferFactoryResponse,

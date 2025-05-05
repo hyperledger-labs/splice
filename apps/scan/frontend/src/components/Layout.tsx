@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
 import { Header } from '@lfdecentralizedtrust/splice-common-frontend';
+import { useBackfillingStatus } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 
-import { Box } from '@mui/material';
+import { Alert, Box, Stack } from '@mui/material';
 import Container from '@mui/material/Container';
 
 import { useScanConfig } from '../utils';
@@ -14,6 +15,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const config = useScanConfig();
+  const backfillingStatus = useBackfillingStatus();
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">
       <Container maxWidth="xl">
@@ -27,6 +29,29 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Validators', path: '/validator-licenses' },
           ]}
         />
+        {backfillingStatus.data === false && (
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="center"
+            sx={{
+              margin: '2px',
+              height: '50px',
+              width: '100%',
+            }}
+          >
+            <Alert
+              variant="filled"
+              severity={'warning'}
+              id={'backfilling-alert'}
+              data-testid={'backfilling-alert'}
+            >
+              This scan instance is currently processing historical data in the background.
+              Historical information such as recent activity or past votes will be incomplete until
+              this processing finishes.
+            </Alert>
+          </Stack>
+        )}
       </Container>
 
       {props.children}

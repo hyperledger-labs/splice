@@ -256,11 +256,13 @@ class ScanHistoryBackfillingIntegrationTest
         sv1ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
+        sv1ScanBackend.getBackfillingStatus().complete shouldBe true
         readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
 
         sv2ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.InProgress)
+        sv2ScanBackend.getBackfillingStatus().complete shouldBe false
         assertThrowsAndLogsCommandFailures(
           readUpdateHistoryFromScan(sv2ScanBackend),
           logEntry => {
@@ -284,9 +286,11 @@ class ScanHistoryBackfillingIntegrationTest
         sv1ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
+        sv1ScanBackend.getBackfillingStatus().complete shouldBe true
         sv2ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
+        sv2ScanBackend.getBackfillingStatus().complete shouldBe true
       },
     )
 

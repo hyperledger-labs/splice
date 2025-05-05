@@ -624,6 +624,14 @@ abstract class ScanAppReference(
       )
     }
   }
+
+  def getBackfillingStatus(): definitions.GetBackfillingStatusResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetBackfillingStatus()
+      )
+    }
+  }
 }
 
 final class ScanAppBackendReference(

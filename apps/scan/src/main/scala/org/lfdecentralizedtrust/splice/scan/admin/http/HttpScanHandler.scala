@@ -81,6 +81,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 
 class HttpScanHandler(
@@ -1864,6 +1865,24 @@ class HttpScanHandler(
               )
           )
         )
+    }
+  }
+
+  override def getBackfillingStatus(
+      respond: ScanResource.GetBackfillingStatusResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.GetBackfillingStatusResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getBackfillingStatus") { _ => _ =>
+      for {
+        updateHistoryStatus <- store.updateHistory.getBackfillingState()
+        txLogStatus <- store.multiDomainAcsStore.getTxLogBackfillingState()
+        updateHistoryComplete = updateHistoryStatus == BackfillingState.Complete
+        txLogComplete = txLogStatus == TxLogBackfillingState.Complete
+      } yield ScanResource.GetBackfillingStatusResponse.OK(
+        definitions.GetBackfillingStatusResponse(
+          complete = updateHistoryComplete && txLogComplete
+        )
+      )
     }
   }
 
