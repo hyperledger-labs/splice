@@ -129,6 +129,15 @@
         "type": "integer"
       }
     },
+    "txLogBackfilling": {
+      "type": "object",
+      "enabled": {
+        "type": "boolean"
+      },
+      "batchSize": {
+        "type": "integer"
+      }
+    },
     "participantAddress": {
       "type": "string"
     },

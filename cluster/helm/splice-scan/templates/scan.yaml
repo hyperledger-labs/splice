@@ -69,6 +69,14 @@ spec:
               update-history-backfill-batch-size = "{{ .batchSize }}"
             }
         {{- end }}
+        {{- with .Values.txLogBackfilling }}
+        - name: ADDITIONAL_CONFIG_TXLOG_BACKFILLING
+          value: |
+            canton.scan-apps.scan-app {
+              tx-log-backfill-enabled = {{ .enabled }}
+              tx-log-backfill-batch-size = "{{ .batchSize }}"
+            }
+        {{- end }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
             canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}

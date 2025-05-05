@@ -412,6 +412,15 @@
               "description": "The acornum of the name of Name Service on this network, as provided in the docs"
             }
           }
+        },
+        "txLogBackfilling": {
+          "type": "object",
+          "enabled": {
+            "type": "boolean"
+          },
+          "batchSize": {
+            "type": "integer"
+          }
         }
       }
     },
