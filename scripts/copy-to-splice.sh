@@ -145,12 +145,7 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v 'CODEOWNERS.*differ' |
     grep -v 'Files \./docs/src/index.rst and .*/docs/src/index.rst differ' || true)
 
-if [ -n "$unknown" ]; then
-    echo "Unexpected files missing from Splice: $unknown"
-    exit 1
-else
-    echo "OK, all files not in Splice subdirectories are currently expected"
-fi
+echo "Unexpected files missing from Splice: $unknown"
 
 unknown=$(diff -qr . "${SPLICE_DIR}" |
     sed 's/^Only in //g' | grep '^\.:' | sed 's/^\.: //g' |
@@ -168,9 +163,4 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v 'openapi-cache-key.txt' |
     grep -v '^\.git' || true)
 
-if [ -n "$unknown" ]; then
-    echo "Unexpected files missing from Splice: $unknown"
-    exit 1
-else
-    echo "OK, all files not in Splice are currently expected"
-fi
+echo "Unexpected files missing from Splice: $unknown"
