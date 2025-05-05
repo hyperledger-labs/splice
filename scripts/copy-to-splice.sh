@@ -113,6 +113,7 @@ copy_file "start-canton.sh"
 copy_file "start-frontends.sh"
 copy_file "stop-canton.sh"
 copy_file "stop-frontends.sh"
+copy_file "wait-for-canton.sh"
 copy_dir "support"
 cp "${SPLICE_ROOT}"/test-*.log "${SPLICE_DIR}/"
 copy_file "util.sh"
@@ -154,12 +155,7 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v 'CODEOWNERS' |
     grep -v 'LICENSE' |
     grep -v '.*.md' |
-    grep -v '^.*\.da' |
-    grep -v 'log' |
-    grep -v 'package.json' |
-    grep -v 'package-lock.json' |
     grep -v 'wait-for-canton.sh' |
-    grep -v 'out.txt' |
     grep -v 'openapi-cache-key.txt' |
     grep -v '^\.git' || true)
 
