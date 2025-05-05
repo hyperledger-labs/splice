@@ -17,18 +17,6 @@ validator1:
 automation:
   delegatelessAutomation: true
   expectedTaskDuration: 3000 # millis
-synchronizerMigration:
-  active:
-    id: 0
-    provider: external
-    version: "0.4.0-snapshot.20250502.9177.0.v5e4b31d8"
-    releaseReference:
-      gitReference: refs/heads/julien/17951-add-random-delays
-      repoUrl: https://github.com/DACH-NY/canton-network-node
-      pulumiStacksDir: "cluster/stacks/scratchnets"
-      pulumiBaseDir: "cluster/pulumi"
-      deploymentDir: "cluster/deployment"
-      spliceRoot: "."
 operatorDeployment:
   reference:
     gitReference: refs/heads/julien/17951-add-random-delays

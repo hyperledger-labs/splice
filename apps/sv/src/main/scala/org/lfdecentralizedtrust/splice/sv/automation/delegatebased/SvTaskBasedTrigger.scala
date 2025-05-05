@@ -143,11 +143,12 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
       svParty: String,
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val pollingTriggerInterval = context.config.pollingInterval.underlying.toMillis // 30_000ms
+    // default pollingInterval is 30 seconds
+    val pollingTriggerInterval = context.config.pollingInterval.underlying.toMillis
     val upperBound =
       Math.min(
         dsoRules.payload.svs.size().toLong * svTaskContext.expectedTaskDuration,
-        pollingTriggerInterval - svTaskContext.expectedTaskDuration,
+        pollingTriggerInterval,
       )
     val delay = Random.nextLong(upperBound)
     Threading.sleep(delay)
