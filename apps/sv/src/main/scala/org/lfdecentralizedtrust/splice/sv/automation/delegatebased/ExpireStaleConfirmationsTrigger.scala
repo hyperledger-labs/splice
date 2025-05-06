@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import org.lfdecentralizedtrust.splice.automation.{
-  MultiDomainExpiredContractTrigger,
+  MultiDomainExpiredContractDsoDelegateTrigger,
   ScheduledTaskTrigger,
   TaskOutcome,
   TaskSuccess,
@@ -17,8 +17,9 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import ExpireStaleConfirmationsTrigger.*
+
+import scala.jdk.OptionConverters.RichOption
 
 class ExpireStaleConfirmationsTrigger(
     override protected val context: TriggerContext,
@@ -27,7 +28,7 @@ class ExpireStaleConfirmationsTrigger(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends MultiDomainExpiredContractTrigger.Template[
+) extends MultiDomainExpiredContractDsoDelegateTrigger.Template[
       Confirmation.ContractId,
       Confirmation,
     ](
@@ -40,13 +41,16 @@ class ExpireStaleConfirmationsTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireStaleConfirmation(
-          task.work.contractId
+          task.work.contractId,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection

@@ -21,6 +21,8 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
+import scala.util.Random
 
 class MergeUnclaimedRewardsTrigger(
     override protected val context: TriggerContext,
@@ -40,8 +42,9 @@ class MergeUnclaimedRewardsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       threshold = dsoRules.payload.config.numUnclaimedRewardsThreshold
-      limit = PageLimit.tryCreate(threshold.toInt * 2)
-      unclaimedRewards <- store.listUnclaimedRewards(limit)
+      numSvs = dsoRules.payload.svs.size()
+      limit = PageLimit.tryCreate(threshold.toInt * 2 * numSvs)
+      unclaimedRewards <- store.listUnclaimedRewards(limit).map(seq => Random.shuffle(seq))
     } yield
       (
         if (unclaimedRewards.length > threshold) {
@@ -58,14 +61,17 @@ class MergeUnclaimedRewardsTrigger(
   )
 
   override def completeTaskAsDsoDelegate(
-      unclaimedRewardsTask: MergeUnclaimedRewardsTask
+      unclaimedRewardsTask: MergeUnclaimedRewardsTask,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeUnclaimedRewards(
         amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeUnclaimedRewards(arg))
       res <- for {

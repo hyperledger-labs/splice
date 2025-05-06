@@ -211,7 +211,6 @@ private[environment] class LedgerClient(
       disclosedContracts: DisclosedContracts,
       waitFor: SubmitAndWaitFor[Z],
       deadline: Option[NonNegativeFiniteDuration] = None,
-      preferredPackageIds: Seq[String] = Seq.empty,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Z] = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
       .setSynchronizerId(synchronizerId)
@@ -222,7 +221,6 @@ private[environment] class LedgerClient(
       .addAllCommands {
         commands.map(_.toProtoCommand).asJava
       }
-      .addAllPackageIdSelectionPreference(preferredPackageIds.asJava)
       .addAllDisclosedContracts(disclosedContracts.toLedgerApiDisclosedContracts.asJava)
     deduplicationConfig match {
       case DedupOffset(offset) =>

@@ -39,7 +39,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 
 import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
@@ -91,12 +90,12 @@ class ScanHistoryBackfillingTrigger(
       Future.successful(Seq.empty)
     } else {
       store.updateHistory.getBackfillingState().map {
-        case BackfillingState.Complete =>
+        case Some(state) if state.complete =>
           historyMetrics.UpdateHistoryBackfilling.completed.updateValue(1)
           Seq.empty
-        case BackfillingState.InProgress =>
+        case Some(_) =>
           Seq(ScanHistoryBackfillingTrigger.BackfillTask())
-        case BackfillingState.NotInitialized =>
+        case None =>
           Seq(ScanHistoryBackfillingTrigger.InitializeBackfillingTask(findHistoryStartAfter))
       }
     }

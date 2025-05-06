@@ -4,8 +4,8 @@ import {
   createLedgerApiClient,
   filtersByParty,
 } from "../apis/ledger-api-utils";
+import { CommandOptions } from "../cli";
 import { HoldingInterface } from "../constants";
-import { CommandOptions } from "../token-standard-cli";
 import {
   Command,
   DeduplicationPeriod2,
@@ -36,7 +36,7 @@ interface TransferCommandOptions {
 }
 
 export async function transfer(
-  opts: CommandOptions & TransferCommandOptions,
+  opts: CommandOptions & TransferCommandOptions
 ): Promise<void> {
   const {
     sender,
@@ -66,7 +66,7 @@ export async function transfer(
     throw new Error("Sender has no holdings, so transfer can't be executed.");
   }
   const holdings = senderHoldings.map(
-    (h) => h["contractEntry"]["JsActiveContract"],
+    (h) => h["contractEntry"]["JsActiveContract"]
   );
   const inputHoldingCids = holdings.map((h) => h["createdEvent"]["contractId"]);
 
@@ -125,7 +125,7 @@ export async function transfer(
   const signed = signTransaction(
     publicKey,
     privateKey,
-    prepared.preparedTransactionHash,
+    prepared.preparedTransactionHash
   );
   const partySignatures: PartySignatures = {
     signatures: [
@@ -135,8 +135,12 @@ export async function transfer(
           {
             signature: signed.signedHash,
             signedBy: signed.signedBy,
-            format: "SIGNATURE_FORMAT_RAW",
-            signingAlgorithmSpec: "SIGNING_ALGORITHM_SPEC_ED25519",
+            // `unrecognizedValue`s are forced because of openapi generation, but it's not required (nor does it break anything)
+            format: { SIGNATURE_FORMAT_RAW: {}, unrecognizedValue: 0 },
+            signingAlgorithmSpec: {
+              SIGNING_ALGORITHM_SPEC_ED25519: {},
+              unrecognizedValue: 0,
+            },
           },
         ],
       },
@@ -161,17 +165,17 @@ export async function transfer(
 // The synchronizer id is mandatory, so we derive it from the disclosed contracts,
 // expecting that they'll all be in the same synchronizer
 function getSynchronizerIdFromDisclosedContracts(
-  disclosedContracts: DisclosedContract[],
+  disclosedContracts: DisclosedContract[]
 ): string {
   const synchronizerId = disclosedContracts[0].synchronizerId;
   const differentSynchronizerId = disclosedContracts.find(
-    (dc) => dc.synchronizerId !== synchronizerId,
+    (dc) => dc.synchronizerId !== synchronizerId
   );
   if (differentSynchronizerId) {
     throw new Error(
       `Contract is in a different domain so can't submit to the correct synchronizer: ${JSON.stringify(
-        differentSynchronizerId,
-      )}`,
+        differentSynchronizerId
+      )}`
     );
   }
   return synchronizerId;
@@ -185,7 +189,7 @@ interface SignTransactionResult {
 function signTransaction(
   publicKeyPath: string,
   privateKeyPath: string,
-  preparedTransactionHash: string,
+  preparedTransactionHash: string
 ): SignTransactionResult {
   const publicKey = readFileSync(publicKeyPath);
   const nodePublicKey = crypto.createPublicKey({
@@ -210,8 +214,8 @@ function signTransaction(
           // Ed25519 public key is the last 32 bytes of the SPKI DER key
           .subarray(-32)
           .toString("hex")}`,
-        "hex",
-      ),
+        "hex"
+      )
     )
     .digest("hex");
   const fingerprintPreFix = "1220"; // 12 PublicKeyFingerprint, 20 is a special length encoding

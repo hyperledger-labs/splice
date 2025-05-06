@@ -19,6 +19,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 /** Trigger to merge multiple SvRewardStateContracts for the same SV name.
   * This only exists to cleanup after #12495.
@@ -41,7 +42,8 @@ class MergeSvRewardStateContractsTrigger(
   private val MAX_SV_REWARD_CONTRACTS = PageLimit.tryCreate(10)
 
   override def completeTaskAsDsoDelegate(
-      svRewardState: AssignedContract[SvRewardState.ContractId, SvRewardState]
+      svRewardState: AssignedContract[SvRewardState.ContractId, SvRewardState],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val svName = svRewardState.payload.svName
     for {
@@ -54,7 +56,7 @@ class MergeSvRewardStateContractsTrigger(
           logger.warn(
             s"SV $svName has ${svRewardStates.length} SvRewardState contracts, this likely indicates a bug"
           )
-          mergeSvRewardStateContracts(svName, svRewardStates)
+          mergeSvRewardStateContracts(svName, svRewardStates, controller)
         } else
           Future.successful(
             TaskSuccess(s"Only one SvRewardState contract for $svName, nothing to merge")
@@ -65,12 +67,15 @@ class MergeSvRewardStateContractsTrigger(
   def mergeSvRewardStateContracts(
       svName: String,
       svRewardStates: Seq[Contract[SvRewardState.ContractId, SvRewardState]],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeSvRewardState(
         svName,
         svRewardStates.map(_.contractId).asJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeSvRewardState(arg))
       _ <- svTaskContext.connection

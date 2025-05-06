@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Codec, Contract}
 import com.digitalasset.canton.tracing.TraceContext
@@ -20,13 +19,13 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 /** Trigger to merge multiple ValidatorLicenseContracts for the same validator.
   */
 class MergeValidatorLicenseContractsTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -42,11 +41,12 @@ class MergeValidatorLicenseContractsTrigger(
   private val MAX_VALIDATOR_LICENSE_CONTRACTS = PageLimit.tryCreate(10)
 
   override def completeTaskAsDsoDelegate(
-      validatorLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense]
+      validatorLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
-      pruneAmuletConfigScheduleFeatureSupport <- packageVersionSupport
+      supportsPruneAmuletConfigSchedule <- svTaskContext.packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
           Seq(
             store.key.svParty,
@@ -56,7 +56,7 @@ class MergeValidatorLicenseContractsTrigger(
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
       validatorLicenses <-
-        if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        if (supportsPruneAmuletConfigSchedule) {
           store.listValidatorLicensePerValidator(
             validator,
             MAX_VALIDATOR_LICENSE_CONTRACTS,
@@ -69,12 +69,8 @@ class MergeValidatorLicenseContractsTrigger(
           logger.warn(
             s"Validator $validator has ${validatorLicenses.length} Validator License contracts."
           )
-          mergeValidatorLicenseContracts(
-            validator,
-            validatorLicenses,
-            pruneAmuletConfigScheduleFeatureSupport.packageIds,
-          )
-        } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+          mergeValidatorLicenseContracts(validator, validatorLicenses, controller)
+        } else if (supportsPruneAmuletConfigSchedule) {
           Future.successful(
             TaskSuccess(s"Only one Validator License contract for $validator, nothing to merge.")
           )
@@ -91,18 +87,19 @@ class MergeValidatorLicenseContractsTrigger(
   private def mergeValidatorLicenseContracts(
       validator: String,
       validatorLicenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]],
-      preferredPackages: Seq[String],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeValidatorLicense(
-        validatorLicenses.map(_.contractId).asJava
+        validatorLicenses.map(_.contractId).asJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorLicense(arg))
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPrefferedPackage(preferredPackages)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${validatorLicenses.length} ValidatorLicense contracts for $validator"

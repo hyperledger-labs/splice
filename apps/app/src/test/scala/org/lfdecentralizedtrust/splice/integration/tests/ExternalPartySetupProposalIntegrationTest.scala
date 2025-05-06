@@ -59,11 +59,11 @@ class ExternalPartySetupProposalIntegrationTest
     with TriggerTestUtil
     with ExternallySignedPartyTestUtil {
 
-  override lazy val sanityChecksIgnoredRootExercises = Seq(
+  override lazy val updateHistoryIgnoredRootExercises = Seq(
     (TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID, "Archive")
   )
 
-  override lazy val sanityChecksIgnoredRootCreates = Seq(
+  override lazy val updateHistoryIgnoredRootCreates = Seq(
     TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID,
     amuletCodegen.AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID,
   )
