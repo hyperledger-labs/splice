@@ -511,6 +511,10 @@ final class DbMultiDomainAcsStore[TXE](
           tc: TraceContext
       ): Future[DestinationHistory.InsertResult] = {
         val trees = items.collect { case UpdateHistoryResponse(TransactionTreeUpdate(tree), _) =>
+          assert(
+            tree.getRecordTime.isAfter(CantonTimestamp.MinValue.toInstant),
+            "insert() must not be called with import updates",
+          )
           tree
         }
         val nonEmpty = NonEmptyList
@@ -560,6 +564,7 @@ final class DbMultiDomainAcsStore[TXE](
                           val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
                           entries.map(entry =>
                             doIngestTxLogInsert(
+                              migrationId,
                               synchronizerId,
                               tree.getOffset,
                               CantonTimestamp.assertFromInstant(tree.getRecordTime),
@@ -1356,6 +1361,7 @@ final class DbMultiDomainAcsStore[TXE](
                   })*),
                   DBIO.seq(txLogEntries.map { txe =>
                     doIngestTxLogInsert(
+                      domainMigrationId,
                       synchronizerId,
                       offset,
                       CantonTimestamp.assertFromInstant(tree.getRecordTime),
@@ -1626,6 +1632,7 @@ final class DbMultiDomainAcsStore[TXE](
     else data.map(_._1).mkString(",", ", ", "")
 
   private def doIngestTxLogInsert(
+      migrationId: Long,
       domainId: SynchronizerId,
       offset: Long,
       recordTime: CantonTimestamp,
@@ -1645,7 +1652,7 @@ final class DbMultiDomainAcsStore[TXE](
     (sql"""
       insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
       entry_type, entry_data #$indexColumnNames)
-      values ($txLogStoreId, $domainMigrationId, $safeOffset, $recordTime, $domainId,
+      values ($txLogStoreId, $migrationId, $safeOffset, $recordTime, $domainId,
               $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
     """).toActionBuilder.asUpdate
   }
@@ -1656,9 +1663,9 @@ final class DbMultiDomainAcsStore[TXE](
       recordTime: CantonTimestamp,
   ) = {
     sqlu"""
-      update txlog_first_ingested_update
-      set record_time = $recordTime
-      where store_id = $txLogStoreId and migration_id = $migrationId and synchronizer_id = $synchronizerId
+      insert into txlog_first_ingested_update (store_id, migration_id, synchronizer_id, record_time)
+      values ($txLogStoreId, $migrationId, $synchronizerId, $recordTime)
+      on conflict (store_id, migration_id, synchronizer_id) do update set record_time = $recordTime
     """
   }
 
@@ -1666,7 +1673,7 @@ final class DbMultiDomainAcsStore[TXE](
       synchronizerId: SynchronizerId,
       migrationId: Long,
       recordTime: CantonTimestamp,
-  ) = {
+  )(implicit tc: TraceContext) = {
     // - doUpdateFirstIngestedUpdate: called by the backfilling process, always overwrites the existing value
     // - doInitializeFirstIngestedUpdate: called by the ingestion process, only inserts a new value if it doesn't exist
     //
@@ -1679,11 +1686,16 @@ final class DbMultiDomainAcsStore[TXE](
     // This method could be optimized by keeping a cache for which synchronizers have been initialized,
     // and not doing anything if the synchronizer is already in the cache.
     if (txLogStoreDescriptor.isDefined) {
-      sqlu"""
-      insert into txlog_first_ingested_update (store_id, migration_id, synchronizer_id, record_time)
-      values ($txLogStoreId, $migrationId, $synchronizerId, $recordTime)
-      on conflict do nothing
-    """
+      if (recordTime > CantonTimestamp.MinValue) {
+        sqlu"""
+          insert into txlog_first_ingested_update (store_id, migration_id, synchronizer_id, record_time)
+          values ($txLogStoreId, $migrationId, $synchronizerId, $recordTime)
+          on conflict do nothing
+        """
+      } else {
+        logger.debug("Skipping initialization of txlog_first_ingested_update for import updates")
+        DBIOAction.unit
+      }
     } else {
       DBIOAction.unit
     }
