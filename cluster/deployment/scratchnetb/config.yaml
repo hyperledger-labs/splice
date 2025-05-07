@@ -16,7 +16,7 @@ validator1:
   deduplicationDuration: 30m
 automation:
   delegatelessAutomation: true
-  expectedTaskDuration: 4000 # millis
+  expectedTaskDuration: 6000 # millis
 synchronizerMigration:
   active:
     id: 0
