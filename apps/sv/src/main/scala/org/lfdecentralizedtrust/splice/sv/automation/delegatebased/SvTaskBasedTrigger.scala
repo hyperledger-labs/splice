@@ -3,11 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.DelayUtil
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.environment.{
@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -151,20 +152,28 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
         pollingTriggerInterval,
       )
     val delay = Random.nextLong(upperBound)
-    Threading.sleep(delay)
-    isStaleTask(task).flatMap {
-      case true =>
-        Future.successful(
-          TaskSuccess(
-            s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
-          )
-        )
-      case false =>
-        logger.info(
-          s"Complete dso delegate task ${task.toString} after waiting a delay of $delay ms"
-        )
-        completeTaskAsDsoDelegate(task, svParty)
-    }
+    DelayUtil
+      .delayIfNotClosing(
+        "dso-delegate-task-delay",
+        FiniteDuration.apply(delay, TimeUnit.MILLISECONDS),
+        this,
+      )
+      .onShutdown(throw new RuntimeException("dso delegate task delay not working"))
+      .flatMap(_ =>
+        isStaleTask(task).flatMap {
+          case true =>
+            Future.successful(
+              TaskSuccess(
+                s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
+              )
+            )
+          case false =>
+            logger.info(
+              s"Completing dso delegate task ${task.toString} after waiting a delay of $delay ms"
+            )
+            completeTaskAsDsoDelegate(task, svParty)
+        }
+      )
   }
 
   protected def completeTaskAsDsoDelegate(

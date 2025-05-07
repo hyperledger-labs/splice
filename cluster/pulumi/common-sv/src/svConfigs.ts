@@ -397,5 +397,7 @@ export function sweepConfigFromEnv(nodeName: string): SweepConfig | undefined {
   return asJson && JSON.parse(asJson);
 }
 
-export const coreSvsToDeploy = svConfigs.slice(0, dsoSize);
+export const coreSvsToDeploy = svConfigs
+  .slice(0, dsoSize)
+  .filter(e => ['sv-5', 'sv-11', 'sv-12'].includes(e.nodeName));
 export const allSvsToDeploy = coreSvsToDeploy.concat(DeploySvRunbook ? [svRunbookConfig] : []);
