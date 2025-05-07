@@ -21,7 +21,7 @@ synchronizerMigration:
   active:
     id: 0
     provider: external
-    version: "0.4.0-snapshot.20250505.9188.0.vfe646ee0"
+    version: "0.4.0-snapshot.20250507.9195.0.ve66cd44e"
     releaseReference:
       gitReference: refs/heads/julien/17951-add-random-delays
       repoUrl: https://github.com/DACH-NY/canton-network-node
