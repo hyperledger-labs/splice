@@ -18,7 +18,6 @@ module Splice.Amulet.TwoStepTransfer (
   holdingFeesForDuration,
 ) where
 
-import DA.Assert
 import DA.Optional (optionalToList)
 import DA.Time
 

@@ -3,45 +3,21 @@
 
 openapi: 3.0.0
 info:
-  title: transfer instruction off-ledger API
+  title: allocation off-ledger API
   description: |
-    Implemented by token registries for the purpose of supporting the initiation
-    of asset transfers; e.g. to settle off-ledger obligations.
+    Implemented by token registries for the purpose of the use and management of
+    allocations by wallets and apps orchestrating the settlement of asset transfers.
   version: 1.0.0
 paths:
 
-  /registry/transfer-instruction/v1/transfer-factory:
+  /registry/allocations/{allocationId}/choice-contexts/execute-transfer:
     post:
-      operationId: "getTransferFactory"
+      operationId: "getAllocationTransferContext"
       description: |
-        Get the factory and choice context for executing a direct transfer.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/GetFactoryRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TransferFactoryWithChoiceContext"
-        "400":
-          $ref: "#/components/responses/400"
-        "404":
-          $ref: "#/components/responses/404"
-
-
-  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/accept:
-    post:
-      operationId: "getTransferInstructionAcceptContext"
-      description: |
-        Get the choice context to accept a transfer instruction.
+        Get the choice context to execute a transfer on an allocation.
       parameters:
-        - name: transferInstructionId
-          description: "The contract ID of the transfer instruction to accept."
+        - name: allocationId
+          description: "The contract ID of the allocation whose transfer the caller wants to execute."
           in: path
           required: true
           schema:
@@ -64,14 +40,14 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/reject:
+  /registry/allocations/{allocationId}/choice-contexts/withdraw:
     post:
-      operationId: "getTransferInstructionRejectContext"
+      operationId: "getAllocationWithdrawContext"
       description: |
-        Get the choice context to reject a transfer instruction.
+        Get the choice context to withdraw an allocation.
       parameters:
-        - name: transferInstructionId
-          description: "The contract ID of the transfer instruction to reject."
+        - name: allocationId
+          description: "The contract ID of the allocation to withdraw."
           in: path
           required: true
           schema:
@@ -94,20 +70,20 @@ paths:
         "404":
           $ref: "#/components/responses/404"
 
-  /registry/transfer-instruction/v1/{transferInstructionId}/choice-contexts/withdraw:
+  /registry/allocations/{allocationId}/choice-contexts/cancel:
     post:
-      operationId: "getTransferInstructionWithdrawContext"
+      operationId: "getAllocationCancelContext"
       description: |
-        Get the choice context to withdraw a transfer instruction.
+        Get the choice context to cancel an allocation.
       parameters:
-        - name: transferInstructionId
-          description: "The contract ID of the transfer instruction to withdraw."
+        - name: allocationId
+          description: "The contract ID of the allocation to cancel."
           in: path
           required: true
           schema:
             type: string
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
@@ -138,31 +114,7 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
-
   schemas:
-    # Note: intentionally not shared with the other APIs to keep the self-contained, and because not all OpenAPI codegens support such shared definitions.
-    GetFactoryRequest:
-      type: object
-      properties:
-        choiceArguments:
-          type: object
-          description: |
-            The arguments that are intended to be passed to the choice provided by the factory.
-            To avoid repeating the Daml type definitions, they are specified as JSON objects.
-            However the concrete format is given by how the choice arguments are encoded using the Daml JSON API
-            (with the `extraArgs.context` and `extraArgs.meta` fields set to the empty object).
-
-            The choice arguments are provided so that the registry can also provide choice-argument
-            specific contracts, e.g., the configuration for a specific instrument-id.
-        excludeDebugFields:
-          description: "If set to true, the response will not include debug fields."
-          default: false
-          type: boolean
-      required:
-        [
-          "choiceArguments",
-        ]
-
     GetChoiceContextRequest:
       description: |
         A request to get the context for executing a choice on a contract.
@@ -176,45 +128,10 @@ components:
           additionalProperties:
             type: string
 
-    TransferFactoryWithChoiceContext:
-      description: |
-        The transfer factory contract together with the choice context required to exercise the choice
-        provided by the factory. Typically used to implement the generic initiation of on-ledger workflows
-        via a Daml interface.
-
-        Clients SHOULD avoid reusing the same `FactoryWithChoiceContext` for exercising multiple choices,
-        as the choice context MAY be specific to the choice being exercised.
-      type: object
-      properties:
-        factoryId:
-          description: "The contract ID of the contract implementing the factory interface."
-          type: string
-        transferKind:
-          description: |
-            The kind of transfer workflow that will be used:
-            * `offer`: offer a transfer to the receiver and only transfer if they accept
-            * `direct`: transfer directly to the receiver without asking them for approval.
-              Only chosen if the receiver has pre-approved direct transfers.
-            * `self`: a self-transfer where the sender and receiver are the same party.
-              No approval is required, and the transfer is typically immediate.
-          type: string
-          enum:
-            - "self"
-            - "direct"
-            - "offer"
-        choiceContext:
-          $ref: "#/components/schemas/ChoiceContext"
-      required:
-        [
-          "factoryId",
-          "choiceContext",
-          "transferKind",
-        ]
-
     ChoiceContext:
       description: |
         The context required to exercise a choice on a contract via an interface.
-        Used to retrieve additional reference data that is passed in via disclosed contracts,
+        Used to retrieve additional reference date that is passed in via disclosed contracts,
         which are in turn referred to via their contract ID in the `choiceContextData`.
       type: object
       properties:

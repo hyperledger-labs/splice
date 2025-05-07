@@ -331,6 +331,14 @@ spec:
               value: {{ .Values.nodeIdentifier | quote }}
             - name: SPLICE_APP_SV_MEDIATOR_IDENTIFIER
               value: {{ .Values.nodeIdentifier | quote }}
+            {{- if .Values.delegatelessAutomation }}
+            - name: SPLICE_APP_DELEGATELESS_AUTOMATION
+              value: {{ .Values.delegatelessAutomation | quote }}
+            {{- end }}
+            {{- if .Values.expectedTaskDuration }}
+            - name: SPLICE_APP_EXPECTED_TASK_DURATION
+              value: {{ .Values.expectedTaskDuration | quote }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

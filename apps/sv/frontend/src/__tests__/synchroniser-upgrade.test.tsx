@@ -4,7 +4,6 @@ import { dsoInfo } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone';
 import { rest } from 'msw';
 import { test, expect, describe } from 'vitest';
 
@@ -12,8 +11,6 @@ import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
-
-dayjs.extend(timezone);
 
 type UserEvent = ReturnType<typeof userEvent.setup>;
 
@@ -33,8 +30,6 @@ dsoInfoWithSynchronizerUpgrade.dso_rules.contract.payload.config.nextScheduledSy
   { time: '2055-04-30T15:37:48Z', migrationId: '1' };
 
 const dateFormat = 'YYYY-MM-DD HH:mm';
-// This format should only be used when working with a datetime already in utc
-const syncPauseTimeDateFormat = 'YYYY-MM-DDTHH:mm:ss[Z]';
 
 async function fillOutForm(user: UserEvent) {
   const unclaimedRewardsThresholdInput = screen.getByTestId('numUnclaimedRewardsThreshold-value');
@@ -132,17 +127,14 @@ describe('SV user can', () => {
       expect(expirationDate).toBeDefined();
 
       const expirationDateDayjs = dayjs(expirationDate);
-      const newSyncUpgradeTime = expirationDateDayjs
-        .utc()
-        .add(1, 'minute')
-        .format(syncPauseTimeDateFormat);
+      const expirationDatePlus1Minute = expirationDateDayjs.add(1, 'minute').format(dateFormat);
 
       const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
         'nextScheduledSynchronizerUpgrade.time-value'
       );
 
       fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: newSyncUpgradeTime },
+        target: { value: expirationDatePlus1Minute },
       });
 
       expect(
@@ -223,15 +215,17 @@ describe('SV user can', () => {
       expect(expirationDate).toBeDefined();
 
       const expirationDateDayjs = dayjs(expirationDate);
-      const invalidUpgradeTime = expirationDateDayjs.subtract(1, 'minute').format(dateFormat);
-      const validUpgradeTime = expirationDateDayjs.utc().add(1, 'minute').format(dateFormat);
+      const expirationDateMinus1Minute = expirationDateDayjs
+        .subtract(1, 'minute')
+        .format(dateFormat);
+      const expirationDatePlus1Minute = expirationDateDayjs.add(1, 'minute').format(dateFormat);
 
       const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
         'nextScheduledSynchronizerUpgrade.time-value'
       );
 
       fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
+        target: { value: expirationDateMinus1Minute },
       });
 
       expect(
@@ -239,7 +233,7 @@ describe('SV user can', () => {
       ).toBeDefined();
 
       fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: validUpgradeTime },
+        target: { value: expirationDatePlus1Minute },
       });
 
       expect(
@@ -299,14 +293,16 @@ describe('SV user can', () => {
       expect(expirationDate).toBeDefined();
 
       const expirationDateDayjs = dayjs(expirationDate);
-      const invalidUpgradeTime = expirationDateDayjs.utc().subtract(1, 'minute').format(dateFormat);
+      const expirationDateMinus1Minute = expirationDateDayjs
+        .subtract(1, 'minute')
+        .format(dateFormat);
 
       const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
         'nextScheduledSynchronizerUpgrade.time-value'
       );
 
       fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
+        target: { value: expirationDateMinus1Minute },
       });
 
       expect(
@@ -351,15 +347,15 @@ describe('SV user can', () => {
       expect(effectiveDate).toBeDefined();
 
       const effectiveDateDayjs = dayjs(effectiveDate);
-      const invalidUpgradeTime = effectiveDateDayjs.utc().subtract(1, 'minute').format(dateFormat);
-      const validUpgradeTime = effectiveDateDayjs.add(1, 'minute').format(dateFormat);
+      const effectiveDateMinus1Minute = effectiveDateDayjs.subtract(1, 'minute').format(dateFormat);
+      const effectiveDatePlus1Minute = effectiveDateDayjs.add(1, 'minute').format(dateFormat);
 
       const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
         'nextScheduledSynchronizerUpgrade.time-value'
       );
 
       fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
+        target: { value: effectiveDateMinus1Minute },
       });
 
       expect(
@@ -367,7 +363,7 @@ describe('SV user can', () => {
       ).toBeDefined();
 
       fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: validUpgradeTime },
+        target: { value: effectiveDatePlus1Minute },
       });
 
       expect(
@@ -375,95 +371,5 @@ describe('SV user can', () => {
       ).toBeNull();
     },
     { timeout: 10000 }
-  );
-
-  test(
-    'make changes with different timezones',
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
-        })
-      );
-
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
-
-      expect(await screen.findByText('Log In')).toBeDefined();
-
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
-
-      await user.click(screen.getByText('Governance'));
-
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
-      await fillOutForm(user);
-
-      const effectiveAtThresholdCheckBox = screen.getByTestId(
-        'checkbox-set-effective-at-threshold'
-      );
-      await user.click(effectiveAtThresholdCheckBox);
-
-      const synchronizerUpgradeCheckBox = screen.getByTestId(
-        'enable-next-scheduled-domain-upgrade'
-      );
-      await user.click(synchronizerUpgradeCheckBox);
-
-      const expirationDate = screen
-        .getByTestId('datetime-picker-vote-request-expiration')
-        .getAttribute('value');
-      expect(expirationDate).toBeDefined();
-
-      // FYI: Tests are running in UTC+2 timezone by default
-      const expirationDateDayjs = dayjs(expirationDate);
-
-      const invalidUpgradeTime = expirationDateDayjs
-        .utc()
-        .subtract(1, 'minute')
-        .format(syncPauseTimeDateFormat);
-
-      const sameUpgradeTime = expirationDateDayjs
-        .utc()
-        .add(1, 'minute')
-        .format(syncPauseTimeDateFormat);
-
-      const validUpgradeTime = expirationDateDayjs
-        .utc()
-        .add(1, 'minute')
-        .format(syncPauseTimeDateFormat);
-
-      const nextScheduledSynchronizerUpgradeTime = screen.getByTestId(
-        'nextScheduledSynchronizerUpgrade.time-value'
-      );
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: invalidUpgradeTime },
-      });
-
-      expect(
-        screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-      ).toBeDefined();
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: sameUpgradeTime },
-      });
-
-      expect(
-        screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
-      ).toBeDefined();
-
-      fireEvent.change(nextScheduledSynchronizerUpgradeTime, {
-        target: { value: validUpgradeTime },
-      });
-
-      expect(
-        screen.queryByTestId('create-voterequest-submit-button')?.getAttribute('disabled')
-      ).toBeNull();
-    },
-    {
-      timeout: 10000,
-    }
   );
 });

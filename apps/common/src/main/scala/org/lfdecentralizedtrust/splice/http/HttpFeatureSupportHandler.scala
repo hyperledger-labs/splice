@@ -34,9 +34,9 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
           ),
           CantonTimestamp.now(),
         )
-        .map { featureSupport =>
+        .map { supportNewsGovernanceFlow =>
           FeatureSupportResponse(
-            featureSupport.supported
+            supportNewsGovernanceFlow
           )
         }
     }

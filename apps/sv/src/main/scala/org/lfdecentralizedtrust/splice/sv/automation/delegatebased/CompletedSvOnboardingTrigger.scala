@@ -18,8 +18,9 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import CompletedSvOnboardingTrigger.*
+
+import scala.jdk.OptionConverters.RichOption
 
 //TODO(#3756) reconsider this trigger
 class CompletedSvOnboardingTrigger(
@@ -40,12 +41,19 @@ class CompletedSvOnboardingTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      dsoRules: DsoRulesContract
+      dsoRules: DsoRulesContract,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svOnboardings <- store.listSvOnboardingRequestsBySvs(dsoRules)
+      supportsSvController <- supportsSvController()
       cmds = svOnboardings.map(co =>
-        dsoRules.exercise(_.exerciseDsoRules_ArchiveSvOnboardingRequest(co.contractId))
+        dsoRules.exercise(
+          _.exerciseDsoRules_ArchiveSvOnboardingRequest(
+            co.contractId,
+            Option.when(supportsSvController)(controller).toJava,
+          )
+        )
       )
       _ <- Future.sequence(
         cmds.map(cmd =>

@@ -113,7 +113,7 @@ class TokenStandardCliIntegrationTest
             "-R",
             s"http://localhost:${sv1ScanBackend.config.adminApi.port.toString}",
             "-l",
-            "http://localhost:6501", // not available in any config
+            "http://localhost:6201", // not available in any config
             "-a",
             aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
             "-u",

@@ -76,7 +76,6 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistoryQueries.UpdateHistoryQueries
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
@@ -129,7 +128,6 @@ class DbScanStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = true,
-      BackfillingRequirement.NeedsBackfilling,
       Some(storeMetrics.history),
     )
     with ScanStore

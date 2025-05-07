@@ -11,8 +11,9 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import ExpiredSvOnboardingConfirmedTrigger.*
+
+import scala.jdk.OptionConverters.RichOption
 
 class ExpiredSvOnboardingConfirmedTrigger(
     override protected val context: TriggerContext,
@@ -33,12 +34,16 @@ class ExpiredSvOnboardingConfirmedTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
+      supportsSvController <- supportsSvController()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireSvOnboardingConfirmed(
-          co.work.contractId
+          co.work.contractId,
+          Option.when(supportsSvController)(controller).toJava,
         )
       )
       _ <- svTaskContext.connection

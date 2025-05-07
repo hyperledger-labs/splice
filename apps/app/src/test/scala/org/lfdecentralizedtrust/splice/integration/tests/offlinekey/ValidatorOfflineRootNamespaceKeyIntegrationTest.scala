@@ -17,9 +17,6 @@ class ValidatorOfflineRootNamespaceKeyIntegrationTest
     with PostgresAroundEach
     with WalletTestUtil {
 
-  // It will fail to find the validator of alice_validator_wallet_user
-  override protected def runTokenStandardCliSanityCheck: Boolean = false
-
   override def usesDbs: Seq[String] = {
     super.usesDbs ++ Seq(
       "alice_participant_offline_key",

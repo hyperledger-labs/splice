@@ -34,10 +34,9 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -72,7 +71,6 @@ class DbValidatorStore(
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
       enableissue12777Workaround = false,
-      BackfillingRequirement.BackfillingNotRequired,
     )
     with ValidatorStore
     with AcsTables

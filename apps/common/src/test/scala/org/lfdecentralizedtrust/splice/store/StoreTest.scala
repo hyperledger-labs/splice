@@ -507,6 +507,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     new DsoRules_CloseVoteRequest(
       requestId,
       Optional.empty(),
+      Optional.empty(),
     ).toValue
   }
 
