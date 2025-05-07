@@ -61,9 +61,6 @@ copy_dir "cluster/compose"
 copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
-remove_dir "docs/src/app_dev"
-copy_dir "docs/src/app_dev/daml_api"
-cp "${SPLICE_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
 copy_dir "load-tester"
 
 # Build code / configs
@@ -87,11 +84,7 @@ for f in project/*; do
     copy_file "$f"
   fi
 done
-copy_dir "docs/api-templates"
-copy_file "docs/gen-daml-docs.sh"
-copy_file "docs/.gitignore"
-copy_file "docs/src/conf.py"
-copy_file "docs/livepreview.sh"
+copy_dir "docs"
 copy_file "daml.yaml"
 copy_file "Makefile"
 copy_file "cluster/local.mk"
@@ -138,13 +131,10 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v '/\.git[/:]' |
     grep -v '/\.github[/:]' |
     grep -v '\./cluster' |
-    grep -v '^./docs' |
-    grep -v 'docs/src/index.rst.*differ' |
     grep -v 'LICENSE.*differ' |
     grep -v 'README.md.*differ' |
     grep -v '\.gitattributes.*differ' |
-    grep -v 'CODEOWNERS.*differ' |
-    grep -v 'Files \./docs/src/index.rst and .*/docs/src/index.rst differ' || true)
+    grep -v 'CODEOWNERS.*differ' || true)
 
 echo "Unexpected files missing from Splice: $unknown"
 

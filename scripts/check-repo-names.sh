@@ -57,6 +57,7 @@ function check_patterns_locally() {
     'build-tools'
     'support'
     'start-canton\.sh'
+    'docs/'
   )
 
   local exception exceptions_args=()

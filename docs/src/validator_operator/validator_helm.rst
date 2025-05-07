@@ -374,10 +374,9 @@ If you are redeploying the validator app as part of a :ref:`synchronizer migrati
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-Finally, please add the following values to your ``standalone-validator-values.yaml`` file:
-
-.. literalinclude:: ../../../cluster/configs/configs/ui-config-values.yaml
-    :language: yaml
+Finally, please download the UI config values file from
+https://github.com/global-synchronizer-foundation/configs/blob/main/configs/ui-config-values.yaml
+and add the values from it to your ``standalone-validator-values.yaml``.
 
 
 .. _validator-helm-charts-install:
