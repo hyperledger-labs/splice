@@ -48,7 +48,10 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.util.{TimeTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
@@ -60,7 +63,8 @@ import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
 class TokenStandardCliTestDataTimeBasedIntegrationTest
-    extends TokenStandardTest
+    extends IntegrationTestWithSharedEnvironment
+    with TokenStandardTest
     with WalletTestUtil
     with HasActorSystem
     with TimeTestUtil

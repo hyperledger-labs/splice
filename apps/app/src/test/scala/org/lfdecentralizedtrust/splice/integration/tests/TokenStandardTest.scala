@@ -13,10 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 }
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{SpliceTestConsoleEnvironment}
 import org.lfdecentralizedtrust.splice.util.FactoryChoiceWithDisclosures
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
@@ -24,7 +21,7 @@ import java.time.Duration
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUtil {
+trait TokenStandardTest extends ExternallySignedPartyTestUtil {
 
   val emptyExtraArgs =
     org.lfdecentralizedtrust.splice.util.ChoiceContextWithDisclosures.emptyExtraArgs
