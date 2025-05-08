@@ -102,7 +102,7 @@ class MergeValidatorLicenseContractsTrigger(
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPrefferedPackage(preferredPackages)
+        .withPreferredPackage(preferredPackages)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${validatorLicenses.length} ValidatorLicense contracts for $validator"

@@ -907,7 +907,7 @@ class SpliceLedgerConnection(
         commandIdDeduplicationOffset = (commandId, deduplicationOffset)
       )
 
-    def withPrefferedPackage(packageIds: Seq[String]): submit[C, CmdId, DomId] = {
+    def withPreferredPackage(packageIds: Seq[String]): submit[C, CmdId, DomId] = {
       copy(
         preferredPackageIds = packageIds
       )

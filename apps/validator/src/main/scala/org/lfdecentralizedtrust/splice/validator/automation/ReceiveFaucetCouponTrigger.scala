@@ -137,7 +137,7 @@ class ReceiveFaucetCouponTrigger(
         )
         .noDedup
         .withDisclosedContracts(spliceLedgerConnection.disclosedContracts(unclaimedRound))
-        .withPrefferedPackage(
+        .withPreferredPackage(
           validatorLivenessActivityFeatureSupport.packageIds
         )
         .yieldUnit()

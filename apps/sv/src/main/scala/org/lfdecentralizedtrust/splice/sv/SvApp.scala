@@ -1292,7 +1292,7 @@ object SvApp {
                     readAs = Seq(dsoParty),
                     cmd,
                   )
-                  .withPrefferedPackage(validatorLicenseMetadataFeatureSupport.packageIds)
+                  .withPreferredPackage(validatorLicenseMetadataFeatureSupport.packageIds)
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
                       "org.lfdecentralizedtrust.splice.sv.createSvValidatorLicense",

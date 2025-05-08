@@ -770,7 +770,7 @@ class HttpSvHandler(
       _ <- dsoStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(dsoParty), cmds)
         .withSynchronizerId(dsoRules.domain)
-        .withPrefferedPackage(validatorLicenseMetadataFeatureSupport.packageIds)
+        .withPreferredPackage(validatorLicenseMetadataFeatureSupport.packageIds)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()

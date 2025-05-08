@@ -75,7 +75,7 @@ class PruneAmuletConfigScheduleTrigger(
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .withSynchronizerId(amuletRules.domain)
         .noDedup
-        .withPrefferedPackage(preferredPackageIds)
+        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(s"Pruned AmuletRules config")
   }

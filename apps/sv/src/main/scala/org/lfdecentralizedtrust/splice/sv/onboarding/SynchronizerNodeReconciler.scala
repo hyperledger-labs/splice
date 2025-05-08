@@ -122,7 +122,7 @@ class SynchronizerNodeReconciler(
             )
             connection
               .submit(Seq(svParty), Seq(dsoParty), cmd)
-              .withPrefferedPackage(legacySequencerConfigFeatureSupport.packageIds)
+              .withPreferredPackage(legacySequencerConfigFeatureSupport.packageIds)
               .noDedup
               .yieldResult()
           }
