@@ -335,6 +335,9 @@ spec:
             - name: sv-api
               containerPort: 5014
               protocol: TCP
+            - name: metrics-api
+              containerPort: 10013
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /api/sv/livez
