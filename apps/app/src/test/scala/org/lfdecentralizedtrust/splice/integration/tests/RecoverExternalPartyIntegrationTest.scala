@@ -94,6 +94,17 @@ class RecoverExternalPartyIntegrationTest
 
       bobValidatorBackend.participantClient.topology.transactions
         .load(signedTxsParticipant, TopologyStoreId.Synchronizer(synchronizerId))
+      clue("PartyToParticipant transaction gets sequenced") {
+        eventually() {
+          sv1Backend.participantClient.topology.party_to_participant_mappings
+            .list(synchronizerId, filterParty = aliceParty.filterString)
+            .loneElement
+            .item
+            .participants
+            .loneElement
+            .participantId shouldBe bobValidatorBackend.participantClient.id
+        }
+      }
     }
 
     // Note: This has a hard dependency on their not being any transaction for the party between
