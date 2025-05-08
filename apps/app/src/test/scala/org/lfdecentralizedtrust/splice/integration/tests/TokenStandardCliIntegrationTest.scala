@@ -4,6 +4,7 @@ import com.digitalasset.canton.crypto.SigningPrivateKey
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.io.FileOutputStream
@@ -13,7 +14,8 @@ import scala.util.Using
 
 // This is an integration test because it requires a live canton & scan to function
 class TokenStandardCliIntegrationTest
-    extends TokenStandardTest
+    extends IntegrationTestWithSharedEnvironment
+    with TokenStandardTest
     with HasExecutionContext
     with ExternallySignedPartyTestUtil
     with HasTempDirectory {

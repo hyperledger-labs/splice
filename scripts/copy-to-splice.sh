@@ -61,9 +61,6 @@ copy_dir "cluster/compose"
 copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
-remove_dir "docs/src/app_dev"
-copy_dir "docs/src/app_dev/daml_api"
-cp "${SPLICE_ROOT}/docs/src/splice-index.rst" "${SPLICE_DIR}/docs/src/index.rst"
 copy_dir "load-tester"
 
 # Build code / configs
@@ -74,6 +71,7 @@ copy_file ".gitignore"
 copy_dir "nix"
 copy_file ".envrc"
 copy_file ".envrc.vars"
+copy_file ".envrc.validate"
 copy_file "LATEST_RELEASE"
 copy_file "VERSION"
 copy_file "create-bundle.sh"
@@ -86,16 +84,11 @@ for f in project/*; do
     copy_file "$f"
   fi
 done
-copy_dir "docs/api-templates"
-copy_file "docs/gen-daml-docs.sh"
-copy_file "docs/.gitignore"
-copy_file "docs/src/conf.py"
-copy_file "docs/livepreview.sh"
+copy_dir "docs"
 copy_file "daml.yaml"
 copy_file "Makefile"
 copy_file "cluster/local.mk"
 copy_dir ".github/actions/scripts"
-
 
 copy_file ".editorconfig"
 copy_file ".gitmodules"
@@ -113,7 +106,47 @@ copy_file "start-canton.sh"
 copy_file "start-frontends.sh"
 copy_file "stop-canton.sh"
 copy_file "stop-frontends.sh"
+copy_file "wait-for-canton.sh"
 copy_dir "support"
 cp "${SPLICE_ROOT}"/test-*.log "${SPLICE_DIR}/"
 copy_file "util.sh"
 
+# Cleanup of directories we used to copy to Splice, but no longer do,
+# so they don't get removed by rsync.
+rm -rf "${SPLICE_DIR}/.circleci"
+rm -rf "${SPLICE_DIR}/cluster/deployment/compose"
+rm -rf "${SPLICE_DIR}/images"
+
+# Since we are explicitly specifying what to copy above, rather than what not
+# to copy, we test that we are not missing anything from Splice that was not
+# expected to be missing, so that we catch if people mistakenly introduce files
+# not captured above.
+# Note that the list of expected to be missing will shrink over the coming days,
+# until we are ready to fully move to Splice.
+
+unknown=$(diff -qr . "${SPLICE_DIR}" |
+    sed 's/^Only in //g' |
+    grep -v '^\.:' |
+    grep -v '^\./cluster/pulumi' |
+    grep -v '/\.git[/:]' |
+    grep -v '/\.github[/:]' |
+    grep -v '\./cluster' |
+    grep -v 'LICENSE.*differ' |
+    grep -v 'README.md.*differ' |
+    grep -v '\.gitattributes.*differ' |
+    grep -v 'CODEOWNERS.*differ' || true)
+
+echo "Unexpected files missing from Splice: $unknown"
+
+unknown=$(diff -qr . "${SPLICE_DIR}" |
+    sed 's/^Only in //g' | grep '^\.:' | sed 's/^\.: //g' |
+    grep -v '.circleci' |
+    grep -v '.direnv' |
+    grep -v 'CODEOWNERS' |
+    grep -v 'LICENSE' |
+    grep -v '.*.md' |
+    grep -v 'wait-for-canton.sh' |
+    grep -v 'openapi-cache-key.txt' |
+    grep -v '^\.git' || true)
+
+echo "Unexpected files missing from Splice: $unknown"
