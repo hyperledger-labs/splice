@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
+import { GetBackfillingStatusResponse } from 'scan-openapi';
 import { test, expect } from 'vitest';
 
 import App from '../App';
 import { ScanConfigProvider } from '../utils';
 import { config } from './setup/config';
+import { server } from './setup/setup';
 
 const spliceInstanceNames = config.spliceInstanceNames;
+const scanUrl = window.splice_config.services.scan.url;
 
 const AppWithConfig: React.FC = () => {
   return (
@@ -91,4 +95,45 @@ test('validator licenses are displayed and paginable', async () => {
 
   mockAllIsIntersecting(true);
   expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
+});
+
+test('backfilling indicator shows when backfilling', async () => {
+  server.use(
+    rest.get(`${scanUrl}/v0/backfilling/status`, (_, res, ctx) => {
+      return res(
+        ctx.json<GetBackfillingStatusResponse>({
+          complete: false,
+        })
+      );
+    })
+  );
+  render(<AppWithConfig />);
+  const backfillingIndicator = screen.queryByTestId('backfilling-alert');
+  expect(backfillingIndicator).toBeDefined();
+});
+
+test('backfilling indicator does not shows when not backfilling', async () => {
+  server.use(
+    rest.get(`${scanUrl}/v0/backfilling/status`, (_, res, ctx) => {
+      return res(
+        ctx.json<GetBackfillingStatusResponse>({
+          complete: true,
+        })
+      );
+    })
+  );
+  render(<AppWithConfig />);
+  const backfillingIndicator = screen.queryByTestId('backfilling-alert');
+  expect(backfillingIndicator).toBeNull();
+});
+
+test('backfilling indicator does not shows when response is unclear', async () => {
+  server.use(
+    rest.get(`${scanUrl}/v0/backfilling/status`, (_, res, ctx) => {
+      return res(ctx.status(503, 'Internal Server Error'));
+    })
+  );
+  render(<AppWithConfig />);
+  const backfillingIndicator = screen.queryByTestId('backfilling-alert');
+  expect(backfillingIndicator).toBeNull();
 });

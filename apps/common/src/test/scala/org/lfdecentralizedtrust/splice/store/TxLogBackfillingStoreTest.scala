@@ -8,12 +8,15 @@ import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, 
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Time
+import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
 import org.lfdecentralizedtrust.splice.store.db.{
@@ -207,7 +210,7 @@ class TxLogBackfillingStoreTest
     "backfill across migration ids" in {
       val migrationId1 = 1L
       val history1 = mkUpdateHistory(dsoParty, migrationId = migrationId1)
-      val migrationId2 = 1L
+      val migrationId2 = 2L
       val store2 = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId2)
       val history2 = mkUpdateHistory(dsoParty, migrationId = migrationId2)
       for {
@@ -221,6 +224,20 @@ class TxLogBackfillingStoreTest
         _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
         _ <- history2.ingestionSink.initialize()
 
+        _ <- sync1.createMulti(
+          c(11),
+          recordTime = importUpdateRecordTime.toInstant,
+          workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX + "_1",
+        )(
+          Seq(history2)
+        )
+        _ <- sync1.createMulti(
+          c(22),
+          recordTime = importUpdateRecordTime.toInstant,
+          workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX + "_2",
+        )(
+          Seq(history2)
+        )
         _ <- sync2.createMulti(c(3), recordTime = t(3))(Seq(history2))
         _ <- sync1.createMulti(c(4), recordTime = t(4))(Seq(history2))
         _ <- sync1.createMulti(c(5), recordTime = t(5))(Seq(store2, history2))
@@ -235,6 +252,63 @@ class TxLogBackfillingStoreTest
         _ <- assertEntries(
           store2,
           Seq(1, 2, 4, 5, 3, 6), // sorted by synchronizer, then record time
+        )
+      } yield succeed
+    }
+
+    "report correct info when backfilling across import updates" in {
+      val migrationId1 = 1L
+      val history1 = mkUpdateHistory(dsoParty, migrationId = migrationId1)
+      val migrationId2 = 2L
+      val store2 = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId2)
+      val history2 = mkUpdateHistory(dsoParty, migrationId = migrationId2)
+      for {
+        // Migration 1 (only history)
+        _ <- history1.ingestionSink.initialize()
+        _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history1))
+        _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
+
+        // Migration 2
+        _ <- store2.testIngestionSink.initialize()
+        _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
+        _ <- history2.ingestionSink.initialize()
+
+        _ <- sync1.createMulti(
+          c(1),
+          recordTime = importUpdateRecordTime.toInstant,
+          workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX + "_1",
+        )(
+          Seq(history2)
+        )
+        _ <- sync1.createMulti(
+          c(2),
+          recordTime = importUpdateRecordTime.toInstant,
+          workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX + "_2",
+        )(
+          Seq(history2)
+        )
+        _ <- sync1.createMulti(c(3), recordTime = t(3))(Seq(history2))
+        _ <- sync1.createMulti(c(4), recordTime = t(4))(Seq(store2, history2))
+
+        // TxLogBackfillingTrigger initializing backfilling
+        _ <- store2.initializeTxLogBackfilling()
+
+        // backfilling info ignores the import updates
+        info1 <- store2.destinationHistory.backfillingInfo
+        _ = info1.value.migrationId shouldBe migrationId2
+        _ = info1.value.backfilledAt shouldBe Map(
+          sync1 -> CantonTimestamp.assertFromInstant(t(4))
+        )
+
+        // first iteration: processes one regular update and skips the import updates
+        workDone1 <- backfillOnce(store2, history2)
+        _ = workDone1 shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableNow(
+          DestinationHistory.InsertResult(1L, 1L, CantonTimestamp.assertFromInstant(t(3)))
+        )
+        // second iteration: continues with regular updates from migration 1
+        workDone2 <- backfillOnce(store2, history2)
+        _ = workDone2 shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableNow(
+          DestinationHistory.InsertResult(2L, 2L, CantonTimestamp.assertFromInstant(t(1)))
         )
       } yield succeed
     }
@@ -325,6 +399,7 @@ class TxLogBackfillingStoreTest
   private type C = Contract[AppRewardCoupon.ContractId, AppRewardCoupon]
   private def c(i: Int): C =
     appRewardCoupon(i, dsoParty, contractId = validContractId(i))
+  protected val importUpdateRecordTime: CantonTimestamp = CantonTimestamp.MinValue
   protected def t(i: Int): Instant = defaultEffectiveAt.plusMillis(i.toLong)
 
   private val sync1: SynchronizerId = SynchronizerId.tryFromString("synchronizer1::synchronizer")
