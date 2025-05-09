@@ -186,19 +186,19 @@ object PackageIdResolver {
       case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
       case SpliceWallet => packageConfig.wallet
       case SpliceWalletPayments => packageConfig.walletPayments
-      case TokenStandard.TokenMetadata =>
+      case TokenStandard.SpliceApiTokenMetadataV1 =>
         DarResources.TokenStandard.tokenMetadata.bootstrap.metadata.version.toString()
-      case TokenStandard.TokenHolding =>
+      case TokenStandard.SpliceApiTokenHoldingV1 =>
         DarResources.TokenStandard.tokenHolding.bootstrap.metadata.version.toString()
-      case TokenStandard.TokenTransferInstruction =>
+      case TokenStandard.SpliceApiTokenTransferInstructionV1 =>
         DarResources.TokenStandard.tokenTransferInstruction.bootstrap.metadata.version.toString()
-      case TokenStandard.TokenAllocation =>
+      case TokenStandard.SpliceApiTokenAllocationV1 =>
         DarResources.TokenStandard.tokenAllocation.bootstrap.metadata.version.toString()
-      case TokenStandard.TokenAllocationRequest =>
+      case TokenStandard.SpliceApiTokenAllocationRequestV1 =>
         DarResources.TokenStandard.tokenAllocationRequest.bootstrap.metadata.version.toString()
-      case TokenStandard.TokenAllocationInstruction =>
+      case TokenStandard.SpliceApiTokenAllocationInstructionV1 =>
         DarResources.TokenStandard.tokenAllocationInstruction.bootstrap.metadata.version.toString()
-      case TokenStandard.TokenStandardTest =>
+      case TokenStandard.SpliceTokenStandardTest =>
         DarResources.TokenStandard.tokenStandardTest.bootstrap.metadata.version.toString()
       case FeaturedApp =>
         DarResources.featuredApp.bootstrap.metadata.version.toString()
@@ -229,13 +229,13 @@ object PackageIdResolver {
     "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
     "Splice.Wallet.ExternalParty" -> Package.SpliceWallet,
     "Splice.Wallet.TransferPreapproval" -> Package.SpliceWallet,
-    "Splice.Api.Token.MetadataV1" -> Package.TokenStandard.TokenMetadata,
-    "Splice.Api.Token.HoldingV1" -> Package.TokenStandard.TokenHolding,
-    "Splice.Api.Token.TransferInstructionV1" -> Package.TokenStandard.TokenTransferInstruction,
-    "Splice.Api.Token.AllocationV1" -> Package.TokenStandard.TokenAllocation,
-    "Splice.Api.Token.AllocationRequestV1" -> Package.TokenStandard.TokenAllocationRequest,
-    "Splice.Api.Token.AllocationInstructionV1" -> Package.TokenStandard.TokenAllocationInstruction,
-    "Splice.Testing.Apps.TradingApp" -> Package.TokenStandard.TokenStandardTest,
+    "Splice.Api.Token.MetadataV1" -> Package.TokenStandard.SpliceApiTokenMetadataV1,
+    "Splice.Api.Token.HoldingV1" -> Package.TokenStandard.SpliceApiTokenHoldingV1,
+    "Splice.Api.Token.TransferInstructionV1" -> Package.TokenStandard.SpliceApiTokenTransferInstructionV1,
+    "Splice.Api.Token.AllocationV1" -> Package.TokenStandard.SpliceApiTokenAllocationV1,
+    "Splice.Api.Token.AllocationRequestV1" -> Package.TokenStandard.SpliceApiTokenAllocationRequestV1,
+    "Splice.Api.Token.AllocationInstructionV1" -> Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
+    "Splice.Testing.Apps.TradingApp" -> Package.TokenStandard.SpliceTokenStandardTest,
     "Splice.Api.FeaturedAppRightV1" -> Package.FeaturedApp,
   )
 
@@ -253,13 +253,13 @@ object PackageIdResolver {
   object Package {
 
     object TokenStandard {
-      final case object TokenMetadata extends Package
-      final case object TokenHolding extends Package
-      final case object TokenTransferInstruction extends Package
-      final case object TokenAllocation extends Package
-      final case object TokenAllocationRequest extends Package
-      final case object TokenAllocationInstruction extends Package
-      final case object TokenStandardTest extends Package
+      final case object SpliceApiTokenMetadataV1 extends Package
+      final case object SpliceApiTokenHoldingV1 extends Package
+      final case object SpliceApiTokenTransferInstructionV1 extends Package
+      final case object SpliceApiTokenAllocationV1 extends Package
+      final case object SpliceApiTokenAllocationRequestV1 extends Package
+      final case object SpliceApiTokenAllocationInstructionV1 extends Package
+      final case object SpliceTokenStandardTest extends Package
     }
     final case object SpliceAmulet extends Package
     final case object SpliceAmuletNameService extends Package

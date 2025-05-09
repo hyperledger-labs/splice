@@ -86,7 +86,6 @@ import java.util.Base64
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
-import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 object HttpScanAppClient {
@@ -1447,7 +1446,7 @@ object HttpScanAppClient {
       extends TokenStandardTransferInstructionBaseCommand[
         transferinstruction.v1.GetTransferFactoryResponse,
         (
-            FactoryChoiceWithDisclosures,
+            FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
         ),
       ] {
@@ -1476,7 +1475,7 @@ object HttpScanAppClient {
       Either[
         String,
         (
-            FactoryChoiceWithDisclosures,
+            FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
         ),
       ],
@@ -1488,7 +1487,7 @@ object HttpScanAppClient {
           factory.choiceContext.disclosedContracts.map(
             fromTransferInstructionHttpDisclosedContract
           )
-        val commands = new transferinstructionv1.TransferFactory.ContractId(factory.factoryId)
+        val exercise = new transferinstructionv1.TransferFactory.ContractId(factory.factoryId)
           .exerciseTransferFactory_Transfer(
             new transferinstructionv1.TransferFactory_Transfer(
               choiceArgs.expectedAdmin,
@@ -1499,10 +1498,7 @@ object HttpScanAppClient {
               ),
             )
           )
-          .commands()
-          .asScala
-          .toSeq
-        (FactoryChoiceWithDisclosures(commands, disclosedContracts), factory.transferKind)
+        (FactoryChoiceWithDisclosures(exercise, disclosedContracts), factory.transferKind)
       }
     }
   }
@@ -1612,7 +1608,7 @@ object HttpScanAppClient {
   case class GetAllocationFactory(choiceArgs: allocationinstructionv1.AllocationFactory_Allocate)
       extends TokenStandardAllocationInstructionBaseCommand[
         allocationinstruction.v1.GetAllocationFactoryResponse,
-        FactoryChoiceWithDisclosures,
+        FactoryChoiceWithDisclosures[allocationinstructionv1.AllocationInstructionResult],
       ] {
     override def submitRequest(
         client: Client,
@@ -1636,7 +1632,9 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ): PartialFunction[
       allocationinstruction.v1.GetAllocationFactoryResponse,
-      Either[String, FactoryChoiceWithDisclosures],
+      Either[String, FactoryChoiceWithDisclosures[
+        allocationinstructionv1.AllocationInstructionResult
+      ]],
     ] = { case allocationinstruction.v1.GetAllocationFactoryResponse.OK(factory) =>
       for {
         choiceContext <- parseAsChoiceContext(factory.choiceContext.choiceContextData)
@@ -1645,7 +1643,7 @@ object HttpScanAppClient {
           factory.choiceContext.disclosedContracts.map(
             fromAllocationInstructionHttpDisclosedContract
           )
-        val commands =
+        val exercise =
           new allocationinstructionv1.AllocationFactory.ContractId(factory.factoryId)
             .exerciseAllocationFactory_Allocate(
               new allocationinstructionv1.AllocationFactory_Allocate(
@@ -1659,10 +1657,7 @@ object HttpScanAppClient {
                 ),
               )
             )
-            .commands()
-            .asScala
-            .toSeq
-        FactoryChoiceWithDisclosures(commands, disclosedContracts)
+        FactoryChoiceWithDisclosures(exercise, disclosedContracts)
       }
     }
   }

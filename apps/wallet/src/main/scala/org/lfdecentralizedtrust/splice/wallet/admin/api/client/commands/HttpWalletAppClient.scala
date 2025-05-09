@@ -22,8 +22,11 @@ import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, wallet as http}
 import org.lfdecentralizedtrust.splice.http.v0.external.wallet as externalHttp
 import org.lfdecentralizedtrust.splice.http.v0.wallet.{
+  CreateTokenStandardTransferResponse,
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
+  ListTokenStandardTransfersResponse,
+  WalletClient,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.util.{
@@ -35,8 +38,9 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -1022,6 +1026,153 @@ object HttpWalletAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.TransferPreapprovalSendResponse.OK => Right(())
 
+    }
+  }
+
+  object TokenStandard {
+    final case object ListTransfers
+        extends InternalBaseCommand[
+          http.ListTokenStandardTransfersResponse,
+          definitions.ListTokenStandardTransfersResponse,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], ListTokenStandardTransfersResponse] =
+        client.listTokenStandardTransfers(headers = headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[ListTokenStandardTransfersResponse, Either[
+        String,
+        definitions.ListTokenStandardTransfersResponse,
+      ]] = { case http.ListTokenStandardTransfersResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
+    final case class CreateTransfer(
+        receiver: PartyId,
+        amount: BigDecimal,
+        description: String,
+        expiresAt: CantonTimestamp,
+        trackingId: String,
+    ) extends InternalBaseCommand[
+          http.CreateTokenStandardTransferResponse,
+          definitions.TransferInstructionResultResponse,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], CreateTokenStandardTransferResponse] =
+        client.createTokenStandardTransfer(
+          definitions.CreateTokenStandardTransferRequest(
+            Codec.encode(receiver),
+            Codec.encode(amount),
+            description,
+            Codec.encode(expiresAt),
+            trackingId,
+          ),
+          headers = headers,
+        )
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.CreateTokenStandardTransferResponse, Either[
+        String,
+        definitions.TransferInstructionResultResponse,
+      ]] = {
+        case http.CreateTokenStandardTransferResponse.OK(value) =>
+          Right(value)
+        case http.CreateTokenStandardTransferResponse.Conflict(value) =>
+          Left(value.error)
+        case http.CreateTokenStandardTransferResponse.TooManyRequests(value) =>
+          Left(value.error)
+      }
+    }
+
+    final case class AcceptTransfer(
+        contractId: transferinstructionv1.TransferInstruction.ContractId
+    ) extends InternalBaseCommand[
+          http.AcceptTokenStandardTransferResponse,
+          definitions.TransferInstructionResultResponse,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.AcceptTokenStandardTransferResponse] =
+        client.acceptTokenStandardTransfer(
+          contractId.contractId,
+          headers = headers,
+        )
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.AcceptTokenStandardTransferResponse, Either[
+        String,
+        definitions.TransferInstructionResultResponse,
+      ]] = { case http.AcceptTokenStandardTransferResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
+    final case class RejectTransfer(
+        contractId: transferinstructionv1.TransferInstruction.ContractId
+    ) extends InternalBaseCommand[
+          http.RejectTokenStandardTransferResponse,
+          definitions.TransferInstructionResultResponse,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.RejectTokenStandardTransferResponse] =
+        client.rejectTokenStandardTransfer(
+          contractId.contractId,
+          headers = headers,
+        )
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.RejectTokenStandardTransferResponse, Either[
+        String,
+        definitions.TransferInstructionResultResponse,
+      ]] = { case http.RejectTokenStandardTransferResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
+    final case class WithdrawTransfer(
+        contractId: transferinstructionv1.TransferInstruction.ContractId
+    ) extends InternalBaseCommand[
+          http.WithdrawTokenStandardTransferResponse,
+          definitions.TransferInstructionResultResponse,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.WithdrawTokenStandardTransferResponse] =
+        client.withdrawTokenStandardTransfer(
+          contractId.contractId,
+          headers = headers,
+        )
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.WithdrawTokenStandardTransferResponse, Either[
+        String,
+        definitions.TransferInstructionResultResponse,
+      ]] = { case http.WithdrawTokenStandardTransferResponse.OK(value) =>
+        Right(value)
+      }
     }
   }
 }

@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection.CommandId
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
-import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletResource as r0
+import org.lfdecentralizedtrust.splice.http.v0.wallet.{WalletResource, WalletResource as r0}
 import org.lfdecentralizedtrust.splice.http.v0.{definitions as d0, wallet as v0}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
@@ -45,17 +45,27 @@ import TreasuryService.AmuletOperationDedupConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.transferinstructionresult_output.{
+  TransferInstructionResult_Completed,
+  TransferInstructionResult_Failed,
+  TransferInstructionResult_Pending,
+}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.CreateTokenStandardTransferRequest
 
 import java.math.RoundingMode as JRM
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
+import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
 class HttpWalletHandler(
@@ -301,7 +311,7 @@ class HttpWalletHandler(
               )
               .map(_.exerciseResult.featuredAppRight)
           )
-        )(user, dislosedContracts = _.disclosedContracts(amuletRules))
+        )(user, disclosedContracts = _.disclosedContracts(amuletRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
   }
@@ -802,6 +812,165 @@ class HttpWalletHandler(
             )
           } yield result
       }
+    }
+  }
+
+  override def createTokenStandardTransfer(
+      respond: WalletResource.CreateTokenStandardTransferResponse.type
+  )(
+      request: CreateTokenStandardTransferRequest
+  )(extracted: TracedUser): Future[WalletResource.CreateTokenStandardTransferResponse] = {
+    implicit val TracedUser(user, traceContext) = extracted
+    (for {
+      userWallet <- getUserWallet(user)
+      commandId = CommandId(
+        "org.lfdecentralizedtrust.splice.wallet.createTokenStandardTransfer",
+        Seq(userWallet.store.key.endUserParty),
+        request.trackingId,
+      )
+      dedupConfig = AmuletOperationDedupConfig(
+        commandId,
+        dedupDuration,
+      )
+      result <- userWallet.treasury.enqueueTokenStandardTransferOperation(
+        Codec.tryDecode(Codec.Party)(request.receiverPartyId),
+        BigDecimal(request.amount),
+        request.description,
+        Codec.tryDecode(Codec.Timestamp)(request.expiresAt),
+        dedup = Some(dedupConfig),
+      )
+    } yield WalletResource.CreateTokenStandardTransferResponse.OK(
+      transferInstructionResultToResponse(result)
+    )).transform(HttpErrorHandler.onGrpcAlreadyExists("CreateTransferOffer duplicate command"))
+  }
+
+  private def transferInstructionResultToResponse(
+      result: transferinstructionv1.TransferInstructionResult
+  ): d0.TransferInstructionResultResponse = {
+    d0.TransferInstructionResultResponse(
+      result.output match {
+        case completed: TransferInstructionResult_Completed =>
+          d0.TransferInstructionCompleted(
+            completed.receiverHoldingCids.asScala.map(_.contractId).toVector
+          )
+        case _: TransferInstructionResult_Failed => d0.TransferInstructionFailed()
+        case pending: TransferInstructionResult_Pending =>
+          d0.TransferInstructionPending(pending.transferInstructionCid.contractId)
+        case x =>
+          throw new IllegalArgumentException(s"Unexpected TransferInstructionResult: $x")
+      },
+      result.senderChangeCids.asScala.map(_.contractId).toVector,
+      result.meta.values.asScala.toMap,
+    )
+  }
+
+  override def listTokenStandardTransfers(
+      respond: WalletResource.ListTokenStandardTransfersResponse.type
+  )()(tuser: TracedUser): Future[WalletResource.ListTokenStandardTransfersResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    listContracts(
+      AmuletTransferInstruction.COMPANION,
+      user,
+      contracts =>
+        WalletResource.ListTokenStandardTransfersResponse.OK(
+          d0.ListTokenStandardTransfersResponse(contracts)
+        ),
+    )
+  }
+
+  override def acceptTokenStandardTransfer(
+      respond: WalletResource.AcceptTokenStandardTransferResponse.type
+  )(contractId: String)(
+      tUser: TracedUser
+  ): Future[WalletResource.AcceptTokenStandardTransferResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.acceptTokenStandardTransfer") { implicit traceContext => _ =>
+      val requestCid = Codec.tryDecodeJavaContractIdInterface(
+        transferinstructionv1.TransferInstruction.INTERFACE
+      )(
+        contractId
+      )
+      for {
+        choiceContext <- scanConnection.getTransferInstructionAcceptContext(requestCid)
+        outcome <- exerciseWalletAction((installCid, _) => {
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_TransferInstruction_Accept(
+                requestCid,
+                new transferinstructionv1.TransferInstruction_Accept(choiceContext.toExtraArgs()),
+              )
+          )
+        })(
+          user,
+          disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
+        )
+      } yield WalletResource.AcceptTokenStandardTransferResponseOK(
+        transferInstructionResultToResponse(outcome.exerciseResult)
+      )
+    }
+  }
+
+  override def rejectTokenStandardTransfer(
+      respond: WalletResource.RejectTokenStandardTransferResponse.type
+  )(contractId: String)(
+      tUser: TracedUser
+  ): Future[WalletResource.RejectTokenStandardTransferResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.rejectTokenStandardTransfer") { implicit traceContext => _ =>
+      val requestCid = Codec.tryDecodeJavaContractIdInterface(
+        transferinstructionv1.TransferInstruction.INTERFACE
+      )(
+        contractId
+      )
+      for {
+        choiceContext <- scanConnection.getTransferInstructionRejectContext(requestCid)
+        outcome <- exerciseWalletAction((installCid, _) => {
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_TransferInstruction_Reject(
+                requestCid,
+                new transferinstructionv1.TransferInstruction_Reject(choiceContext.toExtraArgs()),
+              )
+          )
+        })(
+          user,
+          disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
+        )
+      } yield WalletResource.RejectTokenStandardTransferResponseOK(
+        transferInstructionResultToResponse(outcome.exerciseResult)
+      )
+    }
+  }
+
+  override def withdrawTokenStandardTransfer(
+      respond: WalletResource.WithdrawTokenStandardTransferResponse.type
+  )(contractId: String)(
+      tUser: TracedUser
+  ): Future[WalletResource.WithdrawTokenStandardTransferResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.withdrawTokenStandardTransfer") { implicit traceContext => _ =>
+      val requestCid = Codec.tryDecodeJavaContractIdInterface(
+        transferinstructionv1.TransferInstruction.INTERFACE
+      )(
+        contractId
+      )
+      for {
+        choiceContext <- scanConnection.getTransferInstructionWithdrawContext(requestCid)
+        outcome <- exerciseWalletAction((installCid, _) => {
+          Future.successful(
+            installCid
+              .exerciseWalletAppInstall_TransferInstruction_Withdraw(
+                requestCid,
+                new transferinstructionv1.TransferInstruction_Withdraw(choiceContext.toExtraArgs()),
+              )
+          )
+        })(
+          user,
+          disclosedContracts = _ => DisclosedContracts.fromProto(choiceContext.disclosedContracts),
+        )
+      } yield WalletResource.WithdrawTokenStandardTransferResponseOK(
+        transferInstructionResultToResponse(outcome.exerciseResult)
+      )
     }
   }
 

@@ -90,7 +90,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
   )(
       user: String,
       dedup: Option[(CommandId, DedupConfig)] = None,
-      dislosedContracts: SpliceLedgerConnection => DisclosedContracts = _ => DisclosedContracts(),
+      disclosedContracts: SpliceLedgerConnection => DisclosedContracts = _ => DisclosedContracts(),
       priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Response] = {
     for {
@@ -105,7 +105,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
         case None =>
           userWallet.connection
             .submit(Seq(validatorParty), Seq(userParty), update, priority = priority)
-            .withDisclosedContracts(dislosedContracts(userWallet.connection))
+            .withDisclosedContracts(disclosedContracts(userWallet.connection))
             .noDedup
             .yieldResult()
         case Some((commandId, dedupConfig)) =>
@@ -117,7 +117,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
               priority = priority,
             )
             .withDedup(commandId, dedupConfig)
-            .withDisclosedContracts(dislosedContracts(userWallet.connection))
+            .withDisclosedContracts(disclosedContracts(userWallet.connection))
             .yieldResult()
       }
     } yield result

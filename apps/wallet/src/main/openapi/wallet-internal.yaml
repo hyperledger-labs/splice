@@ -564,6 +564,140 @@ paths:
       responses:
         "200":
           description: ok
+
+  /v0/wallet/token-standard/transfers:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "createTokenStandardTransfer"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CreateTokenStandardTransferRequest"
+      responses:
+        "200":
+          description: The transfer has been created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferInstructionResultResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "404":
+          description: |
+            The submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "409":
+          description:
+            A transfer with the same tracking id has been created.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A transfer with the same tracking id is currently being processed,
+            which may or may not succeed. Retry submitting the request with exponential
+            back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+    get:
+      description:
+        List all open transfers where the user is either sender or receiver.
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "listTokenStandardTransfers"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTokenStandardTransfersResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/token-standard/transfers/{contract_id}/reject:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "rejectTokenStandardTransfer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferInstructionResultResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/token-standard/transfers/{contract_id}/accept:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "acceptTokenStandardTransfer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferInstructionResultResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/token-standard/transfers/{contract_id}/withdraw:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "withdrawTokenStandardTransfer"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferInstructionResultResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 components:
   schemas:
     UserStatusResponse:
@@ -1007,3 +1141,102 @@ components:
             Deduplication id, only one successful transfer with this id
             will be accepted within a 24h period.
           type: string
+
+    CreateTokenStandardTransferRequest:
+      type: object
+      required:
+        - receiver_party_id
+        - amount
+        - description
+        - expires_at
+        - tracking_id
+      properties:
+        receiver_party_id:
+          description: |
+            The party id of the receiver.
+          type: string
+        amount:
+          description: |
+            The amount of Amulet to transfer.
+          type: string
+        description:
+          description: |
+            An arbitrary, user chosen text.
+            This should be a human readable string that describes the purpose of the transfer.
+            It will be shown to the receiver when they decide whether to accept the offer.
+          type: string
+        expires_at:
+          description: |
+            Expiry time of the transfer offer as unix timestamp in microseconds. After this time, the offer can no longer be accepted
+            and automation in the wallet will eventually expire the transfer offer.
+            Note that this time is compared against the ledger effective time of the Daml transaction accepting or expiring an offer, and can skew from the wall clock
+            time measured on the caller's machine. See https://docs.daml.com/concepts/time.html
+            for how ledger effective time is bound to the record time of a transaction on a domain.
+          type: integer
+          format: int64
+        tracking_id:
+          description: |
+            Tracking id to support exactly once submission. Once submitted, all successive calls with the same tracking id
+            will get rejected with a 409 or 429 status code unless the command fails and the transfer did not get created.
+            Clients should create a fresh tracking id when they try to create a new transfer. If that command submission fails
+            with a retryable error or the application crashed and got restarted, successive command submissions must reuse the same
+            tracking id to ensure they don't create the same transfer multiple times.
+          type: string
+
+    TransferInstructionResultResponse:
+      type: object
+      required:
+        - output
+        - sender_change_cids
+        - meta
+      properties:
+        output:
+          "$ref": "#/components/schemas/TransferInstructionResultOutput"
+        sender_change_cids:
+          type: array
+          items:
+            type: string
+        meta:
+          type: object
+          additionalProperties:
+            type: string
+
+    TransferInstructionResultOutput:
+      oneOf:
+        - "$ref": "#/components/schemas/TransferInstructionPending"
+        - "$ref": "#/components/schemas/TransferInstructionCompleted"
+        - "$ref": "#/components/schemas/TransferInstructionFailed"
+
+    TransferInstructionPending:
+      type: object
+      required:
+        - transfer_instruction_cid
+      properties:
+        transfer_instruction_cid:
+          type: string
+
+    TransferInstructionCompleted:
+      type: object
+      required:
+        - receiver_holding_cids
+      properties:
+        receiver_holding_cids:
+          type: array
+          items:
+            type: string
+
+    TransferInstructionFailed:
+      type: object
+      properties:
+        dummy: # cannot define an empty object for some reason
+          type: object
+
+    ListTokenStandardTransfersResponse:
+      type: object
+      required:
+        - transfers
+      properties:
+        transfers:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

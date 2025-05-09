@@ -4,9 +4,13 @@
 package org.lfdecentralizedtrust.splice.util
 
 import cats.implicits.toBifunctorOps
-import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as JavaContractId}
+import com.daml.ledger.javaapi.data.codegen.{
+  ContractCompanion,
+  InterfaceCompanion,
+  ContractId as JavaContractId,
+}
 import com.digitalasset.daml.lf.data.Numeric
-import com.digitalasset.canton.{topology, LfTimestamp}
+import com.digitalasset.canton.{LfTimestamp, topology}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{
   MediatorId,
@@ -69,6 +73,16 @@ object Codec {
     decodeJavaContractId(companion)(e)
       .fold(err => failedToDecode(err), identity)
   def encodeContractId[TCid <: JavaContractId[_]](d: TCid): String = d.contractId
+
+  def decodeJavaContractIdInterface[I, Id, View](companion: InterfaceCompanion[I, Id, View])(
+      e: String
+  ): Either[String, Id] =
+    Right(companion.toContractId(new JavaContractId(e)))
+  def tryDecodeJavaContractIdInterface[I, Id, View](
+      companion: InterfaceCompanion[I, Id, View]
+  )(e: String): Id =
+    decodeJavaContractIdInterface(companion)(e)
+      .fold(err => failedToDecode(err), identity)
 
   implicit val bigDecimalValue: Codec[BigDecimal, String] =
     new Codec[BigDecimal, String] {

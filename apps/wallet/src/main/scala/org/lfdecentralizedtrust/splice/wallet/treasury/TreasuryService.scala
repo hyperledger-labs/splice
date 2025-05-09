@@ -81,6 +81,11 @@ import org.apache.pekko.Done
 import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  holdingv1,
+  metadatav1,
+  transferinstructionv1,
+}
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -88,7 +93,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
-/** This class encapsulates the logic that sequences all operations which change the amulet holdings of an user such
+/** This class encapsulates the logic that sequences all operations which change the amulet holdings of a user such
   * that concurrent manipulations don't conflict.
   *
   * For the design, please see https://github.com/DACH-NY/canton-network-node/issues/913
@@ -115,20 +120,46 @@ class TreasuryService(
 
   private val queueTerminationResult: Promise[Done] = Promise()
 
-  private val queue: BoundedSourceQueue[EnqueuedAmuletOperation] = {
+  // Setting the weight > batch size ensures they go in a batch of their own
+  private val BatchWithOneOperation = treasuryConfig.batchSize.toLong + 1L
+
+  private val queue: BoundedSourceQueue[EnqueuedOperation] = {
     val queue = Source
-      .queue[EnqueuedAmuletOperation](treasuryConfig.queueSize)
-      .batchWeighted(
+      .queue[EnqueuedOperation](treasuryConfig.queueSize)
+      .batchWeighted[OperationBatch](
         treasuryConfig.batchSize.toLong,
-        operation =>
-          if (operation.priority == CommandPriority.High || operation.dedup.isDefined) {
-            // Setting the weight > batch size ensures they go in a batch of their own
-            treasuryConfig.batchSize.toLong + 1L
-          } else 1L,
-        operation => AmuletOperationBatch(operation),
-      )((batch, operation) => batch.addCOToBatch(operation))
+        {
+          case amuletOp: EnqueuedAmuletOperation =>
+            if (amuletOp.priority == CommandPriority.High || amuletOp.dedup.isDefined) {
+              BatchWithOneOperation
+            } else 1L
+          case _: EnqueuedTokenStandardTransferOperation =>
+            BatchWithOneOperation
+        },
+        {
+          case amuletOp: EnqueuedAmuletOperation =>
+            AmuletOperationBatch(amuletOp)
+          case tsOp: EnqueuedTokenStandardTransferOperation =>
+            TokenStandardOperationBatch(tsOp)
+        },
+      ) {
+        case (batch: AmuletOperationBatch, operation: EnqueuedAmuletOperation) =>
+          batch.addCOToBatch(operation)
+        case (_: TokenStandardOperationBatch, _: EnqueuedTokenStandardTransferOperation) =>
+          throw new IllegalStateException(
+            "Token standard batches cannot contain more than one element. This is a bug."
+          )
+        case (batch, operation) =>
+          throw new IllegalStateException(
+            s"Batch is ${batch.getClass.getName} while operation is ${operation.getClass.getName}. This is a bug."
+          )
+      }
       // Execute the batches sequentially to avoid contention
-      .mapAsync(1)(filterAndExecuteBatch)
+      .mapAsync(1) {
+        case amuletBatch: AmuletOperationBatch => filterAndExecuteBatch(amuletBatch)
+        case TokenStandardOperationBatch(operation) =>
+          executeTokenStandardTransferOperation(operation)
+      }
       .toMat(
         Sink.onComplete(result0 => {
           val result =
@@ -186,15 +217,42 @@ class TreasuryService(
       extraDisclosedContracts: DisclosedContracts = DisclosedContracts.Empty,
   )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
     val p = Promise[installCodegen.AmuletOperationOutcome]()
+    enqueue(EnqueuedAmuletOperation(operation, p, tc, priority, dedup, extraDisclosedContracts))
+  }
+
+  def enqueueTokenStandardTransferOperation(
+      receiverPartyId: PartyId,
+      amount: BigDecimal,
+      description: String,
+      expiresAt: CantonTimestamp,
+      dedup: Option[AmuletOperationDedupConfig],
+  )(implicit tc: TraceContext): Future[transferinstructionv1.TransferInstructionResult] = {
+    val p = Promise[transferinstructionv1.TransferInstructionResult]()
+    enqueue(
+      EnqueuedTokenStandardTransferOperation(
+        receiverPartyId,
+        amount,
+        description,
+        expiresAt,
+        p,
+        tc,
+        dedup,
+      )
+    )
+  }
+
+  private def enqueue(
+      operation: EnqueuedOperation
+  )(implicit tc: TraceContext): Future[operation.Result] = {
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
     queue.offer(
-      EnqueuedAmuletOperation(operation, p, tc, priority, dedup, extraDisclosedContracts)
+      operation
     ) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
-        p.future
+        operation.outcomePromise.future
       case Dropped =>
         Future.failed(
           Status.ABORTED
@@ -212,7 +270,7 @@ class TreasuryService(
     }
   }
 
-  private def closingException(operation: installCodegen.AmuletOperation) =
+  private def closingException(operation: EnqueuedOperation) =
     Status.UNAVAILABLE
       .withDescription(
         show"Rejected operation because the amulet operation batch executor is shutting down: $operation"
@@ -448,13 +506,79 @@ class TreasuryService(
       }
 
       // wait for store to ingest the new amulet holdings, then return all outcomes to the callers
-      _ <- waitForIngestion(offset, result).map(_ =>
+      _ <- waitForAmuletBatchIngestion(offset, result).map(_ =>
         batch.completeBatchOperations(result)(logger, tc)
       )
     } yield Done
   }
 
-  private def waitForIngestion(
+  private def executeTokenStandardTransferOperation(
+      operation: EnqueuedTokenStandardTransferOperation
+  ): Future[Done] = {
+    TraceContext.withNewTraceContext(implicit tc => {
+      val now = clock.now.toInstant
+      logger.debug(s"Executing token standard operation $operation")
+      val sender = userStore.key.endUserParty
+      val dso = userStore.key.dsoParty.toProtoPrimitive
+      (for {
+        amulets <- userStore.multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
+        lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
+          amuletCodegen.LockedAmulet.COMPANION
+        )
+        expiredLockedAmulets = lockedAmulets.filter(_.payload.lock.expiresAt.isBefore(now))
+        holdings = amulets ++ expiredLockedAmulets
+        choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
+          dso,
+          new transferinstructionv1.Transfer(
+            sender.toProtoPrimitive,
+            operation.receiverPartyId.toProtoPrimitive,
+            operation.amount.bigDecimal,
+            new holdingv1.InstrumentId(dso, "Amulet"),
+            now,
+            operation.expiresAt.toInstant,
+            holdings
+              .map(holding => new holdingv1.Holding.ContractId(holding.contractId.contractId))
+              .asJava,
+            new metadatav1.Metadata(
+              java.util.Map.of("splice.lfdecentralizedtrust.org/reason", operation.description)
+            ),
+          ),
+          new metadatav1.ExtraArgs(
+            new metadatav1.ChoiceContext(java.util.Map.of()),
+            new metadatav1.Metadata(java.util.Map.of()),
+          ),
+        )
+        (factoryChoiceWithDisclosures, _) <- scanConnection.getTransferFactory(choiceArgs)
+        synchronizerId <- scanConnection.getAmuletRulesDomain()(tc)
+        baseSubmission = connection
+          .submit(
+            Seq(userStore.key.endUserParty),
+            Seq(userStore.key.endUserParty),
+            factoryChoiceWithDisclosures.exercise,
+            CommandPriority.Low,
+            treasuryConfig.grpcDeadline,
+          )
+          .withSynchronizerId(
+            synchronizerId,
+            DisclosedContracts.fromProto(factoryChoiceWithDisclosures.disclosedContracts),
+          )
+        result <- operation.dedup match {
+          case None => baseSubmission.noDedup.yieldResult()
+          case Some(dedup) =>
+            baseSubmission.withDedup(dedup.commandId, dedup.config).yieldResult()
+        }
+      } yield {
+        operation.outcomePromise.success(result.exerciseResult)
+        Done
+      }).recover { case ex =>
+        logger.info(s"Token standard operation failed.", ex)
+        operation.outcomePromise.failure(ex)
+        Done
+      }
+    })
+  }
+
+  private def waitForAmuletBatchIngestion(
       offset: Long,
       outcomes: Exercised[WalletAppInstall_ExecuteBatchResult],
   )(implicit tc: TraceContext): Future[Unit] =
@@ -831,6 +955,8 @@ class TreasuryService(
 
 object TreasuryService {
 
+  private sealed trait OperationBatch
+
   /** Helper class for the batches of amulet operations executed by the treasury service.
     * Mainly introduced to handle to cleanly separate the logic around managing CO_MergeTransferInputs.
     *
@@ -842,7 +968,8 @@ object TreasuryService {
       mergeOperationOpt: Option[EnqueuedAmuletOperation],
       nonMergeOperations: Seq[EnqueuedAmuletOperation],
       dedup: Option[AmuletOperationDedupConfig],
-  ) extends PrettyPrinting {
+  ) extends OperationBatch
+      with PrettyPrinting {
     require(
       !(dedup.isDefined && (mergeOperationOpt.toList.size + nonMergeOperations.size) > 1),
       "Operations requiring dedup are in their own batch",
@@ -949,6 +1076,42 @@ object TreasuryService {
     }
   }
 
+  // Only one item per batch supported
+  private case class TokenStandardOperationBatch(operation: EnqueuedTokenStandardTransferOperation)
+      extends OperationBatch
+      with PrettyPrinting {
+    override def pretty: Pretty[TokenStandardOperationBatch.this.type] = prettyOfClass(
+      param("operation", _.operation)
+    )
+  }
+
+  private sealed trait EnqueuedOperation extends PrettyPrinting {
+    type Result
+    val outcomePromise: Promise[Result]
+  }
+
+  private case class EnqueuedTokenStandardTransferOperation(
+      receiverPartyId: PartyId,
+      amount: BigDecimal,
+      description: String,
+      expiresAt: CantonTimestamp,
+      outcomePromise: Promise[transferinstructionv1.TransferInstructionResult],
+      submittedFrom: TraceContext,
+      dedup: Option[AmuletOperationDedupConfig],
+  ) extends EnqueuedOperation {
+    override type Result = transferinstructionv1.TransferInstructionResult
+
+    override protected def pretty: Pretty[EnqueuedTokenStandardTransferOperation.this.type] =
+      prettyNode(
+        "TokenStandardTransferOperation",
+        param("from", _.submittedFrom.showTraceId),
+        param("receiver", _.receiverPartyId),
+        param("amount", _.amount),
+        param("expiresAt", _.expiresAt),
+        param("dedup", _.dedup),
+      )
+  }
+
   private case class EnqueuedAmuletOperation(
       operation: installCodegen.AmuletOperation,
       outcomePromise: Promise[installCodegen.AmuletOperationOutcome],
@@ -956,7 +1119,9 @@ object TreasuryService {
       priority: CommandPriority,
       dedup: Option[AmuletOperationDedupConfig],
       extraDisclosedContracts: DisclosedContracts,
-  ) extends PrettyPrinting {
+  ) extends EnqueuedOperation {
+    override type Result = installCodegen.AmuletOperationOutcome
+
     override def pretty: Pretty[EnqueuedAmuletOperation.this.type] =
       prettyNode(
         "AmuletOperation",

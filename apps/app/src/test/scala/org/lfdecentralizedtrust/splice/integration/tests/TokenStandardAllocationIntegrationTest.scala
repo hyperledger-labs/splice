@@ -105,7 +105,7 @@ class TokenStandardAllocationIntegrationTest
       legId: String,
   )(implicit
       env: SpliceTestConsoleEnvironment
-  ): FactoryChoiceWithDisclosures = {
+  ): FactoryChoiceWithDisclosures[allocationinstructionv1.AllocationInstructionResult] = {
     val leg = request.transferLegs.get(legId)
     clue(
       s"Creating command to request allocation for leg $legId to transfer ${leg.amount} amulets from ${leg.sender} to ${leg.receiver}"

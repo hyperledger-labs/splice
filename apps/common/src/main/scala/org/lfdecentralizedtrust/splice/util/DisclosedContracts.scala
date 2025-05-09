@@ -26,7 +26,7 @@ sealed abstract class DisclosedContracts {
 
   def toLedgerApiDisclosedContracts: Seq[Lav1DisclosedContract] = this match {
     case Empty => Seq.empty
-    case NE(contracts, _) => contracts.map(_.toDisclosedContract)
+    case NE(contracts, _) => contracts.toSeq
   }
 
   /** Pick a consistent `synchronizerId` argument for ledger API submission that will take
@@ -50,7 +50,7 @@ sealed abstract class DisclosedContracts {
       case NE(contracts, otherSynchronizerId) =>
         // TODO (#8135) invalidate contracts
         retryableError(
-          show"disclosed contracts are not on expected domain $synchronizerId, but on $otherSynchronizerId: $contracts"
+          s"disclosed contracts are not on expected domain $synchronizerId, but on $otherSynchronizerId: $contracts"
         )
     }
 
@@ -69,7 +69,7 @@ object DisclosedContracts {
     val contracts = arg +-: args
     contracts.map(_.state).toSet match {
       case Singleton(ContractState.Assigned(onlyDomain)) =>
-        NE(contracts.map(_.contract), onlyDomain)
+        NE(contracts.map(_.contract.toDisclosedContract), onlyDomain)
       case variousStates =>
         // We expect there to be background automation that ensures that
         // all disclosed contracts are eventually on the same domain.
@@ -80,6 +80,22 @@ object DisclosedContracts {
         retryableError(
           show"contracts must be assigned to a single domain to be disclosed, not $variousStates: $contracts"
         )
+    }
+  }
+
+  def fromProto(
+      contracts: Seq[Lav1DisclosedContract]
+  ): DisclosedContracts = {
+    val synchronizerIds = contracts.map(_.getSynchronizerId).toSet
+    if (synchronizerIds.size > 1) {
+      throw new IllegalArgumentException(
+        s"Disclosed contracts must be assigned to a single domain. Got: $synchronizerIds"
+      )
+    } else {
+      NonEmpty.from(contracts) match {
+        case None => Empty
+        case Some(value) => NE(value, SynchronizerId.tryFromString(value.head1.getSynchronizerId))
+      }
     }
   }
 
@@ -105,7 +121,7 @@ object DisclosedContracts {
   }
 
   final case class NE(
-      private val contracts: NonEmpty[Seq[Contract[?, ?]]],
+      private val contracts: NonEmpty[Seq[Lav1DisclosedContract]],
       assignedDomain: SynchronizerId,
   ) extends DisclosedContracts {
     private[splice] override def inferDomain(
@@ -126,7 +142,8 @@ object DisclosedContracts {
         case ContractWithState(_, ContractState.Assigned(`assignedDomain`)) => false
         case _ => true
       }
-      if (inOtherStates.isEmpty) NE(contracts ++ other.map(_.contract), assignedDomain)
+      if (inOtherStates.isEmpty)
+        NE(contracts ++ other.map(_.contract.toDisclosedContract), assignedDomain)
       else // TODO (#8135) invalidate contracts and other
         retryableError(
           show"contracts must match the domain of other disclosed contracts, $assignedDomain, to be disclosed: $other"
