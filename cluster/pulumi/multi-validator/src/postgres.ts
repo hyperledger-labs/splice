@@ -28,7 +28,7 @@ export function installPostgres(
     'splice-postgres',
     {
       persistence: { secretName },
-      db: { volumeSize: '300Gi', maxConnections: 1000 },
+      db: { volumeSize: '600Gi', maxConnections: 1000 },
       resources: {
         requests: { memory: '10Gi' },
         limits: { memory: '20Gi' },
