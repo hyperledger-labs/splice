@@ -16,7 +16,8 @@ app_charts := \
 	splice-splitwell-app \
 	splice-splitwell-web-ui \
 	splice-sv-node \
-	splice-validator
+	splice-validator \
+	splice-info
 
 HELM_VERSION_TAG := cluster/helm/.version-tag
 IMAGE_DIGESTS := cluster/helm/.image-digests
