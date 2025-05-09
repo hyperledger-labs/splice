@@ -25,7 +25,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.PageLimit
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, SpliceUtil}
+import org.lfdecentralizedtrust.splice.util.{ContractWithState, AssignedContract, SpliceUtil}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import com.digitalasset.canton.data.CantonTimestamp
@@ -162,6 +162,9 @@ class TransferCommandSendTrigger(
                     (openRound +: transferPreapprovalO.toList)*
                   )
                   .addAll(openIssuingRounds)
+                  // copy paste the state from amulet rules as we don't currently expose it in scan for featured
+                  // app rights.
+                  .addAll(featuredAppRight.map(ContractWithState(_, amuletRules.state)).toList)
               )
               .noDedup
               .yieldResult()

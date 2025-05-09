@@ -174,20 +174,21 @@ class ExternalPartySetupProposalIntegrationTest
 
     // Onboard and Create/Accept ExternalPartySetupProposal for Bob
     val onboardingBob @ OnboardingResult(bobParty, _, _) =
-      onboardExternalParty(aliceValidatorBackend, Some("bobExternal"))
-    aliceValidatorBackend.participantClient.parties
+      onboardExternalParty(bobValidatorBackend, Some("bobExternal"))
+    bobValidatorBackend.participantClient.parties
       .hosted(filterParty = bobParty.filterString) should not be empty
+    bobValidatorWalletClient.tap(50.0)
     val (cidBob, _) =
       createAndAcceptExternalPartySetupProposal(
-        aliceValidatorBackend,
+        bobValidatorBackend,
         onboardingBob,
         verboseHashing = true,
       )
     eventually() {
-      aliceValidatorBackend.lookupTransferPreapprovalByParty(bobParty) should not be empty
-      aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(bobParty) should not be empty
+      bobValidatorBackend.lookupTransferPreapprovalByParty(bobParty) should not be empty
+      bobValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(bobParty) should not be empty
     }
-    aliceValidatorBackend
+    bobValidatorBackend
       .listTransferPreapprovals()
       .map(tp => tp.contract.contractId) contains cidBob
 
@@ -279,7 +280,7 @@ class ExternalPartySetupProposalIntegrationTest
           BigDecimal(2000 - 1000 - 16.0 - 6.0 /* 16 output fees, 6.0 sender change fees */ ) +
             BigDecimal(issuingRound.issuancePerUnfeaturedAppRewardCoupon) * appRewardAmount
         )
-        aliceValidatorBackend
+        bobValidatorBackend
           .getExternalPartyBalance(bobParty)
           .totalUnlockedCoin shouldBe "1000.0000000000"
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -376,6 +377,65 @@ class ExternalPartySetupProposalIntegrationTest
         }
     }
 
+    // Check that transfer works correctly with featured app rights
+    bobValidatorWalletClient.selfGrantFeaturedAppRight()
+    // Transfer 500.0 from Alice to Bob
+    val prepareSendFeatured =
+      aliceValidatorBackend.prepareTransferPreapprovalSend(
+        aliceParty,
+        bobParty,
+        BigDecimal(500.0),
+        CantonTimestamp.now().plus(Duration.ofHours(24)),
+        1L,
+        verboseHashing = true,
+      )
+    prepareSendFeatured.hashingDetails should not be empty
+    val (_, _) = actAndCheck(
+      "Submit signed TransferCommand creation",
+      aliceValidatorBackend.submitTransferPreapprovalSend(
+        aliceParty,
+        prepareSendFeatured.transaction,
+        HexString.toHexString(
+          crypto
+            .signBytes(
+              HexString.parseToByteString(prepareSendFeatured.txHash).value,
+              alicePrivateKey.asInstanceOf[SigningPrivateKey],
+              usage = SigningKeyUsage.ProtocolOnly,
+            )
+            .value
+            .toProtoV30
+            .signature
+        ),
+        publicKeyAsHexString(alicePublicKey),
+      ),
+    )(
+      "validator automation completes transfer",
+      _ => {
+        BigDecimal(
+          aliceValidatorBackend
+            .getExternalPartyBalance(aliceParty)
+            .totalUnlockedCoin
+        ) should beAround(
+          BigDecimal(
+            2000 - 1000 - 500 - 34.0 /* last number is fees from the prior transfer and this combined */
+          )
+        )
+        bobValidatorBackend
+          .getExternalPartyBalance(bobParty)
+          .totalUnlockedCoin shouldBe "1500.0000000000"
+        val rewards = bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
+            bobValidatorBackend.getValidatorUserInfo().primaryParty,
+            c =>
+              c.data.provider == bobValidatorBackend
+                .getValidatorUserInfo()
+                .primaryParty
+                .toProtoPrimitive,
+          )
+        rewards.loneElement.data.featured shouldBe true
+      },
+    )
+
     // Check that transfer command gets archived if preapproval does not exist.
     val sv1Party = sv1Backend.getDsoInfo().svParty
     val now = env.environment.clock.now.toInstant
@@ -411,7 +471,7 @@ class ExternalPartySetupProposalIntegrationTest
         sv1Party,
         BigDecimal(10.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
-        1L,
+        2L,
       )
     prepareSendNoPreapproval.hashingDetails shouldBe empty
 
@@ -470,7 +530,7 @@ class ExternalPartySetupProposalIntegrationTest
           val result = aliceValidatorBackend.scanProxy
             .lookupTransferCommandStatus(
               aliceParty,
-              1L,
+              2L,
             )
             .value
           result.transferCommandsByContractId.values.loneElement.status shouldBe definitions.TransferCommandContractStatus.members
