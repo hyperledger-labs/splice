@@ -14,10 +14,10 @@ const circleCiNamespace = new Namespace('circleci-runner', {
     name: 'circleci-runner',
   },
 });
-// filestore minimum capacity to provision an ssd instance is 2.5TB
-const capacityGb = 2560;
+// filestore minimum capacity to provision a hdd instance is 1TB
+const capacityGb = 1024;
 const filestore = new gcp.filestore.Instance(`cci-filestore`, {
-  tier: 'BASIC_SSD',
+  tier: 'BASIC_HDD',
   fileShares: {
     name: 'cci_share',
     capacityGb: capacityGb,

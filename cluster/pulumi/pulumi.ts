@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { config } from 'splice-pulumi-common/src/config';
-import { CLUSTER_BASENAME, PULUMI_STACKS_DIR, SPLICE_ROOT } from 'splice-pulumi-common/src/utils';
+import { CLUSTER_BASENAME, PULUMI_STACKS_DIR } from 'splice-pulumi-common/src/utils';
 
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pulumi-'));
 
