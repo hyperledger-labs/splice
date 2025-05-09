@@ -10,6 +10,7 @@ import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.W
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.HexString
@@ -60,7 +61,7 @@ class RecoverExternalPartyIntegrationTest
 
     clue("Submit PartyToParticipant to migrate to bob's validator") {
       val synchronizerId =
-        bobValidatorBackend.participantClient.synchronizers.list_connected().head.synchronizerId
+        sv1Backend.participantClient.synchronizers.id_of(SynchronizerAlias.tryCreate("global"))
 
       val partyToParticipant = PartyToParticipant
         .create(
