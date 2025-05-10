@@ -48,7 +48,13 @@ import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
-import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{
+  ChoiceContextWithDisclosures,
+  Contract,
+  ContractWithState,
+  FactoryChoiceWithDisclosures,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
@@ -74,10 +80,13 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
 import org.slf4j.event.Level
 
 import java.util.concurrent.ConcurrentHashMap
@@ -419,6 +428,34 @@ class BftScanConnection(
       result
     }
   }
+
+  def getTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)(implicit
+      tc: TraceContext
+  ): Future[
+    (
+        FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+        TransferFactoryWithChoiceContext.TransferKind,
+    )
+  ] =
+    bftCall(_.getTransferFactory(choiceArgs))
+
+  def getTransferInstructionAcceptContext(
+      instructionCid: TransferInstruction.ContractId
+  )(implicit tc: TraceContext): Future[ChoiceContextWithDisclosures] = bftCall(
+    _.getTransferInstructionAcceptContext(instructionCid)
+  )
+
+  def getTransferInstructionRejectContext(
+      instructionCid: TransferInstruction.ContractId
+  )(implicit tc: TraceContext): Future[ChoiceContextWithDisclosures] = bftCall(
+    _.getTransferInstructionRejectContext(instructionCid)
+  )
+
+  def getTransferInstructionWithdrawContext(
+      instructionCid: TransferInstruction.ContractId
+  )(implicit tc: TraceContext): Future[ChoiceContextWithDisclosures] = bftCall(
+    _.getTransferInstructionWithdrawContext(instructionCid)
+  )
 
   private def bftCall[T](
       call: SingleScanConnection => Future[T],

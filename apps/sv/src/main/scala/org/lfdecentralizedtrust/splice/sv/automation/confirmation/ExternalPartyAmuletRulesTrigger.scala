@@ -102,7 +102,7 @@ class ExternalPartyAmuletRulesTrigger(
                   ),
                   deduplicationOffset = offset,
                 )
-                .withPrefferedPackage(task.packageIds)
+                .withPreferredPackage(task.packageIds)
                 .yieldUnit()
             } yield TaskSuccess(
               s"Confirmation created for creating ExternalPartyAmuletRules"

@@ -1,0 +1,67 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: storage
+    folder: k8s
+    interval: 5m
+    rules:
+      - uid: adlrbu5kog0sga
+        title: KubePersistentVolumeTooFull
+        condition: free_space_below_threshold
+        data:
+          - refId: free_space
+            relativeTimeRange:
+              from: 360
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: kubelet_volume_stats_available_bytes{job="kubelet",metrics_path="/metrics",namespace=~".*"} / kubelet_volume_stats_capacity_bytes{job="kubelet",metrics_path="/metrics",namespace=~".*"}
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: free_space
+          - refId: free_space_below_threshold
+            relativeTimeRange:
+              from: 360
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.15
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: free_space
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: free_space_below_threshold
+              type: threshold
+        dashboardUid: 919b92a8e8041bd567af9edab12c840c
+        panelId: 2
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: 919b92a8e8041bd567af9edab12c840c
+          __panelId__: "2"
+          severity: warning
+          description: The PersistentVolume claimed by {{ index $labels "persistentvolumeclaim" }} in Namespace {{ index $labels "namespace" }} is running out of disk space. Currently {{ humanizePercentage (index $values "free_space").Value }} is available.
+          runbook_url: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepersistentvolumefillingup
+          summary: PersistentVolume is too full.
+        isPaused: false

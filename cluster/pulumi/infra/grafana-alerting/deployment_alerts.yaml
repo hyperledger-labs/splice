@@ -1,0 +1,107 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: deployments
+      folder: canton-network
+      interval: 1m
+      rules:
+        - uid: adkhl6u18pqtce
+          title: Failing Stacks
+          condition: D
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: prometheus
+              model:
+                datasource:
+                    type: prometheus
+                    uid: prometheus
+                editorMode: code
+                exemplar: true
+                expr: splice_deployment_pulumi_stack_status{state="failed"}
+                format: time_series
+                instant: true
+                interval: ""
+                intervalMs: 30000
+                legendFormat: stacks_active
+                maxDataPoints: 43200
+                range: false
+                refId: A
+            - refId: D
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - D
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: D
+                type: threshold
+          dashboardUid: QP_wDqDnz
+          panelId: 11
+          noDataState: OK
+          execErrState: OK
+          for: 5m
+          annotations:
+            __dashboardUid__: QP_wDqDnz
+            __panelId__: "11"
+            description: The pulumi operator failed to update the {{ $labels.stack }} stack. Check the logs for the deployment.
+            runbook_url: ""
+            severity: critical
+            summary: '{{ $labels.stack }} stack failed to update'
+          labels:
+            "": ""
+          isPaused: false
+        - uid: bdndg5g3x4kxsf
+          title: Deployments running
+          condition: A
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 300
+                to: 0
+              datasourceUid: prometheus
+              model:
+                editorMode: code
+                expr: splice_deployment_pulumi_stack_condition{type="Reconciling"}
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+          dashboardUid: QP_wDqDnz
+          panelId: 27
+          noDataState: OK
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: QP_wDqDnz
+            __panelId__: "27"
+            description: A deployment is currently running for the {{ $labels.stack }} stack.
+            runbook_url: ""
+            severity: info
+            summary: Stack {{ $labels.stack }} is being updated
+          labels:
+            "": ""
+          isPaused: false

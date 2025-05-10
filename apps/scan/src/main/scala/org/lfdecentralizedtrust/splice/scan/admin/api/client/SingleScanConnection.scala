@@ -40,15 +40,17 @@ import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{
+  ChoiceContextWithDisclosures,
   Codec,
   Contract,
   ContractWithState,
+  FactoryChoiceWithDisclosures,
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
@@ -61,6 +63,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   VoteRequest,
 }
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the DSO party id.
@@ -577,6 +582,50 @@ class SingleScanConnection private[client] (
       contractId
     ),
   )
+
+  def getTransferInstructionAcceptContext(
+      instructionCid: TransferInstruction.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetTransferInstructionAcceptContext(instructionCid),
+    )
+
+  def getTransferInstructionRejectContext(
+      instructionCid: TransferInstruction.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetTransferInstructionRejectContext(instructionCid),
+    )
+
+  def getTransferInstructionWithdrawContext(
+      instructionCid: TransferInstruction.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetTransferInstructionWithdrawContext(instructionCid),
+    )
+
+  def getTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    (
+        FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+        TransferFactoryWithChoiceContext.TransferKind,
+    )
+  ] =
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetTransferFactory(choiceArgs))
 
 }
 
