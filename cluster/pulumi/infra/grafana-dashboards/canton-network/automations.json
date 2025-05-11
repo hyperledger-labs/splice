@@ -766,7 +766,7 @@
         {
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sum(rate(splice_trigger_attempted_total{statusCode=\"OK\", isDsoDelegateTrigger=\"$isDsoDelegateTrigger\", trigger_name=~\"$trigger_name\", namespace=~\"$namespace\", node_type=~\"$app\"}[$__rate_interval]))",
+          "expr": "sum(rate(splice_trigger_attempted_total{isDsoDelegateTrigger=\"$isDsoDelegateTrigger\", trigger_name=~\"$trigger_name\", namespace=~\"$namespace\", node_type=~\"$app\"}[$__rate_interval]))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "legendFormat": "total attempts",
