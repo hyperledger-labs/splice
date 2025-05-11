@@ -79,7 +79,10 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       timeToLife: Duration = Duration.ofMinutes(10),
   )(implicit
       env: SpliceTestConsoleEnvironment
-  ): (FactoryChoiceWithDisclosures, Seq[holdingv1.Holding.ContractId]) = {
+  ): (
+      FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+      Seq[holdingv1.Holding.ContractId],
+  ) = {
     val now = env.environment.clock.now.toInstant
     def unlocked(optLock: java.util.Optional[holdingv1.Lock]): Boolean =
       optLock.toScala.forall(lock => lock.expiresAt.toScala.exists(t => t.isBefore(now)))

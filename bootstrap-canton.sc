@@ -58,12 +58,12 @@ def bootstrapOtherDomain(
             nrIntervalsToTriggerCatchUp = PositiveInt.tryCreate(2),
           )
         ),
-        submissionTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofHours(24),
+        preparationTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofHours(24),
         mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofHours(48),
       ),
     signedBy = Some(sequencer.id.uid.namespace.fingerprint),
     // This is test code so just force the change.
-    force = ForceFlags(ForceFlag.SubmissionTimeRecordTimeToleranceIncrease),
+    force = ForceFlags(ForceFlag.PreparationTimeRecordTimeToleranceIncrease),
   )
 }
 

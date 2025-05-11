@@ -1,0 +1,271 @@
+import * as gcp from '@pulumi/gcp';
+import * as pulumi from '@pulumi/pulumi';
+import * as random from '@pulumi/random';
+import * as _ from 'lodash';
+import { Resource } from '@pulumi/pulumi';
+
+import { CnChartVersion } from './artifacts';
+import { clusterSmallDisk, config } from './config';
+import { spliceConfig } from './config/config';
+import { installSpliceHelmChart } from './helm';
+import { installPostgresPasswordSecret } from './secrets';
+import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
+
+const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
+const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
+const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
+const cloudSqlEnterprisePlus = spliceConfig.pulumiProjectConfig.cloudSql.enterprisePlus;
+
+const project = gcp.organizations.getProjectOutput({});
+
+// use existing default network (needs to have a private vpc connection)
+const privateNetwork = gcp.compute.Network.get(
+  'default',
+  pulumi.interpolate`projects/${project.name}/global/networks/default`
+);
+
+function generatePassword(name: string, opts?: pulumi.ResourceOptions): random.RandomPassword {
+  return new random.RandomPassword(
+    name,
+    {
+      length: 16,
+      overrideSpecial: '_%@',
+      special: true,
+    },
+    opts
+  );
+}
+
+export interface Postgres extends pulumi.Resource {
+  readonly instanceName: string;
+  readonly namespace: ExactNamespace;
+
+  readonly address: pulumi.Output<string>;
+  readonly secretName: pulumi.Output<string>;
+}
+
+export class CloudPostgres extends pulumi.ComponentResource implements Postgres {
+  instanceName: string;
+  namespace: ExactNamespace;
+  address: pulumi.Output<string>;
+  secretName: pulumi.Output<string>;
+
+  private readonly pgSvc: gcp.sql.DatabaseInstance;
+
+  constructor(
+    xns: ExactNamespace,
+    instanceName: string,
+    alias: string,
+    secretName: string,
+    active: boolean = true,
+    disableProtection?: boolean,
+    migrationId?: string
+  ) {
+    const instanceLogicalName = xns.logicalName + '-' + instanceName;
+    const instanceLogicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
+    const deletionProtection = disableProtection ? false : protectCloudSql;
+    const baseOpts = {
+      protect: deletionProtection,
+      aliases: [{ name: instanceLogicalNameAlias }],
+    };
+    super('canton:cloud:postgres', instanceLogicalName, undefined, baseOpts);
+    this.instanceName = instanceName;
+    this.namespace = xns;
+
+    this.pgSvc = new gcp.sql.DatabaseInstance(
+      instanceLogicalName,
+      {
+        databaseVersion: 'POSTGRES_14',
+        deletionProtection: deletionProtection,
+        region: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
+        settings: {
+          deletionProtectionEnabled: deletionProtection,
+          activationPolicy: active ? 'ALWAYS' : 'NEVER',
+          databaseFlags: [{ name: 'temp_file_limit', value: '2147483647' }],
+          backupConfiguration: {
+            enabled: true,
+            pointInTimeRecoveryEnabled: true,
+          },
+          insightsConfig: {
+            queryInsightsEnabled: true,
+          },
+          tier: cloudSqlDbInstance,
+          edition: cloudSqlEnterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
+          dataCacheConfig: {
+            dataCacheEnabled: cloudSqlEnterprisePlus,
+          },
+          ipConfiguration: {
+            ipv4Enabled: false,
+            privateNetwork: privateNetwork.id,
+            enablePrivatePathForGoogleCloudServices: true,
+          },
+          userLabels: migrationId
+            ? {
+                cluster: CLUSTER_BASENAME,
+                migration_id: migrationId,
+              }
+            : {
+                cluster: CLUSTER_BASENAME,
+              },
+          locationPreference: {
+            // it's fairly critical for performance that the sql instance is in the same zone as the GKE nodes
+            zone: GCP_ZONE || config.requireEnv('DB_CLOUDSDK_COMPUTE_ZONE'),
+          },
+          maintenanceWindow: spliceConfig.pulumiProjectConfig.cloudSql.maintenanceWindow,
+        },
+      },
+      { ...baseOpts, parent: this }
+    );
+
+    this.address = this.pgSvc.privateIpAddress;
+
+    new gcp.sql.Database(
+      `${this.namespace.logicalName}-db-${this.instanceName}-cantonnet`,
+      {
+        instance: this.pgSvc.name,
+        name: 'cantonnet',
+      },
+      {
+        parent: this,
+        deletedWith: this.pgSvc,
+        protect: deletionProtection,
+        aliases: [{ name: `${this.namespace.logicalName}-db-${alias}-cantonnet` }],
+      }
+    );
+
+    const password = generatePassword(`${instanceLogicalName}-passwd`, {
+      parent: this,
+      protect: deletionProtection,
+      aliases: [{ name: `${instanceLogicalNameAlias}-passwd` }],
+    }).result;
+    const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
+    this.secretName = passwordSecret.metadata.name;
+
+    new gcp.sql.User(
+      `user-${instanceLogicalName}`,
+      {
+        instance: this.pgSvc.name,
+        name: 'cnadmin',
+        password: password,
+      },
+      {
+        parent: this,
+        deletedWith: this.pgSvc,
+        dependsOn: [passwordSecret],
+        protect: deletionProtection,
+        aliases: [{ name: `user-${instanceLogicalNameAlias}` }],
+      }
+    );
+
+    this.registerOutputs({
+      privateIpAddress: this.pgSvc.privateIpAddress,
+      secretName: this.secretName,
+    });
+  }
+}
+
+export class SplicePostgres extends pulumi.ComponentResource implements Postgres {
+  instanceName: string;
+  namespace: ExactNamespace;
+  address: pulumi.Output<string>;
+  pg: Resource;
+  secretName: pulumi.Output<string>;
+
+  constructor(
+    xns: ExactNamespace,
+    instanceName: string,
+    alias: string,
+    secretName: string,
+    values?: ChartValues,
+    overrideDbSizeFromValues?: boolean,
+    disableProtection?: boolean,
+    version?: CnChartVersion
+  ) {
+    const logicalName = xns.logicalName + '-' + instanceName;
+    const logicalNameAlias = xns.logicalName + '-' + alias; // pulumi name before #12391
+    super('canton:network:postgres', logicalName, [], {
+      protect: disableProtection ? false : protectCloudSql,
+      aliases: [{ name: logicalNameAlias, type: 'canton:network:postgres' }],
+    });
+
+    this.instanceName = instanceName;
+    this.namespace = xns;
+    this.address = pulumi.output(
+      `${this.instanceName}.${this.namespace.logicalName}.svc.cluster.local`
+    );
+    const password = generatePassword(`${logicalName}-passwd`, {
+      parent: this,
+      aliases: [{ name: `${logicalNameAlias}-passwd` }],
+    }).result;
+    const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
+    this.secretName = passwordSecret.metadata.name;
+
+    // an initial database named cantonnet is created automatically (configured in the Helm chart).
+    const smallDiskSize = clusterSmallDisk ? '240Gi' : undefined;
+    const pg = installSpliceHelmChart(
+      xns,
+      instanceName,
+      'splice-postgres',
+      _.merge(values || {}, {
+        db: {
+          volumeSize: overrideDbSizeFromValues
+            ? values?.db?.volumeSize || smallDiskSize
+            : smallDiskSize,
+        },
+        persistence: {
+          secretName: this.secretName,
+        },
+      }),
+      version,
+      {
+        aliases: [{ name: logicalNameAlias, type: 'kubernetes:helm.sh/v3:Release' }],
+        dependsOn: [passwordSecret],
+      }
+    );
+    this.pg = pg;
+
+    this.registerOutputs({
+      address: pg.id.apply(() => `${instanceName}.${xns.logicalName}.svc.cluster.local`),
+      secretName: this.secretName,
+    });
+  }
+}
+
+// toplevel
+
+export function installPostgres(
+  xns: ExactNamespace,
+  instanceName: string,
+  alias: string,
+  version: CnChartVersion,
+  uniqueSecretName = false,
+  isActive: boolean = true,
+  migrationId?: number,
+  disableProtection?: boolean
+): Postgres {
+  let ret: Postgres;
+  const secretName = uniqueSecretName ? instanceName + '-secrets' : 'postgres-secrets';
+  if (enableCloudSql) {
+    ret = new CloudPostgres(
+      xns,
+      instanceName,
+      alias,
+      secretName,
+      isActive,
+      disableProtection,
+      migrationId?.toString()
+    );
+  } else {
+    ret = new SplicePostgres(
+      xns,
+      instanceName,
+      alias,
+      secretName,
+      undefined,
+      undefined,
+      undefined,
+      version
+    );
+  }
+  return ret;
+}

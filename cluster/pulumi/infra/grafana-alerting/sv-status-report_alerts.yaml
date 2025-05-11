@@ -1,0 +1,102 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: sv status reports
+    folder: canton-network
+    interval: 1m
+    rules:
+      - uid: adlmhpz5iv4sgc
+        title: Report Creation Time Lag
+        condition: No recent report
+        data:
+          - refId: Report time lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~".*", report_publisher=~".*", canton_version=~".*"}) / 1000000
+              instant: false
+              interval: ""
+              intervalMs: 30000
+              legendFormat: '{{report_publisher}}'
+              maxDataPoints: 43200
+              range: true
+              refId: Report time lag
+          - refId: Latest report time lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: Report time lag
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: Latest report time lag
+              settings:
+                mode: dropNN
+              type: reduce
+          - refId: No recent report
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 300
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: Latest report time lag
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: No recent report
+              type: threshold
+        dashboardUid: cdlm6c7fn7vuod
+        panelId: 18
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: cdlm6c7fn7vuod
+          __panelId__: "18"
+          severity: critical
+          description: The SV {{ $labels.report_publisher }} has not submitted a status report recently
+          runbook_url: ""
+          summary: Status report creation time lag too high
+        labels:
+          "team": "support"
+        isPaused: false

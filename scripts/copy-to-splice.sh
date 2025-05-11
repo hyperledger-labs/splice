@@ -58,6 +58,7 @@ copy_dir "scripts"
 copy_dir "cluster/images"
 copy_dir "cluster/helm"
 copy_dir "cluster/compose"
+copy_dir "cluster/pulumi"
 copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
@@ -127,7 +128,6 @@ rm -rf "${SPLICE_DIR}/images"
 unknown=$(diff -qr . "${SPLICE_DIR}" |
     sed 's/^Only in //g' |
     grep -v '^\.:' |
-    grep -v '^\./cluster/pulumi' |
     grep -v '/\.git[/:]' |
     grep -v '/\.github[/:]' |
     grep -v '\./cluster' |
@@ -145,7 +145,6 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v 'CODEOWNERS' |
     grep -v 'LICENSE' |
     grep -v '.*.md' |
-    grep -v 'wait-for-canton.sh' |
     grep -v 'openapi-cache-key.txt' |
     grep -v '^\.git' || true)
 

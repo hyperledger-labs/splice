@@ -1,0 +1,40 @@
+apiVersion: 1
+contactPoints:
+  - name: cn-ci-channel-notification
+    disable_resolve_message: false
+    default: true
+    receivers:
+      - uid: cn-ci
+        type: slack
+        settings:
+          recipient: $SLACK_NOTIFICATION_CHANNEL
+          token: $SLACK_ACCESS_TOKEN
+          username: grafana
+          title: |
+            {{ template "slack_title" . }}
+          text: |
+            {{ template "slack_message" . }}
+  - name: cn-ci-channel-high-prio-notification
+    disable_resolve_message: false
+    receivers:
+      - uid: cn-high-prio-ci
+        type: slack
+        settings:
+          recipient: $SLACK_HIGH_PRIO_NOTIFICATION_CHANNEL
+          token: $SLACK_ACCESS_TOKEN
+          username: grafana
+          title: |
+            {{ template "slack_title" . }}
+          text: |
+            {{ template "slack_message" . }}
+  - name: email-to-support-team
+    receivers:
+      - uid: email-to-support-team
+        type: email
+        settings:
+          addresses: $SUPPORT_TEAM_EMAIL
+          singleEmail: false
+          message: '{{ template "support_email_message" . }}'
+        disableResolveMessage: false
+deleteContactPoints:
+  - uid: grafana-default-email

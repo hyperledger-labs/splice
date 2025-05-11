@@ -478,11 +478,10 @@ export class TransactionParser {
     const transferInstructionEvents =
       await this.getEventsForArchive(exercisedEvent);
     if (!transferInstructionEvents) {
-      throw new Error(
-        `Transfer instruction events not found when looking them up for ${JSON.stringify(
-          exercisedEvent,
-        )}`,
-      );
+      // This will happen when the party observes the archive but is not a stakeholder.
+      // For example, for Amulet, a validator will see a TransferInstruction_Reject/Withdraw
+      // but will not see the create of a TransferInstruction.
+      return null;
     }
     const transferInstructionView = ensureInterfaceViewIsPresent(
       transferInstructionEvents.created.createdEvent,

@@ -81,7 +81,7 @@ This will download all the necessary dependencies and compile openAPI bindings u
 
 ### Run
 
-All commands can be run with `npm run cli -- <command> <options...>` in the `token-standard` directory.
+All commands can be run with `npm run cli -- <command> <options...>` in the `cli` directory.
 They all provide a `--help` option to figure out the required options.
 The commands are:
 

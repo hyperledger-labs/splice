@@ -1,0 +1,106 @@
+# config file version
+apiVersion: 1
+
+# List of templates to import or update
+# source https://community.grafana.com/t/working-configuration-example-for-alerts-templating-telegram-and-slack/80988
+templates:
+  - name: slack
+    template: |
+      {{ define "slack_title" }}
+        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}
+        {{- range .Alerts.Firing -}}
+          {{- if eq .Annotations.severity "critical" -}}
+            {{- $hasCritical = true -}}
+          {{- else if eq .Annotations.severity "warning" -}}
+            {{- $hasWarning = true -}}
+          {{- else if eq .Annotations.severity "info" -}}
+            {{- $hasInfo = true -}}
+          {{- else -}}
+            {{- $hasOthers = true -}}
+          {{- end -}}
+        {{- end -}}
+
+        $CLUSTER_BASENAME
+        {{ if gt (len .Alerts.Firing) 0 }}
+          {{- if $hasCritical }}
+          🔥 {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
+          {{- else if $hasWarning }}
+          ⚠️ {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
+          {{- else }}
+          :information_source: {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing
+          {{- end }}
+        {{ end }}
+        {{ if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}
+      {{ end }}
+
+      {{ define "slack_message" }}
+        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}
+        {{- range .Alerts.Firing -}}
+          {{- if eq .Annotations.severity "critical" -}}
+            {{- $hasCritical = true -}}
+          {{- else if eq .Annotations.severity "warning" -}}
+            {{- $hasWarning = true -}}
+          {{- else if eq .Annotations.severity "info" -}}
+            {{- $hasInfo = true -}}
+          {{- else -}}
+            {{- $hasOthers = true -}}
+          {{- end -}}
+        {{- end -}}
+        {{ if $hasCritical }} 🔥Critical alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "critical" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
+        {{ if $hasWarning }} ⚠️Warning alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "warning" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
+        {{ if $hasInfo }} :information_source:Info alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity "info" -}} {{ template "slack_alert_firing" .}} {{ end }} {{ end }} {{ end }}
+        {{ if $hasOthers }} Other alerts {{ range .Alerts.Firing }} {{- if and (and (ne .Annotations.severity "info")  (ne .Annotations.severity "warning")) (ne .Annotations.severity "critical") -}} {{ template "slack_alert_firing" . }} {{ end }} {{ end }} {{ end }}
+        {{ if gt (len .Alerts.Resolved) 0 }} ✅Resolved Alerts {{ range .Alerts.Resolved }} {{ template "slack_alert_resolved" .}} {{ end }} {{ end }}
+      {{ end }}
+
+      {{ define "slack_alert_firing" }}
+        *{{ .Labels.alertname }}*
+        {{ .Annotations.summary }}
+        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+        {{- if .Labels.service }}
+        Service: {{ .Labels.service }}
+        {{- end }}
+        {{ template "slack_gcloud_log_link" . }}
+      {{ end }}
+
+      {{ define "slack_alert_resolved" }}
+        *{{ .Labels.alertname }}*
+        {{ if .Annotations.severity }}{{ .Annotations.severity }}{{ end }}
+        {{ .Annotations.summary }}
+        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}
+      {{ end }}
+
+      {{ define "slack_gcloud_log_link" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format "2006-01-02T15:04:05Z"  }};query=resource.labels.cluster_name%3D%22cn-$CLUSTER_BASENAMEnet%22%0A{{ .Labels.gcloud_filter }}?project=$GCP_PROJECT|cloud logs>{{ end }}
+
+      {{ define "slack_color" -}}
+        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}
+        {{- range .Alerts.Firing -}}
+          {{- if eq .Annotations.severity "critical" -}}
+            {{- $hasCritical = true -}}
+          {{- else if eq .Annotations.severity "warning" -}}
+            {{- $hasWarning = true -}}
+          {{- else if eq .Annotations.severity "info" -}}
+            {{- $hasInfo = true -}}
+          {{- else -}}
+            {{- $hasOthers = true -}}
+          {{- end -}}
+        {{- end -}}
+        {{ if eq .Status "firing" -}}
+          {{ if $hasCritical -}}
+            danger
+          {{- else if $hasWarning -}}
+            warning
+          {{- else -}}
+            #439FE0
+          {{- end -}}
+        {{ else -}}
+          good
+        {{- end }}
+      {{- end }}
+
+      {{ define "support_email_message" }}
+      [ MAINNET-DA2-SVN-CRITICAL-ALERT 9f2b7e1a-4c3d-58b9-9f1e-df9c4a5b6e7d ]
+      {{ if gt (len .Alerts.Firing) 0 }}**Firing**
+      {{ template "__text_alert_list" .Alerts.Firing }}{{ if gt (len .Alerts.Resolved) 0 }}
+      {{ end }}{{ end }}{{ if gt (len .Alerts.Resolved) 0 }}**Resolved**
+      {{ template "__text_alert_list" .Alerts.Resolved }}{{ end }}{{ end }}

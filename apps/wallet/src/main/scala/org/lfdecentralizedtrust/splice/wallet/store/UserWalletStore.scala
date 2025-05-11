@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amuletrules as amuletrulesCodegen,
   round as roundCodegen,
   validatorlicense as validatorCodegen,
+  amulettransferinstruction as amuletTransferInstructionCodegen,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
@@ -633,6 +634,9 @@ object UserWalletStore {
               Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
           )
         ),
+        mkFilter(amuletTransferInstructionCodegen.AmuletTransferInstruction.COMPANION)(co =>
+          co.payload.transfer.instrumentId.admin == dso && (co.payload.transfer.sender == endUser || co.payload.transfer.receiver == endUser)
+        )(contract => UserWalletAcsStoreRowData(contract)),
       ),
     )
   }
