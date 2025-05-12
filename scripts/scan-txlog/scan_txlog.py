@@ -1493,25 +1493,23 @@ class TransferInputs:
             output += ["amulets:"]
             for amulet in self.amulets:
                 amount = amulet.payload.get_amulet_amount()
-                round_number = amount.get_expiring_amount_created_at()
-                initial_amount = amount.get_expiring_amount_initial_amount()
-                rate_per_round = amount.get_expiring_amount_rate_per_round()
-                round_diff = self.round_number - round_number
-                effective_amount = max(
-                    initial_amount - rate_per_round * DamlDecimal(round_diff),
-                    DamlDecimal(0),
+                effective = EffectiveAmount.from_amount_and_round(
+                    amount, self.round_number
                 )
-                effective_inputs += [effective_amount]
+                effective_inputs += [effective.effective_amount]
 
-                initial_amulet_total_cc += initial_amount
-                amulet_total_cc += effective_amount
+                initial_amulet_total_cc += effective.initial_amount
+                amulet_total_cc += effective.effective_amount
                 all_amulet += [
                     TransferInput(
-                        "amulet", initial_amount, effective_amount, round_number
+                        "amulet",
+                        effective.initial_amount,
+                        effective.effective_amount,
+                        effective.created_at,
                     )
                 ]
                 output += [
-                    f"  created in round {round_number}: -{effective_amount} = -({initial_amount} - {rate_per_round} * {round_diff})"
+                    f"  created in round {effective.created_at}: -{effective.effective_amount} = -({effective.initial_amount} - {effective.rate_per_round} * {effective.round_diff})"
                 ]
 
         all_inputs = (
@@ -1531,6 +1529,27 @@ class TransferInputs:
             initial_amulet_total_cc,
             amulet_total_cc,
             all_inputs,
+        )
+
+
+@dataclass
+class EffectiveAmount:
+    effective_amount: DamlDecimal
+    initial_amount: DamlDecimal
+    created_at: int
+    rate_per_round: DamlDecimal
+    round_diff: int
+
+    def from_amount_and_round(amount, round_number):
+        created_at = amount.get_expiring_amount_created_at()
+        initial_amount = amount.get_expiring_amount_initial_amount()
+        rate_per_round = amount.get_expiring_amount_rate_per_round()
+        round_diff = max(0, round_number - created_at)
+        effective_amount = max(
+            initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
+        )
+        return EffectiveAmount(
+            effective_amount, initial_amount, created_at, rate_per_round, round_diff
         )
 
 
@@ -1560,14 +1579,8 @@ class PerPartyState:
         self.open_mining_round_numbers = open_mining_round_numbers
 
     def __effective_amount__(self, amount, round_number):
-        created_at = amount.get_expiring_amount_created_at()
-        initial_amount = amount.get_expiring_amount_initial_amount()
-        rate_per_round = amount.get_expiring_amount_rate_per_round()
-        round_diff = max(0, round_number - created_at)
-        effective_amount = max(
-            initial_amount - DamlDecimal(round_diff) * rate_per_round, DamlDecimal("0")
-        )
-        return f"round {round_number}: {effective_amount} = {initial_amount} - {round_diff} * {rate_per_round}"
+        effective = EffectiveAmount.from_amount_and_round(amount, round_number)
+        return f"round {round_number}: {effective.effective_amount} = {effective.initial_amount} - {effective.round_diff} * {effective.rate_per_round}"
 
     def __str__(self):
         lines = []
@@ -2956,7 +2969,9 @@ class State:
         )
         return HandleTransactionResult.for_open_round(round_number)
 
-    def handle_locked_owner_expire_lock(self, transaction, event, log_prefix="ExpireUnlock"):
+    def handle_locked_owner_expire_lock(
+        self, transaction, event, log_prefix="ExpireUnlock"
+    ):
         summary = (
             event.exercise_result.get_locked_amulet_owner_expire_lock_result_amulet_sum()
         )
@@ -3514,7 +3529,9 @@ class State:
             and child_event.choice_name == "LockedAmulet_OwnerExpireLock"
         ):
             self.handle_locked_owner_expire_lock(
-                transaction, child_event, log_prefix="Unlock transfer inputs with expired locks"
+                transaction,
+                child_event,
+                log_prefix="Unlock transfer inputs with expired locks",
             )
 
     def handle_transfer_factory_transfer(self, transaction, event):
@@ -3526,16 +3543,18 @@ class State:
                 isinstance(child_event, ExercisedEvent)
                 and child_event.choice_name == "TransferPreapproval_Send"
             ):
-                return self.handle_transfer_preapproval_send(
-                    transaction, child_event
-                )
+                return self.handle_transfer_preapproval_send(transaction, child_event)
             # Or a direct call to AmuletRules_Transfer
             if (
                 isinstance(child_event, ExercisedEvent)
                 and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 output = event.exercise_result.get_transferinstructionresult_output()
-                description = "Token standard: offer transfer" if output["tag"] == "TransferInstructionResult_Pending" else "Token standard: self-transfer"
+                description = (
+                    "Token standard: offer transfer"
+                    if output["tag"] == "TransferInstructionResult_Pending"
+                    else "Token standard: self-transfer"
+                )
                 return self.handle_transfer(
                     transaction, child_event, description=description
                 )
@@ -3551,14 +3570,18 @@ class State:
                 and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 self.handle_locked_amulet_unlock(
-                    transaction, child_event, log_prefix="Token standard: unlock funds for accepted transfer"
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: unlock funds for accepted transfer",
                 )
             if (
                 isinstance(child_event, ExercisedEvent)
                 and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 return self.handle_transfer(
-                    transaction, child_event, description="Token standard: accept transfer"
+                    transaction,
+                    child_event,
+                    description="Token standard: accept transfer",
                 )
         raise Exception(
             f"Could not find AmuletRules_Transfer child of TransferInstruction_Accept"
@@ -3572,7 +3595,9 @@ class State:
                 and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 return self.handle_locked_amulet_unlock(
-                    transaction, child_event, log_prefix="Token standard: offer rejected - return locked funds"
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: offer rejected - return locked funds",
                 )
         # Unlocking is skipped, if the LockedAmulet was already archived.
         return HandleTransactionResult.empty()
@@ -3585,7 +3610,9 @@ class State:
                 and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 return self.handle_locked_amulet_unlock(
-                    transaction, child_event, log_prefix="Token standard: offer withdrawn - return locked funds"
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: offer withdrawn - return locked funds",
                 )
         # Unlocking is skipped, if the LockedAmulet was already archived.
         return HandleTransactionResult.empty()
@@ -3599,7 +3626,9 @@ class State:
                 and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 return self.handle_transfer(
-                    transaction, child_event, description="Token standard: lock funds for allocation "
+                    transaction,
+                    child_event,
+                    description="Token standard: lock funds for allocation ",
                 )
         raise Exception(
             f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
@@ -3613,14 +3642,18 @@ class State:
                 and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 self.handle_locked_amulet_unlock(
-                    transaction, child_event, log_prefix="Token standard: unlock allocated funds"
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: unlock allocated funds",
                 )
             if (
                 isinstance(child_event, ExercisedEvent)
                 and child_event.choice_name == "AmuletRules_Transfer"
             ):
                 return self.handle_transfer(
-                    transaction, child_event, description="Token standard: execute allocated transfer"
+                    transaction,
+                    child_event,
+                    description="Token standard: execute allocated transfer",
                 )
         raise Exception(
             f"Could not find AmuletRules_Transfer child of AllocationFactory_Allocate"
@@ -3634,7 +3667,9 @@ class State:
                 and child_event.choice_name == "LockedAmulet_Unlock"
             ):
                 return self.handle_locked_amulet_unlock(
-                    transaction, child_event, log_prefix="Token standard: allocation withdrawn - return locked funds"
+                    transaction,
+                    child_event,
+                    log_prefix="Token standard: allocation withdrawn - return locked funds",
                 )
         # Unlocking is skipped, if the LockedAmulet was already archived.
         return HandleTransactionResult.empty()
