@@ -48,7 +48,7 @@ class ExpireRewardCouponsTrigger(
       .getExpiredRewards(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
-        PageLimit.tryCreate(1000),
+        PageLimit.tryCreate(2000),
       )
       .map(seq => Random.shuffle(seq))
   } yield batches
