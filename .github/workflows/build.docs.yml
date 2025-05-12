@@ -11,9 +11,6 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_READ }}
-          submodules: recursive
 
       - name: Setup
         id: setup

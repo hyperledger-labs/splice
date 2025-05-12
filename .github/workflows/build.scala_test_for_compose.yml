@@ -65,8 +65,6 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v4
         with:
-          # TODO(#17437): reduce the number of places where we checkout the private configs repo
-          token: ${{ secrets.GH_READ }}
           submodules: recursive
 
       - name: Run Tests
