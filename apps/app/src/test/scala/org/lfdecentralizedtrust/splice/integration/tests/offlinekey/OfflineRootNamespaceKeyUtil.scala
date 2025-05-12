@@ -129,7 +129,7 @@ trait OfflineRootNamespaceKeyUtil extends PostgresAroundEach {
         node.id.member,
         NonEmpty(Seq, signingKey, encryptionKey),
       ),
-      PositiveInt.one,
+      Some(PositiveInt.one),
       signedBy = Seq(delegatedNamespaceKey.fingerprint, signingKey.fingerprint),
     )
   }

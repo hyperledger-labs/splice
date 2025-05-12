@@ -1,0 +1,623 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: cometbft
+    folder: canton-network
+    interval: 1m
+    rules:
+      - uid: fa4b8a18-e4be-4d19-a5af-90c7326fd935
+        title: Cometbft Consensus
+        condition: threshold
+        data:
+          - refId: invalid_voting_power
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: max by(chain_id) (cometbft_consensus_missing_validators_power) + max by(chain_id) (cometbft_consensus_byzantine_validators_power)
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: invalid_voting_power
+              useBackend: false
+          - refId: total_voting_power
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              disableTextWrap: false
+              editorMode: builder
+              expr: min by(chain_id) (cometbft_consensus_validators_power)
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: total_voting_power
+              useBackend: false
+          - refId: acceptable_invalid_voting_power
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: floor(${total_voting_power} / 3)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: acceptable_invalid_voting_power
+              type: math
+          - refId: threshold
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: ${invalid_voting_power} >= ${acceptable_invalid_voting_power} && ${invalid_voting_power} > 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: threshold
+              type: math
+        dashboardUid: UJyurCTWz
+        panelId: 48
+        noDataState: $NODATA
+        execErrState: OK
+        for: 15m
+        annotations:
+          __dashboardUid__: UJyurCTWz
+          __panelId__: "48"
+          description: We're missing {{ index $values "invalid_voting_power" }} voting power from a total of {{ index $values "total_voting_power" }}. We can tolerate f = {{ index $values "acceptable_invalid_voting_power" }}.
+          runbook_url: ""
+          severity: |-
+            {{- if (gt (index $values "invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
+            critical
+            {{- else -}}
+            warning
+            {{- end -}}
+          summary: |-
+            {{- if (gt (index $values "invalid_voting_power").Value (index $values "acceptable_invalid_voting_power").Value) -}}
+            CometBFT network voting power is byzantine
+            {{- else -}}
+            CometBFT network voting power close to byzantine status
+            {{- end -}}
+        labels:
+          "": ""
+        isPaused: false
+      - uid: a3b47fca-0982-491b-80bb-0c70f04dcd8b
+        title: Cometbft Height Not Advancing
+        condition: C
+        data:
+          - refId: height_advances
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: changes(cometbft_consensus_height{active_migration="true"}[5m])
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: height_advances
+              useBackend: false
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              disableTextWrap: false
+              editorMode: builder
+              expr: cometbft_consensus_height{active_migration="true"}
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: latest_height
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: latest_height
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: height_advances
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: UJyurCTWz
+        panelId: 66
+        noDataState: $NODATA
+        execErrState: OK
+        for: 10m
+        annotations:
+          __dashboardUid__: UJyurCTWz
+          __panelId__: "66"
+          description: Current height {{ index $values "latest_height" }} on node {{ $labels.service }} in {{ $labels.namespace }}
+          runbook_url: ""
+          severity: critical
+          summary: Blockchain height not advancing
+        labels:
+          "": ""
+        isPaused: false
+      - uid: a3f23df0-40d5-41d1-8b4b-03aa8c62c030
+        title: Cometbft Not Voting
+        condition: C
+        data:
+          - refId: blocks_not_signed
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: code
+              exemplar: false
+              expr: sum(cometbft_consensus_latest_block_height - on(pod) cometbft_consensus_validator_last_signed_height)
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: false
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: true
+              refId: blocks_not_signed
+              useBackend: false
+          - refId: block_height
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              disableTextWrap: false
+              editorMode: code
+              expr: cometbft_consensus_latest_block_height
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: block_height
+              useBackend: false
+          - refId: signed_height
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              disableTextWrap: false
+              editorMode: builder
+              expr: cometbft_consensus_validator_last_signed_height
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: signed_height
+              useBackend: false
+          - refId: current_blocks_not_signed
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [ ]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: blocks_not_signed
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: current_blocks_not_signed
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 50
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: current_blocks_not_signed
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+          - refId: latest_signed_height
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: signed_height
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: latest_signed_height
+              type: reduce
+          - refId: latest_block_height
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: block_height
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: latest_block_height
+              type: reduce
+        dashboardUid: UJyurCTWz
+        panelId: 66
+        noDataState: $NODATA
+        execErrState: OK
+        for: 5m
+        annotations:
+          __dashboardUid__: UJyurCTWz
+          __panelId__: "66"
+          severity: critical
+          description: |-
+            Blocks not signed: {{ index $values "current_blocks_not_signed" }}
+            Latest signed block: {{ index $values "latest_signed_block" }}
+            Latest block: {{ index $values "latest_block_height" }}
+          runbook_url: ""
+          summary: Node in namespace {{ $labels.namespace }} didn't sign {{ index $values "current_blocks_not_signed" }} in the last 5 minutes
+        labels:
+          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A'
+        isPaused: false
+      - uid: adl2npxte6u4gd
+        title: Reached Expected Maximum CometBFT Block Rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: rate(cometbft_consensus_height[30m])
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $EXPECTED_MAX_BLOCK_RATE_PER_SECOND
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: UJyurCTWz
+        panelId: 68
+        noDataState: $NODATA
+        execErrState: OK
+        for: 120m
+        annotations:
+          __dashboardUid__: UJyurCTWz
+          __panelId__: "68"
+          description: This alert triggers when the expected maximum hourly-averaged block rate threshold is reached.
+          runbook_url: ""
+          severity: warning
+          summary: The expected maximum hourly-averaged block rate threshold was exceeded in {{ $labels.namespace }} with a value of {{ index $values "A" }} c/s.
+        labels:
+          "": ""
+        isPaused: false
+      - uid: ddlrp7f1f8l4wf
+        title: CometBFT is not pruning old blocks
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: splice_sv_cometbft_latest_block_height - splice_sv_cometbft_earliest_block_height
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: A
+              useBackend: false
+          - refId: latest_height_difference
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [ ]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: latest_height_difference
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $COMETBFT_RETAIN_BLOCKS
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: latest_height_difference
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: $NODATA
+        execErrState: OK
+        for: 5m
+        annotations:
+          description: The block height difference of {{ index $values "latest_height_difference" }} is larger than the expected number of retained blocks ($COMETBFT_RETAIN_BLOCKS) in {{ $labels.namespace }}
+          runbook_url: ""
+          severity: critical
+          summary: Blockchain is not being pruned
+        labels:
+          "": ""
+        isPaused: $ENABLE_COMETBFT_PRUNING

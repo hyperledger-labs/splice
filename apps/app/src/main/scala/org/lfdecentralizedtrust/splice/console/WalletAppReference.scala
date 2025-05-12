@@ -16,6 +16,8 @@ import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
+  ListTokenStandardTransfersResponse,
+  TransferInstructionResultResponse,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
@@ -27,7 +29,8 @@ import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 
 abstract class WalletAppReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
@@ -476,6 +479,66 @@ abstract class WalletAppReference(
   ): Unit =
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TransferPreapprovalSend(receiver, amount, deduplicationId))
+    }
+
+  @Help.Summary("List active Token Standard transfers")
+  @Help.Description("Shows both incoming and outgoing Token Standard transfers.")
+  def listTokenStandardTransfers(): ListTokenStandardTransfersResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.TokenStandard.ListTransfers
+      )
+    }
+
+  @Help.Summary("Creates a transfer via the token standard")
+  @Help.Description(
+    "Send the given amulet to the receiver via the Token Standard. To be accepted by the receiver."
+  )
+  def createTokenStandardTransfer(
+      receiver: PartyId,
+      amount: BigDecimal,
+      description: String,
+      expiresAt: CantonTimestamp,
+      trackingId: String,
+  ): TransferInstructionResultResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.TokenStandard
+          .CreateTransfer(receiver, amount, description, expiresAt, trackingId)
+      )
+    }
+
+  @Help.Summary("Accepts a transfer created via the token standard")
+  @Help.Description("Accept a specific offer for a Token Standard transfer.")
+  def acceptTokenStandardTransfer(
+      contractId: transferinstructionv1.TransferInstruction.ContractId
+  ): TransferInstructionResultResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.TokenStandard.AcceptTransfer(contractId)
+      )
+    }
+
+  @Help.Summary("Rejects a transfer created via the token standard")
+  @Help.Description("Reject a specific offer for a Token Standard transfer.")
+  def rejectTokenStandardTransfer(
+      contractId: transferinstructionv1.TransferInstruction.ContractId
+  ): TransferInstructionResultResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.TokenStandard.RejectTransfer(contractId)
+      )
+    }
+
+  @Help.Summary("Withdraws a transfer created via the token standard")
+  @Help.Description("Withdraw a specific offer for a Token Standard transfer.")
+  def withdrawTokenStandardTransfer(
+      contractId: transferinstructionv1.TransferInstruction.ContractId
+  ): TransferInstructionResultResponse =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpWalletAppClient.TokenStandard.WithdrawTransfer(contractId)
+      )
     }
 }
 

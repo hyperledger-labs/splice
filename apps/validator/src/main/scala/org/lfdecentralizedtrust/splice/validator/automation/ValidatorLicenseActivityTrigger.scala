@@ -81,7 +81,7 @@ class ValidatorLicenseActivityTrigger(
         ),
       )
       .noDedup
-      .withPrefferedPackage(task.work.featureSupport.packageIds)
+      .withPreferredPackage(task.work.featureSupport.packageIds)
       .yieldUnit()
       .map(_ =>
         TaskSuccess(

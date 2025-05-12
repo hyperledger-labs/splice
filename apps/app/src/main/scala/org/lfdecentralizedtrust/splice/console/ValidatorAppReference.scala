@@ -62,8 +62,7 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("Create a namespace delegation and party transaction")
   @Help.Description(
-    """Create a namespace delegation and party transaction
-      |Return the topology transaction and transaction authorization hash (this should be signed by CCSP).""".stripMargin
+    """Create a namespace delegation and party transaction. Return the topology transaction and transaction authorization hash (this should be signed by CCSP)."""
   )
   def generateExternalPartyTopology(
       partyHint: String,
@@ -92,8 +91,9 @@ abstract class ValidatorAppReference(
   }
 
   @Help.Summary("Onboard a new user")
-  @Help.Description("""Onboard individual canton-amulet user with a fresh or existing party-id.
-                      |Return the user's partyId.""".stripMargin)
+  @Help.Description(
+    """Onboard individual canton-amulet user with a fresh or existing party-id. Return the user's partyId."""
+  )
   def onboardUser(user: String, existingPartyId: Option[PartyId] = None): PartyId = {
     consoleEnvironment.run {
       httpCommand(
@@ -104,8 +104,7 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("Register a new user identified by token")
   @Help.Description(
-    """Register the authenticated canton-amulet user with a fresh party-id.
-      |Return the newly set up partyId.""".stripMargin
+    """Register the authenticated canton-amulet user with a fresh party-id. Return the newly set up partyId."""
   )
   def register(): PartyId = {
     consoleEnvironment.run {

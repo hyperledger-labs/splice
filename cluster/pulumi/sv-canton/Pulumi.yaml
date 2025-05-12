@@ -1,0 +1,4 @@
+---
+name: sv-canton
+description: 'Provision the canton nodes for the SV cluster'
+runtime: nodejs

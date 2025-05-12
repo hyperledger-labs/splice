@@ -58,6 +58,7 @@ function check_patterns_locally() {
     'support'
     'start-canton\.sh'
     'docs/'
+    'cluster/pulumi/'
   )
 
   local exception exceptions_args=()

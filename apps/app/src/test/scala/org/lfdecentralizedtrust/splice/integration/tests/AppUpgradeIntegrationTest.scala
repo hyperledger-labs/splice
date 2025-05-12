@@ -256,7 +256,7 @@ class AppUpgradeIntegrationTest
             )
           )
 
-          actAndCheck(
+          actAndCheck(timeUntilSuccess = 40.seconds)(
             "Voting on a AmuletRules config change for upgraded packages", {
               val (_, voteRequest) = actAndCheck(
                 "Creating vote request",
