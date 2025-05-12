@@ -59,7 +59,7 @@ class RecoverExternalPartyIntegrationTest
       },
     )
 
-    clue("Submit PartyToParticipant to migrate to bob's validator") {
+    val partyMigrationTime = clue("Submit PartyToParticipant to migrate to bob's validator") {
       val synchronizerId =
         sv1Backend.participantClient.synchronizers.id_of(SynchronizerAlias.tryCreate("global"))
 
@@ -97,13 +97,11 @@ class RecoverExternalPartyIntegrationTest
         .load(signedTxsParticipant, TopologyStoreId.Synchronizer(synchronizerId))
       clue("PartyToParticipant transaction gets sequenced") {
         eventually() {
-          sv1Backend.participantClient.topology.party_to_participant_mappings
+          val topologyTx = sv1Backend.participantClient.topology.party_to_participant_mappings
             .list(synchronizerId, filterParty = aliceParty.filterString)
             .loneElement
-            .item
-            .participants
-            .loneElement
-            .participantId shouldBe bobValidatorBackend.participantClient.id
+          topologyTx.item.participants.loneElement.participantId shouldBe bobValidatorBackend.participantClient.id
+          topologyTx.context.validFrom
         }
       }
     }
@@ -113,7 +111,10 @@ class RecoverExternalPartyIntegrationTest
     // the ACS import. Otherwise the participant can blow up trying to process
     // a transaction with contracts it does not yet consider active.
     clue("Import the ACS to bob's validator") {
-      val acsSnapshot = sv1ScanBackend.getAcsSnapshot(aliceParty)
+      // This can fail if sv1 participant is not yet ready to serve the ACS at that timestamp.
+      val acsSnapshot = eventuallySucceeds() {
+        sv1ScanBackend.getAcsSnapshot(aliceParty, Some(partyMigrationTime))
+      }
       val acsSnapshotFile = Files.createTempFile("acs", ".snapshot")
       Files.write(acsSnapshotFile, acsSnapshot.toByteArray())
       bobValidatorBackend.participantClient.synchronizers.disconnect_all()

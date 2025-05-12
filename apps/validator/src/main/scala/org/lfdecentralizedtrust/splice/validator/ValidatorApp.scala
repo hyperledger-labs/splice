@@ -446,7 +446,9 @@ class ValidatorApp(
         retryProvider,
         loggerFactory,
       ) { scanConnection =>
-        scanConnection.getAcsSnapshot(partyId)
+        // We don't set the record time for now here. We assume recover node from
+        // keys
+        scanConnection.getAcsSnapshot(partyId, recordTime = None)
       },
       logger,
     )

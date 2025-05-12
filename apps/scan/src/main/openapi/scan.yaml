@@ -1002,6 +1002,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: "record_time"
+          in: "query"
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: ok
