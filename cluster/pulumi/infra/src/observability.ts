@@ -126,7 +126,7 @@ const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
-export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
+export function configureObservability(dependsOn: pulumi.Resource[] = []): pulumi.Resource {
   const namespace = new k8s.core.v1.Namespace(
     'observabilty',
     {
@@ -536,10 +536,11 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     }
   );
 
+  const path = `${SPLICE_ROOT}/cluster/pulumi/infra/prometheus-crd-update.sh`;
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {
-      create: `bash prometheus-crd-update.sh ${prometheusStackCrdVersion}`,
+      create: `bash ${path} ${prometheusStackCrdVersion}`,
     },
     { dependsOn: prometheusStack }
   );
@@ -589,6 +590,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     );
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
+
+  return prometheusStack;
 }
 
 // Even though the AuthorizationPolicy explicitly allows all traffic to Grafana api

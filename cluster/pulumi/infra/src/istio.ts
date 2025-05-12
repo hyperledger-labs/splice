@@ -13,6 +13,7 @@ import {
   infraAffinityAndTolerations,
   InstalledHelmChart,
   installSpliceHelmChart,
+  SPLICE_ROOT,
 } from '../../common';
 import { clusterBasename, loadIPRanges } from './config';
 
@@ -29,8 +30,9 @@ function configureIstioBase(
   ns: k8s.core.v1.Namespace,
   istioDNamespace: k8s.core.v1.Namespace
 ): k8s.helm.v3.Release {
+  const path = SPLICE_ROOT + '/cluster/pulumi/infra/migrate-istio.sh';
   const migration = new local.Command(`migrate-istio-crds`, {
-    create: `bash migrate-istio.sh`,
+    create: path,
   });
 
   return new k8s.helm.v3.Release(
@@ -120,15 +122,6 @@ function configureIstiod(
     {
       dependsOn: [ingressNs, base],
     }
-  );
-  new ServiceMonitor(
-    'istiod-service-monitor',
-    {
-      istio: 'pilot',
-    },
-    'http-monitoring',
-    ingressNs.metadata.name,
-    { dependsOn: istiodRelease }
   );
   return istiodRelease;
 }
@@ -349,28 +342,6 @@ function configureGatewayService(
       dependsOn: [ingressNs, istiod],
     }
   );
-  new PodMonitor(
-    `istio-sidecar-monitor${suffix}`,
-    {
-      'security.istio.io/tlsMode': 'istio',
-    },
-    [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
-    ingressNs.metadata.name,
-    {
-      dependsOn: [gateway],
-    }
-  );
-  new PodMonitor(
-    `istio-gateway-monitor${suffix}`,
-    {
-      istio: 'ingress',
-    },
-    [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
-    ingressNs.metadata.name,
-    {
-      dependsOn: [gateway],
-    }
-  );
   // Turn on envoy access logging on the ingress gateway
   new k8s.apiextensions.CustomResource(`access-logging${suffix}`, {
     apiVersion: 'telemetry.istio.io/v1alpha1',
@@ -446,4 +417,47 @@ export function configureIstio(
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
   const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
   return configureGateway(ingressNs, gwSvc, publicGwSvc);
+}
+
+export function istioMonitoring(
+  ingressNs: ExactNamespace,
+  dependsOn: pulumi.Resource[] = []
+): pulumi.Resource[] {
+  const svc = new ServiceMonitor(
+    'istiod-service-monitor',
+    {
+      istio: 'pilot',
+    },
+    'http-monitoring',
+    ingressNs.ns.metadata.name,
+    { dependsOn }
+  );
+
+  const pods = ['', '-public'].flatMap(suffix => {
+    const sidecar = new PodMonitor(
+      `istio-sidecar-monitor${suffix}`,
+      {
+        'security.istio.io/tlsMode': 'istio',
+      },
+      [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+      ingressNs.ns.metadata.name,
+      {
+        dependsOn,
+      }
+    );
+    const gateway = new PodMonitor(
+      `istio-gateway-monitor${suffix}`,
+      {
+        istio: 'ingress',
+      },
+      [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+      ingressNs.ns.metadata.name,
+      {
+        dependsOn,
+      }
+    );
+    return [sidecar, gateway];
+  });
+
+  return pods.concat([svc]);
 }
