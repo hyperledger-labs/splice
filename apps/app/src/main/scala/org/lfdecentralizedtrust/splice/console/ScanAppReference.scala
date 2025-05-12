@@ -555,22 +555,6 @@ abstract class ScanAppReference(
     }
   }
 
-  def getAllocationCancelContext(
-      allocationId: allocationv1.Allocation.ContractId
-  ): ChoiceContextWithDisclosures = {
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetAllocationCancelContext(allocationId))
-    }
-  }
-
-  def getAllocationWithdrawContext(
-      allocationId: allocationv1.Allocation.ContractId
-  ): ChoiceContextWithDisclosures = {
-    consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetAllocationWithdrawContext(allocationId))
-    }
-  }
-
   @Help.Summary("List vote requests")
   def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
     consoleEnvironment.run {

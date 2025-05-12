@@ -21,6 +21,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 
 class MergeUnclaimedRewardsTrigger(
     override protected val context: TriggerContext,
@@ -58,14 +59,17 @@ class MergeUnclaimedRewardsTrigger(
   )
 
   override def completeTaskAsDsoDelegate(
-      unclaimedRewardsTask: MergeUnclaimedRewardsTask
+      unclaimedRewardsTask: MergeUnclaimedRewardsTask,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      supportsSvController <- supportsSvController()
       arg = new DsoRules_MergeUnclaimedRewards(
         amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
+        Option.when(supportsSvController)(controller).toJava,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeUnclaimedRewards(arg))
       res <- for {

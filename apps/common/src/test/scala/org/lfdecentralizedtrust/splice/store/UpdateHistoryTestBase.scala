@@ -18,7 +18,6 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.util.EventId
 import org.scalatest.Assertion
 
@@ -210,7 +209,6 @@ abstract class UpdateHistoryTestBase
       domainMigrationId: Long = migration1,
       participantId: ParticipantId = participant1,
       storeName: String = storeName1,
-      backfillingRequired: BackfillingRequirement = BackfillingRequirement.NeedsBackfilling,
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
@@ -221,7 +219,6 @@ abstract class UpdateHistoryTestBase
       storeName,
       participantId,
       updateStreamParty,
-      backfillingRequired,
       loggerFactory,
       enableissue12777Workaround = true,
     )

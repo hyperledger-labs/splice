@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
-import cats.data.{NonEmptyList, OptionT}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
@@ -63,9 +62,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import io.circe.Json
-import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
-import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import scala.collection.mutable
@@ -395,17 +392,13 @@ final class DbMultiDomainAcsStore[TXE](
       .map(assignedContractFromRow(companion)(_))
   }
 
-  def listTxLogEntries()(implicit
-      tc: TraceContext,
-      tag: ClassTag[TXE],
-  ): Future[Seq[TXE]] = {
+  def listTxLogEntries()(implicit tc: TraceContext, tag: ClassTag[TXE]): Future[Seq[TXE]] = {
     storage
       .query(
         selectFromTxLogTable(
           txLogTableName,
           txLogStoreId,
           where = sql"true",
-          orderLimit = sql"order by migration_id, domain_id, record_time, entry_number",
         ),
         "listTextLogEntry",
       )
@@ -413,196 +406,6 @@ final class DbMultiDomainAcsStore[TXE](
         rows.map(txLogEntryFromRow[TXE](txLogConfig))
       }
   }
-  override def initializeTxLogBackfilling()(implicit tc: TraceContext): Future[Unit] = {
-    storage.update(
-      DBIOAction
-        .seq(
-          sqlu"""
-            insert into txlog_backfilling_status (store_id, backfilling_complete)
-            values ($txLogStoreId, false)
-            on conflict do nothing
-          """
-        )
-        .transactionally,
-      "initializeTxLogBackfilling",
-    )
-  }
-
-  override def getTxLogBackfillingState()(implicit
-      tc: TraceContext
-  ): Future[TxLogBackfillingState] = for {
-    complete <- storage
-      .query(
-        sql"""
-            select backfilling_complete
-            from txlog_backfilling_status
-            where store_id = $txLogStoreId
-            """.as[Boolean].headOption,
-        "getTxLogBackfillingComplete",
-      )
-  } yield complete match {
-    case Some(true) =>
-      TxLogBackfillingState.Complete
-    case Some(false) =>
-      TxLogBackfillingState.InProgress
-    case None =>
-      TxLogBackfillingState.NotInitialized
-  }
-
-  def getTxLogFirstIngestedMigrationId(
-  )(implicit tc: TraceContext): Future[Option[Long]] = {
-    for {
-      migrationId <- storage
-        .query(
-          sql"""
-            select min(migration_id)
-            from txlog_first_ingested_update
-            where store_id = $txLogStoreId
-           """
-            .as[Option[Long]]
-            .head,
-          "getTxLogFirstIngestedMigrationId",
-        )
-    } yield {
-      migrationId
-    }
-  }
-
-  def getTxLogFirstIngestedRecordTimes(
-      migrationId: Long
-  )(implicit tc: TraceContext): Future[Map[SynchronizerId, CantonTimestamp]] = {
-    for {
-      rows <- storage
-        .query(
-          sql"""
-            select synchronizer_id, record_time
-            from txlog_first_ingested_update
-            where store_id = $txLogStoreId and migration_id = $migrationId
-           """
-            .as[(SynchronizerId, CantonTimestamp)],
-          "getTxLogFirstIngestedRecordTimes",
-        )
-    } yield {
-      rows.toMap
-    }
-  }
-
-  override lazy val destinationHistory
-      : HistoryBackfilling.DestinationHistory[UpdateHistoryResponse] =
-    new HistoryBackfilling.DestinationHistory[UpdateHistoryResponse] {
-      override def isReady: Boolean = state.get().txLogStoreId.isDefined
-
-      override def backfillingInfo(implicit
-          tc: TraceContext
-      ): Future[Option[HistoryBackfilling.DestinationBackfillingInfo]] = {
-        (
-          for {
-            migrationId <- OptionT(getTxLogFirstIngestedMigrationId())
-            range <- OptionT.liftF(getTxLogFirstIngestedRecordTimes(migrationId))
-          } yield HistoryBackfilling.DestinationBackfillingInfo(migrationId, range)
-        ).value
-      }
-
-      override def insert(
-          migrationId: Long,
-          synchronizerId: SynchronizerId,
-          items: Seq[UpdateHistoryResponse],
-      )(implicit
-          tc: TraceContext
-      ): Future[DestinationHistory.InsertResult] = {
-        val trees = items.collect { case UpdateHistoryResponse(TransactionTreeUpdate(tree), _) =>
-          tree
-        }
-        val nonEmpty = NonEmptyList
-          .fromFoldable(trees)
-          .getOrElse(
-            throw new RuntimeException("insert() must not be called with an empty sequence")
-          )
-        val firstTree = nonEmpty.foldLeft(nonEmpty.head) { case (acc, tree) =>
-          if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
-        }
-        val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
-        val summary = MutableIngestionSummary.empty
-        for {
-          _ <- storage.queryAndUpdate(
-            for {
-              // DbStorage requires all actions to be idempotent.
-              // We can't use `ON CONFLICT DO NOTHING` because different txlog tables have different uniqueness constraints:
-              // - `txlog_store_template` (used in test code) doesn't have any uniqueness constraint
-              // - `user_wallet_txlog_store` has a unique index on (store_id, tx_log_id, event_id)
-              // - `txlog_first_ingested_update` has an index on (store_id, entry_type, event_id), but it's not unique
-              // Uniqueness constraints should also be consistent with parsers - some parsers might want to produce
-              // multiple entries for the same event (for example, if an exercise event batches multiple logical operations).
-              // Instead of rethinking the whole design, we just check if some entry for one of the trees already exists in the table.
-              //
-              // Note: this approach protects against repeated calls of this method with the same arguments
-              // (e.g., if it's retried because of a transient database connection error or in DbStorageIdempotency test code),
-              // but it does NOT protect against this method being called concurrently (both SQL transactions could independently
-              // decide that the items do not exist and need to be inserted).
-              // This is fine because this method is only called from TxLogBackfillingTrigger, and triggers only run one task at a time.
-              itemExists <- sql"""
-                 select exists(
-                   select record_time
-                   from #$txLogTableName
-                   where
-                     store_id = $txLogStoreId and
-                     migration_id = $migrationId and
-                     domain_id = $synchronizerId and
-                     record_time = $firstRecordTime
-                 )
-               """.as[Boolean].head
-              _ <-
-                if (!itemExists) {
-                  DBIOAction
-                    .seq(
-                      DBIOAction.seq(
-                        trees.flatMap { tree =>
-                          val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
-                          entries.map(entry =>
-                            doIngestTxLogInsert(
-                              synchronizerId,
-                              tree.getOffset,
-                              CantonTimestamp.assertFromInstant(tree.getRecordTime),
-                              entry,
-                              summary,
-                            )
-                          )
-                        }*
-                      ),
-                      doUpdateFirstIngestedUpdate(
-                        synchronizerId,
-                        migrationId,
-                        firstRecordTime,
-                      ),
-                    )
-                    .transactionally
-                } else {
-                  DBIOAction.unit
-                }
-            } yield (),
-            "destinationHistory.insert",
-          )
-        } yield DestinationHistory.InsertResult(
-          backfilledUpdates = trees.size.toLong,
-          backfilledEvents =
-            trees.foldLeft(0L)((sum, tree) => sum + tree.getEventsById.size().toLong),
-          lastBackfilledRecordTime = CantonTimestamp.assertFromInstant(nonEmpty.last.getRecordTime),
-        )
-      }
-
-      override def markBackfillingComplete()(implicit tc: TraceContext): Future[Unit] = {
-        storage
-          .update(
-            sqlu"""
-            update txlog_backfilling_status
-            set backfilling_complete = true
-            where store_id = $txLogStoreId
-            """,
-            "markBackfillingComplete",
-          )
-          .map(_ => ())
-      }
-    }
 
   private val defaultPageSizeForContractStream = PageLimit.tryCreate(100)
 
@@ -942,7 +745,7 @@ final class DbMultiDomainAcsStore[TXE](
             where store_id = $txLogStoreId and migration_id = $domainMigrationId
           """.asUpdate
         } else {
-          DBIO.unit
+          DBIO.successful(())
         },
       )
     }
@@ -1332,8 +1135,9 @@ final class DbMultiDomainAcsStore[TXE](
             ingestUpdateAtOffset(
               offset,
               DBIO
-                .seq(
-                  DBIO.seq(workTodo.map({
+                .sequence(
+                  // TODO (#5643): batch inserts
+                  workTodo.map {
                     case Insert(createdEvent) =>
                       for {
                         alreadyArchived <- hasIncompleteReassignments(createdEvent.getContractId)
@@ -1353,8 +1157,7 @@ final class DbMultiDomainAcsStore[TXE](
                       } yield ()
                     case Delete(exercisedEvent) =>
                       doDeleteContract(exercisedEvent, summary)
-                  })*),
-                  DBIO.seq(txLogEntries.map { txe =>
+                  } ++ txLogEntries.map(txe =>
                     doIngestTxLogInsert(
                       synchronizerId,
                       offset,
@@ -1362,12 +1165,7 @@ final class DbMultiDomainAcsStore[TXE](
                       txe,
                       summary,
                     )
-                  }*),
-                  doInitializeFirstIngestedUpdate(
-                    synchronizerId,
-                    domainMigrationId,
-                    CantonTimestamp.assertFromInstant(tree.getRecordTime),
-                  ),
+                  )
                 ),
             ),
             "ingestTransactionTree",
@@ -1423,6 +1221,21 @@ final class DbMultiDomainAcsStore[TXE](
       reassignmentUnassignId = Some(String255.tryCreate(event.unassignId)),
     )
 
+    private def getIndexColumnValues(data: Seq[(String, IndexColumnValue[?])]): SQLActionBuilder =
+      data
+        .map(_._2)
+        .map(v => sql"$v")
+        .reduceOption { (acc, next) =>
+          (acc ++ sql"," ++ next).toActionBuilder
+        }
+        .map(s => (sql"," ++ s).toActionBuilder)
+        .getOrElse(sql"")
+
+    // Note: the column names are hardcoded so they're safe to interpolate raw
+    private def getIndexColumnNames(data: Seq[(String, IndexColumnValue[?])]): String =
+      if (data.isEmpty) ""
+      else data.map(_._1).mkString(",", ", ", "")
+
     private def doIngestAcsInsert(
         offset: Long,
         createdEvent: CreatedEvent,
@@ -1473,6 +1286,31 @@ final class DbMultiDomainAcsStore[TXE](
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
               """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
       }
+    }
+
+    private def doIngestTxLogInsert(
+        synchronizerId: SynchronizerId,
+        offset: Long,
+        recordTime: CantonTimestamp,
+        txe: TXE,
+        summary: MutableIngestionSummary,
+    ) = {
+      val safeOffset = lengthLimited(LegacyOffset.Api.fromLong(offset))
+      val (entryType, entryData) = txLogConfig.encodeEntry(txe)
+      // Note: lengthLimited() uses String2066 which throws an exception if the string is longer than 2066 characters.
+      // Here we use String256M to support larger TxLogEntry payloads.
+      val safeEntryData = String256M.tryCreate(entryData)
+      val rowData = txLogConfig.entryToRow(txe)
+      val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
+      val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+
+      summary.ingestedTxLogEntries.addOne((entryType, entryData))
+      (sql"""
+      insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
+      entry_type, entry_data #$indexColumnNames)
+      values ($txLogStoreId, $domainMigrationId, $safeOffset, $recordTime, $synchronizerId,
+              $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
+    """).toActionBuilder.asUpdate
     }
 
     private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary) = {
@@ -1608,85 +1446,6 @@ final class DbMultiDomainAcsStore[TXE](
     sealed trait OperationToDo
     case class Insert(evt: CreatedEvent) extends OperationToDo
     case class Delete(evt: ExercisedEvent) extends OperationToDo
-  }
-
-  private def getIndexColumnValues(data: Seq[(String, IndexColumnValue[?])]): SQLActionBuilder =
-    data
-      .map(_._2)
-      .map(v => sql"$v")
-      .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
-      }
-      .map(s => (sql"," ++ s).toActionBuilder)
-      .getOrElse(sql"")
-
-  // Note: the column names are hardcoded so they're safe to interpolate raw
-  private def getIndexColumnNames(data: Seq[(String, IndexColumnValue[?])]): String =
-    if (data.isEmpty) ""
-    else data.map(_._1).mkString(",", ", ", "")
-
-  private def doIngestTxLogInsert(
-      domainId: SynchronizerId,
-      offset: Long,
-      recordTime: CantonTimestamp,
-      txe: TXE,
-      summary: MutableIngestionSummary,
-  ) = {
-    val safeOffset = lengthLimited(LegacyOffset.Api.fromLong(offset))
-    val (entryType, entryData) = txLogConfig.encodeEntry(txe)
-    // Note: lengthLimited() uses String2066 which throws an exception if the string is longer than 2066 characters.
-    // Here we use String256M to support larger TxLogEntry payloads.
-    val safeEntryData = String256M.tryCreate(entryData)
-    val rowData = txLogConfig.entryToRow(txe)
-    val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
-    val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
-
-    summary.ingestedTxLogEntries.addOne((entryType, entryData))
-    (sql"""
-      insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
-      entry_type, entry_data #$indexColumnNames)
-      values ($txLogStoreId, $domainMigrationId, $safeOffset, $recordTime, $domainId,
-              $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
-    """).toActionBuilder.asUpdate
-  }
-
-  private def doUpdateFirstIngestedUpdate(
-      synchronizerId: SynchronizerId,
-      migrationId: Long,
-      recordTime: CantonTimestamp,
-  ) = {
-    sqlu"""
-      update txlog_first_ingested_update
-      set record_time = $recordTime
-      where store_id = $txLogStoreId and migration_id = $migrationId and synchronizer_id = $synchronizerId
-    """
-  }
-
-  private def doInitializeFirstIngestedUpdate(
-      synchronizerId: SynchronizerId,
-      migrationId: Long,
-      recordTime: CantonTimestamp,
-  ) = {
-    // - doUpdateFirstIngestedUpdate: called by the backfilling process, always overwrites the existing value
-    // - doInitializeFirstIngestedUpdate: called by the ingestion process, only inserts a new value if it doesn't exist
-    //
-    // The backfilling process won't process a synchronizer until there is at least one entry in the
-    // txlog for that synchronizer. The two operations will therefore be called in the following order:
-    // 1. doInitializeFirstIngestedUpdate() is called once and inserts a new row.
-    // 2. doUpdateFirstIngestedUpdate() and doInitializeFirstIngestedUpdate() are called concurrently.
-    //    The former updates the existing row, the latter does nothing.
-    //
-    // This method could be optimized by keeping a cache for which synchronizers have been initialized,
-    // and not doing anything if the synchronizer is already in the cache.
-    if (txLogStoreDescriptor.isDefined) {
-      sqlu"""
-      insert into txlog_first_ingested_update (store_id, migration_id, synchronizer_id, record_time)
-      values ($txLogStoreId, $migrationId, $synchronizerId, $recordTime)
-      on conflict do nothing
-    """
-    } else {
-      DBIOAction.unit
-    }
   }
 
   private[this] def cleanUpDataAfterDomainMigration(

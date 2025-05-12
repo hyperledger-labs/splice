@@ -3,7 +3,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.daml.ledger.api.v2
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
@@ -36,8 +35,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
       amount: BigDecimal,
       expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
       timeToLife: Duration = Duration.ofMinutes(10),
-      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
-      advanceTimeBeforeExecute: Option[Duration] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -56,8 +53,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
             sender,
             commands = factoryChoice.commands,
             disclosedContracts = factoryChoice.disclosedContracts,
-            expectedTimeBounds = expectedTimeBounds,
-            advanceTimeBeforeExecute = advanceTimeBeforeExecute,
           )
         senderHoldingCids.head
       },
@@ -184,7 +179,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
       participant: ParticipantClientReference,
       receiver: RichPartyId,
       instructionCid: transferinstructionv1.TransferInstruction.ContractId,
-      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -198,7 +192,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
           .asScala
           .toSeq,
         disclosedContracts = choiceContext.disclosedContracts,
-        expectedTimeBounds = expectedTimeBounds,
       )
   }
 
@@ -206,7 +199,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
       participant: ParticipantClientReference,
       receiver: RichPartyId,
       instructionCid: transferinstructionv1.TransferInstruction.ContractId,
-      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -220,7 +212,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
           .asScala
           .toSeq,
         disclosedContracts = choiceContext.disclosedContracts,
-        expectedTimeBounds = expectedTimeBounds,
       )
   }
 
@@ -228,7 +219,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
       participant: ParticipantClientReference,
       receiver: RichPartyId,
       instructionCid: transferinstructionv1.TransferInstruction.ContractId,
-      expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -242,7 +232,6 @@ trait TokenStandardTest extends IntegrationTest with ExternallySignedPartyTestUt
           .asScala
           .toSeq,
         disclosedContracts = choiceContext.disclosedContracts,
-        expectedTimeBounds = expectedTimeBounds,
       )
   }
 }

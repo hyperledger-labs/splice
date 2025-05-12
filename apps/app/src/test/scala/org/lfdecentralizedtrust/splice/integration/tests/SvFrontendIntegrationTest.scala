@@ -8,6 +8,10 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 import org.lfdecentralizedtrust.splice.util.{
   FrontendLoginUtil,
   SvFrontendTestUtil,
@@ -41,8 +45,6 @@ class SvFrontendIntegrationTest
     walletVersion = "0.1.7",
     walletPaymentsVersion = "0.1.7",
   )
-  // TODO(#16139): when using the latest version, this can be removed
-  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   private val splitwellDarPath = "daml/dars/splitwell-0.1.7.dar"
 
@@ -519,10 +521,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Pausing vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation
-              .trigger[CloseVoteRequestTrigger]
-              .pause()
-              .futureValue
+            pauseAllDsoDelegateTriggers[CloseVoteRequestTrigger]
           }
 
           actAndCheck(
@@ -553,7 +552,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Resuming vote request expiration automation") {
-            sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+            resumeAllDsoDelegateTriggers[CloseVoteRequestTrigger]
           }
 
           clue("Voting to reject the other vote request") {

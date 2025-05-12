@@ -18,7 +18,6 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.environment.EnvironmentFactory
-
 import java.time.Duration
 import com.digitalasset.canton.integration.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -40,15 +39,14 @@ import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.config.{AuthTokenSourceConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
-  RetryProvider,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
+  RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
-  TokenStandardCliSanityCheckPlugin,
   UpdateHistorySanityCheckPlugin,
   WaitForPorts,
 }
@@ -164,31 +162,19 @@ object SpliceTests extends LazyLogging {
       durationUntilOffboardingEffectivity.minusSeconds(1)
 
     protected def runUpdateHistorySanityCheck: Boolean = true
-    protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
-    protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
+    protected lazy val updateHistoryIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
+    registerPlugin(new WaitForPorts(extraPortsToWaitFor))
+
     if (runUpdateHistorySanityCheck) {
       registerPlugin(
         new UpdateHistorySanityCheckPlugin(
-          sanityChecksIgnoredRootCreates,
-          sanityChecksIgnoredRootExercises,
+          updateHistoryIgnoredRootCreates,
+          updateHistoryIgnoredRootExercises,
           loggerFactory,
         )
       )
     }
-
-    protected def runTokenStandardCliSanityCheck: Boolean = true
-    protected lazy val tokenStandardCliBehavior
-        : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
-      TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreForTemplateIds(
-        sanityChecksIgnoredRootCreates ++ sanityChecksIgnoredRootExercises.map(_._1)
-      )
-    if (runTokenStandardCliSanityCheck) {
-      registerPlugin(
-        new TokenStandardCliSanityCheckPlugin(tokenStandardCliBehavior, loggerFactory)
-      )
-    }
-
-    registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
     if (resetRequiredTopologyState) {
       registerPlugin(new ResetDecentralizedNamespace())
@@ -218,17 +204,8 @@ object SpliceTests extends LazyLogging {
       BaseEnvironmentDefinition[SpliceConfig, SpliceEnvironment]
 
     protected def runUpdateHistorySanityCheck: Boolean = true
-    protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq.empty
-    protected lazy val sanityChecksIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
-    if (runUpdateHistorySanityCheck) {
-      registerPlugin(
-        new UpdateHistorySanityCheckPlugin(
-          sanityChecksIgnoredRootCreates,
-          sanityChecksIgnoredRootExercises,
-          loggerFactory,
-        )
-      )
-    }
+    protected lazy val updateHistoryIgnoredRootCreates: Seq[Identifier] = Seq.empty
+    protected lazy val updateHistoryIgnoredRootExercises: Seq[(Identifier, String)] = Seq.empty
 
     protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
@@ -247,18 +224,15 @@ object SpliceTests extends LazyLogging {
 
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
 
-    protected def runTokenStandardCliSanityCheck: Boolean = true
-    protected lazy val tokenStandardCliBehavior
-        : TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior =
-      TokenStandardCliSanityCheckPlugin.OutputCreateArchiveBehavior.IgnoreForTemplateIds(
-        sanityChecksIgnoredRootCreates ++ sanityChecksIgnoredRootExercises.map(_._1)
-      )
-    if (runTokenStandardCliSanityCheck) {
+    if (runUpdateHistorySanityCheck) {
       registerPlugin(
-        new TokenStandardCliSanityCheckPlugin(tokenStandardCliBehavior, loggerFactory)
+        new UpdateHistorySanityCheckPlugin(
+          updateHistoryIgnoredRootCreates,
+          updateHistoryIgnoredRootExercises,
+          loggerFactory,
+        )
       )
     }
-
     if (resetRequiredTopologyState) {
       // We MUST have the decentralized namespace reset before the reset of the sequencer domain state since
       // the latter expects that submitting the topology tx from only sv1 will succeed.

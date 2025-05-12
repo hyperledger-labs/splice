@@ -21,6 +21,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.OptionConverters.RichOption
 
 class ExpiredAnsSubscriptionTrigger(
     override protected val context: TriggerContext,
@@ -39,14 +40,17 @@ class ExpiredAnsSubscriptionTrigger(
     store.listExpiredAnsSubscriptions(now, PageLimit.tryCreate(limit))
 
   override protected def completeTaskAsDsoDelegate(
-      task: ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleAnsSubscription]
+      task: ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleAnsSubscription],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
+    supportsSvController <- supportsSvController()
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ExpireSubscription(
         task.work.context.contractId,
         task.work.state.contractId,
         new SubscriptionIdleState_ExpireSubscription(store.key.dsoParty.toProtoPrimitive),
+        Option.when(supportsSvController)(controller).toJava,
       )
     )
     result <- svTaskContext.connection

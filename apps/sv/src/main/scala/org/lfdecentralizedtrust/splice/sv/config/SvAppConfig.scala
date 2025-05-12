@@ -264,6 +264,8 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x submissionTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    delegatelessAutomation: Boolean = true,
+    expectedTaskDuration: Long = 5000, // milliseconds
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

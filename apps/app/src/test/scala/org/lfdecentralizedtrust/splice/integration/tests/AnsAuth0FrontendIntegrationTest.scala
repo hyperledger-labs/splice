@@ -15,9 +15,6 @@ class AnsAuth0FrontendIntegrationTest
     with AnsFrontendTestUtil
     with FrontendLoginUtil {
 
-  // The change of the authyority appears to break the JSON API and causes "The supplied authentication is invalid"
-  override protected def runTokenStandardCliSanityCheck: Boolean = false
-
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition =
     EnvironmentDefinition
