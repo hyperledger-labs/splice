@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-sdk-version: 3.3.0-snapshot.20250415.13756.0.vafc5c867
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-api-token-allocation-v1
 version: 1.0.0
 source: daml
@@ -13,7 +13,6 @@ data-dependencies:
 - ../splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
 build-options:
   - --target=2.1
-  - --disable-deprecated-exceptions-warning
 codegen:
   java:
     package-prefix: org.lfdecentralizedtrust.splice.codegen.java
