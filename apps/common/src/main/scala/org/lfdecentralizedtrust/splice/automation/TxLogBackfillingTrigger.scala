@@ -124,10 +124,10 @@ class TxLogBackfillingTrigger[TXE](
         )
         TaskSuccess("Backfilling step completed")
       case HistoryBackfilling.Outcome.MoreWorkAvailableLater =>
-        historyMetrics.UpdateHistoryBackfilling.completed.updateValue(0)
+        historyMetrics.TxLogBackfilling.completed.updateValue(0)
         TaskNoop
       case HistoryBackfilling.Outcome.BackfillingIsComplete =>
-        historyMetrics.UpdateHistoryBackfilling.completed.updateValue(1)
+        historyMetrics.TxLogBackfilling.completed.updateValue(1)
         logger.info(
           "UpdateHistory backfilling is complete, this trigger should not do any work ever again"
         )

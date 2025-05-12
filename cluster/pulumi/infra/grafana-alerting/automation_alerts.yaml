@@ -365,3 +365,60 @@ groups:
         labels:
           "": ""
         isPaused: false
+      - uid: bel66uf182ha8e
+        title: TxLog backfilling not progressing
+        condition: C
+        data:
+          - refId: Max (rate vs completed)
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by(namespace)(rate(splice_history_txlog_backfilling_transaction_count[5m]) > 0 or splice_history_txlog_backfilling_completed)
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: Max (rate vs completed)
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1e-11
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: Max (rate vs completed)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        # TODO(#19239): Change "OK" to "$NODATA" when backfilling is enabled by default everywhere
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: ""
+          runbook_url: ""
+          summary: TxLog backfilling is not making any progress in {{ index $labels "namespace" }}
+        labels:
+          "": ""
+        isPaused: false
