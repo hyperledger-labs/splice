@@ -1,0 +1,7 @@
+receiver: email-to-support-team
+object_matchers:
+  - ['team', '=', 'support']
+# disable grouping of alerts
+group_by: ['...']
+# continue to match other policies even if this policy was matched
+continue: true

@@ -30,6 +30,11 @@ Upcoming
     German-Evtushenko for contributing this in
     https://github.com/hyperledger-labs/splice/pull/318
 
+- Validator
+
+  - Fix an issue where the automation for completing ``TransferCommand`` failed
+    if the provider had a featured app right.
+
 0.3.21
 ------
 

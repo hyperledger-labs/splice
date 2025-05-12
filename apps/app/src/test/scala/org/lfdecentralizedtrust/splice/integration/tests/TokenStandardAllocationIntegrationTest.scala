@@ -105,7 +105,7 @@ class TokenStandardAllocationIntegrationTest
       legId: String,
   )(implicit
       env: SpliceTestConsoleEnvironment
-  ): FactoryChoiceWithDisclosures = {
+  ): FactoryChoiceWithDisclosures[allocationinstructionv1.AllocationInstructionResult] = {
     val leg = request.transferLegs.get(legId)
     clue(
       s"Creating command to request allocation for leg $legId to transfer ${leg.amount} amulets from ${leg.sender} to ${leg.receiver}"
@@ -478,11 +478,11 @@ class TokenStandardAllocationIntegrationTest
 
         },
       )(
-        "There exists a trade proposal",
+        "There exists a trade proposal visible to both alice and bob's participants",
         _ => {
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
-              aliceParty
+              bobParty
             )
         },
       )

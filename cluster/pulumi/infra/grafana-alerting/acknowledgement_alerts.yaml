@@ -1,0 +1,100 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: acknowledgements
+      folder: canton-network
+      interval: 1m
+      rules:
+        - uid: aeg75a4mu72tcc
+          title: Mediator Acknowledgement Lag
+          condition: No recent report
+          data:
+            - refId: Mediator Acknowledgement Lag
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: prometheus
+              model:
+                datasource:
+                    type: prometheus
+                    uid: prometheus
+                editorMode: code
+                expr: time() - (max by (member_prefix) (label_replace(daml_sequencer_block_acknowledgments_micros{member=~"MED::.*"}, "member_prefix", "$1", "member", "(MED::[^:]+::)[^:]+.*")) / 1e6)
+                instant: false
+                interval: ""
+                intervalMs: 30000
+                legendFormat: '{{report_publisher}}'
+                maxDataPoints: 43200
+                range: true
+                refId: Mediator Acknowledgement Lag
+            - refId: Latest report time lag
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params: []
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - B
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: Mediator Acknowledgement Lag
+                intervalMs: 1000
+                maxDataPoints: 43200
+                reducer: last
+                refId: Latest report time lag
+                settings:
+                    mode: dropNN
+                type: reduce
+            - refId: No recent report
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 300
+                        type: gt
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: Latest report time lag
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: No recent report
+                type: threshold
+          dashboardUid: cdlm6c7fn7vuod
+          panelId: 18
+          noDataState: Alerting
+          execErrState: Alerting
+          for: 5m
+          annotations:
+            __dashboardUid__: cdlm6c7fn7vuod
+            __panelId__: "18"
+            description: The mediator {{ $labels.member_prefix }} has not submitted a recent acknowledgement
+            severity: critical
+            summary: Mediator Acknowledgement lag
+          labels: {}
+          isPaused: false
