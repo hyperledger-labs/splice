@@ -115,7 +115,7 @@ export class Dso extends pulumi.ComponentResource {
   }
 
   private async installDso() {
-    const relevantSvConfs = svConfigs.slice(0, this.args.dsoSize).filter(e => "sv-6" != e.nodeName);
+    const relevantSvConfs = svConfigs.slice(0, this.args.dsoSize);
     const [sv1Conf, ...restSvConfs] = relevantSvConfs;
 
     const svIdKeys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
