@@ -14,6 +14,7 @@ import { ArtifactoryCreds } from 'splice-pulumi-common/src/artifactory';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 
 import { createCachePvc } from './cache';
+import { ghaConfig } from './config';
 
 type ResourcesSpec = {
   requests?: {
@@ -130,6 +131,7 @@ function installDockerRunnerScaleSet(
   serviceAccountName: string,
   dependsOn: Resource[]
 ): k8s.helm.v3.Release {
+  const repo = ghaConfig.githubRepo;
   return new k8s.helm.v3.Release(
     name,
     {
@@ -137,7 +139,7 @@ function installDockerRunnerScaleSet(
       version: '0.10.1',
       namespace: runnersNamespace.metadata.name,
       values: {
-        githubConfigUrl: 'https://github.com/DACH-NY/canton-network-node',
+        githubConfigUrl: repo,
         githubConfigSecret: tokenSecret.metadata.name,
         runnerScaleSetName: name,
         listenerTemplate: {
@@ -501,6 +503,8 @@ function installK8sRunnerScaleSet(
   const runnerImage =
     'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-runner-hook:0.3.21';
 
+  const repo = ghaConfig.githubRepo;
+
   return new k8s.helm.v3.Release(
     name,
     {
@@ -508,7 +512,7 @@ function installK8sRunnerScaleSet(
       version: '0.10.1',
       namespace: runnersNamespace.metadata.name,
       values: {
-        githubConfigUrl: 'https://github.com/DACH-NY/canton-network-node',
+        githubConfigUrl: repo,
         githubConfigSecret: tokenSecret.metadata.name,
         runnerScaleSetName: name,
         listenerTemplate: {
