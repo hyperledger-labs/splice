@@ -116,6 +116,7 @@ copy_file "CONTRIBUTING.md"
 copy_file "MAINTENANCE.md"
 copy_file "TESTING.md"
 copy_file "CANTON_CODE_CHANGES.md"
+copy_file "support/cometbft-json.lnav.json"
 
 # Cleanup of directories we used to copy to Splice, but no longer do,
 # so they don't get removed by rsync.
