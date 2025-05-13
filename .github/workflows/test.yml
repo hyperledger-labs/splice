@@ -1,0 +1,8 @@
+name: hello-world
+on: push
+jobs:
+  my-job:
+    runs-on: self-hosted-docker-tiny
+    steps:
+      - name: my-step
+        run: echo "Hello World!"
