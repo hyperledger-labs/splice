@@ -3,18 +3,21 @@
 import { ValidatorLicensesPage } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useScanClient } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
-import { UseInfiniteQueryResult, useInfiniteQuery } from '@tanstack/react-query';
+import { InfiniteData, UseInfiniteQueryResult, useInfiniteQuery } from '@tanstack/react-query';
 
 import { ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense/module';
 
 export const useValidatorLicenses = (
   limit: number
-): UseInfiniteQueryResult<ValidatorLicensesPage> => {
+): UseInfiniteQueryResult<InfiniteData<ValidatorLicensesPage>> => {
   const scanClient = useScanClient();
   return useInfiniteQuery({
     queryKey: ['listValidatorLicenses', limit],
     queryFn: async ({ pageParam }) => {
-      const page = await scanClient.listValidatorLicenses(pageParam, limit);
+      const page = await scanClient.listValidatorLicenses(
+        pageParam === 0 ? undefined : pageParam,
+        limit
+      );
       const validatorLicenses = page.validator_licenses.map(c =>
         Contract.decodeOpenAPI(c, ValidatorLicense)
       );
@@ -23,5 +26,6 @@ export const useValidatorLicenses = (
     getNextPageParam: lastPage => {
       return lastPage && lastPage.after;
     },
+    initialPageParam: 0,
   });
 };

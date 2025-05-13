@@ -12,9 +12,9 @@ export type AnsEntryProps = PartyIdProps & TypographyProps;
 
 const AnsEntry: React.FC<AnsEntryProps> = props => {
   const { partyId } = props;
-  const { data: ansEntry, isLoading, isError } = useLookupAnsEntryByParty(partyId);
+  const { data: ansEntry, isPending, isError } = useLookupAnsEntryByParty(partyId);
 
-  if (isLoading || isError) {
+  if (isPending || isError) {
     return <div>...</div>;
   } else {
     return <AnsEntryDisplay ansEntryName={ansEntry?.name} {...props} />;

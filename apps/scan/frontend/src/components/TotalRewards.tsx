@@ -15,10 +15,12 @@ export const TotalRewards: React.FC = () => {
 
   const isLoading = totalRewardsQuery.isLoading || amuletPriceQuery.isLoading;
   const isError = totalRewardsQuery.isError || amuletPriceQuery.isError;
+  const isDataUndefined =
+    totalRewardsQuery.data === undefined || amuletPriceQuery.data === undefined;
 
   return isLoading ? (
     <Loading />
-  ) : isError ? (
+  ) : isError || isDataUndefined ? (
     <ErrorDisplay message={'Could not retrieve total rewards or amulet price'} />
   ) : (
     <AmountSummary

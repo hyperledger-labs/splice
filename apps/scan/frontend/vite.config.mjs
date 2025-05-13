@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { vitest_common_conf } from '@lfdecentralizedtrust/splice-common-test-vite-utils';
+import vitest_common_conf from '@lfdecentralizedtrust/splice-common-test-vite-utils';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, mergeConfig } from 'vite';
 import viteTsconfigPaths from 'vite-tsconfig-paths';
@@ -13,12 +13,6 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), viteTsconfigPaths()],
     server: {
       port: parseInt(env.PORT),
-      proxy: {
-        '^/api/json-api/.*': {
-          target: env.JSON_API_URL,
-          rewrite: path => path.replace(/^\/api\/json-api/, ''),
-        },
-      },
     },
     build: {
       outDir: 'build',
@@ -35,7 +29,7 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./src/__tests__/setup/setup.ts'],
       reporters: [
         'default',
-        ['junit', { outputFile: './../target/test-reports/TEST-ans.xml' }], // JUnit XML report
+        ['junit', { outputFile: './../target/test-reports/TEST-scan.xml' }], // JUnit XML report
       ],
     },
   });

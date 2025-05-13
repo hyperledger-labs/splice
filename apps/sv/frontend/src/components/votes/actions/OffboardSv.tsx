@@ -27,7 +27,7 @@ const OffboardSv: React.FC<{ chooseAction: (action: ActionRequiringConfirmation)
     return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
-  var memberOptions: { key: string; value: string }[] = [];
+  const memberOptions: { key: string; value: string }[] = [];
   dsoInfosQuery.data!.dsoRules.payload.svs.forEach((value, key) =>
     memberOptions.push(createRow(key, value.name))
   );

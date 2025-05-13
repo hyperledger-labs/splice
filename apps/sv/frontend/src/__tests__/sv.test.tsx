@@ -81,6 +81,7 @@ describe('An SetConfig request', () => {
 
   test(
     'displays a warning when an SV tries to modify a DsoRules field already changed by another request',
+    { timeout: 10000 },
     async () => {
       const user = userEvent.setup();
       render(<AppWithConfig />);
@@ -118,12 +119,12 @@ describe('An SetConfig request', () => {
 
       const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
       expect(button.getAttribute('disabled')).toBeDefined();
-    },
-    { timeout: 10000 }
+    }
   );
 
   test(
     'displays a warning when an SV tries to modify an AmuletRules field already changed by another request',
+    { timeout: 10000 },
     async () => {
       const user = userEvent.setup();
       render(<AppWithConfig />);
@@ -159,12 +160,12 @@ describe('An SetConfig request', () => {
 
       const button = screen.getByRole('button', { name: 'Send Request to Super Validators' });
       expect(button.getAttribute('disabled')).toBeDefined();
-    },
-    { timeout: 10000 }
+    }
   );
 
   test(
     'disables the Proceed button in the confirmation dialog if a conflict arises after request creation',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
@@ -208,8 +209,7 @@ describe('An SetConfig request', () => {
 
       const button = screen.getByRole('button', { name: 'Proceed' });
       expect(button.getAttribute('disabled')).toBeDefined();
-    },
-    { timeout: 10000 }
+    }
   );
 });
 

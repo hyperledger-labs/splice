@@ -211,11 +211,11 @@ const SendTransfer: React.FC = () => {
           <DisableConditionally
             conditions={[
               {
-                disabled: createTransferOfferMutation.isLoading,
+                disabled: createTransferOfferMutation.isPending,
                 reason: 'Creating transfer offer...',
               },
               {
-                disabled: transferPreapprovalSendMutation.isLoading,
+                disabled: transferPreapprovalSendMutation.isPending,
                 reason: 'Executing preapproved transfer...',
               },
               {

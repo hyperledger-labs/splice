@@ -17,12 +17,12 @@ import { useAnsConfig } from '../utils';
 const AnsEntries: React.FC = () => {
   const config = useAnsConfig();
   const nameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcronym;
-  const { data: ownedEntries, isError, isLoading } = useEntriesWithPayData();
+  const { data: ownedEntries, isError, isPending } = useEntriesWithPayData();
 
   return (
     <div id="ans-entries">
       <Typography variant="h5">Your {nameServiceAcronym} Entries</Typography>
-      {isLoading ? (
+      {isPending ? (
         <Loading />
       ) : isError ? (
         <ErrorDisplay message="Error while loading entries" />
@@ -38,7 +38,7 @@ const AnsEntries: React.FC = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {ownedEntries.entries.map(entry => (
+            {ownedEntries?.entries.map(entry => (
               <TableRow key={entry.contractId} className="entries-table-row">
                 <TableCell className="entries-table-name">{entry.name}</TableCell>
                 <TableCell className="entries-table-amount">{entry.amount}</TableCell>

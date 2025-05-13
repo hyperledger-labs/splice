@@ -19,11 +19,11 @@ export const AppLeaderboardTable: React.FC = () => {
   const topAppProvidersQuery = useTopAppProviders();
 
   switch (topAppProvidersQuery.status) {
-    case 'loading':
+    case 'pending':
       return <Loading />;
     case 'error':
       return <ErrorDisplay message={'Could not retrieve app provider leaderboard'} />;
-    case 'success':
+    case 'success': {
       const appProviders = topAppProvidersQuery.data.providersAndRewards.map(provider => ({
         name: provider.provider,
         // TODO(#5280) - add transfer totals to API response
@@ -51,6 +51,7 @@ export const AppLeaderboardTable: React.FC = () => {
           </TableBody>
         </TitledTable>
       );
+    }
   }
 };
 

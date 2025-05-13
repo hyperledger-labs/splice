@@ -8,7 +8,7 @@ import { ConfigReader } from '../config';
 export class ConfigProvider<
   A extends z.ZodRawShape,
   B extends z.ZodTypeAny,
-  T extends z.ZodObject<A, 'strip', B>
+  T extends z.ZodObject<A, 'strip', B>,
 > extends Component<{
   children: React.ReactNode;
   configScheme: T;

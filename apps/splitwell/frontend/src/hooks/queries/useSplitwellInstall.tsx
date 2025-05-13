@@ -26,7 +26,8 @@ export const useSplitwellInstalls = (): UseQueryResult<SplitwellInstall[]> => {
         return null;
       }
     },
-    refetchInterval: (data, query) => {
+    refetchInterval: query => {
+      const data = query.state.data;
       if (data !== null && data !== undefined && connectedDomainIds && splitwellDomainIds) {
         const connectedSplitwellDomainIds = connectedDomainIds.filter(
           d => splitwellDomainIds.preferred === d || splitwellDomainIds.others.includes(d)

@@ -17,11 +17,13 @@ export const TotalAmuletBalance: React.FC = () => {
 
   const isLoading = totalAmuletBalanceQuery.isLoading || amuletPriceQuery.isLoading;
   const isError = totalAmuletBalanceQuery.isError || amuletPriceQuery.isError;
+  const isDataUndefined =
+    totalAmuletBalanceQuery.data === undefined || amuletPriceQuery.data === undefined;
   const title = `Total Circulating ${config.spliceInstanceNames.amuletName}`;
 
   return isLoading ? (
     <Loading />
-  ) : isError ? (
+  ) : isError || isDataUndefined ? (
     <ErrorDisplay message={'Could not retrieve total amulet balance or amulet price'} />
   ) : (
     <AmountSummary

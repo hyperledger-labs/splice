@@ -4,7 +4,7 @@ const defaultInterval = 1000; // in ms
 
 export class PollingStrategy {
   /** disable polling outright */
-  static NONE: false = false;
+  static NONE = false as const;
 
   /** poll with the default interval forever */
   static FIXED: number = defaultInterval;

@@ -30,7 +30,7 @@ const ValidatorOnboardingSecrets: React.FC = () => {
     },
   });
 
-  if (validatorOnboardingsQuery.isLoading) {
+  if (validatorOnboardingsQuery.isPending) {
     return <Loading />;
   }
 
@@ -58,13 +58,13 @@ const ValidatorOnboardingSecrets: React.FC = () => {
       )}
 
       <DisableConditionally
-        conditions={[{ disabled: prepareOnboardingMutation.isLoading, reason: 'Loading...' }]}
+        conditions={[{ disabled: prepareOnboardingMutation.isPending, reason: 'Loading...' }]}
       >
         <Button
           id="create-validator-onboarding-secret"
           variant="pill"
           fullWidth
-          disabled={prepareOnboardingMutation.isLoading}
+          disabled={prepareOnboardingMutation.isPending}
           size="large"
           onClick={() => prepareOnboardingMutation.mutate()}
         >

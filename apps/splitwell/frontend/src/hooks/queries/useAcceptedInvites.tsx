@@ -23,6 +23,11 @@ export const useAcceptedInvites = (
       return invites.map(c => Contract.decodeOpenAPI(c, AcceptedGroupInvite));
     },
     structuralSharing: (oldData, newData) =>
-      sameContracts(oldData || [], newData) ? oldData || [] : newData,
+      sameContracts(
+        (oldData as Contract<AcceptedGroupInvite>[]) || [],
+        newData as Contract<AcceptedGroupInvite>[]
+      )
+        ? oldData || []
+        : newData,
   });
 };

@@ -8,7 +8,7 @@ import {
   TransferButton,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { Decimal } from 'decimal.js';
+import { Decimal } from 'decimal.js-light';
 import { useCallback, useState } from 'react';
 
 import {
@@ -69,7 +69,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, r
       const amounts: ReceiverAmuletAmount[] = Object.entries(balances.data)
         .filter(([_, v]) => new Decimal(v).isNegative())
         .map(([k, v]) => {
-          return { receiver: k, amuletAmount: Decimal.abs(new Decimal(v)).toString() };
+          return { receiver: k, amuletAmount: new Decimal(v).abs().toString() };
         });
       return initiateTransfer.mutateAsync({ groupId, amounts });
     } else {
@@ -77,7 +77,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, r
     }
   }, [balances, groupId, initiateTransfer]);
 
-  if (balances.isLoading) {
+  if (balances.isPending) {
     return <Loading />;
   }
   if (balances.isError) {
@@ -138,7 +138,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
 
   const addMember = useAddMember(party, provider, domainId, rules);
 
-  if (acceptedInvites.isLoading) {
+  if (acceptedInvites.isPending) {
     return <Loading />;
   }
   if (acceptedInvites.isError) {
@@ -292,7 +292,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
     }
   };
 
-  if (balanceUpdates.isLoading) {
+  if (balanceUpdates.isPending) {
     return <Loading />;
   }
   if (balanceUpdates.isError) {
@@ -379,7 +379,7 @@ interface GroupsProps {
 const Groups: React.FC<GroupsProps> = ({ party, provider, rulesMap }) => {
   const groups = useGroups(party);
 
-  if (groups.isLoading) {
+  if (groups.isPending) {
     return <Loading />;
   }
 

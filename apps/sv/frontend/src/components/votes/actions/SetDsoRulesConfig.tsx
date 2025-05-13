@@ -105,6 +105,7 @@ const SetDsoRulesConfig: React.FC<{
 
     if (configuration && configuration.nextScheduledSynchronizerUpgrade) {
       const nextScheduledUpgrade = dayjs.utc(nextScheduledSynchronizerUpgrade.time);
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expiration.isBefore(nextScheduledUpgrade)
         ? setIsValidSynchronizerPauseTime(true)
         : setIsValidSynchronizerPauseTime(false);

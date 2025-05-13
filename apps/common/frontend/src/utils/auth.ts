@@ -65,5 +65,5 @@ export const isHs256UnsafeToken = (token: string): boolean => {
 export const tryDecodeTokenSub = (token?: string): string | undefined => {
   try {
     return decodeJwt(token!).sub;
-  } catch (_) {}
+  } catch (_) {} // eslint-disable-line no-empty
 };

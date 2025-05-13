@@ -82,21 +82,21 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         <link rel="icon" href={config.spliceInstanceNames.networkFaviconUrl} />
       </Helmet>
       <AuthProvider authConf={config.auth}>
-        <QueryClientProvider client={queryClient}>
-          <ReactQueryDevtools initialIsOpen={false} />
-          <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
-            <SplitwellClientProvider url={config.services.splitwell.url}>
-              <ScanClientProvider url={config.services.scan.url}>
+        <ScanClientProvider url={config.services.scan.url}>
+          <QueryClientProvider client={queryClient}>
+            <ReactQueryDevtools initialIsOpen={false} />
+            <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
+              <SplitwellClientProvider url={config.services.splitwell.url}>
                 <SplitwellLedgerApiClientProvider
                   jsonApiUrl={config.services.jsonApi.url}
                   packageIdResolver={new SplitwellPackageIdResolver()}
                 >
                   {children}
                 </SplitwellLedgerApiClientProvider>
-              </ScanClientProvider>
-            </SplitwellClientProvider>
-          </UserProvider>
-        </QueryClientProvider>
+              </SplitwellClientProvider>
+            </UserProvider>
+          </QueryClientProvider>
+        </ScanClientProvider>
       </AuthProvider>
     </HelmetProvider>
   );

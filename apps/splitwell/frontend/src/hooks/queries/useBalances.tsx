@@ -20,7 +20,7 @@ export const useBalances = (group: Contract<Group>, party: string): UseQueryResu
       const balanceMap = (
         await splitwellClient.listBalances(party, group.payload.id.unpack, group.payload.owner)
       ).balances;
-      let balances: Balances = {};
+      const balances: Balances = {};
       [group.payload.owner].concat(group.payload.members).forEach(p => {
         if (p !== party) {
           const balance: string | undefined = balanceMap[p];

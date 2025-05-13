@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+
 import {
   Alerting,
   AlertState,
@@ -131,7 +132,7 @@ const ElectionRequests: React.FC = () => {
       <Alerting alertState={alertState} />
       <DisableConditionally
         conditions={[
-          { disabled: createElectionRequestMutation.isLoading, reason: 'Submitting...' },
+          { disabled: createElectionRequestMutation.isPending, reason: 'Submitting...' },
           {
             disabled:
               electionContextQuery.data!.ranking.find(

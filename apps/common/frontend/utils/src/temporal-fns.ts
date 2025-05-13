@@ -78,7 +78,7 @@ export const formatDatetime: (datetime: string | Date) => FormattedDateTime = (
 
 export function getUTCWithOffset(): string {
   const dt = new Date();
-  let timezoneOffset = dt.getTimezoneOffset();
+  const timezoneOffset = dt.getTimezoneOffset();
 
   const offsetHours = Math.floor(Math.abs(timezoneOffset) / 60.0);
   const offsetMinutes = Math.abs(timezoneOffset) % 60;

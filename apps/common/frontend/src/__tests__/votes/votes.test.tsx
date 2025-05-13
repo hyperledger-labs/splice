@@ -63,11 +63,11 @@ const provider: VotesHooks = {
     });
   },
   useListVoteRequestResult(
-    limit: number,
-    actionName: string | undefined,
-    requester: string | undefined,
+    _limit: number,
+    _actionName: string | undefined,
+    _requester: string | undefined,
     effectiveFrom: string | undefined,
-    effectiveTo: string | undefined,
+    _effectiveTo: string | undefined,
     executed: boolean | undefined
   ): UseQueryResult<DsoRules_CloseVoteRequestResult[]> {
     return useQuery({

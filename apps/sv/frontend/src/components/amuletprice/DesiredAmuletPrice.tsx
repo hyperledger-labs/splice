@@ -69,7 +69,7 @@ const DesiredAmuletPrice: React.FC<DesiredAmuletPriceProps> = ({ canEditVote }) 
     [dsoInfosQuery.data]
   );
 
-  if (amuletPriceVotesQuery.isLoading || dsoInfosQuery.isLoading) {
+  if (amuletPriceVotesQuery.isPending || dsoInfosQuery.isPending) {
     return <Loading />;
   }
 
@@ -77,12 +77,12 @@ const DesiredAmuletPrice: React.FC<DesiredAmuletPriceProps> = ({ canEditVote }) 
     return <p>Error, something went wrong.</p>;
   }
 
-  const svPartyId = dsoInfosQuery.data!.svPartyId;
+  const svPartyId = dsoInfosQuery.data.svPartyId;
 
   const filteredVotes = canEditVote
     ? amuletPriceVotesQuery.data.filter(v => v.sv !== svPartyId)
     : amuletPriceVotesQuery.data;
-  const otherAmuletPriceVotes = filteredVotes.sort((a, b) => {
+  const otherAmuletPriceVotes = filteredVotes?.sort((a, b) => {
     return b.lastUpdatedAt.valueOf() - a.lastUpdatedAt.valueOf();
   });
 
@@ -161,7 +161,7 @@ const EditDesiredPriceSection: React.FC<EditDesiredPriceSectionProps> = ({
 }) => {
   const amuletPriceVotesQuery = useAmuletPriceVotes();
 
-  if (amuletPriceVotesQuery.isLoading || dsoInfosQuery.isLoading) {
+  if (amuletPriceVotesQuery.isPending || dsoInfosQuery.isPending) {
     return <Loading />;
   }
 
@@ -179,7 +179,7 @@ const EditDesiredPriceSection: React.FC<EditDesiredPriceSectionProps> = ({
         {`Your Desired ${amuletName} Price`}
       </Typography>
       {isReadyToEdit ? (
-        updateDesiredAmuletPriceMutation.isLoading ? (
+        updateDesiredAmuletPriceMutation.isPending ? (
           <Loading />
         ) : (
           <Stack direction="row">

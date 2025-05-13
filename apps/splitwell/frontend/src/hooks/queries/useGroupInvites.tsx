@@ -21,6 +21,11 @@ export const useGroupInvites = (party: string): UseQueryResult<AssignedContract<
       });
     },
     structuralSharing: (oldData, newData) =>
-      sameAssignedContracts(oldData || [], newData) ? oldData || [] : newData,
+      sameAssignedContracts(
+        (oldData as AssignedContract<GroupInvite>[]) || [],
+        newData as AssignedContract<GroupInvite>[]
+      )
+        ? oldData || []
+        : newData,
   });
 };

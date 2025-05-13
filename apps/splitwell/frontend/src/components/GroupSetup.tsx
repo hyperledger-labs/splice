@@ -58,7 +58,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
   });
   const requestGroup = useRequestGroup(party, provider, dso, domainId, newGroupRules);
   const onCreateGroup = async () => {
-    await requestGroup.mutate(groupId);
+    requestGroup.mutate(groupId);
   };
 
   const groupInvites = useGroupInvites(party);
@@ -117,7 +117,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     await navigator.clipboard.writeText(text);
   };
 
-  if (groupInvites.isLoading) {
+  if (groupInvites.isPending) {
     return <Loading />;
   }
   if (groupInvites.isError) {

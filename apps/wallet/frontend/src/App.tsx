@@ -50,11 +50,6 @@ const App: React.FC = () => {
           structuralSharing: replaceEqualDeep,
         },
       },
-      logger: {
-        log: () => {},
-        error: () => {},
-        warn: () => {},
-      },
     });
 
     return (

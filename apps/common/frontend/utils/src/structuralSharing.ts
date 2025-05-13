@@ -9,6 +9,8 @@
 // changing the source.
 import BigNumber from 'bignumber.js';
 
+/*eslint no-prototype-builtins: "off"*/
+
 function isPlainArray(value: unknown) {
   return Array.isArray(value) && value.length === Object.keys(value).length;
 }
@@ -96,8 +98,8 @@ export function replaceEqualDeep(a: any, b: any): any {
     const copy: any = array
       ? []
       : isOpenApiObject(a)
-      ? Object.create(Object.getPrototypeOf(a))
-      : {};
+        ? Object.create(Object.getPrototypeOf(a))
+        : {};
 
     let equalItems = 0;
 

@@ -106,8 +106,8 @@ const TransactionHistory: React.FC = () => {
           txQuery.isFetchingNextPage
             ? 'Loading more...'
             : txQuery.hasNextPage
-            ? 'Load More'
-            : 'Nothing more to load'
+              ? 'Load More'
+              : 'Nothing more to load'
         }
         loadMore={() => txQuery.fetchNextPage()}
         disabled={!txQuery.hasNextPage}
@@ -172,7 +172,7 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
       icon = <AccountBalanceWallet fontSize="small" />;
       text = 'Balance Change';
       break;
-    case 'transfer':
+    case 'transfer': {
       const isUserTheSender = transaction.senderId === primaryPartyId;
       const noReceivers = transaction.receivers.length === 0;
       if (noReceivers) {
@@ -186,6 +186,7 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
         text = 'Received';
       }
       break;
+    }
     case 'notification':
       icon = <InfoOutlined fontSize="small" />;
       text = 'Notification';

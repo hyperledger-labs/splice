@@ -21,7 +21,7 @@ function validateScheduleDateTime(
   const takenTimes =
     data.map(e => {
       switch (e.payload.action.tag) {
-        case 'ARC_AmuletRules':
+        case 'ARC_AmuletRules': {
           const amuletRulesAction = e.payload.action.value.amuletRulesAction;
           switch (amuletRulesAction.tag) {
             case 'CRARC_RemoveFutureAmuletConfigSchedule': {
@@ -36,6 +36,7 @@ function validateScheduleDateTime(
             default:
               return '';
           }
+        }
         default:
           return '';
       }
@@ -91,10 +92,13 @@ export function isExpirationBeforeEffectiveDate(
 }
 
 export function isValidUrl(url: string): boolean {
+  if (!url) return false;
+
   let validUrl: URL;
   try {
     validUrl = new URL(url);
   } catch (error) {
+    console.debug(`Invalid URL: ${url}`, error);
     return false;
   }
   return ['http:', 'https:'].some(protocol => validUrl.protocol === protocol);

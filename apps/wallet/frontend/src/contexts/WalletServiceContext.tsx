@@ -295,11 +295,11 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             const subscription = Contract.decodeOpenAPI(sub.subscription, Subscription);
             const state = sub.state.payment
               ? {
-                  type: 'payment' as 'payment',
+                  type: 'payment' as const,
                   value: Contract.decodeOpenAPI(sub.state.payment!, SubscriptionPayment),
                 }
               : {
-                  type: 'idle' as 'idle',
+                  type: 'idle' as const,
                   value: Contract.decodeOpenAPI(sub.state.idle!, SubscriptionIdleState),
                 };
             return { subscription, state };

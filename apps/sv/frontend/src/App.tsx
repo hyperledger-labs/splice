@@ -48,28 +48,25 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
         structuralSharing: replaceEqualDeep,
       },
     },
-    logger: {
-      log: () => {},
-      error: () => {},
-      warn: () => {},
-    },
   });
 
   return (
-    <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
-      <QueryClientProvider client={queryClient}>
-        <ReactQueryDevtools initialIsOpen={false} />
-        <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-          <SvClientProvider url={config.services.sv.url}>
-            <SvAppVotesHooksProvider>
-              <SvAdminClientProvider url={config.services.sv.url}>
-                <LocalizationProvider dateAdapter={AdapterDayjs}>{children}</LocalizationProvider>
-              </SvAdminClientProvider>
-            </SvAppVotesHooksProvider>
-          </SvClientProvider>
-        </UserProvider>
-      </QueryClientProvider>
-    </AuthProvider>
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+        <QueryClientProvider client={queryClient}>
+          <ReactQueryDevtools initialIsOpen={false} />
+          <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
+            <SvClientProvider url={config.services.sv.url}>
+              <SvAppVotesHooksProvider>
+                <SvAdminClientProvider url={config.services.sv.url}>
+                  {children}
+                </SvAdminClientProvider>
+              </SvAppVotesHooksProvider>
+            </SvClientProvider>
+          </UserProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </LocalizationProvider>
   );
 };
 

@@ -45,12 +45,12 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   });
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <ReactQueryDevtools initialIsOpen={false} />
-      <ScanClientProvider url={config.services.scan.url}>
+    <ScanClientProvider url={config.services.scan.url}>
+      <QueryClientProvider client={queryClient}>
+        <ReactQueryDevtools initialIsOpen={false} />
         <ScanAppVotesHooksProvider>{children}</ScanAppVotesHooksProvider>
-      </ScanClientProvider>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ScanClientProvider>
   );
 };
 

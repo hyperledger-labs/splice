@@ -36,7 +36,6 @@ export const useListVoteRequestResult = (
   const scanClient = useScanClient();
   return useQuery({
     queryKey: ['listVoteRequestResults', DsoRules_CloseVoteRequestResult, limit, query],
-    keepPreviousData: true,
     queryFn: async () => {
       const result = await scanClient.listVoteRequestResults({
         ...query,

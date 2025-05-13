@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2022",
     "lib": ["dom", "dom.iterable", "esnext"],
     "module": "esnext",
     "declaration": true,
     "sourceMap": true,
     "declarationMap": true,
     "strict": true,
-    "moduleResolution": "node16",
+    "moduleResolution": "bundler",
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

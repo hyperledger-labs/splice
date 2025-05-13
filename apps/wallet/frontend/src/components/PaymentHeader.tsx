@@ -18,6 +18,7 @@ const PaymentHeader: React.FC = () => {
 
   const isLoading = amuletPriceQuery.isLoading || balanceQuery.isLoading;
   const isError = amuletPriceQuery.isError || balanceQuery.isError;
+  const isDataUndefined = amuletPriceQuery.data === undefined || balanceQuery.data === undefined;
 
   return (
     <Box bgcolor="colors.neutral.20">
@@ -35,7 +36,7 @@ const PaymentHeader: React.FC = () => {
           </Stack>
           {isLoading ? (
             <Loading />
-          ) : isError ? (
+          ) : isError || isDataUndefined ? (
             <ErrorDisplay message={'Error while fetching amulet price and balance'} />
           ) : (
             <Typography className="available-balance">

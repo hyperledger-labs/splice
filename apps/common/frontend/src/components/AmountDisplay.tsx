@@ -15,7 +15,7 @@ type AmountDisplayProps = {
 };
 
 const AmountDisplay: React.FC<AmountDisplayProps> = props => {
-  var _amount: BigNumber,
+  let _amount: BigNumber,
     _currency: string = unitToCurrency(props.currency);
 
   if (props.amount === undefined) {

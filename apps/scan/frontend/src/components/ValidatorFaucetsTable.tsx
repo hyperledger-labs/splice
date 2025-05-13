@@ -15,11 +15,11 @@ export const ValidatorFaucetsTable: React.FC = () => {
   const topValidatorsQuery = useGetTopValidatorsByValidatorFaucets();
 
   switch (topValidatorsQuery.status) {
-    case 'loading':
+    case 'pending':
       return <Loading />;
     case 'error':
       return <ErrorDisplay message={'Could not retrieve validator liveness leaderboard'} />;
-    case 'success':
+    case 'success': {
       const topValidators = topValidatorsQuery.data.validatorsByReceivedFaucets.map(validator => ({
         partyId: validator.validator,
         numRoundsCollected: validator.numRoundsCollected,
@@ -53,6 +53,7 @@ export const ValidatorFaucetsTable: React.FC = () => {
           </TableBody>
         </TitledTable>
       );
+    }
   }
 };
 

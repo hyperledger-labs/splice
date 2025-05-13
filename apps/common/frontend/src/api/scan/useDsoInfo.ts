@@ -26,6 +26,7 @@ export const useDsoInfo = (): UseQueryResult<DsoInfo> => {
         nodeStates: resp.sv_node_states.map(c => Contract.decodeOpenAPI(c.contract, SvNodeState)),
       };
     },
+    initialData: undefined,
   });
 };
 

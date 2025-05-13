@@ -13,7 +13,7 @@ import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
 function getVoteStatus(votes: damlTypes.Map<string, Vote>): Vote[] {
   const allVotes: Vote[] = [];
-  votes.forEach((v, _) => allVotes.push(v));
+  votes.forEach(v => allVotes.push(v));
   return allVotes;
 }
 

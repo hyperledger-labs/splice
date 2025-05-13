@@ -38,12 +38,14 @@ export const ConfirmPayment: React.FC = () => {
   const { cid } = useParams();
   const amuletPriceQuery = useAmuletPrice();
   const appPaymentRequestQuery = useAppPaymentRequest(cid!);
+  const isDataUndefined =
+    appPaymentRequestQuery.data === undefined || amuletPriceQuery.data === undefined;
 
   if (appPaymentRequestQuery.isLoading || amuletPriceQuery.isLoading) {
     return <Loading />;
   }
 
-  if (amuletPriceQuery.isError || appPaymentRequestQuery.isError) {
+  if (amuletPriceQuery.isError || appPaymentRequestQuery.isError || isDataUndefined) {
     return <ErrorDisplay message={'Error while fetching payment requests and amulet price'} />;
   }
 

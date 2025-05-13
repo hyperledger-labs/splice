@@ -26,7 +26,7 @@ const OpenMiningRounds: React.FC = () => {
   const config = useSvConfig();
   const openMiningRoundsQuery = useOpenMiningRounds();
 
-  if (openMiningRoundsQuery.isLoading) {
+  if (openMiningRoundsQuery.isPending) {
     return <Loading />;
   }
 
