@@ -1,0 +1,161 @@
+name: 'Run bash command in nix'
+description: 'Run a bash command in a nix environment'
+inputs:
+  cmd:
+    description: 'The bash command to run'
+    required: true
+  additional_nix_args:
+    description: 'Additional arguments to pass to nix develop'
+    required: false
+  cmd_retry_count:
+    description: 'The number of times to retry the command'
+    required: false
+    default: "0"
+  cmd_retry_wait:
+    description: 'The number of seconds to wait between retries'
+    required: false
+    default: "5"
+  cmd_before_retry:
+    description: 'The bash command to run before retrying the command'
+    required: false
+    default: ""
+runs:
+  using: 'composite'
+  steps:
+    - name: Run bash command
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "sourcing nix profile"
+        export USER=$(whoami)
+        . ~/.nix-profile/etc/profile.d/nix.sh
+
+        # Attempt to build the nix env with retries to work around transient download failures
+        echo "building nix env"
+        MAX_RETRY_NIX_ENV=5
+        NIX_ENV_TRY_COUNT=0
+        until [ $NIX_ENV_TRY_COUNT -ge $MAX_RETRY_NIX_ENV ]
+        do
+          if [ $NIX_ENV_TRY_COUNT -gt 0 ]; then
+            SLEEP_DURATION=$((NIX_ENV_TRY_COUNT*2))
+            echo "Failed to build and enter the nix environment, retrying in $SLEEP_DURATION seconds..."
+            sleep $SLEEP_DURATION
+          fi
+          nix develop \
+            path:nix \
+            --ignore-environment \
+            --keep USER \
+            --keep HOME \
+            --keep TERM \
+            --keep CI \
+            --keep RUN_SPLITTED_TESTS_CMD \
+            --keep COURSIER_CACHE \
+            --keep SBT_OPTS \
+            --command echo "Confirmed that we can build and enter the nix environment!" \
+            && break
+          NIX_ENV_TRY_COUNT=$((NIX_ENV_TRY_COUNT+1))
+        done
+
+        if [ $NIX_ENV_TRY_COUNT -ge $MAX_RETRY_NIX_ENV ]; then
+          echo "Failed to build and enter the nix environment after $MAX_RETRY_NIX_ENV attempts"
+          exit 1
+        fi
+
+        # kill all processes in the process group (this includes children of children) upon being interrupted
+        # (see e.g. "Propagate the signal to multiple children" in https://linuxconfig.org/how-to-propagate-a-signal-to-child-processes-from-a-bash-script)
+        trap 'echo "Caught signal, killing all pgroup processes"; trap " " SIGTERM; kill 0; wait' SIGINT SIGTERM
+
+        # We write the whole nix command to a separate file, so that we can run nix <command> &, and wait for it,
+        # so that we can properly trap signals and kill all processes in the process group.
+
+        # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
+        CMD_FILE=$(mktemp cmd-XXXXXX.sh)
+        echo "temporary CMD_FILE: $CMD_FILE"
+        cat <<'EOF' > $CMD_FILE
+
+          set -euo pipefail
+
+          . .envrc.vars
+
+          # TODO(#17839): once we support cluster deployments in GHA, add cluster authentication here
+
+          MAX_RETRY=${{ inputs.cmd_retry_count }}
+          n=0
+          until [ $n -gt $MAX_RETRY ]
+          do
+              if [ $n -gt 0 ]; then
+                sleep ${{ inputs.cmd_retry_wait }}
+                ${{ inputs.cmd_before_retry }}
+              fi
+              cmd_wrapper() {
+                # We write the cmd to a separate file. That way `set -e` statements in the cmd will take effect
+                # despite us using this in a tested context below where they would usually be disabled.
+                # See https://gist.github.com/cocreature/9c345b75b7dad05ed32865b21c1b0460 for a minimal example
+                # of what happens if we just call parameters.cmd directly.
+                # We enforce set -euo pipefail by including it in all the commands. Even if the command has already set it, then it will have no effect
+                # but this way we ensure all the commands will fail on error and no lead to confusing behaviour
+                # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
+                CMD_FILE_2=$(mktemp cmd-XXXXXX.sh)
+                cat <<'EOF2' > $CMD_FILE_2
+                set -euo pipefail
+                echo "Running command"
+                ${{ inputs.cmd }}
+        EOF2
+                RESULT=$?
+
+                if [ $RESULT -ne 0 ]; then
+                  echo "Failed to write command to CMD_FILE_2 $CMD_FILE_2"
+                  exit $RESULT
+                fi
+                echo "Wrote command to CMD_FILE $CMD_FILE_2"
+                bash $CMD_FILE_2
+              }
+              cmd_wrapper && break
+
+              # TODO(#17839): support a conditional retry (cmd_retry_condition argument in CCI), used for retrying if VPN failed
+
+              n=$[$n+1]
+          done
+
+          if [ $n -gt $MAX_RETRY ]; then
+            echo "Exceeded maximum retries ($n / $MAX_RETRY), no more attempts << parameters.cmd_name >>" >&2
+            exit 1
+          fi
+        EOF
+
+        RESULT=$?
+
+        if [ $RESULT -ne 0 ]; then
+          echo "Failed to write command to CMD_FILE $CMD_FILE"
+          exit $RESULT
+        fi
+        echo "Wrote command to CMD_FILE $CMD_FILE"
+
+        ADDITIONAL_NIX_ARGS="${{ inputs.additional_nix_args }}"
+
+        echo "Running actual command"
+        # Run the command for real within the nix environment
+        nix develop \
+          path:nix \
+          --ignore-environment \
+          --keep USER \
+          --keep HOME \
+          --keep TERM \
+          --keep CI \
+          --keep COURSIER_CACHE \
+          --keep SBT_OPTS \
+          --keep RUN_SPLITTED_TESTS_CMD \
+          --keep GCP_DA_CN_DEVNET_KEY \
+          --keep GCP_DA_CN_CI_KEY \
+          --keep GCP_DA_CN_CI_2_KEY \
+          --keep GCP_DA_CN_SCRATCHNET_KEY \
+          --keep GCP_DA_CN_SCRATCHNET2_KEY \
+          --keep GCP_DA_CN_MAINNET_KEY \
+          --keep CIRCLE_BRANCH \
+          --keep TARGET_CLUSTER \
+          $ADDITIONAL_NIX_ARGS \
+          --command bash $CMD_FILE &
+        PID=$!
+
+        wait $PID
+

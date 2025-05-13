@@ -1,0 +1,24 @@
+name: Deploy CIUpgrade
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  trigger_ciupgrade:
+    runs-on: self-hosted-docker-tiny
+    name: Trigger CIUpgrade deployment
+    steps:
+      - name: Trigger CIUpgrade deployment
+        shell: bash
+        run: |
+          # TODO(#19109): re-enable ciupgrade
+          echo "CIUpgrade deployments are currently disabled"
+          exit 0
+
+          # curl --fail-with-body --request POST \
+          # --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-internal/pipeline \
+          # --header "Circle-Token: ${{ secrets.CIRCLECI_TOKEN }}" \
+          # --header 'content-type: application/json' \
+          # --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-ciupgrade\", \"upgrade-splice-git-ref\": \"${{ github.sha }}\"}}"
+

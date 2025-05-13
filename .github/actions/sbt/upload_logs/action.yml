@@ -1,0 +1,50 @@
+name: "Upload logs"
+description: |
+  Upload logs.
+  We put this in a separate action and not as part of post_sbt so that it can be called
+  only upon failure. Conditioning a single step inside the action on `failure()` does not
+  seem to capture the failure condition of the whole workflow :(
+
+inputs:
+  name:
+    description: "Name of the artifact"
+    required: false
+    default: log
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Pack logfiles
+      shell: bash
+      run: |
+        if [[ -d log ]]; then
+          # pigz fails if there is no file to compress, which can be the case if Canton just rolled its logs
+          pigz -r log/* || true
+        fi
+
+    # Certain characters are disallowed in artifact filenames in GHA, so we need to sanitize them
+    - name: Sanitize filenames
+      # Runs in nix to have access to `rename`
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          rename -a : . log/* || true
+
+    - name: Upload logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        path: log
+
+    - name: Upload runner logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}-runner
+        path: /logs
+
+    - name: Upload runner temp directory
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.name }}-runner-temp
+        path: /__w/_temp
+

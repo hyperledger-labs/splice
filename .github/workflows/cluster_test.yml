@@ -1,0 +1,44 @@
+name: Trigger a cluster test on a PR
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  trigger_cluster_test_basic:
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/cluster_test')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v3
+        id: comment-branch
+      - run: |
+          sha="${{ steps.comment-branch.outputs.head_sha }}"
+          result=$(curl --fail-with-body --request POST \
+            --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-internal/pipeline \
+            --header "Circle-Token: ${{secrets.CIRCLECI_TOKEN}}" \
+            --header 'content-type: application/json' \
+            --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-scratchnet-basic\", \"splice-git-ref\": \"$sha\"}}")
+          number=$(echo "$result" | jq -r '.number')
+          echo "Deploy scratchnet pipeline triggered for [PR as of $sha](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/$sha), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+
+  trigger_cluster_test_hdm:
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/hdm_test')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@v3
+        id: comment-branch
+      - run: |
+          sha="${{ steps.comment-branch.outputs.head_sha }}"
+          result=$(curl --fail-with-body --request POST \
+            --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-internal/pipeline \
+            --header "Circle-Token: ${{secrets.CIRCLECI_TOKEN}}" \
+            --header 'content-type: application/json' \
+            --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-scratchnet-hdm\", \"upgrade-splice-git-ref\": \"$sha\"}}")
+          number=$(echo "$result" | jq -r '.number')
+          echo "Deploy scratchnet HDM pipeline triggered for [PR as of $sha](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/$sha), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+

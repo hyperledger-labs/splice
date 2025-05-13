@@ -1,0 +1,55 @@
+name: "Post SBT job"
+description: "Post SBT job"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+  setup_sbt_cache_hits:
+    description: "Cache hits from the setup SBT job (should be the cache_hits output from the setup SBT job)"
+    required: true
+  save_caches:
+    description: "If set to false, no caches will be saved"
+    required: false
+    default: "true"
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Store precompiled classes
+      if: ${{ fromJson(inputs.save_caches) }}
+      uses: ./.github/actions/cache/precompiled_classes/save
+      with:
+        cache_version: ${{ inputs.cache_version }}
+        load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).classes }}
+
+    - name: Store SBT Cache
+      if: ${{ fromJson(inputs.save_caches) }}
+      uses: ./.github/actions/cache/sbt/save
+      with:
+        cache_version: ${{ inputs.cache_version }}
+        load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).sbt }}
+
+    - name: Store frontend node_modules
+      if: ${{ fromJson(inputs.save_caches) }}
+      uses: ./.github/actions/cache/frontend_node_modules/save
+      with:
+        cache_version: ${{ inputs.cache_version }}
+        load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).node_modules }}
+
+    - name: Store Daml artifacts
+      if: ${{ fromJson(inputs.save_caches) }}
+      uses: ./.github/actions/cache/daml_artifacts/save
+      with:
+        cache_version: ${{ inputs.cache_version }}
+        load_cache_hit: ${{ fromJson(inputs.setup_sbt_cache_hits).daml }}
+
+    - name: Collect test reports
+      shell: bash
+      run: |
+        sudo mkdir -p /cache/test-reports
+        sudo chown $(whoami):$(whoami) "/cache/test-reports"
+        for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
+        do
+          # `|| true` to avoid failing if there are no test reports
+          cp -v "$subproject"/target/test-reports/TEST-*.xml /cache/test-reports/ || true
+        done

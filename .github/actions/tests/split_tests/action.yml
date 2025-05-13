@@ -1,0 +1,19 @@
+name: Split tests
+description: Split tests for parallelization
+inputs:
+  test_reports_dir:
+    description: "Directory containing XML test reports"
+    required: true
+  test_names_file:
+    description: "File containing the test names"
+    required: true
+  split_total:
+    description: "Total number of buckets to split into"
+    required: true
+outputs:
+  test_names:
+    description: "Test names to run (an array of size split_total, each element is an array of test names for that bucket)"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
