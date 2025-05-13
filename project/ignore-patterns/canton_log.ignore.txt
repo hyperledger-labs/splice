@@ -122,4 +122,16 @@ failed to ping endpoint PlainTextP2PEndpoint.*UNAVAILABLE
 # Sometimes Canton is a bit slow in tests
 Timeout .*expired, but readers are still active
 
+# Party migrations can generally produce temporary ACS mismatches
+# as the repair service is not precise enough in inserting the ACS snapshot
+# exactly at the topology change time.
+# We've seen that at least in RecoverExternalPartyIntegrationTest although
+# in theory it seems like it can affect any test for party migrations.
+# We limit it only to bob and alice here to still have a chance to catch actual issues
+# as this is the only place where we observed it causing issues.
+# As an alternative, we can spin up dedicated Canton instances. That's not realistic for SVs
+# but could be an option for RecoverExternalPartyIntegrationTest. But it slows down the
+# test significantly so for now we don't bother.
+ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
+
 # Make sure to have a trailing newline
