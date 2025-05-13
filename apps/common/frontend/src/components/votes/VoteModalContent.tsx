@@ -3,6 +3,7 @@
 import { CopyableTypography, PartyId, SvVote } from '@lfdecentralizedtrust/splice-common-frontend';
 import dayjs from 'dayjs';
 import React, { ReactElement } from 'react';
+import { sanitizeUrl } from '@braintree/sanitize-url';
 
 import CheckIcon from '@mui/icons-material/Check';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -64,6 +65,7 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
   expiresAt,
   effectiveAt,
 }) => {
+  const sanitizedUrl = sanitizeUrl(reason.url);
   return (
     <>
       <CardContent sx={{ paddingX: '64px' }}>
@@ -116,8 +118,12 @@ const VoteModalContent: React.FC<VoteModalProps> = ({
                     <Typography variant="h6">Proposal URL</Typography>
                   </TableCell>
                   <TableCell>
-                    <Link href={reason.url} id="vote-request-modal-reason-url">
-                      {reason.url}
+                    <Link
+                      href={sanitizedUrl}
+                      id="vote-request-modal-reason-url"
+                      data-testid="vote-request-modal-reason-url"
+                    >
+                      {sanitizedUrl}
                     </Link>
                   </TableCell>
                 </TableRow>
@@ -223,18 +229,23 @@ interface VoteRowProps {
   reasonUrl: string;
 }
 
-const VoteRow: React.FC<VoteRowProps> = ({ svName, sv, reasonBody, reasonUrl }) => (
-  <TableRow className="vote-table-row">
-    <TableCell className="sv-name">{svName}</TableCell>
-    <TableCell>
-      <PartyId partyId={sv} className="sv-party" />
-    </TableCell>
-    <TableCell className="vote-reason-body">{reasonBody}</TableCell>
-    <TableCell className="url">
-      <Link href={reasonUrl}>{reasonUrl}</Link>
-    </TableCell>
-  </TableRow>
-);
+export const VoteRow: React.FC<VoteRowProps> = ({ svName, sv, reasonBody, reasonUrl }) => {
+  const sanitizedUrl = sanitizeUrl(reasonUrl);
+  return (
+    <TableRow className="vote-table-row">
+      <TableCell className="sv-name">{svName}</TableCell>
+      <TableCell>
+        <PartyId partyId={sv} className="sv-party" />
+      </TableCell>
+      <TableCell className="vote-reason-body">{reasonBody}</TableCell>
+      <TableCell className="url">
+        <Link data-testid="vote-row-reason-url" href={sanitizedUrl}>
+          {sanitizedUrl}
+        </Link>
+      </TableCell>
+    </TableRow>
+  );
+};
 
 const VoteRows: React.FC<{
   icon: ReactElement;

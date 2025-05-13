@@ -8,6 +8,7 @@ import {
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
+import { sanitizeUrl } from '@braintree/sanitize-url';
 
 import CheckIcon from '@mui/icons-material/Check';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -189,7 +190,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                     </DisableConditionally>
                   ) : (
                     <Typography id="vote-request-modal-vote-reason-url" variant="h6">
-                      {vote ? vote.reason.url : ''}
+                      {vote ? sanitizeUrl(vote.reason.url) : ''}
                     </Typography>
                   )}
                 </TableCell>

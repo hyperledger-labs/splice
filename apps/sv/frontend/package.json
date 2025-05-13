@@ -14,6 +14,7 @@
     ]
   },
   "dependencies": {
+    "@braintree/sanitize-url": "^7.1.1",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
     "@emotion/react": "^11.11.1",

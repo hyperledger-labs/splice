@@ -343,7 +343,7 @@ class SvFrontendIntegrationTest2
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
         env: SpliceTestConsoleEnvironment
     ) = {
-      val requestReasonUrl = "https://vote-request-url.com"
+      val requestReasonUrl = "https://vote-request-url.com/"
       val requestReasonBody = "This is a request reason."
       val expirationDate = "2034-07-12 00:12"
       val effectiveDate = "2034-07-13 00:12"
