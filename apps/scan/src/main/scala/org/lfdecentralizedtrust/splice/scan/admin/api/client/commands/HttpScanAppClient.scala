@@ -68,6 +68,7 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
@@ -971,7 +972,8 @@ object HttpScanAppClient {
   }
 
   case class GetAcsSnapshot(
-      party: PartyId
+      party: PartyId,
+      recordTime: Option[Instant],
   ) extends InternalBaseCommand[http.GetAcsSnapshotResponse, ByteString] {
     override def submitRequest(
         client: http.ScanClient,
@@ -980,7 +982,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], http.GetAcsSnapshotResponse] = {
-      client.getAcsSnapshot(party.toProtoPrimitive, headers)
+      client.getAcsSnapshot(
+        party.toProtoPrimitive,
+        recordTime.map(t => Timestamp.assertFromInstant(t).toString),
+        headers,
+      )
     }
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {

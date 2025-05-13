@@ -367,10 +367,10 @@ abstract class ScanAppReference(
       )
     }
 
-  def getAcsSnapshot(party: PartyId): ByteString =
+  def getAcsSnapshot(party: PartyId, recordTime: Option[Instant]): ByteString =
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.GetAcsSnapshot(party)
+        HttpScanAppClient.GetAcsSnapshot(party, recordTime)
       )
     }
 

@@ -74,15 +74,7 @@ initialSynchronizerFeesConfig and onboardingFoundingSvRewardWeightBps
 cannot be set when you are deploying in the phase with migrating=true.
 Your SV app will fail to become healthy otherwise
 
-3) You probably want to point decentralizedSynchronizerUrl at your own
-   bootstrap node
-
-::
-
-   -    decentralizedSynchronizerUrl: https://sequencer-0.sv-2.whatever.global.canton.network.digitalasset.com
-   +    decentralizedSynchronizerUrl: https://sequencer-0.sv-0.my.domain.com
-   +    // or you could try cluster DNS:
-   +    // decentralizedSynchronizerUrl: 'http://global-domain-0-sequencer:5008',
+3) Remove the ``decentralizedSynchronizerUrl`` config from ``sv-values.yaml``. It is only used for nodes that join after the initial SV.
 
 other helm values you may need to consider
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

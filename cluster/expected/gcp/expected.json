@@ -1,0 +1,961 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.type == \"cloudkms.googleapis.com/CryptoKey\" &&\n            resource.name.startsWith(\"projects/'da-cn-devnet'/locations/'europe-west6'/keyRings/pulumi\")",
+        "title": "Pulumi KMS"
+      },
+      "role": "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+    },
+    "name": "circleci-roles/cloudkms.cryptoKeyEncrypterDecrypter-pulumi-kms-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/cloudsql.admin"
+    },
+    "name": "circleci-roles/cloudsql.admin-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/compute.viewer"
+    },
+    "name": "circleci-roles/compute.viewer-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/container.serviceAgent"
+    },
+    "name": "circleci-roles/container.serviceAgent-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/logging.privateLogViewer"
+    },
+    "name": "circleci-roles/logging.privateLogViewer-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "\n          resource.name.endsWith(\"-cometbft-keys/versions/latest\")\n          ",
+        "title": "CometBft keys"
+      },
+      "role": "roles/secretmanager.secretAccessor"
+    },
+    "name": "circleci-roles/secretmanager.secretAccessor-cometbft-keys-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "\n          resource.name.endsWith(\"grafana-keys/versions/latest\")\n          ",
+        "title": "Grafana keys"
+      },
+      "role": "roles/secretmanager.secretAccessor"
+    },
+    "name": "circleci-roles/secretmanager.secretAccessor-grafana-keys-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.endsWith(\"secrets/gcp-bucket-sa-key-secret/versions/1\")",
+        "title": "SA key secret"
+      },
+      "role": "roles/secretmanager.secretAccessor"
+    },
+    "name": "circleci-roles/secretmanager.secretAccessor-sa-key-secret-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "\n          resource.name.endsWith(\"-id/versions/latest\")\n          ",
+        "title": "SV IDs"
+      },
+      "role": "roles/secretmanager.secretAccessor"
+    },
+    "name": "circleci-roles/secretmanager.secretAccessor-sv-ids-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/storage.objectAdmin"
+    },
+    "name": "circleci-roles/storage.objectAdmin-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "roles/viewer"
+    },
+    "name": "circleci-roles/viewer-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "circleci",
+      "description": "Service account for Circle CI (managed by Pulumi)",
+      "displayName": "Circle CI"
+    },
+    "name": "circleci-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "circleci",
+    "provider": "",
+    "type": "cn:gcp:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "disableDependentServices": true,
+      "service": "container.googleapis.com"
+    },
+    "name": "container",
+    "provider": "",
+    "type": "gcp:projects/service:Service"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "da-cn-example-project-id",
+    "provider": "",
+    "type": "cn:gcp:project"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "network": "projects/da-cn-example-project-id/global/networks/default",
+      "reservedPeeringRanges": [
+        "google-managed-services-default"
+      ],
+      "service": "servicenetworking.googleapis.com"
+    },
+    "name": "google-managed-services-default-connection",
+    "provider": "",
+    "type": "gcp:servicenetworking/connection:Connection"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "addressType": "INTERNAL",
+      "name": "google-managed-services-default",
+      "network": "projects/da-cn-example-project-id/global/networks/default",
+      "prefixLength": 20,
+      "purpose": "VPC_PEERING"
+    },
+    "name": "google-managed-services-default",
+    "provider": "",
+    "type": "gcp:compute/globalAddress:GlobalAddress"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"adminUser\": \"grafana-keys-admin-user\"\n                , \"adminPassword\": \"grafana-keys-admin-password\"}"
+      }
+    },
+    "name": "grafana-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "grafana-keys"
+    },
+    "name": "grafana-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "grafana-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "disableDependentServices": true,
+      "service": "secretmanager.googleapis.com"
+    },
+    "name": "secretmanager",
+    "provider": "",
+    "type": "gcp:projects/service:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "disableDependentServices": true,
+      "service": "servicenetworking.googleapis.com"
+    },
+    "name": "servicenetworking",
+    "provider": "",
+    "type": "gcp:projects/service:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"publicKey\": \"sv-id-public-key\", \"privateKey\": \"sv-id-private-key\"}"
+      }
+    },
+    "name": "sv-id-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv-id"
+    },
+    "name": "sv-id-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv-id",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv1-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv1-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv1-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv1-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv1-cometbft-keys"
+    },
+    "name": "sv1-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv1-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv10-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv10-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv10-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv10-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv10-cometbft-keys"
+    },
+    "name": "sv10-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv10-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv11-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv11-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv11-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv11-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv11-cometbft-keys"
+    },
+    "name": "sv11-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv11-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv12-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv12-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv12-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv12-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv12-cometbft-keys"
+    },
+    "name": "sv12-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv12-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv13-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv13-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv13-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv13-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv13-cometbft-keys"
+    },
+    "name": "sv13-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv13-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv14-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv14-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv14-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv14-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv14-cometbft-keys"
+    },
+    "name": "sv14-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv14-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv15-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv15-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv15-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv15-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv15-cometbft-keys"
+    },
+    "name": "sv15-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv15-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv16-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv16-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv16-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv16-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv16-cometbft-keys"
+    },
+    "name": "sv16-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv16-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv2-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv2-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv2-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv2-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv2-cometbft-keys"
+    },
+    "name": "sv2-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv2-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"publicKey\": \"sv2-id-public-key\", \"privateKey\": \"sv2-id-private-key\"}"
+      }
+    },
+    "name": "sv2-id-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv2-id"
+    },
+    "name": "sv2-id-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv2-id",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv3-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv3-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv3-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv3-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv3-cometbft-keys"
+    },
+    "name": "sv3-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv3-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"publicKey\": \"sv3-id-public-key\", \"privateKey\": \"sv3-id-private-key\"}"
+      }
+    },
+    "name": "sv3-id-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv3-id"
+    },
+    "name": "sv3-id-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv3-id",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv4-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv4-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv4-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv4-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv4-cometbft-keys"
+    },
+    "name": "sv4-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv4-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"publicKey\": \"sv4-id-public-key\", \"privateKey\": \"sv4-id-private-key\"}"
+      }
+    },
+    "name": "sv4-id-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv4-id"
+    },
+    "name": "sv4-id-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv4-id",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv5-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv5-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv5-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv5-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv5-cometbft-keys"
+    },
+    "name": "sv5-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv5-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv6-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv6-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv6-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv6-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv6-cometbft-keys"
+    },
+    "name": "sv6-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv6-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv7-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv7-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv7-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv7-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv7-cometbft-keys"
+    },
+    "name": "sv7-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv7-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv8-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv8-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv8-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv8-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv8-cometbft-keys"
+    },
+    "name": "sv8-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv8-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"nodePrivateKey\": \"sv9-cometbft-keys-node-private-key\", \"validatorPrivateKey\": \"sv9-cometbft-keys-validator-private-key\"\n                , \"validatorPublicKey\": \"sv9-cometbft-keys-validator-public-key\"}"
+      }
+    },
+    "name": "sv9-cometbft-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "sv9-cometbft-keys"
+    },
+    "name": "sv9-cometbft-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "sv9-cometbft-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
+  }
+]
