@@ -13,6 +13,7 @@ import {
   infraAffinityAndTolerations,
   InstalledHelmChart,
   installSpliceHelmChart,
+  MOCK_SPLICE_ROOT,
   SPLICE_ROOT,
 } from '../../common';
 import { clusterBasename, loadIPRanges } from './config';
@@ -30,7 +31,8 @@ function configureIstioBase(
   ns: k8s.core.v1.Namespace,
   istioDNamespace: k8s.core.v1.Namespace
 ): k8s.helm.v3.Release {
-  const path = SPLICE_ROOT + '/cluster/pulumi/infra/migrate-istio.sh';
+  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
+  const path = `${root}/cluster/pulumi/infra/migrate-istio.sh`;
   const migration = new local.Command(`migrate-istio-crds`, {
     create: path,
   });

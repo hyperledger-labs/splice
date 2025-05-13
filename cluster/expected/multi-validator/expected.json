@@ -1,0 +1,4569 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-0-secret",
+        "namespace": "multi-validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-multi-validator-postgres-0-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-1-secret",
+        "namespace": "multi-validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-multi-validator-postgres-1-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-2-secret",
+        "namespace": "multi-validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-multi-validator-postgres-2-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-3-secret",
+        "namespace": "multi-validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-multi-validator-postgres-3-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-4-secret",
+        "namespace": "multi-validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-multi-validator-postgres-4-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s-imgpull-multi-validator-default",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "loopback",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "hostname": "mock.global.canton.network.digitalasset.com"
+        },
+        "cometbftPorts": {
+          "domains": 5
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-participant-0-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-0"
+          }
+        }
+      }
+    },
+    "name": "multi-participant-0-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-participant-0",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-0"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-0"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-participant-0"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                    "value": "postgres-0"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_DB",
+                    "value": "cantonnet_p"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-0-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-participant:0.3.20",
+                "livenessProbe": {
+                  "failureThreshold": 5,
+                  "grpc": {
+                    "port": 5061,
+                    "service": "liveness"
+                  },
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-participant",
+                "ports": [
+                  {
+                    "containerPort": 5001,
+                    "name": "lg-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5002,
+                    "name": "adm-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5101,
+                    "name": "lg-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5102,
+                    "name": "adm-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5201,
+                    "name": "lg-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5202,
+                    "name": "adm-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5301,
+                    "name": "lg-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5302,
+                    "name": "adm-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5401,
+                    "name": "lg-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5402,
+                    "name": "adm-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5501,
+                    "name": "lg-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5502,
+                    "name": "adm-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5601,
+                    "name": "lg-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5602,
+                    "name": "adm-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5701,
+                    "name": "lg-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5702,
+                    "name": "adm-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5801,
+                    "name": "lg-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5802,
+                    "name": "adm-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5901,
+                    "name": "lg-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5902,
+                    "name": "adm-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "grpc": {
+                    "port": 5061
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 5,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "8",
+                    "memory": "24Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "12Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-0-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-participant-0",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-0"
+        },
+        "name": "multi-participant-0",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "lg-0",
+            "port": 5001
+          },
+          {
+            "name": "adm-0",
+            "port": 5002
+          },
+          {
+            "name": "lg-1",
+            "port": 5101
+          },
+          {
+            "name": "adm-1",
+            "port": 5102
+          },
+          {
+            "name": "lg-2",
+            "port": 5201
+          },
+          {
+            "name": "adm-2",
+            "port": 5202
+          },
+          {
+            "name": "lg-3",
+            "port": 5301
+          },
+          {
+            "name": "adm-3",
+            "port": 5302
+          },
+          {
+            "name": "lg-4",
+            "port": 5401
+          },
+          {
+            "name": "adm-4",
+            "port": 5402
+          },
+          {
+            "name": "lg-5",
+            "port": 5501
+          },
+          {
+            "name": "adm-5",
+            "port": 5502
+          },
+          {
+            "name": "lg-6",
+            "port": 5601
+          },
+          {
+            "name": "adm-6",
+            "port": 5602
+          },
+          {
+            "name": "lg-7",
+            "port": 5701
+          },
+          {
+            "name": "adm-7",
+            "port": 5702
+          },
+          {
+            "name": "lg-8",
+            "port": 5801
+          },
+          {
+            "name": "adm-8",
+            "port": 5802
+          },
+          {
+            "name": "lg-9",
+            "port": 5901
+          },
+          {
+            "name": "adm-9",
+            "port": 5902
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-participant-0"
+        }
+      }
+    },
+    "name": "multi-participant-0",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-participant-1-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-1"
+          }
+        }
+      }
+    },
+    "name": "multi-participant-1-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-participant-1",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-1"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-1"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-participant-1"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                    "value": "postgres-1"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_DB",
+                    "value": "cantonnet_p"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-1-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-participant:0.3.20",
+                "livenessProbe": {
+                  "failureThreshold": 5,
+                  "grpc": {
+                    "port": 5061,
+                    "service": "liveness"
+                  },
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-participant",
+                "ports": [
+                  {
+                    "containerPort": 5001,
+                    "name": "lg-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5002,
+                    "name": "adm-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5101,
+                    "name": "lg-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5102,
+                    "name": "adm-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5201,
+                    "name": "lg-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5202,
+                    "name": "adm-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5301,
+                    "name": "lg-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5302,
+                    "name": "adm-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5401,
+                    "name": "lg-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5402,
+                    "name": "adm-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5501,
+                    "name": "lg-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5502,
+                    "name": "adm-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5601,
+                    "name": "lg-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5602,
+                    "name": "adm-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5701,
+                    "name": "lg-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5702,
+                    "name": "adm-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5801,
+                    "name": "lg-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5802,
+                    "name": "adm-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5901,
+                    "name": "lg-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5902,
+                    "name": "adm-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "grpc": {
+                    "port": 5061
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 5,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "8",
+                    "memory": "24Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "12Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-1-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-participant-1",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-1"
+        },
+        "name": "multi-participant-1",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "lg-0",
+            "port": 5001
+          },
+          {
+            "name": "adm-0",
+            "port": 5002
+          },
+          {
+            "name": "lg-1",
+            "port": 5101
+          },
+          {
+            "name": "adm-1",
+            "port": 5102
+          },
+          {
+            "name": "lg-2",
+            "port": 5201
+          },
+          {
+            "name": "adm-2",
+            "port": 5202
+          },
+          {
+            "name": "lg-3",
+            "port": 5301
+          },
+          {
+            "name": "adm-3",
+            "port": 5302
+          },
+          {
+            "name": "lg-4",
+            "port": 5401
+          },
+          {
+            "name": "adm-4",
+            "port": 5402
+          },
+          {
+            "name": "lg-5",
+            "port": 5501
+          },
+          {
+            "name": "adm-5",
+            "port": 5502
+          },
+          {
+            "name": "lg-6",
+            "port": 5601
+          },
+          {
+            "name": "adm-6",
+            "port": 5602
+          },
+          {
+            "name": "lg-7",
+            "port": 5701
+          },
+          {
+            "name": "adm-7",
+            "port": 5702
+          },
+          {
+            "name": "lg-8",
+            "port": 5801
+          },
+          {
+            "name": "adm-8",
+            "port": 5802
+          },
+          {
+            "name": "lg-9",
+            "port": 5901
+          },
+          {
+            "name": "adm-9",
+            "port": 5902
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-participant-1"
+        }
+      }
+    },
+    "name": "multi-participant-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-participant-2-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-2"
+          }
+        }
+      }
+    },
+    "name": "multi-participant-2-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-participant-2",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-2"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-2"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-participant-2"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                    "value": "postgres-2"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_DB",
+                    "value": "cantonnet_p"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-2-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-participant:0.3.20",
+                "livenessProbe": {
+                  "failureThreshold": 5,
+                  "grpc": {
+                    "port": 5061,
+                    "service": "liveness"
+                  },
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-participant",
+                "ports": [
+                  {
+                    "containerPort": 5001,
+                    "name": "lg-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5002,
+                    "name": "adm-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5101,
+                    "name": "lg-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5102,
+                    "name": "adm-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5201,
+                    "name": "lg-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5202,
+                    "name": "adm-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5301,
+                    "name": "lg-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5302,
+                    "name": "adm-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5401,
+                    "name": "lg-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5402,
+                    "name": "adm-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5501,
+                    "name": "lg-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5502,
+                    "name": "adm-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5601,
+                    "name": "lg-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5602,
+                    "name": "adm-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5701,
+                    "name": "lg-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5702,
+                    "name": "adm-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5801,
+                    "name": "lg-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5802,
+                    "name": "adm-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5901,
+                    "name": "lg-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5902,
+                    "name": "adm-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "grpc": {
+                    "port": 5061
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 5,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "8",
+                    "memory": "24Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "12Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-2-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-participant-2",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-2"
+        },
+        "name": "multi-participant-2",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "lg-0",
+            "port": 5001
+          },
+          {
+            "name": "adm-0",
+            "port": 5002
+          },
+          {
+            "name": "lg-1",
+            "port": 5101
+          },
+          {
+            "name": "adm-1",
+            "port": 5102
+          },
+          {
+            "name": "lg-2",
+            "port": 5201
+          },
+          {
+            "name": "adm-2",
+            "port": 5202
+          },
+          {
+            "name": "lg-3",
+            "port": 5301
+          },
+          {
+            "name": "adm-3",
+            "port": 5302
+          },
+          {
+            "name": "lg-4",
+            "port": 5401
+          },
+          {
+            "name": "adm-4",
+            "port": 5402
+          },
+          {
+            "name": "lg-5",
+            "port": 5501
+          },
+          {
+            "name": "adm-5",
+            "port": 5502
+          },
+          {
+            "name": "lg-6",
+            "port": 5601
+          },
+          {
+            "name": "adm-6",
+            "port": 5602
+          },
+          {
+            "name": "lg-7",
+            "port": 5701
+          },
+          {
+            "name": "adm-7",
+            "port": 5702
+          },
+          {
+            "name": "lg-8",
+            "port": 5801
+          },
+          {
+            "name": "adm-8",
+            "port": 5802
+          },
+          {
+            "name": "lg-9",
+            "port": 5901
+          },
+          {
+            "name": "adm-9",
+            "port": 5902
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-participant-2"
+        }
+      }
+    },
+    "name": "multi-participant-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-participant-3-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-3"
+          }
+        }
+      }
+    },
+    "name": "multi-participant-3-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-participant-3",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-3"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-3"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-participant-3"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                    "value": "postgres-3"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_DB",
+                    "value": "cantonnet_p"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-3-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-participant:0.3.20",
+                "livenessProbe": {
+                  "failureThreshold": 5,
+                  "grpc": {
+                    "port": 5061,
+                    "service": "liveness"
+                  },
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-participant",
+                "ports": [
+                  {
+                    "containerPort": 5001,
+                    "name": "lg-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5002,
+                    "name": "adm-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5101,
+                    "name": "lg-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5102,
+                    "name": "adm-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5201,
+                    "name": "lg-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5202,
+                    "name": "adm-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5301,
+                    "name": "lg-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5302,
+                    "name": "adm-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5401,
+                    "name": "lg-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5402,
+                    "name": "adm-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5501,
+                    "name": "lg-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5502,
+                    "name": "adm-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5601,
+                    "name": "lg-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5602,
+                    "name": "adm-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5701,
+                    "name": "lg-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5702,
+                    "name": "adm-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5801,
+                    "name": "lg-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5802,
+                    "name": "adm-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5901,
+                    "name": "lg-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5902,
+                    "name": "adm-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "grpc": {
+                    "port": 5061
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 5,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "8",
+                    "memory": "24Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "12Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-3-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-participant-3",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-3"
+        },
+        "name": "multi-participant-3",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "lg-0",
+            "port": 5001
+          },
+          {
+            "name": "adm-0",
+            "port": 5002
+          },
+          {
+            "name": "lg-1",
+            "port": 5101
+          },
+          {
+            "name": "adm-1",
+            "port": 5102
+          },
+          {
+            "name": "lg-2",
+            "port": 5201
+          },
+          {
+            "name": "adm-2",
+            "port": 5202
+          },
+          {
+            "name": "lg-3",
+            "port": 5301
+          },
+          {
+            "name": "adm-3",
+            "port": 5302
+          },
+          {
+            "name": "lg-4",
+            "port": 5401
+          },
+          {
+            "name": "adm-4",
+            "port": 5402
+          },
+          {
+            "name": "lg-5",
+            "port": 5501
+          },
+          {
+            "name": "adm-5",
+            "port": 5502
+          },
+          {
+            "name": "lg-6",
+            "port": 5601
+          },
+          {
+            "name": "adm-6",
+            "port": 5602
+          },
+          {
+            "name": "lg-7",
+            "port": 5701
+          },
+          {
+            "name": "adm-7",
+            "port": 5702
+          },
+          {
+            "name": "lg-8",
+            "port": 5801
+          },
+          {
+            "name": "adm-8",
+            "port": 5802
+          },
+          {
+            "name": "lg-9",
+            "port": 5901
+          },
+          {
+            "name": "adm-9",
+            "port": 5902
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-participant-3"
+        }
+      }
+    },
+    "name": "multi-participant-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-participant-4-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-4"
+          }
+        }
+      }
+    },
+    "name": "multi-participant-4-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-participant-4",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-4"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-participant-4"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-participant-4"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SERVER",
+                    "value": "postgres-4"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_DB",
+                    "value": "cantonnet_p"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "CANTON_PARTICIPANT_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-4-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 -XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6 -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-participant:0.3.20",
+                "livenessProbe": {
+                  "failureThreshold": 5,
+                  "grpc": {
+                    "port": 5061,
+                    "service": "liveness"
+                  },
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-participant",
+                "ports": [
+                  {
+                    "containerPort": 5001,
+                    "name": "lg-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5002,
+                    "name": "adm-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5101,
+                    "name": "lg-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5102,
+                    "name": "adm-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5201,
+                    "name": "lg-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5202,
+                    "name": "adm-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5301,
+                    "name": "lg-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5302,
+                    "name": "adm-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5401,
+                    "name": "lg-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5402,
+                    "name": "adm-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5501,
+                    "name": "lg-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5502,
+                    "name": "adm-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5601,
+                    "name": "lg-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5602,
+                    "name": "adm-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5701,
+                    "name": "lg-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5702,
+                    "name": "adm-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5801,
+                    "name": "lg-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5802,
+                    "name": "adm-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5901,
+                    "name": "lg-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5902,
+                    "name": "adm-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "failureThreshold": 3,
+                  "grpc": {
+                    "port": 5061
+                  },
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 5,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "8",
+                    "memory": "24Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "12Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_p_00\ncreateDb cantonnet_p_01\ncreateDb cantonnet_p_02\ncreateDb cantonnet_p_03\ncreateDb cantonnet_p_04\ncreateDb cantonnet_p_05\ncreateDb cantonnet_p_06\ncreateDb cantonnet_p_07\ncreateDb cantonnet_p_08\ncreateDb cantonnet_p_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-4-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-participant-4",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-participant-4"
+        },
+        "name": "multi-participant-4",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "lg-0",
+            "port": 5001
+          },
+          {
+            "name": "adm-0",
+            "port": 5002
+          },
+          {
+            "name": "lg-1",
+            "port": 5101
+          },
+          {
+            "name": "adm-1",
+            "port": 5102
+          },
+          {
+            "name": "lg-2",
+            "port": 5201
+          },
+          {
+            "name": "adm-2",
+            "port": 5202
+          },
+          {
+            "name": "lg-3",
+            "port": 5301
+          },
+          {
+            "name": "adm-3",
+            "port": 5302
+          },
+          {
+            "name": "lg-4",
+            "port": 5401
+          },
+          {
+            "name": "adm-4",
+            "port": 5402
+          },
+          {
+            "name": "lg-5",
+            "port": 5501
+          },
+          {
+            "name": "adm-5",
+            "port": 5502
+          },
+          {
+            "name": "lg-6",
+            "port": 5601
+          },
+          {
+            "name": "adm-6",
+            "port": 5602
+          },
+          {
+            "name": "lg-7",
+            "port": 5701
+          },
+          {
+            "name": "adm-7",
+            "port": 5702
+          },
+          {
+            "name": "lg-8",
+            "port": 5801
+          },
+          {
+            "name": "adm-8",
+            "port": 5802
+          },
+          {
+            "name": "lg-9",
+            "port": 5901
+          },
+          {
+            "name": "adm-9",
+            "port": 5902
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-participant-4"
+        }
+      }
+    },
+    "name": "multi-participant-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-validator-0-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-0"
+          }
+        }
+      }
+    },
+    "name": "multi-validator-0-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-validator-0",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-0"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-0"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-validator-0"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "SPLICE_APP_DEVNET",
+                    "value": "1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                    "value": "multi-participant-0"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
+                    "value": "http://scan-app.sv-1:5012"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS",
+                    "value": "http://sv-app.sv-1:5014"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_DATABASE_NAME",
+                    "value": "cantonnet_v"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_HOST",
+                    "value": "postgres-0"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PORT",
+                    "value": "5432"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_USER",
+                    "value": "cnadmin"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-0-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
+                    "value": "3"
+                  },
+                  {
+                    "name": "SPLICE_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
+                "livenessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/livez"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-validator",
+                "ports": [
+                  {
+                    "containerPort": 5003,
+                    "name": "val-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5103,
+                    "name": "val-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5203,
+                    "name": "val-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5303,
+                    "name": "val-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5403,
+                    "name": "val-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5503,
+                    "name": "val-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5603,
+                    "name": "val-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5703,
+                    "name": "val-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5803,
+                    "name": "val-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5903,
+                    "name": "val-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/readyz"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 15,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "4",
+                    "memory": "16Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "8Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-0 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_v_00\ncreateDb cantonnet_v_01\ncreateDb cantonnet_v_02\ncreateDb cantonnet_v_03\ncreateDb cantonnet_v_04\ncreateDb cantonnet_v_05\ncreateDb cantonnet_v_06\ncreateDb cantonnet_v_07\ncreateDb cantonnet_v_08\ncreateDb cantonnet_v_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-0-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-validator-0",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-0"
+        },
+        "name": "multi-validator-0",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "val-0",
+            "port": 5003
+          },
+          {
+            "name": "val-1",
+            "port": 5103
+          },
+          {
+            "name": "val-2",
+            "port": 5203
+          },
+          {
+            "name": "val-3",
+            "port": 5303
+          },
+          {
+            "name": "val-4",
+            "port": 5403
+          },
+          {
+            "name": "val-5",
+            "port": 5503
+          },
+          {
+            "name": "val-6",
+            "port": 5603
+          },
+          {
+            "name": "val-7",
+            "port": 5703
+          },
+          {
+            "name": "val-8",
+            "port": 5803
+          },
+          {
+            "name": "val-9",
+            "port": 5903
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-validator-0"
+        }
+      }
+    },
+    "name": "multi-validator-0",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-validator-1-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-1"
+          }
+        }
+      }
+    },
+    "name": "multi-validator-1-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-validator-1",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-1"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-1"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-validator-1"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "SPLICE_APP_DEVNET",
+                    "value": "1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                    "value": "multi-participant-1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
+                    "value": "http://scan-app.sv-1:5012"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS",
+                    "value": "http://sv-app.sv-1:5014"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_DATABASE_NAME",
+                    "value": "cantonnet_v"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_HOST",
+                    "value": "postgres-1"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PORT",
+                    "value": "5432"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_USER",
+                    "value": "cnadmin"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-1-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
+                    "value": "3"
+                  },
+                  {
+                    "name": "SPLICE_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
+                "livenessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/livez"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-validator",
+                "ports": [
+                  {
+                    "containerPort": 5003,
+                    "name": "val-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5103,
+                    "name": "val-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5203,
+                    "name": "val-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5303,
+                    "name": "val-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5403,
+                    "name": "val-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5503,
+                    "name": "val-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5603,
+                    "name": "val-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5703,
+                    "name": "val-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5803,
+                    "name": "val-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5903,
+                    "name": "val-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/readyz"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 15,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "4",
+                    "memory": "16Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "8Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-1 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_v_00\ncreateDb cantonnet_v_01\ncreateDb cantonnet_v_02\ncreateDb cantonnet_v_03\ncreateDb cantonnet_v_04\ncreateDb cantonnet_v_05\ncreateDb cantonnet_v_06\ncreateDb cantonnet_v_07\ncreateDb cantonnet_v_08\ncreateDb cantonnet_v_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-1-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-validator-1",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-1"
+        },
+        "name": "multi-validator-1",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "val-0",
+            "port": 5003
+          },
+          {
+            "name": "val-1",
+            "port": 5103
+          },
+          {
+            "name": "val-2",
+            "port": 5203
+          },
+          {
+            "name": "val-3",
+            "port": 5303
+          },
+          {
+            "name": "val-4",
+            "port": 5403
+          },
+          {
+            "name": "val-5",
+            "port": 5503
+          },
+          {
+            "name": "val-6",
+            "port": 5603
+          },
+          {
+            "name": "val-7",
+            "port": 5703
+          },
+          {
+            "name": "val-8",
+            "port": 5803
+          },
+          {
+            "name": "val-9",
+            "port": 5903
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-validator-1"
+        }
+      }
+    },
+    "name": "multi-validator-1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-validator-2-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-2"
+          }
+        }
+      }
+    },
+    "name": "multi-validator-2-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-validator-2",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-2"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-2"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-validator-2"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "SPLICE_APP_DEVNET",
+                    "value": "1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                    "value": "multi-participant-2"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
+                    "value": "http://scan-app.sv-1:5012"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS",
+                    "value": "http://sv-app.sv-1:5014"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_DATABASE_NAME",
+                    "value": "cantonnet_v"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_HOST",
+                    "value": "postgres-2"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PORT",
+                    "value": "5432"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_USER",
+                    "value": "cnadmin"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-2-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
+                    "value": "3"
+                  },
+                  {
+                    "name": "SPLICE_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
+                "livenessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/livez"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-validator",
+                "ports": [
+                  {
+                    "containerPort": 5003,
+                    "name": "val-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5103,
+                    "name": "val-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5203,
+                    "name": "val-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5303,
+                    "name": "val-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5403,
+                    "name": "val-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5503,
+                    "name": "val-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5603,
+                    "name": "val-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5703,
+                    "name": "val-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5803,
+                    "name": "val-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5903,
+                    "name": "val-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/readyz"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 15,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "4",
+                    "memory": "16Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "8Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-2 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_v_00\ncreateDb cantonnet_v_01\ncreateDb cantonnet_v_02\ncreateDb cantonnet_v_03\ncreateDb cantonnet_v_04\ncreateDb cantonnet_v_05\ncreateDb cantonnet_v_06\ncreateDb cantonnet_v_07\ncreateDb cantonnet_v_08\ncreateDb cantonnet_v_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-2-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-validator-2",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-2"
+        },
+        "name": "multi-validator-2",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "val-0",
+            "port": 5003
+          },
+          {
+            "name": "val-1",
+            "port": 5103
+          },
+          {
+            "name": "val-2",
+            "port": 5203
+          },
+          {
+            "name": "val-3",
+            "port": 5303
+          },
+          {
+            "name": "val-4",
+            "port": 5403
+          },
+          {
+            "name": "val-5",
+            "port": 5503
+          },
+          {
+            "name": "val-6",
+            "port": 5603
+          },
+          {
+            "name": "val-7",
+            "port": 5703
+          },
+          {
+            "name": "val-8",
+            "port": 5803
+          },
+          {
+            "name": "val-9",
+            "port": 5903
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-validator-2"
+        }
+      }
+    },
+    "name": "multi-validator-2",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-validator-3-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-3"
+          }
+        }
+      }
+    },
+    "name": "multi-validator-3-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-validator-3",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-3"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-3"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-validator-3"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "SPLICE_APP_DEVNET",
+                    "value": "1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                    "value": "multi-participant-3"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
+                    "value": "http://scan-app.sv-1:5012"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS",
+                    "value": "http://sv-app.sv-1:5014"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_DATABASE_NAME",
+                    "value": "cantonnet_v"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_HOST",
+                    "value": "postgres-3"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PORT",
+                    "value": "5432"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_USER",
+                    "value": "cnadmin"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-3-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
+                    "value": "3"
+                  },
+                  {
+                    "name": "SPLICE_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
+                "livenessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/livez"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-validator",
+                "ports": [
+                  {
+                    "containerPort": 5003,
+                    "name": "val-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5103,
+                    "name": "val-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5203,
+                    "name": "val-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5303,
+                    "name": "val-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5403,
+                    "name": "val-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5503,
+                    "name": "val-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5603,
+                    "name": "val-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5703,
+                    "name": "val-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5803,
+                    "name": "val-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5903,
+                    "name": "val-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/readyz"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 15,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "4",
+                    "memory": "16Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "8Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-3 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_v_00\ncreateDb cantonnet_v_01\ncreateDb cantonnet_v_02\ncreateDb cantonnet_v_03\ncreateDb cantonnet_v_04\ncreateDb cantonnet_v_05\ncreateDb cantonnet_v_06\ncreateDb cantonnet_v_07\ncreateDb cantonnet_v_08\ncreateDb cantonnet_v_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-3-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-validator-3",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-3"
+        },
+        "name": "multi-validator-3",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "val-0",
+            "port": 5003
+          },
+          {
+            "name": "val-1",
+            "port": 5103
+          },
+          {
+            "name": "val-2",
+            "port": 5203
+          },
+          {
+            "name": "val-3",
+            "port": 5303
+          },
+          {
+            "name": "val-4",
+            "port": 5403
+          },
+          {
+            "name": "val-5",
+            "port": 5503
+          },
+          {
+            "name": "val-6",
+            "port": 5603
+          },
+          {
+            "name": "val-7",
+            "port": 5703
+          },
+          {
+            "name": "val-8",
+            "port": 5803
+          },
+          {
+            "name": "val-9",
+            "port": 5903
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-validator-3"
+        }
+      }
+    },
+    "name": "multi-validator-3",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "monitoring.coreos.com/v1",
+      "kind": "ServiceMonitor",
+      "metadata": {
+        "name": "multi-validator-4-service-monitor",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "endpoints": [
+          {
+            "port": "metrics"
+          }
+        ],
+        "namespaceSelector": {
+          "any": true
+        },
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-4"
+          }
+        }
+      }
+    },
+    "name": "multi-validator-4-service-monitor",
+    "provider": "",
+    "type": "kubernetes:monitoring.coreos.com/v1:ServiceMonitor"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "multi-validator-4",
+    "provider": "",
+    "type": "canton:network:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-4"
+        },
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "multi-validator-4"
+          }
+        },
+        "strategy": {
+          "type": "Recreate"
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "multi-validator-4"
+            }
+          },
+          "spec": {
+            "affinity": {
+              "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                  "nodeSelectorTerms": [
+                    {
+                      "matchExpressions": [
+                        {
+                          "key": "cn_apps",
+                          "operator": "Exists"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "SPLICE_APP_DEVNET",
+                    "value": "1"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_PARTICIPANT_ADDRESS",
+                    "value": "multi-participant-4"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SCAN_URL",
+                    "value": "http://scan-app.sv-1:5012"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_AUTH_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS",
+                    "value": "http://sv-app.sv-1:5014"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_DATABASE_NAME",
+                    "value": "cantonnet_v"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_SCHEMA",
+                    "value": "cantonnet"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_HOST",
+                    "value": "postgres-4"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PORT",
+                    "value": "5432"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_USER",
+                    "value": "cnadmin"
+                  },
+                  {
+                    "name": "SPLICE_APP_POSTGRES_PASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-4-secret"
+                      }
+                    }
+                  },
+                  {
+                    "name": "SPLICE_APP_VALIDATOR_MIGRATION_ID",
+                    "value": "3"
+                  },
+                  {
+                    "name": "SPLICE_APP_CONTACT_POINT",
+                    "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "NUM_NODES",
+                    "value": "10"
+                  },
+                  {
+                    "name": "VALIDATOR_USERNAME_PREFIX",
+                    "value": "validator_user"
+                  },
+                  {
+                    "name": "AUTH_TARGET_AUDIENCE",
+                    "value": "https://canton.network.global"
+                  },
+                  {
+                    "name": "JAVA_TOOL_OPTIONS",
+                    "value": "-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16  -Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1"
+                  }
+                ],
+                "image": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/multi-validator:0.3.20",
+                "livenessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/livez"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 60,
+                  "periodSeconds": 60,
+                  "timeoutSeconds": 10
+                },
+                "name": "multi-validator",
+                "ports": [
+                  {
+                    "containerPort": 5003,
+                    "name": "val-0",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5103,
+                    "name": "val-1",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5203,
+                    "name": "val-2",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5303,
+                    "name": "val-3",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5403,
+                    "name": "val-4",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5503,
+                    "name": "val-5",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5603,
+                    "name": "val-6",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5703,
+                    "name": "val-7",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5803,
+                    "name": "val-8",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 5903,
+                    "name": "val-9",
+                    "protocol": "TCP"
+                  },
+                  {
+                    "containerPort": 10013,
+                    "name": "metrics"
+                  },
+                  {
+                    "containerPort": 9010,
+                    "name": "jmx"
+                  }
+                ],
+                "readinessProbe": {
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/readyz"
+                    ]
+                  },
+                  "failureThreshold": 5,
+                  "initialDelaySeconds": 5,
+                  "periodSeconds": 15,
+                  "timeoutSeconds": 10
+                },
+                "resources": {
+                  "limits": {
+                    "cpu": "4",
+                    "memory": "16Gi"
+                  },
+                  "requests": {
+                    "cpu": "1",
+                    "memory": "8Gi"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "command": [
+                  "bash",
+                  "-c",
+                  "\n                        function createDb() {\n                          local dbname=\"$1\"\n\n                          until errmsg=$(psql -h postgres-4 --username=cnadmin --dbname=cantonnet -c \"create database $dbname\" 2>&1); do\n                          if [[ $errmsg == *\"already exists\"* ]]; then\n                              echo \"Database $dbname already exists. Done.\"\n                              break\n                          fi\n\n                          echo \"trying to create postgres database $dbname, last error: $errmsg\";\n                          sleep 2;\n                          done\n                        }\n\n                        createDb cantonnet_v_00\ncreateDb cantonnet_v_01\ncreateDb cantonnet_v_02\ncreateDb cantonnet_v_03\ncreateDb cantonnet_v_04\ncreateDb cantonnet_v_05\ncreateDb cantonnet_v_06\ncreateDb cantonnet_v_07\ncreateDb cantonnet_v_08\ncreateDb cantonnet_v_09\n                      "
+                ],
+                "env": [
+                  {
+                    "name": "PGPASSWORD",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "key": "postgresPassword",
+                        "name": "postgres-4-secret"
+                      }
+                    }
+                  }
+                ],
+                "image": "postgres:14",
+                "name": "pg-init"
+              }
+            ],
+            "tolerations": [
+              {
+                "effect": "NoSchedule",
+                "key": "cn_apps",
+                "operator": "Exists"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "name": "multi-validator-4",
+    "provider": "",
+    "type": "kubernetes:apps/v1:Deployment"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "labels": {
+          "app": "multi-validator-4"
+        },
+        "name": "multi-validator-4",
+        "namespace": "multi-validator"
+      },
+      "spec": {
+        "ports": [
+          {
+            "name": "val-0",
+            "port": 5003
+          },
+          {
+            "name": "val-1",
+            "port": 5103
+          },
+          {
+            "name": "val-2",
+            "port": 5203
+          },
+          {
+            "name": "val-3",
+            "port": 5303
+          },
+          {
+            "name": "val-4",
+            "port": 5403
+          },
+          {
+            "name": "val-5",
+            "port": 5503
+          },
+          {
+            "name": "val-6",
+            "port": 5603
+          },
+          {
+            "name": "val-7",
+            "port": 5703
+          },
+          {
+            "name": "val-8",
+            "port": 5803
+          },
+          {
+            "name": "val-9",
+            "port": 5903
+          },
+          {
+            "name": "metrics",
+            "port": 10013
+          },
+          {
+            "name": "jmx",
+            "port": 9010
+          }
+        ],
+        "selector": {
+          "app": "multi-validator-4"
+        }
+      }
+    },
+    "name": "multi-validator-4",
+    "provider": "",
+    "type": "kubernetes:core/v1:Service"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "multi-validator"
+      }
+    },
+    "name": "multi-validator-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-multi-validator-default::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "docker-reg-cred",
+        "namespace": "multi-validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "multi-validator-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "multi-validator-postgres-0-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "multi-validator-postgres-1-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "multi-validator-postgres-2-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "multi-validator-postgres-3-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "multi-validator-postgres-4-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "multi-validator"
+      }
+    },
+    "name": "multi-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "postgres-0",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "600Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "postgres-0-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "postgres-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "postgres-1",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "600Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "postgres-1-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "postgres-1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "postgres-2",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "600Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "postgres-2-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "postgres-2",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "postgres-3",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "600Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "postgres-3-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "postgres-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "postgres-4",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "db": {
+          "maxConnections": 1000,
+          "volumeSize": "600Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "postgres-4-secret"
+        },
+        "resources": {
+          "limits": {
+            "memory": "20Gi"
+          },
+          "requests": {
+            "memory": "10Gi"
+          }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "postgres-4",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  }
+]

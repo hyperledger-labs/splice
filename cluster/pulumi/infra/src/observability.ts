@@ -18,6 +18,7 @@ import {
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   isMainNet,
+  MOCK_SPLICE_ROOT,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
@@ -536,7 +537,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     }
   );
 
-  const path = `${SPLICE_ROOT}/cluster/pulumi/infra/prometheus-crd-update.sh`;
+  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
+  const path = `${root}/cluster/pulumi/infra/prometheus-crd-update.sh`;
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {

@@ -1,0 +1,110 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "autoscaling": {
+        "maxNodeCount": 20,
+        "minNodeCount": 0
+      },
+      "cluster": "cn-mocknet",
+      "initialNodeCount": 0,
+      "name": "cn-apps-pool",
+      "nodeConfig": {
+        "labels": {
+          "cn_apps": "true"
+        },
+        "loggingVariant": "MAX_THROUGHPUT",
+        "machineType": "n2-standard-16",
+        "taints": [
+          {
+            "effect": "NO_SCHEDULE",
+            "key": "cn_apps",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    "name": "cn-apps-node-pool",
+    "provider": "",
+    "type": "gcp:container/nodePool:NodePool"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "autoscaling": {
+        "maxNodeCount": 3,
+        "minNodeCount": 1
+      },
+      "cluster": "cn-mocknet",
+      "initialNodeCount": 1,
+      "name": "cn-infra-pool",
+      "nodeConfig": {
+        "labels": {
+          "cn_infra": "true"
+        },
+        "loggingVariant": "MAX_THROUGHPUT",
+        "machineType": "e2-standard-8",
+        "taints": [
+          {
+            "effect": "NO_SCHEDULE",
+            "key": "cn_infra",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    "name": "cn-infra-node-pool",
+    "provider": "",
+    "type": "gcp:container/nodePool:NodePool"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "autoscaling": {
+        "maxNodeCount": 3,
+        "minNodeCount": 1
+      },
+      "cluster": "cn-mocknet",
+      "initialNodeCount": 1,
+      "name": "gke-pool",
+      "nodeConfig": {
+        "loggingVariant": "MAX_THROUGHPUT",
+        "machineType": "e2-standard-4",
+        "taints": [
+          {
+            "effect": "NO_SCHEDULE",
+            "key": "components.gke.io/gke-managed-components",
+            "value": "true"
+          }
+        ]
+      }
+    },
+    "name": "gke-node-pool",
+    "provider": "",
+    "type": "gcp:container/nodePool:NodePool"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "storage.k8s.io/v1",
+      "kind": "StorageClass",
+      "metadata": {
+        "name": "hyperdisk-balanced-rwo"
+      },
+      "parameters": {
+        "provisioned-iops-on-create": "7000",
+        "provisioned-throughput-on-create": "250Mi",
+        "type": "hyperdisk-balanced"
+      },
+      "provisioner": "pd.csi.storage.gke.io",
+      "volumeBindingMode": "WaitForFirstConsumer"
+    },
+    "name": "hyperdisk-balanced-rwo",
+    "provider": "",
+    "type": "kubernetes:storage.k8s.io/v1:StorageClass"
+  }
+]
