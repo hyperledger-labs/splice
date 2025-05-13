@@ -60,7 +60,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added support for passing trace-contexts via gRPC CallOptions to `TraceContextGrpc`
 * Added priority shutdown tasks in `OnShutdownRunner` that run before other tasks, and added `setAsClosing` method.
 * Disabled `logConfigOnStartup` by default as it also logs secrets.
-* Changed `metrics.filterByNodeAndAttribute` in `InstanceReference ` to filter by `node_name` instead of `node` to match the CN metrics
+* Changed `metrics.filterByNodeAndAttribute` in `InstanceReference ` to filter by `node_name` instead of `node` to match the Splice metrics
 * Split `CommandFailure` into `InteractiveCommandFailure` and `CommandFailureWithDetails`.
 * `Cli.logLastErrors` default changed from `true` to `false`.
 * Added better logging of setup and cleanup failures in `DbTest`
