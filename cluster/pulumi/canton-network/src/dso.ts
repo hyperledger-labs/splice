@@ -153,9 +153,12 @@ export class Dso extends pulumi.ComponentResource {
       ingressName: conf.ingressName,
     }));
 
-    const sv1SvRewardWeightBps = approvedSvIdentities().find(
-      identity => identity.name == sv1Conf.onboardingName
-    )!.rewardWeightBps;
+    const sv1SvRewardWeightBps = (() => {
+      const found = approvedSvIdentities().find(
+        identity => identity.name == sv1Conf.onboardingName
+      );
+      return found ? found.rewardWeightBps : 10000;
+    })();
 
     const runningMigration = this.args.decentralizedSynchronizerUpgradeConfig.isRunningMigration();
     const sv1 = await this.installSvNode(
