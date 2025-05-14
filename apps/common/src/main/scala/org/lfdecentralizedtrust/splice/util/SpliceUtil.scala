@@ -256,6 +256,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      createFee: BigDecimal = defaultCreateFee.fee,
       transferPreapprovalFee: Option[BigDecimal] = None,
   ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
     splice.amuletconfig.USD
@@ -271,6 +272,7 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor,
       initialPackageConfig,
       holdingFee,
+      createFee,
       transferPreapprovalFee,
     ),
     List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
@@ -330,13 +332,14 @@ object SpliceUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       initialPackageConfig: splice.amuletconfig.PackageConfig = readPackageConfig(),
       holdingFee: BigDecimal = defaultHoldingFee.rate,
+      createFee: BigDecimal = defaultCreateFee.fee,
       transferPreapprovalFee: Option[BigDecimal] = None,
       featuredAppActivityMarkerAmount: Option[BigDecimal] = None,
       nextSynchronizerId: Option[SynchronizerId] = None,
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.AmuletConfig(
       // transferConfig
-      defaultTransferConfig(initialMaxNumInputs, holdingFee),
+      defaultTransferConfig(initialMaxNumInputs, holdingFee, createFee),
 
       // issuance curve
       defaultIssuanceCurve,
@@ -415,11 +418,12 @@ object SpliceUtil {
   def defaultTransferConfig(
       initialMaxNumInputs: Int,
       holdingFee: BigDecimal,
+      createFee: BigDecimal = defaultCreateFee.fee,
   ): splice.amuletconfig.TransferConfig[splice.amuletconfig.USD] =
     new splice.amuletconfig.TransferConfig(
       // Fee to create a new amulet.
       // Set to the fixed part of the transfer fee.
-      defaultCreateFee,
+      new splice.fees.FixedFee(damlDecimal(createFee)),
 
       // Fee for keeping a amulet around.
       // This is roughly equivalent to 1$/360 days but expressed as rounds
