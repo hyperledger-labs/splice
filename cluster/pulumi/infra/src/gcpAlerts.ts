@@ -94,7 +94,7 @@ ${conditionalString(
     '-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")\n' +
     '-- TODO(#8300): Can happen due to random disconnects/reconnects but also in other contexts\n' +
     '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")' +
-    '-(jsonPayload.remote : "AcsCommitment(\\n  domainId = global-domain::1220e1e594cd...,\\n  sender = PAR::tw-cn-testnet-participant")'
+    '-(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")'
 )}
 ${conditionalString(
   !isMainNet,
