@@ -45,13 +45,13 @@ const NetworkInfo: React.FC = () => {
 
   let openRoundsDisplay: JSX.Element;
   switch (openRoundsQuery.status) {
-    case 'loading':
+    case 'pending':
       openRoundsDisplay = <Loading />;
       break;
     case 'error':
       openRoundsDisplay = <ErrorDisplay message="Failed to fetch open rounds" />;
       break;
-    case 'success':
+    case 'success': {
       const sortedRounds = openRoundsQuery.data.sort(
         (a, b) => parseInt(a.payload.round.number) - parseInt(b.payload.round.number)
       );
@@ -86,6 +86,7 @@ const NetworkInfo: React.FC = () => {
           </TableBody>
         </Table>
       );
+    }
   }
 
   const configDescription = `The ${amuletName} configuration details below are voted on by the Super Validators, and may be updated over time.`;
@@ -99,11 +100,11 @@ const NetworkInfo: React.FC = () => {
   }
 
   switch (getAmuletRulesQuery.status) {
-    case 'loading':
+    case 'pending':
       return <Loading />;
     case 'error':
       return <ErrorDisplay message="Failed to fetch amulet rules" />;
-    case 'success':
+    case 'success': {
       const supportNewGovernanceFlow = featureSupport.data?.newGovernanceFlow || false;
       return (
         <Card>
@@ -131,6 +132,7 @@ const NetworkInfo: React.FC = () => {
           </CardContent>
         </Card>
       );
+    }
   }
 };
 

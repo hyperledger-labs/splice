@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-// @ts-ignore
 import * as jsondiffpatch from 'jsondiffpatch';
-// @ts-ignore
 import * as htmlFormatter from 'jsondiffpatch/formatters/html';
 import DiffMatchPatch from 'diff-match-patch';
 import DOMPurify from 'dompurify';
@@ -224,7 +222,7 @@ export const PrettyJsonDiff: React.FC<PrettyJsonDiffProps> = ({
   }
 
   // Sanitize and format the HTML for the diff 'display'
-  // @ts-ignore
+  // @ts-expect-error Type mismatch.
   const sanitizedHtml = DOMPurify.sanitize(htmlFormatter.format(delta, actualConfig));
 
   return (

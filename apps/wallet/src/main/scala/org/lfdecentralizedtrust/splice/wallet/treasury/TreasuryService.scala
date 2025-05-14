@@ -554,7 +554,8 @@ class TreasuryService(
           .submit(
             Seq(userStore.key.endUserParty),
             Seq(userStore.key.endUserParty),
-            factoryChoiceWithDisclosures.exercise,
+            factoryChoiceWithDisclosures.factoryId
+              .exerciseTransferFactory_Transfer(factoryChoiceWithDisclosures.args),
             CommandPriority.Low,
             treasuryConfig.grpcDeadline,
           )

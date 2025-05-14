@@ -1,7 +1,7 @@
 # Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-sdk-version: 3.3.0-snapshot.20250415.13756.0.vafc5c867
+sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: splice-token-standard-test
 description: |
   Test infrastructure for the token standard.
@@ -32,7 +32,6 @@ data-dependencies:
   - ../../daml/splice-amulet/.daml/dist/splice-amulet-current.dar
 build-options:
   - --target=2.1
-  - --disable-deprecated-exceptions-warning
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
   - -Wno-template-interface-depends-on-daml-script # This is test-only code, not intended to be uploaded to the ledger

@@ -59,6 +59,7 @@ copy_dir "cluster/images"
 copy_dir "cluster/helm"
 copy_dir "cluster/compose"
 copy_dir "cluster/pulumi"
+copy_dir "cluster/expected"
 copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
@@ -108,15 +109,21 @@ copy_file "start-frontends.sh"
 copy_file "stop-canton.sh"
 copy_file "stop-frontends.sh"
 copy_file "wait-for-canton.sh"
-copy_dir "support"
 cp "${SPLICE_ROOT}"/test-*.log "${SPLICE_DIR}/"
 copy_file "util.sh"
+copy_file "DEVELOPMENT.md"
+copy_file "CONTRIBUTING.md"
+copy_file "MAINTENANCE.md"
+copy_file "TESTING.md"
+copy_file "CANTON_CODE_CHANGES.md"
+copy_file "support/cometbft-json.lnav.json"
 
 # Cleanup of directories we used to copy to Splice, but no longer do,
 # so they don't get removed by rsync.
 rm -rf "${SPLICE_DIR}/.circleci"
 rm -rf "${SPLICE_DIR}/cluster/deployment/compose"
 rm -rf "${SPLICE_DIR}/images"
+rm -rf "${SPLICE_DIR}/support"
 
 # Since we are explicitly specifying what to copy above, rather than what not
 # to copy, we test that we are not missing anything from Splice that was not
@@ -144,7 +151,7 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v '.direnv' |
     grep -v 'CODEOWNERS' |
     grep -v 'LICENSE' |
-    grep -v '.*.md' |
+    grep -v "OPEN_SOURCE.md"
     grep -v 'openapi-cache-key.txt' |
     grep -v '^\.git' || true)
 

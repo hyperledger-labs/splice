@@ -13,16 +13,20 @@ const ANS_LEDGER_NAME = 'ans-ledger';
 interface JsonApiErrorResponse {
   status: number;
   statusText: string;
-  body: string;
+  body: JsonApiErrorBody;
+}
+
+interface JsonApiErrorBody {
+  error: string;
 }
 
 export class JsonApiError extends Error {
   status: number;
   statusText: string;
-  body: string;
+  body: JsonApiErrorBody;
 
   constructor({ status, body, statusText }: JsonApiErrorResponse) {
-    super(body);
+    super(statusText);
     this.name = 'JsonApiError';
     this.status = status;
     this.statusText = statusText;
@@ -166,7 +170,11 @@ export class LedgerApiClient {
           return r.json();
         } else {
           const body = await r.text();
-          throw new JsonApiError({ status: r.status, body: body, statusText: r.statusText });
+          throw new JsonApiError({
+            status: r.status,
+            body: { error: body },
+            statusText: r.statusText,
+          });
         }
       })
       .catch(e => {

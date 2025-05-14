@@ -38,8 +38,8 @@ const RequestAnsEntry: React.FC = () => {
   const nameLookupStatus: NameLookupStatus = isLoading
     ? 'loading'
     : entryLookupResult === null
-    ? 'available'
-    : 'taken';
+      ? 'available'
+      : 'taken';
 
   return (
     <Stack justifyContent="center" mt={2} spacing={2}>
@@ -101,7 +101,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
     return <></>;
   }
 
-  var message, icon, additionalContent;
+  let message, icon, additionalContent;
 
   const entryFee = ansRules.payload.config.entryFee;
   const entryInterval = ansRules.payload.config.entryLifetime;

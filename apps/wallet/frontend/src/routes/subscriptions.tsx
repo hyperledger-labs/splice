@@ -44,6 +44,8 @@ const Subscriptions: React.FC = () => {
 
   const isLoading = amuletPriceQuery.isLoading || subscriptionQuery.isLoading;
   const isError = amuletPriceQuery.isError || subscriptionQuery.isError;
+  const isDataUndefined =
+    subscriptionQuery.data === undefined || amuletPriceQuery.data === undefined;
 
   return (
     <Stack marginY={10} spacing={2}>
@@ -52,7 +54,7 @@ const Subscriptions: React.FC = () => {
       </Typography>
       {isLoading ? (
         <Loading />
-      ) : isError ? (
+      ) : isError || isDataUndefined ? (
         <ErrorDisplay message={'Error while fetching either transactions or amulet price.'} />
       ) : (
         <TableContainer>

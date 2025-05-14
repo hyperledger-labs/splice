@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { defaultActiveMigration, SynchronizerMigrationSchema } from './migrationSchema';
 
+// This is a config that's relevant for all (most) pulumi projects. For project-specific configuration,
+// define a config schema in the project itself, and parse the Yaml file there. See e.g. cluster/pulumi/infra/src/config.ts
 const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   isExternalCluster: z.boolean(),

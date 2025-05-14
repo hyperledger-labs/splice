@@ -1,0 +1,588 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "cluster-ingress"
+      }
+    },
+    "name": "cluster-ingress-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-cluster-ingress-default::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "docker-reg-cred",
+        "namespace": "cluster-ingress"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "cluster-ingress-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "cluster-ingress-validator",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "svNamespace": "validator"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "withSvIngress": false
+      },
+      "version": "0.3.20"
+    },
+    "name": "cluster-ingress-validator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "postgres-secrets",
+        "namespace": "validator"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "projects/test-project/global/networks/default",
+    "inputs": {},
+    "name": "default",
+    "provider": "",
+    "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s-imgpull-cluster-ingress-default",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s-imgpull-validator-default",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "loopback",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "hostname": "mock.global.canton.network.digitalasset.com"
+        },
+        "cometbftPorts": {
+          "domains": 5
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-validator-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "validator"
+      }
+    },
+    "name": "validator-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-validator-default::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "docker-reg-cred",
+        "namespace": "validator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "validator-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "participant-3",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://ledger_api.example.com"
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 3
+          }
+        },
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "splice-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
+        "persistence": {
+          "databaseName": "participant_3",
+          "host": "postgres.validator.svc.cluster.local",
+          "postgresName": "postgres",
+          "schema": "participant",
+          "secretName": "postgres-secrets"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator-participant-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator-postgres-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator-postgres",
+    "provider": "",
+    "type": "canton:network:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-postgres",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "postgres",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "db": {
+          "volumeSize": "50Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "persistence": {
+          "secretName": "postgres-secrets"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator-postgres",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "validator"
+      }
+    },
+    "name": "validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "validator",
+      "namespace": "validator",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "audience": "https://validator.example.com/api",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
+        "contactPoint": "sv-support@digitalasset.com",
+        "db": {},
+        "enablePostgresMetrics": true,
+        "enableWallet": true,
+        "failOnAppVersionMismatch": true,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "metrics": {
+          "enable": true
+        },
+        "migrateValidatorParty": false,
+        "migration": {
+          "id": "3"
+        },
+        "nodeIdentifier": "validator-runbook",
+        "participantAddress": "participant-3",
+        "participantIdentitiesDumpPeriodicBackup": {
+          "backupInterval": "10m",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-data-dumps",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+            },
+            "prefix": "mock/validator"
+          }
+        },
+        "persistence": {
+          "host": "postgres",
+          "postgresName": "postgres",
+          "secretName": "postgres-secrets"
+        },
+        "scanAddress": "https://scan.sv-2.mock.global.canton.network.digitalasset.com",
+        "spliceInstanceNames": {
+          "amuletName": "Amulet",
+          "amuletNameAcronym": "AMT",
+          "nameServiceName": "Amulet Name Service",
+          "nameServiceNameAcronym": "ANS",
+          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+          "networkName": "Splice"
+        },
+        "svSponsorAddress": "https://sv.sv-2.mock.global.canton.network.digitalasset.com",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 4500
+        },
+        "validatorPartyHint": "digitalasset-testValidator-1",
+        "validatorWalletUsers": [
+          "auth0|6526fab5214c99a9a8e1e3cc"
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  }
+]

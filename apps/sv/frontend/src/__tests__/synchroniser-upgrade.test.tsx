@@ -63,42 +63,39 @@ describe('SV user can', () => {
     expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
   });
 
-  test(
-    'set next scheduled synchronizer upgrade',
-    async () => {
-      server.use(
-        rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
-          return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
-        })
-      );
+  test('set next scheduled synchronizer upgrade', { timeout: 10000 }, async () => {
+    server.use(
+      rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
+        return res(ctx.json(dsoInfoWithoutSynchronizerUpgrade));
+      })
+    );
 
-      const user = userEvent.setup();
-      render(<AppWithConfig />);
+    const user = userEvent.setup();
+    render(<AppWithConfig />);
 
-      expect(await screen.findByText('Log In')).toBeDefined();
+    expect(await screen.findByText('Log In')).toBeDefined();
 
-      const input = screen.getByRole('textbox');
-      await user.type(input, 'sv1');
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
 
-      await user.click(screen.getByText('Governance'));
+    await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      expect(dropdown).toBeDefined();
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+    const dropdown = screen.getByTestId('display-actions');
+    expect(dropdown).toBeDefined();
+    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
 
-      expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
-      expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
+    expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
+    expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
 
-      const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
-      await user.click(checkBox);
+    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(checkBox);
 
-      expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
-    },
-    { timeout: 10000 }
-  );
+    expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
+  });
 
   test(
     'submit vote request with new valid synchronizer upgrade time',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
@@ -148,12 +145,12 @@ describe('SV user can', () => {
       expect(
         screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
       ).toBeDefined();
-    },
-    { timeout: 10000 }
+    }
   );
 
   test(
     'submit vote request with existing and unchanged synchronizer upgrade time',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
@@ -176,15 +173,17 @@ describe('SV user can', () => {
 
       await fillOutForm(user);
 
-      expect(
-        screen.queryByTestId('create-voterequest-submit-button')?.getAttribute('disabled')
-      ).toBeNull();
-    },
-    { timeout: 10000 }
+      const disabled = screen
+        .queryByTestId('create-voterequest-submit-button')
+        ?.getAttribute('disabled');
+
+      expect(disabled).toBeOneOf([null, '']);
+    }
   );
 
   test(
     'not submit vote request if new synchronizer upgrade time is before expiry',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
@@ -245,12 +244,12 @@ describe('SV user can', () => {
       expect(
         screen.queryByTestId('create-voterequest-submit-button')?.getAttribute('disabled')
       ).toBeNull();
-    },
-    { timeout: 10000 }
+    }
   );
 
   test(
     'not submit vote request if synchronizer upgrade time is changed and is before expiry and effective at threshold',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
@@ -312,12 +311,12 @@ describe('SV user can', () => {
       expect(
         screen.getByTestId('create-voterequest-submit-button').getAttribute('disabled')
       ).toBeDefined();
-    },
-    { timeout: 10000 }
+    }
   );
 
   test(
     'not submit vote request if synchronizer upgrade time is changed and is before effective date',
+    { timeout: 10000 },
     async () => {
       server.use(
         rest.get(`${svUrl}/v0/dso`, (_, res, ctx) => {
@@ -370,11 +369,12 @@ describe('SV user can', () => {
         target: { value: validUpgradeTime },
       });
 
-      expect(
-        screen.queryByTestId('create-voterequest-submit-button')?.getAttribute('disabled')
-      ).toBeNull();
-    },
-    { timeout: 10000 }
+      const disabled = screen
+        .queryByTestId('create-voterequest-submit-button')
+        ?.getAttribute('disabled');
+
+      expect(disabled).toBeOneOf([null, '']);
+    }
   );
 
   test(

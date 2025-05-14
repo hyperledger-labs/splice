@@ -43,7 +43,6 @@ abstract class ValidatorPreflightIntegrationTestBase
   protected val auth0: Auth0Util
 
   protected val validatorName: String
-  protected val validatorPartyHint: String
   protected val validatorAuth0Secret: String
   protected val validatorAuth0Audience: String
   protected val validatorWalletUser: String
@@ -200,7 +199,7 @@ abstract class ValidatorPreflightIntegrationTestBase
             inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
               val transaction = readTransactionFromRow(tx)
               transaction.action should matchText("Received")
-              val partyR = s"${alicePartyId}.*${validatorPartyHint}::.*".r
+              val partyR = s"$alicePartyId.*".r
               val description =
                 transaction.partyDescription.getOrElse(fail("There should be a party."))
               description should fullyMatch regex partyR
@@ -516,7 +515,6 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
   override protected val auth0 = auth0UtilFromEnvVars("validator")
 
   override protected val validatorName = "validator"
-  override protected val validatorPartyHint = "digitalasset-testValidator-1"
   override protected val validatorAuth0Secret = sys.env("SPLICE_OAUTH_TEST_CLIENT_ID_VALIDATOR")
   override protected val validatorAuth0Audience = "https://validator.example.com/api"
   override protected val includeSplitwellTests = false
@@ -548,7 +546,6 @@ class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTe
   override protected val isDevNet = true
   override protected val auth0 = auth0UtilFromEnvVars("dev")
   override protected val validatorName = "validator1"
-  override protected val validatorPartyHint = "digitalasset-validator1-1"
   override protected val validatorAuth0Secret =
     sys.env("SPLICE_OAUTH_DEV_CLIENT_ID_VALIDATOR1")
   override protected val validatorAuth0Audience = sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE")

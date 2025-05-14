@@ -8,6 +8,7 @@ import {
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useMutation } from '@tanstack/react-query';
 import React, { useState } from 'react';
+import { sanitizeUrl } from '@braintree/sanitize-url';
 
 import CheckIcon from '@mui/icons-material/Check';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -101,7 +102,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
             </Button>
           ) : (
             <DisableConditionally
-              conditions={[{ disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' }]}
+              conditions={[{ disabled: castOrUpdateVoteMutation.isPending, reason: 'Loading...' }]}
             >
               <Button id="cast-vote-button" size="small" variant="contained" onClick={startEditing}>
                 vote
@@ -120,7 +121,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                 <TableCell>
                   <DisableConditionally
                     conditions={[
-                      { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                      { disabled: castOrUpdateVoteMutation.isPending, reason: 'Loading...' },
                       { disabled: !isEditing, reason: 'Not editing' },
                     ]}
                   >
@@ -150,7 +151,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                   {isEditing ? (
                     <DisableConditionally
                       conditions={[
-                        { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                        { disabled: castOrUpdateVoteMutation.isPending, reason: 'Loading...' },
                       ]}
                     >
                       <TextField
@@ -177,7 +178,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                   {isEditing ? (
                     <DisableConditionally
                       conditions={[
-                        { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                        { disabled: castOrUpdateVoteMutation.isPending, reason: 'Loading...' },
                       ]}
                     >
                       <TextField
@@ -189,7 +190,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                     </DisableConditionally>
                   ) : (
                     <Typography id="vote-request-modal-vote-reason-url" variant="h6">
-                      {vote ? vote.reason.url : ''}
+                      {vote ? sanitizeUrl(vote.reason.url) : ''}
                     </Typography>
                   )}
                 </TableCell>
@@ -203,7 +204,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                     <Stack direction="row" spacing={2}>
                       <DisableConditionally
                         conditions={[
-                          { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                          { disabled: castOrUpdateVoteMutation.isPending, reason: 'Loading...' },
                         ]}
                       >
                         <Button variant="outlined" onClick={() => setIsEditing(false)}>
@@ -212,7 +213,7 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
                       </DisableConditionally>
                       <DisableConditionally
                         conditions={[
-                          { disabled: castOrUpdateVoteMutation.isLoading, reason: 'Loading...' },
+                          { disabled: castOrUpdateVoteMutation.isPending, reason: 'Loading...' },
                           { disabled: voteEditing === undefined, reason: 'No vote to edit' },
                         ]}
                       >

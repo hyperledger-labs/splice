@@ -1,0 +1,944 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-participant-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "validator-pg-secrets",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-validator1-validator-pg-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "projects/test-project/global/networks/default",
+    "inputs": {},
+    "name": "default",
+    "provider": "",
+    "type": "gcp:compute/network:Network"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {}
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s-imgpull-validator1-default",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
+        "title": "\"validator1_test\" keyring"
+      },
+      "role": "roles/cloudkms.admin"
+    },
+    "name": "mock-validator1-kms-roles/cloudkms.admin-\"validator1_test\"-keyring-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
+        "title": "\"validator1_test\" keyring"
+      },
+      "role": "roles/cloudkms.cryptoOperator"
+    },
+    "name": "mock-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_test\"-keyring-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "accountId": "mock-validator1-kms",
+      "description": "(managed by Pulumi)",
+      "displayName": "KMS Service Account (mock validator1)"
+    },
+    "name": "mock-validator1-kms-sa",
+    "provider": "",
+    "type": "gcp:serviceaccount/account:Account"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "mock-validator1-kms",
+    "provider": "",
+    "type": "cn:gcp:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {},
+    "name": "participantKmsServiceAccountKey",
+    "provider": "",
+    "type": "gcp:serviceaccount/key:Key"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "secret": "dmFsaWRhdG9yMXNlY3JldDI="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-onboarding-validator",
+        "namespace": "validator1"
+      },
+      "type": "Opaque"
+    },
+    "name": "splice-app-validator1-validator-onboarding-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-validator-ledger-api-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://canton.network.global",
+          "client-id": "validator1-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator1-client-id@clients",
+          "url": "https://canton-network-dev.us.auth0.com/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "splice-auth0-secret-validator1-validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-cns-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-cns-ui-client-id",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-splitwell-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-splitwell-ui-client-id",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-splitwell",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "splice-app-wallet-ui-auth",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "validator1-wallet-ui-client-id",
+          "url": "https://canton-network-dev.us.auth0.com"
+        }
+      }
+    },
+    "name": "splice-auth0-ui-secret-validator1-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-validator1-participant-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cnadmin",
+      "password": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": null
+      }
+    },
+    "name": "user-validator1-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/user:User"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "cluster-ingress-validator1",
+      "namespace": "validator1",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet",
+          "svNamespace": "validator1"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "ingress": {
+          "decentralizedSynchronizer": {
+            "activeMigrationId": "3"
+          },
+          "splitwell": true
+        },
+        "spliceDomainNames": {
+          "nameServiceDomain": "cns"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "withSvIngress": false
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator1-cluster-ingress-validator1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "validator1-db-participant-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "cantonnet"
+    },
+    "name": "validator1-db-validator-pg-cantonnet",
+    "provider": "",
+    "type": "gcp:sql/database:Database"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "validator1"
+      }
+    },
+    "name": "validator1-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-validator1-default::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "docker-reg-cred",
+        "namespace": "validator1"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "validator1-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "loopback",
+      "namespace": "validator1",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "cometbftPorts": {
+          "domains": 5
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator1-loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "participant-3",
+      "namespace": "validator1",
+      "timeout": 600,
+      "values": {
+        "additionalEnvVars": [
+          {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": "/app/gcp-credentials.json"
+          }
+        ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json",
+          "targetAudience": "https://canton.network.global"
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "enableHealthProbes": true,
+        "enablePostgresMetrics": true,
+        "extraVolumeMounts": [
+          {
+            "mountPath": "/app/gcp-credentials.json",
+            "name": "gcp-credentials",
+            "subPath": "googleCredentials"
+          }
+        ],
+        "extraVolumes": [
+          {
+            "name": "gcp-credentials",
+            "secret": {
+              "secretName": "gke-credentials"
+            }
+          }
+        ],
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "kms": {
+          "keyRingId": "validator1_test",
+          "locationId": "us-central1",
+          "projectId": "da-cn-devnet",
+          "type": "gcp"
+        },
+        "metrics": {
+          "enable": true,
+          "migration": {
+            "active": true,
+            "id": 3
+          }
+        },
+        "participantAdminUserNameFrom": {
+          "secretKeyRef": {
+            "key": "ledger-api-user",
+            "name": "splice-app-validator-ledger-api-auth",
+            "optional": false
+          }
+        },
+        "persistence": {
+          "databaseName": "participant_3",
+          "postgresName": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secrets"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator1-participant-3",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-participant-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-participant-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": true,
+      "region": "europe-west6",
+      "settings": {
+        "activationPolicy": "ALWAYS",
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "2147483647"
+          }
+        ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "europe-west6-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "mock"
+        }
+      }
+    },
+    "name": "validator1-participant-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-splitwell-web-ui",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "splitwell-web-ui",
+      "namespace": "validator1",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "auth": {
+          "audience": "https://canton.network.global"
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.global.canton.network.digitalasset.com",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "spliceInstanceNames": {
+          "amuletName": "Amulet",
+          "amuletNameAcronym": "AMT",
+          "nameServiceName": "Amulet Name Service",
+          "nameServiceNameAcronym": "ANS",
+          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+          "networkName": "Splice"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator1-splitwell-web-ui",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "validator1-validator-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "validator1-validator-pg",
+    "provider": "",
+    "type": "canton:cloud:postgres"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "databaseVersion": "POSTGRES_14",
+      "deletionProtection": true,
+      "region": "europe-west6",
+      "settings": {
+        "activationPolicy": "ALWAYS",
+        "backupConfiguration": {
+          "enabled": true,
+          "pointInTimeRecoveryEnabled": true
+        },
+        "dataCacheConfig": {
+          "dataCacheEnabled": false
+        },
+        "databaseFlags": [
+          {
+            "name": "temp_file_limit",
+            "value": "2147483647"
+          }
+        ],
+        "deletionProtectionEnabled": true,
+        "edition": "ENTERPRISE",
+        "insightsConfig": {
+          "queryInsightsEnabled": true
+        },
+        "ipConfiguration": {
+          "enablePrivatePathForGoogleCloudServices": true,
+          "ipv4Enabled": false,
+          "privateNetwork": "projects/test-project/global/networks/default"
+        },
+        "locationPreference": {
+          "zone": "europe-west6-a"
+        },
+        "maintenanceWindow": {
+          "day": 2,
+          "hour": 8
+        },
+        "tier": "db-custom-2-7680",
+        "userLabels": {
+          "cluster": "mock"
+        }
+      }
+    },
+    "name": "validator1-validator-pg",
+    "provider": "",
+    "type": "gcp:sql/databaseInstance:DatabaseInstance"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-validator",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "validator-validator1",
+      "namespace": "validator1",
+      "timeout": 600,
+      "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ONBOARDING_SECRET_ONLY_FOR_TESTING",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "secret",
+                "name": "splice-app-validator-onboarding-validator",
+                "optional": false
+              }
+            }
+          }
+        ],
+        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
+        "additionalUsers": [],
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "appDars": [
+          "splice-node/dars/splitwell-0.1.0.dar",
+          "splice-node/dars/splitwell-0.1.1.dar",
+          "splice-node/dars/splitwell-0.1.2.dar",
+          "splice-node/dars/splitwell-0.1.3.dar",
+          "splice-node/dars/splitwell-0.1.4.dar",
+          "splice-node/dars/splitwell-0.1.5.dar",
+          "splice-node/dars/splitwell-0.1.6.dar",
+          "splice-node/dars/splitwell-0.1.7.dar",
+          "splice-node/dars/splitwell-0.1.8.dar",
+          "splice-node/dars/splitwell-0.1.9.dar"
+        ],
+        "auth": {
+          "audience": "https://canton.network.global",
+          "jwksUrl": "https://canton-network-dev.us.auth0.com/.well-known/jwks.json"
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "contactPoint": "sv-support@digitalasset.com",
+        "enablePostgresMetrics": true,
+        "failOnAppVersionMismatch": true,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "metrics": {
+          "enable": true
+        },
+        "migration": {
+          "id": 3,
+          "migrating": false
+        },
+        "nodeIdentifier": "validator1",
+        "onboardingSecretFrom": {
+          "secretKeyRef": {
+            "key": "secret",
+            "name": "splice-app-validator-onboarding-validator",
+            "optional": false
+          }
+        },
+        "participantAddress": "participant-3",
+        "participantIdentitiesDumpPeriodicBackup": {
+          "backupInterval": "10m",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-data-dumps",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+            },
+            "prefix": "mock/validator1"
+          }
+        },
+        "persistence": {
+          "databaseName": "validator1",
+          "port": 5432,
+          "postgresName": "validator-pg",
+          "schema": "validator1",
+          "secretName": "validator-pg-secrets",
+          "user": "cnadmin"
+        },
+        "scanAddress": "http://scan-app.sv-1:5012",
+        "spliceInstanceNames": {
+          "amuletName": "Amulet",
+          "amuletNameAcronym": "AMT",
+          "nameServiceName": "Amulet Name Service",
+          "nameServiceNameAcronym": "ANS",
+          "networkFaviconUrl": "https://www.hyperledger.org/hubfs/hyperledgerfavicon.png",
+          "networkName": "Splice"
+        },
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
+        "svValidator": false,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ],
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 45000
+        },
+        "useSequencerConnectionsFromScan": true,
+        "validatorPartyHint": "digitalasset-validator1-1",
+        "validatorWalletUsers": [
+          "auth0|63e3d75ff4114d87a2c1e4f5"
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "validator1-validator-validator1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test",
+    "inputs": {
+      "location": "us-central1",
+      "name": "validator1_test",
+      "project": "da-cn-devnet"
+    },
+    "name": "validator1_test_keyring",
+    "provider": "",
+    "type": "gcp:kms/keyRing:KeyRing"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "validator1"
+      }
+    },
+    "name": "validator1",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  }
+]

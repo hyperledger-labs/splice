@@ -19,11 +19,11 @@ export const ValidatorLeaderboardTable: React.FC = () => {
   const topValidatorsQuery = useGetTopValidatorsByValidatorRewards();
 
   switch (topValidatorsQuery.status) {
-    case 'loading':
+    case 'pending':
       return <Loading />;
     case 'error':
       return <ErrorDisplay message={'Could not retrieve validator leaderboard'} />;
-    case 'success':
+    case 'success': {
       const topValidators = topValidatorsQuery.data.validatorsAndRewards.map(validator => ({
         name: validator.provider,
         // TODO(#5280) - add transfer totals to API response
@@ -51,6 +51,7 @@ export const ValidatorLeaderboardTable: React.FC = () => {
           </TableBody>
         </TitledTable>
       );
+    }
   }
 };
 

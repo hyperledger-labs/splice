@@ -30,6 +30,7 @@ import { convertCurrency } from '../utils/currencyConversion';
 export const ConfirmSubscription: React.FC = () => {
   const { cid } = useParams();
   const subscriptionRequestQuery = useSubscriptionRequest(cid!);
+  const isDataUndefined = subscriptionRequestQuery.data === undefined;
 
   if (subscriptionRequestQuery.isLoading) {
     return <Loading />;
@@ -38,7 +39,7 @@ export const ConfirmSubscription: React.FC = () => {
   return (
     <Container maxWidth="md">
       <Stack alignItems="center" paddingTop={4} spacing={4}>
-        {subscriptionRequestQuery.isError ? (
+        {subscriptionRequestQuery.isError || isDataUndefined ? (
           <Box display="flex" alignItems="center" justifyContent="center">
             <ErrorDisplay message={'Error while fetching subscription request and amulet price'} />
           </Box>
@@ -79,7 +80,7 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionReque
     return <Loading />;
   }
 
-  if (amuletPriceQuery.isError) {
+  if (amuletPriceQuery.isError || amuletPriceQuery.data === undefined) {
     return <ErrorDisplay message={'Error while fetching amulet price'} />;
   }
 

@@ -180,7 +180,8 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
     return <p>Error, something went wrong.</p>;
   }
 
-  const voteRequests = [...listVoteRequestsQuery.data].sort((a, b) => {
+  const voteRequestsData = listVoteRequestsQuery.data ? [...listVoteRequestsQuery.data] : [];
+  const voteRequests = voteRequestsData.sort((a, b) => {
     const createdAtA = a.createdAt;
     const createdAtB = b.createdAt;
     if (createdAtA === createdAtB) {

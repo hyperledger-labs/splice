@@ -86,6 +86,7 @@ object SvOnboardingConfig {
       initialMaxNumInputs: Int = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
+      initialCreateFee: BigDecimal = SpliceUtil.defaultCreateFee.fee,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,

@@ -417,11 +417,28 @@ final class DbMultiDomainAcsStore[TXE](
     storage.update(
       DBIOAction
         .seq(
+          // Note: this one-time explicit backfilling initialization might run concurrently with
+          // `doInitializeFirstIngestedUpdate()`, which is called by the ingestion process.
+          // Both methods use `ON CONFLICT` clauses to handle concurrent updates.
+          //
+          // No matter in which order the above methods are called, the actual backfilling process
+          // (i.e., `destinationHistory.insert()`) won't be called until this method finishes, which
+          // guarantees that txlog_first_ingested_update is initialized with the first observed record_time
+          // for each migration/synchronizer pair.
+          sqlu"""
+            insert into txlog_first_ingested_update (store_id, migration_id, synchronizer_id, record_time)
+            select store_id, migration_id, domain_id, min(record_time) as record_time
+              from #$txLogTableName
+              where store_id = $txLogStoreId
+              group by store_id, migration_id, domain_id
+            on conflict (store_id, migration_id, synchronizer_id) do update
+              set record_time = least(excluded.record_time, txlog_first_ingested_update.record_time)
+          """,
           sqlu"""
             insert into txlog_backfilling_status (store_id, backfilling_complete)
             values ($txLogStoreId, false)
             on conflict do nothing
-          """
+          """,
         )
         .transactionally,
       "initializeTxLogBackfilling",
@@ -503,6 +520,63 @@ final class DbMultiDomainAcsStore[TXE](
         ).value
       }
 
+      private def doInsertEntries(
+          migrationId: Long,
+          synchronizerId: SynchronizerId,
+          treesWithEntries: Seq[(TransactionTree, TXE)],
+      ) = {
+        treesWithEntries.headOption match {
+          case None =>
+            // None of the trees in this batch produced any entries, nothing to insert
+            DBIOAction.unit
+          case Some((firstEntryTree, _)) =>
+            val firstRecordTime = CantonTimestamp.assertFromInstant(firstEntryTree.getRecordTime)
+            val summary = MutableIngestionSummary.empty
+            for {
+              // DbStorage requires all actions to be idempotent.
+              // We can't use `ON CONFLICT DO NOTHING` because different txlog tables have different uniqueness constraints:
+              // - `txlog_store_template` (used in test code) doesn't have any uniqueness constraint
+              // - `user_wallet_txlog_store` has a unique index on (store_id, tx_log_id, event_id)
+              // - `txlog_first_ingested_update` has an index on (store_id, entry_type, event_id), but it's not unique
+              // Uniqueness constraints should also be consistent with parsers - some parsers might want to produce
+              // multiple entries for the same event (for example, if an exercise event batches multiple logical operations).
+              // Instead of rethinking the whole design, we just check if some entry for one of the trees already exists in the table.
+              //
+              // Note: this approach protects against repeated calls of this method with the same arguments
+              // (e.g., if it's retried because of a transient database connection error or in DbStorageIdempotency test code),
+              // but it does NOT protect against this method being called concurrently (both SQL transactions could independently
+              // decide that the items do not exist and need to be inserted).
+              // This is fine because this method is only called from TxLogBackfillingTrigger, and triggers only run one task at a time.
+              itemExists <- sql"""
+                select exists(
+                  select record_time
+                  from #$txLogTableName
+                  where
+                    store_id = $txLogStoreId and
+                    migration_id = $migrationId and
+                    domain_id = $synchronizerId and
+                    record_time = $firstRecordTime
+                )
+                """.as[Boolean].head
+              _ <-
+                if (!itemExists) {
+                  DBIOAction.seq(
+                    treesWithEntries.map { case (tree, entry) =>
+                      doIngestTxLogInsert(
+                        migrationId,
+                        synchronizerId,
+                        tree.getOffset,
+                        CantonTimestamp.assertFromInstant(tree.getRecordTime),
+                        entry,
+                        summary,
+                      )
+                    }*
+                  )
+                } else DBIOAction.unit
+            } yield ()
+        }
+      }
+
       override def insert(
           migrationId: Long,
           synchronizerId: SynchronizerId,
@@ -526,65 +600,23 @@ final class DbMultiDomainAcsStore[TXE](
           if (tree.getRecordTime.isBefore(acc.getRecordTime)) tree else acc
         }
         val firstRecordTime = CantonTimestamp.assertFromInstant(firstTree.getRecordTime)
-        val summary = MutableIngestionSummary.empty
+        val treesWithEntries = trees.flatMap { tree =>
+          val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
+          entries.map(e => (tree, e))
+        }
+
         for {
           _ <- storage.queryAndUpdate(
-            for {
-              // DbStorage requires all actions to be idempotent.
-              // We can't use `ON CONFLICT DO NOTHING` because different txlog tables have different uniqueness constraints:
-              // - `txlog_store_template` (used in test code) doesn't have any uniqueness constraint
-              // - `user_wallet_txlog_store` has a unique index on (store_id, tx_log_id, event_id)
-              // - `txlog_first_ingested_update` has an index on (store_id, entry_type, event_id), but it's not unique
-              // Uniqueness constraints should also be consistent with parsers - some parsers might want to produce
-              // multiple entries for the same event (for example, if an exercise event batches multiple logical operations).
-              // Instead of rethinking the whole design, we just check if some entry for one of the trees already exists in the table.
-              //
-              // Note: this approach protects against repeated calls of this method with the same arguments
-              // (e.g., if it's retried because of a transient database connection error or in DbStorageIdempotency test code),
-              // but it does NOT protect against this method being called concurrently (both SQL transactions could independently
-              // decide that the items do not exist and need to be inserted).
-              // This is fine because this method is only called from TxLogBackfillingTrigger, and triggers only run one task at a time.
-              itemExists <- sql"""
-                 select exists(
-                   select record_time
-                   from #$txLogTableName
-                   where
-                     store_id = $txLogStoreId and
-                     migration_id = $migrationId and
-                     domain_id = $synchronizerId and
-                     record_time = $firstRecordTime
-                 )
-               """.as[Boolean].head
-              _ <-
-                if (!itemExists) {
-                  DBIOAction
-                    .seq(
-                      DBIOAction.seq(
-                        trees.flatMap { tree =>
-                          val entries = txLogConfig.parser.parse(tree, synchronizerId, logger)
-                          entries.map(entry =>
-                            doIngestTxLogInsert(
-                              migrationId,
-                              synchronizerId,
-                              tree.getOffset,
-                              CantonTimestamp.assertFromInstant(tree.getRecordTime),
-                              entry,
-                              summary,
-                            )
-                          )
-                        }*
-                      ),
-                      doUpdateFirstIngestedUpdate(
-                        synchronizerId,
-                        migrationId,
-                        firstRecordTime,
-                      ),
-                    )
-                    .transactionally
-                } else {
-                  DBIOAction.unit
-                }
-            } yield (),
+            DBIOAction
+              .seq(
+                doInsertEntries(migrationId, synchronizerId, treesWithEntries),
+                doUpdateFirstIngestedUpdate(
+                  synchronizerId,
+                  migrationId,
+                  firstRecordTime,
+                ),
+              )
+              .transactionally,
             "destinationHistory.insert",
           )
         } yield DestinationHistory.InsertResult(

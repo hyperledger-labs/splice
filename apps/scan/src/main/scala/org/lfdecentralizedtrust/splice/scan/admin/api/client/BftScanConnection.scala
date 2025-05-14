@@ -433,7 +433,10 @@ class BftScanConnection(
       tc: TraceContext
   ): Future[
     (
-        FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+        FactoryChoiceWithDisclosures[
+          transferinstructionv1.TransferFactory.ContractId,
+          transferinstructionv1.TransferFactory_Transfer,
+        ],
         TransferFactoryWithChoiceContext.TransferKind,
     )
   ] =

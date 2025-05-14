@@ -33,7 +33,7 @@ export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ childre
         ansEntry: ansEntryName,
         primaryParty: primaryPartyId!,
       });
-      return ansEntry;
+      return ansEntry ?? null;
     },
     enabled: !!primaryPartyId,
   });

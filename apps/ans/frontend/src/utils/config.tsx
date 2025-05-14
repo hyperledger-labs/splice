@@ -13,6 +13,7 @@ import { PollingStrategy } from '@lfdecentralizedtrust/splice-common-frontend-ut
 import React from 'react';
 import { z } from 'zod';
 
+// eslint-disable-next-line  @typescript-eslint/no-unused-vars
 const walletSchema = z.object({
   uiUrl: z.string().url(),
 });

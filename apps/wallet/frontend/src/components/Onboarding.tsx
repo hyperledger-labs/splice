@@ -65,7 +65,7 @@ const Onboarding: React.FC = () => {
         </Typography>
 
         <DisableConditionally
-          conditions={[{ disabled: onboardUserMutation.isLoading, reason: 'Loading...' }]}
+          conditions={[{ disabled: onboardUserMutation.isPending, reason: 'Loading...' }]}
         >
           <Button
             variant="pill"

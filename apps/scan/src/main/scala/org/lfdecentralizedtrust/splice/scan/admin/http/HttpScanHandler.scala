@@ -712,19 +712,10 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getUpdateHistory") { _ => _ =>
       val updateHistory = store.updateHistory
       val afterO = after.map { after =>
-        val afterRecordTime = {
-          for {
-            instant <- Try(Instant.parse(after.afterRecordTime)).toEither.left.map(_.getMessage)
-            ts <- Timestamp.fromInstant(instant)
-          } yield CantonTimestamp(ts)
-        }
-        afterRecordTime.fold(
-          error => throw new IllegalArgumentException(s"Invalid timestamp: $error"),
-          afterRecordTime =>
-            (
-              after.afterMigrationId,
-              afterRecordTime,
-            ),
+        val afterRecordTime = parseTimestamp(after.afterRecordTime)
+        (
+          after.afterMigrationId,
+          afterRecordTime,
         )
       }
       updateHistory
@@ -1119,9 +1110,12 @@ class HttpScanHandler(
     output.toByteString
   }
 
-  override def getAcsSnapshot(respond: ScanResource.GetAcsSnapshotResponse.type)(party: String)(
+  override def getAcsSnapshot(
+      respond: ScanResource.GetAcsSnapshotResponse.type
+  )(party: String, recordTimeStr: Option[String])(
       extracted: com.digitalasset.canton.tracing.TraceContext
   ): Future[ScanResource.GetAcsSnapshotResponse] = {
+    val recordTime = recordTimeStr.map(parseTimestamp)
     implicit val tc = extracted
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
@@ -1134,7 +1128,10 @@ class HttpScanHandler(
         // that users backup their own ACS.
         // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(partyId))
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+          Set(partyId),
+          timestamp = recordTime.map(_.toInstant),
+        )
       } yield {
         val filteredAcsSnapshot =
           filterAcsSnapshot(acsSnapshot, store.key.dsoParty)
@@ -1891,6 +1888,17 @@ class HttpScanHandler(
   ): Future[ScanResource.FeatureSupportResponse] = readFeatureSupport(
     store.key.dsoParty
   )(extracted, ec, tracer).map(ScanResource.FeatureSupportResponseOK(_))
+
+  private def parseTimestamp(str: String): CantonTimestamp = {
+    val timestamp = for {
+      instant <- Try(Instant.parse(str)).toEither.left.map(_.getMessage)
+      ts <- Timestamp.fromInstant(instant)
+    } yield CantonTimestamp(ts)
+    timestamp.fold(
+      error => throw new IllegalArgumentException(s"Invalid timestamp: $error"),
+      identity,
+    )
+  }
 
 }
 

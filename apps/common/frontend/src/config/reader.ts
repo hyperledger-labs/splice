@@ -16,7 +16,7 @@ const envConfigString = import.meta.env.VITE_SPLICE_CONFIG;
 export class ConfigReader<
   A extends z.ZodRawShape,
   B extends z.ZodTypeAny,
-  T extends z.ZodObject<A, 'strip', B>
+  T extends z.ZodObject<A, 'strip', B>,
 > {
   private schema;
 

@@ -120,6 +120,47 @@ describe('Wallet user can', () => {
     expect(entries.find(e => e === dsoEntry.name)).toBeUndefined();
   });
 
+  describe('Token Standard', () => {
+    transferTests(false);
+  });
+
+  describe('Regular transfer offer', () => {
+    transferTests(true);
+  });
+});
+
+function transferTests(disableTokenStandard: boolean) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function toggleTokenStandard(user: any): Promise<void> {
+    if (disableTokenStandard) {
+      await user.click(screen.getByRole('checkbox', { name: 'Use Token Standard Transfer' }));
+    }
+  }
+
+  async function assertCorrectMockIsCalled(
+    expected: { amount: string; receiver_party_id: string },
+    isPreapproval: boolean
+  ) {
+    if (!disableTokenStandard) {
+      expect(requestMocks.createTransferViaTokenStandard).toHaveBeenCalledWith(
+        expect.objectContaining(expected)
+      );
+      expect(requestMocks.transferPreapprovalSend).not.toHaveBeenCalled();
+      expect(requestMocks.createTransferOffer).not.toHaveBeenCalled();
+    } else if (isPreapproval) {
+      expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledWith(
+        expect.objectContaining(expected)
+      );
+      expect(requestMocks.createTransferOffer).not.toHaveBeenCalled();
+      expect(requestMocks.createTransferViaTokenStandard).not.toHaveBeenCalled();
+    } else {
+      expect(requestMocks.createTransferOffer).toHaveBeenCalledWith(
+        expect.objectContaining(expected)
+      );
+      expect(requestMocks.transferPreapprovalSend).not.toHaveBeenCalled();
+      expect(requestMocks.createTransferViaTokenStandard).not.toHaveBeenCalled();
+    }
+  }
   test('transfer offer is used when receiver has no transfer preapproval', async () => {
     const user = userEvent.setup();
     render(
@@ -138,14 +179,15 @@ describe('Wallet user can', () => {
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
-    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
+    await toggleTokenStandard(user);
     expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(requestMocks.createTransferOffer).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: '1.0', receiver_party_id: 'bob::nopreapproval' })
+    await assertCorrectMockIsCalled(
+      { amount: '1.0', receiver_party_id: 'bob::nopreapproval' },
+      false
     );
-    expect(requestMocks.transferPreapprovalSend).not.toHaveBeenCalled();
   });
 
   test('transfer preapproval is used when receiver has a transfer preapproval', async () => {
@@ -167,14 +209,12 @@ describe('Wallet user can', () => {
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
     // Checkbox is there, we don't change it though as the default uses the preapproval
-    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '' })).toBeInTheDocument();
+    await toggleTokenStandard(user);
     expect(screen.queryByRole('textbox', { name: 'description' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: '1.0', receiver_party_id: 'bob::preapproval' })
-    );
-    expect(requestMocks.createTransferOffer).not.toHaveBeenCalled();
+    await assertCorrectMockIsCalled({ amount: '1.0', receiver_party_id: 'bob::preapproval' }, true);
   });
 
   test('transfer offer is used when receiver has a transfer preapproval but checkbox is unchecked', async () => {
@@ -195,16 +235,17 @@ describe('Wallet user can', () => {
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
-    expect(screen.getByRole('checkbox')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: '' })).toBeInTheDocument();
+    await toggleTokenStandard(user);
     expect(screen.queryByRole('textbox', { name: 'description' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('checkbox', { name: '' }));
     expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(requestMocks.createTransferOffer).toHaveBeenCalledWith(
-      expect.objectContaining({ amount: '1.0', receiver_party_id: 'bob::preapproval' })
+    await assertCorrectMockIsCalled(
+      { amount: '1.0', receiver_party_id: 'bob::preapproval' },
+      false
     );
-    expect(requestMocks.transferPreapprovalSend).not.toHaveBeenCalled();
   });
 
   test('deduplication id is passed', async () => {
@@ -225,18 +266,24 @@ describe('Wallet user can', () => {
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
-    requestMocks.transferPreapprovalSend.mockImplementationOnce(() => {
+    const mock = disableTokenStandard
+      ? requestMocks.transferPreapprovalSend
+      : requestMocks.createTransferViaTokenStandard;
+    mock.mockImplementationOnce(() => {
       throw new Error('Request failed');
     });
+    await toggleTokenStandard(user);
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledTimes(1);
-    const firstDeduplicationId =
-      requestMocks.transferPreapprovalSend.mock.lastCall![0].deduplication_id;
+    expect(mock).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function getDeduplicationIdFromCall(call: any) {
+      return call.deduplication_id || call.tracking_id;
+    }
+    const firstDeduplicationId = getDeduplicationIdFromCall(mock.mock.lastCall![0]);
     await user.click(screen.getByRole('button', { name: 'Send' }));
-    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledTimes(2);
-    const secondDeduplicationId =
-      requestMocks.transferPreapprovalSend.mock.lastCall![0].deduplication_id;
+    expect(mock).toHaveBeenCalledTimes(2);
+    const secondDeduplicationId = getDeduplicationIdFromCall(mock.mock.lastCall![0]);
     expect(firstDeduplicationId).toBe(secondDeduplicationId);
 
     render(
@@ -253,14 +300,14 @@ describe('Wallet user can', () => {
     receiverInput = screen.getAllByRole('combobox').find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
-    requestMocks.transferPreapprovalSend.mockImplementationOnce(() => {
+    mock.mockImplementationOnce(() => {
       throw new Error('Request failed');
     });
+    await toggleTokenStandard(user);
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
-    expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledTimes(3);
-    const thirdDeduplicationId =
-      requestMocks.transferPreapprovalSend.mock.lastCall![0].deduplication_id;
+    expect(mock).toHaveBeenCalledTimes(3);
+    const thirdDeduplicationId = getDeduplicationIdFromCall(mock.mock.lastCall![0]);
     expect(thirdDeduplicationId).not.toBe(firstDeduplicationId);
   }, 10000);
-});
+}

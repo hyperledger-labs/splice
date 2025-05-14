@@ -27,7 +27,7 @@ const Tap: React.FC = () => {
       />
       <DisableConditionally
         conditions={[
-          { disabled: mutation.isLoading, reason: 'Loading...' },
+          { disabled: mutation.isPending, reason: 'Loading...' },
           { disabled: isInvalidAmount, reason: 'Invalid amount' },
         ]}
       >
