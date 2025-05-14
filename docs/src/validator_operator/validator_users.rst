@@ -59,3 +59,7 @@ To disable the wallet HTTP server and the wallet automation, update the ``valida
     :language: yaml
     :start-after: ENABLEWALLET_START
     :end-before: ENABLEWALLET_END
+
+Since your wallet is disabled, your validator will not have funds to pay for traffic. You should therefore
+remove the validator top-up config to prevent its automation from trying to top up the traffic.
+See :ref:`helm_validator_topup` for more details.
