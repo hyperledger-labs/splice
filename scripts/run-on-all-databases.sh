@@ -66,7 +66,7 @@ do
     # Construct and output the psql command
     for ((i = 0; i < ${#databases[@]}; i++))
     do
-      commands+=("PGPASSWORD='$password' psql -h '$internal_ip' -D ${databases[$i]} -f $sql_file")
+      commands+=("PGPASSWORD='$password' PGOPTIONS=--search_path=${databases[$i]} psql -h '$internal_ip' -d ${databases[$i]} -f $sql_file")
     done
 done
 
