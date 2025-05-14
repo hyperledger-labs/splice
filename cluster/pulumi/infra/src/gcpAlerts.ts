@@ -93,13 +93,13 @@ ${conditionalString(
   "-- TODO(#17637): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3\n" +
     '-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")\n' +
     '-- TODO(#8300): Can happen due to random disconnects/reconnects but also in other contexts\n' +
-    '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")' +
-    '-(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")'
+    '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")'
 )}
 ${conditionalString(
   !isMainNet,
   '-- TODO(#17025): Stop ignoring these again once we have topology-aware package selection\n' +
-    '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))'
+    '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))' +
+    '-(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")'
 )}
 ${conditionalString(
   enableChaosMesh,
