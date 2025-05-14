@@ -492,7 +492,10 @@ abstract class ScanAppReference(
   def getTransferFactory(
       choiceArgs: transferinstructionv1.TransferFactory_Transfer
   ): (
-      FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+      FactoryChoiceWithDisclosures[
+        transferinstructionv1.TransferFactory.ContractId,
+        transferinstructionv1.TransferFactory_Transfer,
+      ],
       transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
   ) = {
     consoleEnvironment.run {
@@ -541,7 +544,10 @@ abstract class ScanAppReference(
 
   def getAllocationFactory(
       choiceArgs: allocationinstructionv1.AllocationFactory_Allocate
-  ): FactoryChoiceWithDisclosures[allocationinstructionv1.AllocationInstructionResult] = {
+  ): FactoryChoiceWithDisclosures[
+    allocationinstructionv1.AllocationFactory.ContractId,
+    allocationinstructionv1.AllocationFactory_Allocate,
+  ] = {
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.GetAllocationFactory(choiceArgs))
     }

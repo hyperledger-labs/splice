@@ -105,7 +105,10 @@ class TokenStandardAllocationIntegrationTest
       legId: String,
   )(implicit
       env: SpliceTestConsoleEnvironment
-  ): FactoryChoiceWithDisclosures[allocationinstructionv1.AllocationInstructionResult] = {
+  ): FactoryChoiceWithDisclosures[
+    allocationinstructionv1.AllocationFactory.ContractId,
+    allocationinstructionv1.AllocationFactory_Allocate,
+  ] = {
     val leg = request.transferLegs.get(legId)
     clue(
       s"Creating command to request allocation for leg $legId to transfer ${leg.amount} amulets from ${leg.sender} to ${leg.receiver}"
@@ -166,7 +169,11 @@ class TokenStandardAllocationIntegrationTest
         participantClient.ledger_api_extensions.commands
           .submitJava(
             Seq(senderParty),
-            commands = factoryChoice.commands,
+            commands = factoryChoice.factoryId
+              .exerciseAllocationFactory_Allocate(factoryChoice.args)
+              .commands
+              .asScala
+              .toSeq,
             disclosedContracts = factoryChoice.disclosedContracts,
           )
       },

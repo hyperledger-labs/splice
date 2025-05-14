@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
-import com.daml.ledger.api.v2.TraceContextOuterClass
+import com.daml.ledger.api.v2.{CommandsOuterClass, TraceContextOuterClass}
 import com.daml.ledger.javaapi.data as javaApi
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -8,13 +8,18 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.time.SimClock
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  holdingv1,
+  metadatav1,
+  transferinstructionv1,
+}
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.environment.{
@@ -35,8 +40,10 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   DomainRecordTimeRange,
+  FactoryChoiceWithDisclosures,
   SpliceUtil,
 }
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind
 import org.mockito.exceptions.base.MockitoAssertionError
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
@@ -354,6 +361,64 @@ class BftScanConnectionTest
         succeed
       }
     }
+
+    "reach consensus for token standard transfer factory" in {
+      val transfer = new transferinstructionv1.Transfer(
+        "sender",
+        "receiver",
+        BigDecimal(2).bigDecimal,
+        new holdingv1.InstrumentId("admin", "Amulet"),
+        Instant.EPOCH,
+        Instant.EPOCH.plusSeconds(60),
+        java.util.List.of(),
+        new metadatav1.Metadata(java.util.Map.of()),
+      )
+      def arg() = new transferinstructionv1.TransferFactory_Transfer(
+        "admin",
+        transfer,
+        new metadatav1.ExtraArgs(
+          new metadatav1.ChoiceContext(java.util.Map.of()),
+          new metadatav1.Metadata(java.util.Map.of()),
+        ),
+      )
+
+      val connections = getMockedConnections(n = 4)
+      connections.foreach { connMock =>
+        when(
+          connMock.getTransferFactory(any[transferinstructionv1.TransferFactory_Transfer])(
+            any[ExecutionContext],
+            any[TraceContext],
+          )
+        )
+          .thenReturn(Future.successful {
+            val disclosedContracts = Seq(
+              CommandsOuterClass.DisclosedContract
+                .newBuilder()
+                .setContractId("disclosed")
+                .setCreatedEventBlob(
+                  ByteString.copyFrom("let's pretend that this is a proper blob".getBytes("UTF-8"))
+                )
+                .setSynchronizerId("sync")
+                .setTemplateId(holdingv1.Holding.TEMPLATE_ID.toProto)
+                .build()
+            )
+            (
+              FactoryChoiceWithDisclosures(
+                new transferinstructionv1.TransferFactory.ContractId("factory"),
+                arg(),
+                disclosedContracts,
+              ),
+              TransferKind.Direct,
+            )
+          })
+      }
+
+      val bft = getBft(connections)
+      for {
+        _ <- bft.getTransferFactory(arg())
+      } yield succeed
+    }
+
   }
 
   "BftScanConnection for backfilling" should {
