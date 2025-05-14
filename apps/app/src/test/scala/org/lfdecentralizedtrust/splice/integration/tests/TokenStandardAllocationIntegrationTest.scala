@@ -619,6 +619,15 @@ class TokenStandardAllocationIntegrationTest
             expectedHoldingFeeRange = holdingFeesBound,
           ),
       )
+
+    clue("Wait for allocations to be ingested by SV1") {
+      // there's no endpoint to list allocations, so call these until they succeed
+      eventuallySucceeds() {
+        sv1ScanBackend.getAllocationCancelContext(aliceAllocationId)
+        sv1ScanBackend.getAllocationCancelContext(bobAllocationId)
+      }
+    }
+
     AllocatedOtcTrade(
       venueParty = venueParty,
       aliceParty = aliceParty,
