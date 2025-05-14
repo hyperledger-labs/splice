@@ -7,7 +7,6 @@ pulumiProjectConfig:
   default:
     cloudSql:
       protected: false
-    isExternalCluster: true # TODO(#18023): remove it once cluster is reset
 validator1:
   participantPruningSchedule:
     cron: "0 /10 * * * ?" # Run every 10min
