@@ -7,14 +7,11 @@ import { useDsoInfo } from '@lfdecentralizedtrust/splice-common-frontend/scan-ap
 import { Box } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import { useFeatureSupport } from '../../hooks/useFeatureSupport';
 import Layout from '../Layout';
 
-//TODO(#16139): retire this logics
 const ScanListVoteRequests: React.FC = () => {
   const dsoInfosQuery = useDsoInfo();
-  const featureSupport = useFeatureSupport();
-  if (dsoInfosQuery.isLoading || featureSupport.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
   if (dsoInfosQuery.isError) {
@@ -23,15 +20,11 @@ const ScanListVoteRequests: React.FC = () => {
   if (!dsoInfosQuery.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  const supportNewGovernanceFlow = featureSupport.data?.newGovernanceFlow || false;
   return (
     <Layout>
       <Box bgcolor="colors.neutral.15" sx={{ flex: 1 }}>
         <Container maxWidth="lg">
-          <ListVoteRequests
-            supportsVoteEffectivityAndSetConfig={supportNewGovernanceFlow}
-            showActionNeeded={false}
-          />
+          <ListVoteRequests showActionNeeded={false} />
         </Container>
       </Box>
     </Layout>

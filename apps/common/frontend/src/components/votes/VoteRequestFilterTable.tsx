@@ -16,7 +16,6 @@ import {
 import { VoteRequestModalState } from './ListVoteRequests';
 
 interface ListVoteRequestsTableProps {
-  supportsVoteEffectivityAndSetConfig: boolean;
   voteRequests: Contract<VoteRequest>[];
   getAction: (action: ActionRequiringConfirmation) => string;
   openModalWithVoteRequest: (voteRequestModalState: VoteRequestModalState) => void;
@@ -24,7 +23,6 @@ interface ListVoteRequestsTableProps {
 }
 
 export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
-  supportsVoteEffectivityAndSetConfig,
   voteRequests,
   getAction,
   openModalWithVoteRequest,
@@ -120,11 +118,9 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
     action: getAction(request.payload.action),
     requester: request.payload.requester,
     expiresAt: new Date(request.payload.voteBefore),
-    // TODO(#16139): get rid of supportsVoteEffectivityAndSetConfig check
-    effectiveAt:
-      supportsVoteEffectivityAndSetConfig && request.payload?.targetEffectiveAt
-        ? new Date(request.payload.targetEffectiveAt)
-        : undefined,
+    effectiveAt: request.payload?.targetEffectiveAt
+      ? new Date(request.payload.targetEffectiveAt)
+      : undefined,
     createdAt: request.createdAt,
     voteStatus: request.contractId,
     idx: index,

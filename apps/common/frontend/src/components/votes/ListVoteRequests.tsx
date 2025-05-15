@@ -4,7 +4,7 @@ import { Loading, SvVote } from '@lfdecentralizedtrust/splice-common-frontend';
 import { useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 
 import { ClickAwayListener } from '@mui/base';
 import CloseIcon from '@mui/icons-material/Close';
@@ -32,11 +32,7 @@ import { ContractId } from '@daml/types';
 import { VoteRequestsFilterTable } from './VoteRequestFilterTable';
 import VoteRequestModalContent from './VoteRequestModalContent';
 import { VoteResultModalContent } from './VoteResultModalContent';
-import {
-  VoteRequestResultTableType,
-  VoteRequestResultTableType2,
-  VoteResultsFilterTable,
-} from './VoteResultsFilterTable';
+import { VoteRequestResultTableType, VoteResultsFilterTable } from './VoteResultsFilterTable';
 
 dayjs.extend(utc);
 
@@ -81,7 +77,6 @@ const TabPanel = (props: TabPanelProps) => {
 };
 
 interface ListVoteRequestsProps {
-  supportsVoteEffectivityAndSetConfig: boolean;
   showActionNeeded: boolean;
   voteForm?: (
     voteRequestContractId: ContractId<VoteRequest>,
@@ -93,7 +88,7 @@ export type VoteResultModalState =
   | { open: false }
   | {
       open: true;
-      tableType: VoteRequestResultTableType | VoteRequestResultTableType2;
+      tableType: VoteRequestResultTableType;
       voteResult: DsoRules_CloseVoteRequestResult;
       effectiveAt: Date;
     };
@@ -108,21 +103,11 @@ export type VoteRequestModalState =
     };
 
 export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
-  supportsVoteEffectivityAndSetConfig,
   showActionNeeded,
   voteForm,
 }) => {
   const votesHooks = useVotesHooks();
   const [value, setValue] = React.useState(0);
-  const [now, setNow] = useState<string>(dayjs().utc().format('YYYY-MM-DDTHH:mm:ss[Z]'));
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(dayjs().utc().format('YYYY-MM-DDTHH:mm:ss[Z]'));
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -225,7 +210,6 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
             ),
             () => (
               <VoteRequestsFilterTable
-                supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
                 voteRequests={voteRequestsNotVoted}
                 getAction={getAction}
                 openModalWithVoteRequest={openModalWithVoteRequest}
@@ -249,7 +233,6 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         ),
         () => (
           <VoteRequestsFilterTable
-            supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
             voteRequests={voteRequestsVoted}
             getAction={getAction}
             openModalWithVoteRequest={openModalWithVoteRequest}
@@ -258,34 +241,6 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         ),
       ],
     ])
-    .concat(
-      !supportsVoteEffectivityAndSetConfig
-        ? [
-            [
-              () => (
-                <Tab
-                  key={'planned'}
-                  label="Planned"
-                  {...tabProps('planned')}
-                  id={'tab-panel-planned'}
-                />
-              ),
-              () => (
-                <VoteResultsFilterTable
-                  supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
-                  getAction={getAction}
-                  tableBodyId={'sv-vote-results-planned-table-body'}
-                  tableType={'Planned'}
-                  openModalWithVoteResult={openModalWithVoteResult}
-                  validityColumnName={'Effective At'}
-                  accepted
-                  effectiveFrom={now}
-                />
-              ),
-            ],
-          ]
-        : []
-    )
     .concat([
       [
         () => (
@@ -298,7 +253,6 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         ),
         () => (
           <VoteResultsFilterTable
-            supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
             getAction={getAction}
             tableBodyId={'sv-vote-results-executed-table-body'}
             tableType={'Executed'}
@@ -318,7 +272,6 @@ export const ListVoteRequests: React.FC<ListVoteRequestsProps> = ({
         ),
         () => (
           <VoteResultsFilterTable
-            supportsVoteEffectivityAndSetConfig={supportsVoteEffectivityAndSetConfig}
             getAction={getAction}
             tableBodyId={'sv-vote-results-rejected-table-body'}
             tableType={'Rejected'}
