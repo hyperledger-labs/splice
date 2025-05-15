@@ -43,7 +43,7 @@ class TokenStandardTransferIntegrationTest
           "Alice and Bob see it",
           _ => {
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size i.toLong
+              _.listTokenStandardTransfers().transfers should have size i.toLong
             )
           },
         )._1
@@ -74,7 +74,7 @@ class TokenStandardTransferIntegrationTest
           result => {
             inside(result.output) { case members.TransferInstructionFailed(_) => () }
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size (cids.length.toLong - 1L)
+              _.listTokenStandardTransfers().transfers should have size (cids.length.toLong - 1L)
             )
             bobWalletClient.balance().unlockedQty should be(BigDecimal(0))
           },
@@ -88,7 +88,7 @@ class TokenStandardTransferIntegrationTest
           result => {
             inside(result.output) { case members.TransferInstructionFailed(_) => () }
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size (cids.length.toLong - 2L)
+              _.listTokenStandardTransfers().transfers should have size (cids.length.toLong - 2L)
             )
             bobWalletClient.balance().unlockedQty should be(BigDecimal(0))
           },
@@ -102,7 +102,7 @@ class TokenStandardTransferIntegrationTest
           result => {
             inside(result.output) { case members.TransferInstructionCompleted(_) => () }
             Seq(aliceWalletClient, bobWalletClient).foreach(
-              _.listTokenStandardTransfers() should have size (cids.length.toLong - 3L)
+              _.listTokenStandardTransfers().transfers should have size (cids.length.toLong - 3L)
             )
             bobWalletClient.balance().unlockedQty should be > BigDecimal(0)
           },
@@ -141,8 +141,8 @@ class TokenStandardTransferIntegrationTest
       )
 
       eventually() {
-        inside(aliceWalletClient.listTokenStandardTransfers()) { case Seq(t) =>
-          t.contractId.contractId should be(created.output match {
+        inside(aliceWalletClient.listTokenStandardTransfers().transfers) { case Seq(t) =>
+          t.contractId should be(created.output match {
             case members.TransferInstructionPending(value) => value.transferInstructionCid
             case x => fail(s"Expected pending transfer, got $x")
           })

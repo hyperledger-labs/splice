@@ -7,6 +7,7 @@ import {
   ErrorDisplay,
   Loading,
 } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -14,27 +15,17 @@ import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Box, Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.9/lib/Splice/AmuletTransferInstruction';
 import { Unit } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import { TransferOffer } from '@daml.js/splice-wallet/lib/Splice/Wallet/TransferOffer/module';
-import { ContractId } from '@daml/types';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty, useTransferOffers } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import { useTokenStandardTransfers } from '../hooks/useTokenStandardTransfers';
 import { WalletTransferOffer } from '../models/models';
 import { useWalletConfig } from '../utils/config';
 import { convertCurrency } from '../utils/currencyConversion';
 import BftAnsEntry from './BftAnsEntry';
 
-type PartialWalletTransferOffer = {
-  contractId: ContractId<TransferOffer> | ContractId<AmuletTransferInstruction>;
-  amount: string;
-  sender: string;
-  expiresAt: string;
-  isTokenStandard: boolean;
-};
 export const TransferOffers: React.FC = () => {
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
   const amuletPriceQuery = useAmuletPrice();
@@ -42,25 +33,26 @@ export const TransferOffers: React.FC = () => {
 
   const toWalletTransferOffer = useCallback(
     async (
-      items: Array<PartialWalletTransferOffer>,
+      offerList: Contract<TransferOffer>[],
       amuletPrice: BigNumber
     ): Promise<WalletTransferOffer[]> => {
-      return items
-        .filter(item => item.sender !== primaryPartyId)
-        .map(item => {
+      return offerList
+        .filter(o => o.payload.sender !== primaryPartyId)
+        .map(offer => {
           return {
-            contractId: item.contractId,
-            ccAmount: item.amount,
-            usdAmount: amuletPrice ? amuletPrice.times(item.amount).toString() : '...',
+            contractId: offer.contractId,
+            ccAmount: offer.payload.amount.amount,
+            usdAmount: amuletPrice
+              ? amuletPrice.times(offer.payload.amount.amount).toString()
+              : '...',
             conversionRate: amuletPrice ? amuletPrice?.toString() : '...',
             convertedCurrency: convertCurrency(
-              BigNumber(item.amount),
+              BigNumber(offer.payload.amount.amount),
               Unit.AmuletUnit,
               amuletPrice
             ),
-            senderId: item.sender,
-            expiry: item.expiresAt,
-            isTokenStandard: item.isTokenStandard,
+            senderId: offer.payload.sender,
+            expiry: offer.payload.expiresAt,
           };
         });
     },
@@ -69,47 +61,16 @@ export const TransferOffers: React.FC = () => {
 
   const transferOfferContractsQuery = useTransferOffers(amuletPriceQuery.data);
   const { data: transferOfferContracts } = transferOfferContractsQuery;
-  const tokenStandardTransfersQuery = useTokenStandardTransfers();
-  const { data: tokenStandardTransferContracts } = tokenStandardTransfersQuery;
   const amuletPrice = amuletPriceQuery.data;
 
   useMemo(() => {
-    if (transferOfferContracts && tokenStandardTransferContracts && amuletPrice) {
-      const allTransfers: PartialWalletTransferOffer[] = transferOfferContracts
-        .map(offer => {
-          const item: PartialWalletTransferOffer = {
-            isTokenStandard: false,
-            contractId: offer.contractId,
-            amount: offer.payload.amount.amount,
-            sender: offer.payload.sender,
-            expiresAt: offer.payload.expiresAt,
-          };
-          return item;
-        })
-        .concat(
-          tokenStandardTransferContracts.map(transfer => {
-            const item: PartialWalletTransferOffer = {
-              isTokenStandard: true,
-              contractId: transfer.contractId,
-              amount: transfer.payload.transfer.amount,
-              sender: transfer.payload.transfer.sender,
-              expiresAt: transfer.payload.transfer.executeBefore,
-            };
-            return item;
-          })
-        );
-      toWalletTransferOffer(allTransfers, amuletPrice).then(setOffers);
+    if (transferOfferContracts && amuletPrice) {
+      toWalletTransferOffer(transferOfferContracts, amuletPrice).then(setOffers);
     }
-  }, [amuletPrice, toWalletTransferOffer, transferOfferContracts, tokenStandardTransferContracts]);
+  }, [amuletPrice, toWalletTransferOffer, transferOfferContracts]);
 
-  const isLoading =
-    amuletPriceQuery.isLoading ||
-    transferOfferContractsQuery.isLoading ||
-    tokenStandardTransfersQuery.isLoading;
-  const isError =
-    amuletPriceQuery.isError ||
-    transferOfferContractsQuery.isError ||
-    tokenStandardTransfersQuery.isError;
+  const isLoading = amuletPriceQuery.isLoading || transferOfferContractsQuery.isLoading;
+  const isError = amuletPriceQuery.isError || transferOfferContractsQuery.isError;
 
   return (
     <Stack spacing={4} direction="column" justifyContent="center" id="transfer-offers">
@@ -141,14 +102,7 @@ interface TransferOfferProps {
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const config = useWalletConfig();
   const offer = props.transferOffer;
-  const {
-    acceptTransferOffer,
-    rejectTransferOffer,
-    acceptTokenStandardTransfer,
-    rejectTokenStandardTransfer,
-  } = useWalletClient();
-  const accept = offer.isTokenStandard ? acceptTokenStandardTransfer : acceptTransferOffer;
-  const reject = offer.isTokenStandard ? rejectTokenStandardTransfer : rejectTransferOffer;
+  const { acceptTransferOffer, rejectTransferOffer } = useWalletClient();
 
   return (
     <Card className="transfer-offer" variant="outlined">
@@ -189,7 +143,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
           <Button
             variant="pill"
             size="small"
-            onClick={() => accept(offer.contractId)}
+            onClick={() => acceptTransferOffer(offer.contractId)}
             className="transfer-offer-accept"
           >
             Accept
@@ -198,7 +152,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
             variant="pill"
             color="warning"
             size="small"
-            onClick={() => reject(offer.contractId)}
+            onClick={() => rejectTransferOffer(offer.contractId)}
             className="transfer-offer-reject"
           >
             Reject

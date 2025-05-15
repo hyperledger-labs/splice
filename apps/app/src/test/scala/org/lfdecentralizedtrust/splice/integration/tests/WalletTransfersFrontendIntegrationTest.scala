@@ -2,22 +2,19 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{
-  FrontendLoginUtil,
   SpliceUtil,
+  FrontendLoginUtil,
   WalletFrontendTestUtil,
   WalletTestUtil,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.console.WalletAppClientReference
 
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.{Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
-import BaseWalletTransfersFrontendIntegrationTest.*
 
-abstract class BaseWalletTransfersFrontendIntegrationTest
+class WalletTransfersFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "bob")
     with WalletTestUtil
     with WalletFrontendTestUtil
@@ -31,18 +28,6 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
       .withAmuletPrice(amuletPrice)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
-
-  protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(
-      receiver: PartyId,
-      amount: BigDecimal,
-      description: String,
-      expiry: CantonTimestamp,
-      trackingId: String,
-  ): Unit
-  protected def listTransferOffersViaBackend(
-      walletClient: WalletAppClientReference
-  ): Seq[TransferOfferInBackend]
-  protected def shouldDisableTokenStandardSwitch: Boolean
 
   "A wallet UI" should {
 
@@ -69,35 +54,29 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
       )
       createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient, cc)
 
-      listTransferOffersViaBackend(bobWalletClient) shouldBe empty
+      bobWalletClient.listTransferOffers() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
 
         actAndCheck(
           "alice creates transfer offer", {
-            createTransferOffer(
-              bobUserParty,
-              transferAmount,
-              expiryDays,
-              shouldDisableTokenStandardSwitch = shouldDisableTokenStandardSwitch,
-            )
+            createTransferOffer(bobUserParty, transferAmount, expiryDays)
           },
         )(
           "alice is redirected to /transactions & bob observes transfer offer",
           _ => {
             currentUrl should endWith("/transactions")
 
-            val offers = listTransferOffersViaBackend(bobWalletClient)
-            offers should have size 1
-            val transfer = offers.head
+            bobWalletClient.listTransferOffers() should have size 1
+            val transfer = bobWalletClient.listTransferOffers().head.payload
             val tenDaysFromNow = Instant.now().plus(expiryDays.toLong, ChronoUnit.DAYS)
-            val timeDiff = ChronoUnit.MINUTES.between(transfer.expiry, tenDaysFromNow)
+            val timeDiff = ChronoUnit.MINUTES.between(transfer.expiresAt, tenDaysFromNow)
 
-            transfer.amount.floatValue shouldBe transferAmount.floatValue
+            transfer.amount.amount.floatValue() shouldBe transferAmount.floatValue
             transfer.description shouldBe "by party ID"
-            transfer.sender shouldBe aliceUserParty
-            transfer.receiver shouldBe bobUserParty
+            transfer.sender shouldBe aliceUserParty.toProtoPrimitive
+            transfer.receiver shouldBe bobUserParty.toProtoPrimitive
 
             // Allowing 1 min of correctness in the transfer dates
             assertInRange(BigDecimal(timeDiff), (BigDecimal(0), BigDecimal(1)))
@@ -166,16 +145,16 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
 
       actAndCheck(
         " Bob creates transfer offer to alice",
-        createTransferOfferViaBackend(bobWalletClient)(
+        bobWalletClient.createTransferOffer(
           aliceUserParty,
           BigDecimal(1),
-          "Bob transfer to Alice",
+          "Bobo transfer to Alice",
           transferExpiry,
           UUID.randomUUID().toString,
         ),
       )(
         "alice observes transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ => aliceWalletClient.listTransferOffers() should have size 1,
       )
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -228,7 +207,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
 
       actAndCheck(
         "Alice creates transfer offer to bob",
-        createTransferOfferViaBackend(aliceWalletClient)(
+        aliceWalletClient.createTransferOffer(
           bobUserParty,
           BigDecimal(1),
           "Alice transfer to Bob",
@@ -237,7 +216,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         ),
       )(
         "alice has an outgoing transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ => aliceWalletClient.listTransferOffers() should have size 1,
       )
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -276,16 +255,11 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         "bob creates transfer offer",
         withFrontEnd("bob") { implicit webDriver =>
           browseToBobWallet(bobWalletClient.config.ledgerApiUser)
-          createTransferOffer(
-            aliceUserParty,
-            transferAmount,
-            expiryDays = 1,
-            shouldDisableTokenStandardSwitch = shouldDisableTokenStandardSwitch,
-          )
+          createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
         },
       )(
         "alice observes transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ => aliceWalletClient.listTransferOffers() should have size 1,
       )
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -336,16 +310,11 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
         "bob creates transfer offer",
         withFrontEnd("bob") { implicit webDriver =>
           browseToBobWallet(bobWalletClient.config.ledgerApiUser)
-          createTransferOffer(
-            aliceUserParty,
-            transferAmount,
-            expiryDays = 1,
-            shouldDisableTokenStandardSwitch = shouldDisableTokenStandardSwitch,
-          )
+          createTransferOffer(aliceUserParty, transferAmount, expiryDays = 1)
         },
       )(
         "alice observes transfer offer",
-        _ => listTransferOffersViaBackend(aliceWalletClient) should have size 1,
+        _ => aliceWalletClient.listTransferOffers() should have size 1,
       )
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -370,68 +339,4 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
       }
     }
   }
-}
-
-object BaseWalletTransfersFrontendIntegrationTest {
-  case class TransferOfferInBackend(
-      sender: PartyId,
-      receiver: PartyId,
-      description: String,
-      amount: BigDecimal,
-      expiry: Instant,
-  )
-}
-
-class WalletTransferOffersFrontendIntegrationTest
-    extends BaseWalletTransfersFrontendIntegrationTest {
-  override protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(
-      receiver: PartyId,
-      amount: BigDecimal,
-      description: String,
-      expiry: CantonTimestamp,
-      trackingId: String,
-  ): Unit = walletClient.createTransferOffer(receiver, amount, description, expiry, trackingId)
-
-  override protected def listTransferOffersViaBackend(
-      walletClient: WalletAppClientReference
-  ): Seq[TransferOfferInBackend] = walletClient.listTransferOffers().map { contract =>
-    val transfer = contract.payload
-    TransferOfferInBackend(
-      sender = PartyId.tryFromProtoPrimitive(transfer.sender),
-      receiver = PartyId.tryFromProtoPrimitive(transfer.receiver),
-      description = transfer.description,
-      amount = transfer.amount.amount,
-      expiry = transfer.expiresAt,
-    )
-  }
-
-  override protected def shouldDisableTokenStandardSwitch: Boolean = true
-}
-
-class TokenStandardWalletTransfersFrontendIntegrationTest
-    extends BaseWalletTransfersFrontendIntegrationTest {
-  override protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(
-      receiver: PartyId,
-      amount: BigDecimal,
-      description: String,
-      expiry: CantonTimestamp,
-      trackingId: String,
-  ): Unit =
-    walletClient.createTokenStandardTransfer(receiver, amount, description, expiry, trackingId)
-
-  override protected def listTransferOffersViaBackend(
-      walletClient: WalletAppClientReference
-  ): Seq[TransferOfferInBackend] =
-    walletClient.listTokenStandardTransfers().map { contract =>
-      val transfer = contract.payload.transfer
-      TransferOfferInBackend(
-        sender = PartyId.tryFromProtoPrimitive(transfer.sender),
-        receiver = PartyId.tryFromProtoPrimitive(transfer.receiver),
-        description = transfer.meta.values.get("splice.lfdecentralizedtrust.org/reason"),
-        amount = transfer.amount,
-        expiry = transfer.executeBefore,
-      )
-    }
-
-  override protected def shouldDisableTokenStandardSwitch: Boolean = false
 }
