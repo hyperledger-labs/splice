@@ -4,6 +4,8 @@ validator1:
     locationId: us-central1
     projectId: da-cn-devnet
     keyRingId: validator1_test
+multiValidator:
+  postgresPvcSize: '100Gi'
 synchronizerMigration:
   archived:
     - id: 1

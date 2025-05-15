@@ -4310,7 +4310,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -4367,7 +4367,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -4424,7 +4424,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -4481,7 +4481,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
@@ -4538,7 +4538,7 @@
         },
         "db": {
           "maxConnections": 1000,
-          "volumeSize": "600Gi"
+          "volumeSize": "100Gi"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "persistence": {
