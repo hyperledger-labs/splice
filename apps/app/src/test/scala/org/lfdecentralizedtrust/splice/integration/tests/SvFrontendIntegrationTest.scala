@@ -82,7 +82,7 @@ class SvFrontendIntegrationTest
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
         env: SpliceTestConsoleEnvironment
     ) = {
-      val requestReasonUrl = "https://vote-request-url.com"
+      val requestReasonUrl = "https://vote-request-url.com/"
       val requestReasonBody = "This is a request reason."
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
         implicit webDriver =>

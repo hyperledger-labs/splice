@@ -27,6 +27,7 @@ import org.lfdecentralizedtrust.splice.store.db.{
   SplicePostgresTest,
 }
 import slick.jdbc.JdbcProfile
+import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import java.time.Instant
 import scala.concurrent.Future
@@ -256,6 +257,89 @@ class TxLogBackfillingStoreTest
       } yield succeed
     }
 
+    "handle data ingested before txlog backfilling was introduced " in {
+      val migrationId1 = 1L
+      val history1 = mkUpdateHistory(dsoParty, migrationId = migrationId1)
+      val migrationId2 = 2L
+      val store2 = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId2)
+      val history2 = mkUpdateHistory(dsoParty, migrationId = migrationId2)
+      for {
+        // Migration 1 (only history)
+        _ <- history1.ingestionSink.initialize()
+        _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history1))
+        _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(history1))
+
+        // Migration 2
+        _ <- store2.testIngestionSink.initialize()
+        _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store2)
+        _ <- history2.ingestionSink.initialize()
+
+        _ <- sync1.createMulti(
+          c(1),
+          recordTime = importUpdateRecordTime.toInstant,
+          workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX + "_1",
+        )(
+          Seq(history2)
+        )
+        _ <- sync1.createMulti(
+          c(2),
+          recordTime = importUpdateRecordTime.toInstant,
+          workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX + "_2",
+        )(
+          Seq(history2)
+        )
+        _ <- sync1.createMulti(c(3), recordTime = t(3))(Seq(history2))
+        _ <- sync1.createMulti(c(4), recordTime = t(4))(Seq(store2, history2))
+
+        // Reset all tables introduced in V038__txlog_backfilling.sql, to simulate
+        // all of the above happening before that migration was applied.
+        _ <- storage
+          .update(sqlu"truncate table txlog_backfilling_status", "truncate1")
+          .failOnShutdown
+        _ <- storage
+          .update(sqlu"truncate table txlog_first_ingested_update", "truncate1")
+          .failOnShutdown
+
+        // TxLogBackfillingTrigger initializing backfilling
+        _ <- store2.initializeTxLogBackfilling()
+        _ <- assertEntries(store2, Seq(4))
+
+        // TxLogBackfillingTrigger performing backfilling
+        _ <- backfillAll(store2, history2)
+        _ <- assertEntries(
+          store2,
+          Seq(1, 2, 3, 4), // sorted by synchronizer, then record time
+        )
+      } yield succeed
+    }
+
+    "handle trigger initializing before first update" in {
+      val migrationId = 1L
+      val store = mkStore(acsId = 1, txLogId = Some(1), migrationId = migrationId)
+      val history = mkUpdateHistory(dsoParty, migrationId = migrationId)
+      for {
+        _ <- store.testIngestionSink.initialize()
+        _ <- acs(Seq.empty, Seq.empty, Seq.empty)(store)
+        _ <- history.ingestionSink.initialize()
+
+        // TxLogBackfillingTrigger initializing backfilling
+        _ <- store.initializeTxLogBackfilling()
+
+        // Backfilling can't do anything until the first update is ingested
+        result <- backfillOnce(store, history)
+        _ = result shouldBe HistoryBackfilling.Outcome.MoreWorkAvailableLater
+        _ <- assertEntries(store, Seq.empty)
+
+        _ <- sync1.createMulti(c(1), recordTime = t(1))(Seq(history))
+        _ <- sync1.createMulti(c(2), recordTime = t(2))(Seq(store, history))
+        _ <- assertEntries(store, Seq(2))
+
+        // TxLogBackfillingTrigger performing backfilling
+        _ <- backfillAll(store, history)
+        _ <- assertEntries(store, Seq(1, 2))
+      } yield succeed
+    }
+
     "report correct info when backfilling across import updates" in {
       val migrationId1 = 1L
       val history1 = mkUpdateHistory(dsoParty, migrationId = migrationId1)
@@ -335,16 +419,17 @@ class TxLogBackfillingStoreTest
             recordTime = t(i),
           )(history)
         }
-        _ <- sync1.createMulti(c(11), recordTime = t(11))(Seq(store, history))
+        _ <- sync1.createMulti(c(11), recordTime = t(11))(Seq(history))
+        _ <- sync1.createMulti(c(12), recordTime = t(12))(Seq(store, history))
 
         // TxLogBackfillingTrigger initializing backfilling
         _ <- store.initializeTxLogBackfilling()
-        _ <- assertEntries(store, Seq(11))
+        _ <- assertEntries(store, Seq(12))
 
         // TxLogBackfillingTrigger performing backfilling
         _ <- backfillAll(store, history)
 
-        _ <- assertEntries(store, Seq(1, 11))
+        _ <- assertEntries(store, Seq(1, 11, 12))
       } yield succeed
     }
   }

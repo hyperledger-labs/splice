@@ -7,7 +7,6 @@ export function validateStrict(
   output: PrettyTransactions,
   ignoreNames: string[],
 ): void {
-  console.error(`FUCK: ${JSON.stringify(ignoreNames)}`);
   const errorEvents: TokenStandardEvent[] = [];
   for (const tx of output.transactions) {
     for (const event of tx.events) {

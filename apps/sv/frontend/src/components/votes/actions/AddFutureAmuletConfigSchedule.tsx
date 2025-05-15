@@ -19,6 +19,8 @@ import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfi
 
 import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 dayjs.extend(utc);
 
@@ -87,29 +89,31 @@ const AddFutureAmuletConfigSchedule: React.FC<{
         Configuration Effective Date
       </Typography>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
-        <DesktopDateTimePicker
-          label={`Enter time in local timezone (${getUTCWithOffset()})`}
-          value={date}
-          minDateTime={dayjs()}
-          ampm={false}
-          format="YYYY-MM-DD HH:mm"
-          readOnly={false}
-          onChange={(newValue: Dayjs | null) => {
-            try {
-              newValue?.toISOString();
-              setDate(newValue);
-            } catch (error) {
-              console.log('Invalid date', error);
-              return;
-            }
-          }}
-          slotProps={{
-            textField: {
-              id: 'datetime-picker-amulet-configuration',
-            },
-          }}
-          closeOnSelect
-        />
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <DesktopDateTimePicker
+            label={`Enter time in local timezone (${getUTCWithOffset()})`}
+            value={date}
+            minDateTime={dayjs()}
+            ampm={false}
+            format="YYYY-MM-DD HH:mm"
+            readOnly={false}
+            onChange={(newValue: Dayjs | null) => {
+              try {
+                newValue?.toISOString();
+                setDate(newValue);
+              } catch (error) {
+                console.log('Invalid date', error);
+                return;
+              }
+            }}
+            slotProps={{
+              textField: {
+                id: 'datetime-picker-amulet-configuration',
+              },
+            }}
+            closeOnSelect
+          />
+        </LocalizationProvider>
         <Typography variant="body2" mt={1}>
           Effective{' '}
           <DateWithDurationDisplay datetime={date?.toDate()} enableDuration onlyDuration />

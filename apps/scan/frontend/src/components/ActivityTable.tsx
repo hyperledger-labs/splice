@@ -147,8 +147,7 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
   function getActivityFromTransfer(transfer: Transfer): ActivityView {
     let activityType;
     let receiver;
-    let feesBurnt;
-    let rewardsCollected: RewardsCollected = {};
+    const rewardsCollected: RewardsCollected = {};
 
     const receivers = transfer.receivers;
 
@@ -187,7 +186,7 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
     const receiverFees = receivers
       .map(r => BigNumber(r.receiver_fee))
       .reduce((prev, cur) => prev.plus(cur), BigNumber(0));
-    feesBurnt = feesFromSender(senderAmount).plus(receiverFees);
+    const feesBurnt = feesFromSender(senderAmount).plus(receiverFees);
 
     const transferAmount = receivers
       .map(r => BigNumber(r.amount))

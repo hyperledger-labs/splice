@@ -2,11 +2,18 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ActionRequiringConfirmation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAmuletConfig
 import org.lfdecentralizedtrust.splice.util.{
+  AmuletConfigSchedule,
   FrontendLoginUtil,
   SvFrontendTestUtil,
   SvTestUtil,
@@ -343,7 +350,7 @@ class SvFrontendIntegrationTest2
     )(validateRequestedActionInModal: WebDriverType => Unit)(implicit
         env: SpliceTestConsoleEnvironment
     ) = {
-      val requestReasonUrl = "https://vote-request-url.com"
+      val requestReasonUrl = "https://vote-request-url.com/"
       val requestReasonBody = "This is a request reason."
       val expirationDate = "2034-07-12 00:12"
       val effectiveDate = "2034-07-13 00:12"
@@ -907,48 +914,46 @@ class SvFrontendIntegrationTest2
           // the second request will be rejected with "This vote request has already been created."
           def submitSetAmuletConfigRequest(
               createFee: String,
-              holdingFee: String = "",
+              holdingFee: String = "0.001",
               expiresSoon: Boolean,
-              enabled: Boolean = true,
-          ) = {
-            // The `eventually` guards against `StaleElementReferenceException`s
-            // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
-            eventually() {
-              find(id("display-actions")) should not be empty
-              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("CRARC_SetConfig")
-              inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
-                element.underlying.click()
-              }
-              inside(find(id("transferConfig.createFee.fee-value"))) { case Some(element) =>
-                if (createFee != "") element.underlying.clear()
-                element.underlying.sendKeys(createFee)
-              }
-              inside(find(id("transferConfig.holdingFee.rate-value"))) { case Some(element) =>
-                if (holdingFee != "") element.underlying.clear()
-                element.underlying.sendKeys(holdingFee)
-              }
-              inside(find(id("create-reason-summary"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonBody)
-              }
-              inside(find(id("create-reason-url"))) { case Some(element) =>
-                element.underlying.sendKeys(requestReasonUrl)
-              }
-              if (expiresSoon) {
-                setExpirationDate(
-                  "sv1",
-                  DateTimeFormatter
-                    .ofPattern("yyyy-MM-dd HH:mm")
-                    .format(
-                      LocalDateTime
-                        .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
-                        // Might not be wise to go lower than that because the date input doesn't do seconds
-                        .plusMinutes(1)
-                    ),
+          ): Unit = {
+            val activeSynchronizerId =
+              AmuletConfigSchedule(sv1Backend.getDsoInfo().amuletRules)
+                .getConfigAsOf(env.environment.clock.now)
+                .decentralizedSynchronizer
+                .activeSynchronizer
+            val baseConfig = defaultAmuletConfig(
+              defaultTickDuration,
+              1000,
+              SynchronizerId.tryFromString(activeSynchronizerId),
+            )
+            val newConfig = defaultAmuletConfig(
+              defaultTickDuration,
+              1000,
+              SynchronizerId.tryFromString(activeSynchronizerId),
+              holdingFee = BigDecimal(holdingFee),
+              createFee = BigDecimal(createFee),
+            )
+            val setAmuletConfigAction: ActionRequiringConfirmation = new ARC_AmuletRules(
+              new CRARC_SetConfig(
+                new AmuletRules_SetConfig(
+                  newConfig,
+                  baseConfig,
                 )
-              }
-              clickVoteRequestSubmitButtonOnceEnabled(enabled)
-            }
+              )
+            )
+            sv1Backend.createVoteRequest(
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+              setAmuletConfigAction,
+              requestReasonUrl,
+              requestReasonBody,
+              if (expiresSoon) {
+                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+              } else {
+                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
+              },
+              None,
+            )
           }
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {

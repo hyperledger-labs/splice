@@ -46,7 +46,6 @@ export const useListVoteRequestResult = (
       query.effectiveFrom,
       query.effectiveTo,
     ],
-    keepPreviousData: true,
     queryFn: async () => {
       const { dso_rules_vote_results } = await listVoteRequestResults(
         limit,

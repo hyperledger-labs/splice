@@ -49,6 +49,9 @@ spec:
         - port: 443
           uri:
             prefix: "/api/scan/"
+        - port: 443
+          uri:
+            prefix: "/registry/"
       route:
         - destination:
             port:

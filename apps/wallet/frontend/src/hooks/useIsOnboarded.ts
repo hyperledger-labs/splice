@@ -13,6 +13,5 @@ export const useIsOnboarded = (): UseQueryResult<boolean> => {
       const { userOnboarded, userWalletInstalled } = data!;
       return !!(userOnboarded && userWalletInstalled);
     },
-    enabled: !!data,
   });
 };

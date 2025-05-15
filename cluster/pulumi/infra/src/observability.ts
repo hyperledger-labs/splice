@@ -18,6 +18,7 @@ import {
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   isMainNet,
+  MOCK_SPLICE_ROOT,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
@@ -126,7 +127,7 @@ const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
 
-export function configureObservability(dependsOn: pulumi.Resource[] = []): void {
+export function configureObservability(dependsOn: pulumi.Resource[] = []): pulumi.Resource {
   const namespace = new k8s.core.v1.Namespace(
     'observabilty',
     {
@@ -536,10 +537,12 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     }
   );
 
+  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
+  const path = `${root}/cluster/pulumi/infra/prometheus-crd-update.sh`;
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {
-      create: `bash prometheus-crd-update.sh ${prometheusStackCrdVersion}`,
+      create: `bash ${path} ${prometheusStackCrdVersion}`,
     },
     { dependsOn: prometheusStack }
   );
@@ -589,6 +592,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
     );
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
+
+  return prometheusStack;
 }
 
 // Even though the AuthorizationPolicy explicitly allows all traffic to Grafana api

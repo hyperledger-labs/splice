@@ -10,7 +10,7 @@ import {
   installGcpLoggingAlerts,
   installClusterMaintenanceUpdateAlerts,
 } from './gcpAlerts';
-import { configureIstio } from './istio';
+import { configureIstio, istioMonitoring } from './istio';
 import { configureNetwork } from './network';
 import { configureObservability } from './observability';
 import { configureStorage } from './storage';
@@ -34,6 +34,7 @@ if (enableAlerts && !clusterIsResetPeriodically) {
     installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
   }
 }
+istioMonitoring(network.ingressNs, []);
 
 configureStorage();
 

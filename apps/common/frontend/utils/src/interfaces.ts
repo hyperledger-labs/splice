@@ -28,7 +28,6 @@ export interface ContractWithState<T> {
   domainId?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const Contract = {
   decodeOpenAPI: <T extends object, K, I extends string>(
     c: OpenAPIContract,
@@ -41,7 +40,7 @@ export const Contract = {
     createdAt: c.created_at!,
   }),
   toDisclosedContract: <T extends object, K>(
-    tmpl: Template<T, K>,
+    _tmpl: Template<T, K>,
     c: Contract<T>
   ): DisclosedContract => ({
     templateId: c.templateId,
@@ -75,7 +74,6 @@ export const Contract = {
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-redeclare
 export const AssignedContract = {
   // undefined if c is in-flight between domains
   decodeContractWithState<T extends object, K>(

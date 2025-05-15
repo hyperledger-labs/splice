@@ -12,9 +12,9 @@ type RateDisplayProps = {
 };
 
 const RateDisplay: React.FC<RateDisplayProps> = props => {
-  var { base, quote, amuletPrice } = props;
-  var amuletAcronym = window.splice_config.spliceInstanceNames?.amuletNameAcronym;
-  var amount, rate;
+  const { base, quote, amuletPrice } = props;
+  const amuletAcronym = window.splice_config.spliceInstanceNames?.amuletNameAcronym;
+  let amount, rate;
   switch (true) {
     case base === 'AmuletUnit' && quote === 'USDUnit':
       amount = BigNumber(1).div(amuletPrice);

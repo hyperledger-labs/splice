@@ -94,7 +94,7 @@ setupValidator app name = do
 
 setupValidator' : AmuletApp -> Text -> Script AmuletUser
 setupValidator' app name = do
-  validatorParty <- allocatePartyWithHint name (PartyIdHint name)
+  validatorParty <- allocatePartyByHint (PartyIdHint name)
   sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
   now <- getTime
   submitMulti [validatorParty, app.dso] [] $ createCmd ValidatorLicense with
@@ -126,7 +126,7 @@ data AmuletUser = AmuletUser
 
 setupUserWithoutValidatorRight: AmuletApp -> Text -> Script AmuletUser
 setupUserWithoutValidatorRight app name = do
-  user <- allocatePartyWithHint name (PartyIdHint name)
+  user <- allocatePartyByHint (PartyIdHint name)
   userId <- validateUserId name
   -- TODO(#2957): remove read-as DSO party.
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]

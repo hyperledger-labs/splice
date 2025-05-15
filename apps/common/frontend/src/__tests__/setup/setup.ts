@@ -4,8 +4,7 @@ import { cleanup } from '@testing-library/react';
 import { beforeEach, afterEach } from 'vitest';
 
 beforeEach(() => {
-  // Fixes "cannot serialize bigint" from react-query
-  // @ts-ignore
+  // @ts-expect-error Fixes "cannot serialize bigint" from react-query
   BigInt.prototype['toJSON'] = function () {
     return this.toString();
   };

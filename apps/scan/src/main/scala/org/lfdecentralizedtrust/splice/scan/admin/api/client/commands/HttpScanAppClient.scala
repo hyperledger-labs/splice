@@ -68,6 +68,7 @@ import com.digitalasset.canton.topology.{
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
@@ -971,7 +972,8 @@ object HttpScanAppClient {
   }
 
   case class GetAcsSnapshot(
-      party: PartyId
+      party: PartyId,
+      recordTime: Option[Instant],
   ) extends InternalBaseCommand[http.GetAcsSnapshotResponse, ByteString] {
     override def submitRequest(
         client: http.ScanClient,
@@ -980,7 +982,11 @@ object HttpScanAppClient {
       Throwable,
       HttpResponse,
     ], http.GetAcsSnapshotResponse] = {
-      client.getAcsSnapshot(party.toProtoPrimitive, headers)
+      client.getAcsSnapshot(
+        party.toProtoPrimitive,
+        recordTime.map(t => Timestamp.assertFromInstant(t).toString),
+        headers,
+      )
     }
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
@@ -1446,7 +1452,10 @@ object HttpScanAppClient {
       extends TokenStandardTransferInstructionBaseCommand[
         transferinstruction.v1.GetTransferFactoryResponse,
         (
-            FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+            FactoryChoiceWithDisclosures[
+              transferinstructionv1.TransferFactory.ContractId,
+              transferinstructionv1.TransferFactory_Transfer,
+            ],
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
         ),
       ] {
@@ -1475,7 +1484,10 @@ object HttpScanAppClient {
       Either[
         String,
         (
-            FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+            FactoryChoiceWithDisclosures[
+              transferinstructionv1.TransferFactory.ContractId,
+              transferinstructionv1.TransferFactory_Transfer,
+            ],
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
         ),
       ],
@@ -1487,18 +1499,22 @@ object HttpScanAppClient {
           factory.choiceContext.disclosedContracts.map(
             fromTransferInstructionHttpDisclosedContract
           )
-        val exercise = new transferinstructionv1.TransferFactory.ContractId(factory.factoryId)
-          .exerciseTransferFactory_Transfer(
-            new transferinstructionv1.TransferFactory_Transfer(
-              choiceArgs.expectedAdmin,
-              choiceArgs.transfer,
-              new metadatav1.ExtraArgs(
-                choiceContext,
-                choiceArgs.extraArgs.meta,
-              ),
-            )
-          )
-        (FactoryChoiceWithDisclosures(exercise, disclosedContracts), factory.transferKind)
+        val args = new transferinstructionv1.TransferFactory_Transfer(
+          choiceArgs.expectedAdmin,
+          choiceArgs.transfer,
+          new metadatav1.ExtraArgs(
+            choiceContext,
+            choiceArgs.extraArgs.meta,
+          ),
+        )
+        (
+          FactoryChoiceWithDisclosures(
+            new transferinstructionv1.TransferFactory.ContractId(factory.factoryId),
+            args,
+            disclosedContracts,
+          ),
+          factory.transferKind,
+        )
       }
     }
   }
@@ -1608,7 +1624,10 @@ object HttpScanAppClient {
   case class GetAllocationFactory(choiceArgs: allocationinstructionv1.AllocationFactory_Allocate)
       extends TokenStandardAllocationInstructionBaseCommand[
         allocationinstruction.v1.GetAllocationFactoryResponse,
-        FactoryChoiceWithDisclosures[allocationinstructionv1.AllocationInstructionResult],
+        FactoryChoiceWithDisclosures[
+          allocationinstructionv1.AllocationFactory.ContractId,
+          allocationinstructionv1.AllocationFactory_Allocate,
+        ],
       ] {
     override def submitRequest(
         client: Client,
@@ -1633,7 +1652,8 @@ object HttpScanAppClient {
     ): PartialFunction[
       allocationinstruction.v1.GetAllocationFactoryResponse,
       Either[String, FactoryChoiceWithDisclosures[
-        allocationinstructionv1.AllocationInstructionResult
+        allocationinstructionv1.AllocationFactory.ContractId,
+        allocationinstructionv1.AllocationFactory_Allocate,
       ]],
     ] = { case allocationinstruction.v1.GetAllocationFactoryResponse.OK(factory) =>
       for {
@@ -1643,21 +1663,21 @@ object HttpScanAppClient {
           factory.choiceContext.disclosedContracts.map(
             fromAllocationInstructionHttpDisclosedContract
           )
-        val exercise =
-          new allocationinstructionv1.AllocationFactory.ContractId(factory.factoryId)
-            .exerciseAllocationFactory_Allocate(
-              new allocationinstructionv1.AllocationFactory_Allocate(
-                choiceArgs.expectedAdmin,
-                choiceArgs.allocation,
-                choiceArgs.requestedAt,
-                choiceArgs.inputHoldingCids,
-                new metadatav1.ExtraArgs(
-                  choiceContext,
-                  choiceArgs.extraArgs.meta,
-                ),
-              )
-            )
-        FactoryChoiceWithDisclosures(exercise, disclosedContracts)
+        val args = new allocationinstructionv1.AllocationFactory_Allocate(
+          choiceArgs.expectedAdmin,
+          choiceArgs.allocation,
+          choiceArgs.requestedAt,
+          choiceArgs.inputHoldingCids,
+          new metadatav1.ExtraArgs(
+            choiceContext,
+            choiceArgs.extraArgs.meta,
+          ),
+        )
+        FactoryChoiceWithDisclosures(
+          new allocationinstructionv1.AllocationFactory.ContractId(factory.factoryId),
+          args,
+          disclosedContracts,
+        )
       }
     }
   }

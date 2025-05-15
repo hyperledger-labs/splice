@@ -14,8 +14,11 @@ import { useMutation } from '@tanstack/react-query';
 import dayjs, { Dayjs } from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useCallback, useEffect, useState } from 'react';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import {
+  AlertColor,
   Box,
   Button,
   Card,
@@ -272,6 +275,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
   try {
     expiresAt = expiration?.toISOString();
   } catch (error) {
+    console.log('Failed to convert expiration to ISO string', error);
     expiresAt = undefined;
   }
 
@@ -292,15 +296,26 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
     }
   }, [conflicts]);
 
-  // @ts-ignore
+  // @ts-expect-error type mismatch
   const submissionConditions: { disabled: boolean; reason: string; severity?: AlertColor }[] = [
-    { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
+    { disabled: createVoteRequestMutation.isPending, reason: 'Loading...' },
     { disabled: summary === '', reason: 'No summary', severity: 'warning' },
     { disabled: !isValidUrl(url), reason: 'Invalid URL', severity: 'warning' },
     {
       disabled: !isValidSynchronizerPauseTime,
       reason: 'Synchronizer upgrade time is before the expiry/effective date',
       severity: 'warning',
+    },
+    { disabled: summary === '', reason: 'No summary', severity: 'warning' as AlertColor },
+    {
+      disabled: !isValidUrl(url),
+      reason: 'Invalid URL',
+      severity: 'warning' as AlertColor,
+    },
+    {
+      disabled: !isValidSynchronizerPauseTime,
+      reason: 'Synchronizer upgrade time is before the expiry/effective date',
+      severity: 'warning' as AlertColor,
     },
     // keep this as the last condition
     {
@@ -317,12 +332,12 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
           {
             disabled: isEffective && expiration.isAfter(effectivity),
             reason: 'Expiration must be set before effectivity.',
-            severity: 'warning',
+            severity: 'warning' as AlertColor,
           },
           {
             disabled: conflicts.hasConflict,
             reason: `A Vote Request aiming to change similar fields already exists. You are therefore not allowed to modify the fields: ${conflicts.intersection}`,
-            severity: 'warning',
+            severity: 'warning' as AlertColor,
           },
         ]
       : []
@@ -341,7 +356,7 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
               <NativeSelect
                 inputProps={{
                   id: 'display-actions',
-                  // @ts-ignore
+                  // @ts-expect-error this is not part of mui but required for testing to work
                   'data-testid': 'display-actions',
                 }}
                 value={actionName}
@@ -361,25 +376,27 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                 <Typography variant="h6" mt={4}>
                   Vote Request Expires At
                 </Typography>
-                <DesktopDateTimePicker
-                  label={`Enter time in local timezone (${getUTCWithOffset()})`}
-                  value={expiration}
-                  ampm={false}
-                  format="YYYY-MM-DD HH:mm"
-                  minDateTime={dayjs()}
-                  maxDateTime={effectivity}
-                  readOnly={false}
-                  onChange={d => handleExpirationDateChange(d)}
-                  slotProps={{
-                    textField: {
-                      id: 'datetime-picker-vote-request-expiration',
-                      inputProps: {
-                        'data-testid': 'datetime-picker-vote-request-expiration',
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                  <DesktopDateTimePicker
+                    label={`Enter time in local timezone (${getUTCWithOffset()})`}
+                    value={expiration}
+                    ampm={false}
+                    format="YYYY-MM-DD HH:mm"
+                    minDateTime={dayjs()}
+                    maxDateTime={effectivity}
+                    readOnly={false}
+                    onChange={d => handleExpirationDateChange(d)}
+                    slotProps={{
+                      textField: {
+                        id: 'datetime-picker-vote-request-expiration',
+                        inputProps: {
+                          'data-testid': 'datetime-picker-vote-request-expiration',
+                        },
                       },
-                    },
-                  }}
-                  closeOnSelect
-                />
+                    }}
+                    closeOnSelect
+                  />
+                </LocalizationProvider>
                 <Typography variant="body2" mt={1}>
                   Expires{' '}
                   <DateWithDurationDisplay
@@ -408,24 +425,26 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
                   <Typography variant="h6" mt={4}>
                     Vote Request Effective At
                   </Typography>
-                  <DesktopDateTimePicker
-                    label={`Enter time in local timezone (${getUTCWithOffset()})`}
-                    value={effectivity}
-                    minDateTime={dayjs()}
-                    ampm={false}
-                    format="YYYY-MM-DD HH:mm"
-                    readOnly={false}
-                    onChange={d => handleEffectivityDateChange(d)}
-                    slotProps={{
-                      textField: {
-                        id: 'datetime-picker-vote-request-effectivity',
-                        inputProps: {
-                          'data-testid': 'datetime-picker-vote-request-effectivity',
+                  <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DesktopDateTimePicker
+                      label={`Enter time in local timezone (${getUTCWithOffset()})`}
+                      value={effectivity}
+                      minDateTime={dayjs()}
+                      ampm={false}
+                      format="YYYY-MM-DD HH:mm"
+                      readOnly={false}
+                      onChange={d => handleEffectivityDateChange(d)}
+                      slotProps={{
+                        textField: {
+                          id: 'datetime-picker-vote-request-effectivity',
+                          inputProps: {
+                            'data-testid': 'datetime-picker-vote-request-effectivity',
+                          },
                         },
-                      },
-                    }}
-                    closeOnSelect
-                  />
+                      }}
+                      closeOnSelect
+                    />
+                  </LocalizationProvider>
                   <Typography variant="body2" mt={1}>
                     Effective{' '}
                     <DateWithDurationDisplay
@@ -442,22 +461,24 @@ export const CreateVoteRequest: React.FC<{ supportsVoteEffectivityAndSetConfig: 
               <Typography variant="h6" mt={4}>
                 Vote Request Expires At
               </Typography>
-              <DesktopDateTimePicker
-                label={`Enter time in local timezone (${getUTCWithOffset()})`}
-                value={expiration}
-                ampm={false}
-                format="YYYY-MM-DD HH:mm"
-                minDateTime={dayjs()}
-                maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
-                readOnly={false}
-                onChange={d => handleExpirationDateChange(d)}
-                slotProps={{
-                  textField: {
-                    id: 'datetime-picker-vote-request-expiration',
-                  },
-                }}
-                closeOnSelect
-              />
+              <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DesktopDateTimePicker
+                  label={`Enter time in local timezone (${getUTCWithOffset()})`}
+                  value={expiration}
+                  ampm={false}
+                  format="YYYY-MM-DD HH:mm"
+                  minDateTime={dayjs()}
+                  maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
+                  readOnly={false}
+                  onChange={d => handleExpirationDateChange(d)}
+                  slotProps={{
+                    textField: {
+                      id: 'datetime-picker-vote-request-expiration',
+                    },
+                  }}
+                  closeOnSelect
+                />
+              </LocalizationProvider>
               <Typography variant="body2" mt={1}>
                 Expires{' '}
                 <DateWithDurationDisplay

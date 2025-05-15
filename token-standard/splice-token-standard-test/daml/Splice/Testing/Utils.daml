@@ -89,4 +89,4 @@ submitWithDisclosuresMustFail' p (Disclosures' ds) cmds = submitWithDisclosuresM
 
 -- | Allocate party with a specific name.
 allocatePartyExact : Text -> Script Party
-allocatePartyExact name = allocatePartyWithHint name (PartyIdHint name)
+allocatePartyExact name = allocatePartyByHint (PartyIdHint name)

@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRewardCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
@@ -10,7 +12,6 @@ import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.W
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.util.HexString
@@ -28,7 +29,18 @@ class RecoverExternalPartyIntegrationTest
   override def environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
 
+  override protected lazy val sanityChecksIgnoredRootCreates = Seq(
+    ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID
+  )
+
+  override lazy val sanityChecksIgnoredRootExercises = Seq(
+    (ValidatorRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID, "Archive")
+  )
+
   "External parties can recover from key" in { implicit env =>
+    // Canton endpoint is kinda slow for this so we only resolve it once.
+    val synchronizerId = decentralizedSynchronizerId
+
     val onboarding @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
       onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
 
@@ -59,9 +71,7 @@ class RecoverExternalPartyIntegrationTest
       },
     )
 
-    clue("Submit PartyToParticipant to migrate to bob's validator") {
-      val synchronizerId =
-        sv1Backend.participantClient.synchronizers.id_of(SynchronizerAlias.tryCreate("global"))
+    val signedTx = clue("Sign PartyToParticipant to migrate to bob's validator") {
 
       val partyToParticipant = PartyToParticipant
         .create(
@@ -87,36 +97,78 @@ class RecoverExternalPartyIntegrationTest
 
       val signedTxs = txs.map(sign(_, alicePrivateKey))
 
-      val signedTxsParticipant = bobValidatorBackend.participantClient.topology.transactions.sign(
+      // Note: This only signs it does not upload.
+      bobValidatorBackend.participantClient.topology.transactions.sign(
         signedTxs,
         TopologyStoreId.Synchronizer(synchronizerId),
         signedBy = Seq(bobValidatorBackend.participantClient.id.fingerprint),
       )
 
-      bobValidatorBackend.participantClient.topology.transactions
-        .load(signedTxsParticipant, TopologyStoreId.Synchronizer(synchronizerId))
+    }
+
+    val rewardCid =
+      clue("Create a contract that will be included in the ACS import and can easily be archived") {
+        // ValidatorRewardCoupon just acts as an example that we can easily create and easily archive
+        // as it only has a single signatory and an observer.
+        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
+          .submitWithResult(
+            userId = sv1Backend.config.ledgerApiUser,
+            actAs = Seq(dsoParty),
+            readAs = Seq.empty,
+            update = new ValidatorRewardCoupon(
+              dsoParty.toProtoPrimitive,
+              aliceParty.toProtoPrimitive,
+              BigDecimal(42.0).bigDecimal,
+              new Round(0),
+            ).create,
+          )
+          .contractId
+      }
+
+    bobValidatorBackend.participantClient.synchronizers.disconnect_all()
+
+    val partyMigrationTime = clue("Submit PartyToParticipant") {
+      // Bob is disconnected so we have to submit the transaction through another participant.
+      // Any participant works here.
+      // If users don't have access to another one, they could:
+      // 1. Migrate to a fresh participant and submit the topology transaction from that. Given that it is a new participant if it blows up due to concurrent activity
+      //    they can just reset it and try again.
+      // 2. Spin up a temporary one just for submitting the topology transaction although that is difficult in practice on mainnet.
+      // 3. Ask any of the other validators to submit it for them.
+      // While in theory we could allow submitting it through SV participants via scan, rate limiting that
+      // is a bit tricky so we don't invest into that for now given that with online party migration this
+      // will be less of an issue.
+      sv1Backend.participantClient.topology.transactions
+        .load(signedTx, TopologyStoreId.Synchronizer(synchronizerId))
       clue("PartyToParticipant transaction gets sequenced") {
         eventually() {
-          sv1Backend.participantClient.topology.party_to_participant_mappings
+          val topologyTx = sv1Backend.participantClient.topology.party_to_participant_mappings
             .list(synchronizerId, filterParty = aliceParty.filterString)
             .loneElement
-            .item
-            .participants
-            .loneElement
-            .participantId shouldBe bobValidatorBackend.participantClient.id
+          topologyTx.item.participants.loneElement.participantId shouldBe bobValidatorBackend.participantClient.id
+          topologyTx.context.validFrom
         }
       }
     }
 
-    // Note: This has a hard dependency on their not being any transaction for the party between
-    // the validity time of the topology transaction that migrates the party and
-    // the ACS import. Otherwise the participant can blow up trying to process
-    // a transaction with contracts it does not yet consider active.
+    clue("Use a contract in the ACS before bob imports the ACS") {
+      // Note: This blows up if Bob is not disconnected while the party to participant
+      // change becomes valid as it does not yet know about the contract.
+      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
+        userId = sv1Backend.config.ledgerApiUser,
+        actAs = Seq(dsoParty),
+        readAs = Seq.empty,
+        update = rewardCid.exerciseArchive(),
+      )
+    }
+
     clue("Import the ACS to bob's validator") {
-      val acsSnapshot = sv1ScanBackend.getAcsSnapshot(aliceParty)
+      // This can fail if sv1 participant is not yet ready to serve the ACS at that timestamp.
+      val acsSnapshot = eventuallySucceeds() {
+        sv1ScanBackend.getAcsSnapshot(aliceParty, Some(partyMigrationTime))
+      }
       val acsSnapshotFile = Files.createTempFile("acs", ".snapshot")
       Files.write(acsSnapshotFile, acsSnapshot.toByteArray())
-      bobValidatorBackend.participantClient.synchronizers.disconnect_all()
       bobValidatorBackend.participantClient.repair.import_acs_old(acsSnapshotFile.toString)
       bobValidatorBackend.participantClient.synchronizers.reconnect_all()
     }
@@ -206,7 +258,7 @@ class RecoverExternalPartyIntegrationTest
       tx,
       NonEmpty(Set, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,
-      ProtocolVersion.dev,
+      ProtocolVersion.v33,
     )
   }
 }

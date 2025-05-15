@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { QueryObserverSuccessResult } from '@tanstack/react-query';
+import { UseQueryResult } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 
 import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
@@ -76,7 +76,7 @@ export function getInflightVoteRequests(
             ?.value as DsoRules_SetConfig;
           return [vr.voteBefore, DsoRulesConfig.encode(newConfig.newConfig)] as [
             string,
-            DsoRulesConfig
+            DsoRulesConfig,
           ];
         })
         .filter(v => !dayjs(v[0]).isSame(dayjs(effectiveAt)))
@@ -88,8 +88,8 @@ export function getDsoConfigToCompareWith(
   tableType: VoteRequestResultTableType | undefined,
   votesHooks: BaseVotesHooks,
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig },
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>
-): [string, DsoRulesConfig] {
+  dsoInfosQuery: UseQueryResult<DsoInfo>
+): [string, DsoRulesConfig | undefined] {
   // TODO(#15180): Implement effectivity on all actions
   // we need to subtract 1 second because the effectiveAt differs slightly from the completedAt in DsoRules-based actions
   const latestConfig =
@@ -102,12 +102,14 @@ export function getDsoConfigToCompareWith(
         )
       : undefined;
 
-  const dsoConfigToCompareWith: [string, DsoRulesConfig] = !latestConfig
+  const dsoConfigToCompareWith: [string, DsoRulesConfig | undefined] = !latestConfig
     ? [
         'initial',
         tableType
           ? dsoAction.value.baseConfig || dsoAction.value.newConfig
-          : (DsoRulesConfig.encode(dsoInfosQuery.data.dsoRules.payload.config) as DsoRulesConfig),
+          : dsoInfosQuery.data
+            ? (DsoRulesConfig.encode(dsoInfosQuery.data.dsoRules.payload.config) as DsoRulesConfig)
+            : undefined,
       ]
     : [
         latestConfig.request.voteBefore,
@@ -123,8 +125,8 @@ export function getAmuletConfigToCompareWith(
   tableType: VoteRequestResultTableType | undefined,
   votesHooks: BaseVotesHooks,
   amuetAction: { tag: 'CRARC_SetConfig'; value: AmuletRules_SetConfig },
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>
-): [string, AmuletConfig<USD>] {
+  dsoInfosQuery: UseQueryResult<DsoInfo>
+): [string, AmuletConfig<USD>] | undefined {
   // TODO(#15180): Implement effectivity on all actions
   // we need to subtract 1 second because the effectiveAt differs slightly from the completedAt in DsoRules-based actions
   const latestConfig =
@@ -137,22 +139,28 @@ export function getAmuletConfigToCompareWith(
         )
       : undefined;
 
-  const dsoConfigToCompareWith: [string, AmuletConfig<USD>] = !latestConfig
-    ? [
-        'initial',
-        tableType
-          ? amuetAction.value.baseConfig
-          : (AmuletConfig(USD).encode(
-              dsoInfosQuery.data.amuletRules.payload.configSchedule.initialValue
-            ) as AmuletConfig<USD>),
-      ]
-    : [
-        latestConfig.request.voteBefore,
-        (
-          (latestConfig.request.action.value as ARC_AmuletRules).amuletRulesAction
-            .value as AmuletRules_SetConfig
-        ).newConfig,
-      ];
+  let dsoConfigToCompareWith: [string, AmuletConfig<USD>] | undefined;
+
+  if (!latestConfig) {
+    dsoConfigToCompareWith = dsoInfosQuery.data
+      ? [
+          'initial',
+          tableType
+            ? amuetAction.value.baseConfig
+            : (AmuletConfig(USD).encode(
+                dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue
+              ) as AmuletConfig<USD>),
+        ]
+      : undefined;
+  } else {
+    dsoConfigToCompareWith = [
+      latestConfig.request.voteBefore,
+      (
+        (latestConfig.request.action.value as ARC_AmuletRules).amuletRulesAction
+          .value as AmuletRules_SetConfig
+      ).newConfig,
+    ];
+  }
 
   return dsoConfigToCompareWith;
 }

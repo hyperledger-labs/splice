@@ -121,6 +121,7 @@ export async function initDumpConfig(): Promise<void> {
   process.env.AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_MAIN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
+  process.env.MOCK_SPLICE_ROOT = 'SPLICE_ROOT';
   // the project name in setMocks seems to be ignored and we need to load the proper config, so we override it here to ensure we  always use the same config as in prod
   process.env.CONFIG_PROJECT_NAME = path.basename(process.cwd());
   // StackReferences cannot be mocked in tests currently

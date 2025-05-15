@@ -1,0 +1,648 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
+      "kind": "Alert",
+      "metadata": {
+        "name": "flux-deployment-alert",
+        "namespace": "operator"
+      },
+      "spec": {
+        "eventMetadata": {
+          "cluster": "mock"
+        },
+        "eventSeverity": "info",
+        "eventSources": [
+          {
+            "kind": "GitRepository",
+            "matchLabels": {
+              "notifications": "true"
+            },
+            "name": "*"
+          }
+        ],
+        "providerRef": {
+          "name": "flux-slack-provider"
+        },
+        "summary": "Deployment for stack"
+      }
+    },
+    "name": "deployment-alerts",
+    "provider": "",
+    "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Alert"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "pulumi.com/v1",
+      "kind": "Stack",
+      "metadata": {
+        "name": "deployment",
+        "namespace": "operator"
+      },
+      "spec": {
+        "backend": "gs://da-cn-pulumi-dev-stacks",
+        "continueResyncOnCommitMatch": false,
+        "destroyOnFinalize": false,
+        "envRefs": {
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_ID",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_ID",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": {
+            "secret": {
+              "key": "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "DEPLOYMENT_DIR": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/deployment"
+            },
+            "type": "Literal"
+          },
+          "GCP_CLUSTER_BASENAME": {
+            "literal": {
+              "value": "mock"
+            },
+            "type": "Literal"
+          },
+          "PRIVATE_CONFIGS_PATH": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/configs/configs-private"
+            },
+            "type": "Literal"
+          },
+          "PUBLIC_CONFIGS_PATH": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "SLACK_ACCESS_TOKEN": {
+            "secret": {
+              "key": "SLACK_ACCESS_TOKEN",
+              "name": "operator-env"
+            },
+            "type": "Secret"
+          },
+          "SPLICE_ROOT": {
+            "literal": {
+              "value": "/tmp/pulumi-working/operator/deployment/workspace/splice"
+            },
+            "type": "Literal"
+          }
+        },
+        "fluxSource": {
+          "dir": "splice/cluster/pulumi/deployment",
+          "sourceRef": {
+            "apiVersion": "source.toolkit.fluxcd.io/v1",
+            "kind": "GitRepository",
+            "name": "splice-node-deployment"
+          }
+        },
+        "retryOnUpdateConflict": true,
+        "stack": "organization/deployment/deployment.mock",
+        "useLocalStackOnly": true
+      }
+    },
+    "name": "deployment",
+    "provider": "",
+    "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "flux2",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "flux",
+      "namespace": "operator",
+      "repositoryOpts": {
+        "repo": "https://fluxcd-community.github.io/helm-charts"
+      },
+      "values": {
+        "cli": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "helmController": {
+          "create": false
+        },
+        "imageAutomationController": {
+          "create": false
+        },
+        "imageReflectionController": {
+          "create": false
+        },
+        "kustomizeController": {
+          "create": false
+        },
+        "notificationController": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        },
+        "prometheus": {
+          "podMonitor": {
+            "create": true
+          }
+        },
+        "sourceController": {
+          "affinity": {
+            "nodeAffinity": {
+              "requiredDuringSchedulingIgnoredDuringExecution": {
+                "nodeSelectorTerms": [
+                  {
+                    "matchExpressions": [
+                      {
+                        "key": "cn_infra",
+                        "operator": "Exists"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          "tolerations": [
+            {
+              "effect": "NoSchedule",
+              "key": "cn_infra",
+              "operator": "Exists"
+            }
+          ]
+        }
+      },
+      "version": "2.12.4"
+    },
+    "name": "flux",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "github",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "password": "s3cr3t",
+          "username": "canton-network-da"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "github",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "googleCredentials": "s3cr3t"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "enableServerSideApply": "true"
+    },
+    "name": "k8s-imgpull-operator-default",
+    "provider": "",
+    "type": "pulumi:providers:kubernetes"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "imagePullSecrets": [
+        {
+          "name": "docker-reg-cred"
+        }
+      ],
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "operator"
+      }
+    },
+    "name": "operator-default",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:kubernetes::k8s-imgpull-operator-default::undefined_id",
+    "type": "kubernetes:core/v1:ServiceAccountPatch"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "docker-reg-cred",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          ".dockerconfigjson": "{\"auths\":{\"digitalasset-canton-network-docker.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"},\"digitalasset-canton-network-docker-dev.jfrog.io\":{\"auth\":\"YXJ0X3VzZXI6czNjcjN0\",\"username\":\"art_user\",\"password\":\"s3cr3t\"}}}"
+        }
+      },
+      "type": "kubernetes.io/dockerconfigjson"
+    },
+    "name": "operator-docker-reg-cred",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "operator-env",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID": "mgmt",
+          "AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET": "s3cr3t",
+          "SLACK_ACCESS_TOKEN": "s3cr3t"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "operator-env",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {},
+        "name": "operator"
+      }
+    },
+    "name": "operator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator",
+      "compat": "true",
+      "name": "pulumi-kubernetes-operator",
+      "namespace": "operator",
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "controller": {
+          "args": [
+            "--zap-level=debug",
+            "--zap-time-encoding=iso8601",
+            "--zap-encoder=json"
+          ],
+          "gracefulShutdownTimeoutDuration": "30m"
+        },
+        "createClusterRole": true,
+        "extraEnv": [
+          {
+            "name": "CLOUDSDK_CORE_PROJECT",
+            "value": "da-cn-devnet"
+          },
+          {
+            "name": "CLOUDSDK_COMPUTE_REGION",
+            "value": "europe-west6"
+          },
+          {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": "/app/gcp-credentials.json"
+          },
+          {
+            "name": "GOOGLE_CREDENTIALS",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "googleCredentials",
+                "name": "gke-credentials"
+              }
+            }
+          },
+          {
+            "name": "GITHUB_TOKEN",
+            "valueFrom": {
+              "secretKeyRef": {
+                "key": "password",
+                "name": "github"
+              }
+            }
+          },
+          {
+            "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+            "value": "true"
+          },
+          {
+            "name": "SPLICE_OPERATOR_DEPLOYMENT",
+            "value": "true"
+          }
+        ],
+        "extraVolumeMounts": [
+          {
+            "mountPath": "/app/gcp-credentials.json",
+            "name": "gcp-credentials",
+            "subPath": "googleCredentials"
+          }
+        ],
+        "extraVolumes": [
+          {
+            "name": "gcp-credentials",
+            "secret": {
+              "secretName": "gke-credentials"
+            }
+          }
+        ],
+        "image": {
+          "pullPolicy": "Always",
+          "registry": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+          "repository": "pulumi-kubernetes-operator",
+          "tag": "0.0.1-deadbeef"
+        },
+        "imagePullSecrets": [
+          {
+            "name": "docker-reg-cred"
+          }
+        ],
+        "maxHistory": 10,
+        "resources": {
+          "limits": {
+            "cpu": 5,
+            "memory": "20G"
+          },
+          "requests": {
+            "cpu": 1,
+            "memory": "2G"
+          }
+        },
+        "serviceMonitor": {
+          "enabled": true,
+          "namespace": "operator",
+          "service": {
+            "annotations": {},
+            "type": "ClusterIP"
+          }
+        },
+        "terminationGracePeriodSeconds": 1800,
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.7.3"
+    },
+    "name": "pulumi-kubernetes-operator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "notification.toolkit.fluxcd.io/v1beta3",
+      "kind": "Provider",
+      "metadata": {
+        "name": "flux-slack-provider",
+        "namespace": "operator"
+      },
+      "spec": {
+        "address": "https://slack.com/api/chat.postMessage",
+        "channel": "mock-slack-channel",
+        "secretRef": {
+          "name": "slack"
+        },
+        "type": "slack"
+      }
+    },
+    "name": "slack-notification-provider",
+    "provider": "",
+    "type": "kubernetes:notification.toolkit.fluxcd.io/v1beta3:Provider"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "slack",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "token": "s3cr3t"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "slack",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-deployment-base",
+        "namespace": "operator"
+      },
+      "spec": {
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "interval": "5m",
+        "recurseSubmodules": true,
+        "ref": {
+          "name": "refs/heads/main"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-internal"
+      }
+    },
+    "name": "splice-node-deployment-base",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "source.toolkit.fluxcd.io/v1",
+      "kind": "GitRepository",
+      "metadata": {
+        "labels": {
+          "notifications": "false"
+        },
+        "name": "splice-node-deployment",
+        "namespace": "operator"
+      },
+      "spec": {
+        "ignore": "**/daml/dars\n!**/daml/dars/splitwell*",
+        "include": [
+          {
+            "fromPath": "cluster/stacks/prod/deployment/Pulumi.deployment.mock.yaml",
+            "repository": {
+              "name": "splice-node-deployment-base"
+            },
+            "toPath": "splice/cluster/pulumi/deployment/Pulumi.deployment.mock.yaml"
+          }
+        ],
+        "interval": "5m",
+        "recurseSubmodules": true,
+        "ref": {
+          "name": "refs/heads/main"
+        },
+        "secretRef": {
+          "name": "github"
+        },
+        "url": "https://github.com/DACH-NY/canton-network-internal"
+      }
+    },
+    "name": "splice-node-deployment",
+    "provider": "",
+    "type": "kubernetes:source.toolkit.fluxcd.io/v1:GitRepository"
+  }
+]

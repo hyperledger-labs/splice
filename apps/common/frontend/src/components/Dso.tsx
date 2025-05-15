@@ -70,7 +70,7 @@ function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
 }
 const GeneralInformationView: React.FC<{ dsoInfo: DsoInfo }> = ({ dsoInfo }) => {
-  let cs: { key: string; value: string }[] = [];
+  const cs: { key: string; value: string }[] = [];
   dsoInfo.dsoRules.payload.svs.forEach((value, key) => cs.push(createRow(key, value.name)));
   const svInfos = [
     createRow('svUser', dsoInfo.svUser),
@@ -121,15 +121,13 @@ function getCometBftDebugData(
   if (cometBftNodeDebugQuery.isLoading) {
     return <Loading />;
   }
+
   if (cometBftNodeDebugQuery.isError) {
-    return <p>Error, something went wrong.</p>;
+    console.error(cometBftNodeDebugQuery.error);
+    return <p>Error encountered in cometBFT node: {cometBftNodeDebugQuery.error.message} </p>;
   }
 
-  const data = cometBftNodeDebugQuery.data;
-
-  if (data.error) {
-    return <p>Error encountered in cometBFT node: {data.error} </p>;
-  }
+  const data = cometBftNodeDebugQuery.data!;
 
   return (
     <div>
@@ -150,7 +148,7 @@ function getCometBftDebugData(
 }
 
 const StatusDisplay: React.FC<{ status: UseQueryResult<NodeStatus> }> = ({ status }) => {
-  if (status.isLoading) {
+  if (status.isPending) {
     return <Loading />;
   }
   if (status.isError) {
@@ -235,7 +233,7 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
     setValue(newValue);
   };
 
-  if (dsoInfoQuery.isLoading) {
+  if (dsoInfoQuery.isPending) {
     return <Loading />;
   }
   if (dsoInfoQuery.isError) {
