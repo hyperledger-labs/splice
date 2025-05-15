@@ -203,7 +203,9 @@ fi;
 
 
 tmux_cmd_canton() {
-  windowName="$1" tokensFile="$2" participantsFile="$3" baseConfig="$4" confOverrides="$5" logFile="$6"
+  windowName="$1" tokensFile="$2" participantsFile="$3" baseConfig="$4" confOverrides="$5" logFileHint="$6"
+  mainLogFile="log/${logFileHint}.clog"
+  consoleLogFile="log/${logFileHint}.out"
   tmux_cmd "$windowName" \
     "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
@@ -211,20 +213,21 @@ tmux_cmd_canton() {
       -c $baseConfig $confOverrides \
       --log-level-canton=DEBUG \
       --log-encoder json \
-      --log-file-name $logFile \
-      --bootstrap $bootstrapScriptPath"
+      --log-file-name $mainLogFile \
+      --bootstrap $bootstrapScriptPath \
+      2>&1 | tee -a $consoleLogFile"
 }
 
 if [ $wallclocktime -eq 1 ]; then
   tmux_cmd_canton canton canton.tokens canton.participants \
     ./apps/app/src/test/resources/simple-topology-canton.conf \
-    "$config_overrides" log/canton.clog
+    "$config_overrides" canton
 fi
 
 if [ $simtime -eq 1 ]; then
   tmux_cmd_canton canton-simtime canton-simtime.tokens canton-simtime.participants \
      ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
-     "$config_overrides_simtime" log/canton-simtime.clog
+     "$config_overrides_simtime" canton-simtime
 fi
 
 if [[ $collect_metrics -eq 1 ]]; then
@@ -243,7 +246,7 @@ else
   echo "-D specified, not waiting for canton to start "
 fi
 
-tmux_cmd toxiproxy toxiproxy-server > log/toxi.log 2>&1
+tmux_cmd toxiproxy "toxiproxy-server 2>&1 | tee -a log/toxi.log"
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}
