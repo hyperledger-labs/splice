@@ -558,32 +558,14 @@ Once logged in one should see the transactions page.
 
 .. todo:: explain the config sections below in a way that makes them also accessible to the Docker compose users
 
-.. _helm_validator_testnet_cc_grant:
-
-Granting coin to the validator for traffic purchases
-----------------------------------------------------
-
-On DevNet, your validator will automatically tap enough coin to purchase :ref:`traffic <traffic>`.
-However, on TestNet and MainNet, your validator party will need an initial coin grant to be able to purchase traffic.
-After logging into the wallet UI in the previous section, note that the party ID is displayed in
-the top right of the UI (e.g. ``validator_validator_service_user::12204f9f94b7369e027544927703efcdf0f03cb15bd26ac53c784c627b63bdf8f041``).
-
-An SV (say your sponsor) will need to transfer coin to this party. They can do this through their wallet UI.
-
-.. todo::
-    * show error message that people will see while the traffic purchase fails due to insufficient funds;
-      it is currentlye here: :ref:`error-insufficient-funds`
-    * link to the option to disable automatic top-ups, and call out the option of using third-party traffic providers
-    * explain liveness rewards being an alternative
-
 
 .. _helm_validator_topup:
 
 Configuring automatic traffic purchases
 ---------------------------------------
-Optionally you may want to configure your validator to :ref:`automatically purchase traffic <traffic_topup>`
-on a pay-as-you-go basis with rate limiting.
-This is currently enabled by default!
+
+By default your node will be configured to automatically purchase :ref:`traffic <traffic>` on a pay-as-you-go basis
+:ref:`automatically purchase traffic <traffic_topup>`.
 To disable or tune to your needs, edit the following section in the validator-values.yaml file:
 
 .. literalinclude:: ../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
@@ -605,6 +587,23 @@ The next top-up gets triggered when all of the following conditions are met:
 - At least ``minTopupInterval`` has elapsed since the last top-up.
 - The validator has sufficient CC in its wallet to buy the top-up amount worth on traffic
   (except on DevNet, where the validator app will automatically tap enough coin to purchase traffic).
+
+
+Validators receive a small amount of free traffic from the Super Validators, which suffices for submitting the
+top-up transaction. However, if many other transactions are submitted, you may run into a situation where
+you have exhausted also the free traffic, thus the validator cannot submit the top-up transaction.
+The free traffic grant accumulates gradually and continuously. When no transactions are submitted, it
+takes about twenty minutes for free traffic to accumulate to the maximum possible.
+If you've consumed your traffic balance by submitting too many transactions without purchasing traffic,
+pause your Validator node (validator app and participant) for twenty minutes to allow your free traffic
+balance to accumulate.
+
+
+.. todo::
+    * show error message that people will see while the traffic purchase fails due to insufficient funds;
+      it is currentlye here: :ref:`error-insufficient-funds`
+    * link to the option to disable automatic top-ups, and call out the option of using third-party traffic providers
+
 
 Configuring sweeps and auto-accepts of transfer offers
 ------------------------------------------------------

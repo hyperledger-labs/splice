@@ -51,7 +51,11 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
         participant.ledger_api_extensions.commands
           .submitJavaExternalOrLocal(
             sender,
-            commands = factoryChoice.commands,
+            commands = factoryChoice.factoryId
+              .exerciseTransferFactory_Transfer(factoryChoice.args)
+              .commands
+              .asScala
+              .toSeq,
             disclosedContracts = factoryChoice.disclosedContracts,
             expectedTimeBounds = expectedTimeBounds,
             advanceTimeBeforeExecute = advanceTimeBeforeExecute,
@@ -80,7 +84,10 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): (
-      FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+      FactoryChoiceWithDisclosures[
+        transferinstructionv1.TransferFactory.ContractId,
+        transferinstructionv1.TransferFactory_Transfer,
+      ],
       Seq[holdingv1.Holding.ContractId],
   ) = {
     val now = env.environment.clock.now.toInstant

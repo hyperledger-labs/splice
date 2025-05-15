@@ -55,6 +55,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import org.apache.pekko.stream.Materializer
 
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -303,10 +304,12 @@ class SingleScanConnection private[client] (
     })
   }
 
-  def getAcsSnapshot(partyId: PartyId)(implicit tc: TraceContext): Future[ByteString] = {
+  def getAcsSnapshot(partyId: PartyId, recordTime: Option[Instant])(implicit
+      tc: TraceContext
+  ): Future[ByteString] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetAcsSnapshot(partyId),
+      HttpScanAppClient.GetAcsSnapshot(partyId, recordTime),
     )
   }
   def listRoundTotals(
@@ -621,7 +624,10 @@ class SingleScanConnection private[client] (
       tc: TraceContext,
   ): Future[
     (
-        FactoryChoiceWithDisclosures[transferinstructionv1.TransferInstructionResult],
+        FactoryChoiceWithDisclosures[
+          transferinstructionv1.TransferFactory.ContractId,
+          transferinstructionv1.TransferFactory_Transfer,
+        ],
         TransferFactoryWithChoiceContext.TransferKind,
     )
   ] =

@@ -27,7 +27,7 @@ const randomHexString = (length: number) =>
 const MAX_BODY_LENGTH_TO_LOG = 300;
 export class OpenAPILoggingMiddleware<
   RequestContext extends LoggableRequestContext,
-  ResponseContext extends LoggableResponseContext
+  ResponseContext extends LoggableResponseContext,
 > {
   readonly name: string;
   public constructor(name: string) {

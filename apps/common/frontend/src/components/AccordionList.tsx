@@ -23,7 +23,7 @@ const AccordionItem: React.FC<AccordionItemProps> = ({ title, content, initially
   };
 
   return (
-    <Accordion expanded={expanded} onChange={(e, isExpanded) => handleChange(isExpanded)}>
+    <Accordion expanded={expanded} onChange={(_e, isExpanded) => handleChange(isExpanded)}>
       <AccordionSummary
         expandIcon={<ExpandMoreIcon />}
         aria-controls={`${title}-content`}

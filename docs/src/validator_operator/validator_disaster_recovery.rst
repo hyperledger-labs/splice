@@ -122,7 +122,142 @@ where ``<node_identities_dump_file>`` is the path to the file containing the nod
 ``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
 Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
 
+Recover the Coin balance of an external party
++++++++++++++++++++++++++++++++++++++++++++++
 
+For a party relying on external signing, a similar procedure can be
+used to recover its coin balance in case the validator originally
+hosting it becomes unusable for whatever reason.
+
+.. warning:: The target validator that you use to host the party after
+             recovery **must** be a **completely new validator**. An existing validator
+             may brick completely due to some limitations around party
+             migrations and there is no way to recover from that at
+             this point. This limitation is expected to be lifted in
+             the future.
+
+First, setup a new validator following the standard :ref:`standard validator deployment docs <validator_operator>`.
+
+Next, connect a :ref:`Canton console <console_access>` to that new validator.
+
+We now need to sign and submit the topology transaction to host the
+external party on the new node and import the ACS for that party.
+
+To do so, first generate the topology transaction. Note that the instructions here
+assume that the party is only hosted on a single participant node. If you want to host
+it on multiple nodes, you will need to adjust this.
+
+.. code::
+
+   // replace YOUR_PARTY_ID by the id of your external party
+   val partyId = PartyId.tryFromProtoPrimitive("YOUR_PARTY_ID")
+   val participantId = participant.id
+   val synchronizerId = participant.synchronizers.id_of("global")
+
+   // generate topology transaction
+   val partyToParticipant = PartyToParticipant.tryCreate(
+       partyId = partyId,
+       threshold = PositiveInt.one,
+       participants = Seq(
+         HostingParticipant(
+           participantId,
+           ParticipantPermission.Confirmation,
+         )
+       ),
+     )
+
+   import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
+   val topologyTransaction = participant.topology.transactions.generate(
+     Seq(
+       GenerateTransactions.Proposal(
+         partyToParticipant,
+         TopologyStoreId.Synchronizer(synchronizerId),
+       )
+     )
+   ).head
+
+   // Print out the hash that needs to be signed. Note that you need to sign
+   // the actual bytes the hex string represents not the hex string
+   topologyTransaction.hash.hash.toHexString
+
+We'll need the topology transaction and the definitions defined here later again. Either keep your Canton console open or save them.
+
+The topology transaction hash needs to be signed externally following the
+`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding#external-party-onboarding-transactions>`_.
+
+After you signed it externally, you need to construct the signed
+topology transaction, sign it additionally through the participant and
+then submit it through the synchronizer.
+
+.. code::
+
+   // Replace HASH_SIGNATURE_HEXSTRING with the signed topology transaction hash
+   val signature = Signature.fromExternalSigning(SignatureFormat.Raw, HexString.parseToByteString("HASH_SIGNATURE_HEXSTRING").get, partyId.namespace.fingerprint, SigningAlgorithmSpec.Ed25519)
+   val topologyTxSignedByParty = SignedTopologyTransaction.create(
+     topologyTransaction,
+     NonEmpty(Set, SingleTransactionSignature(topologyTransaction.hash, signature): TopologyTransactionSignature),
+     isProposal = false,
+     ProtocolVersion.v33,
+   )
+   val topologyTxSignedByBoth = participant.topology.transactions.sign(
+     topologyTxSignedByParty,
+     TopologyStoreId.Synchronizer(synchronizerId),
+     signedBy = Seq(participantId.namespace.fingerprint)
+   )
+   participant.topology.transactions.load(
+     topologyTxSignedByBoth,
+     TopologyStoreId.Synchronizer(synchronizerId),
+   )
+
+We can now check that the topology transaction got correctly applied and get the ``validFrom`` time:
+
+.. code::
+
+    // The detailed output will slightly vary. Make sure that you see the new participant id though.
+    sv1Participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
+      res36: Seq[topology.ListPartyToParticipantResult] = Vector(
+        ListPartyToParticipantResult(
+          context = BaseResult(
+            storeId = Synchronizer(id = global-domain::122025296c61...),
+            validFrom = 2025-05-14T10:19:33.534074Z,
+            validUntil = None,
+            sequenced = 2025-05-14T10:19:33.534074Z,
+            operation = Replace,
+            transactionHash = <ByteString@2d53bfcc size=34 contents="\022 \320\215d\276\352m)\316 \231\345 \360\252WQB\331\3668\216\362\022\342S\310k\vF\267\347\374">,
+            serial = PositiveNumeric(value = 1),
+            signedBy = Vector(1220b529c1d9...)
+          ),
+          item = PartyToParticipant(YOUR_PARTY_ID, PositiveNumeric(1), Vector(HostingParticipant(YOUR_PARTICIPANT_ID..., Submission)))
+        )
+      )
+
+In this example, the validFrom time is ``2025-05-14T10:19:33.534074Z``.
+
+We can now query CC Scan to get the active contract set (ACS) for a party and write it to the file ``acs_snapshot``:
+
+.. parsed-literal::
+
+    // Make sure to adjust YOUR_VALID_FROM to the time you got from the previous query and YOUR_PARY_ID
+    curl -sSL --fail-with-body '|gsf_scan_url|/api/scan/v0/acs/YOUR_PARTY_ID?record_time=YOUR_VALID_FROM' -H 'Content-Type: application/json' | jq -r .acs_snapshot | base64 -d > acs_snapshot
+
+
+Lastly, we can import the ACS:
+
+.. code::
+
+     participant.synchronizers.disconnect_all()
+     participant.repair.import_acs_old("acs_snapshot")
+     participant.synchronizers.reconnect_all()
+
+The party is now hosted on the node and can participat in
+transactions. The last step is to setup the necessary contracts to
+allow the validator automation to renew transfer preapprovals and
+complete transfer commands. To do so, go through the same flow used
+for initial onboarding of the party, i.e.,
+``/v0/admin/external-party/setup-proposal``,
+``/v0/admin/external-party/setup-proposal/prepare-accept`` and
+``/v0/admin/external-party/setup-proposal/submit-accept``. For details
+refer to the :ref:`docs for the validator external signing API <validator-api-external-signing>`.
 
 .. _validator_network_dr:
 

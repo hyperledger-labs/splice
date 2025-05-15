@@ -98,7 +98,8 @@ ${conditionalString(
 ${conditionalString(
   !isMainNet,
   '-- TODO(#17025): Stop ignoring these again once we have topology-aware package selection\n' +
-    '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))'
+    '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))' +
+    '-(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")'
 )}
 ${conditionalString(
   enableChaosMesh,

@@ -194,7 +194,6 @@ describe('SV can see DsoRules config diffs', () => {
 });
 
 function checkNumberNumberOfDiffs(expected: number): void {
-  // eslint-disable-next-line testing-library/no-node-access
   const accordionElements = document.querySelectorAll(
     '.MuiButtonBase-root.MuiAccordionSummary-root.MuiAccordionSummary-gutters'
   );
@@ -221,7 +220,6 @@ async function goToGovernanceTabAndClickOnAction(
 
   expect(await screen.findAllByText(action)).toBeDefined();
 
-  // eslint-disable-next-line testing-library/no-node-access
   const row = document.querySelector(`[data-id="${index}"]`);
 
   await user.click(row!);

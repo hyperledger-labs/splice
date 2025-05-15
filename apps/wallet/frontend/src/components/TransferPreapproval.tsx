@@ -77,7 +77,7 @@ const TransferPreapproval: React.FC = () => {
     <DisableConditionally
       conditions={[
         {
-          disabled: createTransferPreapprovalMutation.isLoading,
+          disabled: createTransferPreapprovalMutation.isPending,
           reason: 'Loading...',
         },
       ]}

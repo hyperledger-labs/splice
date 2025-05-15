@@ -31,7 +31,7 @@ import { ContractId } from '@daml/types';
 
 import * as constants from '../mocks/constants';
 import { ListVoteRequests } from '../../components';
-import VoteModalContent from '../../components/votes/VoteModalContent';
+import VoteModalContent, { VoteRow } from '../../components/votes/VoteModalContent';
 
 const queryClient = new QueryClient();
 // The linter wants me to add the constants.X in the queryKey,
@@ -63,11 +63,11 @@ const provider: VotesHooks = {
     });
   },
   useListVoteRequestResult(
-    limit: number,
-    actionName: string | undefined,
-    requester: string | undefined,
+    _limit: number,
+    _actionName: string | undefined,
+    _requester: string | undefined,
     effectiveFrom: string | undefined,
-    effectiveTo: string | undefined,
+    _effectiveTo: string | undefined,
     executed: boolean | undefined
   ): UseQueryResult<DsoRules_CloseVoteRequestResult[]> {
     return useQuery({
@@ -220,7 +220,7 @@ describe('Vote Modal', () => {
               actionReq={getDsoSvOffboardingAction('sv1')}
               requester="sv1"
               getMemberName={() => 'sv1'}
-              reason={{ body: 'reason', url: 'url' }}
+              reason={{ body: 'reason', url: 'https://vote-request-url.com' }}
               voteBefore={dayjs().subtract(1, 'day').toDate()}
               rejectedVotes={[]}
               acceptedVotes={[]}
@@ -232,5 +232,71 @@ describe('Vote Modal', () => {
 
     const expiryDate = await screen.findByTestId('vote-request-modal-expires-at');
     expect(expiryDate.textContent).toEqual('Did not expire');
+  });
+});
+
+describe('security checks', () => {
+  test('should not alter a valid url', async () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <VoteRow
+          svName="sv1"
+          sv="sv1"
+          reasonBody="reasonBody"
+          reasonUrl="https://vote-request-url.com/"
+        />
+      </ThemeProvider>
+    );
+
+    const urlText = screen.getByText('https://vote-request-url.com/');
+    expect(urlText).toBeDefined();
+  });
+
+  test('should sanitize displayed proposal url', async () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <QueryClientProvider client={queryClient}>
+          <VotesHooksContext.Provider value={provider}>
+            <VoteModalContent
+              voteRequestContractId={'contractId' as ContractId<VoteRequest>}
+              actionReq={getDsoSvOffboardingAction('sv1')}
+              requester="sv1"
+              getMemberName={() => 'sv1'}
+              reason={{ body: 'reason', url: 'javascript:alert(document.domain)' }}
+              voteBefore={dayjs().subtract(1, 'day').toDate()}
+              rejectedVotes={[]}
+              acceptedVotes={[]}
+            />
+          </VotesHooksContext.Provider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    );
+
+    const urlElement = screen.getByTestId('vote-request-modal-reason-url');
+    const href = urlElement.getAttribute('href');
+    const displayText = urlElement.textContent;
+
+    expect(href).toBe('about:blank');
+    expect(displayText).toBe('about:blank');
+  });
+
+  test('should sanitize displayed vote url', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <VoteRow
+          svName="sv1"
+          sv="sv1"
+          reasonBody="reasonBody"
+          reasonUrl="javascript:alert(document.domain)"
+        />
+      </ThemeProvider>
+    );
+
+    const urlElement = screen.getByTestId('vote-row-reason-url');
+    const href = urlElement.getAttribute('href');
+    const displayText = urlElement.textContent;
+
+    expect(href).toBe('about:blank');
+    expect(displayText).toBe('about:blank');
   });
 });

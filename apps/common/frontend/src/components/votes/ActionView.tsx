@@ -11,7 +11,7 @@ import {
   useVotesHooks,
   VotesHooks,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { QueryObserverSuccessResult } from '@tanstack/react-query';
+import { UseQueryResult } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import React from 'react';
 
@@ -177,7 +177,7 @@ export const ActionView: React.FC<{
     return <p>No action specified</p>;
   }
 
-  if (dsoInfosQuery.isLoading) {
+  if (dsoInfosQuery.isPending) {
     return <Loading />;
   }
 
@@ -375,9 +375,7 @@ const ActionValueTable: React.FC<{
                     <Typography variant="h6">{key}</Typography>
                   </TableCell>
                   <TableCell id={`${key}-value`}>
-                    {typeof valuesMap[key] == 'boolean'
-                      ? valuesMap[key].toString()
-                      : valuesMap[key]}
+                    {typeof valuesMap[key] == 'boolean' ? valuesMap[key] : valuesMap[key]}
                   </TableCell>
                 </TableRow>
               ))}
@@ -396,7 +394,7 @@ const ActionValueTable: React.FC<{
 
 const AddFutureConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  dsoInfosQuery: UseQueryResult<DsoInfo>;
   actionType: string;
   amuletRulesAction: {
     tag: 'CRARC_AddFutureAmuletConfigSchedule';
@@ -416,7 +414,7 @@ const AddFutureConfigValueTable: React.FC<{
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
-  if (voteRequests.isLoading) {
+  if (voteRequests.isPending) {
     return <Loading />;
   }
 
@@ -428,13 +426,15 @@ const AddFutureConfigValueTable: React.FC<{
     return <p>no VoteRequest contractId is specified</p>;
   }
 
-  const amuletConfigToCompareWith = findAmuletRulesScheduleItemToCompareAgainst(
-    dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-    amuletRulesAction.value.newScheduleItem._1,
-    votesHooks,
-    amuletRulesAction.value.newScheduleItem._2,
-    voteRequestResultTableType
-  );
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.newScheduleItem._1,
+        votesHooks,
+        amuletRulesAction.value.newScheduleItem._2,
+        voteRequestResultTableType
+      )
+    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -452,19 +452,21 @@ const AddFutureConfigValueTable: React.FC<{
         .filter(v => v[0] !== amuletRulesAction.value.newScheduleItem._1)
     : [];
 
-  const unfoldedAccordions = [
-    {
-      title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
-      content: (
-        <PrettyJsonDiff
-          changes={{
-            newConfig: amuletRulesAction.value.newScheduleItem._2,
-            actualConfig: amuletConfigToCompareWith[1],
-          }}
-        />
-      ),
-    },
-  ];
+  const unfoldedAccordions = amuletConfigToCompareWith
+    ? [
+        {
+          title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
+          content: (
+            <PrettyJsonDiff
+              changes={{
+                newConfig: amuletRulesAction.value.newScheduleItem._2,
+                actualConfig: amuletConfigToCompareWith[1],
+              }}
+            />
+          ),
+        },
+      ]
+    : [];
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
@@ -511,7 +513,7 @@ const AddFutureConfigValueTable: React.FC<{
 
 const RemoveFutureConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  dsoInfosQuery: UseQueryResult<DsoInfo>;
   actionType: string;
   amuletRulesAction: {
     tag: 'CRARC_RemoveFutureAmuletConfigSchedule';
@@ -531,7 +533,7 @@ const RemoveFutureConfigValueTable: React.FC<{
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
-  if (voteRequests.isLoading) {
+  if (voteRequests.isPending) {
     return <Loading />;
   }
 
@@ -542,35 +544,39 @@ const RemoveFutureConfigValueTable: React.FC<{
   if (!voteRequests.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  const amuletConfigToCompareWith = findAmuletRulesScheduleItemToCompareAgainst(
-    dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-    amuletRulesAction.value.scheduleTime,
-    votesHooks,
-    dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
-    voteRequestResultTableType
-  );
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.scheduleTime,
+        votesHooks,
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule.initialValue,
+        voteRequestResultTableType
+      )
+    : undefined;
 
   // TODO(#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
   return (
     <>
-      <ActionValueTable
-        actionType={actionType}
-        actionName={amuletRulesAction.tag}
-        valuesMap={{
-          Time: <DateWithDurationDisplay datetime={amuletRulesAction.value.scheduleTime} />,
-          'Comparing against config from': (
-            <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />
-          ),
-          ScheduleItem: (
-            <PrettyJsonDiff
-              changes={{
-                newConfig: amuletConfigToCompareWith[1],
-                actualConfig: amuletConfigToCompareWith[1],
-              }}
-            />
-          ),
-        }}
-      />
+      {amuletConfigToCompareWith && (
+        <ActionValueTable
+          actionType={actionType}
+          actionName={amuletRulesAction.tag}
+          valuesMap={{
+            Time: <DateWithDurationDisplay datetime={amuletRulesAction.value.scheduleTime} />,
+            'Comparing against config from': (
+              <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />
+            ),
+            ScheduleItem: (
+              <PrettyJsonDiff
+                changes={{
+                  newConfig: amuletConfigToCompareWith[1],
+                  actualConfig: amuletConfigToCompareWith[1],
+                }}
+              />
+            ),
+          }}
+        />
+      )}
       {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
     </>
   );
@@ -578,7 +584,7 @@ const RemoveFutureConfigValueTable: React.FC<{
 
 const UpdateFutureConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  dsoInfosQuery: UseQueryResult<DsoInfo>;
   actionType: string;
   amuletRulesAction: {
     tag: 'CRARC_UpdateFutureAmuletConfigSchedule';
@@ -598,7 +604,7 @@ const UpdateFutureConfigValueTable: React.FC<{
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
 
-  if (voteRequests.isLoading) {
+  if (voteRequests.isPending) {
     return <Loading />;
   }
 
@@ -610,13 +616,15 @@ const UpdateFutureConfigValueTable: React.FC<{
     return <p>no VoteRequest contractId is specified</p>;
   }
 
-  const amuletConfigToCompareWith = findAmuletRulesScheduleItemToCompareAgainst(
-    dsoInfosQuery.data?.amuletRules.payload.configSchedule,
-    amuletRulesAction.value.scheduleItem._1,
-    votesHooks,
-    amuletRulesAction.value.scheduleItem._2,
-    voteRequestResultTableType
-  );
+  const amuletConfigToCompareWith = dsoInfosQuery.data
+    ? findAmuletRulesScheduleItemToCompareAgainst(
+        dsoInfosQuery.data?.amuletRules.payload.configSchedule,
+        amuletRulesAction.value.scheduleItem._1,
+        votesHooks,
+        amuletRulesAction.value.scheduleItem._2,
+        voteRequestResultTableType
+      )
+    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -661,19 +669,21 @@ const UpdateFutureConfigValueTable: React.FC<{
           ),
         }}
         accordionList={{
-          unfoldedAccordions: [
-            {
-              title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
-              content: (
-                <PrettyJsonDiff
-                  changes={{
-                    newConfig: amuletRulesAction.value.scheduleItem._2,
-                    actualConfig: amuletConfigToCompareWith[1],
-                  }}
-                />
-              ),
-            },
-          ],
+          unfoldedAccordions: amuletConfigToCompareWith
+            ? [
+                {
+                  title: <DateWithDurationDisplay datetime={amuletConfigToCompareWith[0]} />,
+                  content: (
+                    <PrettyJsonDiff
+                      changes={{
+                        newConfig: amuletRulesAction.value.scheduleItem._2,
+                        actualConfig: amuletConfigToCompareWith[1],
+                      }}
+                    />
+                  ),
+                },
+              ]
+            : [],
           // TODO(#18846): Fix inflight requests diffs or completely remove them
           foldedAccordions: [],
         }}
@@ -685,7 +695,7 @@ const UpdateFutureConfigValueTable: React.FC<{
 
 const SetAmuletConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  dsoInfosQuery: UseQueryResult<DsoInfo>;
   actionType: string;
   amuletAction: { tag: 'CRARC_SetConfig'; value: AmuletRules_SetConfig };
   expiresAt?: Date;
@@ -705,7 +715,7 @@ const SetAmuletConfigValueTable: React.FC<{
   expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
-  if (voteRequests.isLoading) {
+  if (voteRequests.isPending) {
     return <Loading />;
   }
   if (voteRequests.isError) {
@@ -715,13 +725,15 @@ const SetAmuletConfigValueTable: React.FC<{
     return <p>no VoteRequest contractId is specified</p>;
   }
 
-  const dsoConfigToCompareWith = getAmuletConfigToCompareWith(
-    effectiveAt,
-    voteRequestResultTableType,
-    votesHooks,
-    amuletAction,
-    dsoInfosQuery
-  );
+  const dsoConfigToCompareWith = dsoInfosQuery.data
+    ? getAmuletConfigToCompareWith(
+        effectiveAt,
+        voteRequestResultTableType,
+        votesHooks,
+        amuletAction,
+        dsoInfosQuery
+      )
+    : undefined;
 
   const inflightVoteRequests: [string, AmuletConfig<USD>][] = !voteRequestResultTableType
     ? filterInflightVoteRequests(
@@ -733,26 +745,28 @@ const SetAmuletConfigValueTable: React.FC<{
             ?.value as AmuletRules_SetConfig;
           return [vr.voteBefore, AmuletConfig(USD).encode(newConfig.newConfig)] as [
             string,
-            AmuletConfig<USD>
+            AmuletConfig<USD>,
           ];
         })
         .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
-  const unfoldedAccordions = [
-    {
-      title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
-      content: (
-        <PrettyJsonDiff
-          changes={{
-            newConfig: amuletAction.value.newConfig,
-            baseConfig: amuletAction.value.baseConfig,
-            actualConfig: dsoConfigToCompareWith[1],
-          }}
-        />
-      ),
-    },
-  ];
+  const unfoldedAccordions = dsoConfigToCompareWith
+    ? [
+        {
+          title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
+          content: (
+            <PrettyJsonDiff
+              changes={{
+                newConfig: amuletAction.value.newConfig,
+                baseConfig: amuletAction.value.baseConfig,
+                actualConfig: dsoConfigToCompareWith[1],
+              }}
+            />
+          ),
+        },
+      ]
+    : [];
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({
@@ -795,7 +809,7 @@ const SetAmuletConfigValueTable: React.FC<{
 
 const SetDsoConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
-  dsoInfosQuery: QueryObserverSuccessResult<DsoInfo>;
+  dsoInfosQuery: UseQueryResult<DsoInfo>;
   actionType: string;
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig };
   expiresAt?: Date;
@@ -815,7 +829,7 @@ const SetDsoConfigValueTable: React.FC<{
   expirationInDays,
 }) => {
   const voteRequests = votesHooks.useListDsoRulesVoteRequests();
-  if (voteRequests.isLoading) {
+  if (voteRequests.isPending) {
     return <Loading />;
   }
   if (voteRequests.isError) {
@@ -843,26 +857,28 @@ const SetDsoConfigValueTable: React.FC<{
             ?.value as DsoRules_SetConfig;
           return [vr.voteBefore, DsoRulesConfig.encode(newConfig.newConfig)] as [
             string,
-            DsoRulesConfig
+            DsoRulesConfig,
           ];
         })
         .filter(v => !dayjs(v[0]).isSame(dayjs(expiresAt)))
     : [];
 
-  const unfoldedAccordions = [
-    {
-      title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
-      content: (
-        <PrettyJsonDiff
-          changes={{
-            newConfig: dsoAction.value.newConfig,
-            baseConfig: dsoAction.value.baseConfig || dsoConfigToCompareWith[1],
-            actualConfig: dsoConfigToCompareWith[1],
-          }}
-        />
-      ),
-    },
-  ];
+  const unfoldedAccordions = dsoConfigToCompareWith[1]
+    ? [
+        {
+          title: <DateWithDurationDisplay datetime={dsoConfigToCompareWith[0]} />,
+          content: (
+            <PrettyJsonDiff
+              changes={{
+                newConfig: dsoAction.value.newConfig,
+                baseConfig: dsoAction.value.baseConfig || dsoConfigToCompareWith[1],
+                actualConfig: dsoConfigToCompareWith[1],
+              }}
+            />
+          ),
+        },
+      ]
+    : [];
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const foldedAccordions = inflightVoteRequests.map(vr => ({

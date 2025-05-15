@@ -20,11 +20,11 @@ export const SynchronizerFeesLeaderboardTable: React.FC = () => {
   const amuletNameAcronym = config.spliceInstanceNames.amuletNameAcronym;
 
   switch (topValidatorsQuery.status) {
-    case 'loading':
+    case 'pending':
       return <Loading />;
     case 'error':
       return <ErrorDisplay message={'Could not retrieve validator leaderboard'} />;
-    case 'success':
+    case 'success': {
       const topValidators = topValidatorsQuery.data.validatorsByPurchasedTraffic.map(validator => ({
         name: validator.validator,
         numPurchases: validator.numPurchases,
@@ -58,6 +58,7 @@ export const SynchronizerFeesLeaderboardTable: React.FC = () => {
           </TableBody>
         </TitledTable>
       );
+    }
   }
 };
 

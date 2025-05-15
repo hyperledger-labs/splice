@@ -196,7 +196,6 @@ describe('alice can', () => {
       })
     );
 
-    // eslint-disable-next-line testing-library/no-node-access
     const balanceUpdates = (await screen.findByText('Balance Updates')).parentElement; // testing-library doesn't provide any functions for accessing the parent element, so use direct node access
     expect(balanceUpdates).toBeDefined();
 

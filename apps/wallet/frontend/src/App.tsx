@@ -4,6 +4,7 @@ import * as React from 'react';
 import {
   AuthProvider,
   ErrorRouterPage,
+  retrySynchronizerError,
   theme,
   UserProvider,
 } from '@lfdecentralizedtrust/splice-common-frontend';
@@ -49,11 +50,11 @@ const App: React.FC = () => {
           refetchInterval,
           structuralSharing: replaceEqualDeep,
         },
-      },
-      logger: {
-        log: () => {},
-        error: () => {},
-        warn: () => {},
+        mutations: {
+          retry: retrySynchronizerError,
+          // Exponential backoff up to a maximum of 30 seconds
+          retryDelay: attemptIndex => Math.min(1000 * 1.5 ** attemptIndex, 30000),
+        },
       },
     });
 

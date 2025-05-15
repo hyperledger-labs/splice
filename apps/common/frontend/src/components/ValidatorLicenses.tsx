@@ -7,7 +7,7 @@ import {
   PartyId,
 } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
+import { InfiniteData, UseInfiniteQueryResult, UseQueryResult } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
 
@@ -34,7 +34,7 @@ export interface ValidatorLicensesPage {
 }
 
 interface ValidatorLicensesProps {
-  validatorLicensesQuery: UseInfiniteQueryResult<ValidatorLicensesPage>;
+  validatorLicensesQuery: UseInfiniteQueryResult<InfiniteData<ValidatorLicensesPage>>;
   dsoInfosQuery: UseQueryResult<DsoInfo>;
 }
 
@@ -56,7 +56,7 @@ const ValidatorLicenses: React.FC<ValidatorLicensesProps> = ({
     }
   }, [inView, hasNextLicensesPage, isFetchingNextLicensesPage, fetchNextLicensesPage]);
 
-  if (validatorLicensesQuery.isLoading || dsoInfosQuery.isLoading) {
+  if (validatorLicensesQuery.isPending || dsoInfosQuery.isPending) {
     return <Loading />;
   }
 
