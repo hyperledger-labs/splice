@@ -1703,12 +1703,14 @@ object BuildCommon {
         cacheFileDependencies: Set[File] = Set.empty[File],
         directory: String,
         subPath: String = "src/main/openapi/",
+        outputPrefix: Option[String] = None,
     ): Def.Initialize[Task[Seq[File]]] = Def.task {
       val log = streams.value.log
       val cacheDir = streams.value.cacheDirectory / directory
 
       val openApiSpecFile = baseDirectory.value / subPath / openApiSpec
       val template = templateDirectory.value
+      val outputDir = outputPrefix.fold(baseDirectory.value)(new java.io.File(_)) / directory
       val cache = FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
         runCommand(
           Seq(
@@ -1735,12 +1737,12 @@ object BuildCommon {
             "-i",
             openApiSpecFile.toString,
             "-o",
-            (baseDirectory.value / directory).getAbsolutePath,
+            outputDir.getAbsolutePath,
           ),
           log,
         )
 
-        (baseDirectory.value / directory ** "*").get.toSet
+        (outputDir.getAbsoluteFile ** "*").get.toSet
       }
 
       cache(Set(openApiSpecFile) ++ cacheFileDependencies)
