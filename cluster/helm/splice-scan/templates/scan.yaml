@@ -108,6 +108,9 @@ spec:
         - containerPort: 5012
           name: scan-api
           protocol: TCP
+        - containerPort: 10013
+          name: metrics-api
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /api/scan/livez
