@@ -49,7 +49,6 @@ class UserWalletAutomationService(
     walletSweep: Option[WalletSweepConfig],
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
     dedupDuration: DedupDuration,
-    enableCantonPackageSelection: Boolean,
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
 )(implicit
@@ -62,13 +61,6 @@ class UserWalletAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       store,
-      PackageIdResolver.inferFromAmuletRulesIfEnabled(
-        enableCantonPackageSelection,
-        clock,
-        scanConnection,
-        loggerFactory,
-        UserWalletAutomationService.bootstrapPackageIdResolver,
-      ),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,

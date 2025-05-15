@@ -7,7 +7,6 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -38,13 +37,11 @@ class ExternalPartyWalletManager(
     domainUnpausedSync: DomainUnpausedSynchronization,
     storage: Storage,
     retryProvider: RetryProvider,
-    scanConnection: BftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
-    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -170,12 +167,10 @@ class ExternalPartyWalletManager(
       storage,
       externalPartyRetryProvider,
       partyLoggerFactory,
-      scanConnection,
       domainMigrationInfo,
       participantId,
       ingestFromParticipantBegin,
       ingestUpdateHistoryFromParticipantBegin,
-      enableCantonPackageSelection,
     )
     (externalPartyRetryProvider, walletService)
   }

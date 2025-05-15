@@ -173,7 +173,6 @@ class DomainMigrationInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
-        dsoStore,
         ledgerClient,
       )
       _ <- SetupUtil
@@ -196,8 +195,6 @@ class DomainMigrationInitializer(
         retryProvider,
       )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        config.parameters.enableCantonPackageSelection,
-        dsoStore,
         decentralizedSynchronizerId,
         svAutomation.connection,
       )

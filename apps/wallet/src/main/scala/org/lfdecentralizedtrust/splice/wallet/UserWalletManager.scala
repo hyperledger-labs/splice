@@ -62,7 +62,6 @@ class UserWalletManager(
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
     supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
-    enableCantonPackageSelection: Boolean,
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
 )(implicit
@@ -239,7 +238,6 @@ class UserWalletManager(
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
       supportsSoftDomainMigrationPoc,
       dedupDuration,
-      enableCantonPackageSelection,
       txLogBackfillEnabled = txLogBackfillEnabled,
       txLogBackfillingBatchSize = txLogBackfillingBatchSize,
     )

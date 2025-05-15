@@ -6,7 +6,6 @@ package org.lfdecentralizedtrust.splice.wallet
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -35,12 +34,10 @@ class ExternalPartyWalletService(
     storage: Storage,
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
-    scanConnection: BftScanConnection,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
-    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -69,11 +66,9 @@ class ExternalPartyWalletService(
     clock,
     domainTimeSync,
     domainUnpausedSync,
-    scanConnection,
     retryProvider,
     ingestFromParticipantBegin,
     ingestUpdateHistoryFromParticipantBegin,
-    enableCantonPackageSelection,
     loggerFactory,
   )
 

@@ -240,12 +240,6 @@ class ValidatorApp(
                         val readWriteConnection = ledgerClient.connection(
                           this.getClass.getSimpleName,
                           loggerFactory,
-                          PackageIdResolver.inferFromAmuletRulesIfEnabled(
-                            config.parameters.enableCantonPackageSelection,
-                            clock,
-                            scanConnection,
-                            loggerFactory,
-                          ),
                         )
                         val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
                           readWriteConnection,
@@ -760,13 +754,11 @@ class ValidatorApp(
             domainParamsAutomationService.domainUnpausedSync,
             storage: Storage,
             retryProvider,
-            scanConnection,
             loggerFactory,
             domainMigrationInfo,
             participantId,
             config.ingestFromParticipantBegin,
             config.ingestUpdateHistoryFromParticipantBegin,
-            config.parameters.enableCantonPackageSelection,
           )
           val walletManager = new UserWalletManager(
             ledgerClient,
@@ -791,7 +783,6 @@ class ValidatorApp(
             config.autoAcceptTransfers,
             config.supportsSoftDomainMigrationPoc,
             dedupDuration,
-            config.parameters.enableCantonPackageSelection,
             txLogBackfillEnabled = config.txLogBackfillEnabled,
             txLogBackfillingBatchSize = config.txLogBackfillBatchSize,
           )
@@ -836,11 +827,8 @@ class ValidatorApp(
         config.contactPoint,
         config.supportsSoftDomainMigrationPoc,
         initialSynchronizerTime,
-        config.parameters.enableCantonPackageSelection,
         loggerFactory,
         packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-          config.parameters.enableCantonPackageSelection,
-          scanConnection,
           synchronizerId,
           readOnlyLedgerConnection,
         ),

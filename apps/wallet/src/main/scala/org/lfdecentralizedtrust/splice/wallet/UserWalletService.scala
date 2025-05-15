@@ -55,7 +55,6 @@ class UserWalletService(
     autoAcceptTransfers: Option[AutoAcceptTransfersConfig],
     supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
-    enableCantonPackageSelection: Boolean,
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
 )(implicit
@@ -84,12 +83,6 @@ class UserWalletService(
     ledgerClient.connection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.inferFromAmuletRulesIfEnabled(
-        enableCantonPackageSelection,
-        clock,
-        scanConnection,
-        loggerFactory,
-      ),
     ),
     treasuryConfig,
     supportsSoftDomainMigrationPoc,
@@ -118,7 +111,6 @@ class UserWalletService(
     walletSweep,
     autoAcceptTransfers,
     dedupDuration,
-    enableCantonPackageSelection,
     txLogBackfillEnabled = txLogBackfillEnabled,
     txLogBackfillingBatchSize = txLogBackfillingBatchSize,
   )

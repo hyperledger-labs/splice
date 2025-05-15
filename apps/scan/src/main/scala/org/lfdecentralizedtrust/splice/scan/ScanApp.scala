@@ -231,8 +231,6 @@ class ScanApp(
         )
       }
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        config.parameters.enableCantonPackageSelection,
-        store,
         synchronizerId,
         appInitConnection,
       )

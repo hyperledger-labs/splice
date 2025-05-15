@@ -8,7 +8,6 @@ import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerClient,
   SpliceLedgerConnection,
-  PackageIdResolver,
   RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.store.{
@@ -32,7 +31,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
     override val store: Store,
-    packageIdResolver: PackageIdResolver,
     ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
@@ -54,7 +52,6 @@ abstract class SpliceAppAutomationService[Store <: AppStore](
     ledgerClient.connection(
       this.getClass.getSimpleName,
       loggerFactory,
-      packageIdResolver,
       completionOffsetCallback,
     )
 

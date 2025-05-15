@@ -719,7 +719,6 @@ class SpliceLedgerConnection(
     contractDowngradeErrorCallbacks: AtomicReference[Seq[() => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: Long => Future[Unit],
-    packageIdResolver: PackageIdResolver,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends BaseLedgerConnection(
       client,
@@ -979,7 +978,7 @@ class SpliceLedgerConnection(
         result: SubmitResult[C, Z],
     ): Future[Z] = {
       verifyEnoughExtraTrafficRemains(synchronizerId, priority)
-        .flatMap(_ => commandOut.run(update).toList.traverse(packageIdResolver.resolvePackageId(_)))
+        .map(_ => commandOut.run(update).toList)
         .flatMap { commands =>
           import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
           val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)

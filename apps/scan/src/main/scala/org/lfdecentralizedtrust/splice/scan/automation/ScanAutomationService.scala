@@ -10,11 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TxLogBackfillingTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
-import org.lfdecentralizedtrust.splice.environment.{
-  PackageIdResolver,
-  RetryProvider,
-  SpliceLedgerClient,
-}
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
 import org.lfdecentralizedtrust.splice.store.{
@@ -57,12 +53,6 @@ class ScanAutomationService(
       DomainTimeSynchronization.Noop,
       DomainUnpausedSynchronization.Noop,
       store,
-      PackageIdResolver.inferFromAmuletRulesIfEnabled(
-        config.parameters.enableCantonPackageSelection,
-        clock,
-        store,
-        loggerFactory,
-      ),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,

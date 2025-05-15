@@ -46,7 +46,6 @@ class SplitwellAutomationService(
     supportsSoftDomainMigrationPoc: Boolean,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
-    enableCantonPackageSelection: Boolean,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -59,16 +58,6 @@ class SplitwellAutomationService(
       DomainTimeSynchronization.Noop,
       DomainUnpausedSynchronization.Noop,
       store,
-      PackageIdResolver.inferFromAmuletRulesIfEnabled(
-        enableCantonPackageSelection,
-        clock,
-        scanConnection,
-        loggerFactory,
-        extraPackageIdResolver = SplitwellAutomationService.extraPackageIdResolver,
-        extraModules = Map(
-          "Splice.Splitwell" -> DarResources.splitwell.bootstrap.metadata.name
-        ),
-      ),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin = true,
