@@ -3,7 +3,7 @@
 
 dir := $(call current_dir)
 
-$(dir)/$(docker-build): $(dir)/app.conf $(dir)/bootstrap.sc $(dir)/pre-bootstrap.sh $(dir)/health-check.sh
+$(dir)/$(docker-build): $(dir)/app.conf $(dir)/pre-bootstrap.sh $(dir)/health-check.sh
 $(dir)/$(docker-build): build_arg := --build-arg base_version=$(shell get-snapshot-version)
 
 include cluster/images/splice-base-image-dep.mk
