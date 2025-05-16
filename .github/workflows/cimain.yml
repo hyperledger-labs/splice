@@ -6,14 +6,8 @@ on:
 
 jobs:
   trigger_cimain:
-    runs-on: self-hosted-docker-tiny
-    name: Trigger CIMain deployment
-    steps:
-      - name: Trigger CIMain deployment
-        shell: bash
-        run: |
-          curl --fail-with-body --request POST \
-          --url https://circleci.com/api/v2/project/github/DACH-NY/canton-network-internal/pipeline \
-          --header "Circle-Token: ${{ secrets.CIRCLECI_TOKEN }}" \
-          --header 'content-type: application/json' \
-          --data "{\"branch\": \"main\", \"parameters\":{\"run-job\":\"deploy-cimain\", \"cluster\": \"cimain\", \"splice-git-ref\": \"${{ github.sha }}\"}}"
+    uses: ./.github/workflows/cluster_tests.yml
+    secrets: inherit
+    with:
+      workflow: deploy_cimain
+      sha: ${{ github.sha }}
