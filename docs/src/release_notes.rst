@@ -35,6 +35,12 @@ Upcoming
   - Fix an issue where the automation for completing ``TransferCommand`` failed
     if the provider had a featured app right.
 
+  - Fixes and stability improvements for the :ref:`validator re-onboarding <validator_reonboard>` flow.
+    Among other things:
+
+    - Recovery of standard local parties is now automatically possible even if the validator is hosting external parties.
+    - It is now possible to force the recovery attempt for a party that was skipped during the fully automated recovery flow.
+
 - Scan
 
   - Scan now implements some Token Standard endpoints that are under the ``/registry`` path.
