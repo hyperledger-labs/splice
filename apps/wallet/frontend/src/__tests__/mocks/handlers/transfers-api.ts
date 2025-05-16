@@ -7,11 +7,14 @@ export const requestMocks: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createTransferOffer: Mock<(request: any) => Promise<any>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  createTransferViaTokenStandard: Mock<(request: any) => Promise<any>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createTransferPreapproval: Mock<() => Promise<any>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   transferPreapprovalSend: Mock<(request: any) => Promise<any>>;
 } = {
   createTransferOffer: vi.fn(),
+  createTransferViaTokenStandard: vi.fn(),
   createTransferPreapproval: vi.fn(),
   transferPreapprovalSend: vi.fn(),
 };
@@ -20,6 +23,11 @@ export const requestMocks: {
 export const buildTransferOfferMock = (walletUrl: string): RestHandler[] => [
   rest.post(`${walletUrl}/v0/wallet/transfer-offers`, async (req, res, ctx) => {
     await requestMocks.createTransferOffer(await req.json());
+    return res(ctx.json({}));
+  }),
+
+  rest.post(`${walletUrl}/v0/wallet/token-standard/transfers`, async (req, res, ctx) => {
+    await requestMocks.createTransferViaTokenStandard(await req.json());
     return res(ctx.json({}));
   }),
 
