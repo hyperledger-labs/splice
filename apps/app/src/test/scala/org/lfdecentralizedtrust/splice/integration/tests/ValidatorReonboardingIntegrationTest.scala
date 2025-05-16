@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.config.{
   ParticipantClientConfig,
   SpliceConfig,
 }
+import com.digitalasset.canton.logging.SuppressionRule
 import org.lfdecentralizedtrust.splice.environment.RetryFor
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -29,6 +30,7 @@ import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
+import org.slf4j.event.Level
 
 import java.nio.file.{Files, Path, Paths}
 
@@ -36,6 +38,7 @@ trait ValidatorReonboardingIntegrationTestBase
     extends IntegrationTest
     with ProcessTestUtil
     with StandaloneCanton
+    with ExternallySignedPartyTestUtil
     with WalletTestUtil {
 
   override def dbsSuffix = "validator_reonboard"
@@ -207,6 +210,16 @@ trait ValidatorReonboardingIntegrationTestBase
       participantId: ParticipantId,
   )(implicit
       env: SpliceTestConsoleEnvironment
+  ): Unit = assertMapping(
+    partyId,
+    Seq(participantId),
+  )
+
+  def assertMapping(
+      partyId: PartyId,
+      participants: Seq[ParticipantId],
+  )(implicit
+      env: SpliceTestConsoleEnvironment
   ): Unit = {
     val mapping = sv1Backend.appState.participantAdminConnection
       .getPartyToParticipant(
@@ -215,9 +228,7 @@ trait ValidatorReonboardingIntegrationTestBase
       )
       .futureValue
       .mapping
-    mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
-      participantId
-    )
+    mapping.participants.map(_.participantId) should contain theSameElementsAs participants
   }
 }
 
@@ -228,58 +239,68 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
     initDsoWithSv1Only()
     // We need a standalone instance so we can revoke the domain trust certificate
     // without breaking the long-running nodes.
-    val (dump, aliceValidatorWalletParty, aliceParty, charlieParty, lockedAmount) = withCanton(
-      Seq(
-        testResourcesPath / "standalone-participant-extra.conf",
-        // lockAmulets does a direct ledger API submission and our usual magic for getting admin tokens
-        // in tests for Canton does not work for standalone instances.
-        testResourcesPath / "standalone-participant-extra-no-auth.conf",
-      ),
-      Seq.empty,
-      "alice-participant",
-      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
-      "EXTRA_PARTICIPANT_DB" -> oldParticipantDb,
-    ) {
-      aliceValidatorBackend.startSync()
-      val aliceValidatorWalletParty =
-        PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
-      val aliceParticipantId = aliceValidatorBackend.participantClient.id
-      // check that we have a collision between paritcipant admin party
-      // and validator operator party.
-      aliceValidatorWalletParty.uid shouldBe aliceParticipantId.uid
-      aliceValidatorWalletClient.tap(100)
-
-      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      aliceWalletClient.tap(150)
-      val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
-      charlieWalletClient.tap(100)
-
-      val lockedAmount = walletUsdToAmulet(BigDecimal(50))
-      actAndCheck(
-        "alice locks a amulet that both aliceParty and aliceValidatorWalletParty are stake holders",
-        lockAmulets(
-          aliceValidatorBackend,
-          aliceParty,
-          aliceValidatorWalletParty,
-          aliceWalletClient.list().amulets,
-          lockedAmount,
-          sv1ScanBackend,
-          java.time.Duration.ofMinutes(5),
-          CantonTimestamp.now(),
+    val (dump, aliceValidatorWalletParty, aliceParty, charlieParty, daveExtParty, lockedAmount) =
+      withCanton(
+        Seq(
+          testResourcesPath / "standalone-participant-extra.conf",
+          // lockAmulets does a direct ledger API submission and our usual magic for getting admin tokens
+          // in tests for Canton does not work for standalone instances.
+          testResourcesPath / "standalone-participant-extra-no-auth.conf",
         ),
-      )(
-        "Wait for locked amulet to appear",
-        _ => {
-          aliceWalletClient.list().lockedAmulets.loneElement.effectiveAmount shouldBe lockedAmount
-        },
-      )
+        Seq.empty,
+        "alice-participant",
+        "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+        "EXTRA_PARTICIPANT_DB" -> oldParticipantDb,
+      ) {
+        aliceValidatorBackend.startSync()
+        val aliceValidatorWalletParty =
+          PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
+        val aliceParticipantId = aliceValidatorBackend.participantClient.id
+        // check that we have a collision between paritcipant admin party
+        // and validator operator party.
+        aliceValidatorWalletParty.uid shouldBe aliceParticipantId.uid
+        aliceValidatorWalletClient.tap(100)
 
-      val dump = aliceValidatorBackend.dumpParticipantIdentities()
-      clue("Stop aliceValidator") {
-        aliceValidatorBackend.stop()
+        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        aliceWalletClient.tap(150)
+        val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+        charlieWalletClient.tap(100)
+
+        val daveExtParty = onboardExternalParty(
+          aliceValidatorBackend,
+          Some("daveExternal"),
+        ).party
+        assertMapping(
+          daveExtParty,
+          aliceValidatorBackend.participantClient.id,
+        )
+
+        val lockedAmount = walletUsdToAmulet(BigDecimal(50))
+        actAndCheck(
+          "alice locks a amulet that both aliceParty and aliceValidatorWalletParty are stake holders",
+          lockAmulets(
+            aliceValidatorBackend,
+            aliceParty,
+            aliceValidatorWalletParty,
+            aliceWalletClient.list().amulets,
+            lockedAmount,
+            sv1ScanBackend,
+            java.time.Duration.ofMinutes(5),
+            CantonTimestamp.now(),
+          ),
+        )(
+          "Wait for locked amulet to appear",
+          _ => {
+            aliceWalletClient.list().lockedAmulets.loneElement.effectiveAmount shouldBe lockedAmount
+          },
+        )
+
+        val dump = aliceValidatorBackend.dumpParticipantIdentities()
+        clue("Stop aliceValidator") {
+          aliceValidatorBackend.stop()
+        }
+        (dump, aliceValidatorWalletParty, aliceParty, charlieParty, daveExtParty, lockedAmount)
       }
-      (dump, aliceValidatorWalletParty, aliceParty, charlieParty, lockedAmount)
-    }
     better.files
       .File(dumpPath)
       .overwrite(
@@ -295,7 +316,19 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
       "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
       "EXTRA_PARTICIPANT_DB" -> newParticipantDb,
     ) {
-      aliceValidatorLocalBackend.startSync()
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        {
+          aliceValidatorLocalBackend.startSync()
+        },
+        entries => {
+          // we expect it to refuse to migrate the external party
+          forExactly(1, entries) {
+            _.warningMessage should include(
+              "not be able to migrate due to an unsupported namespace"
+            )
+          }
+        },
+      )
 
       clue("onboard users on the new validator") {
         onboardWalletUser(aliceLocalWalletClient, aliceValidatorLocalBackend) shouldBe aliceParty
@@ -360,6 +393,13 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
       clue("Restart validator without migration config") {
         aliceValidatorLocalBackend.stop()
         aliceValidatorLocalRestart.startSync()
+      }
+
+      clue(s"external party ${daveExtParty} is not hosted anywhere anymore") {
+        assertMapping(
+          daveExtParty,
+          Seq.empty,
+        )
       }
     }
   }
@@ -427,7 +467,7 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
       val aliceValidatorWalletParty =
         PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
       val aliceParticipantId = aliceValidatorBackend.participantClient.id
-      // check that we have no collision between paritcipant admin party
+      // check that we have no collision between participant admin party
       // and validator operator party.
       aliceValidatorWalletParty.uid shouldNot be(aliceParticipantId.uid)
       aliceValidatorWalletClient.tap(100)

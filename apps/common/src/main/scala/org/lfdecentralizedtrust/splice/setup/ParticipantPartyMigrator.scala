@@ -69,10 +69,22 @@ class ParticipantPartyMigrator(
         synchronizerAlias,
         oldParticipantId,
       )
+      partiesToMigrateFinal <- overridePartiesToMigrate match {
+        case Some(_) =>
+          Future.successful(partiesToMigrate)
+        case None =>
+          // Logs warnings
+          filterOutUnsupportedParties(
+            partiesToMigrate,
+            synchronizerId,
+            participantId,
+            oldParticipantId,
+          )
+      }
       _ = logger.info(s"Hosting $partiesToMigrate on $participantId")
       _ <- ensurePartiesMigrated(
         synchronizerAlias,
-        partiesToMigrate,
+        partiesToMigrateFinal,
         participantId,
       )
       // There isn't a great way to check if we already imported the ACS so instead we check if the user already has a primary party
@@ -83,9 +95,9 @@ class ParticipantPartyMigrator(
           logger.info("Party migration already complete, continuing")
           Future.unit
         case None =>
-          logger.info(s"Importing ACS for party ids $partiesToMigrate from scan")
+          logger.info(s"Importing ACS for party ids $partiesToMigrateFinal from scan")
           for {
-            _ <- importAcs(partiesToMigrate, getAcsSnapshot, requiredDars)
+            _ <- importAcs(partiesToMigrateFinal, getAcsSnapshot, requiredDars)
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
           } yield ()
       }
@@ -109,20 +121,71 @@ class ParticipantPartyMigrator(
         logger.info(
           "No overridden parties to migrate, using all parties still hosted on the old participant"
         )
-        for {
-          allHosted <- participantAdminConnection.listPartyToParticipant(
+        participantAdminConnection
+          .listPartyToParticipant(
             TopologyStoreId.SynchronizerStore(synchronizerId).some,
             filterParticipant = oldParticipantId.uid.toProtoPrimitive,
           )
-          (ignored, unhostedOrSingleHosted) = allHosted.partition(_.mapping.participants.size > 1)
-          _ = if (ignored.nonEmpty)
-            logger.info(
-              s"ignoring parties that are hosted by more than one participant: ${ignored.map(_.mapping.partyId)}"
-            )
-        } yield {
-          unhostedOrSingleHosted.map(_.mapping.partyId)
-        }
+          .map(_.map(_.mapping.partyId))
     }
+  }
+
+  private def filterOutUnsupportedParties(
+      parties: Seq[PartyId],
+      synchronizerId: SynchronizerId,
+      participantId: ParticipantId,
+      oldParticipantId: ParticipantId,
+  ): Future[Seq[PartyId]] = {
+    for {
+      filtered1 <- filterOutMultiHostedParties(parties, synchronizerId)
+      filtered2 = filterOutPartiesWithDifferentNamespaces(
+        filtered1,
+        participantId,
+        oldParticipantId,
+      )
+    } yield filtered2
+  }
+
+  private def filterOutMultiHostedParties(
+      parties: Seq[PartyId],
+      synchronizerId: SynchronizerId,
+  ): Future[Seq[PartyId]] =
+    for {
+      mappings <- Future.traverse(parties) { partyId =>
+        participantAdminConnection
+          .getPartyToParticipant(synchronizerId, partyId, None)
+          .map(_.mapping)
+      }
+    } yield {
+      val (supported, ignored) = mappings.partition { mapping =>
+        mapping.participants.size <= 1
+      }
+      if (ignored.nonEmpty)
+        logger.warn(
+          "Ignoring parties that we will not be able to migrate because they are multi-hosted: " +
+            s"${ignored.map(_.partyId)}."
+        )
+      supported.map(_.partyId)
+    }
+
+  private def filterOutPartiesWithDifferentNamespaces(
+      parties: Seq[PartyId],
+      participantId: ParticipantId,
+      oldParticipantId: ParticipantId,
+  ): Seq[PartyId] = {
+    val supportedNamespaces = Set(
+      participantId.uid.namespace,
+      oldParticipantId.uid.namespace,
+    )
+    val (supported, ignored) = parties.partition { party =>
+      supportedNamespaces.contains(party.uid.namespace)
+    }
+    if (ignored.nonEmpty)
+      logger.warn(
+        "Ignoring parties that we will likely not be able to migrate due to an unsupported namespace: " +
+          s"${ignored}."
+      )
+    supported
   }
 
   private def removeDomainTrustCertificateIfNeeded(
@@ -176,16 +239,23 @@ class ParticipantPartyMigrator(
             s"but are missing the additional hosted parties: $missedHostedParties; " +
             "either avoid migrating the admin party or ensure that all parties will be unhosted."
         )
-      // We unhost the admin party last to avoid breaking the participant in case we fail unhosting some other party.
       partiesToMigrateExAdminParty = partiesToMigrate.filterNot(_ == adminPartyId)
       _ = logger.info(s"Unhosting $partiesToMigrateExAdminParty from $oldParticipantId")
+      // needs only participant signatures, so works also for external parties
       _ <- ensurePartiesUnhosted(
         synchronizerAlias,
         partiesToMigrateExAdminParty,
         oldParticipantId,
       )
-      _ = logger.info(s"Unhosting $adminPartyId from $oldParticipantId")
-      _ <- ensurePartiesUnhosted(synchronizerAlias, Seq(adminPartyId), oldParticipantId)
+      _ = logger.info(
+        s"Removing party mapping for $adminPartyId (was mapping to $oldParticipantId)"
+      )
+      _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
+        RetryFor.WaitingOnInitDependency,
+        synchronizerId,
+        adminPartyId,
+        oldParticipantId,
+      )
       _ = logger.info("Removing domain trust certificate.")
       _ <- participantAdminConnection.ensureSynchronizerTrustCertificateRemoved(
         RetryFor.WaitingOnInitDependency,
@@ -213,6 +283,7 @@ class ParticipantPartyMigrator(
                 .getPartyToParticipant(synchronizerId, partyId, None)
                 .flatMap { result =>
                   result.mapping.participants match {
+                    case Seq() => Future.successful(Left(result))
                     case Seq(participant) =>
                       if (
                         participant.participantId == participantId && result.base.operation == TopologyChangeOp.Replace
@@ -257,7 +328,7 @@ class ParticipantPartyMigrator(
       Future
         .traverse(partyIds) { partyId =>
           for {
-            _ <- participantAdminConnection.ensurePartyToParticipantRemoved(
+            _ <- participantAdminConnection.ensurePartyUnhostedFromParticipant(
               RetryFor.WaitingOnInitDependency,
               synchronizerId,
               partyId,

@@ -1316,6 +1316,44 @@ abstract class TopologyAdminConnection(
       logger,
     )
 
+  def ensurePartyUnhostedFromParticipant(
+      retryFor: RetryFor,
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+      participant: ParticipantId,
+  )(implicit tc: TraceContext): Future[Unit] =
+    retryProvider.ensureThat(
+      retryFor,
+      "ensure_party_unhosted_from_participant",
+      s"Remove $participant from party to participant mapping for $partyId on $synchronizerId",
+      listPartyToParticipant(
+        TopologyStoreId.SynchronizerStore(synchronizerId).some,
+        Some(TopologyChangeOp.Replace),
+        filterParty = partyId.filterString,
+        filterParticipant = participant.filterString,
+      ).map {
+        case Seq() => Right(())
+        case Seq(mapping) => Left(mapping)
+        case mappings =>
+          throw Status.INTERNAL
+            .withDescription(
+              s"Expected at most one PartyToParticipant mapping for $partyId but got: $mappings"
+            )
+            .asRuntimeException()
+      },
+      (previous: TopologyResult[PartyToParticipant]) =>
+        proposeMapping(
+          TopologyStoreId.SynchronizerStore(synchronizerId),
+          previous.mapping.copy(
+            participants = previous.mapping.participants.filterNot(_.participantId == participant)
+          ),
+          previous.base.serial + PositiveInt.one,
+          isProposal = false,
+          change = TopologyChangeOp.Replace,
+        ).map(_ => ()),
+      logger,
+    )
+
   def ensurePartyToParticipantRemoved(
       retryFor: RetryFor,
       synchronizerId: SynchronizerId,
