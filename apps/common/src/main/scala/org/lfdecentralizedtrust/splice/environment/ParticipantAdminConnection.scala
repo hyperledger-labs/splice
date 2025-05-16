@@ -457,6 +457,7 @@ class ParticipantAdminConnection(
         listPartyToParticipant(
           store.some,
           filterParty = partyId.filterString,
+          operation = None,
         ).map(_.nonEmpty),
         proposeInitialPartyToParticipant(
           store,
@@ -606,6 +607,7 @@ class ParticipantAdminConnection(
             store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
             filterParty = party.filterString,
             proposals = transactionType,
+            operation = None,
           ).flatMap { proposals =>
             val proposalsWithRightSignature = transactionType match {
               case TopologyTransactionType.ProposalSignedByOwnKey =>
