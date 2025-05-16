@@ -132,10 +132,7 @@ const TestVotes: React.FC<{ showActionNeeded: boolean }> = ({ showActionNeeded }
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <VotesHooksContext.Provider value={provider}>
-          <ListVoteRequests
-            supportsVoteEffectivityAndSetConfig
-            showActionNeeded={showActionNeeded}
-          />
+          <ListVoteRequests showActionNeeded={showActionNeeded} />
         </VotesHooksContext.Provider>
       </QueryClientProvider>
     </ThemeProvider>

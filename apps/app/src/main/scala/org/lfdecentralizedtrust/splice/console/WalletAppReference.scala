@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
+  ListTokenStandardTransfersResponse,
   TransferInstructionResultResponse,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
@@ -29,7 +30,6 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 
 abstract class WalletAppReference(
@@ -483,8 +483,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("List active Token Standard transfers")
   @Help.Description("Shows both incoming and outgoing Token Standard transfers.")
-  def listTokenStandardTransfers()
-      : Seq[Contract[AmuletTransferInstruction.ContractId, AmuletTransferInstruction]] =
+  def listTokenStandardTransfers(): ListTokenStandardTransfersResponse =
     consoleEnvironment.run {
       httpCommand(
         HttpWalletAppClient.TokenStandard.ListTransfers

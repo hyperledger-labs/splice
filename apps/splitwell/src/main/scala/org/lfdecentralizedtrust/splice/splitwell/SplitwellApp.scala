@@ -137,7 +137,6 @@ class SplitwellApp(
       config.supportsSoftDomainMigrationPoc,
       retryProvider,
       loggerFactory,
-      config.parameters.enableCantonPackageSelection,
     )
     preferred <- appInitStep(s"Wait for preferred domain connection") {
       store.domains.waitForDomainConnection(config.domains.splitwell.preferred.alias)

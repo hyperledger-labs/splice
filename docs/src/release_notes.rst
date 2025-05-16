@@ -35,6 +35,12 @@ Upcoming
   - Fix an issue where the automation for completing ``TransferCommand`` failed
     if the provider had a featured app right.
 
+- Scan
+
+  - Scan now implements some Token Standard endpoints that are under the ``/registry`` path.
+    ``https://scan.sv.<YOUR_HOSTNAME>/registry`` should be routed to ``/registry`` at port 5012 in service ``scan-app`` in the ``sv`` namespace,
+    the same way that ``/api/scan`` already is.
+
 0.3.21
 ------
 

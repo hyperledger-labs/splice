@@ -234,7 +234,6 @@ class SV1Initializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
-        dsoStore,
         ledgerClient,
       )
       (_, decentralizedSynchronizer) <- (
@@ -276,8 +275,6 @@ class SV1Initializer(
         logger,
       )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        config.parameters.enableCantonPackageSelection,
-        dsoStore,
         decentralizedSynchronizer,
         svAutomation.connection,
       )

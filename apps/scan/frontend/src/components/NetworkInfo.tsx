@@ -105,7 +105,6 @@ const NetworkInfo: React.FC = () => {
     case 'error':
       return <ErrorDisplay message="Failed to fetch amulet rules" />;
     case 'success': {
-      const supportNewGovernanceFlow = featureSupport.data?.newGovernanceFlow || false;
       return (
         <Card>
           <CardContent>
@@ -127,7 +126,7 @@ const NetworkInfo: React.FC = () => {
                   ).initialValue
                 }
               />
-              {supportNewGovernanceFlow ? <NextConfigUpdate2 /> : <NextConfigUpdate />}
+              <NextConfigUpdate />
             </Stack>
           </CardContent>
         </Card>
@@ -136,41 +135,7 @@ const NetworkInfo: React.FC = () => {
   }
 };
 
-// TODO(#16139): retire old nextconfigupdate
 const NextConfigUpdate: React.FC = () => {
-  const { data: amuletRules } = useGetAmuletRules();
-
-  const futureValues =
-    amuletRules &&
-    getAmuletConfigurationAsOfNow(amuletRules.contract.payload.configSchedule).futureValues;
-  const configurationUpdate =
-    futureValues && futureValues.length > 0 && new Date(futureValues[0]._1);
-
-  return (
-    <Stack spacing={2}>
-      <Typography variant="h3">Next Configuration Update</Typography>
-      {configurationUpdate ? (
-        <Stack spacing={4}>
-          <Typography variant="body1" id="next-config-update-time">
-            {formatDistanceToNow(configurationUpdate, { includeSeconds: true })}
-          </Typography>
-          <Typography variant="h3" id="next-config-update">
-            Fees
-          </Typography>
-          <FeesTable amuletConfig={futureValues.at(0)!._2} />
-        </Stack>
-      ) : (
-        <Typography variant="caption" id="next-config-update-time">
-          No currently scheduled configuration changes
-        </Typography>
-      )}
-    </Stack>
-  );
-};
-
-// TODO(#16139): NextConfigUpdate2 is NextConfigUpgrade that supports the new governance logic (rename it once old
-// logic is retired.
-const NextConfigUpdate2: React.FC = () => {
   const query = useListDsoRulesVoteRequests();
   const voteRequests = query.data;
 

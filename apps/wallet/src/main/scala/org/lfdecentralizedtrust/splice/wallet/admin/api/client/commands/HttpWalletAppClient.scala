@@ -40,7 +40,6 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -1034,7 +1033,7 @@ object HttpWalletAppClient {
     final case object ListTransfers
         extends InternalBaseCommand[
           http.ListTokenStandardTransfersResponse,
-          Seq[Contract[AmuletTransferInstruction.ContractId, AmuletTransferInstruction]],
+          definitions.ListTokenStandardTransfersResponse,
         ] {
       override def submitRequest(
           client: WalletClient,
@@ -1046,11 +1045,9 @@ object HttpWalletAppClient {
           decoder: TemplateJsonDecoder
       ): PartialFunction[ListTokenStandardTransfersResponse, Either[
         String,
-        Seq[Contract[AmuletTransferInstruction.ContractId, AmuletTransferInstruction]],
+        definitions.ListTokenStandardTransfersResponse,
       ]] = { case http.ListTokenStandardTransfersResponse.OK(value) =>
-        value.transfers
-          .traverse(Contract.fromHttp(AmuletTransferInstruction.COMPANION)(_))
-          .leftMap(_.toString)
+        Right(value)
       }
     }
 

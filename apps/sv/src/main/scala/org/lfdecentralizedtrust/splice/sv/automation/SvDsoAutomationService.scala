@@ -49,7 +49,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{FoundDso, InitialPackageConfig}
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
@@ -92,17 +92,6 @@ class SvDsoAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       dsoStore,
-      PackageIdResolver
-        .inferFromAmuletRulesIfEnabled(
-          config.parameters.enableCantonPackageSelection,
-          clock,
-          dsoStore,
-          loggerFactory,
-          SvDsoAutomationService.bootstrapPackageIdResolver(config.onboarding match {
-            case Some(foundDso: FoundDso) => Some(foundDso.initialPackageConfig)
-            case _ => None
-          }),
-        ),
       ledgerClient,
       retryProvider,
       config.ingestFromParticipantBegin,

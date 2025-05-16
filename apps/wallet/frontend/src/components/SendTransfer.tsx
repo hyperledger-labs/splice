@@ -9,19 +9,16 @@ import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  Alert,
   Box,
   Button,
   Card,
   CardContent,
   Checkbox,
   FormControl,
-  FormControlLabel,
   InputAdornment,
   NativeSelect,
   OutlinedInput,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -34,11 +31,9 @@ import BftAnsField from './BftAnsField';
 
 const SendTransfer: React.FC = () => {
   const config = useWalletConfig();
-  const { createTransferOffer, transferPreapprovalSend, createTransferViaTokenStandard } =
-    useWalletClient();
+  const { createTransferOffer, transferPreapprovalSend } = useWalletClient();
   const amuletPriceQuery = useAmuletPrice();
 
-  const [useTokenStandardTransfer, setUseTokenStandardTransfer] = useState(true);
   const [receiver, setReceiver] = useState<string>('');
   const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
   const [ccAmountText, setCCAmountText] = useState<string>('1');
@@ -67,17 +62,7 @@ const SendTransfer: React.FC = () => {
     mutationFn: async () => {
       const now = new Date();
       const expires = addHours(now, Number(expDays) * 24);
-      if (useTokenStandardTransfer) {
-        return await createTransferViaTokenStandard(
-          receiver,
-          ccAmount,
-          description,
-          expires,
-          deduplicationId
-        );
-      } else {
-        return await createTransferOffer(receiver, ccAmount, description, expires, deduplicationId);
-      }
+      return await createTransferOffer(receiver, ccAmount, description, expires, deduplicationId);
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -95,19 +80,7 @@ const SendTransfer: React.FC = () => {
 
   const transferPreapprovalSendMutation = useMutation({
     mutationFn: async () => {
-      if (useTokenStandardTransfer) {
-        const now = new Date();
-        const expires = addHours(now, Number(expDays) * 24);
-        return await createTransferViaTokenStandard(
-          receiver,
-          ccAmount,
-          description,
-          expires,
-          deduplicationId
-        );
-      } else {
-        return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
-      }
+      return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -141,24 +114,6 @@ const SendTransfer: React.FC = () => {
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack direction="row" spacing={5} sx={{ justifyContent: 'space-between' }}>
             <Stack direction="column" mb={4} spacing={1}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    id="toggle-token-standard-transfer"
-                    checked={useTokenStandardTransfer}
-                    onChange={(_evt, checked: boolean) => setUseTokenStandardTransfer(checked)}
-                  />
-                }
-                label="Use Token Standard Transfer"
-              />
-              {!useTokenStandardTransfer ? (
-                <Alert severity="warning">
-                  Legacy transfer offers can only be accepted through the splice wallet which only
-                  supports parties not relying on external signing. Token standard transfers on the
-                  other hand can be accepted by any token standard compliant wallet including those
-                  relying on external signing.
-                </Alert>
-              ) : null}
               <Typography variant="h6">Recipient</Typography>
               <BftAnsField
                 name="Receiver"

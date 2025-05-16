@@ -432,8 +432,6 @@ class SvApp(
           } yield res
       }
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        config.parameters.enableCantonPackageSelection,
-        dsoStore,
         decentralizedSynchronizer,
         svAutomation.connection,
       )
