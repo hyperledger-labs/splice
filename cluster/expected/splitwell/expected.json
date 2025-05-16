@@ -545,9 +545,6 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
-        "dataCacheConfig": {
-          "dataCacheEnabled": false
-        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
@@ -678,9 +675,6 @@
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
         },
-        "dataCacheConfig": {
-          "dataCacheEnabled": false
-        },
         "databaseFlags": [
           {
             "name": "temp_file_limit",
@@ -746,9 +740,6 @@
         "backupConfiguration": {
           "enabled": true,
           "pointInTimeRecoveryEnabled": true
-        },
-        "dataCacheConfig": {
-          "dataCacheEnabled": false
         },
         "databaseFlags": [
           {
