@@ -4,7 +4,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
-import { GetBackfillingStatusResponse } from 'scan-openapi';
+import { GetBackfillingStatusResponse, GetRoundOfLatestDataResponse } from 'scan-openapi';
 import { test, expect } from 'vitest';
 
 import App from '../App';
@@ -28,6 +28,24 @@ test('home screen shows up', async () => {
   const appName = await screen.findByText(`${spliceInstanceNames.amuletName} Scan`);
 
   expect(appName).toBeDefined();
+});
+
+test('round of latest data is displayed', async () => {
+  server.use(
+    rest.get(`${scanUrl}/v0/round-of-latest-data`, (_, res, ctx) => {
+      return res(ctx.json<GetRoundOfLatestDataResponse>({ round: 0, effectiveAt: new Date() }));
+    })
+  );
+
+  render(<AppWithConfig />);
+
+  const roundOfLatestDataText = await screen.findByTestId('round-of-latest-data-text');
+  const roundOfLatestDataValue = await screen.findByTestId('round-of-latest-data-value');
+
+  expect(roundOfLatestDataText.textContent).toMatch(
+    /The content on this page is computed as of round:/
+  );
+  expect(roundOfLatestDataValue.textContent).toBe('0');
 });
 
 test('total circulating amulet balance is displayed', async () => {

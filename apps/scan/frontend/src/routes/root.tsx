@@ -40,7 +40,7 @@ const Root: React.FC = () => {
         return '--';
       }
     }
-    return latestRound?.round || '--';
+    return latestRound?.round !== undefined ? latestRound.round : '--';
   }, [latestRound, error]);
 
   return (
@@ -54,8 +54,9 @@ const Root: React.FC = () => {
 
         <Grid item xs={4}>
           <div id="as-of-round">
-            <Typography variant="body2">
-              The content on this page is computed as of round: {round}
+            <Typography variant="body2" data-testid="round-of-latest-data-text">
+              The content on this page is computed as of round:{' '}
+              <span data-testid="round-of-latest-data-value">{round}</span>
             </Typography>
           </div>
         </Grid>
