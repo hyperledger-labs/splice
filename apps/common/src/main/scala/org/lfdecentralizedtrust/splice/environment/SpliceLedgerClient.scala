@@ -102,7 +102,6 @@ class SpliceLedgerClient(
   def connection(
       connectionClient: String,
       baseLoggerFactory: NamedLoggerFactory,
-      packageIdResolver: PackageIdResolver,
       completionOffsetCallback: Long => Future[Unit] = _ => Future.unit,
   ): SpliceLedgerConnection =
     new SpliceLedgerConnection(
@@ -114,7 +113,6 @@ class SpliceLedgerClient(
       contractDowngradeErrorCallbacks,
       trafficBalanceService,
       completionOffsetCallback,
-      packageIdResolver,
     )
 
   override def onClosed(): Unit = {

@@ -9,18 +9,14 @@ import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  SpliceLedgerClient,
-  PackageIdResolver,
-  RetryProvider,
-}
+import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.store.SvSvStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -33,7 +29,6 @@ class SvSvAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
-    dsoStore: SvDsoStore,
     ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -47,13 +42,6 @@ class SvSvAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       svStore,
-      PackageIdResolver
-        .inferFromAmuletRulesIfEnabled(
-          config.parameters.enableCantonPackageSelection,
-          clock,
-          dsoStore,
-          loggerFactory,
-        ),
       ledgerClient,
       retryProvider,
       config.ingestFromParticipantBegin,

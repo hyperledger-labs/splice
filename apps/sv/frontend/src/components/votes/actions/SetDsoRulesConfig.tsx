@@ -17,20 +17,12 @@ import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
 
 const SetDsoRulesConfig: React.FC<{
-  supportsVoteEffectivityAndSetConfig: boolean;
   chooseAction: (action: ActionFromForm) => void;
   setIsValidSynchronizerPauseTime: (isValid: boolean) => void;
   expiration: Dayjs;
   effectivity: Dayjs;
   isEffective: boolean;
-}> = ({
-  supportsVoteEffectivityAndSetConfig,
-  chooseAction,
-  setIsValidSynchronizerPauseTime,
-  expiration,
-  effectivity,
-  isEffective,
-}) => {
+}> = ({ chooseAction, setIsValidSynchronizerPauseTime, expiration, effectivity, isEffective }) => {
   const dsoInfosQuery = useDsoInfos();
   // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue> | undefined>(
@@ -132,9 +124,7 @@ const SetDsoRulesConfig: React.FC<{
     if (decoded.ok) {
       const scheduled = dsoRulesConfig.nextScheduledSynchronizerUpgrade;
       const newConfig = decoded.result;
-      const baseConfig = supportsVoteEffectivityAndSetConfig
-        ? dsoInfosQuery.data?.dsoRules.payload.config || null
-        : null;
+      const baseConfig = dsoInfosQuery.data?.dsoRules.payload.config || null;
 
       chooseAction({
         tag: 'ARC_DsoRules',

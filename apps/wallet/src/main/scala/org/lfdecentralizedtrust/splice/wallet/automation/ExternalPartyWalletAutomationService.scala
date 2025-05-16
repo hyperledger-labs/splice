@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 import AutomationServiceCompanion.TriggerClass
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.*
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -30,11 +29,9 @@ class ExternalPartyWalletAutomationService(
     clock: Clock,
     domainTimeSync: DomainTimeSynchronization,
     domainUnpausedSync: DomainUnpausedSynchronization,
-    scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
-    enableCantonPackageSelection: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -46,12 +43,6 @@ class ExternalPartyWalletAutomationService(
       domainTimeSync,
       domainUnpausedSync,
       store,
-      PackageIdResolver.inferFromAmuletRulesIfEnabled(
-        enableCantonPackageSelection,
-        clock,
-        scanConnection,
-        loggerFactory,
-      ),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,

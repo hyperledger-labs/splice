@@ -22,11 +22,7 @@ const Voting: React.FC = () => {
   if (!dsoInfosQuery.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
-  const supportNewGovernanceFlow = featureSupport.data?.newGovernanceFlow || false;
-  //TODO(#16139): retire this logic
-  return (
-    <Box>{<VoteRequest supportsVoteEffectivityAndSetConfig={supportNewGovernanceFlow} />}</Box>
-  );
+  return <Box>{<VoteRequest />}</Box>;
 };
 
 export default Voting;

@@ -87,7 +87,7 @@ coin balance and CNS entries should be recovered.
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
 
-To re-onboard a validator in a Docker-compose deployment and recover the balances of all users it hosts,
+To re-onboard a validator in a Kubernetes deployment and recover the balances of all users it hosts,
 repeat the steps described in :ref:`helm-validator-install` for installing the validator app and participant.
 While doing so, please note the following:
 

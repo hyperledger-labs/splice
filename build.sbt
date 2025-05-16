@@ -429,7 +429,7 @@ lazy val `splice-token-test-dummy-holding-daml` =
     .dependsOn(`canton-bindings-java`)
 
 lazy val `canton-json-api-v2-openapi-ts-client` = project
-  .in(file("token-standard/dependencies/canton-json-api-v2"))
+  .in(file("canton/community/ledger/ledger-json-api/src/test/resources"))
   .settings(
     Headers.NoHeaderSettings,
     templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
@@ -446,10 +446,16 @@ lazy val `canton-json-api-v2-openapi-ts-client` = project
           openApiSpec = "openapi.yaml",
           cacheFileDependencies = Set(openApiFile),
           directory = "openapi-ts-client",
-          subPath = "openapi",
+          subPath = "json-api-docs",
+          // NPM needs this to be in a subdirectory of the workspace package.json so we overwrite it here.
+          outputPrefix = Some("token-standard/dependencies/canton-json-api-v2"),
         )
       },
-    cleanFiles += { baseDirectory.value / "openapi-ts-client" },
+    cleanFiles += {
+      new java.io.File(
+        "token-standard/dependencies/canton-json-api-v2/openapi-ts-client"
+      ).getAbsoluteFile
+    },
   )
 
 lazy val `token-standard-cli` =

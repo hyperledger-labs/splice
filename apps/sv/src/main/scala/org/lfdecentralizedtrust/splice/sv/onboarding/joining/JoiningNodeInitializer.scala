@@ -183,7 +183,6 @@ class JoiningNodeInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
-        dsoStore,
         ledgerClient,
       )
       _ <- DomainMigrationInfo.saveToUserMetadata(
@@ -221,8 +220,6 @@ class JoiningNodeInitializer(
         decentralizedSynchronizerId,
       )
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        config.parameters.enableCantonPackageSelection,
-        dsoStore,
         decentralizedSynchronizerId,
         svAutomation.connection,
       )

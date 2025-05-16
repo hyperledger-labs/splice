@@ -33,12 +33,9 @@ import { VoteResultModalState } from './ListVoteRequests';
 
 dayjs.extend(utc);
 
-// TODO(#16139): switch to VoteRequestResultTableType2 everywhere
-export type VoteRequestResultTableType = 'Executed' | 'Planned' | 'Rejected';
-export type VoteRequestResultTableType2 = 'Executed' | 'Rejected';
+export type VoteRequestResultTableType = 'Executed' | 'Rejected';
 
 interface ListVoteResultsTableProps {
-  supportsVoteEffectivityAndSetConfig: boolean;
   getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
   tableBodyId: string;
   tableType: VoteRequestResultTableType;
@@ -72,7 +69,6 @@ type VoteResultQueryOptions = {
 const QUERY_LIMIT = 50;
 
 export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
-  supportsVoteEffectivityAndSetConfig,
   getAction,
   tableBodyId,
   tableType,
@@ -240,13 +236,6 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
             result.outcome.tag === 'VRO_Accepted' &&
             dayjs(result.outcome.value.effectiveAt).isBefore(now) &&
             tableType === 'Executed'
-          ) {
-            return true;
-          } else if (
-            !supportsVoteEffectivityAndSetConfig &&
-            result.outcome.tag === 'VRO_Accepted' &&
-            dayjs(result.outcome.value.effectiveAt).isAfter(now) &&
-            tableType === 'Planned'
           ) {
             return true;
           } else {

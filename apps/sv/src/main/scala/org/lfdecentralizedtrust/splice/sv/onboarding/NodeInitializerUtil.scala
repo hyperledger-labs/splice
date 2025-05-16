@@ -69,7 +69,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
 
   protected def newSvSvAutomationService(
       svStore: SvSvStore,
-      dsoStore: SvDsoStore,
       ledgerClient: SpliceLedgerClient,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -82,7 +81,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       domainUnpausedSync,
       config,
       svStore,
-      dsoStore,
       ledgerClient,
       retryProvider,
       loggerFactory,
