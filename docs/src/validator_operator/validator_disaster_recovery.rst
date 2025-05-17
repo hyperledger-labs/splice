@@ -82,8 +82,6 @@ Once the new validator is up and running, you should be able to login as the adm
 and see its balance. Other users hosted on the validator would need to re-onboard, but their
 coin balance and CNS entries should be recovered.
 
-.. todo:: explain that the recovery only automatically works for users whose parties were allocated in the participant namespace
-
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -121,6 +119,26 @@ To re-onboard a validator in a Docker-compose deployment and recover the balance
 where ``<node_identities_dump_file>`` is the path to the file containing the node identities dump, and
 ``<new_participant_id>`` is a new identifier to be used for the new participant. It must be one never used before.
 Note that in subsequent restarts of the validator, you should keep providing ``-P`` with the same ``<new_participant_id>``.
+
+Limitations and Troubleshooting
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In some non-standard cases, the automated re-onboarding from key backup might not succeed in migrating (i.e., recovering) a party.
+Please check the logs of the validator for warnings or error entries that may give clues.
+Among other things, the following types of parties will not be migrated by default:
+
+* Parties that are hosted on multiple participants.
+  These may get unhosted from the original (failed) participant, but will remain hosted on any other participants.
+* External parties that are hosted on the validator.
+  These may get unhosted from the original (failed) participant.
+  Please refer to :ref:`validator_recover_external_party` for instructions on how to recover external parties.
+
+In some cases you might want to force the migration attempt for a set of parties that were not migrated automatically.
+To do so, you can set the ``parties-to-migrate`` :ref:`configuration option <configuration>` on your validator app.
+A migration will be attempted for each party that you pass to this option.
+The initialization of the validator app will be interrupted on the first failed migration attempt.
+
+.. _validator_recover_external_party:
 
 Recover the Coin balance of an external party
 +++++++++++++++++++++++++++++++++++++++++++++

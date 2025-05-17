@@ -44,6 +44,7 @@ trait DomainMigrationUtil extends BaseTest with TestCommon {
         .getPartyToParticipant(
           synchronizerId,
           dsoParty,
+          None,
         )
     } {
       _.mapping.participantIds.size shouldBe 4
