@@ -18,9 +18,11 @@ import {
   ResponseContext,
   ServerConfiguration,
   WalletApi,
+  WalletFeatureSupportResponse,
 } from 'wallet-openapi';
 
 import * as payment from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.9/lib/Splice/AmuletTransferInstruction';
 import { AppPaymentRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import {
   Subscription,
@@ -45,6 +47,7 @@ import {
   WalletBalance,
   Unknown,
   Notification,
+  ListTokenStandardTransfersResponse,
 } from '../models/models';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
@@ -65,6 +68,7 @@ export interface WalletClient {
   getBalance: () => Promise<WalletBalance>;
   listTransactions: (beginAfterId?: string) => Promise<Transaction[]>;
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
+  listTokenStandardTransfers: () => Promise<ListTokenStandardTransfersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
     amount: BigNumber,
@@ -73,14 +77,22 @@ export interface WalletClient {
     trackingId: string
   ) => Promise<void>;
   createTransferPreapproval: () => Promise<void>;
+  createTransferViaTokenStandard: (
+    receiverPartyId: string,
+    amount: BigNumber,
+    description: string,
+    expiresAt: Date,
+    trackingId: string
+  ) => Promise<void>;
   transferPreapprovalSend: (
     receiverPartyId: string,
     amount: BigNumber,
     deduplicationId: string
   ) => Promise<void>;
   acceptTransferOffer: (offerContractId: string) => Promise<void>;
-  withdrawTransferOffer: (offerContractId: string) => Promise<void>;
+  acceptTokenStandardTransfer: (transferContractId: string) => Promise<void>;
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
+  rejectTokenStandardTransfer: (transferContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
   getAppPaymentRequest: (contractId: string) => Promise<ContractWithState<AppPaymentRequest>>;
@@ -95,6 +107,8 @@ export interface WalletClient {
 
   userStatus: () => Promise<UserStatusResponse>;
   selfGrantFeaturedAppRights: () => Promise<void>;
+
+  featureSupport: () => Promise<WalletFeatureSupportResponse>;
 }
 
 class ApiMiddleware
@@ -224,6 +238,22 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         };
         await externalWalletClient.createTransferOffer(request);
       },
+      createTransferViaTokenStandard: async (
+        receiverPartyId,
+        amount,
+        description,
+        expiresAt,
+        trackingId
+      ) => {
+        const request = {
+          receiver_party_id: receiverPartyId,
+          amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
+          description: description,
+          expires_at: expiresAt.getTime() * 1000,
+          tracking_id: trackingId,
+        };
+        await walletClient.createTokenStandardTransfer(request);
+      },
       createTransferPreapproval: async () => {
         await walletClient.createTransferPreapproval();
       },
@@ -245,14 +275,24 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           offersList: res.offers.map(c => Contract.decodeOpenAPI(c, TransferOffer)),
         };
       },
+      listTokenStandardTransfers: async (): Promise<ListTokenStandardTransfersResponse> => {
+        const res = await walletClient.listTokenStandardTransfers();
+        const transfers = res.transfers.map(c =>
+          Contract.decodeOpenAPI(c, AmuletTransferInstruction)
+        );
+        return { transfers };
+      },
       acceptTransferOffer: async offerContractId => {
         await walletClient.acceptTransferOffer(offerContractId);
+      },
+      acceptTokenStandardTransfer: async transferContractId => {
+        await walletClient.acceptTokenStandardTransfer(transferContractId);
       },
       rejectTransferOffer: async offerContractId => {
         await walletClient.rejectTransferOffer(offerContractId);
       },
-      withdrawTransferOffer: async offerContractId => {
-        await walletClient.withdrawTransferOffer(offerContractId);
+      rejectTokenStandardTransfer: async transferContractId => {
+        await walletClient.rejectTokenStandardTransfer(transferContractId);
       },
       listAcceptedTransferOffers: async (): Promise<ListAcceptedTransferOffersResponse> => {
         const res = await walletClient.listAcceptedTransferOffers();
@@ -320,6 +360,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       selfGrantFeaturedAppRights: async () => {
         await walletClient.selfGrantFeatureAppRight();
+      },
+      featureSupport: async (): Promise<WalletFeatureSupportResponse> => {
+        return await walletClient.featureSupport();
       },
     };
   }, [url, userAccessToken]);

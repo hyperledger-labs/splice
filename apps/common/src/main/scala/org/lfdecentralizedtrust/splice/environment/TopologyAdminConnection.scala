@@ -153,7 +153,8 @@ abstract class TopologyAdminConnection(
 
   def listPartyToParticipant(
       store: Option[TopologyStoreId] = None,
-      operation: Option[TopologyChangeOp] = None,
+      // list only active (non-removed) mappings by default; this matches the Canton console defaults
+      operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
       filterParty: String = "",
       filterParticipant: String = "",
       timeQuery: TimeQuery = TimeQuery.HeadState,
@@ -200,11 +201,13 @@ abstract class TopologyAdminConnection(
   private def findPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
+      operation: Option[TopologyChangeOp],
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(
       listPartyToParticipant(
         store = Some(TopologyStoreId.SynchronizerStore(synchronizerId)),
         filterParty = partyId.filterString,
+        operation = operation,
       ).map { txs =>
         txs.headOption
       }
@@ -213,8 +216,10 @@ abstract class TopologyAdminConnection(
   def getPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
+      // get only active (non-removed) mappings by default; this matches the Canton console defaults
+      operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
-    findPartyToParticipant(synchronizerId, partyId).getOrElse {
+    findPartyToParticipant(synchronizerId, partyId, operation).getOrElse {
       throw Status.NOT_FOUND
         .withDescription(s"No PartyToParticipant state for $partyId on domain $synchronizerId")
         .asRuntimeException
@@ -1311,10 +1316,50 @@ abstract class TopologyAdminConnection(
       logger,
     )
 
+  def ensurePartyUnhostedFromParticipant(
+      retryFor: RetryFor,
+      synchronizerId: SynchronizerId,
+      partyId: PartyId,
+      participant: ParticipantId,
+  )(implicit tc: TraceContext): Future[Unit] =
+    retryProvider.ensureThat(
+      retryFor,
+      "ensure_party_unhosted_from_participant",
+      s"Remove $participant from party to participant mapping for $partyId on $synchronizerId",
+      listPartyToParticipant(
+        TopologyStoreId.SynchronizerStore(synchronizerId).some,
+        Some(TopologyChangeOp.Replace),
+        filterParty = partyId.filterString,
+        filterParticipant = participant.filterString,
+      ).map {
+        case Seq() => Right(())
+        case Seq(mapping) => Left(mapping)
+        case mappings =>
+          throw Status.INTERNAL
+            .withDescription(
+              s"Expected at most one PartyToParticipant mapping for $partyId but got: $mappings"
+            )
+            .asRuntimeException()
+      },
+      (previous: TopologyResult[PartyToParticipant]) =>
+        proposeMapping(
+          TopologyStoreId.SynchronizerStore(synchronizerId),
+          previous.mapping.copy(
+            participants = previous.mapping.participants.filterNot(_.participantId == participant)
+          ),
+          previous.base.serial + PositiveInt.one,
+          isProposal = false,
+          change = TopologyChangeOp.Replace,
+        ).map(_ => ()),
+      logger,
+    )
+
   def ensurePartyToParticipantRemoved(
       retryFor: RetryFor,
       synchronizerId: SynchronizerId,
       partyId: PartyId,
+      participant: ParticipantId,
+      forceChanges: ForceFlags = ForceFlags.none,
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider.ensureThat(
       retryFor,
@@ -1324,6 +1369,7 @@ abstract class TopologyAdminConnection(
         TopologyStoreId.SynchronizerStore(synchronizerId).some,
         Some(TopologyChangeOp.Replace),
         filterParty = partyId.filterString,
+        filterParticipant = participant.filterString,
       ).map {
         case Seq() => Right(())
         case Seq(mapping) => Left(mapping)
@@ -1341,6 +1387,7 @@ abstract class TopologyAdminConnection(
           previous.base.serial + PositiveInt.one,
           isProposal = false,
           change = TopologyChangeOp.Remove,
+          forceChanges = forceChanges,
         ).map(_ => ()),
       logger,
     )

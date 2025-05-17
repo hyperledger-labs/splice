@@ -485,9 +485,13 @@ class TokenStandardAllocationIntegrationTest
 
         },
       )(
-        "There exists a trade proposal visible to both alice and bob's participants",
+        "There exists a trade proposal visible to both bob's and the venue's participants",
         _ => {
           bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+            .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
+              bobParty
+            )
+          splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
               bobParty
             )

@@ -698,6 +698,22 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/feature-support:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "featureSupport"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletFeatureSupportResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 components:
   schemas:
     UserStatusResponse:
@@ -1240,3 +1256,11 @@ components:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    WalletFeatureSupportResponse:
+      type: object
+      required:
+        - token_standard
+      properties:
+        token_standard:
+          type: boolean

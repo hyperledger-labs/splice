@@ -217,11 +217,17 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       transferAmount: BigDecimal,
       expiryDays: Int,
       description: String = "by party ID",
+      shouldDisableTokenStandardSwitch: Boolean = false,
   )(implicit
       driver: WebDriverType
   ) = {
     assert(transferAmount.scale <= 10, "Amulet amount must have at most 10 decimal places")
     click on "navlink-transfer"
+
+    if (shouldDisableTokenStandardSwitch) {
+      click on "toggle-token-standard-transfer"
+    }
+
     click on "create-offer-receiver"
     setAnsField(
       textField("create-offer-receiver"),

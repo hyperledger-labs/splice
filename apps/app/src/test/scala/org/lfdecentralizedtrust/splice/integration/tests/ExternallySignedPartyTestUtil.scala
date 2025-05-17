@@ -36,6 +36,10 @@ trait ExternallySignedPartyTestUtil extends TestCommon {
     val truePartyHint = partyHint.getOrElse(UUID.randomUUID().toString)
     val signingKeyPairByteString = validatorBackend.participantClient.keys.secret
       .download(generatedKey.fingerprint, ProtocolVersion.dev)
+
+    // delete the key from the participant to ensure that it won't be actually used there for anything
+    validatorBackend.participantClient.keys.secret.delete(generatedKey.fingerprint, true)
+
     val keyPair =
       CryptoKeyPair.fromTrustedByteString(signingKeyPairByteString).value
     val privateKey = keyPair.privateKey
