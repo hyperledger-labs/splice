@@ -1,6 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  DisableConditionally,
+  ErrorDisplay,
+  Loading,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import { useMutation } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import addHours from 'date-fns/addHours';
@@ -9,16 +13,19 @@ import { useNavigate } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
+  Alert,
   Box,
   Button,
   Card,
   CardContent,
   Checkbox,
   FormControl,
+  FormControlLabel,
   InputAdornment,
   NativeSelect,
   OutlinedInput,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -28,12 +35,15 @@ import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import useLookupTransferPreapproval from '../hooks/scan-proxy/useLookupTransferPreapproval';
 import { useWalletConfig } from '../utils/config';
 import BftAnsField from './BftAnsField';
+import { useFeatureSupport } from '../hooks/useFeatureSupport';
 
 const SendTransfer: React.FC = () => {
   const config = useWalletConfig();
-  const { createTransferOffer, transferPreapprovalSend } = useWalletClient();
+  const { createTransferOffer, transferPreapprovalSend, createTransferViaTokenStandard } =
+    useWalletClient();
   const amuletPriceQuery = useAmuletPrice();
 
+  const [useTokenStandardTransfer, setUseTokenStandardTransfer] = useState(true);
   const [receiver, setReceiver] = useState<string>('');
   const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
   const [ccAmountText, setCCAmountText] = useState<string>('1');
@@ -41,6 +51,7 @@ const SendTransfer: React.FC = () => {
   const [description, setDescription] = useState<string>('');
   const [useTransferPreapproval, setUseTransferPreapproval] = useState<boolean>(true);
   const preapprovalResult = useLookupTransferPreapproval(receiver);
+  const featureSupport = useFeatureSupport();
 
   const expiryOptions = [
     { name: '1 day', value: 1 },
@@ -62,7 +73,17 @@ const SendTransfer: React.FC = () => {
     mutationFn: async () => {
       const now = new Date();
       const expires = addHours(now, Number(expDays) * 24);
-      return await createTransferOffer(receiver, ccAmount, description, expires, deduplicationId);
+      if (featureSupport.data?.tokenStandard && useTokenStandardTransfer) {
+        return await createTransferViaTokenStandard(
+          receiver,
+          ccAmount,
+          description,
+          expires,
+          deduplicationId
+        );
+      } else {
+        return await createTransferOffer(receiver, ccAmount, description, expires, deduplicationId);
+      }
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -80,7 +101,19 @@ const SendTransfer: React.FC = () => {
 
   const transferPreapprovalSendMutation = useMutation({
     mutationFn: async () => {
-      return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
+      if (featureSupport.data?.tokenStandard && useTokenStandardTransfer) {
+        const now = new Date();
+        const expires = addHours(now, Number(expDays) * 24);
+        return await createTransferViaTokenStandard(
+          receiver,
+          ccAmount,
+          description,
+          expires,
+          deduplicationId
+        );
+      } else {
+        return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
+      }
     },
     onSuccess: () => {
       navigate('/transactions');
@@ -105,6 +138,12 @@ const SendTransfer: React.FC = () => {
     setCCAmountText(e.target.value);
   };
 
+  if (featureSupport.isLoading) {
+    return <Loading />;
+  } else if (featureSupport.isError) {
+    return <ErrorDisplay message="Failed to load Feature Support" />;
+  }
+
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={6} variant="h4">
@@ -114,6 +153,26 @@ const SendTransfer: React.FC = () => {
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack direction="row" spacing={5} sx={{ justifyContent: 'space-between' }}>
             <Stack direction="column" mb={4} spacing={1}>
+              {featureSupport.data?.tokenStandard ? (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      id="toggle-token-standard-transfer"
+                      checked={useTokenStandardTransfer}
+                      onChange={(_evt, checked: boolean) => setUseTokenStandardTransfer(checked)}
+                    />
+                  }
+                  label="Use Token Standard Transfer"
+                />
+              ) : null}
+              {!useTokenStandardTransfer ? (
+                <Alert severity="warning">
+                  Legacy transfer offers can only be accepted through the splice wallet which only
+                  supports parties not relying on external signing. Token standard transfers on the
+                  other hand can be accepted by any token standard compliant wallet including those
+                  relying on external signing.
+                </Alert>
+              ) : null}
               <Typography variant="h6">Recipient</Typography>
               <BftAnsField
                 name="Receiver"

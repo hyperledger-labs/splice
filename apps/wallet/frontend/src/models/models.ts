@@ -4,6 +4,7 @@ import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
 import { AmuletPosition } from 'wallet-openapi';
 
+import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.9/lib/Splice/AmuletTransferInstruction';
 import {
   Subscription,
   SubscriptionIdleState,
@@ -75,13 +76,14 @@ export interface TransactionReceiver {
 }
 
 export interface WalletTransferOffer {
-  contractId: ContractId<TransferOffer>;
+  contractId: ContractId<TransferOffer> | ContractId<AmuletTransferInstruction>;
   ccAmount: string;
   usdAmount: string;
   conversionRate: string;
   convertedCurrency: ConvertedCurrency;
   senderId: string;
   expiry: string;
+  isTokenStandard: boolean;
 }
 
 export interface WalletSubscription {
@@ -108,6 +110,10 @@ export interface ListResponse {
 
 export interface ListTransferOffersResponse {
   offersList: Contract<TransferOffer>[];
+}
+
+export interface ListTokenStandardTransfersResponse {
+  transfers: Contract<AmuletTransferInstruction>[];
 }
 
 export interface ListAcceptedTransferOffersResponse {
