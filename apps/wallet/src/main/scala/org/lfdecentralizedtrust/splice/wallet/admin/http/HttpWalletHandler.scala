@@ -289,11 +289,13 @@ class HttpWalletHandler(
           beginAfterId,
           PageLimit.tryCreate(request.pageSize.toInt),
         )
-      } yield v0.WalletResource.ListTransactionsResponse.OK(
-        d0.ListTransactionsResponse(
-          items = transactions.map(TxLogEntry.Http.toResponseItem).toVector
+      } yield {
+        v0.WalletResource.ListTransactionsResponse.OK(
+          d0.ListTransactionsResponse(
+            items = transactions.map(TxLogEntry.Http.toResponseItem).toVector
+          )
         )
-      )
+      }
     }
   }
 

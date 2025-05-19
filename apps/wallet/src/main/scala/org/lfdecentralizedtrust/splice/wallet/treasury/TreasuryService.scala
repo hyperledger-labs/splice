@@ -52,6 +52,7 @@ import org.lfdecentralizedtrust.splice.util.{
   DisclosedContracts,
   HasHealth,
   SpliceUtil,
+  TokenStandardMetadata,
 }
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import org.lfdecentralizedtrust.splice.wallet.config.TreasuryConfig
@@ -540,7 +541,7 @@ class TreasuryService(
               .map(holding => new holdingv1.Holding.ContractId(holding.contractId.contractId))
               .asJava,
             new metadatav1.Metadata(
-              java.util.Map.of("splice.lfdecentralizedtrust.org/reason", operation.description)
+              java.util.Map.of(TokenStandardMetadata.reasonMetaKey, operation.description)
             ),
           ),
           new metadatav1.ExtraArgs(

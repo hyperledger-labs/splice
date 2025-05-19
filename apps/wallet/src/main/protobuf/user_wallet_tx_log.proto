@@ -30,6 +30,9 @@ message TransactionSubtype {
   string choice = 4;
   // The constructor name of the AmuletOperation. Only relevant for WalletAppInstall_ExecuteBatch
   string amulet_operation = 5;
+  string interface_package_id = 6;
+  string interface_module_name = 7;
+  string interface_entity_name = 8;
 }
 
 /** Balance change due to a transfer */
@@ -48,6 +51,10 @@ message TransferTxLogEntry {
   string app_rewards_used = 9 [(scalapb.field).type = "scala.math.BigDecimal"];
   string validator_rewards_used = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
   string sv_rewards_used = 11 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+  string transfer_instruction_description = 12;
+  string transfer_instruction_receiver = 13;
+  string transfer_instruction_amount = 14 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+  string transfer_instruction_cid = 15;
 }
 
 /** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */
@@ -61,6 +68,7 @@ message BalanceChangeTxLogEntry {
   string receiver = 4;
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
   string amulet_price = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string transfer_instruction_cid = 7;
 }
 
 /** An event that does not change anyone's amulet balance. */
@@ -143,4 +151,3 @@ message BuyTrafficRequestTxLogEntry {
   };
   string buyer = 6;
 }
-

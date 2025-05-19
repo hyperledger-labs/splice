@@ -343,8 +343,24 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // AnsEntryRenewalPaymentCollected
       text = `${nameServiceNameAcronym.toUpperCase()} Entry Renewal Payment Collected`;
       break;
+    case 'TransferFactory_Transfer':
+      // TODO(#19607) Improve display
+      text = `Create Transfer Offer`;
+      break;
+    case 'TransferInstruction_Accept':
+      // TODO(#19607) Improve display
+      text = `Accept Transfer Offer`;
+      break;
+    case 'TransferInstruction_Reject':
+      // TODO(#19607) Improve display
+      text = `Reject Transfer Offer`;
+      break;
+    case 'TransferInstruction_Withdraw':
+      // TODO(#19607) Improve display
+      text = `Withdraw Transfer Offer`;
+      break;
     default:
-      console.warn('Unknown Transaction Subtype', subtype);
+      console.warn('Unknown Transaction Subtype', JSON.stringify(subtype));
       text = subtype.choice;
   }
   return (

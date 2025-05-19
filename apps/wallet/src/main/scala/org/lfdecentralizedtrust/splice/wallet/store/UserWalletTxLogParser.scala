@@ -61,11 +61,21 @@ import org.lfdecentralizedtrust.splice.history.{
   LockedAmuletUnlock,
   Mint,
   Tap,
+  CreateTokenStandardTransferInstruction,
+  TransferInstructionCreate,
+  TransferInstruction_Accept,
+  TransferInstruction_Reject,
+  TransferInstruction_Withdraw,
   Transfer,
   TransferPreapproval_Renew,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
-import org.lfdecentralizedtrust.splice.util.{EventId, ExerciseNode, ExerciseNodeCompanion}
+import org.lfdecentralizedtrust.splice.util.{
+  EventId,
+  ExerciseNode,
+  ExerciseNodeCompanion,
+  TokenStandardMetadata,
+}
 import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
@@ -545,6 +555,98 @@ class UserWalletTxLogParser(
           // Other transfers
           // ------------------------------------------------------------------
 
+          case CreateTokenStandardTransferInstruction(node) =>
+            val cid: String = node.result.value.output match {
+              case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending =>
+                output.transferInstructionCid.contractId
+              case output =>
+                // CreateTokenStandardTransferInstruction only matches on two-step transfers resulting in pending status.
+                // Single-step transfers are just parsed as the underlying transfer.
+                logger.warn(
+                  s"Unexpected transfer instruction result output, expected pending but got: $output"
+                )
+                ""
+            }
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+              )
+            }.map { x =>
+              x.setTransferSubtype(
+                TransferTransactionSubtype.CreateTokenStandardTransferInstruction
+              ).setTransferInstructionDescription(
+                node.argument.value.transfer.meta.values
+                  .getOrDefault(TokenStandardMetadata.reasonMetaKey, "")
+              ).setTransferInstructionReceiver(
+                node.argument.value.transfer.receiver
+              ).setTransferInstructionAmount(
+                node.argument.value.transfer.amount
+              ).setTransferInstructionCid(
+                cid
+              ).setEventId(
+                EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
+              )
+            }
+
+          case TransferInstruction_Accept(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+              )
+            }.map { x =>
+              x.mergeBalanceChangesIntoTransfer(
+                TransferTransactionSubtype.TransferInstruction_Accept
+              ).setTransferInstructionCid(
+                exercised.getContractId
+              ).setEventId(
+                EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
+              )
+            }
+
+          case TransferInstruction_Withdraw(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+              )
+            }.map {
+              _.ensureBalanceChangeTxLogEntry(tree, endUserParty)
+                .setBalanceChangeSubtype(
+                  BalanceChangeTransactionSubtype.TransferInstruction_Withdraw
+                )
+                .setTransferInstructionCid(
+                  exercised.getContractId
+                )
+                .setEventId(
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
+                )
+            }
+
+          case TransferInstruction_Reject(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+              )
+            }.map {
+              _.ensureBalanceChangeTxLogEntry(tree, endUserParty)
+                .setBalanceChangeSubtype(
+                  BalanceChangeTransactionSubtype.TransferInstruction_Reject
+                )
+                .setTransferInstructionCid(
+                  exercised.getContractId
+                )
+                .setEventId(
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
+                )
+            }
+
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
             now(State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer))
@@ -689,6 +791,37 @@ class UserWalletTxLogParser(
               s"Unexpected amulet create event for amulet ${amulet.contractId.contractId} in transaction ${tree.getUpdateId}"
             )
 
+          case TransferInstructionCreate(create)
+              if create.payload.transfer.receiver == endUserParty.toProtoPrimitive =>
+            val sender = create.payload.transfer.sender
+            val receiver = create.payload.transfer.receiver
+            // We hit this for the receiver.
+            // While it doesn't change the balance of the receiver it still seems useful to include
+            // so we parse it as a synthetic transfer with all amounts set to zero.
+            val entry = TransferTxLogEntry(
+              eventId = EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, created.getNodeId),
+              // This is slightly off. The receiver does not actually see this exercised event.
+              // But our tx log infrastructure does not support putting in created events here.
+              subtype =
+                Some(TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto),
+              date = Some(tree.getEffectiveAt),
+              provider = sender,
+              sender = Some(PartyAndAmount(sender, 0.0)),
+              receivers = Seq(PartyAndAmount(receiver, 0.0)),
+              senderHoldingFees = BigDecimal(0.0),
+              // dummy value as it's mandatory
+              amuletPrice = BigDecimal(0.0),
+              appRewardsUsed = BigDecimal(0.0),
+              validatorRewardsUsed = BigDecimal(0.0),
+              svRewardsUsed = Some(BigDecimal(0.0)),
+              transferInstructionDescription = create.payload.transfer.meta.values
+                .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
+              transferInstructionReceiver = receiver,
+              transferInstructionAmount = Some(create.payload.transfer.amount),
+              transferInstructionCid = create.contractId.contractId,
+            )
+            now(State(entries = immutable.Queue[TxLogEntry](entry)))
+
           case _ =>
             now(State.empty)
         }
@@ -803,6 +936,68 @@ object UserWalletTxLogParser {
       )
     }
 
+    def setBalanceChangeSubtype(
+        transactionSubtype: BalanceChangeTransactionSubtype
+    ): State = {
+      State(
+        entries = entries.map {
+          case b: BalanceChangeTxLogEntry =>
+            b.copy(subtype = Some(transactionSubtype.toProto))
+          case other => other
+        }
+      )
+    }
+
+    def setTransferInstructionDescription(
+        description: String
+    ): State = {
+      State(
+        entries = entries.map {
+          case b: TransferTxLogEntry =>
+            b.copy(transferInstructionDescription = description)
+          case other => other
+        }
+      )
+    }
+
+    def setTransferInstructionReceiver(
+        receiver: String
+    ): State = {
+      State(
+        entries = entries.map {
+          case b: TransferTxLogEntry =>
+            b.copy(transferInstructionReceiver = receiver)
+          case other => other
+        }
+      )
+    }
+
+    def setTransferInstructionAmount(
+        amount: BigDecimal
+    ): State = {
+      State(
+        entries = entries.map {
+          case b: TransferTxLogEntry =>
+            b.copy(transferInstructionAmount = Some(amount))
+          case other => other
+        }
+      )
+    }
+
+    def setTransferInstructionCid(
+        cid: String
+    ): State = {
+      State(
+        entries = entries.map {
+          case b: TransferTxLogEntry =>
+            b.copy(transferInstructionCid = cid)
+          case b: BalanceChangeTxLogEntry =>
+            b.copy(transferInstructionCid = cid)
+          case other => other
+        }
+      )
+    }
+
     /** Sets the eventId for all entries that store eventIds to the given eventId.
       *
       * This is useful when you want to re-use the parsing logic of existing methods
@@ -868,6 +1063,31 @@ object UserWalletTxLogParser {
       State(
         entries = newEntries
       )
+    }
+
+    def ensureBalanceChangeTxLogEntry(tx: TransactionTree, party: PartyId) = {
+      if (this.filterByParty(party).entries.isEmpty) {
+        // This can happen in two cases:
+        // 1. We're parsing as the receiver. In that case, the balance change txlog entry
+        //    would be empty as the balance doesn't actually change.
+        // 2. The lock expired and the locked amulet got unlocked separately.
+        // Arguably this should be a notification instead of a zero balance change
+        // but that requires a fair amount of duplication which doesn't seem worth it.
+        val emptyBalanceChangeTxLogEntry = BalanceChangeTxLogEntry(
+          date = Some(tx.getEffectiveAt),
+          amount = BigDecimal(0.0),
+          receiver = party.toProtoPrimitive,
+          // We need a dummy price here to make our parsers happy.
+          amuletPrice = BigDecimal(0.0),
+        )
+        State(
+          entries = immutable.Queue(
+            emptyBalanceChangeTxLogEntry
+          )
+        )
+      } else {
+        this
+      }
     }
   }
 
