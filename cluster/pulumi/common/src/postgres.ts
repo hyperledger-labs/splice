@@ -91,9 +91,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           },
           tier: cloudSqlDbInstance,
           edition: cloudSqlEnterprisePlus ? 'ENTERPRISE_PLUS' : 'ENTERPRISE',
-          dataCacheConfig: {
-            dataCacheEnabled: cloudSqlEnterprisePlus,
-          },
+          ...(cloudSqlEnterprisePlus
+            ? {
+                dataCacheConfig: {
+                  dataCacheEnabled: true,
+                },
+              }
+            : undefined),
           ipConfiguration: {
             ipv4Enabled: false,
             privateNetwork: privateNetwork.id,

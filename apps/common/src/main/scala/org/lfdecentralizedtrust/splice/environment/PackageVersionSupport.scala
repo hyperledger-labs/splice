@@ -90,6 +90,18 @@ trait PackageVersionSupport {
     )
   }
 
+  def supportsTokenStandard(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceWallet,
+      now,
+      // this is the first version implementing the token standard
+      DarResources.wallet_0_1_9,
+    )
+  }
+
   private def isDarSupported(
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,

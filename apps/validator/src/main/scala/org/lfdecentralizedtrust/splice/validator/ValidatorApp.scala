@@ -903,6 +903,11 @@ class ValidatorApp(
           loggerFactory,
         )
 
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        synchronizerId,
+        readOnlyLedgerConnection,
+      )
+
       walletInternalHandler = walletManagerOpt.map(walletManager =>
         new HttpWalletHandler(
           walletManager,
@@ -911,6 +916,7 @@ class ValidatorApp(
           retryProvider,
           validatorTopupConfig,
           dedupDuration,
+          packageVersionSupport,
         )
       )
 

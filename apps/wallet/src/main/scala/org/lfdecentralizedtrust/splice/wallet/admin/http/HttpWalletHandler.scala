@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 import org.lfdecentralizedtrust.splice.auth.AuthExtractor.TracedUser
 import org.lfdecentralizedtrust.splice.environment.{
   CommandPriority,
+  PackageVersionSupport,
   RetryProvider,
   SpliceLedgerConnection,
 }
@@ -42,6 +43,7 @@ import org.lfdecentralizedtrust.splice.wallet.{UserWalletManager, UserWalletServ
 import org.lfdecentralizedtrust.splice.wallet.store.{TxLogEntry, UserWalletStore}
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import TreasuryService.AmuletOperationDedupConfig
+import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.wallet.util.{TopupUtil, ValidatorTopupConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
@@ -75,6 +77,7 @@ class HttpWalletHandler(
     retryProvider: RetryProvider,
     validatorTopupConfig: ValidatorTopupConfig,
     dedupDuration: DedupDuration,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     mat: Materializer,
     ec: ExecutionContext,
@@ -1061,6 +1064,21 @@ class HttpWalletHandler(
         ErrorUtil.internalErrorGrpc(
           s"expected to receive a amulet operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
         )
+    }
+  }
+
+  override def featureSupport(respond: WalletResource.FeatureSupportResponse.type)()(
+      tuser: TracedUser
+  ): Future[WalletResource.FeatureSupportResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.featureSupport") { _ => _ =>
+      val parties = Seq(store.walletKey.dsoParty)
+      val now = CantonTimestamp.now()
+      for {
+        tokenStandard <- packageVersionSupport.supportsTokenStandard(parties, now)
+      } yield WalletResource.FeatureSupportResponse.OK(
+        d0.WalletFeatureSupportResponse(tokenStandard = tokenStandard.supported)
+      )
     }
   }
 }
