@@ -1,34 +1,33 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ActionRequiringConfirmation
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
+  ARC_AmuletRules,
+  ARC_DsoRules,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  ActionRequiringConfirmation,
+  DsoRules_SetConfig,
+}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
-import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAmuletConfig
-import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigSchedule,
-  FrontendLoginUtil,
-  SvFrontendTestUtil,
-  SvTestUtil,
-  WalletTestUtil,
-}
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultDsoRulesConfig}
+import org.lfdecentralizedtrust.splice.util.*
 import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
-import java.time.format.DateTimeFormatter
-import java.time.{LocalDateTime, ZoneOffset}
+import java.util.Optional
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
-class SvFrontendIntegrationTest2
+class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
     with SvTestUtil
     with SvFrontendTestUtil
@@ -768,12 +767,11 @@ class SvFrontendIntegrationTest2
         withFrontEnd("sv1") { implicit webDriver =>
           // If we try to create two vote requests for identical configs,
           // the second request will be rejected with "This vote request has already been created."
-          def submitSetDsoConfigRequest(
-              numUnclaimedRewardsThreshold: String,
-              numMemberTrafficContractsThreshold: String = "",
-              expiresSoon: Boolean,
+          def submitSetDsoConfigRequestViaFrontend(
+              numUnclaimedRewardsThreshold: String = "",
+              numMemberTrafficContractsThreshold: String,
               enabled: Boolean = true,
-          ) = {
+          ): Unit = {
             // The `eventually` guards against `StaleElementReferenceException`s
             // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
             eventually() {
@@ -798,21 +796,52 @@ class SvFrontendIntegrationTest2
               inside(find(id("create-reason-url"))) { case Some(element) =>
                 element.underlying.sendKeys(requestReasonUrl)
               }
-              if (expiresSoon) {
-                setExpirationDate(
-                  "sv1",
-                  DateTimeFormatter
-                    .ofPattern("yyyy-MM-dd HH:mm")
-                    .format(
-                      LocalDateTime
-                        .ofInstant(CantonTimestamp.now().toInstant, ZoneOffset.UTC)
-                        // Might not be wise to go lower than that because the date input doesn't do seconds
-                        .plusMinutes(1)
-                    ),
-                )
-              }
               clickVoteRequestSubmitButtonOnceEnabled(enabled)
             }
+          }
+
+          def submitSetDsoConfigRequestViaBackend(
+              numUnclaimedRewardsThreshold: String,
+              numMemberTrafficContractsThreshold: String = "",
+              expiresSoon: Boolean = true,
+          ): Unit = {
+            val activeSynchronizerId =
+              AmuletConfigSchedule(sv1Backend.getDsoInfo().amuletRules)
+                .getConfigAsOf(env.environment.clock.now)
+                .decentralizedSynchronizer
+                .activeSynchronizer
+            val baseConfig = defaultDsoRulesConfig(
+              1,
+              2,
+              3,
+              SynchronizerId.tryFromString(activeSynchronizerId),
+            )
+            val newConfig = defaultDsoRulesConfig(
+              numUnclaimedRewardsThreshold.toIntOption.getOrElse(1),
+              numMemberTrafficContractsThreshold.toIntOption.getOrElse(2),
+              3,
+              SynchronizerId.tryFromString(activeSynchronizerId),
+            )
+            val setDsoConfigAction: ActionRequiringConfirmation = new ARC_DsoRules(
+              new SRARC_SetConfig(
+                new DsoRules_SetConfig(
+                  newConfig,
+                  Optional.of(baseConfig),
+                )
+              )
+            )
+            sv1Backend.createVoteRequest(
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+              setDsoConfigAction,
+              requestReasonUrl,
+              requestReasonBody,
+              if (expiresSoon) {
+                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+              } else {
+                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
+              },
+              None,
+            )
           }
 
           def checkNewVoteRequestInProgressTab(previousVoteRequestsInProgress: Int) = {
@@ -847,7 +876,9 @@ class SvFrontendIntegrationTest2
 
           actAndCheck(
             "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetDsoConfigRequest(numUnclaimedRewardsThreshold = "41", expiresSoon = true)
+              submitSetDsoConfigRequestViaBackend(
+                numUnclaimedRewardsThreshold = "41"
+              )
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -856,10 +887,8 @@ class SvFrontendIntegrationTest2
 
           val (_, requestId) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetDsoConfigRequest(
-                numUnclaimedRewardsThreshold = "10",
-                numMemberTrafficContractsThreshold = "42",
-                expiresSoon = false,
+              submitSetDsoConfigRequestViaFrontend(
+                numMemberTrafficContractsThreshold = "42"
               )
             },
           )(
@@ -912,7 +941,7 @@ class SvFrontendIntegrationTest2
         withFrontEnd("sv1") { implicit webDriver =>
           // If we try to create two vote requests for identical configs,
           // the second request will be rejected with "This vote request has already been created."
-          def submitSetAmuletConfigRequest(
+          def submitSetAmuletConfigRequestViaBackend(
               createFee: String,
               holdingFee: String = "0.001",
               expiresSoon: Boolean,
@@ -992,7 +1021,7 @@ class SvFrontendIntegrationTest2
 
           actAndCheck(
             "sv1 operator creates a new vote request with a short expiration time", {
-              submitSetAmuletConfigRequest(createFee = "41", expiresSoon = true)
+              submitSetAmuletConfigRequestViaBackend(createFee = "41", expiresSoon = true)
             },
           )(
             "sv1 can see the new vote request in the progress tab",
@@ -1001,7 +1030,7 @@ class SvFrontendIntegrationTest2
 
           val (_, requestId) = actAndCheck(
             "sv1 operator creates a new vote request with a long expiration time", {
-              submitSetAmuletConfigRequest(
+              submitSetAmuletConfigRequestViaBackend(
                 createFee = "0.03",
                 holdingFee = "42",
                 expiresSoon = false,
