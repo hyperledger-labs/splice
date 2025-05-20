@@ -453,7 +453,8 @@ class DbScanStore(
       val entryTypeCondition = sql"""entry_type in (
                   ${EntryType.TransferTxLogEntry},
                   ${EntryType.TapTxLogEntry},
-                  ${EntryType.MintTxLogEntry}
+                  ${EntryType.MintTxLogEntry},
+                  ${EntryType.AbortTransferInstructionTxLogEntry}
                 )"""
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {

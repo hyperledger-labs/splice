@@ -5,6 +5,7 @@ export const MultiValidatorConfigSchema = z.object({
   multiValidator: z
     .object({
       postgresPvcSize: z.string(),
+      requiresOnboardingSecret: z.boolean().default(false),
     })
     .optional(),
 });

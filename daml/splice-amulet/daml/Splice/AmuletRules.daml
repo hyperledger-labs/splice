@@ -1379,6 +1379,7 @@ template TransferPreapproval
         inputs : [TransferInput]
         amount : Decimal
         sender : Party
+        description : Optional Text
       controller sender
       do
          assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
@@ -1399,7 +1400,10 @@ template TransferPreapproval
              -- go to the party hosting the receiver. Allowing the sender
              -- to configure arbitrary beneficiaries doesn't make sense.
              -- If needed, we could extend preapprovals to track beneficiaries later.
-         pure (TransferPreapproval_SendResult transferResult)
+         let meta = optionalMetadata reasonMetaKey identity description (fromOptional emptyMetadata transferResult.meta).values
+         -- strip metadata to avoid duplicating it needlessly
+         let result = transferResult with meta = None
+         pure (TransferPreapproval_SendResult result (Some (Metadata meta)))
 
     -- Renew the contract as the provider
     choice TransferPreapproval_Renew : TransferPreapproval_RenewResult
@@ -1447,6 +1451,7 @@ instance HasCheckedFetch TransferPreapproval ForOwner where
 data TransferPreapproval_SendResult = TransferPreapproval_SendResult
   with
     result : TransferResult
+    meta : Optional Metadata
   deriving (Show, Eq)
 
 data TransferPreapproval_RenewResult = TransferPreapproval_RenewResult

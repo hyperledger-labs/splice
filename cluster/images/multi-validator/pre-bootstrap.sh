@@ -52,8 +52,6 @@ function write_validator_config() {
     local user="${VALIDATOR_USERNAME_PREFIX}_${index}"
     local partyHint="Digital_Asset-load_test-${index}"
 
-    secret="$(request_onboarding_secret)"
-
     cat <<EOF >> /app/app.conf
 canton.validator-apps.validator_backend_$index = {
     app-instances = {}
@@ -116,11 +114,6 @@ canton.validator-apps.validator_backend_$index = {
         secret = "test"
     }
 
-    onboarding = {
-        sv-client.admin-api.url = \${?SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS}
-        secret = "$secret"
-    }
-
     domains {
         global {
             alias = "global"
@@ -141,6 +134,18 @@ canton.validator-apps.validator_backend_$index = {
     }
 }
 EOF
+
+    if [ -n "${SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET:-}" ]; then
+      secret="$(request_onboarding_secret)"
+      cat <<EOF >> /app/app.conf
+      canton.validator-apps.validator_backend_$index.onboarding = {
+        sv-client.admin-api.url = \${?SPLICE_APP_VALIDATOR_SV_SPONSOR_ADDRESS}
+        secret = "$secret"
+      }
+EOF
+    else
+      echo "Validator is not configured to request a secret, must be already onboarded"
+    fi
 }
 
 nodes=${NUM_NODES:-1}

@@ -11,6 +11,8 @@ import {
 } from 'splice-pulumi-common';
 import { ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
+import { multiValidatorConfig } from './config';
+
 export interface BaseMultiNodeArgs {
   namespace: k8s.core.v1.Namespace;
   postgres: {
@@ -112,7 +114,16 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                         `-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 ${javaOpts || ''} ` +
                         jmxOptions(),
                     },
-                  ],
+                  ].concat(
+                    multiValidatorConfig?.requiresOnboardingSecret
+                      ? [
+                          {
+                            name: 'SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET',
+                            value: 'true',
+                          },
+                        ]
+                      : []
+                  ),
                 },
               ],
               initContainers: [

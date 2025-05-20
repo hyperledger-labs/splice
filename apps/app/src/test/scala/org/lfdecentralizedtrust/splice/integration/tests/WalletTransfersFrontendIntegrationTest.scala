@@ -427,7 +427,8 @@ class TokenStandardWalletTransfersFrontendIntegrationTest
       TransferOfferInBackend(
         sender = PartyId.tryFromProtoPrimitive(transfer.sender),
         receiver = PartyId.tryFromProtoPrimitive(transfer.receiver),
-        description = transfer.meta.values.get("splice.lfdecentralizedtrust.org/reason"),
+        description =
+          transfer.meta.values.getOrDefault("splice.lfdecentralizedtrust.org/reason", ""),
         amount = transfer.amount,
         expiry = transfer.executeBefore,
       )

@@ -196,7 +196,11 @@ abstract class ValidatorPreflightIntegrationTestBase
         )(
           "Transfer appears in transactions log",
           _ => {
-            inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
+            // There will be two tx log entries, one for the creation of the offer and one for the acceptance
+            // when using the token standard flow and one otherwise.
+            // We support both and just check that the entry for the completed transfer is there.
+            val txs = findAll(className("tx-row")).toSeq
+            forExactly(1, txs) { tx =>
               val transaction = readTransactionFromRow(tx)
               transaction.action should matchText("Received")
               val partyR = s"$alicePartyId.*".r

@@ -7,6 +7,7 @@ module Splice.ExternalPartyAmuletRules where
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.Optional
+import qualified DA.TextMap as TextMap
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
@@ -42,6 +43,7 @@ template ExternalPartyAmuletRules
         amount : Decimal
         expiresAt : Time
         nonce : Int
+        description : Optional Text
       controller sender
       do -- TODO(#18633): once the `isLedgerTimeXX` primitives are in, enforce that `expiresAt` is in the future
          -- We don't do that yet, as otherwise this would be a regression, as it would introduce a time-bound
@@ -54,6 +56,7 @@ template ExternalPartyAmuletRules
            amount
            expiresAt
            nonce
+           description
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
 
     interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
@@ -115,6 +118,7 @@ template TransferCommand
     nonce : Int
       -- ^ Expected nonce value to order and deduplicate concurrent transfers.
       -- Starts at 0 and the next value to use can then be read from TransferCommandCounter and the in-flight TransferCommand contracts.
+    description : Optional Text
   where
     -- The DSO party is a signatory to make sure
     -- that the external signature
@@ -179,7 +183,7 @@ template TransferCommand
                   assertWithinDeadline "TransferCommand.expiresAt" expiresAt
                   result <-
                     try do
-                      TransferPreapproval_SendResult result <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender)
+                      TransferPreapproval_SendResult result _meta <- exercise transferPreapprovalCid (TransferPreapproval_Send context inputs amount sender description)
                       pure (TransferCommandResultSuccess result)
                     catch
                       (ex : InvalidTransfer) -> mergeInputsAndReportError ex.reason
@@ -269,6 +273,8 @@ amulet_transferFactory_transferImpl this _self arg = do
   -- inputHoldingCids: note that their detailed validation is done in the transfer itself
   require "At least one holding must be provided" (not $ null transfer.inputHoldingCids)
 
+  let reason = TextMap.lookup reasonMetaKey transfer.meta.values
+
   -- execute the right kind of transfer
   case optPreapprovalCid of
     None
@@ -322,13 +328,14 @@ amulet_transferFactory_transferImpl this _self arg = do
           context = paymentContext
           inputs
           amount = transfer.amount
+          description = reason
 
       -- return result
       pure Api.Token.TransferInstructionV1.TransferInstructionResult with
         senderChangeCids = toInterfaceContractId <$> optionalToList result.result.senderChangeAmulet
         output = Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
           receiverHoldingCids = createdAmuletToHolding <$> result.result.createdAmulets
-        meta = copyOnlyBurnMeta result.result.meta
+        meta = copyOnlyBurnMeta result.meta
 
 
 -- Token standard allocation factory

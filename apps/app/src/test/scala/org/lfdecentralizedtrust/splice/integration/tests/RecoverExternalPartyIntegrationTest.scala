@@ -209,6 +209,7 @@ class RecoverExternalPartyIntegrationTest
         BigDecimal(1000.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         0L,
+        Some("transfer-command-description"),
         verboseHashing = true,
       )
     val (updateId, _) = actAndCheck(timeUntilSuccess = 60.seconds)(

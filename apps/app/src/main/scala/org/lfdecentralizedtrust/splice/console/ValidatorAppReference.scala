@@ -256,6 +256,7 @@ abstract class ValidatorAppReference(
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       nonce: Long,
+      description: Option[String],
       verboseHashing: Boolean = false,
   ): definitions.PrepareTransferPreapprovalSendResponse = {
     consoleEnvironment.run {
@@ -266,6 +267,7 @@ abstract class ValidatorAppReference(
           amount,
           expiresAt,
           nonce,
+          description,
           verboseHashing,
         )
       )

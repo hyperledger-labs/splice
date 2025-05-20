@@ -1033,6 +1033,8 @@ components:
           type: string
         amulet_operation:
           type: string
+        interface_id:
+          type: string
 
     BaseListTransactionsResponseItem:
       type: object
@@ -1083,6 +1085,14 @@ components:
               type: string
             sv_rewards_used:
               type: string
+            transfer_instruction_description:
+              type: string
+            transfer_instruction_receiver:
+              type: string
+            transfer_instruction_amount:
+              type: string
+            transfer_instruction_cid:
+              type: string
     BalanceChangeResponseItem:
       allOf:
         - $ref: "#/components/schemas/BaseListTransactionsResponseItem"
@@ -1096,6 +1106,8 @@ components:
               items:
                 $ref: "#/components/schemas/PartyAndAmount"
             amulet_price:
+              type: string
+            transfer_instruction_cid:
               type: string
     NotificationResponseItem:
       allOf:
@@ -1156,6 +1168,8 @@ components:
           description: |
             Deduplication id, only one successful transfer with this id
             will be accepted within a 24h period.
+          type: string
+        description:
           type: string
 
     CreateTokenStandardTransferRequest:

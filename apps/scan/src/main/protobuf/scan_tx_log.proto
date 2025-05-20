@@ -78,7 +78,7 @@ message BalanceChangeTxLogEntry {
   int64 round = 3;
   string change_to_initial_amount_as_of_round_zero = 4 [(scalapb.field).type = "scala.math.BigDecimal"];
   string change_to_holding_fees_rate = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
-  map <string, PartyBalanceChange> party_balance_changes = 6 [(scalapb.field).key_type = "com.digitalasset.canton.topology.PartyId"];
+  map <string, PartyBalanceChange> party_balance_changes = 6 [(scalapb.field).key_type = "com.digitalasset.canton.topology.PartyId"];;
 }
 
 message ExtraTrafficPurchaseTxLogEntry {
@@ -116,6 +116,12 @@ message ClosedMiningRoundTxLogEntry {
   google.protobuf.Timestamp effective_at = 4 [(scalapb.field).type = "java.time.Instant"];
 }
 
+enum TransferKind {
+  TRANSFER_KIND_OTHER = 0;
+  TRANSFER_KIND_CREATE_TRANSFER_INSTRUCTION = 1;
+  TRANSFER_KIND_TRANSFER_INSTRUCTION_ACCEPT = 2;
+}
+
 message TransferTxLogEntry {
   option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.TransactionTxLogEntry";
   option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
@@ -130,6 +136,13 @@ message TransferTxLogEntry {
   repeated BalanceChange balance_changes = 8;
   int64 round = 9;
   string amulet_price = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
+
+  string transfer_instruction_description = 11;
+  string transfer_instruction_receiver = 12;
+  string transfer_instruction_amount = 13 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
+  string transfer_instruction_cid = 14;
+
+  TransferKind transfer_kind = 15;
 }
 
 message TapTxLogEntry {
@@ -231,4 +244,24 @@ message TransferCommandExpired {
 }
 
 message TransferCommandWithdrawn {
+}
+
+enum TransferAbortKind {
+  TRANSFER_ABORT_KIND_RESERVED = 0;
+  TRANSFER_ABORT_KIND_WITHDRAW = 1;
+  TRANSFER_ABORT_KIND_REJECT = 2;
+}
+
+message AbortTransferInstructionTxLogEntry {
+  option (scalapb.message).extends = "org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.TransactionTxLogEntry";
+  option (scalapb.message).companion_extends = "org.lfdecentralizedtrust.splice.store.TxLogStore.TxLogEntryTypeMappers";
+
+  string event_id = 1;
+  string offset = 2;
+  string domain_id = 3 [(scalapb.field).type = "com.digitalasset.canton.topology.SynchronizerId"];
+  google.protobuf.Timestamp date = 4 [(scalapb.field).type = "java.time.Instant"];
+
+  string transfer_instruction_cid = 14;
+
+  TransferAbortKind transfer_abort_kind = 15;
 }

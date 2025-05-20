@@ -497,6 +497,29 @@ function subcmd_gcloud_logs() {
     fi
 }
 
+subcommand_whitelist[gcloud_logs_ui]='Open the gcloud logs viewer for this cluster'
+
+function subcmd_gcloud_logs_ui() {
+    _cluster_must_exist
+
+    base_query="resource.labels.cluster_name%3D%22${GCP_CLUSTER_NAME}%22"
+    if [ -n "${1-}" ]; then
+        namespace_query="%0Aresource.labels.namespace_name%3D%22${1}%22";
+    else
+        namespace_query=""
+    fi
+    if [ -n "${2-}" ]; then
+        container_name_query="%0Aresource.labels.container_name%3D%22${2}%22";
+    else
+        container_name_query=""
+    fi
+    query="${base_query}${namespace_query}${container_name_query}"
+
+    url="https://console.cloud.google.com/logs/query?query=$query&project=$CLOUDSDK_CORE_PROJECT"
+    _info "Opening gcloud logs viewer: $url"
+    open "$url"
+}
+
 ###
 
 subcommand_whitelist[upgrade]='Upgrades the cluster to the latest GKE version'
