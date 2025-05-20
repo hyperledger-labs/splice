@@ -44,6 +44,9 @@ jobs:
     runs-on: ${{ inputs.runs_on }}
     name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
     timeout-minutes: 35
+    permissions:
+      id-token: write # Required for GCP Workload Identity for failure notifications
+      contents: read
     needs:
       - split_tests
     if: ${{ needs.split_tests.outputs.indices != '[]' }}
@@ -82,5 +85,7 @@ jobs:
           auth0_management_api_client_secret: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
           compose_validator_web_ui_password: ${{ secrets.COMPOSE_VALIDATOR_WEB_UI_PASSWORD }}
           auth0_validator_audience: ${{ secrets.AUTH0_TESTS_VALIDATOR_AUDIENCE }}
-          slack_access_token: ${{ secrets.SLACK_ACCESS_TOKEN }}
-          github_token: ${{ secrets.GH_ISSUES }}
+          google_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          failure_notifications_invoker_sa: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}
+          failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
+          failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}

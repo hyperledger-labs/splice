@@ -63,12 +63,6 @@ inputs:
     description: "audience for the validator in docker-compose tests (from AUTH0_TESTS_VALIDATOR_AUDIENCE secret)"
     required: false
     default: ""
-  slack_access_token:
-    description: "Slack access token (for failure notifications)"
-    required: true
-  github_token:
-    description: "Github token with permissions to create issues in the failures project (for failure notifications)"
-    required: true
   additional_nix_args:
     description: "Additional arguments to pass to the Nix command"
     required: false
@@ -77,6 +71,18 @@ inputs:
     description: "A bash command to run before starting SBT"
     required: false
     default: ""
+  google_workload_identity_provider:
+    description: "Google Workload Identity provider (for failure notifications)"
+    required: true
+  failure_notifications_invoker_sa:
+    description: "Google Service Account for failure notifications (for failure notifications)"
+    required: true
+  failure_notifications_invoker_url:
+    description: "URL for failure notifications (for failure notifications)"
+    required: true
+  failure_notifications_slack_channel:
+    description: "Slack channel for failure notifications (for failure notifications)"
+    required: true
 
 runs:
   using: "composite"
@@ -239,8 +245,9 @@ runs:
 
     - name: Report Failures on Slack & Github
       if: failure() && github.event_name == 'push'
-      shell: bash
-      env:
-        SLACK_ACCESS_TOKEN: ${{ inputs.slack_access_token }}
-        GH_TOKEN: ${{ inputs.github_token }}
-      run: ./.github/actions/scripts/notification-scripts/failure_notification.py
+      uses: ./.github/actions/tests/failure_notifications
+      with:
+        workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'
+        service_account: '${{ inputs.failure_notifications_invoker_sa }}'
+        notifications_url: '${{ inputs.failure_notifications_invoker_url }}'
+        slack_channel: '${{ inputs.failure_notifications_slack_channel }}'

@@ -42,6 +42,9 @@ jobs:
     runs-on: ${{ inputs.runs_on }}
     name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
     timeout-minutes: 35
+    permissions:
+      id-token: write # Required for GCP Workload Identity for failure notifications
+      contents: read
     needs:
       - split_tests
     if: ${{ needs.split_tests.outputs.indices != '[]' }}
@@ -103,6 +106,8 @@ jobs:
           runner_index: ${{ matrix.runner-index }}
           with_gcp_creds: "false"
           is_frontend_test: "false"
-          slack_access_token: ${{ secrets.SLACK_ACCESS_TOKEN }}
-          github_token: ${{ secrets.GH_ISSUES }}
           additional_nix_args: "--keep COMETBFT_DOCKER_IP"
+          google_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          failure_notifications_invoker_sa: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}
+          failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
+          failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
