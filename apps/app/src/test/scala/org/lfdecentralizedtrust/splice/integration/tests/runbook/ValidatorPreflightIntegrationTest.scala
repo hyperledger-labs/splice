@@ -196,7 +196,10 @@ abstract class ValidatorPreflightIntegrationTestBase
         )(
           "Transfer appears in transactions log",
           _ => {
-            inside(findAll(className("tx-row")).toSeq) { case Seq(tx) =>
+            // There will be two tx log entries, one for the creation of the offer and one for the acceptance
+            val txs = findAll(className("tx-row")).toSeq
+            txs should have size (2)
+            forExactly(1, txs) { tx =>
               val transaction = readTransactionFromRow(tx)
               transaction.action should matchText("Received")
               val partyR = s"$alicePartyId.*".r
