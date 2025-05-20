@@ -81,8 +81,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.base_branch }}
-          submodules: recursive
-          token: ${{ secrets.GH_READ }}
       - name: Backport to ${{ inputs.base_branch }} - Create branch & push
         id: create_branch
         shell: bash
