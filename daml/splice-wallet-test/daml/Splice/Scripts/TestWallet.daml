@@ -99,7 +99,7 @@ sendPreapprovedTransfer app sender senderWalletProvider receiver amount = do
   context <- getPaymentTransferContextFeaturedApp app sender senderProviderFeaturedRight
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [senderWalletProvider.primaryParty] [sender.primaryParty, app.dso] $ exerciseCmd senderWalletInstall WalletAppInstall_ExecuteBatch with
     inputs = fmap ((\amulet -> InputAmulet amulet) . fst) amulets
-    operations = [CO_TransferPreapprovalSend preapprovalCid receiverProviderFeaturedRight amount]
+    operations = [CO_TransferPreapprovalSend preapprovalCid receiverProviderFeaturedRight amount (Some "wallet-app-install-preapproval-send-description")]
     context
   pure (head outcomes)
 

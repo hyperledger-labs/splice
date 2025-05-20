@@ -87,7 +87,8 @@ export interface WalletClient {
   transferPreapprovalSend: (
     receiverPartyId: string,
     amount: BigNumber,
-    deduplicationId: string
+    deduplicationId: string,
+    description: string
   ) => Promise<void>;
   acceptTransferOffer: (offerContractId: string) => Promise<void>;
   acceptTokenStandardTransfer: (transferContractId: string) => Promise<void>;
@@ -260,12 +261,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       transferPreapprovalSend: async (
         receiverPartyId: string,
         amount: BigNumber,
-        deduplicationId: string
+        deduplicationId: string,
+        description: string
       ) => {
         const request = {
           receiver_party_id: receiverPartyId,
           amount: amount.isInteger() ? amount.toFixed(1) : amount.toString(),
           deduplication_id: deduplicationId,
+          description,
         };
         await walletClient.transferPreapprovalSend(request);
       },

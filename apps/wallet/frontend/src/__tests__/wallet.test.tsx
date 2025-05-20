@@ -161,7 +161,7 @@ describe('Wallet user can', () => {
 
       await assertCorrectMockIsCalled(
         true,
-        { amount: '1.0', receiver_party_id: 'bob::nopreapproval' },
+        { amount: '1.0', receiver_party_id: 'bob::nopreapproval', description: '' },
         false
       );
     });
@@ -201,12 +201,14 @@ function transferTests(disableTokenStandard: boolean) {
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
     expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
     await toggleTokenStandard(user);
-    expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
+    const description = 'Test';
+    const descriptionInput = screen.getByRole('textbox', { name: 'description' });
+    await user.type(descriptionInput, description);
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
     await assertCorrectMockIsCalled(
       disableTokenStandard,
-      { amount: '1.0', receiver_party_id: 'bob::nopreapproval' },
+      { amount: '1.0', receiver_party_id: 'bob::nopreapproval', description },
       false
     );
   });
@@ -233,12 +235,14 @@ function transferTests(disableTokenStandard: boolean) {
     // Checkbox is there, we don't change it though as the default uses the preapproval
     expect(screen.getByRole('checkbox', { name: '' })).toBeInTheDocument();
     await toggleTokenStandard(user);
-    expect(screen.queryByRole('textbox', { name: 'description' })).not.toBeInTheDocument();
+    const description = 'Pre';
+    const descriptionInput = screen.getByRole('textbox', { name: 'description' });
+    await user.type(descriptionInput, description);
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
     await assertCorrectMockIsCalled(
       disableTokenStandard,
-      { amount: '1.0', receiver_party_id: 'bob::preapproval' },
+      { amount: '1.0', receiver_party_id: 'bob::preapproval', description },
       true
     );
   });
@@ -264,14 +268,15 @@ function transferTests(disableTokenStandard: boolean) {
     await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
     expect(screen.getByRole('checkbox', { name: '' })).toBeInTheDocument();
     await toggleTokenStandard(user);
-    expect(screen.queryByRole('textbox', { name: 'description' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('checkbox', { name: '' }));
-    expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
+    const description = 'Pre2';
+    const descriptionInput = screen.getByRole('textbox', { name: 'description' });
+    await user.type(descriptionInput, description);
     await user.click(screen.getByRole('button', { name: 'Send' }));
 
     await assertCorrectMockIsCalled(
       disableTokenStandard,
-      { amount: '1.0', receiver_party_id: 'bob::preapproval' },
+      { amount: '1.0', receiver_party_id: 'bob::preapproval', description },
       false
     );
   });
@@ -343,7 +348,7 @@ function transferTests(disableTokenStandard: boolean) {
 
 async function assertCorrectMockIsCalled(
   usesRegularTransferOffer: boolean,
-  expected: { amount: string; receiver_party_id: string },
+  expected: { amount: string; receiver_party_id: string; description: string },
   isPreapproval: boolean
 ) {
   if (!usesRegularTransferOffer) {

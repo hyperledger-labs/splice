@@ -42,7 +42,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
-    submissionTimeRecordTimeTolerance: NonNegativeFiniteDuration,
+    preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration,
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
@@ -50,8 +50,8 @@ class ReconcileDynamicSynchronizerParametersTrigger(
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[Task] {
 
-  private val internalSubmissionTimeRecordTimeTolerance =
-    InternalNonNegativeFiniteDuration.fromConfig(submissionTimeRecordTimeTolerance)
+  private val internalPreparationTimeRecordTimeTolerance =
+    InternalNonNegativeFiniteDuration.fromConfig(preparationTimeRecordTimeTolerance)
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -76,7 +76,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       state <- participantAdminConnection.getSynchronizerParametersState(
         decentralizedSynchronizerId
       )
-      submissionTimeRecordTimeToleranceTarget = getSubmissionTimeRecordTimeToleranceTarget(
+      preparationTimeRecordTimeToleranceTarget = getPreparationTimeRecordTimeToleranceTarget(
         domainTime,
         state,
         stateHistory,
@@ -85,7 +85,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         state.mapping.parameters,
         amuletConfig,
         decentralizedSynchronizerConfig,
-        submissionTimeRecordTimeToleranceTarget,
+        preparationTimeRecordTimeToleranceTarget,
       )
     } yield
       if (state.mapping.parameters != updatedConfig)
@@ -93,32 +93,32 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           Task(
             amuletConfig,
             decentralizedSynchronizerConfig,
-            submissionTimeRecordTimeToleranceTarget,
+            preparationTimeRecordTimeToleranceTarget,
           )
         )
       else Seq.empty
   }
 
-  // This replicates the logic from Canton’s securely_set_submission_time_record_time_tolerance macro.
+  // This replicates the logic from Canton’s securely_set_preparation_time_record_time_tolerance macro.
   // The TLDR is that to set the tolerance to 24h, we first need to set the mediator deduplication timeout
   // to 48, then wait 48h and then change the tolerance to 24h.
-  private def getSubmissionTimeRecordTimeToleranceTarget(
+  private def getPreparationTimeRecordTimeToleranceTarget(
       domainTime: CantonTimestamp,
       currentState: TopologyResult[SynchronizerParametersState],
       stateHistory: Seq[TopologyResult[SynchronizerParametersState]],
   )(implicit tc: TraceContext): Option[InternalNonNegativeFiniteDuration] = {
     val requiredMinMediatorDeduplicationTimeout =
-      InternalNonNegativeFiniteDuration.fromConfig(submissionTimeRecordTimeTolerance * 2)
+      InternalNonNegativeFiniteDuration.fromConfig(preparationTimeRecordTimeTolerance * 2)
     val currentParameters = currentState.mapping.parameters
     if (currentParameters.mediatorDeduplicationTimeout < requiredMinMediatorDeduplicationTimeout) {
       logger.info(
-        s"Current mediator deduplication timeout is ${currentParameters.mediatorDeduplicationTimeout}, to change to submissionTimeRecordTimeTolerance $submissionTimeRecordTimeTolerance it must be at least $requiredMinMediatorDeduplicationTimeout"
+        s"Current mediator deduplication timeout is ${currentParameters.mediatorDeduplicationTimeout}, to change to preparationTimeRecordTimeTolerance $preparationTimeRecordTimeTolerance it must be at least $requiredMinMediatorDeduplicationTimeout"
       )
       None
     } else {
       val incompatibleTransactions = stateHistory.filterNot(tx =>
         ConsoleDynamicSynchronizerParameters(tx.mapping.parameters)
-          .compatibleWithNewSubmissionTimeRecordTimeTolerance(submissionTimeRecordTimeTolerance)
+          .compatibleWithNewPreparationTimeRecordTimeTolerance(preparationTimeRecordTimeTolerance)
       )
       val lastValidUntil: Instant = incompatibleTransactions
         .map(_.base.validUntil)
@@ -127,10 +127,10 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         .getOrElse(CantonTimestamp.MinValue.toInstant)
       val minSafeChangePoint = lastValidUntil.plus(requiredMinMediatorDeduplicationTimeout.duration)
       if (minSafeChangePoint.compareTo(domainTime.toInstant) < 0) {
-        Some(internalSubmissionTimeRecordTimeTolerance)
+        Some(internalPreparationTimeRecordTimeTolerance)
       } else {
         logger.info(
-          s"submissionTimeRecordTimeTolerance can only be changed to $submissionTimeRecordTimeTolerance at $minSafeChangePoint, current domain time is $domainTime"
+          s"preparationTimeRecordTimeTolerance can only be changed to $preparationTimeRecordTimeTolerance at $minSafeChangePoint, current domain time is $domainTime"
         )
         None
       }
@@ -148,14 +148,14 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           _,
           task.amuletConfig,
           task.synchronizerConfig,
-          task.submissionTimeRecordTimeToleranceTarget,
+          task.preparationTimeRecordTimeToleranceTarget,
         ),
         forceChanges =
-          if (task.submissionTimeRecordTimeToleranceTarget.isDefined)
+          if (task.preparationTimeRecordTimeToleranceTarget.isDefined)
             // Canton's validation is not very clever and requires a force flag for all increases
             // even if you waited long enough. We only set it if needed to limit accidental
             // impact of a force flag in other cases.
-            ForceFlags(ForceFlag.SubmissionTimeRecordTimeToleranceIncrease)
+            ForceFlags(ForceFlag.PreparationTimeRecordTimeToleranceIncrease)
           else
             ForceFlags.none,
       )
@@ -176,7 +176,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       existingDomainParameters: DynamicSynchronizerParameters,
       amuletConfig: AmuletConfig[USD],
       synchronizerConfig: Option[SynchronizerConfig],
-      submissionTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
+      preparationTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
   ): DynamicSynchronizerParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
@@ -199,8 +199,8 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval)
         )(PositiveSeconds.tryOfSeconds(_)),
       acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
-      submissionTimeRecordTimeTolerance = submissionTimeRecordTimeToleranceTarget.getOrElse(
-        existingDomainParameters.submissionTimeRecordTimeTolerance
+      preparationTimeRecordTimeTolerance = preparationTimeRecordTimeToleranceTarget.getOrElse(
+        existingDomainParameters.preparationTimeRecordTimeTolerance
       ),
       mediatorDeduplicationTimeout =
         InternalNonNegativeFiniteDuration.fromConfig(mediatorDeduplicationTimeout),
@@ -212,7 +212,7 @@ object ReconcileSynchronizerFeesConfigTrigger {
   case class Task(
       amuletConfig: AmuletConfig[USD],
       synchronizerConfig: Option[SynchronizerConfig],
-      submissionTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
+      preparationTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
   ) extends PrettyPrinting {
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = {
@@ -223,8 +223,8 @@ object ReconcileSynchronizerFeesConfigTrigger {
           _.synchronizerConfig.flatMap(_.acsCommitmentReconciliationInterval.toScala),
         ),
         paramIfDefined(
-          "submissionTimeRecordTimeToleranceTarget",
-          _.submissionTimeRecordTimeToleranceTarget,
+          "preparationTimeRecordTimeToleranceTarget",
+          _.preparationTimeRecordTimeToleranceTarget,
         ),
       )
     }

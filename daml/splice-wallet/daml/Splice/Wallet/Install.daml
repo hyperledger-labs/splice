@@ -88,7 +88,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
     CO_RenewTransferPreapproval previousApprovalCid newExpiresAt -> do
       resultE <- catchAll $ handleRenewTransferPreapproval previousApprovalCid newExpiresAt
       handleResult COO_RenewTransferPreapproval resultE
-    CO_TransferPreapprovalSend transferPreapprovalCid providerFeaturedAppRightCid amount -> do
+    CO_TransferPreapprovalSend transferPreapprovalCid providerFeaturedAppRightCid amount description -> do
       -- The designated app provider for pre-approved transfers is the host of the receiver's party and
       -- not sender's wallet provider. So, the `featuredAppRight` in this context needs to be replaced
       -- with that of the app provider hosting the receiver which must be passed as an argument.
@@ -99,6 +99,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         context = paymentTransferContext
         inputs
         amount
+        description
       handleResultTransferPreapprovalSend result
   where
     context : PaymentTransferContext
@@ -172,7 +173,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
     handleResultTransferPreapprovalSend : Either InvalidTransferReason TransferPreapproval_SendResult -> Update [AmuletOperationOutcome]
     handleResultTransferPreapprovalSend = \case
       Left errorMsg -> handleLeft errorMsg
-      Right (TransferPreapproval_SendResult transferResult) -> do
+      Right (TransferPreapproval_SendResult transferResult _meta) -> do
         let senderChange = transferResult.senderChangeAmulet
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
         executeAmuletOperationRec executionContext inputAmulets (COO_TransferPreapprovalSend senderChange :: prevResults) remainingOperations
@@ -286,6 +287,7 @@ data AmuletOperation
       transferPreapprovalCid : ContractId TransferPreapproval
       providerFeaturedAppRightCid : Optional (ContractId FeaturedAppRight)
       amount : Decimal
+      description : Optional Text
   deriving (Eq, Show)
 
 -- Enum of the possible outcomes of operating on a amulet through the wallet.

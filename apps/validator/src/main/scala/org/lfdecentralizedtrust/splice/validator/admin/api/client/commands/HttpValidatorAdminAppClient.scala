@@ -470,6 +470,7 @@ object HttpValidatorAdminAppClient {
       amount: BigDecimal,
       expiresAt: CantonTimestamp,
       nonce: Long,
+      description: Option[String],
       verboseHashing: Boolean,
   ) extends BaseCommand[
         http.PrepareTransferPreapprovalSendResponse,
@@ -491,6 +492,7 @@ object HttpValidatorAdminAppClient {
           expiresAt.toInstant.atOffset(ZoneOffset.UTC),
           nonce,
           Some(verboseHashing),
+          description = description,
         ),
         headers = headers,
       )

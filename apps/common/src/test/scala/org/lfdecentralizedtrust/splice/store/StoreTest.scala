@@ -169,6 +169,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amount.bigDecimal,
       expiresAt,
       nonce,
+      Optional.of("transfer-command-description"),
     )
     contract(
       identifier = templateId,

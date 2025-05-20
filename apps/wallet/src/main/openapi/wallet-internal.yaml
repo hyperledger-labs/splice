@@ -1169,6 +1169,8 @@ components:
             Deduplication id, only one successful transfer with this id
             will be accepted within a 24h period.
           type: string
+        description:
+          type: string
 
     CreateTokenStandardTransferRequest:
       type: object

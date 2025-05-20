@@ -6,11 +6,11 @@ package com.digitalasset.canton.participant.util
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries}
+import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{LoggingContextUtil, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.PackageService
-import com.digitalasset.canton.participant.protocol.EngineController
 import com.digitalasset.canton.participant.protocol.EngineController.GetEngineAbortStatus
 import com.digitalasset.canton.participant.store.ContractLookupAndVerification
 import com.digitalasset.canton.participant.util.DAMLe.{
@@ -28,7 +28,7 @@ import com.digitalasset.canton.{LfCommand, LfCreateCommand, LfKeyResolver, LfPar
 import com.digitalasset.daml.lf.VersionRange
 import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName}
 import com.digitalasset.daml.lf.data.{ImmArray, Ref, Time}
-import com.digitalasset.daml.lf.engine.*
+import com.digitalasset.daml.lf.engine.{Enricher as _, *}
 import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 import com.digitalasset.daml.lf.language.Ast.Package
 import com.digitalasset.daml.lf.language.LanguageVersion
@@ -118,7 +118,7 @@ object DAMLe {
         submitters: Set[LfPartyId],
         command: LfCommand,
         ledgerTime: CantonTimestamp,
-        submissionTime: CantonTimestamp,
+        preparationTime: CantonTimestamp,
         rootSeed: Option[LfHash],
         packageResolution: Map[Ref.PackageName, Ref.PackageId],
         expectFailure: Boolean,
@@ -159,47 +159,29 @@ class DAMLe(
   private lazy val engineForEnrichment = new Engine(
     engine.config.copy(requireSuffixedGlobalContractId = false)
   )
-  private lazy val valueEnricher = new ValueEnricher(engineForEnrichment)
+  private lazy val interactiveSubmissionEnricher = new InteractiveSubmissionEnricher(
+    engineForEnrichment,
+    packageId =>
+      implicit traceContext => {
+        resolvePackage(packageId)(traceContext).transformWithHandledAborted {
+          case Success(pkg) => FutureUnlessShutdown.pure(pkg)
+          case Failure(ex) =>
+            logger.error(s"Package resolution failed for [$packageId]", ex)
+            FutureUnlessShutdown.failed(ex)
+        }
+      },
+  )
 
   /** Enrich transaction values by re-hydrating record labels and identifiers
     */
   val enrichTransaction: TransactionEnricher = { transaction => implicit traceContext =>
-    EitherT {
-      handleResult(
-        ContractLookupAndVerification.noContracts(loggerFactory),
-        valueEnricher.enrichVersionedTransaction(transaction),
-        // This should not happen as value enrichment should only request lookups
-        () =>
-          EngineController.EngineAbortStatus(
-            Some("Unexpected engine interruption while enriching transaction")
-          ),
-      )
-    }
+    EitherT.liftF(interactiveSubmissionEnricher.enrichVersionedTransaction(transaction))
   }
 
   /** Enrich create node values by re-hydrating record labels and identifiers
     */
   val enrichCreateNode: CreateNodeEnricher = { createNode => implicit traceContext =>
-    EitherT {
-      handleResult(
-        ContractLookupAndVerification.noContracts(loggerFactory),
-        valueEnricher.enrichNode(createNode),
-        // This should not happen as value enrichment should only request lookups
-        () =>
-          EngineController.EngineAbortStatus(
-            Some("Unexpected engine interruption while enriching create node")
-          ),
-      ).flatMap {
-        case Right(createNode: LfNodeCreate) => FutureUnlessShutdown.pure(Right(createNode))
-        case Right(otherNode) =>
-          FutureUnlessShutdown.failed(
-            new RuntimeException(
-              s"Enrichment of create node produced another node type: $otherNode"
-            )
-          )
-        case Left(value) => FutureUnlessShutdown.pure(Left(value))
-      }
-    }
+    EitherT.liftF(interactiveSubmissionEnricher.enrichCreateNode(createNode))
   }
 
   override def reinterpret(
@@ -207,7 +189,7 @@ class DAMLe(
       submitters: Set[LfPartyId],
       command: LfCommand,
       ledgerTime: CantonTimestamp,
-      submissionTime: CantonTimestamp,
+      preparationTime: CantonTimestamp,
       rootSeed: Option[LfHash],
       packageResolution: Map[PackageName, PackageId],
       expectFailure: Boolean,
@@ -266,7 +248,7 @@ class DAMLe(
         submitters = submitters,
         command = command,
         nodeSeed = rootSeed,
-        submissionTime = submissionTime.toLf,
+        preparationTime = preparationTime.toLf,
         ledgerEffectiveTime = ledgerTime.toLf,
         packageResolution = packageResolution,
         engineLogger =
@@ -303,7 +285,7 @@ class DAMLe(
         submitters = submitters,
         command = command,
         nodeSeed = Some(DAMLe.zeroSeed),
-        submissionTime = Time.Timestamp.Epoch, // Only used to compute contract ids
+        preparationTime = Time.Timestamp.Epoch, // Only used to compute contract ids
         ledgerEffectiveTime = ledgerEffectiveTime.ts.underlying,
         packageResolution = Map.empty,
       )

@@ -893,6 +893,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   BigDecimal(10.0),
                   CantonTimestamp.now().plus(Duration.ofHours(24)),
                   0L,
+                  Some("transfer-command-description"),
                 )
               actAndCheck(
                 "Submit signed TransferCommand creation",

@@ -1380,6 +1380,7 @@ abstract class ScanStoreTest
             transferCmd.payload.amount,
             transferCmd.payload.expiresAt,
             transferCmd.payload.nonce,
+            transferCmd.payload.description,
           ).toValue,
           new splice.externalpartyamuletrules.ExternalPartyAmuletRules_CreateTransferCommandResult(
             transferCmd.contractId

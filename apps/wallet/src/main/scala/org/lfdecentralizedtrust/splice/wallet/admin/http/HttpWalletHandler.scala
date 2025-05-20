@@ -797,6 +797,7 @@ class HttpWalletHandler(
                 preapproval.contractId,
                 featuredAppRight.map(_.contractId).toJava,
                 amount,
+                body.description.toJava,
               ),
               user,
               (_: amuletoperationoutcome.COO_TransferPreapprovalSend) =>

@@ -62,6 +62,7 @@ import java.util.Base64
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class HttpValidatorAdminHandler(
     storeWithIngestion: AppStoreWithIngestion[ValidatorStore],
@@ -776,6 +777,7 @@ class HttpValidatorAdminHandler(
               body.amount.bigDecimal,
               body.expiresAt.toInstant,
               body.nonce,
+              body.description.toJava,
             )
           )
           .update
