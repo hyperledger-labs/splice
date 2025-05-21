@@ -564,11 +564,12 @@ class TreasuryService(
             synchronizerId,
             DisclosedContracts.fromProto(factoryChoiceWithDisclosures.disclosedContracts),
           )
-        result <- operation.dedup match {
-          case None => baseSubmission.noDedup.yieldResult()
+        (offset, result) <- operation.dedup match {
+          case None => baseSubmission.noDedup.yieldResultAndOffset()
           case Some(dedup) =>
-            baseSubmission.withDedup(dedup.commandId, dedup.config).yieldResult()
+            baseSubmission.withDedup(dedup.commandId, dedup.config).yieldResultAndOffset()
         }
+        _ <- userStore.signalWhenIngestedOrShutdown(offset)
       } yield {
         operation.outcomePromise.success(result.exerciseResult)
         Done
