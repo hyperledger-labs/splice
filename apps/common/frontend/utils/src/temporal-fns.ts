@@ -30,6 +30,8 @@ function prettyPrintInterval(
   return durations.join(', ');
 }
 
+export const dateTimeFormatISO = 'YYYY-MM-DD HH:mm:ss';
+
 export function durationToInterval(duration: string): string {
   const { years, months, days, hours, minutes, seconds } = Temporal.Duration.from(duration);
 
