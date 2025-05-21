@@ -964,6 +964,8 @@ components:
             When true, the response will contain additional details on how the transaction was encoded and hashed.
             This can be useful for troubleshooting of hash mismatches. Should only be used for debugging.
           default: false
+        description:
+          type: string
 
     PrepareTransferPreapprovalSendResponse:
       type: object

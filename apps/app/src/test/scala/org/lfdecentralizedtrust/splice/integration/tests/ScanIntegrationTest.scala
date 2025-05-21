@@ -159,7 +159,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       val desc = TransactionHistoryRequest.SortOrder.Desc
       val allPagesAsc = collectAllTapPagesForAlice(asc)
       val allPagesDesc = collectAllTapPagesForAlice(desc)
-      allPagesAsc.map(_.round) should contain only latestRound
+      allPagesAsc.map(_.round) should contain only Some(latestRound)
 
       val tapsFirstPageAscending = allPagesAsc.take(pageSize)
 
@@ -368,7 +368,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
           activities should have size (1)
           val round = activities.loneElement.round
-          activities.loneElement.round shouldBe openRoundForTransfer
+          activities.loneElement.round shouldBe Some(openRoundForTransfer)
           val transfer = activities.flatMap(_.transfer).loneElement
           val inputAmuletAmount =
             transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
@@ -388,12 +388,12 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           transfer.receivers
             .map(r => BigDecimal(r.amount))
             .sum shouldBe transferAmount
-          val amuletAsOfRoundZeroAdjustment = round * holdingFee
+          val amuletAsOfRoundZeroAdjustment = round.value * holdingFee
           transfer.balanceChanges shouldBe Vector(
             BalanceChange(
               aliceUserParty.toProtoPrimitive,
               Codec.encode(
-                transferAmount + round * holdingFee
+                transferAmount + round.value * holdingFee
               ),
               Codec.encode(
                 1 * holdingFee
@@ -402,7 +402,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
             BalanceChange(
               bobUserParty.toProtoPrimitive,
               Codec.encode(
-                senderChangeAmount + amuletAsOfRoundZeroAdjustment - (inputAmuletAmount + holdingFee * round) // See AmuletRules: senderChangeAmount + amuletAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
+                senderChangeAmount + amuletAsOfRoundZeroAdjustment - (inputAmuletAmount + holdingFee * round.value) // See AmuletRules: senderChangeAmount + amuletAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
               ),
               Codec.encode(
                 BigDecimal(

@@ -416,8 +416,8 @@ class SV1Initializer(
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
           acsCommitmentsCatchUp = Some(SvUtil.defaultAcsCommitmentsCatchUpParameters),
-          submissionTimeRecordTimeTolerance =
-            NonNegativeFiniteDuration.fromConfig(config.submissionTimeRecordTimeTolerance),
+          preparationTimeRecordTimeTolerance =
+            NonNegativeFiniteDuration.fromConfig(config.preparationTimeRecordTimeTolerance),
           mediatorDeduplicationTimeout =
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
         )

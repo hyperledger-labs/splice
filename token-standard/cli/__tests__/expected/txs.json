@@ -46,23 +46,6 @@
           },
           "transferInstruction": {
             "originalInstructionCid": null,
-            "transfer": {
-              "inputs": [
-                {
-                  "tag": "InputAmulet",
-                  "value": "15"
-                }
-              ],
-              "outputs": [
-                {
-                  "amount": "200.0000000000",
-                  "receiver": "alice::normalized",
-                  "receiverFeeRatio": "0.0000000000"
-                }
-              ],
-              "provider": "aliceValidator::normalized",
-              "sender": "aliceValidator::normalized"
-            },
             "status": {
               "before": null
             },
@@ -297,23 +280,6 @@
           },
           "transferInstruction": {
             "originalInstructionCid": null,
-            "transfer": {
-              "inputs": [
-                {
-                  "tag": "InputAmulet",
-                  "value": "23"
-                }
-              ],
-              "outputs": [
-                {
-                  "amount": "10.0000000000",
-                  "receiver": "aliceValidator::normalized",
-                  "receiverFeeRatio": "0.0000000000"
-                }
-              ],
-              "provider": "aliceValidator::normalized",
-              "sender": "alice::normalized"
-            },
             "status": {
               "before": null
             },

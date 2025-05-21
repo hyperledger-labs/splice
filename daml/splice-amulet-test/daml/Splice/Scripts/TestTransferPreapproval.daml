@@ -5,10 +5,13 @@ module Splice.Scripts.TestTransferPreapproval where
 
 import Daml.Script
 import DA.Assert
+import DA.Optional
 import DA.Time
+import qualified DA.TextMap as TextMap
 import Splice.Scripts.Util
 import Splice.Amulet
 import Splice.AmuletRules
+import Splice.Amulet.TokenApiUtils
 import Splice.ExternalPartyAmuletRules
 import Splice.Fees
 import Splice.Types
@@ -35,12 +38,15 @@ testTransferPreapprovalSend = script do
   -- Externally signed transaction (or not if bob is not also externally hosted, like for a sweep) to send amulets
   context <- getPaymentTransferContext app bob
   amuletCid <- tap app bob 50.0
-  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
+  result <- submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd transferPreapprovalCid TransferPreapproval_Send
     with
       sender = bob.primaryParty
       context
       inputs = [InputAmulet amuletCid]
       amount = 10.0
+      description = Some "test-description"
+
+  TextMap.lookup reasonMetaKey (fromSome result.meta).values === Some "test-description"
 
   -- Move forward in time to expire pre-approval
   passTime (days 1)
@@ -54,6 +60,7 @@ testTransferPreapprovalSend = script do
         context
         inputs = [InputAmulet amuletCid]
         amount = 10.0
+        description = None
 
   pure ()
 
@@ -150,6 +157,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 12
       nonce = 0
+      description = Some "test-transfer-command"
 
   transferCounterCid <- submit app.dso $ createCmd TransferCommandCounter with
     dso = app.dso
@@ -209,6 +217,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 12
       nonce = 1
+      description = Some "test-transfer-command"
 
   allAmulets <- query @Amulet alice.primaryParty
 
@@ -234,6 +243,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 1
+      description = Some "test-transfer-command"
 
   assert (length allAmulets > 1)
 
@@ -263,6 +273,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 2
+      description = Some "test-transfer-command"
 
   submit alice.primaryParty $ exerciseCmd transferCmd TransferCommand_Withdraw
 
@@ -277,6 +288,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 2
+      description = Some "test-transfer-command"
 
   submitMustFail app.dso $ exerciseCmd transferCmd (TransferCommand_Expire app.dso)
 
@@ -296,6 +308,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 1
+      description = Some "test-transfer-command"
 
   TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
@@ -314,6 +327,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 3
+      description = Some "test-transfer-command"
 
   amulet <- tap app alice 50.0
 
@@ -334,6 +348,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 2
+      description = Some "test-transfer-command"
 
   amulet <- tap app alice 50.0
 
@@ -368,6 +383,7 @@ testTransferCommand = script do
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
       nonce = 4
+      description = Some "test-transfer-command"
 
   -- transferCmdFuture can now be submitted after the counter advanced
   TransferCommand_SendResult (TransferCommandResultFailure msg) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send

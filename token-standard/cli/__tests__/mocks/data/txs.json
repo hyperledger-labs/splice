@@ -680,6 +680,13 @@
                 "consuming" : false,
                 "contractId" : "11",
                 "exerciseResult" : {
+                  "meta" : {
+                    "values" : {
+                      "splice.lfdecentralizedtrust.org/burned" : "14.0",
+                      "splice.lfdecentralizedtrust.org/sender" : "aliceValidator::normalized",
+                      "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
+                    }
+                  },
                   "result" : {
                     "createdAmulets" : [
                       {
@@ -687,13 +694,6 @@
                         "value" : "16"
                       }
                     ],
-                    "meta" : {
-                      "values" : {
-                        "splice.lfdecentralizedtrust.org/burned" : "14.0",
-                        "splice.lfdecentralizedtrust.org/sender" : "aliceValidator::normalized",
-                        "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
-                      }
-                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -1184,6 +1184,13 @@
                 "consuming" : false,
                 "contractId" : "21",
                 "exerciseResult" : {
+                  "meta" : {
+                    "values" : {
+                      "splice.lfdecentralizedtrust.org/burned" : "13.0",
+                      "splice.lfdecentralizedtrust.org/sender" : "alice::normalized",
+                      "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
+                    }
+                  },
                   "result" : {
                     "createdAmulets" : [
                       {
@@ -1191,13 +1198,6 @@
                         "value" : "22"
                       }
                     ],
-                    "meta" : {
-                      "values" : {
-                        "splice.lfdecentralizedtrust.org/burned" : "13.0",
-                        "splice.lfdecentralizedtrust.org/sender" : "alice::normalized",
-                        "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
-                      }
-                    },
                     "round" : {
                       "number" : "1"
                     },
@@ -1663,6 +1663,13 @@
                 "consuming" : false,
                 "contractId" : "21",
                 "exerciseResult" : {
+                  "meta" : {
+                    "values" : {
+                      "splice.lfdecentralizedtrust.org/burned" : "12.1",
+                      "splice.lfdecentralizedtrust.org/sender" : "alice::normalized",
+                      "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
+                    }
+                  },
                   "result" : {
                     "createdAmulets" : [
                       {
@@ -1670,13 +1677,6 @@
                         "value" : "27"
                       }
                     ],
-                    "meta" : {
-                      "values" : {
-                        "splice.lfdecentralizedtrust.org/burned" : "12.1",
-                        "splice.lfdecentralizedtrust.org/sender" : "alice::normalized",
-                        "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
-                      }
-                    },
                     "round" : {
                       "number" : "1"
                     },

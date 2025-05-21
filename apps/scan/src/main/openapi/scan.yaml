@@ -1865,8 +1865,6 @@ components:
         - event_id
         - date
         - domain_id
-        - amulet_price
-        - round
       properties:
         transaction_type:
           description: |
@@ -1878,6 +1876,7 @@ components:
             - "transfer"
             - "mint"
             - "devnet_tap"
+            - "abort_transfer_instruction"
         event_id:
           description: |
             The event id.
@@ -1917,6 +1916,8 @@ components:
           description: |
             A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
           $ref: "#/components/schemas/AmuletAmount"
+        abort_transfer_instruction:
+          $ref: "#/components/schemas/AbortTransferInstruction"
     UpdateHistoryRequestAfter:
       type: object
       required:
@@ -2576,8 +2577,6 @@ components:
         - event_id
         - date
         - domain_id
-        - round
-        - amulet_price
       properties:
         activity_type:
           description: |
@@ -2589,6 +2588,7 @@ components:
             - "transfer"
             - "mint"
             - "devnet_tap"
+            - "abort_transfer_instruction"
         event_id:
           description: |
             The event id.
@@ -2628,6 +2628,8 @@ components:
           description: |
             A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
           $ref: "#/components/schemas/AmuletAmount"
+        abort_transfer_instruction:
+          $ref: "#/components/schemas/AbortTransferInstruction"
     Transfer:
       description: |
         A transfer between one sender and possibly many receivers, provided by an application provider.
@@ -2658,6 +2660,28 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BalanceChange"
+        transferInstructionDescription:
+          type: string
+        transferInstructionReceiver:
+          type: string
+        transferInstructionAmount:
+          type: string
+        transferInstructionCid:
+          type: string
+        transfer_kind:
+          type: string
+          enum: [create_transfer_instruction, transfer_instruction_accept]
+    AbortTransferInstruction:
+      type: object
+      required:
+        - abort_kind
+        - transfer_instruction_cid
+      properties:
+        abort_kind:
+          type: string
+          enum: ["withdraw", "reject"]
+        transfer_instruction_cid:
+          type: string
     BalanceChange:
       type: object
       required:

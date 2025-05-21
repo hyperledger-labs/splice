@@ -28,14 +28,14 @@ class RecordTimeToleranceTimeBasedIntegrationTest
               config
                 .svApps(InstanceName.tryCreate(s"sv1"))
                 .copy(
-                  submissionTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofMinutes(1),
+                  preparationTimeRecordTimeTolerance = NonNegativeFiniteDuration.ofMinutes(1),
                   mediatorDeduplicationTimeout = NonNegativeFiniteDuration.ofMinutes(2),
                 ))
         )
       })
       .withManualStart
 
-  "ReconcileDynamicSynchronizerParametersTrigger can change submissionTimeRecordTimeTolerance" in {
+  "ReconcileDynamicSynchronizerParametersTrigger can change preparationTimeRecordTimeTolerance" in {
     implicit env =>
       // Note: This test must run against a fresh Canton instance. Ideally we'd achieve this using withCanton
       // but that does not work with simtime as we try to access the remote clock before Canton is started
@@ -49,7 +49,7 @@ class RecordTimeToleranceTimeBasedIntegrationTest
       val synchronizerId = connectedDomain.synchronizerId
       sv1Backend.participantClient.topology.synchronizer_parameters
         .get_dynamic_synchronizer_parameters(synchronizerId)
-        .submissionTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofMinutes(1)
+        .preparationTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofMinutes(1)
       sv1Backend.participantClient.topology.synchronizer_parameters
         .get_dynamic_synchronizer_parameters(synchronizerId)
         .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofMinutes(2)
@@ -58,7 +58,7 @@ class RecordTimeToleranceTimeBasedIntegrationTest
       eventually() {
         sv1Backend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(synchronizerId)
-          .submissionTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofMinutes(1)
+          .preparationTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofMinutes(1)
         sv1Backend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(synchronizerId)
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)
@@ -68,7 +68,7 @@ class RecordTimeToleranceTimeBasedIntegrationTest
       eventually() {
         sv1Backend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(synchronizerId)
-          .submissionTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofHours(24)
+          .preparationTimeRecordTimeTolerance shouldBe NonNegativeFiniteDuration.ofHours(24)
         sv1Backend.participantClient.topology.synchronizer_parameters
           .get_dynamic_synchronizer_parameters(synchronizerId)
           .mediatorDeduplicationTimeout shouldBe NonNegativeFiniteDuration.ofHours(48)

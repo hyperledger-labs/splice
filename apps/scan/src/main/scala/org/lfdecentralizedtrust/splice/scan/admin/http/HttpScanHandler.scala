@@ -65,6 +65,7 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType.members.{
+  AbortTransferInstruction,
   DevnetTap,
   Mint,
   Transfer,
@@ -821,6 +822,8 @@ class HttpScanHandler(
                 ActivityType.Mint
               case Transfer =>
                 ActivityType.Transfer
+              case AbortTransferInstruction =>
+                ActivityType.AbortTransferInstruction
             },
             eventId = txItem.eventId,
             offset = txItem.offset,
@@ -829,6 +832,7 @@ class HttpScanHandler(
             mint = txItem.mint,
             tap = txItem.tap,
             transfer = txItem.transfer,
+            abortTransferInstruction = txItem.abortTransferInstruction,
             round = txItem.round,
             amuletPrice = txItem.amuletPrice,
           )

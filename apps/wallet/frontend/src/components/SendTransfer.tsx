@@ -112,7 +112,7 @@ const SendTransfer: React.FC = () => {
           deduplicationId
         );
       } else {
-        return await transferPreapprovalSend(receiver, ccAmount, deduplicationId);
+        return await transferPreapprovalSend(receiver, ccAmount, deduplicationId, description);
       }
     },
     onSuccess: () => {
@@ -151,7 +151,7 @@ const SendTransfer: React.FC = () => {
       </Typography>
       <Card variant="outlined">
         <CardContent sx={{ paddingX: '64px' }}>
-          <Stack direction="row" spacing={5} sx={{ justifyContent: 'space-between' }}>
+          <Stack direction="column" spacing={1} sx={{ justifyContent: 'space-between' }}>
             <Stack direction="column" mb={4} spacing={1}>
               {featureSupport.data?.tokenStandard ? (
                 <FormControlLabel
@@ -183,18 +183,18 @@ const SendTransfer: React.FC = () => {
               />
             </Stack>
             <Stack
-              direction="column"
-              sx={{ alignItems: 'flex-end', display: preapprovalResult.data ? undefined : 'none' }}
+              direction="row"
+              sx={{ alignItems: 'center', display: preapprovalResult.data ? undefined : 'none' }}
             >
-              <Typography variant="h6">
-                Receiver has approved incoming transfers, transfer directly instead of creating a
-                transfer offer
-              </Typography>
               <Checkbox
                 id="use-transfer-preapproval-checkbox"
                 checked={useTransferPreapproval}
                 onChange={e => setUseTransferPreapproval(e.target.checked)}
               ></Checkbox>
+              <Typography variant="h6">
+                Receiver has approved incoming transfers, transfer directly instead of creating a
+                transfer offer
+              </Typography>
             </Stack>
           </Stack>
 
@@ -252,20 +252,18 @@ const SendTransfer: React.FC = () => {
               </FormControl>
             </Stack>
           )}
-          {!(preapprovalResult.data && useTransferPreapproval) && (
-            <Stack direction="column" mb={4} spacing={1}>
-              <Typography variant="h6">
-                Description <Typography variant="caption">(optional)</Typography>{' '}
-              </Typography>
-              <TextField
-                id="create-offer-description"
-                rows={4}
-                multiline
-                inputProps={{ 'aria-label': 'description' }}
-                onChange={e => setDescription(e.target.value)}
-              />
-            </Stack>
-          )}
+          <Stack direction="column" mb={4} spacing={1}>
+            <Typography variant="h6">
+              Description <Typography variant="caption">(optional)</Typography>{' '}
+            </Typography>
+            <TextField
+              id="create-offer-description"
+              rows={4}
+              multiline
+              inputProps={{ 'aria-label': 'description' }}
+              onChange={e => setDescription(e.target.value)}
+            />
+          </Stack>
 
           <DisableConditionally
             conditions={[

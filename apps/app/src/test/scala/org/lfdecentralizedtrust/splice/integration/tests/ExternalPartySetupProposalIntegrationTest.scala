@@ -248,6 +248,7 @@ class ExternalPartySetupProposalIntegrationTest
         BigDecimal(1000.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         0L,
+        Some("transfer-command-description"),
         verboseHashing = true,
       )
     prepareSend.hashingDetails should not be empty
@@ -322,6 +323,7 @@ class ExternalPartySetupProposalIntegrationTest
           BigDecimal(1000.0).bigDecimal,
           payload.expiresAt,
           0L,
+          java.util.Optional.of("transfer-command-description"),
         )
       },
     )
@@ -387,6 +389,7 @@ class ExternalPartySetupProposalIntegrationTest
         BigDecimal(500.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         1L,
+        Some("transfer-command-description"),
         verboseHashing = true,
       )
     prepareSendFeatured.hashingDetails should not be empty
@@ -472,6 +475,7 @@ class ExternalPartySetupProposalIntegrationTest
         BigDecimal(10.0),
         CantonTimestamp.now().plus(Duration.ofHours(24)),
         2L,
+        Some("transfer-command-description"),
       )
     prepareSendNoPreapproval.hashingDetails shouldBe empty
 

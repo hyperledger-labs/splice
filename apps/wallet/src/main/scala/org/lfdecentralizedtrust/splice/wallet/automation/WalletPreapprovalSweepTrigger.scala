@@ -82,6 +82,7 @@ class WalletPreapprovalSweepTrigger(
           preapproval.contractId,
           featuredAppRight.map(_.contractId).toJava,
           amountToSendAfterFeesCC,
+          Some("sweep").toJava,
         ),
         dedup = Some(
           AmuletOperationDedupConfig(

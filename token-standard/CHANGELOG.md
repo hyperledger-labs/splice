@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+Polishing changes:
+
+- Removed the `sender` argument from `BurnMintFactory` to allow for
+  more flexible implementations. Implementations are still free to
+  restrict `inputHoldingCids` to a single sender.
+
+## 2025-05-12
+
 Major changes:
 
 - Adjusted the `AllocationInstruction` interfaces to follow the structure of `TransferInstruction`, and
