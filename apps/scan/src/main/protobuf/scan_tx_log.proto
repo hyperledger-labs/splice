@@ -120,6 +120,7 @@ enum TransferKind {
   TRANSFER_KIND_OTHER = 0;
   TRANSFER_KIND_CREATE_TRANSFER_INSTRUCTION = 1;
   TRANSFER_KIND_TRANSFER_INSTRUCTION_ACCEPT = 2;
+  TRANSFER_KIND_PREAPPROVAL_SEND = 3;
 }
 
 message TransferTxLogEntry {
@@ -137,7 +138,8 @@ message TransferTxLogEntry {
   int64 round = 9;
   string amulet_price = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
 
-  string transfer_instruction_description = 11;
+  string description = 11;
+
   string transfer_instruction_receiver = 12;
   string transfer_instruction_amount = 13 [(scalapb.field).type = "Option[scala.math.BigDecimal]"];
   string transfer_instruction_cid = 14;

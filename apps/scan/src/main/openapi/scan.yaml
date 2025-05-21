@@ -2660,7 +2660,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BalanceChange"
-        transferInstructionDescription:
+        description:
           type: string
         transferInstructionReceiver:
           type: string
@@ -2670,7 +2670,7 @@ components:
           type: string
         transfer_kind:
           type: string
-          enum: [create_transfer_instruction, transfer_instruction_accept]
+          enum: [create_transfer_instruction, transfer_instruction_accept, preapproval_send]
     AbortTransferInstruction:
       type: object
       required:

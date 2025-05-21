@@ -46,6 +46,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
+import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -202,9 +203,20 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             alice.partyId,
             BigDecimal("200.0"),
             transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
+            description = Some("token-standard-transfer-description"),
           )
           eventually() {
             aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
+            val scanTxs = sv1ScanBackend.listActivity(None, 1000)
+            forExactly(1, scanTxs) { tx =>
+              val transfer = tx.transfer.value
+              transfer.transferKind shouldBe Some(
+                definitions.Transfer.TransferKind.members.PreapprovalSend
+              )
+              transfer.description shouldBe Some("token-standard-transfer-description")
+              transfer.sender.party shouldBe aliceValidator.partyId.toProtoPrimitive
+              transfer.receivers.loneElement.party shouldBe alice.partyId.toProtoPrimitive
+            }
           }
           // send some back so there's a TransferOut
           executeTransferViaTokenStandard(

@@ -14,7 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{SpliceTestConsoleEnvironment}
-import org.lfdecentralizedtrust.splice.util.FactoryChoiceWithDisclosures
+import org.lfdecentralizedtrust.splice.util.{FactoryChoiceWithDisclosures, TokenStandardMetadata}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.time.Duration
@@ -35,6 +35,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       timeToLife: Duration = Duration.ofMinutes(10),
       expectedTimeBounds: Option[(CantonTimestamp, CantonTimestamp)] = None,
       advanceTimeBeforeExecute: Option[Duration] = None,
+      description: Option[String] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ) = {
@@ -47,6 +48,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
           amount,
           expectedKind,
           timeToLife,
+          description,
         )
         participant.ledger_api_extensions.commands
           .submitJavaExternalOrLocal(
@@ -81,6 +83,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       amount: BigDecimal,
       expectedKind: transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
       timeToLife: Duration = Duration.ofMinutes(10),
+      description: Option[String] = None,
   )(implicit
       env: SpliceTestConsoleEnvironment
   ): (
@@ -109,7 +112,9 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
         now,
         now.plus(timeToLife),
         senderHoldingCids.asJava,
-        new metadatav1.Metadata(java.util.Map.of()),
+        new metadatav1.Metadata(
+          description.toList.map(TokenStandardMetadata.reasonMetaKey -> _).toMap.asJava
+        ),
       ),
       emptyExtraArgs,
     )

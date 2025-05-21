@@ -67,6 +67,24 @@ class ScanTxLogParser(
         exercised match {
           case Transfer(node) =>
             State.fromTransfer(tree, exercised, synchronizerId, node)
+          case TransferPreapproval_Send(node) =>
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
+            state.copy(
+              entries = state.entries.map {
+                case e: TransferTxLogEntry =>
+                  e.copy(
+                    description = node.argument.value.description.orElse(""),
+                    eventId =
+                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                    transferKind = TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND,
+                  )
+                case e => e
+              }
+            )
           case CreateTokenStandardTransferInstruction(node) =>
             val cid: String = node.result.value.output match {
               case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending =>
@@ -88,7 +106,7 @@ class ScanTxLogParser(
               entries = state.entries.map {
                 case e: TransferTxLogEntry =>
                   e.copy(
-                    transferInstructionDescription = node.argument.value.transfer.meta.values
+                    description = node.argument.value.transfer.meta.values
                       .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
                     transferInstructionReceiver = node.argument.value.transfer.receiver,
                     transferInstructionAmount = Some(node.argument.value.transfer.amount),

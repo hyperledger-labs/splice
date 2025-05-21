@@ -292,7 +292,7 @@ class TokenStandardTransferIntegrationTest
         val transfer = activityTxs(0).transfer.value
         transfer.sender.party shouldBe aliceUserParty.toProtoPrimitive
         transfer.transferInstructionCid shouldBe Some(cids(2).contractId)
-        transfer.transferInstructionDescription shouldBe None
+        transfer.description shouldBe None
         transfer.transferInstructionReceiver shouldBe None
         transfer.transferKind shouldBe Some(Transfer.TransferKind.members.TransferInstructionAccept)
         transfer.receivers shouldBe Seq(
@@ -334,7 +334,7 @@ class TokenStandardTransferIntegrationTest
           transfer.transferInstructionCid shouldBe Some(
             cids(transferInstructionNumber - 1).contractId
           )
-          transfer.transferInstructionDescription shouldBe Some(
+          transfer.description shouldBe Some(
             s"Transfer #$transferInstructionNumber"
           )
           transfer.transferInstructionReceiver shouldBe Some(bobUserParty.toProtoPrimitive)

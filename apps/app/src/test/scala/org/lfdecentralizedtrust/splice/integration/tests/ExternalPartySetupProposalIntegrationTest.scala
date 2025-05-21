@@ -445,6 +445,8 @@ class ExternalPartySetupProposalIntegrationTest
       val transfer = tx.transfer.value
       transfer.sender.party shouldBe aliceParty.toProtoPrimitive
       transfer.balanceChanges should have size (2)
+      transfer.transferKind shouldBe Some(definitions.Transfer.TransferKind.members.PreapprovalSend)
+      transfer.description shouldBe Some("transfer-command-description")
       forExactly(1, transfer.balanceChanges) { change =>
         change.party shouldBe aliceParty.toProtoPrimitive
         BigDecimal(change.changeToInitialAmountAsOfRoundZero) should beAround(BigDecimal(-517))

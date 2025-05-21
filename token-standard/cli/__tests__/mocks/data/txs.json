@@ -669,6 +669,7 @@
                       ]
                     }
                   },
+                  "description" : "token-standard-transfer-description",
                   "inputs" : [
                     {
                       "tag" : "InputAmulet",
@@ -683,6 +684,7 @@
                   "meta" : {
                     "values" : {
                       "splice.lfdecentralizedtrust.org/burned" : "14.0",
+                      "splice.lfdecentralizedtrust.org/reason" : "token-standard-transfer-description",
                       "splice.lfdecentralizedtrust.org/sender" : "aliceValidator::normalized",
                       "splice.lfdecentralizedtrust.org/tx-kind" : "transfer"
                     }
