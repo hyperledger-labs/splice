@@ -171,6 +171,12 @@ object TransferPreapproval_Renew
       template = splice.amuletrules.TransferPreapproval.COMPANION,
     )
 
+object TransferPreapproval_Send
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_Send,
+      template = splice.amuletrules.TransferPreapproval.COMPANION,
+    )
+
 object AnsRules_CollectInitialEntryPayment
     extends ExerciseNodeCompanion.Mk(
       choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectInitialEntryPayment,

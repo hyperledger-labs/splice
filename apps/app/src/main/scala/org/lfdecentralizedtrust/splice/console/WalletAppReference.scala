@@ -476,9 +476,12 @@ abstract class WalletAppReference(
       receiver: PartyId,
       amount: BigDecimal,
       deduplicationId: String,
+      description: Option[String] = None,
   ): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.TransferPreapprovalSend(receiver, amount, deduplicationId))
+      httpCommand(
+        HttpWalletAppClient.TransferPreapprovalSend(receiver, amount, deduplicationId, description)
+      )
     }
 
   @Help.Summary("List active Token Standard transfers")

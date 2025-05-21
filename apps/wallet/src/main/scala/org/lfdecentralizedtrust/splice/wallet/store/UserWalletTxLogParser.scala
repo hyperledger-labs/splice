@@ -68,6 +68,7 @@ import org.lfdecentralizedtrust.splice.history.{
   TransferInstruction_Withdraw,
   Transfer,
   TransferPreapproval_Renew,
+  TransferPreapproval_Send,
 }
 import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.util.{
@@ -576,7 +577,7 @@ class UserWalletTxLogParser(
             }.map { x =>
               x.setTransferSubtype(
                 TransferTransactionSubtype.CreateTokenStandardTransferInstruction
-              ).setTransferInstructionDescription(
+              ).setTransferDescription(
                 node.argument.value.transfer.meta.values
                   .getOrDefault(TokenStandardMetadata.reasonMetaKey, "")
               ).setTransferInstructionReceiver(
@@ -765,6 +766,22 @@ class UserWalletTxLogParser(
           case TransferPreapproval_Renew(node) =>
             now(State.fromRenewTransferPreapproval(node, tree, exercised))
 
+          case TransferPreapproval_Send(node) =>
+            defer {
+              parseTrees(
+                tree,
+                tree.getChildNodeIds(exercised).asScala.toList,
+                synchronizerId,
+              )
+            }.map(
+              _.setTransferSubtype(TransferTransactionSubtype.TransferPreapprovalSend)
+                .setTransferDescription(
+                  node.result.value.meta.toScala
+                    .flatMap(meta => Option(meta.values.get(TokenStandardMetadata.reasonMetaKey)))
+                    .getOrElse("")
+                )
+            )
+
           // ------------------------------------------------------------------
           // Other
           // ------------------------------------------------------------------
@@ -814,7 +831,7 @@ class UserWalletTxLogParser(
               appRewardsUsed = BigDecimal(0.0),
               validatorRewardsUsed = BigDecimal(0.0),
               svRewardsUsed = Some(BigDecimal(0.0)),
-              transferInstructionDescription = create.payload.transfer.meta.values
+              description = create.payload.transfer.meta.values
                 .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
               transferInstructionReceiver = receiver,
               transferInstructionAmount = Some(create.payload.transfer.amount),
@@ -948,18 +965,6 @@ object UserWalletTxLogParser {
       )
     }
 
-    def setTransferInstructionDescription(
-        description: String
-    ): State = {
-      State(
-        entries = entries.map {
-          case b: TransferTxLogEntry =>
-            b.copy(transferInstructionDescription = description)
-          case other => other
-        }
-      )
-    }
-
     def setTransferInstructionReceiver(
         receiver: String
     ): State = {
@@ -993,6 +998,16 @@ object UserWalletTxLogParser {
             b.copy(transferInstructionCid = cid)
           case b: BalanceChangeTxLogEntry =>
             b.copy(transferInstructionCid = cid)
+          case other => other
+        }
+      )
+    }
+
+    def setTransferDescription(description: String): State = {
+      State(
+        entries = entries.map {
+          case t: TransferTxLogEntry =>
+            t.copy(description = description)
           case other => other
         }
       )
@@ -1136,6 +1151,7 @@ object UserWalletTxLogParser {
           TransferOfferStatusCreated(
             offerCid.contractId,
             tx.getUpdateId,
+            description = transferOffer.description,
           )
         ),
         transferOffer.sender,

@@ -176,7 +176,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(3).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #4"
+            logEntry.description shouldBe "Transfer #4"
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
@@ -187,7 +187,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(2).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #3"
+            logEntry.description shouldBe "Transfer #3"
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
@@ -198,7 +198,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(1).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #2"
+            logEntry.description shouldBe "Transfer #2"
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
@@ -209,7 +209,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(0).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #1"
+            logEntry.description shouldBe "Transfer #1"
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
@@ -249,7 +249,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(3).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #4"
+            logEntry.description shouldBe "Transfer #4"
             logEntry.receivers shouldBe Seq(PartyAndAmount(bobUserParty.toProtoPrimitive, 0))
             logEntry.sender.value.amount shouldBe 0
           },
@@ -258,7 +258,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(2).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #3"
+            logEntry.description shouldBe "Transfer #3"
             logEntry.receivers shouldBe Seq(PartyAndAmount(bobUserParty.toProtoPrimitive, 0))
             logEntry.sender.value.amount shouldBe 0
           },
@@ -267,7 +267,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(1).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #2"
+            logEntry.description shouldBe "Transfer #2"
             logEntry.receivers shouldBe Seq(PartyAndAmount(bobUserParty.toProtoPrimitive, 0))
             logEntry.sender.value.amount shouldBe 0
           },
@@ -276,16 +276,18 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe cids(0).contractId
             logEntry.transferInstructionReceiver shouldBe bobUserParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "Transfer #1"
+            logEntry.description shouldBe "Transfer #1"
             logEntry.receivers shouldBe Seq(PartyAndAmount(bobUserParty.toProtoPrimitive, 0))
             logEntry.sender.value.amount shouldBe 0
           },
         ),
       )
 
-      val activityTxs = sv1ScanBackend.listActivity(None, 1000)
-      // tap + 4 transfer instructions + accept + withdraw + reject
-      activityTxs should have size (8)
+      val activityTxs = sv1ScanBackend
+        .listActivity(None, 1000)
+        .filter(t => t.transfer.isDefined || t.abortTransferInstruction.isDefined)
+      // 4 transfer instructions + accept + withdraw + reject
+      activityTxs should have size (7)
       clue("TransferInstruction accept") {
         val transfer = activityTxs(0).transfer.value
         transfer.sender.party shouldBe aliceUserParty.toProtoPrimitive
@@ -349,9 +351,6 @@ class TokenStandardTransferIntegrationTest
             BigDecimal(-13)
           )
         }
-      }
-      clue("tap") {
-        activityTxs(7).tap.value.amuletAmount shouldBe "20000.0000000000"
       }
     }
 
@@ -438,7 +437,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe offer.contractId
             logEntry.transferInstructionReceiver shouldBe bobParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "transfer offer description"
+            logEntry.description shouldBe "transfer offer description"
             // No balance is transferred here so receivers is empty
             logEntry.receivers shouldBe empty
             // The wallet counts moving the balance to a locked amulet as a negative balance change
@@ -463,7 +462,7 @@ class TokenStandardTransferIntegrationTest
             logEntry.transferInstructionCid shouldBe offer.contractId
             logEntry.transferInstructionReceiver shouldBe bobParty.toProtoPrimitive
             logEntry.transferInstructionAmount shouldBe Some(BigDecimal(10))
-            logEntry.transferInstructionDescription shouldBe "transfer offer description"
+            logEntry.description shouldBe "transfer offer description"
             logEntry.receivers shouldBe Seq(PartyAndAmount(bobParty.toProtoPrimitive, 0))
             logEntry.sender.value.amount shouldBe 0
           },

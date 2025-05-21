@@ -1085,13 +1085,13 @@ components:
               type: string
             sv_rewards_used:
               type: string
-            transfer_instruction_description:
-              type: string
             transfer_instruction_receiver:
               type: string
             transfer_instruction_amount:
               type: string
             transfer_instruction_cid:
+              type: string
+            description:
               type: string
     BalanceChangeResponseItem:
       allOf:

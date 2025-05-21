@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.history.{
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
   TransferPreapproval_Renew,
+  TransferPreapproval_Send,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
@@ -181,14 +182,10 @@ object TxLogEntry extends StoreErrors {
         appRewardsUsed = Codec.encode(entry.appRewardsUsed),
         validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
         svRewardsUsed = Codec.encode(entry.svRewardsUsed.getOrElse(BigDecimal(0))),
-        transferInstructionDescription = Option.when(!entry.transferInstructionDescription.isEmpty)(
-          entry.transferInstructionDescription
-        ),
-        transferInstructionReceiver = Option
-          .when(!entry.transferInstructionReceiver.isEmpty)(entry.transferInstructionReceiver),
+        transferInstructionReceiver = Some(entry.transferInstructionReceiver).filter(_.nonEmpty),
         transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
-        transferInstructionCid =
-          Option.when(!entry.transferInstructionCid.isEmpty)(entry.transferInstructionCid),
+        transferInstructionCid = Some(entry.transferInstructionCid).filter(_.nonEmpty),
+        description = Some(entry.description).filter(_.nonEmpty),
       )
     }
 
@@ -224,10 +221,10 @@ object TxLogEntry extends StoreErrors {
         appRewardsUsed = appRewardsUsed,
         validatorRewardsUsed = validatorRewardsUsed,
         svRewardsUsed = Some(svRewardsUsed),
-        transferInstructionDescription = item.transferInstructionDescription.getOrElse(""),
         transferInstructionReceiver = item.transferInstructionReceiver.getOrElse(""),
         transferInstructionAmount = transferInstructionAmount,
         transferInstructionCid = item.transferInstructionCid.getOrElse(""),
+        description = item.description.getOrElse(""),
       )
     }
 
@@ -485,6 +482,7 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
     case object TransferPreapprovalRenewal
         extends TransferTransactionSubtype(TransferPreapproval_Renew)
+    case object TransferPreapprovalSend extends TransferTransactionSubtype(TransferPreapproval_Send)
     case object Transfer
         extends TransferTransactionSubtype(org.lfdecentralizedtrust.splice.history.Transfer)
     case object CreateTokenStandardTransferInstruction
@@ -495,26 +493,6 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(
           org.lfdecentralizedtrust.splice.history.TransferInstruction_Accept
         )
-
-    val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
-      P2PPaymentCompleted,
-      AppPaymentAccepted,
-      AppPaymentCollected,
-      SubscriptionInitialPaymentAccepted,
-      SubscriptionInitialPaymentCollected,
-      SubscriptionPaymentAccepted,
-      SubscriptionPaymentCollected,
-      WalletAutomation,
-      ExtraTrafficPurchase,
-      InitialEntryPaymentCollection,
-      EntryRenewalPaymentCollection,
-      TransferPreapprovalCreation,
-      Transfer,
-      CreateTokenStandardTransferInstruction,
-    ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
-
-    def find(choiceName: String): Option[TransferTransactionSubtype] =
-      values.get(choiceName)
   }
 
   sealed abstract class BalanceChangeTransactionSubtype(
