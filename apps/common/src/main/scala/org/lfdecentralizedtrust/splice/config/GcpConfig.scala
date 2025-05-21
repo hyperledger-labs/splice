@@ -52,8 +52,8 @@ object GcpBucketConfig {
   def inferForTesting: GcpBucketConfig =
     infer(
       "GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS",
-      "da-cn-scratchnet",
-      "da-cn-scratch-acs-store-dumps",
+      "da-cn-splice",
+      "da-splice-identity-dumps",
     )
 
   def inferForCluster: GcpBucketConfig =
