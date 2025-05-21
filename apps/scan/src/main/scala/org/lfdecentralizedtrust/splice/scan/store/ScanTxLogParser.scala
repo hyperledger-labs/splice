@@ -203,7 +203,13 @@ class ScanTxLogParser(
           case ExternalPartyAmuletRules_CreateTransferCommand(node) =>
             State.fromCreateTransferCommand(eventId, node)
           case TransferCommand_Send(node) =>
-            State.fromTransferCommand_Send(eventId, exercised, node)
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
+            val transferCommandState = State.fromTransferCommand_Send(eventId, exercised, node)
+            state.appended(transferCommandState)
           case TransferCommand_Withdraw(node) =>
             State.fromTransferCommand_Withdraw(eventId, exercised, node)
           case TransferCommand_Expire(node) =>
