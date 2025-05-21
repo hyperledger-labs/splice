@@ -127,14 +127,18 @@ interface ActivityView {
 }
 
 function toActivities(item: ListActivityResponseItem): ActivityView[] {
-  function getActivity(item: ListActivityResponseItem): ActivityView {
+  function getActivity(item: ListActivityResponseItem): ActivityView[] {
     switch (item.activity_type) {
       case 'transfer':
-        return getActivityFromTransfer(item.transfer!);
+        return [getActivityFromTransfer(item.transfer!)];
       case 'devnet_tap':
-        return getActivityFromTap(item.tap!);
+        return [getActivityFromTap(item.tap!)];
       case 'mint':
-        return getActivityFromMint(item.mint!);
+        return [getActivityFromMint(item.mint!)];
+      case 'abort_transfer_instruction':
+        // For now we don't display those entries in the scan UI as they
+        // don't actually change the balance (scan tracks sum of locked and unlocked balance).
+        return [];
     }
   }
 
@@ -200,7 +204,7 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       feesBurnt: feesBurnt,
       transferAmount: transferAmount,
       rewardsCollected: rewardsCollected,
-      amuletPrice: BigNumber(item.amulet_price),
+      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -214,7 +218,7 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(mint.amulet_amount),
       rewardsCollected: {},
-      amuletPrice: BigNumber(item.amulet_price),
+      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
@@ -228,14 +232,12 @@ function toActivities(item: ListActivityResponseItem): ActivityView[] {
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(tap.amulet_amount),
       rewardsCollected: {},
-      amuletPrice: BigNumber(item.amulet_price),
+      amuletPrice: BigNumber(item.amulet_price!),
       eventId: item.event_id,
     };
   }
 
-  const activity = getActivity(item);
-
-  return [activity];
+  return getActivity(item);
 }
 
 interface ActivityRowProps {

@@ -28,11 +28,18 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.fees.ExpiringAmount
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as sws
 import org.lfdecentralizedtrust.splice.history.*
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry.*
+import org.lfdecentralizedtrust.splice.scan.store.TransferKind
 import org.lfdecentralizedtrust.splice.store.TxLogStore
 import org.lfdecentralizedtrust.splice.store.events.DsoRulesCloseVoteRequest
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.dollarsToCC
 import org.lfdecentralizedtrust.splice.util.TransactionTreeExtensions.*
-import org.lfdecentralizedtrust.splice.util.{Codec, EventId, ExerciseNode, LegacyOffset}
+import org.lfdecentralizedtrust.splice.util.{
+  Codec,
+  EventId,
+  ExerciseNode,
+  LegacyOffset,
+  TokenStandardMetadata,
+}
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
@@ -60,6 +67,83 @@ class ScanTxLogParser(
         exercised match {
           case Transfer(node) =>
             State.fromTransfer(tree, exercised, synchronizerId, node)
+          case CreateTokenStandardTransferInstruction(node) =>
+            val cid: String = node.result.value.output match {
+              case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending =>
+                output.transferInstructionCid.contractId
+              case output =>
+                // CreateTokenStandardTransferInstruction only matches on two-step transfers resulting in pending status.
+                // Single-step transfers are just parsed as the underlying transfer.
+                logger.warn(
+                  s"Unexpected transfer instruction result output, expected pending but got: $output"
+                )
+                ""
+            }
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
+            state.copy(
+              entries = state.entries.map {
+                case e: TransferTxLogEntry =>
+                  e.copy(
+                    transferInstructionDescription = node.argument.value.transfer.meta.values
+                      .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
+                    transferInstructionReceiver = node.argument.value.transfer.receiver,
+                    transferInstructionAmount = Some(node.argument.value.transfer.amount),
+                    transferInstructionCid = cid,
+                    eventId =
+                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                    transferKind = TransferKind.TRANSFER_KIND_CREATE_TRANSFER_INSTRUCTION,
+                  )
+                case e => e
+              }
+            )
+          case TransferInstruction_Accept(node) =>
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
+            state.copy(
+              entries = state.entries.map {
+                case e: TransferTxLogEntry =>
+                  e.copy(
+                    transferInstructionCid = exercised.getContractId,
+                    transferKind = TransferKind.TRANSFER_KIND_TRANSFER_INSTRUCTION_ACCEPT,
+                  )
+                case e => e
+              }
+            )
+          case TransferInstruction_Withdraw(_) =>
+            // Contrary to the wallet which tracks only unlocked amulet balance,
+            // scan tracks the sum of locked and unlocked balance so
+            // this does not actually create a change in balance.
+            State(
+              AbortTransferInstructionTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                eventId = eventId,
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                transferInstructionCid = exercised.getContractId,
+                transferAbortKind = TransferAbortKind.TRANSFER_ABORT_KIND_WITHDRAW,
+              )
+            )
+          case TransferInstruction_Reject(_) =>
+            // Contrary to the wallet which tracks only unlocked amulet balance,
+            // scan tracks the sum of locked and unlocked balance so
+            // this does not actually create a change in balance.
+            State(
+              AbortTransferInstructionTxLogEntry(
+                offset = LegacyOffset.Api.fromLong(tree.getOffset),
+                eventId = eventId,
+                domainId = synchronizerId,
+                date = Some(tree.getEffectiveAt),
+                transferInstructionCid = exercised.getContractId,
+                transferAbortKind = TransferAbortKind.TRANSFER_ABORT_KIND_REJECT,
+              )
+            )
           case Tap(node) =>
             State.fromAmuletCreateSummary(
               tree,

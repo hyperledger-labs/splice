@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.http.v0.wallet.WalletClient
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
+import org.lfdecentralizedtrust.splice.integration.tests.WalletTxLogTestUtil
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
 import org.lfdecentralizedtrust.splice.util.{
   SpliceUtil,
@@ -18,6 +19,12 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.validator.automation.AcceptTransferPreapprovalProposalTrigger
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
+import org.lfdecentralizedtrust.splice.wallet.store.{
+  BalanceChangeTxLogEntry,
+  // PartyAndAmount,
+  TransferTxLogEntry,
+  TxLogEntry,
+}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
@@ -41,7 +48,8 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 class WalletIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletTxLogTestUtil {
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
@@ -557,7 +565,7 @@ class WalletIntegrationTest
       implicit env =>
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         aliceValidatorWalletClient.tap(10.0)
-        onboardWalletUser(bobWalletClient, bobValidatorBackend)
+        val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
         aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
         sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
@@ -587,7 +595,12 @@ class WalletIntegrationTest
         val deduplicationId = UUID.randomUUID.toString
         actAndCheck(
           "Bob sends Alice 40.0 amulet",
-          bobWalletClient.transferPreapprovalSend(aliceUserParty, 40.0, deduplicationId),
+          bobWalletClient.transferPreapprovalSend(
+            aliceUserParty,
+            40.0,
+            deduplicationId,
+            Some("test-description"),
+          ),
         )(
           "Alice and Bob's balance are updated",
           _ => {
@@ -610,6 +623,41 @@ class WalletIntegrationTest
             aliceValidatorBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
             sv1ScanBackend.lookupTransferPreapprovalByParty(aliceUserParty) shouldBe None
           },
+        )
+
+        checkTxHistory(
+          bobWalletClient,
+          Seq(
+            { case logEntry: TransferTxLogEntry =>
+              logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
+              logEntry.description shouldBe "test-description"
+              val receiver = logEntry.receivers.loneElement
+              receiver.party shouldBe aliceUserParty.toProtoPrimitive
+              receiver.amount should beAround(40.0)
+              val sender = logEntry.sender.value
+              sender.party shouldBe bobUserParty.toProtoPrimitive
+              sender.amount should beAround(-52)
+            },
+            { case logEntry: BalanceChangeTxLogEntry =>
+              logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+              succeed
+            },
+          ),
+        )
+        checkTxHistory(
+          aliceWalletClient,
+          Seq(
+            { case logEntry: TransferTxLogEntry =>
+              logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
+              logEntry.description shouldBe "test-description"
+              val receiver = logEntry.receivers.loneElement
+              receiver.party shouldBe aliceUserParty.toProtoPrimitive
+              receiver.amount should beAround(40.0)
+              val sender = logEntry.sender.value
+              sender.party shouldBe bobUserParty.toProtoPrimitive
+              sender.amount should beAround(-52)
+            }
+          ),
         )
     }
 

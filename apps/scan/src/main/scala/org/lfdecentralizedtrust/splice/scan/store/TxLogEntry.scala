@@ -40,6 +40,7 @@ object TxLogEntry extends StoreErrors {
     val SvRewardTxLogEntry = String3.tryCreate("sre")
     val VoteRequestTxLogEntry = String3.tryCreate("vot")
     val TransferCommandTxLogEntry = String3.tryCreate("trc")
+    val AbortTransferInstructionTxLogEntry = String3.tryCreate("ati")
     // The following entry types correspond to entries that were removed from `scan_tx_log.proto`
     // Those entries might still exist in databases, but we don't produce new ones and we don't read them.
     // The values are only kept for documentation purposes.
@@ -62,6 +63,7 @@ object TxLogEntry extends StoreErrors {
       case _: SvRewardTxLogEntry => EntryType.SvRewardTxLogEntry
       case _: VoteRequestTxLogEntry => EntryType.VoteRequestTxLogEntry
       case _: TransferCommandTxLogEntry => EntryType.TransferCommandTxLogEntry
+      case _: AbortTransferInstructionTxLogEntry => EntryType.AbortTransferInstructionTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -87,6 +89,8 @@ object TxLogEntry extends StoreErrors {
         case EntryType.SvRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
         case EntryType.VoteRequestTxLogEntry => from[VoteRequestTxLogEntry](json)
         case EntryType.TransferCommandTxLogEntry => from[TransferCommandTxLogEntry](json)
+        case EntryType.AbortTransferInstructionTxLogEntry =>
+          from[AbortTransferInstructionTxLogEntry](json)
         case _ => throw txLogIsOfWrongType(entryType.str)
       }
     } catch {
@@ -153,10 +157,26 @@ object TxLogEntry extends StoreErrors {
             sender = toResponse(entry.sender.getOrElse(throw txMissingField())),
             receivers = entry.receivers.map(toResponse).toVector,
             balanceChanges = entry.balanceChanges.map(toResponse).toVector,
+            transferInstructionDescription = Option.when(
+              !entry.transferInstructionDescription.isEmpty
+            )(entry.transferInstructionDescription),
+            transferInstructionReceiver = Option
+              .when(!entry.transferInstructionReceiver.isEmpty)(entry.transferInstructionReceiver),
+            transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
+            transferInstructionCid =
+              Option.when(!entry.transferInstructionCid.isEmpty)(entry.transferInstructionCid),
+            transferKind = entry.transferKind match {
+              case TransferKind.Unrecognized(_) => None
+              case TransferKind.TRANSFER_KIND_OTHER => None
+              case TransferKind.TRANSFER_KIND_CREATE_TRANSFER_INSTRUCTION =>
+                Some(httpDef.Transfer.TransferKind.members.CreateTransferInstruction)
+              case TransferKind.TRANSFER_KIND_TRANSFER_INSTRUCTION_ACCEPT =>
+                Some(httpDef.Transfer.TransferKind.members.TransferInstructionAccept)
+            },
           )
         ),
-        round = entry.round,
-        amuletPrice = Codec.encode(entry.amuletPrice),
+        round = Some(entry.round),
+        amuletPrice = Some(Codec.encode(entry.amuletPrice)),
       )
 
     private def toTapResponseItem(entry: TapTxLogEntry) = httpDef.TransactionHistoryResponseItem(
@@ -172,8 +192,8 @@ object TxLogEntry extends StoreErrors {
           amuletAmount = Codec.encode(entry.amuletAmount),
         )
       ),
-      round = entry.round,
-      amuletPrice = Codec.encode(entry.amuletPrice),
+      round = Some(entry.round),
+      amuletPrice = Some(Codec.encode(entry.amuletPrice)),
     )
 
     private def toMintResponseItem(entry: MintTxLogEntry) = httpDef.TransactionHistoryResponseItem(
@@ -189,15 +209,40 @@ object TxLogEntry extends StoreErrors {
           amuletAmount = Codec.encode(entry.amuletAmount),
         )
       ),
-      round = entry.round,
-      amuletPrice = Codec.encode(entry.amuletPrice),
     )
+
+    private def toAbortTransferInstructionResponseItem(entry: AbortTransferInstructionTxLogEntry) =
+      httpDef.TransactionHistoryResponseItem(
+        transactionType = HttpTransactionType.Mint,
+        eventId = entry.eventId,
+        offset = Some(entry.offset),
+        domainId = entry.domainId.toProtoPrimitive,
+        date = java.time.OffsetDateTime
+          .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
+        abortTransferInstruction = Some(
+          httpDef.AbortTransferInstruction(
+            abortKind = entry.transferAbortKind match {
+              case TransferAbortKind.Unrecognized(_) =>
+                sys.error(s"Unexpected transfer abort kind: ${entry.transferAbortKind}")
+              case TransferAbortKind.TRANSFER_ABORT_KIND_RESERVED =>
+                sys.error(s"Unexpected transfer abort kind: ${entry.transferAbortKind}")
+              case TransferAbortKind.TRANSFER_ABORT_KIND_REJECT =>
+                httpDef.AbortTransferInstruction.AbortKind.members.Reject
+              case TransferAbortKind.TRANSFER_ABORT_KIND_WITHDRAW =>
+                httpDef.AbortTransferInstruction.AbortKind.members.Withdraw
+            },
+            transferInstructionCid = entry.transferInstructionCid,
+          )
+        ),
+      )
 
     def toResponseItem(entry: TransactionTxLogEntry): httpDef.TransactionHistoryResponseItem =
       entry match {
         case entry: TransferTxLogEntry => toTransferResponseItem(entry)
         case entry: TapTxLogEntry => toTapResponseItem(entry)
         case entry: MintTxLogEntry => toMintResponseItem(entry)
+        case entry: AbortTransferInstructionTxLogEntry =>
+          toAbortTransferInstructionResponseItem(entry)
         case _ => throw txLogIsOfWrongType(entry.getClass.getSimpleName)
       }
 

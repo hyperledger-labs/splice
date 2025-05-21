@@ -37,7 +37,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
       val preparedTxPartySetup =
         PreparedTransaction.parseFrom(Base64.getDecoder.decode(preparePartySetup1.transaction))
 
-      // Advance time by a little less than the submissionTimeRecordTimeTolerance of 24h
+      // Advance time by a little less than the preparationTimeRecordTimeTolerance of 24h
       advanceTime(Duration.ofHours(23))
 
       // Submit externally signed transaction
@@ -49,7 +49,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
       inside(update) {
         case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(transaction) =>
           val submissionTime =
-            CantonTimestamp.ofEpochMicro(preparedTxPartySetup.getMetadata.getSubmissionTime)
+            CantonTimestamp.ofEpochMicro(preparedTxPartySetup.getMetadata.getPreparationTime)
           val actualRecordTime =
             CantonTimestamp.assertFromInstant(java.time.Instant.parse(transaction.recordTime))
           val expectedRecordTime = submissionTime.plus(Duration.ofHours(23))
@@ -90,11 +90,12 @@ class ExternallySignedTxsTimeBasedIntegrationTest
           BigDecimal(10.0),
           CantonTimestamp.now().plus(Duration.ofHours(24)),
           0L,
+          Some("transfer-command-description"),
         )
       val preparedTxSend =
         PreparedTransaction.parseFrom(Base64.getDecoder.decode(prepareSend.transaction))
 
-      // Advance time by a little less than the submissionTimeRecordTimeTolerance of 24h
+      // Advance time by a little less than the preparationTimeRecordTimeTolerance of 24h
       advanceTime(Duration.ofHours(23))
       actAndCheck(
         "Submit signed TransferCommand creation",
@@ -143,7 +144,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
           inside(update) {
             case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(transaction) =>
               val submissionTime =
-                CantonTimestamp.ofEpochMicro(preparedTxSend.getMetadata.getSubmissionTime)
+                CantonTimestamp.ofEpochMicro(preparedTxSend.getMetadata.getPreparationTime)
               val actualRecordTime =
                 CantonTimestamp.assertFromInstant(java.time.Instant.parse(transaction.recordTime))
               val expectedRecordTime = submissionTime.plus(Duration.ofHours(23))

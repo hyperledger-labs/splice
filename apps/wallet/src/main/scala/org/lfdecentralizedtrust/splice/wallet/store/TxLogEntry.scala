@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.history.{
   LockedAmuletOwnerExpireLock,
   LockedAmuletUnlock,
   TransferPreapproval_Renew,
+  TransferPreapproval_Send,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpDef
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
@@ -22,7 +23,11 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   GetTransferOfferStatusResponse,
 }
 import org.lfdecentralizedtrust.splice.store.StoreErrors
-import org.lfdecentralizedtrust.splice.util.{Codec, ExerciseNodeCompanion}
+import org.lfdecentralizedtrust.splice.util.{
+  BaseExerciseNodeCompanion,
+  Codec,
+  ExerciseNodeCompanion,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
 import java.time.{Instant, ZoneOffset}
@@ -177,6 +182,10 @@ object TxLogEntry extends StoreErrors {
         appRewardsUsed = Codec.encode(entry.appRewardsUsed),
         validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
         svRewardsUsed = Codec.encode(entry.svRewardsUsed.getOrElse(BigDecimal(0))),
+        transferInstructionReceiver = Some(entry.transferInstructionReceiver).filter(_.nonEmpty),
+        transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
+        transferInstructionCid = Some(entry.transferInstructionCid).filter(_.nonEmpty),
+        description = Some(entry.description).filter(_.nonEmpty),
       )
     }
 
@@ -197,6 +206,9 @@ object TxLogEntry extends StoreErrors {
         appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
         svRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.svRewardsUsed)
+        transferInstructionAmount <- item.transferInstructionAmount.traverse(
+          Codec.decode(Codec.BigDecimal)
+        )
       } yield TransferTxLogEntry(
         eventId = item.eventId,
         subtype = Some(subtype),
@@ -209,6 +221,10 @@ object TxLogEntry extends StoreErrors {
         appRewardsUsed = appRewardsUsed,
         validatorRewardsUsed = validatorRewardsUsed,
         svRewardsUsed = Some(svRewardsUsed),
+        transferInstructionReceiver = item.transferInstructionReceiver.getOrElse(""),
+        transferInstructionAmount = transferInstructionAmount,
+        transferInstructionCid = item.transferInstructionCid.getOrElse(""),
+        description = item.description.getOrElse(""),
       )
     }
 
@@ -227,6 +243,8 @@ object TxLogEntry extends StoreErrors {
           httpDef.PartyAndAmount(entry.receiver, Codec.encode(entry.amount))
         ),
         amuletPrice = Codec.encode(entry.amuletPrice),
+        transferInstructionCid =
+          Option.when(!entry.transferInstructionCid.isEmpty)(entry.transferInstructionCid),
       )
     }
 
@@ -244,6 +262,7 @@ object TxLogEntry extends StoreErrors {
         receiver = receiverAndAmount.party,
         amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
         amuletPrice = amuletPrice,
+        transferInstructionCid = item.transferInstructionCid.getOrElse(""),
       )
     }
 
@@ -283,6 +302,9 @@ object TxLogEntry extends StoreErrors {
         choice = subtype.choice,
         amuletOperation =
           if (subtype.amuletOperation.isEmpty) None else Some(subtype.amuletOperation),
+        interfaceId = Option.when(!subtype.interfacePackageId.isEmpty)(
+          s"${subtype.interfacePackageId}:${subtype.interfaceModuleName}:${subtype.interfaceEntityName}"
+        ),
       )
 
     private def subtypeFromResponseItem(
@@ -293,10 +315,18 @@ object TxLogEntry extends StoreErrors {
           Right((packageId, moduleName, entityName))
         case _ => Left("Invalid templateId")
       }
+      interfaceId <- item.interfaceId.fold(Array("", "", ""))(_.split(":")) match {
+        case Array(packageId, moduleName, entityName) =>
+          Right((packageId, moduleName, entityName))
+        case _ => Left(s"Invalid templateId: ${item.interfaceId}")
+      }
     } yield TransactionSubtype(
       packageId = templateId._1,
       moduleName = templateId._2,
       entityName = templateId._3,
+      interfacePackageId = interfaceId._1,
+      interfaceModuleName = interfaceId._2,
+      interfaceEntityName = interfaceId._3,
       choice = item.choice,
       amuletOperation = item.amuletOperation.getOrElse(""),
     )
@@ -404,11 +434,12 @@ object TxLogEntry extends StoreErrors {
   }
 
   sealed abstract class TransactionSubtypeDef(
-      val companion: ExerciseNodeCompanion,
+      val companion: BaseExerciseNodeCompanion,
       val amuletOperation: Option[String],
   ) {
-    val templateId: Identifier = companion.template.getTemplateIdWithPackageId
-    val choice: String = companion.choice.name
+    val templateId: Identifier = companion.templateId
+    val interfaceId: Option[Identifier] = companion.interfaceId
+    val choice: String = companion.choiceName
 
     def toProto: TransactionSubtype =
       new TransactionSubtype(
@@ -417,11 +448,14 @@ object TxLogEntry extends StoreErrors {
         entityName = templateId.getEntityName,
         choice = choice,
         amuletOperation = amuletOperation.getOrElse(""),
+        interfacePackageId = interfaceId.map(_.getPackageId).getOrElse(""),
+        interfaceModuleName = interfaceId.map(_.getModuleName).getOrElse(""),
+        interfaceEntityName = interfaceId.map(_.getEntityName).getOrElse(""),
       )
   }
 
   sealed abstract class TransferTransactionSubtype(
-      companion: ExerciseNodeCompanion
+      companion: BaseExerciseNodeCompanion
   ) extends TransactionSubtypeDef(companion, None)
 
   object TransferTransactionSubtype {
@@ -448,31 +482,21 @@ object TxLogEntry extends StoreErrors {
         extends TransferTransactionSubtype(AmuletRules_CreateTransferPreapproval)
     case object TransferPreapprovalRenewal
         extends TransferTransactionSubtype(TransferPreapproval_Renew)
+    case object TransferPreapprovalSend extends TransferTransactionSubtype(TransferPreapproval_Send)
     case object Transfer
         extends TransferTransactionSubtype(org.lfdecentralizedtrust.splice.history.Transfer)
-
-    val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
-      P2PPaymentCompleted,
-      AppPaymentAccepted,
-      AppPaymentCollected,
-      SubscriptionInitialPaymentAccepted,
-      SubscriptionInitialPaymentCollected,
-      SubscriptionPaymentAccepted,
-      SubscriptionPaymentCollected,
-      WalletAutomation,
-      ExtraTrafficPurchase,
-      InitialEntryPaymentCollection,
-      EntryRenewalPaymentCollection,
-      TransferPreapprovalCreation,
-      Transfer,
-    ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
-
-    def find(choiceName: String): Option[TransferTransactionSubtype] =
-      values.get(choiceName)
+    case object CreateTokenStandardTransferInstruction
+        extends TransferTransactionSubtype(
+          org.lfdecentralizedtrust.splice.history.CreateTokenStandardTransferInstruction
+        )
+    case object TransferInstruction_Accept
+        extends TransferTransactionSubtype(
+          org.lfdecentralizedtrust.splice.history.TransferInstruction_Accept
+        )
   }
 
   sealed abstract class BalanceChangeTransactionSubtype(
-      companion: ExerciseNodeCompanion
+      companion: BaseExerciseNodeCompanion
   ) extends TransactionSubtypeDef(companion, None)
 
   object BalanceChangeTransactionSubtype {
@@ -498,6 +522,14 @@ object TxLogEntry extends StoreErrors {
     case object LockedAmuletExpired
         extends BalanceChangeTransactionSubtype(LockedAmuletExpireAmulet)
     case object AmuletExpired extends BalanceChangeTransactionSubtype(AmuletExpire)
+    case object TransferInstruction_Withdraw
+        extends BalanceChangeTransactionSubtype(
+          org.lfdecentralizedtrust.splice.history.TransferInstruction_Withdraw
+        )
+    case object TransferInstruction_Reject
+        extends BalanceChangeTransactionSubtype(
+          org.lfdecentralizedtrust.splice.history.TransferInstruction_Reject
+        )
 
     val values: Map[String, BalanceChangeTransactionSubtype] =
       Set[BalanceChangeTransactionSubtype](

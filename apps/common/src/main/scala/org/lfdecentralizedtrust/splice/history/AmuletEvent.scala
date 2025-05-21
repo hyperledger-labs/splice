@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.history
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules as externalPartyAmuletRulesCodegen
@@ -16,6 +17,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ExerciseNode,
   ExerciseNodeCompanion,
+  InterfaceExerciseNodeCompanion,
   QualifiedName,
 }
 
@@ -30,6 +32,85 @@ object Transfer
     extends ExerciseNodeCompanion.Mk(
       template = splice.amuletrules.AmuletRules.COMPANION,
       choice = splice.amuletrules.AmuletRules.CHOICE_AmuletRules_Transfer,
+    )
+
+final case class CreateTokenStandardTransferInstruction(
+    node: ExerciseNode[
+      splice.api.token.transferinstructionv1.TransferFactory_Transfer,
+      splice.api.token.transferinstructionv1.TransferInstructionResult,
+    ]
+)
+
+final object CreateTokenStandardTransferInstruction
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.transferinstructionv1.TransferFactory.INTERFACE,
+      template = splice.externalpartyamuletrules.ExternalPartyAmuletRules.COMPANION,
+      choice =
+        splice.api.token.transferinstructionv1.TransferFactory.CHOICE_TransferFactory_Transfer,
+    ) {
+  @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
+  override def unapply(
+      event: ExercisedEvent
+  )(implicit lc: ErrorLoggingContext): Option[ExerciseNode[
+    splice.api.token.transferinstructionv1.TransferFactory_Transfer,
+    splice.api.token.transferinstructionv1.TransferInstructionResult,
+  ]] = {
+    super
+      .unapply(event)
+      .flatMap(node =>
+        // We only parse transfer instructions. Direct transfers are just parsed as the underlying transfer.
+        Option.when(
+          node.result.value.output.isInstanceOf[
+            splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending
+          ]
+        )(node)
+      )
+  }
+}
+
+final case class TransferInstruction_Accept(
+    node: ExerciseNode[
+      splice.api.token.transferinstructionv1.TransferInstruction_Accept,
+      splice.api.token.transferinstructionv1.TransferInstructionResult,
+    ]
+)
+
+final object TransferInstruction_Accept
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.transferinstructionv1.TransferInstruction.INTERFACE,
+      template = splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
+      choice =
+        splice.api.token.transferinstructionv1.TransferInstruction.CHOICE_TransferInstruction_Accept,
+    )
+
+final case class TransferInstruction_Reject(
+    node: ExerciseNode[
+      splice.api.token.transferinstructionv1.TransferInstruction_Reject,
+      splice.api.token.transferinstructionv1.TransferInstructionResult,
+    ]
+)
+
+final object TransferInstruction_Reject
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.transferinstructionv1.TransferInstruction.INTERFACE,
+      template = splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
+      choice =
+        splice.api.token.transferinstructionv1.TransferInstruction.CHOICE_TransferInstruction_Reject,
+    )
+
+final case class TransferInstruction_Withdraw(
+    node: ExerciseNode[
+      splice.api.token.transferinstructionv1.TransferInstruction_Withdraw,
+      splice.api.token.transferinstructionv1.TransferInstructionResult,
+    ]
+)
+
+final object TransferInstruction_Withdraw
+    extends InterfaceExerciseNodeCompanion.Mk(
+      interface = splice.api.token.transferinstructionv1.TransferInstruction.INTERFACE,
+      template = splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION,
+      choice =
+        splice.api.token.transferinstructionv1.TransferInstruction.CHOICE_TransferInstruction_Withdraw,
     )
 
 case class Tap(
@@ -87,6 +168,12 @@ object AmuletRules_CreateTransferPreapproval
 object TransferPreapproval_Renew
     extends ExerciseNodeCompanion.Mk(
       choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_Renew,
+      template = splice.amuletrules.TransferPreapproval.COMPANION,
+    )
+
+object TransferPreapproval_Send
+    extends ExerciseNodeCompanion.Mk(
+      choice = splice.amuletrules.TransferPreapproval.CHOICE_TransferPreapproval_Send,
       template = splice.amuletrules.TransferPreapproval.COMPANION,
     )
 
@@ -157,6 +244,19 @@ object LockedAmuletCreate {
   type T = amuletCodegen.LockedAmulet
   type ContractType = Contract[TCid, T]
   val companion = amuletCodegen.LockedAmulet.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
+object TransferInstructionCreate {
+  type TCid = splice.amulettransferinstruction.AmuletTransferInstruction.ContractId
+  type T = splice.amulettransferinstruction.AmuletTransferInstruction
+  type ContractType = Contract[TCid, T]
+  val companion = splice.amulettransferinstruction.AmuletTransferInstruction.COMPANION
 
   def unapply(
       event: CreatedEvent

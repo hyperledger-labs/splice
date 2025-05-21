@@ -34,9 +34,6 @@ interface BurnMintFactory where
         -- on a factory contract acquired from an untrusted source *provided*
         -- all vetted Daml packages only contain interface implementations
         -- that check the expected admin party.
-      sender : Party
-        -- ^ The sender that owns the holdings in `inputHoldingCids`.
-        -- All holdings in `inputHoldingCids` must be owned by this party.
       instrumentId : InstrumentId
         -- ^ The instrument id of the holdings.
         -- All holdings in `inputHoldingCids` as well as the resulting output holdings MUST
@@ -44,10 +41,12 @@ interface BurnMintFactory where
       inputHoldingCids : [ContractId Holding]
         -- ^ The holdings that should be burnt.
         -- All holdings in `inputHoldingCids` MUST be archived by this choice.
+        -- Implementations MAY enforce additional restrictions such as all `inputHoldingCids`
+        -- belonging to the same owner.
       outputs : [BurnMintOutput]
         -- ^ The holdings that should be created. The choice MUST create new holdings with the given amounts.
       extraActors : [Party]
-        -- ^ Extra actors, the full actors required are the admin + extraActors. This is often the sender and the receivers
+        -- ^ Extra actors, the full actors required are the admin + extraActors. This is often the owners of inputHoldingCids and outputs
         -- but we allow different sets of actors to support token implementations with different authorization setups.
       extraArgs : ExtraArgs
         -- ^ Additional context. Implementations SHOULD include a `splice.lfdecentralizedtrust.org/reason`

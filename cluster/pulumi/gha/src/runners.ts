@@ -167,7 +167,7 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image:
-                  'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-docker-runner:0.3.12',
+                  'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-docker-runner:0.4.0-snapshot.20250519.9323.0.vdb543d93',
                 command: ['/home/runner/run.sh'],
                 env: [
                   {

@@ -237,7 +237,7 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         participantAdminConnection,
-        config.submissionTimeRecordTimeTolerance,
+        config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
       )
     )

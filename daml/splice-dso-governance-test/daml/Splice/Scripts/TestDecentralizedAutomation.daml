@@ -436,6 +436,7 @@ testTransferPreapprovalSend = do
       expiresAt = now `addRelTime` hours 12
       nonce = 0
       delegate = validator
+      description = Some "test-transfer-command"
 
   let action = ARC_DsoRules with
         dsoAction = SRARC_CreateTransferCommandCounter (DsoRules_CreateTransferCommandCounter alice.primaryParty)
