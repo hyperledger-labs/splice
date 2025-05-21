@@ -150,11 +150,14 @@ class SvReOnboardPreflightIntegrationTest
         "Transfer appears in transactions log",
         _ => {
           val rows = findAll(className("tx-row")).toSeq
-          val expectedRow = rows.filter { row =>
+          val expectedRows = rows.filter { row =>
             val transaction = readTransactionFromRow(row)
             transaction.partyDescription.exists(_.contains(offboardedSvParty.toProtoPrimitive))
           }
-          inside(expectedRow) { case Seq(tx) =>
+          // There will be two tx log entries, one for the creation of the offer and one for the acceptance
+          // when using the token standard flow and one otherwise.
+          // We support both and just check that the entry for the completed transfer is there.
+          forExactly(1, expectedRows) { tx =>
             val transaction = readTransactionFromRow(tx)
             logger.info(s"Found transaction $transaction")
             transaction.action should matchText("Received")
