@@ -212,7 +212,7 @@ object TxLogEntry extends StoreErrors {
 
     private def toAbortTransferInstructionResponseItem(entry: AbortTransferInstructionTxLogEntry) =
       httpDef.TransactionHistoryResponseItem(
-        transactionType = HttpTransactionType.Mint,
+        transactionType = HttpTransactionType.AbortTransferInstruction,
         eventId = entry.eventId,
         offset = Some(entry.offset),
         domainId = entry.domainId.toProtoPrimitive,
