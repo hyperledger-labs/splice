@@ -104,4 +104,7 @@ Splice unsafe shutdown future
 # Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
 .*No data has been made available yet.*
 
+# SV UI polls cometbft status endpoint even when there's no cometBFT (we have this in the full network docker compose test)
+.*CometBFT is not configured for this app.*
+
 # Make sure to have a trailing newline
