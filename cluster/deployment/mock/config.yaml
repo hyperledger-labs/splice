@@ -6,6 +6,8 @@ validator1:
     keyRingId: validator1_test
 multiValidator:
   postgresPvcSize: '100Gi'
+splitwell:
+  maxDarVersion: '0.1.8'
 synchronizerMigration:
   archived:
     - id: 1
