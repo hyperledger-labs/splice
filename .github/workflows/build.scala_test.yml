@@ -53,7 +53,7 @@ jobs:
       test_names: ${{ steps.prep.outputs.test_names }}
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # Checkout the PR head commit to get the commit message
           ref: ${{ github.event.pull_request.head.sha }}
@@ -95,7 +95,7 @@ jobs:
     steps:
 
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Run Tests
         uses: ./.github/actions/tests/scala_test

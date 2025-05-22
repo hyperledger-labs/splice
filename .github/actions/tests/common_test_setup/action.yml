@@ -29,7 +29,7 @@ runs:
   steps:
 
     - name: Publish test name metric
-      uses: miguelteixeiraa/action-run-in-background@v1
+      uses: miguelteixeiraa/action-run-in-background@e28f036c202e9066287e6a50ce8b80749627cc7d # v1.0.0
       with:
         script: ./.github/actions/scripts/publish_gha_metrics.py --test_suite ${{ inputs.test_name }}
 

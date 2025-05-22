@@ -55,7 +55,7 @@ jobs:
           fi
       - name: Get Commit Sha
         id: get_commit_sha
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           commit_sha: ${{ inputs.commit_sha }}
           pr_number: ${{ inputs.pr_number }}
@@ -78,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: get_commit_sha
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ inputs.base_branch }}
       - name: Backport to ${{ inputs.base_branch }} - Create branch & push
@@ -102,7 +102,7 @@ jobs:
           echo "new_branch=$new_branch" >> "$GITHUB_OUTPUT"
       - name: Backport to ${{ inputs.base_branch }} - Create PR
         id: create_pr
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           new_branch: ${{ steps.create_branch.outputs.new_branch }}
           base_branch: ${{ inputs.base_branch }}
@@ -130,7 +130,7 @@ jobs:
             });
       - name: Request review
         if: ${{ inputs.reviewer }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           reviewer: ${{ inputs.reviewer }}
           pr_number: ${{ steps.create_pr.outputs.result }}
@@ -151,7 +151,7 @@ jobs:
     if: ${{ failure() && inputs.pr_number }}
     steps:
       - name: Notify on failure
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         env:
           pr_number: ${{ inputs.pr_number }}
           base_branch: ${{ inputs.base_branch }}
