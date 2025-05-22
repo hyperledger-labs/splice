@@ -1,16 +1,7 @@
 on:
-  workflow_call:
-    inputs:
-      env:
-        type: string
-        required: true
-
+  workflow_call
 jobs:
   hello_world_1:
     uses: ./.github/workflows/reusable_1.yml
-    with:
-      env: ${{ inputs.env }}
   hello_world_2:
     uses: ./.github/workflows/reusable_2.yml
-    with:
-      env: ${{ inputs.env }}

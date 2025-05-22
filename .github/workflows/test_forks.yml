@@ -3,7 +3,10 @@ on:
     types: [opened, reopened, synchronize]
 
 jobs:
+  env_hold:
+    environment: ci-forks
+    runs-on: self-hosted-docker-tiny
+
   hello_world:
     uses: ./.github/workflows/reusable.yml
-    with:
-      env: ci-forks
+    needs: env_hold
