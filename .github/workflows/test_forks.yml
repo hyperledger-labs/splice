@@ -6,21 +6,11 @@ jobs:
   env_hold:
     environment: ci-forks
     runs-on: self-hosted-docker-tiny
-    steps:
-      - name: Wait for environment approval for runs from forks
-        run: echo "Wait for environment approval for runs from forks"
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    # steps:
+    #   - name: Wait for environment approval for runs from forks
+    #     run: echo "Wait for environment approval for runs from forks"
 
   hello_world:
     uses: ./.github/workflows/reusable.yml
     needs: env_hold
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Test
-        run: |
-          echo "${{ github.event.pull_request.head.repo.fork }}"
-          echo "${{ github.event.pull_request.head.repo.full_name }}"
-          echo "${{ github.event.pull_request.head.repo.name }}"
-          echo "${{ github.event.pull_request.base.repo.full_name }}"
-          echo "${{ github.event.pull_request.base.repo.name }}"

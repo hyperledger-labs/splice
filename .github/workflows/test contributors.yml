@@ -5,15 +5,4 @@ on:
 jobs:
   hello_world:
     uses: ./.github/workflows/reusable.yml
-    if: (github.repository == 'DACH-NY/canton-network-node') || (github.repository == 'hyperledger-labs/splice')
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Test
-        run: |
-          echo "${{ github.event.pull_request.head.repo.fork }}"
-          echo "${{ github.event.pull_request.head.repo.full_name }}"
-          echo "${{ github.event.pull_request.head.repo.name }}"
-          echo "${{ github.event.pull_request.base.repo.full_name }}"
-          echo "${{ github.event.pull_request.base.repo.name }}"
+    if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
