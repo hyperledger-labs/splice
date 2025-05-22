@@ -1,16 +1,12 @@
 name: Build
 on:
-  pull_request:
-    types: [ opened, synchronize, reopened ]
-  push:
-    branches:
-      - 'main'
-      - 'release-line-**'
-
-# Cancel previously runs of this workflow on the same branch, unless it's main or a release-line branch
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ !endsWith(github.ref, 'heads/main') && !contains(github.ref, 'heads/release-line-') }}
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: 'The commit SHA to use for the build'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   id-token: write # Required for GCP Workload Identity for failure notifications
@@ -22,7 +18,7 @@ jobs:
 
   cancel_if_not_opt_in:
     runs-on: self-hosted-docker-tiny
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
     name: Cancel if not opted in
     permissions:
       actions: write
@@ -46,14 +42,20 @@ jobs:
   static_tests:
     uses: ./.github/workflows/build.static_tests.yml
     secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   deployment_test:
     uses: ./.github/workflows/build.deployment_test.yml
     secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   daml_test:
     uses: ./.github/workflows/build.daml_test.yml
     secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   scala_test_sim_time:
     uses: ./.github/workflows/build.scala_test.yml
@@ -63,6 +65,7 @@ jobs:
       start_canton_options: -s
       parallelism: 4
       test_name: simtime
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_resource_intensive:
@@ -73,6 +76,7 @@ jobs:
       start_canton_options: -w
       parallelism: 2
       test_name: resource-intensive
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_record_time_tolerance:
@@ -83,6 +87,7 @@ jobs:
       start_canton_options: -s
       parallelism: 1
       test_name: record-time-tolerance
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_disaster_recovery:
@@ -93,6 +98,7 @@ jobs:
       start_canton_options: -w
       parallelism: 1
       test_name: disaster-recovery
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_with_cometbft:
@@ -102,6 +108,7 @@ jobs:
       test_names_file: "test-cometbft-full-class-names.log"
       parallelism: 1
       test_name: cometbft
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_with_bft:
@@ -112,6 +119,7 @@ jobs:
       start_canton_options: -we
       parallelism: 1
       test_name: canton bft
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
 
@@ -125,6 +133,7 @@ jobs:
       parallelism: 10
       test_name: wall-clock-time
       with_gcp_creds: true
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_frontend_wall_clock_time:
@@ -136,6 +145,7 @@ jobs:
       parallelism: 5
       test_name: frontend-wall-clock-time
       is_frontend_test: true
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_frontend_simtime:
@@ -147,6 +157,7 @@ jobs:
       parallelism: 1
       test_name: frontend-simtime
       is_frontend_test: true
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_docker_compose:
@@ -157,6 +168,7 @@ jobs:
       start_canton_options: -w
       parallelism: 2
       test_name: docker-compose
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   scala_test_app_upgrade:
@@ -170,19 +182,26 @@ jobs:
       pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1; ./build-tools/prep-app-upgrade-test"
       skip_if_regex: "\\[breaking\\]"
       skip_if_files_changed: "nix/canton-sources.json"
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   ui_tests:
     uses: ./.github/workflows/build.ui_tests.yml
     secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   ts_cli_tests:
     uses: ./.github/workflows/build.ts_cli_tests.yml
     secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   docs:
     uses: ./.github/workflows/build.docs.yml
     secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   scala_test_without_canton:
     uses: ./.github/workflows/build.scala_test.yml
@@ -193,10 +212,11 @@ jobs:
       parallelism: 2
       test_name: without-canton
       with_gcp_creds: true
+      commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
   final_result:
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
     needs:
     - cancel_if_not_opt_in
     - static_tests

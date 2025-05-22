@@ -1,5 +1,11 @@
 name: Docs
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: false
+        default: ""
 
 jobs:
   docs:
@@ -11,6 +17,8 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit_sha }}
 
       - name: Setup
         id: setup
@@ -32,7 +40,7 @@ jobs:
 
       - name: Push documentation
         uses: ./.github/actions/nix/run_bash_command_in_nix
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GH_USER: ${{ github.actor }}
           GH_TOKEN: ${{ secrets.GH_ISSUES }}

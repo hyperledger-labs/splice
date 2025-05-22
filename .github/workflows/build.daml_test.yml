@@ -1,5 +1,11 @@
 name: Daml Tests
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: false
+        default: ""
 
 jobs:
   daml_test:
@@ -11,6 +17,8 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit_sha }}
 
       - name: Skip on [static]
         id: skip
@@ -19,9 +27,12 @@ jobs:
           git fetch origin ${{ github.event.pull_request.head.sha }}
           last_commit_msg=$(git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }})
           echo "Last commit message: $last_commit_msg"
-          if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
-            echo "Skipping Daml tests because of [static] label"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]] || [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            if [[ "$last_commit_msg" == *"[static]"* ]];  then
+              echo "Skipping Daml tests because of [static] label"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
       - name: Setup

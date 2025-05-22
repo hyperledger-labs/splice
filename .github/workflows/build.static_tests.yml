@@ -1,5 +1,12 @@
 name: Static Tests
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: false
+        default: ""
+
 
 jobs:
   static_tests:
@@ -12,6 +19,8 @@ jobs:
 
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit_sha }}
 
       - name: Setup
         id: setup

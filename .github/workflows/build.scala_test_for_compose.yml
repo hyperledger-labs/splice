@@ -17,6 +17,10 @@ on:
       test_name:
         type: string
         required: true
+      commit_sha:
+        type: string
+        required: false
+        default: ""
 
 jobs:
 
@@ -69,6 +73,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
+          ref: ${{ inputs.commit_sha }}
 
       - name: Run Tests
         uses: ./.github/actions/tests/scala_test

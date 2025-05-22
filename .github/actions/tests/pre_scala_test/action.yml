@@ -32,7 +32,7 @@ runs:
       run: |
         last_commit_msg=$(git log -1 --pretty=%B)
         echo "Last commit message: $last_commit_msg"
-        if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
+        if [[ "${{ github.event_name }}" == "pull_request"* ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
           echo "Only static tests should be running, skipping this job"
           echo "skip=true" >> "$GITHUB_ENV"
         else

@@ -1,5 +1,11 @@
 name: UI tests
-on: workflow_call
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: false
+        default: ""
 
 jobs:
   ui_tests:
@@ -12,6 +18,7 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
+          # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Skip on [static]
@@ -20,10 +27,18 @@ jobs:
         run: |
           last_commit_msg=$(git log -1 --pretty=%B)
           echo "Last commit message: $last_commit_msg"
-          if [[ "${{ github.event_name }}" == 'pull_request' ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
-            echo "Skipping UI tests because of [static] label"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "pull_request" ]] || [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            if [[ "$last_commit_msg" == *"[static]"* ]];  then
+              echo "Skipping UI tests because of [static] label"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        if: inputs.commit_sha != ''
+        with:
+          ref: ${{ inputs.commit_sha }}
 
       - name: Setup
         id: setup
