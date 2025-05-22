@@ -7,6 +7,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
 
+import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
 interface MultiValidatorArgs extends BaseMultiNodeArgs {
@@ -124,7 +125,9 @@ export class MultiValidator extends MultiNodeDeployment {
         },
         serviceSpec: { ports },
       },
-      opts
+      opts,
+      undefined,
+      multiValidatorConfig?.extraValidatorEnvVars
     );
   }
 }

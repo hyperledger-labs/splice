@@ -1,6 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { generatePortSequence, numNodesPerInstance } from 'splice-pulumi-common';
 
+import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
 export class MultiParticipant extends MultiNodeDeployment {
@@ -92,7 +93,8 @@ export class MultiParticipant extends MultiNodeDeployment {
        * G1HeapWastePercent - lower the amount of heap space we're willing to waste as it's based on total heap and in most scenario we expect low heap usage
        * GCTimeRatio - dedicate more cpi time to GC compared to default usage to keep heap low (~16% vs default 8%)
        * */
-      '-XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6'
+      '-XX:+UnlockExperimentalVMOptions -XX:-G1UseAdaptiveIHOP -XX:G1MixedGCLiveThresholdPercent=12 -XX:G1HeapWastePercent=2 -XX:InitiatingHeapOccupancyPercent=10 -XX:GCTimeRatio=6',
+      multiValidatorConfig?.extraParticipantEnvVars
     );
   }
 }

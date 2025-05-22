@@ -146,6 +146,11 @@ EOF
     else
       echo "Validator is not configured to request a secret, must be already onboarded"
     fi
+
+    for cfg in ${!MULTI_VALIDATOR_ADDITIONAL_CONFIG@}; do
+      # shellcheck disable=SC2001
+      echo "${!cfg}" | sed "s/INDEX/$index/g" >> /app/app.conf
+    done
 }
 
 nodes=${NUM_NODES:-1}

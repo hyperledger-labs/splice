@@ -6,6 +6,15 @@ validator1:
     keyRingId: validator1_test
 multiValidator:
   postgresPvcSize: '100Gi'
+  # Dummy values for testing
+  extraValidatorEnvVars:
+    - name: MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO
+      value: |
+        canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger"
+        canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger"
+  extraParticipantEnvVars:
+    - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
+      value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
