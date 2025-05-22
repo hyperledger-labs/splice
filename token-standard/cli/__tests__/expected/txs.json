@@ -14,7 +14,7 @@
             "mintAmount": "0",
             "sender": "aliceValidator::normalized",
             "tokenStandardChoice": null,
-            "reason": null,
+            "reason": "token-standard-transfer-description",
             "meta": {
               "values": {}
             }

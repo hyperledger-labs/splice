@@ -157,14 +157,11 @@ object TxLogEntry extends StoreErrors {
             sender = toResponse(entry.sender.getOrElse(throw txMissingField())),
             receivers = entry.receivers.map(toResponse).toVector,
             balanceChanges = entry.balanceChanges.map(toResponse).toVector,
-            transferInstructionDescription = Option.when(
-              !entry.transferInstructionDescription.isEmpty
-            )(entry.transferInstructionDescription),
-            transferInstructionReceiver = Option
-              .when(!entry.transferInstructionReceiver.isEmpty)(entry.transferInstructionReceiver),
+            description = Some(entry.description).filter(_.nonEmpty),
+            transferInstructionReceiver =
+              Some(entry.transferInstructionReceiver).filter(_.nonEmpty),
             transferInstructionAmount = entry.transferInstructionAmount.map(Codec.encode(_)),
-            transferInstructionCid =
-              Option.when(!entry.transferInstructionCid.isEmpty)(entry.transferInstructionCid),
+            transferInstructionCid = Some(entry.transferInstructionCid).filter(_.nonEmpty),
             transferKind = entry.transferKind match {
               case TransferKind.Unrecognized(_) => None
               case TransferKind.TRANSFER_KIND_OTHER => None
@@ -172,6 +169,8 @@ object TxLogEntry extends StoreErrors {
                 Some(httpDef.Transfer.TransferKind.members.CreateTransferInstruction)
               case TransferKind.TRANSFER_KIND_TRANSFER_INSTRUCTION_ACCEPT =>
                 Some(httpDef.Transfer.TransferKind.members.TransferInstructionAccept)
+              case TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND =>
+                Some(httpDef.Transfer.TransferKind.members.PreapprovalSend)
             },
           )
         ),
@@ -213,7 +212,7 @@ object TxLogEntry extends StoreErrors {
 
     private def toAbortTransferInstructionResponseItem(entry: AbortTransferInstructionTxLogEntry) =
       httpDef.TransactionHistoryResponseItem(
-        transactionType = HttpTransactionType.Mint,
+        transactionType = HttpTransactionType.AbortTransferInstruction,
         eventId = entry.eventId,
         offset = Some(entry.offset),
         domainId = entry.domainId.toProtoPrimitive,

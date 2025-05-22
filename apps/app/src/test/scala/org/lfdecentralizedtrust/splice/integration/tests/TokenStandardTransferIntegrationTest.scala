@@ -11,6 +11,7 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem.TransactionType as HttpTransactionType
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AbortTransferInstruction,
   ReceiverAmount,
@@ -289,10 +290,11 @@ class TokenStandardTransferIntegrationTest
       // 4 transfer instructions + accept + withdraw + reject
       activityTxs should have size (7)
       clue("TransferInstruction accept") {
+        activityTxs(0).transactionType shouldBe HttpTransactionType.Transfer
         val transfer = activityTxs(0).transfer.value
         transfer.sender.party shouldBe aliceUserParty.toProtoPrimitive
         transfer.transferInstructionCid shouldBe Some(cids(2).contractId)
-        transfer.transferInstructionDescription shouldBe None
+        transfer.description shouldBe None
         transfer.transferInstructionReceiver shouldBe None
         transfer.transferKind shouldBe Some(Transfer.TransferKind.members.TransferInstructionAccept)
         transfer.receivers shouldBe Seq(
@@ -315,12 +317,14 @@ class TokenStandardTransferIntegrationTest
         }
       }
       clue("TransferInstruction withdraw") {
+        activityTxs(1).transactionType shouldBe HttpTransactionType.AbortTransferInstruction
         val abort = activityTxs(1).abortTransferInstruction.value
         abort.transferInstructionCid shouldBe cids(1).contractId
         abort.abortKind shouldBe AbortTransferInstruction.AbortKind.members.Withdraw
         // Scan tracks the sum of locked and unlocked amulets so there is no balance change here.
       }
       clue("TransferInstruction reject") {
+        activityTxs(2).transactionType shouldBe HttpTransactionType.AbortTransferInstruction
         val abort = activityTxs(2).abortTransferInstruction.value
         abort.transferInstructionCid shouldBe cids(0).contractId
         abort.abortKind shouldBe AbortTransferInstruction.AbortKind.members.Reject
@@ -329,12 +333,13 @@ class TokenStandardTransferIntegrationTest
       forAll(Seq(3, 4, 5, 6)) { i =>
         val transferInstructionNumber = 7 - i
         clue(s"Transfer #$transferInstructionNumber") {
+          activityTxs(i).transactionType shouldBe HttpTransactionType.Transfer
           val transfer = activityTxs(i).transfer.value
           transfer.sender.party shouldBe aliceUserParty.toProtoPrimitive
           transfer.transferInstructionCid shouldBe Some(
             cids(transferInstructionNumber - 1).contractId
           )
-          transfer.transferInstructionDescription shouldBe Some(
+          transfer.description shouldBe Some(
             s"Transfer #$transferInstructionNumber"
           )
           transfer.transferInstructionReceiver shouldBe Some(bobUserParty.toProtoPrimitive)
