@@ -1,11 +1,14 @@
 on:
-  pull_request_target:
-    types: [opened, reopened, synchronize]
+  workflow_call:
+    inputs:
+      env:
+        type: string
+        required: true
 
 jobs:
   hello_world:
     runs-on: ubuntu-latest
-    environment: ci
+    environment: ${{ inputs.env }}
     steps:
       - name: Hello world
         run: echo "Hello, world!"

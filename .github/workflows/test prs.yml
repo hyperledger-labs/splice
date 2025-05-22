@@ -1,0 +1,9 @@
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  hello_world:
+    uses: ./.github/workflows/reusable.yml
+    with:
+      env: ci-contributors
