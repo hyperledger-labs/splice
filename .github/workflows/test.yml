@@ -1,0 +1,11 @@
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  hello_world:
+    runs-on: ubuntu-latest
+    environment: ci
+    steps:
+      - name: Hello world
+        run: echo "Hello, world!"
