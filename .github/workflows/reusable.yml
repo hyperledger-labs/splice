@@ -6,9 +6,11 @@ on:
         required: true
 
 jobs:
-  hello_world:
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.env }}
-    steps:
-      - name: Hello world
-        run: echo "Hello, world!"
+  hello_world_1:
+    uses: ./.github/workflows/reusable_1.yml
+    with:
+      env: ${{ inputs.env }}
+  hello_world_2:
+    uses: ./.github/workflows/reusable_2.yml
+    with:
+      env: ${{ inputs.env }}
