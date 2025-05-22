@@ -6,7 +6,9 @@ jobs:
   env_hold:
     environment: ci-forks
     runs-on: self-hosted-docker-tiny
+    if: (github.repository != 'DACH-NY/canton-network-node') && (github.repository != 'hyperledger-labs/splice')
 
   hello_world:
     uses: ./.github/workflows/reusable.yml
     needs: env_hold
+    if: (github.repository != 'DACH-NY/canton-network-node') && (github.repository != 'hyperledger-labs/splice')
