@@ -35,6 +35,7 @@ import Root from './routes/root';
 import ValidatorOnboarding from './routes/validatorOnboarding';
 import Voting from './routes/voting';
 import { useConfigPollInterval, useSvConfig } from './utils';
+import { Governance } from './routes/governance';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useSvConfig();
@@ -88,6 +89,7 @@ const App: React.FC = () => {
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="amulet-price" element={<AmuletPrice />} />
           <Route path="votes" element={<Voting />} />
+          <Route path="governance-beta" element={<Governance />} />
           <Route path="delegate" element={<Delegate />} />
         </Route>
       </Route>

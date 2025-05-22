@@ -67,6 +67,24 @@ class ScanTxLogParser(
         exercised match {
           case Transfer(node) =>
             State.fromTransfer(tree, exercised, synchronizerId, node)
+          case TransferPreapproval_Send(node) =>
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
+            state.copy(
+              entries = state.entries.map {
+                case e: TransferTxLogEntry =>
+                  e.copy(
+                    description = node.argument.value.description.orElse(""),
+                    eventId =
+                      EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
+                    transferKind = TransferKind.TRANSFER_KIND_PREAPPROVAL_SEND,
+                  )
+                case e => e
+              }
+            )
           case CreateTokenStandardTransferInstruction(node) =>
             val cid: String = node.result.value.output match {
               case output: splice.api.token.transferinstructionv1.transferinstructionresult_output.TransferInstructionResult_Pending =>
@@ -88,7 +106,7 @@ class ScanTxLogParser(
               entries = state.entries.map {
                 case e: TransferTxLogEntry =>
                   e.copy(
-                    transferInstructionDescription = node.argument.value.transfer.meta.values
+                    description = node.argument.value.transfer.meta.values
                       .getOrDefault(TokenStandardMetadata.reasonMetaKey, ""),
                     transferInstructionReceiver = node.argument.value.transfer.receiver,
                     transferInstructionAmount = Some(node.argument.value.transfer.amount),
@@ -203,7 +221,13 @@ class ScanTxLogParser(
           case ExternalPartyAmuletRules_CreateTransferCommand(node) =>
             State.fromCreateTransferCommand(eventId, node)
           case TransferCommand_Send(node) =>
-            State.fromTransferCommand_Send(eventId, exercised, node)
+            val state = parseTrees(
+              tree,
+              synchronizerId,
+              tree.getChildNodeIds(exercised).asScala.toList,
+            )
+            val transferCommandState = State.fromTransferCommand_Send(eventId, exercised, node)
+            state.appended(transferCommandState)
           case TransferCommand_Withdraw(node) =>
             State.fromTransferCommand_Withdraw(eventId, exercised, node)
           case TransferCommand_Expire(node) =>
