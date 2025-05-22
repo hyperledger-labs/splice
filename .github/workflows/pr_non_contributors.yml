@@ -16,9 +16,19 @@ permissions:
   actions: write # To cancel itself if not opted in
 
 jobs:
+  env_hold:
+    name: "Approve CI for Forks"
+    environment: ci-forks
+    runs-on: self-hosted-docker-tiny
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    steps:
+      - name: Wait for environment approval for runs from forks
+        run: exit 0
+
   ci:
     uses: ./.github/workflows/build.yml
-    if: (github.repository != 'DACH-NY/canton-network-node') && (github.repository != 'hyperledger-labs/splice')
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     secrets: inherit
+    needs: env_hold
     with:
       commit_sha: ${{ github.event.pull_request.head.sha }}
