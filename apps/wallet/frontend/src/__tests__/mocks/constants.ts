@@ -9,6 +9,9 @@ export const userLogin = 'alice_wallet_user';
 export const alicePartyId =
   'alice__wallet__user::12201d5aa725ec9491490fd860e86f849358604f6fd387053771cafb90384a94c3e2';
 
+export const bobPartyId =
+  'bob__wallet__user::12201d5aa725ec9491490fd860e86f849358604f6fd387053771cafb90384a94c3e3';
+
 export const nameServiceAcronym = config.spliceInstanceNames.nameServiceNameAcronym.toLowerCase();
 
 export const aliceEntry = {

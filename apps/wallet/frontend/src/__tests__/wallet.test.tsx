@@ -170,7 +170,29 @@ describe('Wallet user can', () => {
   describe('Regular transfer offer', () => {
     transferTests(true);
   });
-});
+
+  test('see two-step transfers in transaction history', async () => {
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    expect(await screen.findByText('(Transfer offer 009a97ffdf… accepted)')).toBeDefined();
+    expect(
+      await screen.findByText(
+        '(Transfer offer 009a97ffdf… for 10 to bob__wallet__user::12201d5aa7…: test transfer)'
+      )
+    ).toBeDefined();
+    expect(
+      await screen.findByText(
+        '(Transfer offer 009a97ffdf… for 10 from bob__wallet__user::12201d5aa7…: test transfer)'
+      )
+    ).toBeDefined();
+    expect(await screen.findByText('(Transfer offer 009a97ffdf… withdrawn)')).toBeDefined();
+    // The withdraw has a dummy conversion rate of 0 so no amulet conversion rate is displayed
+    expect(await screen.findAllByText('@')).toHaveLength(3);
+  });
+}, 5000);
 
 function transferTests(disableTokenStandard: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

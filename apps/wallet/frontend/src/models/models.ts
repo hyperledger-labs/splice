@@ -44,6 +44,10 @@ export interface Transfer {
   appRewardsUsed: BigNumber;
   validatorRewardsUsed: BigNumber;
   svRewardsUsed: BigNumber;
+  description?: string;
+  transferInstructionCid?: string;
+  transferInstructionReceiver?: string;
+  transferInstructionAmount?: BigNumber;
 }
 
 export interface BalanceChange {
@@ -53,6 +57,7 @@ export interface BalanceChange {
   receivers: TransactionReceiver[];
   date: Date;
   amuletPrice: BigNumber;
+  transferInstructionCid?: string;
 }
 
 export interface Notification {
