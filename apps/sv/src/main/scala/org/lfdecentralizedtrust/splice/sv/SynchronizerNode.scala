@@ -3,12 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.sv
 
-import io.grpc.Status
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.sv.config.{SvCometBftConfig, SvSequencerConfig}
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
-import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.time.Duration
 
@@ -21,9 +18,7 @@ abstract class SynchronizerNode(
     val mediatorSequencerAmplification: SubmissionRequestAmplification,
 ) {}
 
-sealed trait SequencerConfig {
-  def externalPeerUrl: Option[String]
-}
+sealed trait SequencerConfig {}
 
 object SequencerConfig {
   def fromConfig(
@@ -31,13 +26,7 @@ object SequencerConfig {
       cometbftConfig: Option[SvCometBftConfig],
   ): SequencerConfig = {
     if (sequencerConfig.isBftSequencer) {
-      BftSequencerConfig(
-        sequencerConfig.externalPeerApiUrlSuffix.getOrElse(
-          throw Status.INVALID_ARGUMENT
-            .withDescription("External peer URL is required")
-            .asRuntimeException()
-        )
-      )
+      BftSequencerConfig()
     } else if (cometbftConfig.exists(_.enabled)) {
       CometBftSequencerConfig()
     } else {
@@ -47,25 +36,10 @@ object SequencerConfig {
 }
 
 final case class BftSequencerConfig(
-    peerUrl: P2PEndpointConfig
-) extends SequencerConfig {
-  override def externalPeerUrl: Option[String] = Some(
-    Uri(
-      peerUrl.tlsConfig.filter(_.enabled).fold("http")(_ => "https"),
-      Uri.Authority(
-        Uri.Host(peerUrl.address),
-        peerUrl.port.unwrap,
-      ),
-    ).toString()
-  )
-}
+) extends SequencerConfig
 
 final case class CometBftSequencerConfig(
-) extends SequencerConfig {
-  override def externalPeerUrl: Option[String] = None
-}
+) extends SequencerConfig
 
 final case class ReferenceSequenceConfig(
-) extends SequencerConfig {
-  override def externalPeerUrl: Option[String] = None
-}
+) extends SequencerConfig

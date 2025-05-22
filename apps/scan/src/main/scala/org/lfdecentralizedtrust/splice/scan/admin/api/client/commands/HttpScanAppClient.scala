@@ -9,6 +9,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v2.CommandsOuterClass
+import com.digitalasset.canton.config.{RequireTypes, TlsClientConfig}
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
@@ -60,6 +61,8 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.{
   Member,
   ParticipantId,
@@ -904,6 +907,27 @@ object HttpScanAppClient {
       svName: String,
       availableAfter: Instant,
   )
+  final case class BftSequencer(
+      migrationId: Long,
+      id: SequencerId,
+      url: String,
+  ) {
+    private val uri = Uri.parseAbsolute(url)
+    val peerId: P2PEndpoint = {
+      P2PEndpoint.fromEndpointConfig(
+        P2PEndpointConfig(
+          uri.authority.host.address(),
+          RequireTypes.Port(uri.effectivePort),
+          Option.when(uri.scheme == "https")(
+            TlsClientConfig(
+              None,
+              None,
+            )
+          ),
+        )
+      )
+    }
+  }
 
   case class ListDsoScans()
       extends InternalBaseCommand[
@@ -2035,4 +2059,35 @@ object HttpScanAppClient {
         .leftMap(_.toString)
     }
   }
+
+  case class ListBftSequencers()
+      extends InternalBaseCommand[
+        http.ListSvBftSequencersResponse,
+        Seq[BftSequencer],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListSvBftSequencersResponse] =
+      client.listSvBftSequencers(headers)
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListSvBftSequencersResponse.OK(response) =>
+        response.bftSequencers.traverse { sequencer =>
+          Codec.decode(Codec.Sequencer)(sequencer.id).map { sequencerId =>
+            BftSequencer(
+              sequencer.migrationId,
+              sequencerId,
+              sequencer.p2pUrl,
+            )
+          }
+        }
+    }
+
+  }
+
 }

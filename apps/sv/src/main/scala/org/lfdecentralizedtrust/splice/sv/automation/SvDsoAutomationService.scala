@@ -48,6 +48,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingSequencerTrigger,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.*
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
@@ -242,6 +243,13 @@ class SvDsoAutomationService(
       )
     )
 
+    lazy val aggregatingScanConnection = new AggregatingScanConnection(
+      dsoStore,
+      upgradesConfig,
+      triggerContext.clock,
+      triggerContext.retryProvider,
+      triggerContext.loggerFactory,
+    )
     if (config.supportsSoftDomainMigrationPoc) {
       registerTrigger(
         new AmuletConfigReassignmentTrigger(
@@ -269,7 +277,7 @@ class SvDsoAutomationService(
               .asRuntimeException
           ),
           extraSynchronizerNodes,
-          upgradesConfig,
+          aggregatingScanConnection,
         )
       )
 
@@ -279,21 +287,38 @@ class SvDsoAutomationService(
           participantAdminConnection,
           triggerContext,
           extraSynchronizerNodes,
-          upgradesConfig,
+          aggregatingScanConnection,
         )
       )
     }
     localSynchronizerNode.foreach { synchronizerNode =>
       synchronizerNode.sequencerConfig match {
-        case BftSequencerConfig(_) =>
+        case BftSequencerConfig() =>
           registerTrigger(
             new SvBftSequencerPeerReconcilingTrigger(
               triggerContext,
               dsoStore,
               synchronizerNode.sequencerAdminConnection,
+              aggregatingScanConnection,
+              config.domainMigrationId,
             )
           )
         case _ =>
+      }
+    }
+
+    // TODO(#19670): We might want to clean this up so it's always registered at the same time
+    if (config.localSynchronizerNode.map(_.sequencer.isBftSequencer).getOrElse(false)) {
+      config.scan.foreach { scan =>
+        registerTrigger(
+          new PublishScanConfigTrigger(
+            triggerContext,
+            dsoStore,
+            connection,
+            scan,
+            upgradesConfig,
+          )
+        )
       }
     }
   }
@@ -399,16 +424,19 @@ class SvDsoAutomationService(
       )
     )
 
-    config.scan.foreach { scan =>
-      registerTrigger(
-        new PublishScanConfigTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          scan,
-          upgradesConfig,
+    // TODO(#19670): We might want to clean this up so it's always registered at the same time
+    if (!config.localSynchronizerNode.map(_.sequencer.isBftSequencer).getOrElse(false)) {
+      config.scan.foreach { scan =>
+        registerTrigger(
+          new PublishScanConfigTrigger(
+            triggerContext,
+            dsoStore,
+            connection,
+            scan,
+            upgradesConfig,
+          )
         )
-      )
+      }
     }
   }
 

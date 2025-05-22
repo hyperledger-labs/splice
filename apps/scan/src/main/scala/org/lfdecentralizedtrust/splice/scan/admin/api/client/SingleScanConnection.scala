@@ -66,6 +66,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
 
 /** Connection to the admin API of CC Scan. This is used by other apps
@@ -632,6 +633,16 @@ class SingleScanConnection private[client] (
     )
   ] =
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetTransferFactory(choiceArgs))
+
+  def listSvBftSequencers()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[BftSequencer]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListBftSequencers(),
+    )
+  }
 
 }
 

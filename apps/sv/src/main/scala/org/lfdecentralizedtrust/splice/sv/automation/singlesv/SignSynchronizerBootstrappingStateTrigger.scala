@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -25,15 +24,14 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.config.{Thresholds, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanSoftDomainMigrationPocAppClient.SynchronizerIdentities
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SignSynchronizerBootstrappingState.Task
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -43,25 +41,22 @@ class SignSynchronizerBootstrappingStateTrigger(
     override protected val context: TriggerContext,
     existingSynchronizer: LocalSynchronizerNode,
     synchronizerNodes: Map[String, ExtraSynchronizerNode],
-    override val upgradesConfig: UpgradesConfig,
+    aggregatingScanConnection: AggregatingScanConnection,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpClient,
     mat: Materializer,
-    templateJsonDecoder: TemplateJsonDecoder,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[Task]
     with SoftMigrationTrigger {
 
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] =
     for {
-      scanUrls <- getScanUrls()
       // TODO(#17032): Handle failures properly
       // TODO(#17032): consider whether we only want to initialize the ones in requiredSynchronizers in AmuletConfig
       // TODO(#17032): Exclude synchronizers already bootstrapped
       tasks <- synchronizerNodes.keys.toList.traverseFilter { prefix =>
-        scanUrls
-          .traverse { url => withScanConnection(url)(_.getSynchronizerIdentities(prefix)) }
+        aggregatingScanConnection
+          .fromAllScans(includeSelf = true) { _.getSynchronizerIdentities(prefix) }
           .map(identities =>
             Some(
               Task(

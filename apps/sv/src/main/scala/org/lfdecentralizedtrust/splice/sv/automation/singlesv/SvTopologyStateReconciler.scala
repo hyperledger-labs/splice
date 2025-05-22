@@ -74,8 +74,9 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
 ) extends SourceBasedTrigger[TaskTrigger] {
 
   // set parallelism to 1 as a full reconciliation is run in a single call so we don't want to run multiple reconciliations in parallel
-  override protected final lazy val context: TriggerContext =
+  protected lazy val noParallelismContext: TriggerContext =
     originalContext.focus(_.config.parallelism).replace(1)
+  override protected lazy val context: TriggerContext = noParallelismContext
 
   val reconciler: DsoRulesTopologyStateReconciler[Task]
   protected val contractsToRunOn

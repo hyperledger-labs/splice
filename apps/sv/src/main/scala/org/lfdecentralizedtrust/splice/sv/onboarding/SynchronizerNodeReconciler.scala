@@ -66,7 +66,7 @@ class SynchronizerNodeReconciler(
       mediatorConfig = synchronizerNodeConfig.flatMap(_.mediator.toScala)
       existingScanConfig = synchronizerNodeConfig.flatMap(_.scan.toScala).toJava
       existingSequencerConfig = sequencerConfig.map(c =>
-        LocalSequencerConfig(c.sequencerId, c.url, c.migrationId, c.peerUrl.toScala)
+        LocalSequencerConfig(c.sequencerId, c.url, c.migrationId)
       )
       existingMediatorConfig = mediatorConfig.map(c => LocalMediatorConfig(c.mediatorId))
       existingLegacySequencerConfig = synchronizerNodeConfig.flatMap(
@@ -150,7 +150,6 @@ class SynchronizerNodeReconciler(
                   case SynchronizerNodeState.Onboarding =>
                     None
                 }).toJava,
-                c.peerUrl.toJava,
               )
             }.toJava,
             localMediatorConfig

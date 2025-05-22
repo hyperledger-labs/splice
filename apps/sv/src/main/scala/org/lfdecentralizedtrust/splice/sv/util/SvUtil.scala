@@ -153,7 +153,6 @@ object SvUtil {
       sequencerId: String,
       url: String,
       migrationId: Long,
-      peerUrl: Option[String],
   )
 
   def getSequencerConfig(synchronizerNode: Option[SynchronizerNode], migrationId: Long)(implicit
@@ -165,7 +164,6 @@ object SvUtil {
         sequencerId.toProtoPrimitive,
         node.sequencerExternalPublicUrl,
         migrationId,
-        node.sequencerConfig.externalPeerUrl,
       )
     }
   }.sequence
@@ -226,7 +224,6 @@ object SvUtil {
           c.sequencerId,
           c.url,
           Some(clock.now.toInstant).toJava,
-          c.peerUrl.toJava,
         )
       )
       localMediatorConfig <- getMediatorConfig(Some(localSynchronizerNode))

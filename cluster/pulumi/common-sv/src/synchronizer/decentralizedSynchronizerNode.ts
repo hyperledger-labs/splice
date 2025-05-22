@@ -5,7 +5,7 @@ import { CLUSTER_HOSTNAME, DomainMigrationIndex } from 'splice-pulumi-common';
 import { SvParticipant } from '../participant';
 
 export interface CantonBftSynchronizerNode {
-  externalSequencerAddress: string;
+  externalSequencerP2pAddress: string;
 }
 
 export interface CometbftSynchronizerNode {
@@ -32,8 +32,8 @@ export class CrossStackDecentralizedSynchronizerNode
   migrationId: number;
   ingressName: string;
 
-  get externalSequencerAddress(): string {
-    return `sequencer-p2p-${this.migrationId}.${this.ingressName}.${CLUSTER_HOSTNAME}`;
+  get externalSequencerP2pAddress(): string {
+    return `https://sequencer-p2p-${this.migrationId}.${this.ingressName}.${CLUSTER_HOSTNAME}`;
   }
 
   constructor(migrationId: DomainMigrationIndex, ingressName: string) {

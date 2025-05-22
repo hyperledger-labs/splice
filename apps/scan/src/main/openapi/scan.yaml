@@ -139,6 +139,23 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListDsoSequencersResponse"
 
+  # TODO(#19679) reconsider naming; "bft sequencers" is a bit overloaded
+  /v0/sv-bft-sequencers:
+    get:
+      tags: [internal, scan]
+      x-jvm-package: scan
+      operationId: "listSvBFTSequencers"
+      description: |
+        Retrieve Canton BFT sequencer configuration for this SV, for each configured Synchronizer
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListSvBFTSequencersResponse"
+
+
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
     get:
       tags: [external, scan]
@@ -1749,6 +1766,29 @@ components:
         lastPurchasedInRound:
           type: integer
           format: int64
+    ListSvBFTSequencersResponse:
+      type: object
+      required: ["bftSequencers"]
+      properties:
+        bftSequencers:
+          type: array
+          items:
+            $ref: "#/components/schemas/SynchronizerBftSequencer"
+    SynchronizerBftSequencer:
+      type: object
+      required: ["migrationId", "id", "p2pUrl"]
+      properties:
+        migrationId:
+          description: |
+            The synchronizer migration id corresponding to this sequencer.
+          type: integer
+          format: int64
+        id:
+          description: The id of the sequencer.
+          type: string
+        p2pUrl:
+          description: The public accessible P2P url of the sequencer, use for inter sequencer communication.
+          type: string
     ListDsoSequencersResponse:
       type: object
       required: ["domainSequencers"]

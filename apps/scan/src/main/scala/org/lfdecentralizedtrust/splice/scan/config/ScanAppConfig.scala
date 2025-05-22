@@ -50,6 +50,7 @@ case class ScanAppBackendConfig(
     updateHistoryBackfillBatchSize: Int = 100,
     txLogBackfillEnabled: Boolean = false,
     txLogBackfillBatchSize: Int = 100,
+    bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
     {

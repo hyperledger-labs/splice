@@ -107,4 +107,8 @@ Splice unsafe shutdown future
 # SV UI polls cometbft status endpoint even when there's no cometBFT (we have this in the full network docker compose test)
 .*CometBFT is not configured for this app.*
 
+# Expected during SV onboarding as we start scan and the sv app concurrently
+# TODO(#19670) maybe remove this again
+Failed to read bft sequencers list from scan
+
 # Make sure to have a trailing newline

@@ -23,6 +23,7 @@ org.lfdecentralizedtrust.splice.store.db.DbUserWalletStoreTest
 org.lfdecentralizedtrust.splice.store.db.ScanAggregatorTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNodeTest
 org.lfdecentralizedtrust.splice.sv.cometbft.CometBftRequestSignerTest
+org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconcilerSpec
 org.lfdecentralizedtrust.splice.sv.util.SvOnboardingTokenTest
 org.lfdecentralizedtrust.splice.sv.util.WeightDistributionForSvTest
 org.lfdecentralizedtrust.splice.unit.store.db.AcsJdbcTypesTest

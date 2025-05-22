@@ -74,6 +74,10 @@ trait CommonAppInstanceReferences {
     "sv2Scan"
   )
 
+  def sv3ScanBackend(implicit env: SpliceTestConsoleEnvironment): ScanAppBackendReference = scanb(
+    "sv3Scan"
+  )
+
   def aliceWalletClient(implicit env: SpliceTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
   )
