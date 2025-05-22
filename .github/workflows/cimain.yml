@@ -1,0 +1,13 @@
+name: Deploy CIMain
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  trigger_cimain:
+    uses: ./.github/workflows/cluster_tests.yml
+    secrets: inherit
+    with:
+      workflow: deploy_cimain
+      sha: ${{ github.sha }}

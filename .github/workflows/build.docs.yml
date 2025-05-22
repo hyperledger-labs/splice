@@ -1,0 +1,70 @@
+name: Docs
+on: workflow_call
+
+jobs:
+  docs:
+    runs-on: self-hosted-k8s-small
+    container:
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup
+        id: setup
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: static_tests
+          save_nix_cache: true
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Build docs
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          # We Test/compile here as the docs job is the one that pushes to the SBT cache
+          # as it finishes fastest and we want to ensure that it includes test sources.
+          cmd: "Test/compile docs/bundle"
+
+      - name: Push documentation
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_USER: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GH_ISSUES }}
+        with:
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN"
+          cmd: |
+            REPO_DIR="$(mktemp -d)"
+            export GIT_SSH_COMMAND="/usr/bin/ssh"
+            git config --global user.email "splice-maintainers@digitalasset.com"
+            git config --global user.name "DA Automation"
+            git clone https://$GH_USER:$GH_TOKEN@github.com/digital-asset/decentralized-canton-sync.git "$REPO_DIR" -b docs
+            # Given that we just wanna overwrite anything an rm + cp seems more straightforward than an rsync.
+            rm -rf "$REPO_DIR/docs"
+            cp -r "docs/html/html" "$REPO_DIR/docs"
+            # Required to make GH service the _static directory properly.
+            touch "$REPO_DIR/docs/.nojekyll"
+            cd "$REPO_DIR"
+            git add .
+            git commit -m 'Update documentation'
+            git push origin docs
+
+      - name: Post-SBT job
+        uses: ./.github/actions/sbt/post_sbt
+        with:
+          cache_version: 4
+          setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        uses: ./.github/actions/tests/failure_notifications
+        with:
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'

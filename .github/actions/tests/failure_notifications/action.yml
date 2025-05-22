@@ -1,0 +1,41 @@
+name: Notify Failures
+description: Notify failures on Slack and create GitHub issues
+
+# Note that this requires the `id-token` write permission to be set in the workflow
+
+inputs:
+  workload_identity_provider:
+    description: "Workload identity provider"
+    required: true
+  service_account:
+    description: "Service account"
+    required: true
+  notifications_url:
+    description: "URL for failure notifications"
+    required: true
+  slack_channel:
+    description: "Slack channel for notifications"
+    required: true
+
+
+runs:
+  using: "composite"
+  steps:
+    - name: Authenticate
+      id: auth
+      uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
+      with:
+        token_format: id_token
+        workload_identity_provider: '${{ inputs.workload_identity_provider }}'
+        create_credentials_file: false
+        service_account: '${{ inputs.service_account }}'
+        id_token_audience: '${{ inputs.notifications_url }}'
+        id_token_include_email: true
+
+    - name: Notify
+      env:
+        FAILURE_NOTIFICATIONS_TOKEN: ${{ steps.auth.outputs.id_token }}
+        FAILURE_NOTIFICATIONS_URL: ${{ inputs.notifications_url }}
+        NOTIFICATION_SLACK_CHANNEL: ${{ inputs.slack_channel }}
+      shell: bash
+      run: ./.github/actions/scripts/notification-scripts/failure_notification.py
