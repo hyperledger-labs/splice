@@ -1,11 +1,11 @@
-name: hello-world
+name: contributed workflow
 on:
   pull_request:
     types: [ opened, synchronize, reopened ]
     
 jobs:
-  my-job:
+  contributed-workflow:
     runs-on: ubuntu-latest
     steps:
       - name: my-step
-        run: echo "Hello World!"
+        run: echo "This was just contributed"
