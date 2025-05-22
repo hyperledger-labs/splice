@@ -7,6 +7,9 @@ jobs:
     environment: ci-forks
     runs-on: self-hosted-docker-tiny
     if: (github.repository != 'DACH-NY/canton-network-node') && (github.repository != 'hyperledger-labs/splice')
+    steps:
+      - name: Wait for environment approval for runs from forks
+        run: echo "Wait for environment approval for runs from forks"
 
   hello_world:
     uses: ./.github/workflows/reusable.yml
