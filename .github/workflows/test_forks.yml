@@ -7,9 +7,9 @@ jobs:
     environment: ci-forks
     runs-on: self-hosted-docker-tiny
     if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
-    # steps:
-    #   - name: Wait for environment approval for runs from forks
-    #     run: echo "Wait for environment approval for runs from forks"
+    steps:
+      - name: Wait for environment approval for runs from forks
+        run: echo "Wait for environment approval for runs from forks"
 
   hello_world:
     uses: ./.github/workflows/reusable.yml
