@@ -1,0 +1,5 @@
+---
+name: cluster
+description: "GKE Cluster for Canton Network"
+runtime: nodejs
+main: "../../../pulumi/cluster/src/index.ts"
