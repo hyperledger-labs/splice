@@ -16,6 +16,7 @@ jobs:
         run: |
           query='query pullRequestDetails { repository(name: \"${{ github.event.repository }}\", owner: \"${{ github.event.organization }}\") { pullRequest(number: 416) { headRef { target { oid } } headRepository { sshUrl } } } }'
           result=$(curl -H "Authorization: Bearer $GITHUB_TOKEN" -X POST -d " { \"query\": \"$query\" } " https://api.github.com/graphql)
+          echo "result: $result"
           sha=$(echo "$result" | jq -r '.data.repository.pullRequest.headRef.target.oid')
           repo=$(echo "$result" | jq -r '.data.repository.pullRequest.headRepository.sshUrl')
 
