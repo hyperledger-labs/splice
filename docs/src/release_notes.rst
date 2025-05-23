@@ -8,22 +8,37 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.0
+-----
 
-- Upgrade to Canton 3.3: This upgrade requires a Hard Synchronizer migration
+.. important::
+
+    - Upgrade to Canton 3.3: This upgrade requires a Hard Synchronizer migration and cannot be applied
+      through a regular helm upgrade. For details refer to the `CIP draft <https://github.com/global-synchronizer-foundation/cips/pull/66>`_.
+
+- Daml
+
+  - Implement `CIP 47 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`_ and
+    `CIP 56 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md>`_.
+
+    This requires an upgrade to the following Daml versions:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.9
+    amuletNameService  0.1.9
+    dsoGovernance      0.1.12
+    validatorLifecycle 0.1.3
+    wallet             0.1.9
+    walletPayments     0.1.9
+    ================== =======
 
 - Deployment
 
   - This release includes a change to the database schema that will trigger a short database migration.
     On DevNet and MainNet, the migration is expected to take 2min for scan applications,
     and much less for validator and sv applications.
-
-- Improve the error message when trying to use the wallet outside of
-  localhost or https. Thanks to Stephane Loeuillet for contributing
-  this in https://github.com/hyperledger-labs/splice/pull/322.
-
-- Docker
 
   - Add jemalloc into the docker images. This is not enabled by
     default but allows for easier testing. Thanks to Stanislav
@@ -40,6 +55,10 @@ Upcoming
 
     - Recovery of standard local parties is now automatically possible even if the validator is hosting external parties.
     - It is now possible to force the recovery attempt for a party that was skipped during the fully automated recovery flow.
+
+  - Improve the error message when trying to use the wallet outside of
+    localhost or https. Thanks to Stephane Loeuillet for contributing
+    this in https://github.com/hyperledger-labs/splice/pull/322.
 
 - Scan
 
