@@ -372,8 +372,7 @@ class SvFrontendIntegrationTest
 
           val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
             "sv1 operator can create a new vote request", {
-              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue(action)
+              changeAction(action)
 
               fillUpForm(webDriver)
 
@@ -672,8 +671,7 @@ class SvFrontendIntegrationTest
 
           actAndCheck(
             "sv1 operator can create a new vote request", {
-              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_GrantFeaturedAppRight")
+              changeAction("SRARC_GrantFeaturedAppRight")
 
               inside(find(id("set-application-provider"))) { case Some(element) =>
                 element.underlying.sendKeys(requestProviderParty)
@@ -728,8 +726,7 @@ class SvFrontendIntegrationTest
             "sv1 operator can create a new vote request to revoke the featured app right", {
               go to s"http://localhost:$sv1UIPort/votes"
 
-              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_RevokeFeaturedAppRight")
+              changeAction("SRARC_RevokeFeaturedAppRight")
 
               inside(find(id("set-application-rightcid"))) { case Some(element) =>
                 element.underlying.sendKeys(rightCid)
@@ -775,9 +772,7 @@ class SvFrontendIntegrationTest
             // The `eventually` guards against `StaleElementReferenceException`s
             // eventually() must contain clickVoteRequestSubmitButtonOnceEnabled() to retry the whole process
             eventually() {
-              find(id("display-actions")) should not be empty
-              val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_SetConfig")
+              changeAction("SRARC_SetConfig")
 
               inside(find(id("checkbox-set-effective-at-threshold"))) { case Some(element) =>
                 element.underlying.click()
@@ -1124,6 +1119,17 @@ class SvFrontendIntegrationTest
         )
 
       }
+    }
+  }
+
+  def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
+    find(id("display-actions")) should not be empty
+    val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
+    dropDownAction.selectByValue(actionName)
+
+    if (actionName != "SRARC_OffboardSv") {
+      val proceedButton = webDriver.findElement(By.id("action-change-dialog-proceed"))
+      proceedButton.click()
     }
   }
 
