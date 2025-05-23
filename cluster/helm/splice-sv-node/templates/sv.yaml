@@ -157,11 +157,6 @@ spec:
                   sequencer {
                     {{- if .enableBftSequencer }}
                     is-bft-sequencer = true
-                    external-peer-api-url-suffix =  {
-                      address = {{ .sequencerBftPublicUrlSuffix | quote }}
-                      port = 443
-                      tls-config.enabled = true
-                    }
                     {{- end }}
                     admin-api {
                       address = {{ .sequencerAddress | quote }}

@@ -1,0 +1,253 @@
+name: Scala Test
+description: Run Scala tests
+inputs:
+  with_canton:
+    description: "Whether to run a shared canton instance in the background"
+    required: false
+    default: "true"
+  start_canton_options:
+    description: "Options for start-canton.sh"
+    required: true
+  artifactory_user:
+    description: "The Artifactory user"
+    required: true
+  artifactory_password:
+    description: "The Artifactory password"
+    required: true
+  test_suite_name:
+    description: "Name of the test suite"
+    required: true
+  test_names:
+    description: "Test names as output from the split_tests job (should be: needs.split_tests.outputs.test_names)"
+    required: true
+  runner_index:
+    description: "The index of this runner in the split_tests output"
+    required: true
+  with_gcp_creds:
+    description: "Whether to set up GCP credentials"
+    required: false
+    default: "false"
+  gcp_kms_creds:
+    description: "GCP KMS service account credentials, relevant when with_gcp_creds == true (from GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS secret)"
+    required: false
+    default: ""
+  gcp_data_export_creds:
+    description: "GCP Data Export service account credentials, relevant when with_gcp_creds == true (from GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS secret)"
+    required: false
+    default: ""
+  with_frontend_creds:
+    description: "Whether to provide frontend test credentials"
+    required: false
+    default: "false"
+  is_frontend_test:
+    description: "Whether this is a frontend test (implies with_frontend_creds)"
+    required: false
+    default: "false"
+  with_docker_images:
+    description: "Whether to build docker images for the tests"
+    required: false
+    default: "false"
+  auth0_management_api_client_id:
+    description: "Auth0 Management API Client ID, relevant for frontend tests (from AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID secret)"
+    required: false
+    default: ""
+  auth0_management_api_client_secret:
+    description: "Auth0 Management API Client ID, relevant for frontend tests (from AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET secret)"
+    required: false
+    default: ""
+  compose_validator_web_ui_password:
+    description: "password for the validator in docker-compose tests (from COMPOSE_VALIDATOR_WEB_UI_PASSWORD secret)"
+    required: false
+    default: ""
+  auth0_validator_audience:
+    description: "audience for the validator in docker-compose tests (from AUTH0_TESTS_VALIDATOR_AUDIENCE secret)"
+    required: false
+    default: ""
+  additional_nix_args:
+    description: "Additional arguments to pass to the Nix command"
+    required: false
+    default: ""
+  pre_sbt_cmd:
+    description: "A bash command to run before starting SBT"
+    required: false
+    default: ""
+  google_workload_identity_provider:
+    description: "Google Workload Identity provider (for failure notifications)"
+    required: true
+  failure_notifications_invoker_sa:
+    description: "Google Service Account for failure notifications (for failure notifications)"
+    required: true
+  failure_notifications_invoker_url:
+    description: "URL for failure notifications (for failure notifications)"
+    required: true
+  failure_notifications_slack_channel:
+    description: "Slack channel for failure notifications (for failure notifications)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Setup
+      uses: ./.github/actions/tests/common_test_setup
+      with:
+        test_name: ${{ inputs.test_suite_name }}
+        with_sbt: false # we setup SBT later while canton is starting up
+        artifactory_user: ${{ inputs.artifactory_user }}
+        artifactory_password: ${{ inputs.artifactory_password }}
+
+    - name: Wait for postgres
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      env:
+        POSTGRES_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+      with:
+        cmd: ./scripts/postgres.sh external wait
+        additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD"
+
+    # Starting canton before setting up SBT, to gain a bit of time doing both in parallel
+    - name: Start Canton
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      env:
+        POSTGRES_HOST: localhost
+        CANTON_DB_HOST: localhost
+        POSTGRES_PORT: 5432
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+        COMETBFT_DOCKER_IP: 127.0.0.1
+      with:
+        cmd: |
+          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+            echo "This job does not require Canton"
+            exit 0
+          fi
+          mkdir -p log
+          ./start-canton.sh -p external -D ${{ inputs.start_canton_options }}
+        additional_nix_args: "--keep POSTGRES_HOST --keep POSTGRES_PORT --keep POSTGRES_USER --keep POSTGRES_PASSWORD ${{ inputs.additional_nix_args }}"
+
+    - name: Set up SBT
+      id: setup_sbt
+      uses: ./.github/actions/sbt/setup_sbt
+      with:
+        cache_version: 4
+
+    - name: Prepare list of tests to run for sbt
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          splitted=$(echo "${{ toJson(inputs.test_names) }}" | jq -r '.[${{ inputs.runner_index }}].[]')
+          tests=$(echo "$splitted" | tr '\n' ' ')
+          count=$(echo "$tests" | wc -w)
+          echo "We are running $count tests in this batch:"
+          echo "$splitted"
+          echo "$tests" > /tmp/tests
+
+    - name: Set RUN_SPLITTED_TESTS_CMD
+      id: list_tests
+      shell: bash
+      run: echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests)\"" >> "$GITHUB_OUTPUT"
+
+    # webpack uses inotify to watch for changes, and we need to increase the limit
+    - name: increase inotify limit
+      if: ${{ inputs.is_frontend_test }}
+      shell: bash
+      run: |
+        echo "Checking watch info..."
+        sysctl fs.inotify
+        echo "Setting max_user_watches..."
+        echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+    - name: Build Docker images
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
+          export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"
+          export CIRCLE_REPOSITORY_URL="${{ github.repositoryUrl }}"
+          export CIRCLE_SHA1="${{ github.sha }}"
+          /usr/bin/sudo mkdir -p ~/.docker/buildx
+          /usr/bin/sudo /usr/bin/chown $(whoami):docker ~/.docker/buildx
+          make docker-build -j
+        cmd_retry_count: 5 # Retry in case of dependency download errors
+        additional_nix_args: "--keep DOCKER_CERT_PATH --keep DOCKER_HOST --keep DOCKER_MACHINE_NAME --keep DOCKER_TLS_VERIFY --keep PULUMI_VERSION --keep NO_PROXY --keep CIRCLE_REPOSITORY_URL --keep CIRCLE_SHA1"
+
+    - name: Wait for Canton to be ready
+      shell: bash
+      run: |
+          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+            echo "This job does not require Canton"
+            exit 0
+          fi
+          start_canton_options="${{ inputs.start_canton_options }}"
+          if [[ "$start_canton_options" == *"-w"* ]]; then
+            ./wait-for-canton.sh -w
+          elif [[ "$start_canton_options" == *"-s"* ]]; then
+            ./wait-for-canton.sh -s
+          fi
+
+    - name: Run tests
+      uses: ./.github/actions/sbt/execute_sbt_command
+      with:
+        extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+        artifactory_user: ${{ inputs.artifactory_user }}
+        artifactory_password: ${{ inputs.artifactory_password }}
+        cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
+        additional_nix_args: "--keep GITHUB_ACTION"
+        extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${{ inputs.auth0_management_api_client_id }} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${{ inputs.auth0_management_api_client_secret }}
+        pre_sbt_cmd: |
+          if [[ "${{ inputs.with_gcp_creds }}" == "true" ]]; then
+            export GOOGLE_APPLICATION_CREDENTIALS="$(mktemp gcp-creds-XXXXXX.json)"
+            echo '${{ inputs.gcp_kms_creds }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+            export GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS='${{ inputs.gcp_data_export_creds }}'
+          fi
+          if [[ "${{ inputs.is_frontend_test }}" == "true" ]] || [[ "${{ inputs.with_frontend_creds }}" == "true" ]]; then
+            export AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID="${{ inputs.auth0_management_api_client_id }}"
+            export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET="${{ inputs.auth0_management_api_client_secret }}"
+            export COMPOSE_VALIDATOR_WEB_UI_PASSWORD="${{ inputs.compose_validator_web_ui_password }}"
+            export OIDC_AUTHORITY_VALIDATOR_AUDIENCE="${{ inputs.auth0_validator_audience }}"
+          fi
+          if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+            ./start-frontends.sh -d -s
+          fi
+          ${{ inputs.pre_sbt_cmd }}
+        post_sbt_cmd: |
+          if [[ "${{ inputs.is_frontend_test }}" == "true" ]]; then
+            ./stop-frontends.sh
+          fi
+
+
+    - name: Check logs for errors
+      uses: ./.github/actions/sbt/execute_sbt_command
+      with:
+        # we don't care if some integration test happened to make the repo dirty
+        pre_sbt_cmd: "export CI_IGNORE_DIRTY_REPO=1"
+        cmd: checkErrors
+
+    - name: Post-SBT job
+      if: ${{ !cancelled() }}
+      uses: ./.github/actions/sbt/post_sbt
+      with:
+        cache_version: 4
+        setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
+        # Save caches only from one runner, to reduce conflicts on the save
+        save_caches: ${{ inputs.runner-index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
+
+    - name: Upload logs
+      # We upload the logs on not success so that we also capture them for cancelled runs
+      # Unfortunately when our apps don't init and stop with sys.exit(1) the run is considered cancelled (as it fails with a timeout) but we do need the logs
+      if: ${{ !success() }}
+      uses: ./.github/actions/sbt/upload_logs
+      with:
+        name: "logs-${{ inputs.test_suite_name }}-${{ inputs.runner_index }}"
+
+    - name: Report Failures on Slack & Github
+      if: failure() && github.event_name == 'push'
+      uses: ./.github/actions/tests/failure_notifications
+      with:
+        workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'
+        service_account: '${{ inputs.failure_notifications_invoker_sa }}'
+        notifications_url: '${{ inputs.failure_notifications_invoker_url }}'
+        slack_channel: '${{ inputs.failure_notifications_slack_channel }}'

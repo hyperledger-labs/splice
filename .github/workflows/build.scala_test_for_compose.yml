@@ -1,0 +1,96 @@
+name: Scala Test for docker-compose
+on:
+  workflow_call:
+    inputs:
+      start_canton_options:
+        type: string
+        required: true
+      runs_on:
+        type: string
+        required: true
+      parallelism:
+        type: number
+        required: true
+      test_names_file:
+        type: string
+        required: true
+      test_name:
+        type: string
+        required: true
+      commit_sha:
+        type: string
+        required: false
+        default: ""
+
+jobs:
+
+  split_tests:
+    runs-on: self-hosted-docker-tiny
+    name: Split the tests into parallel runs
+    outputs:
+      indices: ${{ steps.prep.outputs.indices }}
+      test_names: ${{ steps.prep.outputs.test_names }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Checkout the PR head commit to get the commit message
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Split tests
+        id: prep
+        uses: ./.github/actions/tests/pre_scala_test
+        with:
+          parallelism: ${{ inputs.parallelism }}
+          test_names_file: ${{ inputs.test_names_file }}
+
+  scala_test:
+    runs-on: ${{ inputs.runs_on }}
+    name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
+    timeout-minutes: 35
+    permissions:
+      id-token: write # Required for GCP Workload Identity for failure notifications
+      contents: read
+    needs:
+      - split_tests
+    if: ${{ needs.split_tests.outputs.indices != '[]' }}
+    strategy:
+      matrix:
+        runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
+      fail-fast: false
+
+    services:
+      postgres:
+        image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-postgres:0.3.12
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Run Tests
+        uses: ./.github/actions/tests/scala_test
+        with:
+          start_canton_options: ${{ inputs.start_canton_options }}
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          test_suite_name: ${{ inputs.test_name }}
+          test_names: ${{ needs.split_tests.outputs.test_names }}
+          runner_index: ${{ matrix.runner-index }}
+          with_frontend_creds: true
+          with_docker_images: true
+          auth0_management_api_client_id: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }}
+          auth0_management_api_client_secret: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
+          compose_validator_web_ui_password: ${{ secrets.COMPOSE_VALIDATOR_WEB_UI_PASSWORD }}
+          auth0_validator_audience: ${{ secrets.AUTH0_TESTS_VALIDATOR_AUDIENCE }}
+          google_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}
+          failure_notifications_invoker_sa: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}
+          failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
+          failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}

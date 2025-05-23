@@ -412,9 +412,6 @@ function installSvApp(
         ...(useCantonBft
           ? {
               enableBftSequencer: true,
-              sequencerBftPublicUrlSuffix: (
-                decentralizedSynchronizer as unknown as CantonBftSynchronizerNode
-              ).externalSequencerAddress,
             }
           : {}),
       },
@@ -489,7 +486,11 @@ function installScan(
   participant: SvParticipant,
   postgres: Postgres
 ) {
+  const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
+  const externalSequencerP2pAddress = (
+    decentralizedSynchronizerNode as unknown as CantonBftSynchronizerNode
+  ).externalSequencerP2pAddress;
   const scanValues = {
     ...spliceInstanceNames,
     metrics: {
@@ -504,13 +505,26 @@ function installScan(
     migration: {
       id: decentralizedSynchronizerMigrationConfig.active.id,
     },
+    ...(useCantonBft
+      ? {
+          bftSequencers: [
+            {
+              p2pUrl: externalSequencerP2pAddress,
+              migrationId: decentralizedSynchronizerMigrationConfig.active.id,
+              sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
+            },
+          ],
+        }
+      : {}),
     enablePostgresMetrics: true,
     ...txLogBackfillingValues,
   };
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
-    dependsOn: spliceConfig.pulumiProjectConfig.interAppsDependencies
-      ? decentralizedSynchronizerNode.dependencies.concat([svApp])
-      : decentralizedSynchronizerNode.dependencies,
+    // TODO(#19670) if possible, don't require parallel start of sv app and scan when using CantonBft
+    dependsOn:
+      spliceConfig.pulumiProjectConfig.interAppsDependencies && !useCantonBft
+        ? decentralizedSynchronizerNode.dependencies.concat([svApp])
+        : decentralizedSynchronizerNode.dependencies,
   });
   return scan;
 }

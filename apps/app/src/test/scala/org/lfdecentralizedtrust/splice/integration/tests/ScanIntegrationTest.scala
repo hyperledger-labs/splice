@@ -34,6 +34,7 @@ import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
 import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
+import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 
 import scala.util.Success
 
@@ -50,6 +51,19 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
             _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
               .withPausedTrigger[ExpireIssuingMiningRoundTrigger]
           ))(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(config =>
+          config.copy(
+            bftSequencers = Seq(
+              BftSequencerConfig(
+                config.domainMigrationId,
+                config.sequencerAdminClient,
+                "http://testUrl:8081",
+              )
+            )
+          )
+        )(config)
       )
       .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
@@ -702,6 +716,14 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
             )
         }
     }
+  }
+
+  "return bft sequencers" in { implicit env =>
+    val bftSequencers = sv1ScanBackend.listBftSequencers()
+    val sequencer = bftSequencers.loneElement
+    sequencer.url should be("http://testUrl:8081")
+    sequencer.migrationId should be(0)
+    sequencer.id shouldBe sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
   }
 
   def expectedSenderFee(amount: BigDecimal) = {

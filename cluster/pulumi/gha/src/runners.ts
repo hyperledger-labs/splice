@@ -421,15 +421,6 @@ function installK8sRunnerScaleSet(
       data: {
         'pod.yaml': yaml.dump({
           spec: {
-            hostAliases: [
-              {
-                ip: '127.0.0.1',
-                hostnames: [
-                  // Used by the BFT integration tests
-                  'sequencer-p2p-0.localhost',
-                ],
-              },
-            ],
             volumes: [
               {
                 name: 'cache',

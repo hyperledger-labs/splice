@@ -565,7 +565,6 @@
           "mediatorAddress": "global-domain-3-mediator",
           "sequencerAddress": "global-domain-3-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
-          "sequencerBftPublicUrlSuffix": "sv.mock.global.canton.network.digitalasset.com",
           "sequencerPruningConfig": {
             "enabled": true,
             "pruningInterval": "1 hours",

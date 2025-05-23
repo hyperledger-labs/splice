@@ -1,0 +1,101 @@
+name: Static Tests
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: false
+        default: ""
+
+
+jobs:
+  static_tests:
+    runs-on: self-hosted-k8s-small
+    timeout-minutes: 35
+    container:
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Setup
+        id: setup
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: static_tests
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Check trailing whitespace
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-trailing-whitespace.sh
+
+      - name: Run Daml warts check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-daml-warts.sh
+
+      - name: Run Daml return types check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-daml-return-types.sh
+
+      - name: Run Daml interface implementations check
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-daml-interface-impls.sh
+
+      - name: Checking TODOs
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            echo "PR number: $CIRCLE_PULL_REQUEST"
+            ./scripts/check-todos.sh
+          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
+        env:
+          # The script assumes CCI env vars, so we map GHA ones to CCI ones here
+          GH_USER: ${{ github.actor }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CIRCLE_BRANCH: ${{ github.ref }}
+          CIRCLE_PULL_REQUEST: ${{ github.event.pull_request.number }}
+
+      - name: Store TODOs as artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: todos
+          path: todo-out/todos
+
+      - name: Lint GHA
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: actionlint
+
+      - name: SBT-based static checks
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          cmd: "Test/compile lint printTests"
+
+      - name: Verify no changes in SBT test files
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: git add . && git diff --staged --exit-code test*.log
+
+      # We explicitly do not call post-sbt job here. We don't want to save the
+      # cache as it will be saved by the docs job that is much faster, and we
+      # don't need to collect test reports as this is not an integration test job.
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        uses: ./.github/actions/tests/failure_notifications
+        with:
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'

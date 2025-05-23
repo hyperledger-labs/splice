@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import cats.syntax.traverseFilter.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{CryptoConfig, CryptoProvider}
@@ -30,38 +29,33 @@ import org.lfdecentralizedtrust.splice.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import org.lfdecentralizedtrust.splice.config.UpgradesConfig
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
-import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanSoftDomainMigrationPocAppClient.{
   SynchronizerBootstrappingTransactions,
   SynchronizerIdentities,
 }
 import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
-import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import InitializeSynchronizerTrigger.Task
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 
 class InitializeSynchronizerTrigger(
     override val dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
     override protected val context: TriggerContext,
     synchronizerNodes: Map[String, ExtraSynchronizerNode],
-    override val upgradesConfig: UpgradesConfig,
+    aggregatingScanConnection: AggregatingScanConnection,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpClient,
     mat: Materializer,
-    templateJsonDecoder: TemplateJsonDecoder,
     tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[Task]
     with SoftMigrationTrigger {
 
   protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] =
     for {
-      scanUrls <- getScanUrls()
       // TODO(#17032): Handle failures properly
       // TODO(#17032): consider whether we only want to initialize the ones in requiredSynchronizers in AmuletConfig
       synchronizersWithOnlineNodes <- synchronizerNodes.keys.toList.traverseFilter { prefix =>
@@ -80,14 +74,12 @@ class InitializeSynchronizerTrigger(
         }
       }
       tasks <- synchronizersWithOnlineNodes.traverseFilter { prefix =>
-        scanUrls
-          .traverse { url =>
-            withScanConnection(url) { c =>
-              for {
-                identities <- c.getSynchronizerIdentities(prefix)
-                bootstrapTransactions <- c.getSynchronizerBootstrappingTransactions(prefix)
-              } yield (identities, bootstrapTransactions)
-            }
+        aggregatingScanConnection
+          .fromAllScans(includeSelf = true) { c =>
+            for {
+              identities <- c.getSynchronizerIdentities(prefix)
+              bootstrapTransactions <- c.getSynchronizerBootstrappingTransactions(prefix)
+            } yield (identities, bootstrapTransactions)
           }
           .map(_.unzip)
           .map { case (identities, bootstrapTransactions) =>
