@@ -7,8 +7,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 
-// TODO(#19679) consider renaming to BftManualStartIntegrationTest
-class BFTManualStartIntegrationTest extends IntegrationTest {
+class BftManualStartIntegrationTest extends IntegrationTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
     EnvironmentDefinition

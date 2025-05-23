@@ -69,7 +69,8 @@ export class Dso extends pulumi.ComponentResource {
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
     isFirstSv = false,
-    cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined
+    cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
+    extraDependsOn: CnInput<pulumi.Resource>[] = []
   ) {
     const defaultApprovedSvIdentities = approvedSvIdentities();
 
@@ -110,7 +111,8 @@ export class Dso extends pulumi.ComponentResource {
         sweep: svConf.sweep,
         cometBftGovernanceKey,
       },
-      this.args.decentralizedSynchronizerUpgradeConfig
+      this.args.decentralizedSynchronizerUpgradeConfig,
+      extraDependsOn
     );
   }
 
@@ -180,27 +182,42 @@ export class Dso extends pulumi.ComponentResource {
       cometBftGovernanceKeys[sv1Conf.onboardingName]
     );
 
-    const restSvs = await Promise.all(
-      restSvConfs.map(conf => {
-        const onboarding: SvOnboarding = runningMigration
-          ? { type: 'domain-migration' }
-          : this.joinViaSv1(sv1.svApp, svIdKeys[conf.onboardingName]);
-        const cometBft = {
-          sv1: sv1CometBftConf,
-          peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list
-        };
+    const useCantonBft =
+      this.args.decentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
+    // TODO(#19670): long-term CantonBFT deployments should be robust enough to onboard in parallel again?
+    const incrementalOnboarding = useCantonBft;
 
-        return this.installSvNode(
-          conf,
-          onboarding,
-          cometBft,
-          additionalSvIdentities,
-          [],
-          false,
-          cometBftGovernanceKeys[conf.onboardingName]
-        );
-      })
-    );
+    // recursive install function to allow injecting dependencies on previous svs
+    const installSvNodes = async (
+      configs: StaticSvConfig[],
+      previousSvs: InstalledSv[] = []
+    ): Promise<InstalledSv[]> => {
+      if (configs.length === 0) {
+        return previousSvs;
+      }
+      const [conf, ...remainingConfigs] = configs;
+
+      const onboarding: SvOnboarding = runningMigration
+        ? { type: 'domain-migration' }
+        : this.joinViaSv1(sv1.svApp, svIdKeys[conf.onboardingName]);
+      const cometBft = {
+        sv1: sv1CometBftConf,
+        peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list
+      };
+
+      const newSv = await this.installSvNode(
+        conf,
+        onboarding,
+        cometBft,
+        additionalSvIdentities,
+        [],
+        false,
+        cometBftGovernanceKeys[conf.onboardingName],
+        incrementalOnboarding ? previousSvs.map(sv => sv.svApp) : []
+      );
+      return installSvNodes(remainingConfigs, [...previousSvs, newSv]);
+    };
+    const restSvs = await installSvNodes(restSvConfs);
 
     return { sv1, allSvs: [sv1, ...restSvs] };
   }

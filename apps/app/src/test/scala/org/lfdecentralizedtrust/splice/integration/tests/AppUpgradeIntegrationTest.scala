@@ -28,6 +28,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -74,6 +75,14 @@ class AppUpgradeIntegrationTest
       .addConfigTransforms((_, config) =>
         // Makes the test a bit faster and easier to debug. See #11488
         ConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+          // Reduce the cache TTL so package upgrades are picked up quickly.
+          c.copy(scanClient =
+            c.scanClient.setAmuletRulesCacheTimeToLive(NonNegativeFiniteDuration.ofSeconds(1))
+          )
+        )(conf)
       )
       .addConfigTransform((_, config) => {
         config
@@ -362,7 +371,7 @@ class AppUpgradeIntegrationTest
 
           actAndCheck(
             "Bob taps after upgrade",
-            eventually() {
+            eventuallySucceeds() {
               bobWalletClient.tap(20)
             },
           )(

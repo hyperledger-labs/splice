@@ -60,6 +60,7 @@ function check_patterns_locally() {
     'docs/'
     'cluster/pulumi/'
     'cluster/deployment'
+    'cluster/stacks'
     'expected.json'
   )
 

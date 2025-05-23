@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.daml.ledger.javaapi.data.Unit as damlUnit
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
@@ -211,7 +212,7 @@ class AcsSnapshotStoreTest
       "exercises remove from the ACS" in {
         // t1 -> create
         // t2 -> archives
-        // t3 -> creates a different one
+        // t3 -> creates a different one and exercises a non-consuming choice on it
         val toArchive = openMiningRound(dsoParty, 1L, 1.0)
         val alwaysThere = openMiningRound(dsoParty, 0L, 1.0) // without it there's no snapshots
         val toCreateT3 = openMiningRound(dsoParty, 3L, 1.0)
@@ -226,7 +227,8 @@ class AcsSnapshotStoreTest
           _ <- ingestArchive(updateHistory, toArchive, timestamp2.minusSeconds(2L))
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp2)
           // t3
-          _ <- ingestCreate(updateHistory, toCreateT3, timestamp3.minusSeconds(1L))
+          _ <- ingestCreate(updateHistory, toCreateT3, timestamp3.minusSeconds(2L))
+          _ <- ingestNonConsuming(updateHistory, toCreateT3, timestamp3.minusSeconds(1L))
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp3)
           // querying at the end to prove anything happening in between doesn't matters
           afterT1 <- queryAll(store, timestamp1)
@@ -758,6 +760,34 @@ class AcsSnapshotStoreTest
         mkTx(
           nextOffset(),
           Seq(toArchivedEvent(archive)),
+          dummyDomain,
+          recordTime = recordTime.toInstant,
+        )
+      ),
+    )
+  }
+
+  private def ingestNonConsuming[TCid <: ContractId[T], T](
+      updateHistory: UpdateHistory,
+      contract: Contract[TCid, T],
+      recordTime: CantonTimestamp,
+  ): Future[Unit] = {
+    updateHistory.ingestionSink.ingestUpdate(
+      dummyDomain,
+      TransactionTreeUpdate(
+        mkTx(
+          nextOffset(),
+          Seq(
+            exercisedEvent(
+              contractId = contract.contractId.contractId,
+              templateId = contract.identifier,
+              interfaceId = None,
+              choice = "nonConsumingChoice",
+              consuming = false,
+              argument = damlUnit.getInstance(),
+              result = damlUnit.getInstance(),
+            )
+          ),
           dummyDomain,
           recordTime = recordTime.toInstant,
         )

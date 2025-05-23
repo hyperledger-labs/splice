@@ -115,7 +115,8 @@ export type InstalledSv = {
 
 export async function installSvNode(
   baseConfig: SvConfig,
-  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig
+  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
+  extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
   const loopback = installSpliceHelmChart(
@@ -206,7 +207,8 @@ export async function installSvNode(
       config.cometBftGovernanceKey
         ? svCometBftGovernanceKeySecret(xns, config.cometBftGovernanceKey)
         : []
-    );
+    )
+    .concat(extraDependsOn);
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
@@ -243,6 +245,7 @@ export async function installSvNode(
     config.isFirstSv,
     decentralizedSynchronizerUpgradeConfig,
     config.nodeName,
+    dependsOn,
     canton.decentralizedSynchronizer,
     svApp,
     canton.participant,
@@ -481,6 +484,7 @@ function installScan(
   isFirstSv: boolean,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   nodename: string,
+  dependsOn: CnInput<Resource>[],
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: pulumi.Resource,
   participant: SvParticipant,
@@ -519,12 +523,16 @@ function installScan(
     enablePostgresMetrics: true,
     ...txLogBackfillingValues,
   };
+
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
     // TODO(#19670) if possible, don't require parallel start of sv app and scan when using CantonBft
-    dependsOn:
-      spliceConfig.pulumiProjectConfig.interAppsDependencies && !useCantonBft
-        ? decentralizedSynchronizerNode.dependencies.concat([svApp])
-        : decentralizedSynchronizerNode.dependencies,
+    dependsOn: dependsOn
+      .concat(decentralizedSynchronizerNode.dependencies)
+      .concat(
+        spliceConfig.pulumiProjectConfig.interAppsDependencies && !useCantonBft
+          ? [svApp]
+          : participant.asDependencies.concat([postgres])
+      ),
   });
   return scan;
 }
