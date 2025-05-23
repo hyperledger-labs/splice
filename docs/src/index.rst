@@ -74,6 +74,12 @@ Global Synchronizer for the Canton Network
 
    release_notes.rst
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Community-Contributed
+
+   community/index.rst
+
 .. TODO(M3-17): add back indices and search functionality if required
 
 .. Indices and tables

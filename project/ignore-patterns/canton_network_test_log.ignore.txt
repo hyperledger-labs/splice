@@ -111,4 +111,6 @@ Splice unsafe shutdown future
 # TODO(#19670) maybe remove this again
 Failed to read bft sequencers list from scan
 
+Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
+
 # Make sure to have a trailing newline
