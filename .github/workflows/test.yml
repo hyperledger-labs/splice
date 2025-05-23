@@ -20,6 +20,8 @@ jobs:
           echo "result: $result"
           sha=$(echo "$result" | jq -r '.data.repository.pullRequest.headRef.target.oid')
           repo=$(echo "$result" | jq -r '.data.repository.pullRequest.headRepository.sshUrl')
+          echo "sha=$sha" >> $GITHUB_OUTPUT
+          echo "repo=$repo" >> $GITHUB_OUTPUT
 
   test:
     runs-on: self-hosted-docker-tiny
