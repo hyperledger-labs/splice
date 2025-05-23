@@ -112,6 +112,15 @@ class ScanApp(
         this.getClass.getSimpleName,
         loggerFactory,
       )
+    val bftSequencersWithAdminConnections = config.bftSequencers.map(bftSequencer =>
+      new SequencerAdminConnection(
+        bftSequencer.sequencerAdminClient,
+        amuletAppParameters.loggingConfig.api,
+        loggerFactory,
+        nodeMetrics.grpcClientMetrics,
+        retryProvider,
+      ) -> bftSequencer
+    )
     for {
       dsoParty <- appInitStep("Get DSO party from user metadata") {
         appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
@@ -248,6 +257,7 @@ class ScanApp(
         clock,
         loggerFactory,
         packageVersionSupport,
+        bftSequencersWithAdminConnections,
       )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(
@@ -331,6 +341,7 @@ class ScanApp(
         automation,
         loggerFactory.getTracedLogger(ScanApp.State.getClass),
         timeouts,
+        bftSequencersWithAdminConnections.map(_._1),
       )
     }
   }
@@ -350,11 +361,13 @@ object ScanApp {
       automation: ScanAutomationService,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
+      bftSequencersAdminConnections: Seq[SequencerAdminConnection],
   ) extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
-    override def close(): Unit =
+    override def close(): Unit = {
+      LifeCycle.close(bftSequencersAdminConnections*)(logger)
       LifeCycle.close(
         automation,
         store,
@@ -362,5 +375,6 @@ object ScanApp {
         sequencerAdminConnection,
         participantAdminConnection,
       )(logger)
+    }
   }
 }

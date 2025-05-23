@@ -631,6 +631,16 @@ abstract class ScanAppReference(
     }
   }
 
+  @Help.Summary(
+    "List the BFT sequencers"
+  )
+  def listBftSequencers(): Seq[HttpScanAppClient.BftSequencer] =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListBftSequencers()
+      )
+    }
+
   def getBackfillingStatus(): definitions.GetBackfillingStatusResponse = {
     consoleEnvironment.run {
       httpCommand(

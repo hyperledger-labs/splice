@@ -1,0 +1,66 @@
+name: Daml Tests
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        type: string
+        required: false
+        default: ""
+
+jobs:
+  daml_test:
+    runs-on: self-hosted-k8s-small
+    container:
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.commit_sha }}
+
+      - name: Skip on [static]
+        id: skip
+        shell: bash
+        run: |
+          git fetch origin ${{ github.event.pull_request.head.sha }}
+          last_commit_msg=$(git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }})
+          echo "Last commit message: $last_commit_msg"
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]] || [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
+            if [[ "$last_commit_msg" == *"[static]"* ]];  then
+              echo "Skipping Daml tests because of [static] label"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+      - name: Setup
+        if: steps.skip.outputs.skip != 'true'
+        id: setup
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: daml_test
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Run Daml tests
+        if: steps.skip.outputs.skip != 'true'
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          cmd: "damlTest"
+          extra_env_vars: DAML_DEBUG=1
+
+      # Don't save the cache here. This does not compile scala code so it will be empty.
+      # And this job finishes faster than the rest and the others do not overwrite
+      # so it will stay empty. The Daml artifacts also get compiled as part of all other jobs
+      # so they are still cached.
+
+      - name: Report Failures on Slack & Github
+        if: failure() && github.event_name == 'push'
+        uses: ./.github/actions/tests/failure_notifications
+        with:
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
+          notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
+          slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'

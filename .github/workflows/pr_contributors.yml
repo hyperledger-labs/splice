@@ -1,0 +1,21 @@
+name: CI on PRs (Splice Contributors)
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+  pull-requests: read # Required for the static tests
+  issues: read # Required for the static tests
+  actions: write # To cancel itself if not opted in
+
+jobs:
+  ci:
+    uses: ./.github/workflows/build.yml
+    if: (github.repository == 'DACH-NY/canton-network-node') || (github.repository == 'hyperledger-labs/splice')
+    secrets: inherit

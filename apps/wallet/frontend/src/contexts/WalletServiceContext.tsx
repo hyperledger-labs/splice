@@ -183,6 +183,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               date,
               receivers,
               amuletPrice,
+              transferInstructionCid: item.transfer_instruction_cid,
             };
             return [balanceChange];
           } else if (item.transaction_type === 'transfer') {
@@ -190,6 +191,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             const appRewardsUsed = new BigNumber(item.app_rewards_used);
             const validatorRewardsUsed = new BigNumber(item.validator_rewards_used);
             const svRewardsUsed = new BigNumber(item.sv_rewards_used);
+            const transferInstructionAmount = item.transfer_instruction_amount
+              ? new BigNumber(item.transfer_instruction_amount)
+              : undefined;
             const transfer: Transfer = {
               transactionType: 'transfer',
               transactionSubtype: transaction_subtype,
@@ -204,6 +208,10 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               appRewardsUsed,
               validatorRewardsUsed,
               svRewardsUsed,
+              description: item.description,
+              transferInstructionCid: item.transfer_instruction_cid,
+              transferInstructionAmount: transferInstructionAmount,
+              transferInstructionReceiver: item.transfer_instruction_receiver,
             };
             return [transfer];
           } else if (item.transaction_type === 'notification') {

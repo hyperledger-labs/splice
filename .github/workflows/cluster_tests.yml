@@ -1,0 +1,43 @@
+name: Trigger a cluster test
+
+on:
+  workflow_call:
+    inputs:
+      workflow:
+        type: string
+        required: true
+      sha:
+        type: string
+        required: true
+
+    outputs:
+      result:
+        description: the result of invoking the CCI pipeline
+        value: ${{ jobs.trigger_cluster_test.outputs.result }}
+
+jobs:
+  trigger_cluster_test:
+    runs-on: self-hosted-docker-tiny
+    permissions:
+      id-token: write
+    outputs:
+      result: ${{ steps.trigger.outputs.result }}
+    steps:
+      - name: Authenticate
+        id: auth
+        uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
+        with:
+          token_format: id_token
+          workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER }}'
+          create_credentials_file: false
+          service_account: '${{ secrets.CLUSTER_TEST_INVOKER_SA }}'
+          id_token_audience: '${{ secrets.CLUSTER_TEST_INVOKER_URL }}'
+          id_token_include_email: true
+
+      - name: Trigger cluster test
+        id: trigger
+        run: |
+          set -euo pipefail
+          result=$(curl -sSfL -H "Authorization: Bearer ${{ steps.auth.outputs.id_token }}" \
+            "${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}")
+          echo "result=$result" >> "$GITHUB_OUTPUT"
