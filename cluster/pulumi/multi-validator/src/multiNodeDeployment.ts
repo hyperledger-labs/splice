@@ -11,7 +11,7 @@ import {
 } from 'splice-pulumi-common';
 import { ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
-import { multiValidatorConfig } from './config';
+import { EnvironmentVariable, multiValidatorConfig } from './config';
 
 export interface BaseMultiNodeArgs {
   namespace: k8s.core.v1.Namespace;
@@ -44,7 +44,8 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
     name: string,
     args: MultiNodeDeploymentArgs,
     opts?: pulumi.ComponentResourceOptions,
-    javaOpts?: string
+    javaOpts?: string,
+    extraEnvVars?: EnvironmentVariable[]
   ) {
     super('canton:network:Deployment', name, {}, opts);
 
@@ -114,16 +115,18 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                         `-XX:MaxRAMPercentage=80 -XX:InitialRAMPercentage=80 -Dscala.concurrent.context.minThreads=16 ${javaOpts || ''} ` +
                         jmxOptions(),
                     },
-                  ].concat(
-                    multiValidatorConfig?.requiresOnboardingSecret
-                      ? [
-                          {
-                            name: 'SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET',
-                            value: 'true',
-                          },
-                        ]
-                      : []
-                  ),
+                  ]
+                    .concat(
+                      multiValidatorConfig?.requiresOnboardingSecret
+                        ? [
+                            {
+                              name: 'SPLICE_APP_VALIDATOR_NEEDS_ONBOARDING_SECRET',
+                              value: 'true',
+                            },
+                          ]
+                        : []
+                    )
+                    .concat(extraEnvVars || []),
                 },
               ],
               initContainers: [

@@ -37,9 +37,21 @@ import { Party } from '@daml/types';
 
 import { usePrimaryParty, useTransactions } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import { Transaction, TransactionSubtype } from '../models/models';
+import { BalanceChange, Transaction, Transfer } from '../models/models';
 import { useWalletConfig } from '../utils/config';
 import BftAnsEntry from './BftAnsEntry';
+
+const shortenContractId = (cid: string): string => {
+  return `${cid.slice(0, 10)}…`;
+};
+
+const shortenPartyId = (partyId: string): string => {
+  const elements = partyId.split('::');
+  if (elements.length == 2) {
+    return `${elements[0]}::${elements[1].slice(0, 10)}…`;
+  }
+  return partyId;
+};
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
@@ -204,13 +216,17 @@ const TransactionIconAction: React.FC<TransactionIconInfoProps> = ({
       </Icon>
       <Stack>
         <Typography className="tx-action">{text}</Typography>
-        <TransactionSubtypeText subtype={transaction.transactionSubtype} />
+        <TransactionSubtypeText transaction={transaction} primaryPartyId={primaryPartyId} />
       </Stack>
     </Stack>
   );
 };
 
-const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ subtype }) => {
+const TransactionSubtypeText: React.FC<{ transaction: Transaction; primaryPartyId: string }> = ({
+  transaction,
+  primaryPartyId,
+}) => {
+  const subtype = transaction.transactionSubtype;
   const config = useWalletConfig();
   const { amuletName, nameServiceNameAcronym } = config.spliceInstanceNames;
   let text: string;
@@ -343,22 +359,32 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // AnsEntryRenewalPaymentCollected
       text = `${nameServiceNameAcronym.toUpperCase()} Entry Renewal Payment Collected`;
       break;
-    case 'TransferFactory_Transfer':
+    case 'TransferFactory_Transfer': {
+      const transfer = toTransfer(transaction);
       // TODO(#19607) Improve display
-      text = `Create Transfer Offer`;
+      const target =
+        primaryPartyId == transfer.transferInstructionReceiver
+          ? `from ${shortenPartyId(transfer.senderId)}`
+          : `to ${shortenPartyId(transfer.transferInstructionReceiver!)}`;
+      const description = transfer.description ? `: ${transfer.description}` : '';
+      text = `Transfer offer ${shortenContractId(transfer.transferInstructionCid!)} for ${transfer.transferInstructionAmount} ${target}${description}`;
       break;
-    case 'TransferInstruction_Accept':
-      // TODO(#19607) Improve display
-      text = `Accept Transfer Offer`;
+    }
+    case 'TransferInstruction_Accept': {
+      const transfer = toTransfer(transaction);
+      text = `Transfer offer ${shortenContractId(transfer.transferInstructionCid!)} accepted`;
       break;
-    case 'TransferInstruction_Reject':
-      // TODO(#19607) Improve display
-      text = `Reject Transfer Offer`;
+    }
+    case 'TransferInstruction_Reject': {
+      const transfer = toBalanceChange(transaction);
+      text = `Transfer offer ${shortenContractId(transfer.transferInstructionCid!)} rejected`;
       break;
-    case 'TransferInstruction_Withdraw':
-      // TODO(#19607) Improve display
-      text = `Withdraw Transfer Offer`;
+    }
+    case 'TransferInstruction_Withdraw': {
+      const transfer = toBalanceChange(transaction);
+      text = `Transfer offer ${shortenContractId(transfer.transferInstructionCid!)} withdrawn`;
       break;
+    }
     default:
       console.warn('Unknown Transaction Subtype', JSON.stringify(subtype));
       text = subtype.choice;
@@ -368,6 +394,20 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       ({text})
     </Typography>
   );
+};
+
+const toTransfer = (t: Transaction): Transfer => {
+  if (t.transactionType == 'transfer') {
+    return t;
+  }
+  throw new Error(`Expected transfer but got ${t.transactionType}`);
+};
+
+const toBalanceChange = (t: Transaction): BalanceChange => {
+  if (t.transactionType == 'balance_change') {
+    return t;
+  }
+  throw new Error(`Expected balance change but got ${t.transactionType}`);
 };
 
 const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transaction }) => {
@@ -490,14 +530,18 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
             amuletPrice={amuletPriceAtTimeOfTransaction}
           />
         </Typography>
-        <Typography variant="caption">@</Typography>
-        <Typography variant="caption" className="tx-amount-rate">
-          <RateDisplay
-            base="AmuletUnit"
-            quote="USDUnit"
-            amuletPrice={amuletPriceAtTimeOfTransaction}
-          />
-        </Typography>
+        {!amuletPriceAtTimeOfTransaction.isZero() && (
+          <>
+            <Typography variant="caption">@</Typography>
+            <Typography variant="caption" className="tx-amount-rate">
+              <RateDisplay
+                base="AmuletUnit"
+                quote="USDUnit"
+                amuletPrice={amuletPriceAtTimeOfTransaction}
+              />
+            </Typography>
+          </>
+        )}
       </Stack>
     </Stack>
   );

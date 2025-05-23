@@ -80,6 +80,24 @@ spec:
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
             canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}
+        {{- if .Values.bftSequencers }}
+        - name: ADDITIONAL_CONFIG_BFT_SEQUENCERS
+          value: |
+            canton.scan-apps.scan-app {
+              bft-sequencers = [
+                {{- range .Values.bftSequencers }}
+                {
+                  p2p-url = "{{ .p2pUrl }}"
+                  migration-id = {{ .migrationId }}
+                  sequencer-admin-client {
+                    address = "{{ .sequencerAddress }}"
+                    port = 5009
+                  }
+                }
+                {{- end }}
+              ]
+            }
+        {{- end }}
         {{- include "splice-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: SPLICE_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | quote }}

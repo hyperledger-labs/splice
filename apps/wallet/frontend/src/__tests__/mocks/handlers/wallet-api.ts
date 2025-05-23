@@ -14,6 +14,7 @@ import {
   aliceEntry,
   alicePartyId,
   amuletRules,
+  bobPartyId,
   bobTransferPreapproval,
   miningRounds,
   nameServiceEntries,
@@ -101,16 +102,111 @@ export const buildWalletMock = (walletUrl: string): RestHandler[] => [
     );
   }),
 
-  rest.get(`${walletUrl}/v0/wallet/transactions`, (_, res, ctx) => {
-    return res(ctx.json<ListTransactionsResponse>({ items: [] }));
+  rest.post(`${walletUrl}/v0/wallet/transactions`, (_, res, ctx) => {
+    return res(
+      ctx.json<ListTransactionsResponse>({
+        items: [
+          {
+            transaction_type: 'balance_change',
+            transaction_subtype: {
+              template_id:
+                '#splice-amulet:Splice.AmuletTransferInstruction:AmuletTransferInstruction',
+              choice: 'TransferInstruction_Withdraw',
+            },
+            event_id: '#u4:0',
+            date: new Date('2025-05-21T12:14:12Z'),
+            receivers: [{ party: alicePartyId, amount: '0.0' }],
+            amulet_price: '0.0',
+            transfer_instruction_cid:
+              '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40402',
+
+            // the openapi generator seems to generate a garbage type so there are a bunch of non-sense fields we need to fill in
+            provider: '',
+            sender: { party: '', amount: '' },
+            holding_fees: '',
+            app_rewards_used: '',
+            validator_rewards_used: '',
+            sv_rewards_used: '',
+            details: '',
+          },
+          // incoming
+          {
+            transaction_type: 'transfer',
+            transaction_subtype: {
+              template_id:
+                '#splice-amulet:Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
+              choice: 'TransferFactory_Transfer',
+            },
+            event_id: '#u3:0',
+            date: new Date('2025-05-21T12:14:12Z'),
+            provider: alicePartyId,
+            sender: { party: bobPartyId, amount: '-42.0' },
+            receivers: [{ party: alicePartyId, amount: '0.0' }],
+            holding_fees: '0.0',
+            amulet_price: '0.05',
+            app_rewards_used: '0.0',
+            validator_rewards_used: '0.0',
+            sv_rewards_used: '0.0',
+            details: '',
+            transfer_instruction_cid:
+              '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40402',
+            transfer_instruction_receiver: alicePartyId,
+            transfer_instruction_amount: '10.0',
+            description: 'test transfer',
+          },
+          {
+            transaction_type: 'transfer',
+            transaction_subtype: {
+              template_id:
+                '#splice-amulet:Splice.AmuletTransferInstruction:AmuletTransferInstruction',
+              choice: 'TransferInstruction_Accept',
+            },
+            event_id: '#u2:0',
+            date: new Date('2025-05-21T12:12:12Z'),
+            provider: alicePartyId,
+            sender: { party: alicePartyId, amount: '23.0' },
+            receivers: [],
+            holding_fees: '0.0',
+            amulet_price: '0.05',
+            app_rewards_used: '0.0',
+            validator_rewards_used: '0.0',
+            sv_rewards_used: '0.0',
+            details: '',
+            transfer_instruction_cid:
+              '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40401',
+          },
+          // outgoing
+          {
+            transaction_type: 'transfer',
+            transaction_subtype: {
+              template_id:
+                '#splice-amulet:Splice.ExternalPartyAmuletRules:ExternalPartyAmuletRules',
+              choice: 'TransferFactory_Transfer',
+            },
+            event_id: '#u1:0',
+            date: new Date('2025-05-21T12:10:12Z'),
+            provider: alicePartyId,
+            sender: { party: alicePartyId, amount: '-42.0' },
+            receivers: [],
+            holding_fees: '0.0',
+            amulet_price: '0.05',
+            app_rewards_used: '0.0',
+            validator_rewards_used: '0.0',
+            sv_rewards_used: '0.0',
+            details: '',
+            transfer_instruction_cid:
+              '009a97ffdf201d323d12a428187d9118d985678c37c6c1081f848269943f0da8bbca1112207e4b3e9a65879126e8b8103714f0144e1e0218fa98fb5231c63be74a0bb40401',
+            transfer_instruction_receiver: bobPartyId,
+            transfer_instruction_amount: '10.0',
+            description: 'test transfer',
+          },
+        ],
+      })
+    );
   }),
 
   rest.get(`${walletUrl}/v0/wallet/transfer-offers`, (_, res, ctx) => {
     return res(ctx.json<ListTransferOffersResponse>({ offers: [] }));
-  }),
-
-  rest.post(`${walletUrl}/v0/wallet/transactions`, async (_, res, ctx) => {
-    return res(ctx.json<ListTransactionsResponse>({ items: [] }));
   }),
 
   rest.get(`${walletUrl}/v0/scan-proxy/amulet-rules`, (_, res, ctx) => {

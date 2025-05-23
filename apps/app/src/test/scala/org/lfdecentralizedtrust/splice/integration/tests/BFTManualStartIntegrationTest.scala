@@ -1,13 +1,13 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
 import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
+import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 
+// TODO(#19679) consider renaming to BftManualStartIntegrationTest
 class BFTManualStartIntegrationTest extends IntegrationTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition = {
@@ -15,26 +15,31 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
       .simpleTopology4Svs("BFT")
       .withTrafficTopupsEnabled
       .addConfigTransform((_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs((sv, appConfig) =>
+        ConfigTransforms.updateAllSvAppConfigs((_, appConfig) =>
           appConfig
             .focus(_.localSynchronizerNode)
             .modify(
               _.map(
                 _.focus(_.sequencer).modify(
                   _.copy(
-                    isBftSequencer = true,
-                    externalPeerApiUrlSuffix = Some(
-                      P2PEndpointConfig(
-                        "localhost",
-                        RequireTypes.Port
-                          .tryCreate(5010 + Integer.parseInt(sv.stripPrefix("sv")) * 100),
-                        tlsConfig = None,
-                      )
-                    ),
+                    isBftSequencer = true
                   )
                 )
               )
             )
+        )(config)
+      )
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs((scan, config) =>
+          config.copy(
+            bftSequencers = Seq(
+              BftSequencerConfig(
+                0,
+                config.sequencerAdminClient,
+                s"http://localhost:${5010 + Integer.parseInt(scan.stripPrefix("sv").stripSuffix("Scan")) * 100}",
+              )
+            )
+          )
         )(config)
       )
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
@@ -56,15 +61,15 @@ class BFTManualStartIntegrationTest extends IntegrationTest {
   "Splice apps" should {
     "start with the bft sequencers" in { implicit env =>
       sv1Backend.startSync()
-      sv2Backend.startSync()
-      sv3Backend.startSync()
-      eventually() {
-        forAll(Seq(sv1Backend, sv2Backend, sv3Backend)) { sv =>
-          sv.appState.localSynchronizerNode.value.sequencerAdminConnection
-            .listCurrentPeerEndpoints()
-            .futureValue
-            .size shouldBe 2
-        }
+      sv1ScanBackend.startSync()
+      // TODO(#19670) if possible, don't require parallel start of sv app and scan
+      startAllSync(sv2Backend, sv2ScanBackend)
+      startAllSync(sv3Backend, sv3ScanBackend)
+      forAll(Seq(sv1Backend, sv2Backend, sv3Backend)) { sv =>
+        sv.appState.localSynchronizerNode.value.sequencerAdminConnection
+          .listCurrentPeerEndpoints()
+          .futureValue
+          .size shouldBe 2
       }
     }
   }

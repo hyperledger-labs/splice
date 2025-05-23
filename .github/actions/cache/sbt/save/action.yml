@@ -1,0 +1,26 @@
+name: "Save SBT Cache"
+description: "Saves the SBT cache"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+  load_cache_hit:
+    description: "Cache hit from the restore SBT job (should be the cache_hit output from the restore SBT job)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Store SBT cache
+      if: ${{ ! fromJson(inputs.load_cache_hit) }}
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: |
+          /github/home/.ivy2/cache
+          /github/home/.sbt
+        key: sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}-${{ hashFiles('project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
+    - name: Not storing SBT cache
+      if: ${{ fromJson(inputs.load_cache_hit) }}
+      shell: bash
+      run: |
+        echo "Skipping SBT cache, as there was a cache hit"

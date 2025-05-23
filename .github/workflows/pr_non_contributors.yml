@@ -1,0 +1,34 @@
+name: CI on PRs from forks
+on:
+  pull_request_target:
+    types: [ opened, synchronize, reopened ]
+    branches: [ main ] # Only run on PRs with `main` as their base
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+  pull-requests: read # Required for the static tests
+  issues: read # Required for the static tests
+  actions: write # To cancel itself if not opted in
+
+jobs:
+  env_hold:
+    name: "Approve CI for Forks"
+    environment: ci-forks
+    runs-on: self-hosted-docker-tiny
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    steps:
+      - name: Wait for environment approval for runs from forks
+        run: exit 0
+
+  ci:
+    uses: ./.github/workflows/build.yml
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    secrets: inherit
+    needs: env_hold
+    with:
+      commit_sha: ${{ github.event.pull_request.head.sha }}

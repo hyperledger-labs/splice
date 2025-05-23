@@ -1,0 +1,94 @@
+name: Pre-Scala Test
+description: Prepare for running a Scala test with parallelism
+inputs:
+  parallelism:
+    description: "Number of parallel test runs"
+    required: true
+  test_names_file:
+    description: "File containing the test names"
+    required: true
+  skip_if_regex:
+    description: "Skip the test if the commit messages on the branch match this regex"
+    required: false
+    default: ""
+  skip_if_files_changed:
+    description: "Skip the test if any of the given files was changed since the last release"
+    required: false
+    default: ""
+
+outputs:
+  indices:
+    description: "Indices for parallel test runs"
+    value: ${{ steps.generate_index_list.outputs.json }}
+  test_names:
+    description: "Test names to run per parallel runner"
+    value: ${{ steps.split_tests.outputs.test_names }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check if static only
+      shell: bash
+      run: |
+        last_commit_msg=$(git log -1 --pretty=%B)
+        echo "Last commit message: $last_commit_msg"
+        if [[ "${{ github.event_name }}" == "pull_request"* ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
+          echo "Only static tests should be running, skipping this job"
+          echo "skip=true" >> "$GITHUB_ENV"
+        else
+          echo "Not static-test-only, continuing"
+        fi
+
+    - name: Check if skip regex matches
+      if: ${{ inputs.skip_if_regex != '' }}
+      shell: bash
+      run: |
+        base=$(build-tools/get-latest-main-commit)
+        msg=$(git log "$base"..HEAD --pretty=%B)
+        if [[ $msg =~ ${{ inputs.skip_if_regex }} ]]; then
+          echo "Commit message ($msg) matches regex (${{ inputs.skip_if_regex }}), skipping"
+          echo "skip=true" >> "$GITHUB_ENV"
+        else
+          echo "Commit message ($msg) does not match regex (${{ inputs.skip_if_regex }}), not skipping"
+        fi
+
+    - name: Check if skip files changed
+      if: ${{ inputs.skip_if_files_changed != '' }}
+      shell: bash
+      run: |
+        latest_release=$(cat "LATEST_RELEASE")
+        base=$(git rev-parse origin/release-line-"${latest_release}")
+        changed=$(git diff --name-only $base -- ${{ inputs.skip_if_files_changed }})
+        if [ -n "$changed" ]; then
+          echo "Lock files changed ($changed), skipping"
+          echo "skip=true" >> "$GITHUB_ENV"
+        else
+          echo "No lock files changed, not skipping"
+          echo "All changed files:"
+          git diff --name-only $base
+        fi
+
+    - name: Generate runner indices
+      id: generate_index_list
+      shell: bash
+      run: |
+        last_commit_msg=$(git log -1 --pretty=%B)
+        echo "Last commit message: $last_commit_msg"
+        if [[ "${skip}" == "true" ]]; then
+          echo "Returning an empty array in order to skip the tests"
+          echo "json=[]" >> "$GITHUB_OUTPUT"
+        else
+          echo "Not skipping, generating indices"
+          MAX_INDEX=$((${{ inputs.parallelism }}-1))
+          INDEX_LIST=$(seq 0 ${MAX_INDEX})
+          INDEX_JSON=$(jq --null-input --compact-output '. |= [inputs]' <<< "${INDEX_LIST}")
+          echo "json=${INDEX_JSON}" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Split tests
+      id: split_tests
+      uses: ./.github/actions/tests/split_tests
+      with:
+        test_reports_dir: '/cache/test-reports'
+        test_names_file: ${{ inputs.test_names_file }}
+        split_total: ${{ inputs.parallelism }}

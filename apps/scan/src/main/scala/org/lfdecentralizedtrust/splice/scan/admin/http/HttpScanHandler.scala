@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.OptionT
+import cats.implicits.toTraverseOps
 import cats.syntax.either.*
 import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -82,6 +83,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 
@@ -99,6 +101,7 @@ class HttpScanHandler(
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
+    bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -1904,6 +1907,30 @@ class HttpScanHandler(
     )
   }
 
+  override def listSvBftSequencers(respond: ScanResource.ListSvBftSequencersResponse.type)()(
+      extracted: TraceContext
+  ): Future[ScanResource.ListSvBftSequencersResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listSvBftSequencers") { _ => _ =>
+      bftSequencers
+        .traverse { case (sequencerAdminConnection, bftSequencer) =>
+          for {
+            sequencerId <- sequencerAdminConnection.getSequencerId
+          } yield {
+            definitions.SynchronizerBftSequencer(
+              bftSequencer.migrationId,
+              sequencerId.toProtoPrimitive,
+              bftSequencer.p2pUrl,
+            )
+          }
+        }
+        .map(sequencers =>
+          ScanResource.ListSvBftSequencersResponse.OK(
+            definitions.ListSvBftSequencersResponse(sequencers.toVector)
+          )
+        )
+    }
+  }
 }
 
 object HttpScanHandler {

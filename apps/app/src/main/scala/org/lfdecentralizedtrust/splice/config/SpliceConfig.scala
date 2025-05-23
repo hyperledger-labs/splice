@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.http.UrlValidator
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import org.lfdecentralizedtrust.splice.scan.config.{
+  BftSequencerConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
   ScanSynchronizerConfig,
@@ -421,6 +422,11 @@ object SpliceConfig {
       deriveReader[SynchronizerConfig]
     implicit val scanSynchronizerConfig: ConfigReader[ScanSynchronizerConfig] =
       deriveReader[ScanSynchronizerConfig]
+    // a bit more elaborate because the automatic derivation wants us to use `p-2p-url`
+    implicit val bftSequencerConfigReader: ConfigReader[BftSequencerConfig] =
+      ConfigReader.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(
+        BftSequencerConfig(_, _, _)
+      )
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -506,15 +512,6 @@ object SpliceConfig {
               .leftMap(invalidUrl =>
                 ConfigValidationFailed(s"Sequencer external url is not valid: $invalidUrl")
               )
-            _ <-
-              if (sequencerConfig.isBftSequencer) {
-                sequencerConfig.externalPeerApiUrlSuffix
-                  .toRight(
-                    ConfigValidationFailed(
-                      "Sequencer external peer url must be set for BFT sequencers"
-                    )
-                  )
-              } else Right(())
           } yield sequencerConfig
         }
     }
@@ -793,6 +790,11 @@ object SpliceConfig {
       deriveWriter[ScanAppClientConfig]
     implicit val scanSynchronizerConfig: ConfigWriter[ScanSynchronizerConfig] =
       deriveWriter[ScanSynchronizerConfig]
+    // a bit more elaborate because the automatic derivation wants us to use `p-2p-url`
+    implicit val bftSequencerConfigWriter: ConfigWriter[BftSequencerConfig] =
+      ConfigWriter.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(c =>
+        (c.migrationId, c.sequencerAdminClient, c.p2pUrl)
+      )
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
 
@@ -954,7 +956,6 @@ object SpliceConfig {
 
     implicit val spliceConfigWriter: ConfigWriter[SpliceConfig] =
       deriveWriter[SpliceConfig]
-
   }
 
   private implicit def configReader(implicit

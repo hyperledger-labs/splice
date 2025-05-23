@@ -112,6 +112,11 @@ canton.participants.participant_$index = {
     topology.broadcast-batch-size = 1
 }
 EOF
+
+    for cfg in ${!MULTI_PARTICIPANT_ADDITIONAL_CONFIG@}; do
+      # shellcheck disable=SC2001
+      echo "${!cfg}" | sed "s/INDEX/$index/g" >> /app/app.conf
+    done
 }
 
 nodes=${NUM_NODES:-1}

@@ -1,2 +1,5 @@
 install
 .build
+# IJ typescript language server
+bin
+**/*.js

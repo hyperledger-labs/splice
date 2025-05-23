@@ -1,0 +1,85 @@
+validator1:
+  kms:
+    type: gcp
+    locationId: us-central1
+    projectId: da-cn-devnet
+    keyRingId: validator1_test
+multiValidator:
+  postgresPvcSize: '100Gi'
+  # Dummy values for testing
+  extraValidatorEnvVars:
+    - name: MULTI_VALIDATOR_ADDITIONAL_CONFIG_YOLO
+      value: |
+        canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireTransferOfferTrigger"
+        canton.validator-apps.validator_backend_INDEX.automation.paused-triggers += "org.lfdecentralizedtrust.splice.wallet.automation.ExpireAcceptedTransferOfferTrigger"
+  extraParticipantEnvVars:
+    - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
+      value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
+splitwell:
+  maxDarVersion: '0.1.8'
+synchronizerMigration:
+  archived:
+    - id: 1
+      version: 0.3.18
+      releaseReference:
+        gitReference: "refs/heads/release-line-0.3.18"
+        repoUrl: https://github.com/hyperledger-labs/splice
+        pulumiStacksDir: "cluster/stacks/prod"
+        pulumiBaseDir: "splice/cluster/pulumi"
+        deploymentDir: "cluster/deployment"
+        spliceRoot: "splice"
+    - id: 2
+      version: 0.3.19
+      releaseReference:
+        gitReference: "refs/heads/release-line-0.3.19"
+        repoUrl: https://github.com/hyperledger-labs/splice
+        pulumiStacksDir: "cluster/stacks/prod"
+        pulumiBaseDir: "splice/cluster/pulumi"
+        deploymentDir: "cluster/deployment"
+        spliceRoot: "splice"
+  active:
+    id: 3
+    version: 0.3.20
+    releaseReference:
+      gitReference: "refs/heads/release-line-0.3.20"
+      repoUrl: https://github.com/hyperledger-labs/splice
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "splice/cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "splice"
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
+  upgrade:
+    id: 4
+    version: 0.3.21
+    releaseReference:
+      gitReference: "refs/heads/release-line-0.3.21"
+      repoUrl: https://github.com/hyperledger-labs/splice
+      pulumiStacksDir: "cluster/stacks/prod"
+      pulumiBaseDir: "splice/cluster/pulumi"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "splice"
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
+pulumiProjectConfig:
+  default:
+    interAppsDependencies: false
+    isExternalCluster: true
+    cloudSql:
+      enabled: true
+monitoring:
+  alerting:
+    enableNoDataAlerts: true
+    alerts:
+      cloudSql:
+        maintenance: true
+operatorDeployment:
+  reference:
+    gitReference: refs/heads/main
+    repoUrl: https://github.com/DACH-NY/canton-network-internal
+    pulumiStacksDir: "cluster/stacks/prod"
+    pulumiBaseDir: "splice/cluster/pulumi"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "splice"
+    privateConfigsDir: "cluster/configs/configs-private"
+    publicConfigsDir: "cluster/configs/configs"

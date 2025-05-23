@@ -1,12 +1,14 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
+import * as semver from 'semver';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config, isDevNet, isMainNet } from './config';
 import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
+import { splitwellConfig } from './config/splitwellConfig';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
@@ -233,5 +235,14 @@ export const daContactPoint = 'sv-support@digitalasset.com';
 
 export const splitwellDarPaths = fs
   .readdirSync(`${SPLICE_ROOT}/daml/dars`)
-  .filter(file => file.match(/splitwell.*\.dar/))
+  .filter(file => {
+    const match = file.match(/splitwell-(\d+\.\d+\.\d+)\.dar/);
+    if (match) {
+      const darVersion = match[1];
+      return splitwellConfig?.maxDarVersion
+        ? semver.gte(splitwellConfig.maxDarVersion, darVersion)
+        : true;
+    }
+    return false;
+  })
   .map(file => `splice-node/dars/${file}`);

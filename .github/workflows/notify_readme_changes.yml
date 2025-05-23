@@ -1,0 +1,53 @@
+name: Notify on README changes
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  trigger_ciupgrade:
+    runs-on: self-hosted-docker-tiny
+    name: Notify on README changes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 2
+      - name: Detect README changes
+        id: detect_changes
+        shell: bash
+        run: |
+          commit=$(git rev-parse HEAD)
+          changed_files=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst')
+          changed_files_list=$(git diff --name-only HEAD~ HEAD -- '*.md' '*.rst' | sed ':a;N;$!ba;s/\n/\\n/g')
+          if [ -n "$changed_files" ]; then
+            echo "Setting GITHUB_COMMIT_URL as document change is detected in commit $commit"
+            {
+              echo "FOUND_DOCUMENT_CHANGES=true" ;
+              echo "GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$GITHUB_OUTPUT"
+              echo "CHANGED_DOC_FILES=\"${changed_files_list}\""
+              echo "GIT_LOG=\"$(git log -1 --oneline --no-color | sed s/\"//g)\""
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "No document changes are detected."
+            echo "FOUND_DOCUMENT_CHANGES=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Construct message
+        id: construct_message
+        if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
+        shell: bash
+        run: |
+          # shellcheck disable=SC2028
+          echo "MESSAGE=*Changes to \`.md\` or \`.rst\` files have been detected and merged into the main branch.*\n<${{steps.detect_changes.outputs.GITHUB_COMMIT_URL}}| View change at ${{steps.detect_changes.outputs.GIT_LOG}}>\n\nChanged files:\n\`\`\`\n${{steps.detect_changes.outputs.CHANGED_DOC_FILES}}\n\`\`\`" >> "$GITHUB_OUTPUT"
+      - name: Notify on document changes
+        if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d  # v2.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          payload: |
+            channel: C03J6NCPSE4
+            text: "${{ steps.construct_message.outputs.MESSAGE }}"
+
+
+

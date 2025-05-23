@@ -1,0 +1,59 @@
+name: Trigger a cluster test on a PR
+on:
+  issue_comment:
+    types: [created]
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+  id-token: write
+
+jobs:
+
+  get_sha:
+    runs-on: self-hosted-docker-tiny
+    outputs:
+      sha: ${{ steps.comment-branch.outputs.head_sha }}
+    steps:
+      - name: Get PR branch
+        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
+        id: comment-branch
+
+  trigger_cluster_test_basic:
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/cluster_test')
+    needs: get_sha
+    uses: ./.github/workflows/cluster_tests.yml
+    secrets: inherit
+    with:
+      workflow: cluster_test
+      sha: ${{ needs.get_sha.outputs.sha }}
+
+  result:
+    runs-on: self-hosted-docker-tiny
+    needs:
+      - trigger_cluster_test_basic
+      - get_sha
+    steps:
+      - run: |
+          number=$(echo '${{ needs.trigger_cluster_test_basic.outputs.result }}' | jq -r '.number')
+          echo "Deploy scratchnet pipeline triggered for [PR as of ${{ needs.get_sha.outputs.sha }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_sha.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+
+
+  trigger_cluster_test_hdm:
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/hdm_test')
+    needs: get_sha
+    uses: ./.github/workflows/cluster_tests.yml
+    secrets: inherit
+    with:
+      workflow: hdm_test
+      sha: ${{ needs.get_sha.outputs.sha }}
+
+  result_hdm:
+    runs-on: self-hosted-docker-tiny
+    needs:
+      - trigger_cluster_test_hdm
+      - get_sha
+    steps:
+      - run: |
+          number=$(echo '${{ needs.trigger_cluster_test_hdm.outputs.result }}' | jq -r '.number')
+          echo "Deploy scratchnet HDM pipeline triggered for [PR as of ${{ needs.get_sha.outputs.sha }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_sha.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"

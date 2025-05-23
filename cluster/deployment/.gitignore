@@ -1,0 +1,3 @@
+Pulumi.*.yaml
+.kubecfg
+gke_gcloud_auth_plugin_cache
