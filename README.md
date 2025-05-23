@@ -38,6 +38,7 @@ To provide a mapping between the value of its specific amulet and fiat currencie
 
 Daml applications may choose to use their own, privately operated, Canton synchronizer to create shared state across the Canton participant nodes interacting with those applications, or they may use any shared synchronizer offered by a third party operating group.
 
+
 ## Dependent Projects
 
 Splice has grown out of the Daml blockchain ecosystem and its Canton protocol. Open Source versions of Daml are maintained by Digital Asset under an Apache 2.0 License.
