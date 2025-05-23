@@ -1,0 +1,26 @@
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  get_head:
+    runs-on: self-hosted-docker-tiny
+    outputs:
+      sha: ${{ steps.get_head.outputs.sha }}
+      repo: ${{ steps.get_head.outputs.repo }}
+    steps:
+      - name: Get head SHA & repo
+        id: get_head
+        run: |
+          query='query pullRequestDetails { repository(name: "${{ github.event.repository }}", owner: "${{ github.event.organization }}") { pullRequest(number: 416) { headRef { target { oid } } headRepository { sshUrl } } } }'
+          result=$(gh api graphql -F query="$query")
+          sha=$(echo "$result" | jq -r '.data.repository.pullRequest.headRef.target.oid')
+          repo=$(echo "$result" | jq -r '.data.repository.pullRequest.headRepository.sshUrl')
+
+  test:
+    runs-on: self-hosted-docker-tiny
+    needs: get_head
+    steps:
+      - name: Run tests
+        run: |
+          echo "Running tests for commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}"
