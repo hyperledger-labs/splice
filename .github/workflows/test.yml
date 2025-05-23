@@ -14,6 +14,7 @@ jobs:
       - name: Get head SHA & repo
         id: get_head
         run: |
+          set -euo pipefail
           query='query pullRequestDetails { repository(name: \"${{ github.event.repository }}\", owner: \"${{ github.event.organization }}\") { pullRequest(number: 416) { headRef { target { oid } } headRepository { sshUrl } } } }'
           result=$(curl -H "Authorization: Bearer $GITHUB_TOKEN" -X POST -d " { \"query\": \"$query\" } " https://api.github.com/graphql)
           echo "result: $result"
