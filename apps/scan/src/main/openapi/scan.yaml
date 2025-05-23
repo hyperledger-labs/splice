@@ -139,12 +139,11 @@ paths:
               schema:
                 "$ref": "#/components/schemas/ListDsoSequencersResponse"
 
-  # TODO(#19679) reconsider naming; "bft sequencers" is a bit overloaded
   /v0/sv-bft-sequencers:
     get:
       tags: [internal, scan]
       x-jvm-package: scan
-      operationId: "listSvBFTSequencers"
+      operationId: "listSvBftSequencers"
       description: |
         Retrieve Canton BFT sequencer configuration for this SV, for each configured Synchronizer
       responses:
@@ -153,7 +152,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListSvBFTSequencersResponse"
+                "$ref": "#/components/schemas/ListSvBftSequencersResponse"
 
 
   /v0/domains/{domain_id}/parties/{party_id}/participant-id:
@@ -1766,7 +1765,7 @@ components:
         lastPurchasedInRound:
           type: integer
           format: int64
-    ListSvBFTSequencersResponse:
+    ListSvBftSequencersResponse:
       type: object
       required: ["bftSequencers"]
       properties:

@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.config
 
 import com.digitalasset.canton.config.FullClientConfig
 
-// TODO(#19679) rename me perhaps; something ordering and/or scan and also bft sequencer is overloaded
 case class BftSequencerConfig(
     migrationId: Long,
     sequencerAdminClient: FullClientConfig,

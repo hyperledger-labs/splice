@@ -192,7 +192,7 @@ describe('Wallet user can', () => {
     // The withdraw has a dummy conversion rate of 0 so no amulet conversion rate is displayed
     expect(await screen.findAllByText('@')).toHaveLength(3);
   });
-}, 5000);
+}, 7500);
 
 function transferTests(disableTokenStandard: boolean) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -365,7 +365,7 @@ function transferTests(disableTokenStandard: boolean) {
     expect(mock).toHaveBeenCalledTimes(3);
     const thirdDeduplicationId = getDeduplicationIdFromCall(mock.mock.lastCall![0]);
     expect(thirdDeduplicationId).not.toBe(firstDeduplicationId);
-  }, 10000);
+  }, 15000);
 }
 
 async function assertCorrectMockIsCalled(

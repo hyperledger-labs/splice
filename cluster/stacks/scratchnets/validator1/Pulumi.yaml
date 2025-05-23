@@ -1,0 +1,4 @@
+name: validator1
+runtime: nodejs
+description: Deploy the validator1 service
+main: "../../../pulumi/validator1/src/index.ts"
