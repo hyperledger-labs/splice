@@ -1,0 +1,5 @@
+name: operator
+runtime:
+  name: nodejs
+description: Pulumi k8s operator
+main: "../../../pulumi/operator/src/index.ts"
