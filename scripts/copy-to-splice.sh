@@ -60,6 +60,8 @@ copy_dir "cluster/helm"
 copy_dir "cluster/compose"
 copy_dir "cluster/pulumi"
 copy_dir "cluster/expected"
+copy_dir "cluster/deployment"
+copy_dir "cluster/configs"
 copy_dir "openapi-templates"
 copy_dir "cluster/pulumi/infra/grafana-dashboards"
 copy_dir "network-health"
@@ -90,7 +92,11 @@ copy_dir "docs"
 copy_file "daml.yaml"
 copy_file "Makefile"
 copy_file "cluster/local.mk"
-copy_dir ".github/actions/scripts"
+
+copy_dir ".github/actions"
+copy_dir ".github/workflows"
+copy_file ".github/actionlint.yml"
+copy_file ".github/pull_request_template.md"
 
 copy_file ".editorconfig"
 copy_file ".gitmodules"
@@ -136,7 +142,9 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     sed 's/^Only in //g' |
     grep -v '^\.:' |
     grep -v '/\.git[/:]' |
-    grep -v '/\.github[/:]' |
+    grep -v 'runners' |
+    grep -v 'ISSUE_TEMPLATE' |
+    grep -v 'settings.yml' |
     grep -v '\./cluster' |
     grep -v 'LICENSE.*differ' |
     grep -v 'README.md.*differ' |
@@ -151,8 +159,10 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v '.direnv' |
     grep -v 'CODEOWNERS' |
     grep -v 'LICENSE' |
-    grep -v "OPEN_SOURCE.md"
+    grep -v "OPEN_SOURCE.md" |
     grep -v 'openapi-cache-key.txt' |
+    grep -v 'cmd-' |
+    grep -v 'support' |
     grep -v '^\.git' || true)
 
 echo "Unexpected files missing from Splice: $unknown"
