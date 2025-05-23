@@ -47,19 +47,19 @@ jobs:
 
   trigger_cluster_test_hdm:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/hdm_test')
-    needs: get_sha
+    needs: get_head
     uses: ./.github/workflows/cluster_tests.yml
     secrets: inherit
     with:
       workflow: hdm_test
-      sha: ${{ needs.get_sha.outputs.sha }}
+      sha: ${{ needs.get_head.outputs.sha }}
 
   result_hdm:
     runs-on: self-hosted-docker-tiny
     needs:
       - trigger_cluster_test_hdm
-      - get_sha
+      - get_head
     steps:
       - run: |
           number=$(echo '${{ needs.trigger_cluster_test_hdm.outputs.result }}' | jq -r '.number')
-          echo "Deploy scratchnet HDM pipeline triggered for [PR as of ${{ needs.get_sha.outputs.sha }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_sha.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+          echo "Deploy scratchnet HDM pipeline triggered for [commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
