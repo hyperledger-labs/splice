@@ -6,7 +6,7 @@ set -eou pipefail
 source "${TOOLS_LIB}/libcli.source"
 
 _info "Re-versioning local Daml models from x.y.z to x.y.z.123"
-find "daml" -name "daml.yaml" -exec sed -i 's/^version: \([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)/version: \1.123/g' {} \;
+find "daml"  -name '*-api-*' -prune -o -name "daml.yaml" -print -exec sed -i 's/^version: \([0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\)/version: \1.123/g' {} \;
 find . -name "*.dar" -not -path "*/test/resources/daml/*" -not -path "*-current.dar" -not -path "./daml/dars/*" -exec rm {} \;
 
 base_version=$(cat LATEST_RELEASE)

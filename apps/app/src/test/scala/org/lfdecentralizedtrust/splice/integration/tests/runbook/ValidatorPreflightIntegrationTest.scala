@@ -211,7 +211,7 @@ abstract class ValidatorPreflightIntegrationTestBase
               // we can't test a specific amulet price as the amulet price on a live network can change
               val rateR =
                 raw"""^\s*(\d+(?:\.\d+)?)\s*${amuletNameAcronym}/USD\s*$$""".r
-              inside(transaction.rate) { case rateR(rate) =>
+              inside(transaction.rate.value) { case rateR(rate) =>
                 BigDecimal(rate) should be > BigDecimal(0)
                 transaction.usdAmount should beWithin(
                   transaction.ccAmount / BigDecimal(rate) - smallAmount,

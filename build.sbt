@@ -1908,7 +1908,7 @@ printTests := {
     (
       "canton bft tests",
       "test-full-class-names-canton-bft.log",
-      (t: String) => t.contains("BFTManualStartIntegrationTest"),
+      (t: String) => t.contains("BftManualStartIntegrationTest"),
     ),
     (
       "app upgrade tests",

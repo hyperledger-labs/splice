@@ -15,6 +15,7 @@ import {
   ActionRequiringConfirmation,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { useSvConfig } from '../utils';
 
 export type YourVoteStatus = 'accepted' | 'rejected' | 'not-voted';
 
@@ -27,16 +28,6 @@ type SupportedActionTag =
   | 'SRARC_SetConfig'
   | 'SRARC_UpdateSvRewardWeight';
 
-const actionTagToTitle: Record<SupportedActionTag, string> = {
-  CRARC_AddFutureAmuletConfigSchedule: 'Add Future Amulet Configuration Schedule',
-  CRARC_SetConfig: 'Set Amulet Rules Configuration',
-  SRARC_GrantFeaturedAppRight: 'Feature Application',
-  SRARC_OffboardSv: 'Offboard Member',
-  SRARC_RevokeFeaturedAppRight: 'Unfeature Application',
-  SRARC_SetConfig: 'Set Dso Rules Configuration',
-  SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
-};
-
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
     case 'ARC_AmuletRules':
@@ -47,9 +38,26 @@ function getAction(action: ActionRequiringConfirmation): string {
       return 'Action tag not defined.';
   }
 }
+
 const QUERY_LIMIT = 50;
 
 export const Governance: React.FC = () => {
+  const svConfig = useSvConfig();
+
+  const amuletName = svConfig.spliceInstanceNames.amuletName;
+  const actionTagToTitle = useMemo(
+    (): Record<SupportedActionTag, string> => ({
+      CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
+      CRARC_SetConfig: `Set ${amuletName} Rules Configuration`,
+      SRARC_GrantFeaturedAppRight: 'Feature Application',
+      SRARC_OffboardSv: 'Offboard Member',
+      SRARC_RevokeFeaturedAppRight: 'Unfeature Application',
+      SRARC_SetConfig: 'Set Dso Rules Configuration',
+      SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
+    }),
+    [amuletName]
+  );
+
   const [tabValue, setTabValue] = useState('voting');
 
   const votesHooks = useVotesHooks();

@@ -12,6 +12,7 @@ import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
+import { changeAction } from './helpers';
 
 dayjs.extend(timezone);
 
@@ -80,9 +81,7 @@ describe('SV user can', () => {
 
     await user.click(screen.getByText('Governance'));
 
-    const dropdown = screen.getByTestId('display-actions');
-    expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+    changeAction();
 
     expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
     expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
@@ -113,8 +112,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+      changeAction();
 
       const synchronizerUpgradeCheckBox = screen.getByTestId(
         'enable-next-scheduled-domain-upgrade'
@@ -168,9 +166,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
+      changeAction();
       await fillOutForm(user);
 
       const disabled = screen
@@ -201,9 +197,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
+      changeAction();
       await fillOutForm(user);
 
       const effectiveAtThresholdCheckBox = screen.getByTestId(
@@ -267,9 +261,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
+      changeAction();
       await fillOutForm(user);
 
       const effectiveDateComponent = screen.getByTestId('datetime-picker-vote-request-expiration');
@@ -334,9 +326,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
+      changeAction();
       await fillOutForm(user);
 
       const synchronizerUpgradeCheckBox = screen.getByTestId(
@@ -396,9 +386,7 @@ describe('SV user can', () => {
 
       await user.click(screen.getByText('Governance'));
 
-      const dropdown = screen.getByTestId('display-actions');
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
-
+      changeAction();
       await fillOutForm(user);
 
       const effectiveAtThresholdCheckBox = screen.getByTestId(
