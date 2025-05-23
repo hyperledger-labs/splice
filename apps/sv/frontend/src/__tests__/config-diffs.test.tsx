@@ -8,13 +8,14 @@ import {
   checkAmuletRulesExpectedConfigDiffsHTML,
   checkDsoRulesExpectedConfigDiffsHTML,
 } from '@lfdecentralizedtrust/splice-common-test-utils';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId } from './mocks/constants';
+import { changeAction } from './helpers';
 
 const AppWithConfig = () => {
   return (
@@ -56,9 +57,7 @@ describe('SV can see AmuletRules config diffs', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    const dropdown = screen.getByTestId('display-actions');
-    expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: action } });
+    changeAction(action);
 
     const input = screen.getByTestId('transferConfig.createFee.fee-value');
     await userEvent.type(input, '42');
@@ -121,9 +120,7 @@ describe('SV can see DsoRules config diffs', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    const dropdown = screen.getByTestId('display-actions');
-    expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: action } });
+    changeAction(action);
 
     const input = screen.getByTestId(
       'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'

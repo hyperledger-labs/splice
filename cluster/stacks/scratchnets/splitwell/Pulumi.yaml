@@ -1,0 +1,4 @@
+name: splitwell
+runtime: nodejs
+description: Deploy the splitwell service
+main: "../../../pulumi/splitwell/src/index.ts"

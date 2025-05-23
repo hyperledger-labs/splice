@@ -135,7 +135,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
           .text,
         unit = "USD",
       ),
-      rate = transactionRow.childElement(className("tx-amount-rate")).text,
+      rate = transactionRow.findChildElement(className("tx-amount-rate")).map(_.text),
       appRewardsUsed = parseAmountText(
         transactionRow
           .childElement(className("tx-row-cell-rewards"))
@@ -207,9 +207,15 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       expectedAmountUSD._1,
       expectedAmountUSD._2,
     )
-    transaction.rate should matchText(
-      s"${BigDecimal(1) / amuletPrice} ${spliceInstanceNames.amuletNameAcronym}/USD"
-    )
+
+    transaction.rate match {
+      case Some(rate) =>
+        rate should matchText(
+          s"${BigDecimal(1) / amuletPrice} ${spliceInstanceNames.amuletNameAcronym}/USD"
+        )
+      // Rate text should be missing iff the price is zero
+      case None => amuletPrice shouldBe BigDecimal(0)
+    }
   }
 
   protected def createTransferOffer(
@@ -314,7 +320,7 @@ object WalletFrontendTestUtil {
       partyDescription: Option[String],
       ccAmount: BigDecimal,
       usdAmount: BigDecimal,
-      rate: String,
+      rate: Option[String],
       appRewardsUsed: BigDecimal,
       validatorRewardsUsed: BigDecimal,
       svRewardsUsed: BigDecimal,

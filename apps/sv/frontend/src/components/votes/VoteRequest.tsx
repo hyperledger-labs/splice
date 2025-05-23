@@ -24,6 +24,11 @@ import {
   Card,
   CardContent,
   Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   FormControl,
   NativeSelect,
   Stack,
@@ -65,6 +70,8 @@ export function actionFromFormIsError(
 export const CreateVoteRequest: React.FC = () => {
   // States related to vote requests
   const [actionName, setActionName] = useState('SRARC_OffboardSv');
+  // using this for the alert dialog. Should not be used for anything else
+  const [nextActionName, setNextActionName] = useState('SRARC_OffboardSv');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const [isEffective, setIsEffective] = useState(true);
@@ -74,6 +81,7 @@ export const CreateVoteRequest: React.FC = () => {
   const [disableProceed, setDisableProceed] = useState(false);
 
   const [alertMessage, setAlertMessage] = useState<AlertState>({});
+  const [openActionChangeDialog, setOpenActionChangeDialog] = React.useState(false);
 
   const dsoInfosQuery = useDsoInfos();
   const voteRequestQuery = useListDsoRulesVoteRequests();
@@ -101,13 +109,13 @@ export const CreateVoteRequest: React.FC = () => {
     setEffectivity(newDate ?? dayjs());
   };
 
-  const handleActionNameChange = (newActionName: string) => {
+  const resetForm = () => {
     setExpiration(expirationFromVoteRequestTimeout);
     setIsEffective(true);
     setEffectivity(expirationFromVoteRequestTimeout.add(1, 'day'));
     setUrl('');
     setSummary('');
-    setActionName(newActionName);
+    setActionName(nextActionName);
   };
 
   const actionNameOptions = [
@@ -254,7 +262,10 @@ export const CreateVoteRequest: React.FC = () => {
                   'data-testid': 'display-actions',
                 }}
                 value={actionName}
-                onChange={e => handleActionNameChange(e.target.value)}
+                onChange={e => {
+                  setNextActionName(e.target.value);
+                  setOpenActionChangeDialog(true);
+                }}
               >
                 {actionNameOptions.map((actionName, index) => (
                   <option key={'action-option-' + index} value={actionName.value}>
@@ -456,6 +467,41 @@ export const CreateVoteRequest: React.FC = () => {
           </Stack>
         </CardContent>
       </Card>
+
+      <Dialog
+        open={openActionChangeDialog}
+        onClose={() => setOpenActionChangeDialog(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+        data-testid="action-change-dialog"
+      >
+        <DialogTitle id="alert-dialog-title">Action Change</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="alert-dialog-description">
+            <strong>NOTE:</strong> All fields in this form will be reset to the default values for
+            the new action
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenActionChangeDialog(false)}
+            autoFocus
+            data-testid="action-change-dialog-cancel"
+          >
+            Cancel
+          </Button>
+          <Button
+            id="action-change-dialog-proceed"
+            data-testid="action-change-dialog-proceed"
+            onClick={() => {
+              resetForm();
+              setOpenActionChangeDialog(false);
+            }}
+          >
+            Proceed
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 };

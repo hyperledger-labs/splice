@@ -31,17 +31,20 @@ if [ -f "target/docker.push" ]; then
       exit 0
     fi
 fi
-attempts=0
+
+found_docker_image_id=""
 max_attempts=5
-while (( attempts < max_attempts )); do
-  if docker image ls -q --no-trunc --digests --all | grep -q "${imageId}" > /dev/null 2>&1; then
+
+for ((i=1; i<=max_attempts; i++)); do
+  if docker image ls -q --no-trunc --digests --all | grep -q "${imageId}"; then
+    found_docker_image_id=1
     break
   fi
-  ((attempts++))
+  _warning "Failed to find Docker image ID '${imageId}' in local images. Attempt ${i} of ${max_attempts}."
   sleep 1
 done
 
-if (( attempts == max_attempts )); then
+if [ -z "$found_docker_image_id" ]; then
   _error "Docker image ID '${imageId}' could not be found (should have been built by 'docker-build') after ${max_attempts} attempts.\nCannot tag image for push of '${imageReference}'."
   exit 1
 fi
@@ -64,9 +67,21 @@ if ! _set_x docker tag "${imageId}" "${imageReference}"; then
     exit 1
 fi
 
-if ! _set_x docker push "${imageReference}"; then
-    _error "Could not push image '${imageReference}'."
-    exit 1
+pushed=""
+max_attempts=5
+
+for ((i=1; i<=max_attempts; i++)); do
+  if _set_x docker push "${imageReference}"; then
+    pushed=1
+    break
+  fi
+  _warning "Failed to push Docker image '${imageReference}' with ID '${imageId}'. Attempt ${i} of ${max_attempts}."
+  sleep 1
+done
+
+if [ -z "$pushed" ]; then
+  _error "Failed to push Docker image '${imageReference}' with ID '${imageId}' after ${max_attempts} attempts."
+  exit 1
 fi
 
 echo "${targetPushState}" > target/docker.push

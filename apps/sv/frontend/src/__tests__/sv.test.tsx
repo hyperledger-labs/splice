@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
@@ -11,6 +11,7 @@ import App from '../App';
 import { SvConfigProvider } from '../utils';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
+import { changeAction } from './helpers';
 
 const AppWithConfig = () => {
   return (
@@ -65,14 +66,12 @@ describe('An SetConfig request', () => {
     expect(await screen.findByText('Vote Requests')).toBeDefined();
     expect(await screen.findByText('Governance')).toBeDefined();
 
-    const dropdown = screen.getByTestId('display-actions');
-    expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+    changeAction('CRARC_SetConfig');
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
     expect(await screen.findByDisplayValue('0.03')).toBeDefined();
 
-    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+    changeAction('SRARC_SetConfig');
 
     expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
     expect(await screen.findByDisplayValue('10')).toBeDefined();
@@ -91,9 +90,7 @@ describe('An SetConfig request', () => {
       expect(await screen.findByText('Vote Requests')).toBeDefined();
       expect(await screen.findByText('Governance')).toBeDefined();
 
-      const dropdown = screen.getByTestId('display-actions');
-      expect(dropdown).toBeDefined();
-      fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+      changeAction('SRARC_SetConfig');
 
       const input = screen.getByTestId(
         'decentralizedSynchronizer.synchronizers.0.1.acsCommitmentReconciliationInterval-value'
@@ -134,9 +131,7 @@ describe('An SetConfig request', () => {
       expect(await screen.findByText('Vote Requests')).toBeDefined();
       expect(await screen.findByText('Governance')).toBeDefined();
 
-      const dropdown = screen.getByTestId('display-actions');
-      expect(dropdown).toBeDefined();
-      fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+      changeAction('CRARC_SetConfig');
 
       const input = screen.getByTestId('transferConfig.createFee.fee-value');
       await user.clear(input);
@@ -181,9 +176,7 @@ describe('An SetConfig request', () => {
       expect(await screen.findByText('Vote Requests')).toBeDefined();
       expect(await screen.findByText('Governance')).toBeDefined();
 
-      const dropdown = screen.getByTestId('display-actions');
-      expect(dropdown).toBeDefined();
-      fireEvent.change(dropdown!, { target: { value: 'CRARC_SetConfig' } });
+      changeAction('CRARC_SetConfig');
 
       const input = screen.getByTestId('transferConfig.createFee.fee-value');
       await user.clear(input);
