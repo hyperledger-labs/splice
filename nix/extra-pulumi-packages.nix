@@ -28,6 +28,10 @@
         sha256 = "2c5f29ac9bc058bb9377b906e7630947add587b69040c63af5a8fd4ff95c9e52";
       }
       {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v7.38.0/pulumi-resource-gcp-v7.38.0-linux-amd64.tar.gz";
+        sha256 = "1acca6e3b5b8bc673889333ddc7e22ad3b7c54c12feb612bfb1f85605bebd2ce";
+      }
+      {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-linux-amd64.tar.gz";
         sha256 = "ad6675574e75c6984ab79a2ff9f4ee6c4859d46a41a7d73ef35c84f05a00b407";
       }
@@ -80,6 +84,10 @@
       {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v7.2.1/pulumi-resource-gcp-v7.2.1-darwin-amd64.tar.gz";
         sha256 = "08ee93595be215736c834d75012704713738b6a1452cc21813a84612c950e424";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v7.38.0/pulumi-resource-gcp-v7.38.0-darwin-amd64.tar.gz";
+        sha256 = "09f7ccc14c2c968536404d222038d8ec0dd0e5cfa65a56ababfd4f447338c8bd";
       }
       {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-darwin-amd64.tar.gz";
@@ -136,6 +144,10 @@
         sha256 = "4cddd536e4e28caba68919ba2d051442595ef0c0c139a7779108b579bf596901";
       }
       {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v7.38.0/pulumi-resource-gcp-v7.38.0-linux-arm64.tar.gz";
+        sha256 = "d442eff25b9ec56a19e604ccedcaba6c1072108b448970b019b59856180d9265";
+      }
+      {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-linux-arm64.tar.gz";
         sha256 = "dbf59982dcd94e50b9241e9501dc531bad2a9faac47aa5ecce8e5bb1bfc2e9ff";
       }
@@ -188,6 +200,10 @@
       {
         url = "https://github.com/pulumi/pulumi-gcp/releases/download/v7.2.1/pulumi-resource-gcp-v7.2.1-darwin-arm64.tar.gz";
         sha256 = "4bb52f6d510772d53e0ed88153bd237703610cb1ff7b4e40558c493c45405991";
+      }
+      {
+        url = "https://github.com/pulumi/pulumi-gcp/releases/download/v7.38.0/pulumi-resource-gcp-v7.38.0-darwin-arm64.tar.gz";
+        sha256 = "44883ff3b848c2a8ce19531586967f096b6f803398842cbaa6b9b900f0e20cc5";
       }
       {
         url = "https://github.com/pulumiverse/pulumi-grafana/releases/download/v0.4.2/pulumi-resource-grafana-v0.4.2-darwin-arm64.tar.gz";
