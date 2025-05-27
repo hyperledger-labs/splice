@@ -1821,6 +1821,8 @@ printTests := {
       name.contains("SvOffboardingIntegrationTest")
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
+  def isLocalNetTest(name: String): Boolean =
+    name contains "LocalNet"
   def isCometBftTest(name: String): Boolean =
     name contains "CometBft"
   def isRecordTimeToleranceTest(name: String): Boolean =
@@ -1919,6 +1921,11 @@ printTests := {
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
+    ),
+    (
+      "tests for localnet",
+      "test-full-class-names-local-net-based.log",
+      (t: String) => isLocalNetTest(t),
     ),
     (
       "tests using docker images",

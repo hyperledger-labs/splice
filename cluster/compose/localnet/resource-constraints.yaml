@@ -1,0 +1,30 @@
+## This file is used to set and control resource constraints for all essential services defined
+## in the splice localnet template, These values should be adjusted carefully as it will impact the
+## baseline resource requirements for the project.
+services:
+  nginx:
+    mem_limit: 32mb
+  postgres:
+    mem_limit: 2g
+  canton:
+    mem_limit: 4g
+    environment:
+      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx2560m"
+  splice:
+    mem_limit: 3g
+    environment:
+      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx2560m"
+  console:
+    mem_limit: 1g
+    environment:
+      _JAVA_OPTIONS: "-XX:+UseContainerSupport -XX:-UseCompressedOops"
+  scan-web-ui:
+    mem_limit: 256mb
+  sv-web-ui:
+    mem_limit: 512mb
+  wallet-web-ui-app-provider:
+    mem_limit: 256mb
+  wallet-web-ui-app-user:
+    mem_limit: 256mb
+  wallet-web-ui-sv:
+    mem_limit: 256mb
