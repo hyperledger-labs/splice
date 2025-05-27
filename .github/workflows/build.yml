@@ -171,6 +171,17 @@ jobs:
       commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
+  scala_test_local_net:
+    uses: ./.github/workflows/build.scala_test_for_compose.yml
+    with:
+      runs_on: self-hosted-docker-large
+      test_names_file: 'test-full-class-names-local-net-based.log'
+      parallelism: 1
+      test_name: docker-compose
+      with_canton: false
+      start_canton_options: ""
+    secrets: inherit
+
   scala_test_app_upgrade:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -232,6 +243,7 @@ jobs:
     - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
     - scala_test_docker_compose
+    - scala_test_local_net
     - scala_test_app_upgrade
     - scala_test_without_canton
     - ui_tests

@@ -5,6 +5,10 @@ on:
       start_canton_options:
         type: string
         required: true
+      with_canton:
+        type: boolean
+        required: false
+        default: true
       runs_on:
         type: string
         required: true
@@ -94,3 +98,4 @@ jobs:
           failure_notifications_invoker_sa: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}
           failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
+          with_canton: ${{ inputs.with_canton }}

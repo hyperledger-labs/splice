@@ -11,10 +11,11 @@ import {
   isDevNet,
   numInstances,
   numNodesPerInstance,
+  loadTesterConfig,
 } from 'splice-pulumi-common';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
-  if (config.envFlag('K6_ENABLE_LOAD_GENERATOR')) {
+  if (loadTesterConfig?.enable) {
     const xns = exactNamespace('load-tester', true);
 
     const imagePullDeps = imagePullSecret(xns);
@@ -89,7 +90,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           validators,
           test: {
             duration: `365d`,
-            iterationsPerMinute: 60,
+            iterationsPerMinute: loadTesterConfig.iterationsPerMinute,
           },
         }),
       },

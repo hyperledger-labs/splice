@@ -83,3 +83,7 @@ operatorDeployment:
     spliceRoot: "splice"
     privateConfigsDir: "cluster/configs/configs-private"
     publicConfigsDir: "cluster/configs/configs"
+loadTester:
+  enable: true
+  iterationsPerMinute: 30
+  minRate: 0.123
