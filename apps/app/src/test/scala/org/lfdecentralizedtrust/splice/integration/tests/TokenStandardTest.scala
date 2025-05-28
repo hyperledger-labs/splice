@@ -118,7 +118,8 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       ),
       emptyExtraArgs,
     )
-    val (factory, kind) = sv1ScanBackend.getTransferFactory(choiceArgs)
+    val scanResponse @ (factory, kind) = sv1ScanBackend.getTransferFactory(choiceArgs)
+    aliceValidatorBackend.scanProxy.getTransferFactory(choiceArgs) shouldBe scanResponse
     kind shouldBe expectedKind
     (factory, senderHoldingCids)
   }
@@ -201,6 +202,9 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       env: SpliceTestConsoleEnvironment
   ) = {
     val choiceContext = sv1ScanBackend.getTransferInstructionAcceptContext(instructionCid)
+    aliceValidatorBackend.scanProxy.getTransferInstructionAcceptContext(
+      instructionCid
+    ) shouldBe choiceContext
     participant.ledger_api_extensions.commands
       .submitJavaExternalOrLocal(
         receiver,
@@ -223,6 +227,9 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       env: SpliceTestConsoleEnvironment
   ) = {
     val choiceContext = sv1ScanBackend.getTransferInstructionRejectContext(instructionCid)
+    aliceValidatorBackend.scanProxy.getTransferInstructionRejectContext(
+      instructionCid
+    ) shouldBe choiceContext
     participant.ledger_api_extensions.commands
       .submitJavaExternalOrLocal(
         receiver,
@@ -245,6 +252,9 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       env: SpliceTestConsoleEnvironment
   ) = {
     val choiceContext = sv1ScanBackend.getTransferInstructionWithdrawContext(instructionCid)
+    aliceValidatorBackend.scanProxy.getTransferInstructionWithdrawContext(
+      instructionCid
+    ) shouldBe choiceContext
     participant.ledger_api_extensions.commands
       .submitJavaExternalOrLocal(
         receiver,

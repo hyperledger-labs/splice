@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import util from 'node:util';
 import { KmsConfigSchema } from 'splice-pulumi-common';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';

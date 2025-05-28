@@ -22,6 +22,7 @@
     - [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
     - [Testing App Upgrades](#testing-app-upgrades)
+  - [Deployment Tests](#deployment-tests)
 
 # Testing in Splice
 
@@ -35,6 +36,7 @@ Splice code is tested in the following ways:
 - Integration tests. Extensive integration tests are located under `apps/app/src/test/scala/`. Integration tests
   include tests that use frontends (whose names must end with `FrontendIntegrationTest`), and ones which do not
   (whose names ends with IntegrationTest).
+- [Deployment tests](#deployment-tests) to catch errors in Helm and Pulumi before deploying to a cluster.
 - Cluster tests. Various different cluster tests are currently run by Digital Asset on Splice codebase.
   This includes:
   - Deploying and testing a PR on a scratch cluster. See (TBD)
@@ -365,3 +367,26 @@ PRs/commits that include `[breaking]` in their commit message, or that bump the 
 
 The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
 one-by-one to the current commit's version.
+
+## Deployment Tests
+
+Static deployment tests are run on every commit to `main` and on every PR tagged with `[static]` or `[ci]`.
+They guard against unintended changes to deployed state resulting from changes to Helm charts and Pulumi deployment scripts.
+The tests described here are **not a replacement for testing via cluster deployment**.
+They are meant to provide a quick feedback loop and to offer additional protection against regressions for code paths that are not sufficiently well covered by automatic cluster tests.
+
+### Helm checks
+
+We use [helm-unittest](https://github.com/helm-unittest/helm-unittest/) for some of our Helm charts.
+To run all Helm chart tests locally run `make cluster/helm/test`.
+To run only the tests for a specific chart `CHART`, run `helm unittest cluster/helm/CHART`.
+
+Refer to the documentation of `helm-unittest` for more information on how to extend our Helm tests.
+When writing or debugging Helm tests, it is often useful to run `helm template` to see the rendered templates.
+
+### Pulumi checks
+
+Our pulumi checks are based on checked in `expected` files that need to be updated whenever the expected deployment state changes.
+
+Please run `make cluster/pulumi/update-expected` whenever you intend to change Pulumi deployment scripts in a way that alters deployed state.
+Compare the diff of the resulting `expected` files to confirm that the changes are as intended.

@@ -52,6 +52,9 @@ cluster/helm/build: $(foreach chart,$(app_charts),cluster/helm/$(chart)/helm-bui
 cluster/helm/clean: $(foreach chart,$(app_charts),cluster/helm/$(chart)/helm-clean)
 	rm -rfv cluster/helm/target
 
+.PHONY: cluster/helm/test
+cluster/helm/test: cluster/helm/build $(foreach chart,$(app_charts),cluster/helm/$(chart)/helm-test)
+
 %/values.yaml: %/values-template.yaml
   # We do not automatically run write-digests, as we do not want that for local dev, only for published artifacts
 	cp $< $@
@@ -78,6 +81,10 @@ $$(prefix)/helm-build: $$(prefix)/values.yaml $$(prefix)/Chart.yaml $$(prefix)/L
 .PHONY: $$(prefix)/helm-clean
 $$(prefix)/helm-clean:
 	rm -vf $$(@D)/values.yaml $$(@D)/Chart.yaml $$(@D)/LICENSE
+
+.PHONY: $$(prefix)/helm-test
+$$(prefix)/helm-test:
+	helm unittest $$(@D)
 
 $$(prefix)/LICENSE: LICENSE
 	cp LICENSE $$(@D)/LICENSE

@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import exec from 'node:child_process';
 import { activeVersion, CLUSTER_HOSTNAME, config, exactNamespace } from 'splice-pulumi-common';

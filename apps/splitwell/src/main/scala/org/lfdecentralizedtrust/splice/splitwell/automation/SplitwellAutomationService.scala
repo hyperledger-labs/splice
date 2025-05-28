@@ -43,7 +43,6 @@ class SplitwellAutomationService(
     store: SplitwellStore,
     ledgerClient: SpliceLedgerClient,
     scanConnection: ScanConnection,
-    supportsSoftDomainMigrationPoc: Boolean,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -97,42 +96,40 @@ class SplitwellAutomationService(
     new TerminatedAppPaymentTrigger(triggerContext, store, connection)
   )
 
-  if (!supportsSoftDomainMigrationPoc) {
-    registerTrigger(
-      new UnassignTrigger.Template(
-        triggerContext,
-        store,
-        connection,
-        scanConnection.getAmuletRulesDomain,
-        store.key.providerParty,
-        splitwellCodegen.TransferInProgress.COMPANION,
-      )
+  registerTrigger(
+    new UnassignTrigger.Template(
+      triggerContext,
+      store,
+      connection,
+      scanConnection.getAmuletRulesDomain,
+      store.key.providerParty,
+      splitwellCodegen.TransferInProgress.COMPANION,
     )
+  )
 
-    registerTrigger(
-      new AssignTrigger(
-        triggerContext,
-        store,
-        connection,
-        store.key.providerParty,
-      )
+  registerTrigger(
+    new AssignTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.key.providerParty,
     )
+  )
 
-    registerTrigger(
-      new TransferFollowTrigger(
-        triggerContext,
-        store,
-        connection,
-        store.key.providerParty,
-        implicit tc =>
-          (
-            store.listLaggingBalanceUpdates(),
-            store.listLaggingGroupInvites(),
-            store.listLaggingAcceptedGroupInvites(),
-          ).mapN(_ ++ _ ++ _),
-      )
+  registerTrigger(
+    new TransferFollowTrigger(
+      triggerContext,
+      store,
+      connection,
+      store.key.providerParty,
+      implicit tc =>
+        (
+          store.listLaggingBalanceUpdates(),
+          store.listLaggingGroupInvites(),
+          store.listLaggingAcceptedGroupInvites(),
+        ).mapN(_ ++ _ ++ _),
     )
-  }
+  )
 }
 
 object SplitwellAutomationService extends AutomationServiceCompanion {

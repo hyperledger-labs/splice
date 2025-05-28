@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
 import { config } from 'splice-pulumi-common';
 

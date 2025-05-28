@@ -29,7 +29,12 @@ jobs:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
-      - name: Deployment test
+      - name: Helm tests
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: make cluster/helm/test
+
+      - name: Pulumi tests
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
           cmd_retry_count: 5 # Retry in case of dependency download errors

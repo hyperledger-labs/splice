@@ -40,8 +40,6 @@ case class SplitwellAppBackendConfig(
     domainMigrationId: Long = 0L,
     domains: SplitwellSynchronizerConfig,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
-    // TODO(#13301) Remove this flag
-    supportsSoftDomainMigrationPoc: Boolean = false,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"

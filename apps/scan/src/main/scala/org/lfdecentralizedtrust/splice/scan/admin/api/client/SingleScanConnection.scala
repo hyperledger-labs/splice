@@ -31,10 +31,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   LookupTransferCommandStatusResponse,
   MigrationSchedule,
 }
-import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{
-  HttpScanAppClient,
-  HttpScanSoftDomainMigrationPocAppClient,
-}
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.{HttpScanAppClient}
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanAggregator
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
@@ -46,6 +43,12 @@ import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
   FactoryChoiceWithDisclosures,
   TemplateJsonDecoder,
+}
+import org.lfdecentralizedtrust.tokenstandard.{
+  allocation,
+  allocationinstruction,
+  metadata,
+  transferinstruction,
 }
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -66,6 +69,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.TransferFactoryWithChoiceContext
 
@@ -461,26 +466,6 @@ class SingleScanConnection private[client] (
       )
     )
 
-  def getSynchronizerIdentities(synchronizerIdPrefix: String)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[HttpScanSoftDomainMigrationPocAppClient.SynchronizerIdentities] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerIdentities(synchronizerIdPrefix),
-    )
-
-  def getSynchronizerBootstrappingTransactions(synchronizerIdPrefix: String)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[HttpScanSoftDomainMigrationPocAppClient.SynchronizerBootstrappingTransactions] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanSoftDomainMigrationPocAppClient.GetSynchronizerBootstrappingTransactions(
-        synchronizerIdPrefix
-      ),
-    )
-
   override def lookupTransferPreapprovalByParty(receiver: PartyId)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -620,6 +605,42 @@ class SingleScanConnection private[client] (
       HttpScanAppClient.GetTransferInstructionWithdrawContext(instructionCid),
     )
 
+  def getTransferInstructionAcceptContextRaw(
+      transferInstructionCid: String,
+      body: transferinstruction.v1.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[transferinstruction.v1.definitions.ChoiceContext] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetTransferInstructionTransferContextRaw(transferInstructionCid, body),
+    )
+
+  def getTransferInstructionWithdrawContextRaw(
+      transferInstructionCid: String,
+      body: transferinstruction.v1.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[transferinstruction.v1.definitions.ChoiceContext] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetTransferInstructionWithdrawContextRaw(transferInstructionCid, body),
+    )
+
+  def getTransferInstructionRejectContextRaw(
+      transferInstructionCid: String,
+      body: transferinstruction.v1.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[transferinstruction.v1.definitions.ChoiceContext] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetTransferInstructionRejectContextRaw(transferInstructionCid, body),
+    )
+
   def getTransferFactory(choiceArgs: transferinstructionv1.TransferFactory_Transfer)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -634,6 +655,12 @@ class SingleScanConnection private[client] (
   ] =
     runHttpCmd(config.adminApi.url, HttpScanAppClient.GetTransferFactory(choiceArgs))
 
+  def getTransferFactoryRaw(arg: transferinstruction.v1.definitions.GetFactoryRequest)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[transferinstruction.v1.definitions.TransferFactoryWithChoiceContext] =
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetTransferFactoryRaw(arg))
+
   def listSvBftSequencers()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -644,6 +671,118 @@ class SingleScanConnection private[client] (
     )
   }
 
+  def getRegistryInfo()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[metadata.v1.definitions.GetRegistryInfoResponse] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetRegistryInfo,
+    )
+
+  def lookupInstrument(instrumentId: String)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[metadata.v1.definitions.Instrument]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.LookupInstrument(instrumentId),
+    )
+
+  def listInstruments(pageSize: Option[Int], pageToken: Option[String])(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Seq[metadata.v1.definitions.Instrument]] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListInstruments(pageSize, pageToken),
+    )
+
+  def getAllocationTransferContext(
+      allocationCid: Allocation.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationTransferContext(allocationCid),
+    )
+
+  def getAllocationTransferContextRaw(
+      allocationCid: String,
+      body: allocation.v1.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[allocation.v1.definitions.ChoiceContext] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationTransferContextRaw(allocationCid, body),
+    )
+
+  def getAllocationCancelContextRaw(
+      allocationCid: String,
+      body: allocation.v1.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[allocation.v1.definitions.ChoiceContext] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationCancelContextRaw(allocationCid, body),
+    )
+
+  def getAllocationWithdrawContextRaw(
+      allocationCid: String,
+      body: allocation.v1.definitions.GetChoiceContextRequest,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[allocation.v1.definitions.ChoiceContext] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationWithdrawContextRaw(allocationCid, body),
+    )
+
+  def getAllocationCancelContext(
+      allocationCid: Allocation.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationCancelContext(allocationCid),
+    )
+
+  def getAllocationWithdrawContext(
+      allocationCid: Allocation.ContractId
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[ChoiceContextWithDisclosures] =
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAllocationWithdrawContext(allocationCid),
+    )
+
+  def getAllocationFactory(choiceArgs: allocationinstructionv1.AllocationFactory_Allocate)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[
+    FactoryChoiceWithDisclosures[
+      allocationinstructionv1.AllocationFactory.ContractId,
+      allocationinstructionv1.AllocationFactory_Allocate,
+    ]
+  ] =
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetAllocationFactory(choiceArgs))
+
+  def getAllocationFactoryRaw(arg: allocationinstruction.v1.definitions.GetFactoryRequest)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[allocationinstruction.v1.definitions.FactoryWithChoiceContext] =
+    runHttpCmd(config.adminApi.url, HttpScanAppClient.GetAllocationFactoryRaw(arg))
 }
 
 object SingleScanConnection {

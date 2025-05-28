@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { Secret } from '@pulumi/kubernetes/core/v1';
@@ -225,22 +227,6 @@ export async function installValidatorApp(
       contactPoint: daContactPoint,
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
-      additionalEnvVars:
-        !config.svValidator && config.onboardingSecret
-          ? // TODO(#17447): This is a horrible hacky way to test that `valueFrom` does what it should here; this should be removed ASAP.
-            [
-              {
-                name: 'ONBOARDING_SECRET_ONLY_FOR_TESTING',
-                valueFrom: {
-                  secretKeyRef: {
-                    name: validatorOnboardingSecretName('validator'),
-                    key: 'secret',
-                    optional: false,
-                  },
-                },
-              },
-            ]
-          : undefined,
       deduplicationDuration: config.deduplicationDuration,
       ...spliceInstanceNames,
       ...txLogBackfillingValues,

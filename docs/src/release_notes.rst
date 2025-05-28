@@ -8,6 +8,11 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Expose token-standard endpoints on the validator scan-proxy. The paths are the normal token standard path with a ``/api/validator/v0/scan-proxy`` prefix.
+
 0.4.0
 -----
 

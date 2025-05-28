@@ -66,7 +66,6 @@ class ValidatorAutomationService(
     svValidator: Boolean,
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
-    supportsSoftDomainMigrationPoc: Boolean,
     initialSynchronizerTime: Option[CantonTimestamp],
     override protected val loggerFactory: NamedLoggerFactory,
     packageVersionSupport: PackageVersionSupport,
@@ -192,7 +191,6 @@ class ValidatorAutomationService(
         scanConnection,
         domainConnector,
         sequencerSubmissionAmplificationPatience,
-        supportsSoftDomainMigrationPoc,
         initialSynchronizerTime,
       )
     )
