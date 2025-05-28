@@ -1,0 +1,82 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Participant values"
+templates:
+  - participant.yaml
+tests:
+  - it: "deploys as expected with some AWS KMS config"
+    set:
+      # Things we need just to pass the schema
+      persistence:
+        host: mock-pg-host
+        schema: participant
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        targetAudience: "mock_audience"
+      # More interesting options
+      kms:
+        # All of these are mock values; we translate to Canton config directly
+        type: awwws
+        region: mock_region
+        extraCantonKey: mock_value
+      additionalEnvVars:
+        - name: AWWWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: awwws-credentials
+              key: accessKeyId
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # KMS config
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            # We don't really care about the name of the env var but helm unittest wants it
+            name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
+            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    region = mock_region\n    type = awwws\n  }\n}        \n"
+      # Secret configured via Helm with valueFrom
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AWWWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: awwws-credentials
+                key: accessKeyId
+  - it: "handles multiline additionalEnvVars values"
+    set:
+      # Things we need just to pass the schema
+      persistence:
+        host: mock-pg-host
+        schema: participant
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        targetAudience: "mock_audience"
+      additionalEnvVars:
+        - name: CUSTOM
+          value: |
+            multi
+            line
+            environment
+            variable
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # multi-line env var
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CUSTOM
+            value: "multi\nline\nenvironment\nvariable\n"

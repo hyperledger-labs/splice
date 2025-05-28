@@ -37,7 +37,6 @@ class ReconcileSequencerConnectionsTrigger(
     scanConnection: BftScanConnection,
     domainConnector: DomainConnector,
     patience: NonNegativeFiniteDuration,
-    supportsSoftDomainMigrationPoc: Boolean,
     initialSynchronizerTimeO: Option[CantonTimestamp],
 )(implicit
     override val ec: ExecutionContext,
@@ -51,23 +50,19 @@ class ReconcileSequencerConnectionsTrigger(
     for {
       decentralizedSynchronizer <- amuletRulesDomain()
       maybeDomainTime <-
-        if (supportsSoftDomainMigrationPoc)
-          // TODO(#13301) This should query domain time for each domain and chose sequencers based on that to work accurately with catchup
-          Future.successful(Some(context.clock.now))
-        else
-          participantAdminConnection
-            .getDomainTimeLowerBound(
-              decentralizedSynchronizer,
-              maxDomainTimeLag = context.config.pollingInterval,
-            )
-            .map(domainTime => Some(domainTime.timestamp))
-            .recover {
-              // Time tracker for domain not found. the domainTime is not yet available.
-              case ex: StatusRuntimeException
-                  if ex.getStatus.getCode == Code.INVALID_ARGUMENT &&
-                    ex.getStatus.getDescription.contains("Time tracker for domain") =>
-                None
-            }
+        participantAdminConnection
+          .getDomainTimeLowerBound(
+            decentralizedSynchronizer,
+            maxDomainTimeLag = context.config.pollingInterval,
+          )
+          .map(domainTime => Some(domainTime.timestamp))
+          .recover {
+            // Time tracker for domain not found. the domainTime is not yet available.
+            case ex: StatusRuntimeException
+                if ex.getStatus.getCode == Code.INVALID_ARGUMENT &&
+                  ex.getStatus.getDescription.contains("Time tracker for domain") =>
+              None
+          }
       _ <- maybeDomainTime match {
         case Some(domainTime) =>
           val maxDomainTime = initialSynchronizerTimeO match {

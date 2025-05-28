@@ -41,7 +41,7 @@ in pkgs.mkShell {
     k6
     k9s
     kubectl
-    kubernetes-helm
+    (wrapHelm kubernetes-helm { plugins = with pkgs.kubernetes-helmPlugins; [ helm-unittest ]; })
     lnav
     nix
     nodejs

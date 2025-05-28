@@ -102,7 +102,6 @@ import scala.util.{Failure, Success}
 class TreasuryService(
     connection: SpliceLedgerConnection,
     treasuryConfig: TreasuryConfig,
-    supportsSoftDomainMigrationPoc: Boolean,
     clock: Clock,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
@@ -477,23 +476,10 @@ class TreasuryService(
   )(implicit tc: TraceContext): Future[Done] = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
     logger.debug(s"executing batch $batch with inputs $inputs")
-    // TODO(#13687) Automatic reassignments refuses to reassign contracts the actAs parties are not stakeholders on
-    // so we need the end user in there.
-    val (actAsParties, readAsParties) =
-      if (supportsSoftDomainMigrationPoc)
-        (
-          Seq(walletManager.store.walletKey.validatorParty, userStore.key.endUserParty),
-          readAs.toSeq,
-        )
-      else
-        (
-          Seq(walletManager.store.walletKey.validatorParty),
-          userStore.key.endUserParty +: readAs.toSeq,
-        )
     val baseSubmission = connection
       .submit(
-        actAsParties,
-        readAsParties,
+        Seq(walletManager.store.walletKey.validatorParty),
+        userStore.key.endUserParty +: readAs.toSeq,
         cmd,
         priority = batch.priority,
         deadline = treasuryConfig.grpcDeadline,

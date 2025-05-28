@@ -1342,7 +1342,6 @@ lazy val `apps-splitwell` =
 lazy val pulumi =
   project
     .in(file("cluster/pulumi"))
-    .disablePlugins(sbt.plugins.JvmPlugin, sbt.plugins.IvyPlugin)
     .settings(
       npmRootDir := baseDirectory.value,
       npmFix := {
@@ -1377,6 +1376,7 @@ lazy val pulumi =
         }
         cache(Set(npmRootDir.value / "package.json")).toSeq
       },
+      Headers.TsHeaderSettings,
     )
 
 lazy val `load-tester` =

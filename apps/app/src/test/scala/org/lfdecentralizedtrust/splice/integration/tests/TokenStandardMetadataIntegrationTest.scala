@@ -26,16 +26,30 @@ class TokenStandardMetadataIntegrationTest extends IntegrationTestWithSharedEnvi
       ),
     )
 
-    sv1ScanBackend.getRegistryInfo() shouldBe v1.definitions.GetRegistryInfoResponse(
-      adminId = dso,
-      supportedApis = Map("splice-api-token-metadata-v1" -> 1),
-    )
+    clue("getRegistryInfo") {
+      sv1ScanBackend.getRegistryInfo() shouldBe v1.definitions.GetRegistryInfoResponse(
+        adminId = dso,
+        supportedApis = Map("splice-api-token-metadata-v1" -> 1),
+      )
+      sv1ScanBackend.getRegistryInfo() shouldBe aliceValidatorBackend.scanProxy.getRegistryInfo()
+    }
 
-    sv1ScanBackend.listInstruments().loneElement shouldBe amuletInstrument
+    clue("listInstruments") {
+      sv1ScanBackend.listInstruments().loneElement shouldBe amuletInstrument
+      sv1ScanBackend.listInstruments() shouldBe aliceValidatorBackend.scanProxy.listInstruments()
+    }
 
-    sv1ScanBackend.lookupInstrument(amuletInstrument.id) shouldBe Some(
-      amuletInstrument
-    )
-    sv1ScanBackend.lookupInstrument("non-existent") shouldBe None
+    clue("lookupInstrument") {
+
+      sv1ScanBackend.lookupInstrument(amuletInstrument.id) shouldBe Some(
+        amuletInstrument
+      )
+      sv1ScanBackend.lookupInstrument(amuletInstrument.id) shouldBe aliceValidatorBackend.scanProxy
+        .lookupInstrument(amuletInstrument.id)
+
+      sv1ScanBackend.lookupInstrument("non-existent") shouldBe None
+      sv1ScanBackend.lookupInstrument("non-existent") shouldBe aliceValidatorBackend.scanProxy
+        .lookupInstrument("non-existent")
+    }
   }
 }

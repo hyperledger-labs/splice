@@ -594,13 +594,6 @@ object SpliceConfig {
             ),
           )
           _ <- Either.cond(
-            conf.synchronizerNodes.isEmpty || conf.supportsSoftDomainMigrationPoc,
-            (),
-            ConfigValidationFailed(
-              "synchronizerNodes must be empty unless supportsSoftDomainMigrationPoc is set to true"
-            ),
-          )
-          _ <- Either.cond(
             conf.legacyMigrationId.forall(_ == conf.domainMigrationId - 1L),
             (),
             ConfigValidationFailed(

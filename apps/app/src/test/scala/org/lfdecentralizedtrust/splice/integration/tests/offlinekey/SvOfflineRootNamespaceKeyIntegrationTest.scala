@@ -57,8 +57,8 @@ class SvOfflineRootNamespaceKeyIntegrationTest
       backend: SvAppBackendReference
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val participantClient = backend.participantClientWithAdminToken
-    val sequencerClient = backend.sequencerClient(decentralizedSynchronizerAlias)
-    val mediatorClient = backend.mediatorClient(decentralizedSynchronizerAlias)
+    val sequencerClient = backend.sequencerClient
+    val mediatorClient = backend.mediatorClient
     initializeInstanceWithOfflineRootNamespaceKey(
       s"${backend.name}$cantonNameSuffix",
       participantClient,

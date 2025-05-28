@@ -147,6 +147,7 @@ class TokenStandardAllocationIntegrationTest
         ),
       )
       val factoryChoice0 = sv1ScanBackend.getAllocationFactory(choiceArgs)
+      aliceValidatorBackend.scanProxy.getAllocationFactory(choiceArgs) shouldBe factoryChoice0
       factoryChoice0.copy(disclosedContracts = factoryChoice0.disclosedContracts)
     }
   }
@@ -234,8 +235,12 @@ class TokenStandardAllocationIntegrationTest
     actAndCheck(
       "Settlement venue settles the trade", {
         val aliceContext = clue("Get choice context for alice's allocation") {
-          sv1ScanBackend.getAllocationTransferContext(allocatedOtcTrade.aliceAllocationId)
-
+          val scanResponse =
+            sv1ScanBackend.getAllocationTransferContext(allocatedOtcTrade.aliceAllocationId)
+          aliceValidatorBackend.scanProxy.getAllocationTransferContext(
+            allocatedOtcTrade.aliceAllocationId
+          ) shouldBe scanResponse
+          scanResponse
         }
         // We do this after alice gets her context so one is featured and one isn't.
         actAndCheck("Venue self-features", splitwellWalletClient.selfGrantFeaturedAppRight())(
@@ -332,8 +337,12 @@ class TokenStandardAllocationIntegrationTest
     actAndCheck(
       "Settlement venue cancels the trade", {
         val aliceContext = clue("Get choice context for alice's allocation") {
-          sv1ScanBackend.getAllocationCancelContext(allocatedOtcTrade.aliceAllocationId)
-
+          val scanResponse =
+            sv1ScanBackend.getAllocationCancelContext(allocatedOtcTrade.aliceAllocationId)
+          aliceValidatorBackend.scanProxy.getAllocationCancelContext(
+            allocatedOtcTrade.aliceAllocationId
+          ) shouldBe scanResponse
+          scanResponse
         }
         val bobContext = clue("Get choice context for bob's allocation") {
           sv1ScanBackend.getAllocationCancelContext(allocatedOtcTrade.bobAllocationId)
@@ -389,8 +398,12 @@ class TokenStandardAllocationIntegrationTest
     actAndCheck(
       "Settlement venue withdraw the trade", {
         val aliceContext = clue("Get choice context for alice's allocation") {
-          sv1ScanBackend.getAllocationWithdrawContext(allocatedOtcTrade.aliceAllocationId)
-
+          val scanResponse =
+            sv1ScanBackend.getAllocationWithdrawContext(allocatedOtcTrade.aliceAllocationId)
+          aliceValidatorBackend.scanProxy.getAllocationWithdrawContext(
+            allocatedOtcTrade.aliceAllocationId
+          ) shouldBe scanResponse
+          scanResponse
         }
 
         def mkExtraArg(context: ChoiceContextWithDisclosures) =

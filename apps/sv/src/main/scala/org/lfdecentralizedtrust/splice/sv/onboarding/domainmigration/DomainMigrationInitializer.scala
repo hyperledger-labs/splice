@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftClient, CometBftNode}
 import org.lfdecentralizedtrust.splice.sv.config.{
@@ -73,7 +73,6 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
     localSynchronizerNode: LocalSynchronizerNode,
-    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
     participantId: ParticipantId,
     cometBftConfig: Option[SvCometBftConfig],
@@ -211,7 +210,6 @@ class DomainMigrationInitializer(
           retryProvider,
           newCometBftNode,
           Some(localSynchronizerNode),
-          extraSynchronizerNodes,
           upgradesConfig,
           spliceInstanceNamesConfig,
           loggerFactory,

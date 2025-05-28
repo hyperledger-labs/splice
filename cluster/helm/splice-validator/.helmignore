@@ -23,3 +23,5 @@
 *.tmproj
 .vscode/
 *-template.yaml
+# helm-unittest
+tests

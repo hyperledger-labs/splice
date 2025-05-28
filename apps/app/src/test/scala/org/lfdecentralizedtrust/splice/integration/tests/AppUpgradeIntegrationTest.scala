@@ -121,7 +121,7 @@ class AppUpgradeIntegrationTest
           Seq(
             ("sv1-node", Seq("sv-apps.sv1", "scan-apps.sv1Scan", "validator-apps.sv1Validator")),
             ("sv2-node", Seq("sv-apps.sv2", "scan-apps.sv2Scan", "validator-apps.sv2Validator")),
-            ("sv3-node", Seq("sv-apps.sv3", "validator-apps.sv3Validator")),
+            ("sv3-node", Seq("sv-apps.sv3", "scan-apps.sv3Scan", "validator-apps.sv3Validator")),
             (
               "bobSplitwellValidators",
               Seq(
@@ -202,7 +202,7 @@ class AppUpgradeIntegrationTest
             startAllSync(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
             spliceProcs.stopBundledSplice("sv3-node")
             // No scan for sv3
-            startAllSync(sv3Backend, sv3ValidatorBackend)
+            startAllSync(sv3Backend, sv3ScanBackend, sv3ValidatorBackend)
           }
 
           clue("Testing some more transactions after 2 SVs upgraded") {
@@ -657,6 +657,7 @@ object AppUpgradeIntegrationTest {
       "SV1_URL" -> "http://127.0.0.1:5114",
       "SV1_SCAN_URL" -> "http://127.0.0.1:5012",
       "SV2_SCAN_URL" -> "http://127.0.0.1:5112",
+      "SV3_SCAN_URL" -> "http://127.0.0.1:5112",
     ).!
     if (result != 0) {
       throw new RuntimeException(s"Command $cmd returned: $result")

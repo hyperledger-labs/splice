@@ -30,9 +30,6 @@ case class ScanAppBackendConfig(
     svUser: String,
     override val participantClient: ParticipantClientConfig,
     sequencerAdminClient: FullClientConfig,
-    // Map from domain id prefix to sequencer/mediator config
-    // This is for the Poc from #13301
-    synchronizers: Map[String, ScanSynchronizerConfig] = Map.empty,
     override val automation: AutomationConfig = AutomationConfig(),
     isFirstSv: Boolean = false,
     ingestFromParticipantBegin: Boolean = true,
@@ -43,8 +40,6 @@ case class ScanAppBackendConfig(
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
-    // TODO(#13301) Remove this flag
-    supportsSoftDomainMigrationPoc: Boolean = false,
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
