@@ -7,7 +7,7 @@ metadata:
   name: splitwell-web-ui
   namespace: {{ .Release.Namespace }}
   labels:
-    app: splitwell-web-ui
+    {{- include "splice-util-lib.default-labels" (set . "app" "splitwell-web-ui") | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -18,7 +18,7 @@ spec:
   template:
     metadata:
       labels:
-        app: splitwell-web-ui
+        {{- include "splice-util-lib.default-labels" (set . "app" "splitwell-web-ui") | nindent 8 }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
