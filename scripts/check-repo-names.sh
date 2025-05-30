@@ -61,6 +61,7 @@ function check_patterns_locally() {
     'cluster/pulumi/'
     'cluster/deployment'
     'cluster/stacks'
+    'cluster/images/LICENSE'
     'expected.json'
   )
 

@@ -9,7 +9,7 @@ metadata:
   name: gcs-proxy
   namespace: {{ .Release.Namespace }}
   labels:
-    app: gcs-proxy
+    {{- include "splice-util-lib.default-labels" (set . "app" "gcs-proxy") | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -20,7 +20,7 @@ spec:
   template:
     metadata:
       labels:
-        app: gcs-proxy
+        {{- include "splice-util-lib.default-labels" (set . "app" "gcs-proxy") | nindent 8 }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:

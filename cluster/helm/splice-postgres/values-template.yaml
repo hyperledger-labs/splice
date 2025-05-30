@@ -10,6 +10,11 @@ resources:
     cpu: "0.5"
     memory: 1Gi
 
+# Custom annotations and labels for deployed resources
+pod:
+  annotations: {}
+  labels: {}
+
 db:
   volumeSize: 2800Gi
   volumeStorageClass: standard-rwo

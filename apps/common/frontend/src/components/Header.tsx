@@ -60,6 +60,7 @@ const Header: React.FC<HeaderProps> = ({ children, title, titleVariant, navLinks
                 <NavLink
                   key={index}
                   id={`navlink-${navLink.path}`}
+                  data-testid={`navlink-${navLink.path}`}
                   to={navLink.path}
                   style={p => applyNavStyle(p.isActive)}
                 >
