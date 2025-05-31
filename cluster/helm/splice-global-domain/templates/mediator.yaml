@@ -1,18 +1,25 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+{{- $mediatorLabel := (printf "%s-mediator" .Release.Name) }}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ .Release.Name }}-mediator
-  name: {{ .Release.Name }}-mediator
+    {{- include "splice-util-lib.default-labels" (set . "app" $mediatorLabel) | nindent 4 }}
+    splice-component: mediator
+    app.kubernetes.io/component: mediator
+    {{- with $.Values.metrics.migration }}
+    migration_id: {{ .id | quote }}
+    {{- end }}
+  name: {{ $mediatorLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-mediator
+      app: {{ $mediatorLabel }}
   strategy:
     type: Recreate
   template:
@@ -20,8 +27,9 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ .Release.Name }}-mediator
+        {{- include "splice-util-lib.default-labels" (set . "app" $mediatorLabel) | nindent 8 }}
         splice-component: mediator
+        app.kubernetes.io/component: mediator
         {{- with $.Values.metrics.migration }}
         migration_id: {{ .id | quote }}
         {{- end }}
@@ -121,16 +129,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-mediator
+  name: {{ $mediatorLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-mediator
+    {{- include "splice-util-lib.default-labels" (set . "app" $mediatorLabel) | nindent 4 }}
     {{- with $.Values.metrics.migration }}
     migration_id: {{ .id | quote }}
     {{- end }}
 spec:
   selector:
-    app: {{ .Release.Name }}-mediator
+    app: {{ $mediatorLabel }}
   ports:
   - name: cm-adm-api
     port: 5007
