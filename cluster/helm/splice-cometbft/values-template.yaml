@@ -3,9 +3,10 @@
 
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
-# -- Annotations for the comebft pods
+# Custom annotations and labels for deployed resources
 pod:
-  annotations: { }
+  annotations: {}
+  labels: {}
 
 # Node names use as a moniker to identify the node in the CometBFT network
 nodeName: ""

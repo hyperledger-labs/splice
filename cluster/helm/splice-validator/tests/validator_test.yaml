@@ -1,0 +1,82 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Validator values"
+templates:
+  - validator.yaml
+release:
+  # Set for testing labels
+  name: mock-validator
+chart:
+  # Override for testing labels
+  version: 0.1.1
+  appVersion: 0.1.0
+tests:
+  - it: "sets labels and annotations as expected"
+    set:
+      # Things we need just to pass the schema
+      nodeIdentifier: "helm-mock-1-validator"
+      validatorPartyHint: "helm-mock-1"
+      validatorWalletUser: "mock-wallet-user-id"
+      scanAddress: "trusted.scan.mock.com"
+      topup:
+        enabled: false
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        audience: "mock_audience"
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      # Extra labels and annotations for testing
+      pod:
+        labels:
+          mock: yes-please
+        annotations:
+          mock-annotation: still-an-annotation
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: validator-app
+      # Labels on deployment
+      - isSubset:
+          path: metadata.labels
+          content:
+            # Splice-specific
+            app: validator-app
+            migration: "0"
+            # k8s/Helm standard
+            app.kubernetes.io/instance: mock-validator
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: validator-app
+            app.kubernetes.io/version: "0.1.0"
+            helm.sh/chart: splice-validator-0.1.1
+            # Extra for test
+            mock: yes-please
+      # Labels on pod; should be the same as on deployment
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            # Splice-specific
+            app: validator-app
+            migration: "0"
+            # k8s/Helm standard
+            app.kubernetes.io/instance: mock-validator
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: validator-app
+            app.kubernetes.io/version: "0.1.0"
+            helm.sh/chart: splice-validator-0.1.1
+            # Extra for test
+            mock: yes-please
+      # Annotations on pod
+      - equal:
+          path: spec.template.metadata.annotations
+          value:
+            mock-annotation: still-an-annotation

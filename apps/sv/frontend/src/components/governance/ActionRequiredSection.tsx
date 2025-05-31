@@ -21,7 +21,7 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
   const { actionRequiredRequests } = props;
 
   return (
-    <Box sx={{ mb: 4 }}>
+    <Box sx={{ mb: 4 }} data-testid="action-required-section">
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" id="action-required-header" data-testid="action-required-header">
           Action Required

@@ -1,5 +1,8 @@
 #! /usr/bin/env bash
 
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 set -euo pipefail
 
 if [ $# -eq 1 ]; then
@@ -18,20 +21,10 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
 fi
 
 # Always use the release version on release branches.
-branch=$(git rev-parse --abbrev-ref HEAD)
-if [[ $branch =~ ^release-line-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "${branch#release-line-}"
+release_version=$("${SPLICE_ROOT}"/build-tools/get-release-if-on-release-branch.sh)
+if [ -n "${release_version-}" ]; then
+    echo "${release_version}"
     exit 0
-fi
-# Similarly, use the release version on commits that are on a release branch, but not on main branch
-# (when checking out Splice as a submodule, we might be losing the branch information).
-sha=$(git rev-parse HEAD)
-if ! (git branch -r --contains "$sha" | grep -q "\borigin/main\b"); then
-    if [[ $(git branch -r --contains "$sha") =~ origin/release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        branch=$(git branch -r --contains "$sha" | grep -o 'origin/release-line-.*' | head -n 1)
-        echo "${branch#origin/release-line-}"
-        exit 0
-    fi
 fi
 
 set +e

@@ -7,7 +7,7 @@ metadata:
   name: load-tester
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}
+    {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
 spec:
   replicas: 1
   selector:
@@ -18,7 +18,7 @@ spec:
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
+        {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 8 }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:

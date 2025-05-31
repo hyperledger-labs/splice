@@ -11,7 +11,18 @@ Release Notes
 Upcoming
 --------
 
-- Expose token-standard endpoints on the validator scan-proxy. The paths are the normal token standard path with a ``/api/validator/v0/scan-proxy`` prefix.
+- Validator
+
+  - Expose token-standard endpoints on the validator scan-proxy. The paths are the normal token standard path with a ``/api/validator/v0/scan-proxy`` prefix.
+
+- Sequencer
+
+  - Improve sequencer startup time by fixing a slow query.
+
+- Define `standard k8s labels <https://helm.sh/docs/chart_best_practices/labels/#standard-labels>`_
+  for most k8s resources deployed through Splice Helm charts.
+  Thanks to Stephane Loeuillet for contributing an initial proposal for this change
+  in https://github.com/hyperledger-labs/splice/pull/296.
 
 0.4.0
 -----

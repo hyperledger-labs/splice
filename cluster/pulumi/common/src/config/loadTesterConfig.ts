@@ -16,5 +16,3 @@ export const LoadTesterConfigSchema = z.object({
 export type LoadTesterConfig = z.infer<typeof LoadTesterConfigSchema>;
 
 export const loadTesterConfig = LoadTesterConfigSchema.parse(clusterYamlConfig).loadTester;
-
-console.error(`LOADTESTER ${JSON.stringify(loadTesterConfig)}`);

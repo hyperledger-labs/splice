@@ -211,3 +211,20 @@ spec:
 serviceAccountName: {{ .serviceAccountName }}
 {{- end -}}
 {{- end -}}
+# See https://helm.sh/docs/chart_best_practices/labels/#standard-labels
+{{- define "splice-util-lib.standard-labels" -}}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/name: {{ .app }}
+app.kubernetes.io/version: {{ .Chart.AppVersion }}
+helm.sh/chart: {{ trunc 63 (printf "%s-%s" .Chart.Name ( .Chart.Version | replace "+" "_" )) }}
+{{- end -}}
+{{- define "splice-util-lib.default-labels" -}}
+app: {{ .app }}
+{{ include "splice-util-lib.standard-labels" . }}
+{{- with .Values.pod }}
+{{- with .labels }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+{{- end -}}

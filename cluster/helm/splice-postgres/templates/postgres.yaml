@@ -18,7 +18,7 @@ metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}
+    {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
 spec:
   serviceName: {{ .Release.Name }}
   replicas: 1
@@ -27,8 +27,10 @@ spec:
       app: {{ .Release.Name }}
   template:
     metadata:
+      annotations:
+        {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ .Release.Name }}
+        {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 8 }}
         namespace: {{ .Release.Namespace }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
