@@ -11,3 +11,8 @@ Community-Contributed Documentation
    This section contains community-contributed documentation that
    hasn't been vetted or tested by the splice
    maintainers so it may be incorrect or outdated.
+
+.. toctree::
+
+   oidc-config-okta-keycloak.rst
+   
