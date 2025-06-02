@@ -1,0 +1,45 @@
+Applicable Terms and Conditions for this Docker image
+
+1. Definitions
+
+   “Global Synchronizer” means a decentralized synchronization domain for the Canton Network referred to as the Global Synchronizer; the Global Synchronizer is decentrally operated, with each Super Validator operating an instance of the Global Synchronizer software and with their actions mediated through the Global Synchronizer’s consensus protocol.
+
+   “License” means this Applicable Terms and Conditions for this Docker image as set forth herein.
+
+   “You” or “Your” means the individual or legal entity that is accessing Software through this Docker image.
+
+   “Digital Asset” means Digital Asset (Switzerland) GmbH.
+
+   “Purpose” means acting as a Super Validator or Validator.
+
+   “Software” means any goods, licensed materials, documentation, or software (including object and/or source code) made available for download by Digital Asset via this Docker image.
+
+   “Super Validator” means an entity that operates an instance of the Global Synchronizer software and has been approved to do so through the Global Synchronizer’s governance protocol.
+
+   “Validator” means an entity operating a validator node connected solely to the Global Synchronizer.
+
+2. GOVERNING LICENSE.
+
+   a. Use of Software pursuant to a License Agreement. Except as set forth in section 2.b below, (i) if You are using the Software contained in this Docker image pursuant to a Master Product Agreement, Evaluation Agreement, or other similar software license agreement signed between You and Digital Asset or any of its affiliates and which remains in effect as of the date You access the Software (each, an “Agreement”), and such use of the Software is for the purpose set forth in such Agreement, such Agreement shall govern your use of the Software; (ii) if You have not signed an Agreement, Your use of the Software is not for the purpose set forth in Your Agreement, or Your Agreement is no longer in effect, then You are not authorized to access or use the Software.
+
+   b. Use of Software for the Canton Network’s Global Synchronizer. Notwithstanding whether You are a party to an Agreement, if You are using the Software contained in this Docker image for the Purpose, Your use of the Software is subject to the terms and conditions of this License. BY DOWNLOADING, INSTALLING, OR USING THE SOFTWARE, YOU ACKNOWLEDGE, ACCEPT, AND AGREE TO BE BOUND BY THIS LICENSE.
+
+3. LICENSE TERMS.
+
+   a. Ownership/Title of Software.  As between Digital Asset and You (each individually a “Party” and collectively, the “Parties”), Digital Asset exclusively retains and owns all right, title, and interest, including but not limited to any and all intellectual property rights, in and to the Software and any and all improvements, updates, modifications, derivatives, or enhancements thereof.
+
+   b. License Grant for Software.
+
+      1. The Software is proprietary to Digital Asset and is licensed, not sold. Your rights to use the Software are limited to those expressly granted in this License.
+
+      2. Subject to the approval of the Super Validators pursuant to the Global Synchronizer’s governance protocol to permit You to be a Super Validator or Validator, Digital Asset hereby grants to You an irrevocable, limited, non-exclusive, royalty-free, non-transferable (except if You are permitted to transfer your right to operate a Super Validator or Validator through the Global Synchronizer’s governance protocol), non-sublicensable (except to new entities that are approved to become Super Validators or Validators through the Global Synchronizer’s governance protocol (“New Super Validators” or "New Validators", as applicable) in accordance with section 4 below), and non-assignable (except if You are permitted to assign your right to operate a Super Validator through the Global Synchronizer’s governance protocol) license to use the Software solely for the Purpose and solely to the extent you are permitted in accordance with the Global Synchronizer’s governance protocol to operate a Super Validator or Validator node, and not for any other purpose. You must ensure that anyone who uses the Software (accessed either locally or remotely) does so only on Your behalf and complies with this License.
+
+      3. You shall not: (i) use the Software or any derivatives thereof for any purpose other than the Purpose; (ii) publicly demonstrate any of the Software or any derivatives thereof, whether by itself or in combination with any other product or service; (iii) market, sell, or distribute any of the Software or any derivatives thereof (other than to New Super Validators or New Validators in accordance with section 4 below); (iv) market, sell, or distribute any product or service that includes any of the Software or any derivatives thereof; (v) sublicense, rent, or lease any of the Software or any derivatives thereof; (vi) remove or modify any proprietary notices and other legends of ownership and confidentiality on the Software; (vii) modify, translate, copy, reproduce, reverse engineer, decompile, disassemble, or otherwise attempt to derive the source code of the Software; or (viii) publish, disseminate, or otherwise disclose any aspect of the evaluation, including the results of any performance testing, to any third party.
+
+      4. Sub-licensing to New Super Validators and New Validators. If a New Super Validator or New Validator is approved in accordance with the Global Synchronizer’s governance protocol, you may (and if required by the Global Synchronizer’s governance process, you must) sub-licence the Software to such New Super Validator solely pursuant to the license grant in section 2 above and only if such sub-license includes the language in sections c, d, and e below.
+
+   c. NO OBLIGATIONS OF DIGITAL ASSET; GOVERNANCE THROUGH GLOBAL SYNCHRONIZER. As a condition to using the Software, You acknowledge and agree that (i) Digital Asset has no obligation to (A) provide you with any updates to the Software, (B) provide you with any training and/or support services with respect to any Software, or (C) otherwise assist You with Your use of the Software and (ii) any and all issues with Your use of the Software should be addressed through the Global Synchronizer’s governance mechanisms.
+
+   d. DISCLAIMERS. THE SOFTWARE IS PROVIDED “AS IS” WITH NO REPRESENTATIONS AND WARRANTIES WHATSOEVER, EXPRESS OR IMPLIED, REGARDING THE SOFTWARE INCLUDING, BUT NOT LIMITED TO, ANY IMPLIED WARRANTIES OR CONDITIONS OF MERCHANTABILITY, QUIET ENJOYMENT, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND ANY WARRANTY OR CONDITION OF NON-INFRINGEMENT. WITHOUT LIMITING THE GENERALITY OF THE FOREGOING, DIGITAL ASSET DOES NOT WARRANT THAT THE SOFTWARE WILL FUNCTION WITHOUT ERROR, THAT THE SOFTWARE WILL RUN WITHOUT INTERRUPTION (INCLUDING ANY INTERRUPTION THAT IMPACTS YOUR ABILITY TO MINT CANTON COIN) OR THAT ANY CONTENT AND DATA WILL BE SECURE OR NOT OTHERWISE LOST OR DAMAGED. DIGITAL ASSET PROVIDES NO WARRANTY REGARDING, AND WILL HAVE NO RESPONSIBILITY FOR, ANY CLAIM ARISING OUT OF THE USE OF THE SOFTWARE.
+
+   e. LIMITATION OF LIABILITY. IN NO EVENT AND UNDER NO LEGAL THEORY, WHETHER IN TORT (INCLUDING NEGLIGENCE), CONTRACT, OR OTHERWISE, UNLESS REQUIRED BY APPLICABLE LAW (SUCH AS DELIBERATE AND GROSSLY NEGLIGENT ACTS), SHALL DIGITAL ASSET OR ITS AFFILIATES BE LIABLE TO YOU FOR DAMAGES, INCLUDING ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES OF ANY CHARACTER ARISING AS A RESULT OF THIS LICENSE OR OUT OF THE USE OR INABILITY TO USE THE SOFTWARE (INCLUDING BUT NOT LIMITED TO DAMAGES FOR LOSS OF GOODWILL, WORK STOPPAGE, COMPUTER FAILURE OR MALFUNCTION, YOUR INABILITY TO MINT CANTON COIN, OR ANY AND ALL OTHER COMMERCIAL DAMAGES OR LOSSES), EVEN IF YOU HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.

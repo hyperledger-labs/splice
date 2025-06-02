@@ -3,9 +3,10 @@
 
 imageRepo: "ghcr.io/digital-asset/decentralized-canton-sync/docker"
 
-# -- Annotations for the sv-node pods
+# Custom annotations and labels for deployed resources
 pod:
   annotations: {}
+  labels: {}
 
 cluster:
   fixedTokens: false

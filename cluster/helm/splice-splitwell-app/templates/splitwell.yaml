@@ -7,7 +7,7 @@ metadata:
   name: splitwell-app
   namespace: {{ .Release.Namespace }}
   labels:
-    app: splitwell-app
+    {{- include "splice-util-lib.default-labels" (set . "app" "splitwell-app") | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
@@ -19,7 +19,7 @@ spec:
   template:
     metadata:
       labels:
-        app: splitwell-app
+        {{- include "splice-util-lib.default-labels" (set . "app" "splitwell-app") | nindent 8 }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:
@@ -111,7 +111,7 @@ metadata:
   name: splitwell-app
   namespace: {{ .Release.Namespace }}
   labels:
-    app: splitwell-app
+    {{- include "splice-util-lib.default-labels" (set . "app" "splitwell-app") | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   selector:

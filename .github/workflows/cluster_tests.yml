@@ -9,8 +9,8 @@ on:
       sha:
         type: string
         required: true
-      splice_url:
-        type: string
+      public_splice:
+        type: boolean
         required: false
 
     outputs:
@@ -42,5 +42,5 @@ jobs:
         run: |
           set -euo pipefail
           result=$(curl -sSfL -H "Authorization: Bearer ${{ steps.auth.outputs.id_token }}" \
-            "${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}&splice-url=${{ inputs.splice_url }}")
+            "${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}&public-splice=${{ inputs.public_splice }}")
           echo "result=$result" >> "$GITHUB_OUTPUT"

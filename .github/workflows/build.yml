@@ -139,7 +139,7 @@ jobs:
   scala_test_frontend_wall_clock_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names-frontend.log'
       start_canton_options: -w
       parallelism: 5

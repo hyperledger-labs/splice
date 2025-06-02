@@ -32,9 +32,9 @@ import { Dso } from './dso';
 
 console.error(`Launching with isDevNet: ${isDevNet}`);
 
-// This flag determines whether to add a approved SV entry of 'DA-Helm-Test-Node'
-// An 'DA-Helm-Test-Node' entry is already added to `approved-sv-id-values-dev.yaml` so it is added by default for devnet deployment.
-// This flag is only relevant to non-devnet deployment.
+// This flag determines whether to add an approved SV entry of 'DA-Helm-Test-Node'.
+// This flag is not relevant if you're using an `approved-sv-id-values.yaml` file that
+// already contains a 'DA-Helm-Test-Node' entry.
 const approveSvRunbook = config.envFlag('APPROVE_SV_RUNBOOK');
 if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');

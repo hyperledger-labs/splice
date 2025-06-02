@@ -9,7 +9,9 @@ metadata:
   name: {{ $.Values.node.identifier }}
   namespace: {{ $.Release.Namespace }}
   labels:
-    app: {{ $.Values.node.identifier }}
+    {{- include "splice-util-lib.default-labels" (set $ "app" $.Values.node.identifier) | nindent 4 }}
+    splice-component: cometbft
+    app.kubernetes.io/component: cometbft
 spec:
   replicas: 1
   selector:
@@ -22,8 +24,9 @@ spec:
       annotations:
         {{- toYaml $.Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ $.Values.node.identifier }}
+        {{- include "splice-util-lib.default-labels" (set $ "app" $.Values.node.identifier) | nindent 8 }}
         splice-component: cometbft
+        app.kubernetes.io/component: cometbft
         {{- with $.Values.metrics.migration }}
         active_migration: {{ .active | quote }}
         migration_id: {{ .id | quote }}

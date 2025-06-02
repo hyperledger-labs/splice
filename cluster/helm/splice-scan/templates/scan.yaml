@@ -9,7 +9,7 @@ metadata:
   name: {{ $scanAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ $scanAppLabel }}
+    {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
@@ -23,7 +23,7 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ $scanAppLabel }}
+        {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 8 }}
         migration: {{ .Values.migration.id | quote }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
@@ -186,7 +186,7 @@ metadata:
   name: {{ $scanAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ $scanAppLabel }}
+    {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
@@ -205,7 +205,7 @@ metadata:
   name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ $scanWebUiAppLabel }}
+    {{- include "splice-util-lib.default-labels" (set . "app" $scanWebUiAppLabel) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
@@ -216,8 +216,10 @@ spec:
     type: Recreate
   template:
     metadata:
+      annotations:
+        {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ $scanWebUiAppLabel }}
+        {{- include "splice-util-lib.default-labels" (set . "app" $scanWebUiAppLabel) | nindent 8 }}
         migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
@@ -273,6 +275,7 @@ metadata:
   name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" $scanWebUiAppLabel) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   selector:

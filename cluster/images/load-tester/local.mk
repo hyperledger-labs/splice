@@ -12,5 +12,5 @@ $(target-load-tester): $(load-tester)
 	mkdir -p $(@D)
 	cp -r $< $@
 
-$(dir)/target/LICENSE: LICENSE
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
 	cp $< $@

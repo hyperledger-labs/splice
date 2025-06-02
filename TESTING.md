@@ -382,7 +382,9 @@ To run all Helm chart tests locally run `make cluster/helm/test`.
 To run only the tests for a specific chart `CHART`, run `helm unittest cluster/helm/CHART`.
 
 Refer to the documentation of `helm-unittest` for more information on how to extend our Helm tests.
-When writing or debugging Helm tests, it is often useful to run `helm template` to see the rendered templates.
+When writing or debugging Helm tests, it is often useful to run `helm unittest` with the `-d` flag.
+This produces rendered yaml files under a local `.debug` folder
+that can be inspected to understand errors or determine the correct paths for assertions.
 
 ### Pulumi checks
 

@@ -8,7 +8,7 @@ metadata:
   name: {{ include "prefix" (list .Values "cometbft-data") }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Values.node.identifier }}
+    {{- include "splice-util-lib.default-labels" (set . "app" $.Values.node.identifier) | nindent 4 }}
 spec:
   accessModes:
     - ReadWriteOnce

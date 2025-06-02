@@ -1,0 +1,31 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "cometbft deployment"
+templates:
+  - deployment.yaml
+release:
+  # Set for testing labels
+  name: global-domain-3
+tests:
+  - it: "deploys something"
+    set:
+      sv1:
+        externalAddress: sv.mock.net:26316
+        nodeId: "4c7c99516fb3309b89b7f8ed94690994c8ec0ab0"
+        publicKey: "H2bcJU2zbzbLmP78YWiwMgtB0QG1MNTSozGl1tP11hI="
+        keyAddress: "9473617BBC80C12F68CC25B5A754D1ED9035886C"
+      node:
+        id: "1234dedbeef1234dedbeef1234dedbeef1234ded"
+        identifier: "global-domain-3-cometbft"
+        externalAddress: "global-domain-3-cometbft.sv.mock.net:26356"
+        keysSecret: "cometbft-keys"
+      genesis:
+        chainId: "mock-3"
+        chainIdSuffix: "1"  # must be a string value
+    asserts:
+      # Sanity checks
+      - equal:
+          path: metadata.name
+          value: global-domain-3-cometbft
+

@@ -1,0 +1,62 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+suite: "Splitwell Web UI"
+templates:
+  - splitwell-web-ui.yaml
+chart:
+  # splitwell-web-ui has a very long chart name;
+  # if this works well with our longest version then we're safe everywhere
+  version: 0.4.1-snapshot.20250527.9394.0.vb6a641dc
+  appVersion: 0.4.1-snapshot.20250527.9394.0.vb6a641dc
+tests:
+  - it: "truncates long labels"
+    documentSelector:
+      path: kind
+      value: Deployment
+    set:
+      # Things we need just to pass the schema
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        audience: "mock_audience"
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+    asserts:
+      # Sanity checks
+      - equal:
+          path: metadata.name
+          value: splitwell-web-ui
+      # Long labels are still <= 63 characters long
+      - matchRegex:
+          path: metadata.labels["helm.sh/chart"]
+          pattern: ^.{0,63}$
+      # While we're here we can also check some expected labels...
+      # Labels on deployment
+      - isSubset:
+          path: metadata.labels
+          content:
+            # Splice-specific
+            app: splitwell-web-ui
+            # k8s/Helm standard
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: splitwell-web-ui
+            app.kubernetes.io/version: 0.4.1-snapshot.20250527.9394.0.vb6a641dc
+            # Note how we truncated this
+            helm.sh/chart: splice-splitwell-web-ui-0.4.1-snapshot.20250527.9394.0.vb6a641d
+      # Labels on pod; should be the same as on deployment
+      - isSubset:
+          path: spec.template.metadata.labels
+          content:
+            # Splice-specific
+            app: splitwell-web-ui
+            # k8s/Helm standard
+            app.kubernetes.io/managed-by: Helm
+            app.kubernetes.io/name: splitwell-web-ui
+            app.kubernetes.io/version: 0.4.1-snapshot.20250527.9394.0.vb6a641dc
+            # Note how we truncated this
+            helm.sh/chart: splice-splitwell-web-ui-0.4.1-snapshot.20250527.9394.0.vb6a641d
