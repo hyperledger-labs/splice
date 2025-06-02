@@ -13,7 +13,7 @@ $(dir)/$(docker-build): $(target-dir) $(dir)/target/LICENSE $(rpc-script)
 $(target-dir):
 	mkdir -p $(target-dir)
 
-$(dir)/target/LICENSE: LICENSE
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
 	cp $< $@
 
 $(rpc-script): $(rpc-source)

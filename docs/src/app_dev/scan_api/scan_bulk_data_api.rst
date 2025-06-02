@@ -168,6 +168,7 @@ The response returns a list of transactions. Every transaction contains the foll
 * **update_id**: Uniquely identifies an update (globally unique across networks and synchronizers).
 * **record_time**: The time at which the update was sequenced.
   Within a given migration and synchronizer, the record time of updates is strictly monotonically increasing (and thus unique).
+  Record times between migrations can overlap; for example, if *rtn* is the latest record time for migration ID *n*, then there may exist updates with migration ID *n+1* but record time preceding *rtn*.
   The update history is mainly traversed by ``migration_id``, ``synchronizer_id``, and ``record_time``.
 * **root_event_ids**: These represent the top level events of the update tree that are directly caused by commands submitted to the ledger.
   They are the starting points for all actions within the transaction, and need to be read in the order given.
