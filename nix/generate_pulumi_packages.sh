@@ -18,12 +18,12 @@ plugins=(
   "pulumi/command=0.9.2"
   "pulumi/kubernetes-cert-manager=0.0.5"
   "pulumi/gcp=6.67.0"
+  "pulumi/gcp=7.2.1" # so that old pulumi state can be interpreted
   "pulumi/kubernetes=4.7.1"
   # currently used
   "pulumi/kubernetes=4.11.0"
   "pulumi/kubernetes=4.21.1"
   "pulumi/random=4.14.0"
-  "pulumi/gcp=7.2.1" # TODO (#19680) move above when unused
   "pulumi/gcp=7.38.0"
   "pulumi/auth0=3.3.2"
   "pulumi/std=1.7.3"

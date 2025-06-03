@@ -88,11 +88,11 @@ jobs:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
 
     services:
       postgres:
-        image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-postgres:0.3.12
+        image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
         env:
           POSTGRES_PASSWORD: postgres
 

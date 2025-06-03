@@ -193,7 +193,7 @@ case class ValidatorAppBackendConfig(
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
     participantPruningSchedule: Option[ParticipantPruningConfig] = None,
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
-    txLogBackfillEnabled: Boolean = false,
+    txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {

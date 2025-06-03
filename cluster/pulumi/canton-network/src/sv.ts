@@ -37,7 +37,6 @@ import {
   svCometBftGovernanceKeySecret,
   SvIdKey,
   svUserIds,
-  txLogBackfillingValues,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
@@ -523,7 +522,6 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
-    ...txLogBackfillingValues,
   };
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {

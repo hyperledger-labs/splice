@@ -96,7 +96,8 @@ copy_file "cluster/local.mk"
 
 copy_dir ".github/actions"
 copy_dir ".github/workflows"
-rm "${SPLICE_DIR}/.github/workflows/post_merge.yml" # Don't invoke cimain & ciupgrade on Splice (yet)
+rm "${SPLICE_DIR}/.github/workflows/cimain.yml" # Don't invoke cimain on Splice (yet)
+rm "${SPLICE_DIR}/.github/workflows/ciupgrade.yml" # Don't invoke ciupgrade on Splice (yet)
 copy_file ".github/actionlint.yml"
 copy_file ".github/pull_request_template.md"
 

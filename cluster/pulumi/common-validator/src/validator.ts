@@ -26,7 +26,6 @@ import {
   ParticipantPruningConfig,
   PersistenceConfig,
   spliceInstanceNames,
-  txLogBackfillingValues,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
@@ -229,7 +228,6 @@ export async function installValidatorApp(
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
       ...spliceInstanceNames,
-      ...txLogBackfillingValues,
     },
     chartVersion,
     { dependsOn }
