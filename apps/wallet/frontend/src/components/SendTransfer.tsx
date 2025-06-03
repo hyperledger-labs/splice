@@ -36,6 +36,7 @@ import useLookupTransferPreapproval from '../hooks/scan-proxy/useLookupTransferP
 import { useWalletConfig } from '../utils/config';
 import BftAnsField from './BftAnsField';
 import { useFeatureSupport } from '../hooks/useFeatureSupport';
+import { PendingOffers } from './PendingOffers';
 
 const SendTransfer: React.FC = () => {
   const config = useWalletConfig();
@@ -297,6 +298,7 @@ const SendTransfer: React.FC = () => {
           </DisableConditionally>
         </CardContent>
       </Card>
+      <PendingOffers />
     </Stack>
   );
 };
