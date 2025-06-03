@@ -1674,10 +1674,15 @@ checkErrors := {
     import better.files.File
     val logSpecificIgnores =
       if (File(ignorePatternsFilename(logName)).exists()) Seq(logName) else Seq.empty
+    val bftIgnore = if (sys.env.contains("SPLICE_USE_BFT_SEQUENCER")) {
+      Seq("canton_log_bft")
+    } else {
+      Seq.empty
+    }
 
     val simtimeIgnorePatterns = if (usesSimtime) Seq("canton_log_simtime_extra") else Seq.empty
     val beforeIgnorePatterns =
-      Seq("canton_log") ++ simtimeIgnorePatterns ++ logSpecificIgnores
+      Seq("canton_log") ++ simtimeIgnorePatterns ++ logSpecificIgnores ++ bftIgnore
     val afterIgnorePatterns =
       beforeIgnorePatterns ++ Seq("canton_log_shutdown_extra") ++ logSpecificIgnores
 

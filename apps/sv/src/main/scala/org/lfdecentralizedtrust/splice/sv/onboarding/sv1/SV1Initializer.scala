@@ -571,6 +571,7 @@ class SV1Initializer(
         synchronizerId,
         SynchronizerNodeState.OnboardedImmediately,
         migrationId,
+        config.scan,
       )
     }
 

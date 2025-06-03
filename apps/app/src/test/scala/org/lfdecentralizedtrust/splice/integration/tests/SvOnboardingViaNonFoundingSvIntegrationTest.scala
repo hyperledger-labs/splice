@@ -1,17 +1,24 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.bumpUrl
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  IsTheCantonSequencerBFTEnabled,
+  bumpUrl,
+}
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, NetworkAppClientConfig}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvAppClientConfig}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.SvOffboardingSequencerTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.JoinWithKey
 import org.lfdecentralizedtrust.splice.util.{StandaloneCanton, SvTestUtil}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import org.scalatest.time.SpanSugar.convertIntToGrainOfTime
 import org.scalatest.time.{Minute, Span}
 
 class SvOnboardingViaNonFoundingSvIntegrationTest
@@ -29,11 +36,6 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.withPausedSvOffboardingMediatorAndPartyToParticipantTriggers()(
-          config
-        )
-      )
       .withPreSetup(_ => ())
       .withOnboardingParticipantPromotionDelayEnabled() // Test onboarding with participant promotion delay
       .addConfigTransformsToFront(
@@ -120,6 +122,22 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             )
           },
         )
+        clue("sv2 uses it's own sequencer to handle offboarding sv1") {
+          eventually(timeUntilSuccess = 2.minutes) {
+            sv2Backend.participantClient.synchronizers
+              .config(decentralizedSynchronizerAlias)
+              .value
+              .sequencerConnections
+              .connections
+              .toIndexedSeq
+              .loneElement match {
+              case GrpcSequencerConnection(endpoints, _, _, _) =>
+                endpoints.toIndexedSeq.loneElement shouldBe LocalSynchronizerNode.toEndpoint(
+                  sv2Backend.config.localSynchronizerNode.value.sequencer.internalApi
+                )
+            }
+          }
+        }
         actAndCheck(
           "SV2 creates a request to offboard SV1",
           sv2Backend.createVoteRequest(
@@ -173,12 +191,33 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             }
           }
         }
+
+        // resume only after the other offboarding triggeres finished to not brick sv1's sequencer too early
+        if (IsTheCantonSequencerBFTEnabled) {
+          sv1Backend.dsoAutomation.trigger[SvOffboardingSequencerTrigger].resume()
+          sv2Backend.dsoAutomation.trigger[SvOffboardingSequencerTrigger].resume()
+          eventually() {
+            sv2Backend.participantClient.topology.sequencers
+              .list(
+                store = Some(TopologyStoreId.Synchronizer(decentralizedSynchronizerId))
+              )
+              .loneElement
+              .item
+              .allSequencers
+              .toIndexedSeq should have size 1
+            sv2Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
+              .getSequencerOrderingTopology()
+              .futureValue
+              .sequencerIds should have size 1
+          }
+          sv2Backend.dsoAutomation.trigger[SvBftSequencerPeerOffboardingTrigger].resume()
+        }
         clue("Stop SV1") {
           sv1Backend.stop()
         }
         actAndCheck(
           "Onboard SV3",
-          sv3Backend.startSync(),
+          startAllSync(sv3Backend, sv3ScanBackend),
         )(
           "SV3 is now sv",
           _ => {

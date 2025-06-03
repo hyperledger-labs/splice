@@ -72,6 +72,10 @@ To request a cluster test to be run on your PR, comment on your pr `/cluster_tes
 for a basic test or a hard-migration test respectively. After commenting, reach out to the
 [Splice Contributors](CONTRIBUTORS.md) to approve and trigger the actual test on your behalf.
 
+### Enabling the new Canton bft ordering layer
+
+If you want to run the integration tests with the new Canton bft, you can do so by including the message `[bft]` in your commit message.
+
 ## Running Tests Locally
 
 ### Managing Canton for Tests
@@ -207,6 +211,17 @@ No installation of `lnav` is required, as it is provided by default by our `dire
 
 Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/README.md).
 If you wish to extend our testing topology please also consult [this README](/apps/app/src/test/resources/README.md) about name and port allocation.
+
+### Enabling the new Canton bft ordering layer
+
+If you want to run the integration tests locally with the new Canton bft, canton must be started with the `-e` flag.
+This can be done by running `./start-canton.sh -we`.
+Furthermore the integration test must run with the `SPLICE_USE_BFT_SEQUENCER` environment variable set to `true`.
+Eg of test run:
+
+```bash
+ SPLICE_USE_BFT_SEQUENCER=1 sbt 'apps-app/ testOnly org.lfdecentralizedtrust.splice.integration.tests.SvDevNetReonboardingIntegrationTest'
+```
 
 ### Testing App Behaviour Outside of Tests Without Running Bundle
 
