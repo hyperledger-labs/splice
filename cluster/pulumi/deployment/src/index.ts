@@ -35,4 +35,4 @@ const credentialsSecret = new core.v1.Secret('gke-credentials', {
 });
 
 installSpliceStacks(mainStackReference, envRefs, namespace, credentialsSecret);
-installMigrationSpecificStacks(mainStackReference, envRefs, namespace);
+installMigrationSpecificStacks(mainStackReference, envRefs, namespace, credentialsSecret);

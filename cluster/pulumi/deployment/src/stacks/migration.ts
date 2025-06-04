@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as k8s from '@pulumi/kubernetes';
 import {
   CLUSTER_BASENAME,
   config,
@@ -32,7 +33,8 @@ export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
 export function installMigrationSpecificStacks(
   mainReference: GitFluxRef,
   envRefs: EnvRefs,
-  namespace: string
+  namespace: string,
+  gcpSecret: k8s.core.v1.Secret
 ): void {
   const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
   migrations.forEach(migration => {
@@ -49,7 +51,7 @@ export function installMigrationSpecificStacks(
         )
       : mainReference;
     allSvsToDeploy.forEach(sv => {
-      createStackForMigration(sv.nodeName, migration.id, reference, envRefs, namespace);
+      createStackForMigration(sv.nodeName, migration.id, reference, envRefs, namespace, gcpSecret);
     });
   });
 }
@@ -59,7 +61,8 @@ function createStackForMigration(
   migrationId: DomainMigrationIndex,
   reference: GitFluxRef,
   envRefs: EnvRefs,
-  namespace: string
+  namespace: string,
+  gcpSecret: k8s.core.v1.Secret
 ) {
   createStackCR(
     `sv-canton.${sv}-migration-${migrationId}`,
@@ -68,7 +71,7 @@ function createStackForMigration(
     sv === svRunbookConfig.nodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
     reference,
     envRefs,
-    undefined,
+    gcpSecret,
     {
       SPLICE_MIGRATION_ID: migrationId.toString(),
       SPLICE_SV: sv,

@@ -76,7 +76,7 @@ export function createStackCR(
   supportsResetOnSameCommit: boolean,
   ref: GitFluxRef,
   envRefs: EnvRefs,
-  gcpSecret?: k8s.core.v1.Secret,
+  gcpSecret: k8s.core.v1.Secret,
   extraEnvs: { [key: string]: string } = {},
   dependsOn: pulumi.Resource[] = []
 ): pulumi.CustomResource {
@@ -205,69 +205,60 @@ export function createStackCR(
           workspaceTemplate: {
             spec: {
               image: `pulumi/pulumi:${spliceEnvConfig.requireEnv('PULUMI_VERSION')}`,
-              env: (
-                [
-                  {
-                    name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
-                    value: 'true',
-                  },
-                  {
-                    name: 'SPLICE_OPERATOR_DEPLOYMENT',
-                    value: 'true',
-                  },
-                  {
-                    // Avoids rate-limiting pulumi access of public repositories
-                    name: 'GITHUB_TOKEN',
-                    valueFrom: {
-                      secretKeyRef: {
-                        // This secret is created flux/github-secret.ts for the flux controller
-                        name: 'github',
-                        key: 'password',
-                      },
+              env: [
+                {
+                  name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
+                  value: 'true',
+                },
+                {
+                  name: 'SPLICE_OPERATOR_DEPLOYMENT',
+                  value: 'true',
+                },
+                {
+                  // Avoids rate-limiting pulumi access of public repositories
+                  name: 'GITHUB_TOKEN',
+                  valueFrom: {
+                    secretKeyRef: {
+                      // This secret is created flux/github-secret.ts for the flux controller
+                      name: 'github',
+                      key: 'password',
                     },
                   },
-                ] as unknown[]
-              ).concat(
-                gcpSecret
-                  ? [
-                      {
-                        name: 'CLOUDSDK_CORE_PROJECT',
-                        value: config.requireEnv('CLOUDSDK_CORE_PROJECT'),
-                      },
-                      {
-                        name: 'CLOUDSDK_COMPUTE_REGION',
-                        value: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
-                      },
-                      {
-                        name: 'GOOGLE_APPLICATION_CREDENTIALS',
-                        value: '/app/gcp-credentials.json',
-                      },
-                      {
-                        name: 'GOOGLE_CREDENTIALS',
-                        valueFrom: {
-                          secretKeyRef: {
-                            name: gcpSecret.metadata.name,
-                            key: 'googleCredentials',
-                          },
-                        },
-                      },
-                    ]
-                  : []
-              ),
+                },
+                {
+                  name: 'CLOUDSDK_CORE_PROJECT',
+                  value: config.requireEnv('CLOUDSDK_CORE_PROJECT'),
+                },
+                {
+                  name: 'CLOUDSDK_COMPUTE_REGION',
+                  value: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
+                },
+                {
+                  name: 'GOOGLE_APPLICATION_CREDENTIALS',
+                  value: '/app/gcp-credentials.json',
+                },
+                {
+                  name: 'GOOGLE_CREDENTIALS',
+                  valueFrom: {
+                    secretKeyRef: {
+                      name: gcpSecret.metadata.name,
+                      key: 'googleCredentials',
+                    },
+                  },
+                },
+              ],
               podTemplate: {
                 spec: {
                   ...infraAffinityAndTolerations,
-                  volumes: gcpSecret
-                    ? [
-                        {
-                          name: 'gcp-credentials',
-                          secret: {
-                            secretName: gcpSecret.metadata.name,
-                            optional: false,
-                          },
-                        },
-                      ]
-                    : [],
+                  volumes: [
+                    {
+                      name: 'gcp-credentials',
+                      secret: {
+                        secretName: gcpSecret.metadata.name,
+                        optional: false,
+                      },
+                    },
+                  ],
                   containers: [
                     {
                       name: 'pulumi',
