@@ -25,7 +25,6 @@ synchronizerMigration:
       deploymentDir: "cluster/deployment"
       spliceRoot: "."
       privateConfigsDir: "cluster/configs-private"
-      publicConfigsDir: "cluster/configs"
 operatorDeployment:
   reference:
     repoUrl: https://github.com/DACH-NY/canton-network-node
