@@ -83,7 +83,7 @@ spec:
         {{- range $ii, $user := .Values.validatorWalletUsers }}
         - name: ADDITIONAL_CONFIG_VALIDATOR_WALLET_USER_{{ $ii }}
           value: |
-            canton.validator-apps.validator_backend.validator-wallet-users.{{ $ii }} = {{ $user }}
+            canton.validator-apps.validator_backend.validator-wallet-users.{{ $ii }} = {{ $user | quote }}
         {{- end }}
         {{ if .Values.validatorPartyHint }}
         - name: SPLICE_APP_VALIDATOR_PARTY_HINT
