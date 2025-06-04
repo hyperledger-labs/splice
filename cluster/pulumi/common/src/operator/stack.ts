@@ -2,13 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, config, isMainNet } from 'splice-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  config,
+  infraAffinityAndTolerations,
+  isMainNet,
+} from 'splice-pulumi-common';
 
+import { spliceEnvConfig } from '../config/envConfig';
 import { GitFluxRef } from './flux-source';
 
 export type EnvRefs = { [key: string]: unknown };
 
-export function createEnvRefs(envSecretName: string, namespaceName: string = 'operator'): EnvRefs {
+export function createEnvRefs(envSecretName: string, namespaceName: string): EnvRefs {
   const requiredEnvs = Array.from([
     'AUTH0_CN_MANAGEMENT_API_CLIENT_ID',
     'AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET',
@@ -66,13 +72,49 @@ export function createEnvRefs(envSecretName: string, namespaceName: string = 'op
 export function createStackCR(
   name: string,
   projectName: string,
+  namespaceName: string,
   supportsResetOnSameCommit: boolean,
   ref: GitFluxRef,
   envRefs: EnvRefs,
+  gcpSecret?: k8s.core.v1.Secret,
   extraEnvs: { [key: string]: string } = {},
-  namespaceName: string = 'operator',
   dependsOn: pulumi.Resource[] = []
 ): pulumi.CustomResource {
+  const sa = new k8s.core.v1.ServiceAccount(`${name}-sa`, {
+    metadata: {
+      name: `${name}-sa`,
+      namespace: namespaceName,
+    },
+  });
+  const crb = new k8s.rbac.v1.ClusterRoleBinding(`${name}:system:auth-delegator`, {
+    roleRef: {
+      apiGroup: 'rbac.authorization.k8s.io',
+      kind: 'ClusterRole',
+      name: 'system:auth-delegator',
+    },
+    subjects: [
+      {
+        kind: 'ServiceAccount',
+        name: sa.metadata.name,
+        namespace: sa.metadata.namespace,
+      },
+    ],
+  });
+  const crbAdmin = new k8s.rbac.v1.ClusterRoleBinding(`${name}:cluster-admin`, {
+    roleRef: {
+      apiGroup: 'rbac.authorization.k8s.io',
+      kind: 'ClusterRole',
+      name: 'cluster-admin',
+    },
+    subjects: [
+      {
+        kind: 'ServiceAccount',
+        name: sa.metadata.name,
+        namespace: sa.metadata.namespace,
+      },
+    ],
+  });
+
   const privateConfigs = ref.config.privateConfigsDir
     ? {
         PRIVATE_CONFIGS_PATH: {
@@ -101,10 +143,17 @@ export function createStackCR(
       metadata: { name: name, namespace: namespaceName },
       spec: {
         ...{
+          serviceAccountName: sa.metadata.name,
           stack: `organization/${projectName}/${name}.${CLUSTER_BASENAME}`,
           backend: config.requireEnv('PULUMI_BACKEND_URL'),
           envRefs: {
             ...envRefs,
+            PULUMI_VERSION: {
+              type: 'Literal',
+              literal: {
+                value: config.requireEnv('PULUMI_VERSION'),
+              },
+            },
             SPLICE_ROOT: {
               type: 'Literal',
               literal: {
@@ -152,6 +201,91 @@ export function createStackCR(
           useLocalStackOnly: true,
           // retry if the stack is locked by another operation
           retryOnUpdateConflict: true,
+          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
+          workspaceTemplate: {
+            spec: {
+              image: `pulumi/pulumi:${spliceEnvConfig.requireEnv('PULUMI_VERSION')}-nonroot`,
+              env: (
+                [
+                  {
+                    name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
+                    value: 'true',
+                  },
+                  {
+                    name: 'SPLICE_OPERATOR_DEPLOYMENT',
+                    value: 'true',
+                  },
+                  {
+                    // Avoids rate-limiting pulumi access of public repositories
+                    name: 'GITHUB_TOKEN',
+                    valueFrom: {
+                      secretKeyRef: {
+                        // This secret is created flux/github-secret.ts for the flux controller
+                        name: 'github',
+                        key: 'password',
+                      },
+                    },
+                  },
+                ] as unknown[]
+              ).concat(
+                gcpSecret
+                  ? [
+                      {
+                        name: 'CLOUDSDK_CORE_PROJECT',
+                        value: config.requireEnv('CLOUDSDK_CORE_PROJECT'),
+                      },
+                      {
+                        name: 'CLOUDSDK_COMPUTE_REGION',
+                        value: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
+                      },
+                      {
+                        name: 'GOOGLE_APPLICATION_CREDENTIALS',
+                        value: '/app/gcp-credentials.json',
+                      },
+                      {
+                        name: 'GOOGLE_CREDENTIALS',
+                        valueFrom: {
+                          secretKeyRef: {
+                            name: gcpSecret.metadata.name,
+                            key: 'googleCredentials',
+                          },
+                        },
+                      },
+                    ]
+                  : []
+              ),
+              podTemplate: {
+                spec: {
+                  ...infraAffinityAndTolerations,
+                  volumes: gcpSecret
+                    ? [
+                        {
+                          name: 'gcp-credentials',
+                          secret: {
+                            secretName: gcpSecret.metadata.name,
+                            optional: false,
+                          },
+                        },
+                      ]
+                    : [],
+                  containers: [
+                    {
+                      name: 'pulumi',
+                      volumeMounts: gcpSecret
+                        ? [
+                            {
+                              name: 'gcp-credentials',
+                              mountPath: '/app/gcp-credentials.json',
+                              subPath: 'googleCredentials',
+                            },
+                          ]
+                        : [],
+                    },
+                  ],
+                },
+              },
+            },
+          },
         },
         ...(supportsResetOnSameCommit
           ? {
@@ -164,7 +298,7 @@ export function createStackCR(
       },
     },
     {
-      dependsOn: dependsOn,
+      dependsOn: dependsOn.concat([sa, crb, crbAdmin]),
     }
   );
 }

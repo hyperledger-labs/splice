@@ -29,7 +29,11 @@ export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
     .flat();
 }
 
-export function installMigrationSpecificStacks(mainReference: GitFluxRef, envRefs: EnvRefs): void {
+export function installMigrationSpecificStacks(
+  mainReference: GitFluxRef,
+  envRefs: EnvRefs,
+  namespace: string
+): void {
   const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;
   migrations.forEach(migration => {
     const reference = migration.releaseReference
@@ -45,7 +49,7 @@ export function installMigrationSpecificStacks(mainReference: GitFluxRef, envRef
         )
       : mainReference;
     allSvsToDeploy.forEach(sv => {
-      createStackForMigration(sv.nodeName, migration.id, reference, envRefs);
+      createStackForMigration(sv.nodeName, migration.id, reference, envRefs, namespace);
     });
   });
 }
@@ -54,14 +58,17 @@ function createStackForMigration(
   sv: string,
   migrationId: DomainMigrationIndex,
   reference: GitFluxRef,
-  envRefs: EnvRefs
+  envRefs: EnvRefs,
+  namespace: string
 ) {
   createStackCR(
     `sv-canton.${sv}-migration-${migrationId}`,
     'sv-canton',
+    namespace,
     sv === svRunbookConfig.nodeName && config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
     reference,
     envRefs,
+    undefined,
     {
       SPLICE_MIGRATION_ID: migrationId.toString(),
       SPLICE_SV: sv,

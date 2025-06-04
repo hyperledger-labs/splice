@@ -13,9 +13,4 @@ set -euo pipefail
 
 version="$(get-snapshot-version)"
 
-# the version has a v prefix hardcoded in the pulumi-kuburnetes-operator helm chart so we add one as well
-if [ "$appname" == "pulumi-kubernetes-operator" ]; then
-    version="v${version}"
-fi
-
 echo "$DEV_DOCKER_REGISTRY/${appname}:${version}"

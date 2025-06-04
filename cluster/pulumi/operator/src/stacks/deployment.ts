@@ -8,8 +8,15 @@ import { namespace } from '../namespace';
 import { operator } from '../operator';
 
 export function installDeploymentStack(reference: GitFluxRef, envRefs: EnvRefs): void {
-  createStackCR('deployment', 'deployment', false, reference, envRefs, {}, namespace.logicalName, [
-    operator,
-    flux,
-  ]);
+  createStackCR(
+    'deployment',
+    'deployment',
+    namespace.logicalName,
+    false,
+    reference,
+    envRefs,
+    undefined,
+    {},
+    [operator, flux]
+  );
 }

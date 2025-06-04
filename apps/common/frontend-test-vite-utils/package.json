@@ -27,8 +27,8 @@
     "build:tsc": "tsc -b ./tsconfig.cjs.json ./tsconfig.esm.json ./tsconfig.types.json",
     "check": "npm run format:check && npm run lint:check",
     "fix": "npm run format:fix && npm run lint:fix",
-    "format:check": "prettier --check -- src",
-    "format:fix": "prettier --write -- src",
+    "format:check": "prettier --check -- src/**/*.ts",
+    "format:fix": "prettier --write -- src/**/*.ts",
     "lint:check": "eslint --ignore-pattern src/com/* --max-warnings=0 -- src",
     "lint:fix": "eslint --ignore-pattern src/com/* --fix --max-warnings=0 -- src",
     "start": "nodemon -V -e ts,json -i lib/ -x \"npm run build\""
