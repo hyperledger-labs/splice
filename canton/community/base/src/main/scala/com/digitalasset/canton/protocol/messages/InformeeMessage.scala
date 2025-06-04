@@ -16,7 +16,7 @@ import com.digitalasset.canton.protocol.{RootHash, v30}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.version.{
   ProtoVersion,
   ProtocolVersion,
@@ -57,7 +57,7 @@ case class InformeeMessage(
 
   override def requestUuid: UUID = fullInformeeTree.transactionUuid
 
-  override def synchronizerId: SynchronizerId = fullInformeeTree.synchronizerId
+  override def synchronizerId: PhysicalSynchronizerId = fullInformeeTree.synchronizerId
 
   override def mediator: MediatorGroupRecipient = fullInformeeTree.mediator
 
@@ -90,7 +90,7 @@ object InformeeMessage
     extends VersioningCompanionContext[InformeeMessage, (HashOps, ProtocolVersion)] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.InformeeMessage)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.InformeeMessage)(
       supportedProtoVersion(_)((hashOps, proto) => fromProtoV30(hashOps)(proto)),
       _.toProtoV30,
     )

@@ -40,10 +40,11 @@ import com.digitalasset.canton.synchronizer.sequencer.store.{
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitError,
+  SequencerRateLimitManager,
   SequencerTrafficStatus,
 }
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.FutureUtil.doNotAwait
@@ -69,7 +70,7 @@ object DatabaseSequencer {
       storage: Storage,
       sequencerStore: SequencerStore,
       clock: Clock,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       topologyClientMember: Member,
       protocolVersion: ProtocolVersion,
       cryptoApi: SynchronizerCryptoClient,
@@ -112,6 +113,7 @@ object DatabaseSequencer {
       metrics,
       loggerFactory,
       blockSequencerMode = false,
+      rateLimitManagerO = None,
     )
   }
 }
@@ -130,13 +132,14 @@ class DatabaseSequencer(
     exclusiveStorage: Option[Storage],
     health: Option[SequencerHealthConfig],
     clock: Clock,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     topologyClientMember: Member,
-    protocolVersion: ProtocolVersion,
+    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     cryptoApi: SynchronizerCryptoClient,
     metrics: SequencerMetrics,
     loggerFactory: NamedLoggerFactory,
     blockSequencerMode: Boolean,
+    rateLimitManagerO: Option[SequencerRateLimitManager],
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
     extends BaseSequencer(
       loggerFactory,
@@ -159,6 +162,7 @@ class DatabaseSequencer(
     timeouts,
     storage,
     sequencerStore,
+    rateLimitManagerO,
     clock,
     eventSignaller,
     protocolVersion,

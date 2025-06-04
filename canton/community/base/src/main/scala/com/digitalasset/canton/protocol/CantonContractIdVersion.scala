@@ -19,13 +19,16 @@ object CantonContractIdVersion {
   def maximumSupportedVersion(
       protocolVersion: ProtocolVersion
   ): Either[String, CantonContractIdVersion] =
-    if (protocolVersion >= ProtocolVersion.v33) Right(AuthenticatedContractIdVersionV11)
+    if (protocolVersion >= ProtocolVersion.v34) Right(AuthenticatedContractIdVersionV11)
     else Left(s"No contract ID scheme found for ${protocolVersion.v}")
 
   def extractCantonContractIdVersion(
       contractId: LfContractId
   ): Either[MalformedContractId, CantonContractIdVersion] = {
-    val LfContractId.V1(_, suffix) = contractId
+    val LfContractId.V1(_, suffix) = contractId match {
+      case cid: LfContractId.V1 => cid
+      case _ => sys.error("ContractId V2 are not supported")
+    }
     for {
       versionedContractId <- CantonContractIdVersion
         .fromContractSuffix(suffix)
@@ -38,6 +41,14 @@ object CantonContractIdVersion {
         .leftMap(err => MalformedContractId(contractId.toString, err.message))
     } yield versionedContractId
   }
+
+  // Only use when the contract has been authenticated
+  def tryCantonContractIdVersion(contractId: LfContractId): CantonContractIdVersion =
+    extractCantonContractIdVersion(contractId).valueOr { err =>
+      throw new IllegalArgumentException(
+        s"Unable to unwrap object of type ${getClass.getSimpleName}: $err"
+      )
+    }
 
   def fromContractSuffix(contractSuffix: Bytes): Either[String, CantonContractIdVersion] =
     if (contractSuffix.startsWith(AuthenticatedContractIdVersionV11.versionPrefixBytes)) {

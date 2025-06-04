@@ -56,7 +56,11 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{AsyncResult, HandlerResult}
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SubmissionTopologyHelper, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SubmissionTopologyHelper,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
@@ -102,7 +106,7 @@ abstract class ProtocolProcessor[
     ephemeral: SyncEphemeralState,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClientSend,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
@@ -139,6 +143,17 @@ abstract class ProtocolProcessor[
     */
   private val submissionCounter: AtomicInteger = new AtomicInteger(0)
 
+  /** Validations run at the start of the submission. This can be overridden to provide early stage
+    * validations that should fail _synchronously_ the submission.
+    */
+  protected def preSubmissionValidations(
+      params: SubmissionParam,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, SubmissionError, Unit]
+
   /** Submits the request to the sequencer, using a recent topology snapshot and the current
     * persisted state as an approximation to the future state at the assigned request timestamp.
     *
@@ -161,6 +176,7 @@ abstract class ProtocolProcessor[
     val recentSnapshot = crypto.create(topologySnapshot)
     val explicitMediatorGroupIndex = steps.explicitMediatorGroup(submissionParam)
     for {
+      _ <- preSubmissionValidations(submissionParam, recentSnapshot, protocolVersion)
       mediator <- chooseMediator(recentSnapshot.ipsSnapshot, explicitMediatorGroupIndex)
         .leftMap(steps.embedNoMediatorError)
       submission <- steps.createSubmission(submissionParam, mediator, ephemeral, recentSnapshot)
@@ -710,7 +726,8 @@ abstract class ProtocolProcessor[
               _.leftMap(_ =>
                 steps.embedRequestError(
                   UnableToGetDynamicSynchronizerParameters(
-                    snapshot.synchronizerId,
+                    // TODO(#25467) synchronizerId in the snapshot should be physical
+                    PhysicalSynchronizerId(snapshot.synchronizerId, protocolVersion),
                     snapshot.ipsSnapshot.timestamp,
                   )
                 )
@@ -1883,7 +1900,7 @@ object ProtocolProcessor {
   }
 
   final case class UnableToGetDynamicSynchronizerParameters(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       ts: CantonTimestamp,
   ) extends RequestProcessingError
       with ResultProcessingError {

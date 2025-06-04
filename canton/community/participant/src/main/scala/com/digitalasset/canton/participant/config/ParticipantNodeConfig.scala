@@ -219,6 +219,7 @@ final case class LedgerApiServerConfig(
       LedgerApiKeepAliveServerConfig()
     ),
     maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
+    maxInboundMetadataSize: NonNegativeInt = ServerConfig.defaultMaxInboundMetadataSize,
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
     postgresDataSource: PostgresDataSourceConfig = PostgresDataSourceConfig(),
     databaseConnectionTimeout: config.NonNegativeFiniteDuration =
@@ -342,13 +343,14 @@ final case class ParticipantNodeParameterConfig(
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
     reassignmentTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
-      ParticipantProtocolVersion(ProtocolVersion.v33)
+      ParticipantProtocolVersion(ProtocolVersion.v34)
     ),
     initialProtocolVersion: ParticipantProtocolVersion = ParticipantProtocolVersion(
       ProtocolVersion.latest
     ),
     sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
-    alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    alphaVersionSupport: Boolean = true,
     betaVersionSupport: Boolean = false,
     dontWarnOnDeprecatedPV: Boolean = false,
     warnIfOverloadedFor: Option[config.NonNegativeFiniteDuration] = Some(
@@ -479,13 +481,8 @@ object ContractLoaderConfig {
 }
 
 /** Parameters for the Online Party Replication (OPR) preview feature (unsafe for production)
-  *
-  * @param pauseSynchronizerIndexingDuringPartyReplication
-  *   whether to pause synchronizer indexing during party replication
   */
-final case class UnsafeOnlinePartyReplicationConfig(
-    pauseSynchronizerIndexingDuringPartyReplication: Boolean = false
-) extends UniformCantonConfigValidation
+final case class UnsafeOnlinePartyReplicationConfig() extends UniformCantonConfigValidation
 object UnsafeOnlinePartyReplicationConfig {
   implicit val unsafeOnlinePartyReplicationConfigCantonConfigValidator
       : CantonConfigValidator[UnsafeOnlinePartyReplicationConfig] =

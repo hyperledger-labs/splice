@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: JSON Ledger API HTTP endpoints
-  version: 3.3.0-SNAPSHOT
+  version: 3.4.0-SNAPSHOT
 paths:
   /v2/commands/submit-and-wait:
     post:
@@ -1676,6 +1676,8 @@ components:
       required:
       - partyIdHint
       - identityProviderId
+      - synchronizerId
+      - userId
       properties:
         partyIdHint:
           description: |-
@@ -1694,6 +1696,19 @@ components:
           description: |-
             The id of the ``Identity Provider``
             Optional, if not set, assume the party is managed by the default identity provider or party is not hosted by the participant.
+          type: string
+        synchronizerId:
+          description: |-
+            The synchronizer, on which the party should be allocated.
+            For backwards compatibility, this field may be omitted, if the participant is connected to only one synchronizer.
+            Otherwise a synchronizer must be specified.
+            Optional
+          type: string
+        userId:
+          description: |-
+            The user who will get the act_as rights to the newly allocated party.
+            If set to an empty string (the default), no user will get rights to the party.
+            Optional
           type: string
     AllocatePartyResponse:
       title: AllocatePartyResponse

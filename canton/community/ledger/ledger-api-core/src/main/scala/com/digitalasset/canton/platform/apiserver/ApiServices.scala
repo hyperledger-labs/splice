@@ -7,7 +7,6 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.auth.Authorizer
 import com.digitalasset.canton.config
-import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.ledger.api.SubmissionIdGenerator
 import com.digitalasset.canton.ledger.api.auth.services.*
 import com.digitalasset.canton.ledger.api.grpc.GrpcHealthService
@@ -45,6 +44,7 @@ import com.digitalasset.canton.platform.config.{
   PartyManagementServiceConfig,
   UserManagementServiceConfig,
 }
+import com.digitalasset.canton.platform.store.dao.events.LfValueTranslation
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Ref
 import com.digitalasset.daml.lf.engine.*
@@ -123,7 +123,7 @@ object ApiServices {
       loggerFactory: NamedLoggerFactory,
       dynParamGetter: DynamicSynchronizerParameterGetter,
       interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
-      interactiveSubmissionEnricher: InteractiveSubmissionEnricher,
+      lfValueTranslation: LfValueTranslation,
       logger: TracedLogger,
       packagePreferenceBackend: PackagePreferenceBackend,
   )(implicit
@@ -313,10 +313,10 @@ object ApiServices {
 
       val apiPartyManagementService = ApiPartyManagementService.createApiService(
         partyManagementService,
+        userManagementStore,
         new IdentityProviderExists(identityProviderConfigStore),
         partyManagementServiceConfig.maxPartiesPageSize,
         partyRecordStore,
-        updateService,
         syncService,
         managementServiceTimeout,
         telemetry = telemetry,
@@ -380,7 +380,7 @@ object ApiServices {
             commandExecutor,
             metrics,
             checkOverloaded,
-            interactiveSubmissionEnricher,
+            lfValueTranslation,
             interactiveSubmissionServiceConfig,
             contractStore,
             packagePreferenceBackend,

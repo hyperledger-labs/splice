@@ -35,7 +35,9 @@ class GrpcManagedSubscriptionTest extends AnyWordSpec with BaseTest with HasExec
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
   private class Env {
     val sequencerSubscription = mock[SequencerSubscription[SequencedEventError]]
-    val synchronizerId = SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("da::default"))
+    val synchronizerId = SynchronizerId(
+      UniqueIdentifier.tryFromProtoPrimitive("da::default")
+    ).toPhysical
     var handler: Option[SequencedEventOrErrorHandler[SequencedEventError]] = None
     val member = ParticipantId(DefaultTestIdentities.uid)
     val observer = mock[ServerCallStreamObserver[v30.SubscriptionResponse]]

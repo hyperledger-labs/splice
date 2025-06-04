@@ -38,7 +38,7 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
 import com.digitalasset.daml.lf.engine as LfEngine
-import com.digitalasset.daml.lf.engine.{Engine, Enricher}
+import com.digitalasset.daml.lf.engine.{Engine, ValueEnricher}
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.VersionedValue
@@ -86,9 +86,7 @@ final class LfValueTranslation(
 ) extends LfValueSerialization
     with NamedLogging {
 
-  private val enricherO = engineO.map(engine =>
-    new Enricher(engine, requireContractIdSuffix = engine.config.requireSuffixedGlobalContractId)
-  )
+  private val enricherO = engineO.map(new ValueEnricher(_))
 
   private[this] val packageLoader = new DeduplicatingPackageLoader()
 
@@ -182,11 +180,17 @@ final class LfValueTranslation(
   ): Future[VersionedTransaction] =
     consumeEnricherResult(enricher.enrichVersionedTransaction(versionedTransaction))
 
-  def enrichContract(contract: FatContractInstance)(implicit
+  def enrichCreateNode(node: Node.Create)(implicit
       ec: ExecutionContext,
       loggingContext: LoggingContextWithTrace,
-  ): Future[FatContractInstance] =
-    consumeEnricherResult(enricher.enrichContract(contract))
+  ): Future[Node.Create] =
+    consumeEnricherResult(enricher.enrichNode(node)).flatMap {
+      case enriched: Node.Create => Future.successful(enriched)
+      case other =>
+        Future.failed(
+          new RuntimeException(s"Node enrichment produced a different node type: $other")
+        )
+    }
 
   def toApiValue(
       value: LfValue,
@@ -216,7 +220,7 @@ final class LfValueTranslation(
   private def decompressAndDeserialize(algorithm: Compression.Algorithm, value: Array[Byte]) =
     ValueSerializer.deserializeValue(algorithm.decompress(new ByteArrayInputStream(value)))
 
-  def enricher: Enricher =
+  def enricher: ValueEnricher =
     enricherO.getOrElse(
       sys.error(
         "LfValueTranslation used to deserialize values in verbose mode without an Engine"
@@ -256,8 +260,8 @@ final class LfValueTranslation(
           )
         )
       )
-      Ref.QualifiedChoiceName(interfaceId, choiceName) =
-        Ref.QualifiedChoiceName.assertFromString(rawExercisedEvent.exerciseChoice)
+      Ref.QualifiedChoiceId(interfaceId, choiceName) =
+        Ref.QualifiedChoiceId.assertFromString(rawExercisedEvent.exerciseChoice)
       // Convert Daml-LF values to ledger API values.
       // In verbose mode, this involves loading Daml-LF packages and filling in missing type information.
       choiceArgument <- toApiValue(

@@ -55,7 +55,7 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import scala.jdk.DurationConverters.*
 
-trait AcsCommitmentProcessorIntegrationTest
+sealed trait AcsCommitmentProcessorIntegrationTest
     extends CommunityIntegrationTest
     with SharedEnvironment
     with SortedReconciliationIntervalsHelpers
@@ -71,7 +71,7 @@ trait AcsCommitmentProcessorIntegrationTest
 
   private var lastCommTick: CantonTimestampSecond = _
 
-  lazy val maxDedupDuration = java.time.Duration.ofHours(1)
+  private lazy val maxDedupDuration = java.time.Duration.ofHours(1)
   private val confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfHours(1)
   private val mediatorReactionTimeout = NonNegativeFiniteDuration.tryOfHours(1)
   private val pruningTimeout =
@@ -476,7 +476,10 @@ trait AcsCommitmentProcessorIntegrationTest
         eventually() {
           participants.all.foreach(p =>
             p.testing
-              .await_synchronizer_time(daId, firstNoCommTick.forgetRefinement.immediateSuccessor)
+              .await_synchronizer_time(
+                daId.toPhysical,
+                firstNoCommTick.forgetRefinement.immediateSuccessor,
+              )
           )
         }
 
@@ -577,7 +580,7 @@ trait AcsCommitmentProcessorIntegrationTest
         p1Computed
       }
 
-      val (period, participant, commitment) = p1Computed.loneElement
+      val (period, _participant, commitment) = p1Computed.loneElement
       alreadyDeployedContracts = alreadyDeployedContracts.concat(createdCids)
       (createdCids, period, commitment)
     }
@@ -829,7 +832,7 @@ trait AcsCommitmentProcessorIntegrationTest
         // archive one of these created contracts
         logger.info("Archive one of these contaracts")
         val archivedCid = createdCidsDa.headOption.getOrElse(fail("No created contract found")).id
-        participant1.ledger_api.javaapi.commands.submit_flat(
+        participant1.ledger_api.javaapi.commands.submit(
           Seq(participant1.id.adminParty),
           archivedCid.exerciseArchive().commands.asScala.toSeq,
           Some(daId),
@@ -1011,6 +1014,8 @@ trait AcsCommitmentProcessorIntegrationTest
               s"active on da at the queried time"
           )
           val reassigned = inspectContracts.filter(c => c.cid == reassignedCid)
+          val reassignedCounter =
+            incompleteUnassignment.contracts.contractIdCounters.toMap.apply(reassignedCid)
           reassigned.size shouldBe 2
           reassigned.filter(states =>
             states.activeOnExpectedSynchronizer &&
@@ -1025,7 +1030,7 @@ trait AcsCommitmentProcessorIntegrationTest
                     .contains(incompleteUnassignment.reassignmentId) &&
                   s.contractState
                     .asInstanceOf[ContractUnassigned]
-                    .reassignmentCounterSrc == incompleteUnassignment.reassignmentCounter - 1
+                    .reassignmentCounterSrc == reassignedCounter - 1
               ) == 1 &&
               states.state.sizeIs == 2
           ) should have size 1
@@ -1044,7 +1049,7 @@ trait AcsCommitmentProcessorIntegrationTest
                     .contains(incompleteUnassignment.reassignmentId) &&
                   s.contractState
                     .asInstanceOf[ContractAssigned]
-                    .reassignmentCounterTarget == incompleteUnassignment.reassignmentCounter
+                    .reassignmentCounterTarget == reassignedCounter
               ) == 1 &&
               states.state.sizeIs == 1
           ) should have size 1
@@ -1107,7 +1112,7 @@ trait AcsCommitmentProcessorIntegrationTest
         new Amount(3.50.toBigDecimal, "CHF"),
         List().asJava,
       ).create.commands.asScala.toSeq
-    participant1.ledger_api.javaapi.commands.submit_flat(
+    participant1.ledger_api.javaapi.commands.submit(
       Seq(participant1.id.adminParty),
       cmd,
       Some(daId),
@@ -1211,5 +1216,4 @@ class AcsCommitmentProcessorReferenceIntegrationTestH2
       ),
     )
   )
-
 }

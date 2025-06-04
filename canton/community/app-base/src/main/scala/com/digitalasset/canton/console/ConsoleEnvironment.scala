@@ -29,7 +29,12 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.{LfPartyId, SynchronizerAlias}
 import com.digitalasset.daml.lf.data.Ref.PackageId
@@ -551,6 +556,8 @@ object ConsoleEnvironment {
       SynchronizerAlias.tryCreate(alias)
     implicit def toSynchronizerAliases(aliases: Seq[String]): Seq[SynchronizerAlias] =
       aliases.map(SynchronizerAlias.tryCreate)
+    implicit def toSomeSynchronizerAlias(alias: SynchronizerAlias): Option[SynchronizerAlias] =
+      Some(alias)
 
     implicit def toInstanceName(name: String): InstanceName = InstanceName.tryCreate(name)
 
@@ -643,6 +650,13 @@ object ConsoleEnvironment {
     implicit def toSynchronizerTopologyStoreId(
         synchronizerId: SynchronizerId
     ): TopologyStoreId.Synchronizer = TopologyStoreId.Synchronizer(synchronizerId)
+
+    /** Implicitly convert a [[com.digitalasset.canton.topology.SynchronizerId]] to
+      * [[com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer]]
+      */
+    implicit def toSynchronizerTopologyStoreId(
+        synchronizerId: PhysicalSynchronizerId
+    ): TopologyStoreId.Synchronizer = TopologyStoreId.Synchronizer(synchronizerId.logical)
 
     /** Implicitly convert a [[com.digitalasset.canton.topology.SynchronizerId]] to [[scala.Option]]
       * of [[com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Synchronizer]]

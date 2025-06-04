@@ -223,7 +223,7 @@ abstract class SynchronizerChangeIntegrationTest(config: SynchronizerChangeInteg
       JavaDecodeUtil
         .decodeAllCreated(Iou.COMPANION)(
           P1.ledger_api.javaapi.commands
-            .submit_flat(Seq(bank), createIouCmd)
+            .submit(Seq(bank), createIouCmd)
         )
         .loneElement
     }
@@ -865,6 +865,7 @@ trait SynchronizerChangeRealClockIntegrationTest
                 Seq(paintOfferId),
                 sourceId,
                 targetId,
+                timeout = None, // not waiting for other participants to observe the unassign
               )
 
           def assign(participant: ParticipantReference, party: PartyId): Unit =
@@ -873,7 +874,7 @@ trait SynchronizerChangeRealClockIntegrationTest
               paintOfferUnassignedEvent.unassignId,
               sourceId,
               targetId,
-              timeout = 10 seconds,
+              timeout = None, // not waiting for other participants to observe the assign
             )
 
           // Wait until P5 sees the unassignment result so that assignments do not fail with `UnassignmentIncomplete`

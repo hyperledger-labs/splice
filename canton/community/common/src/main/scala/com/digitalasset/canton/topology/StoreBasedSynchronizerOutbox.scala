@@ -14,7 +14,7 @@ import com.digitalasset.canton.common.sequencer.{
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
@@ -49,7 +49,7 @@ import scala.util.chaining.*
 
 class StoreBasedSynchronizerOutbox(
     synchronizerAlias: SynchronizerAlias,
-    val synchronizerId: SynchronizerId,
+    val synchronizerId: PhysicalSynchronizerId,
     val memberId: Member,
     val protocolVersion: ProtocolVersion,
     val handle: RegisterTopologyTransactionHandle,
@@ -58,7 +58,7 @@ class StoreBasedSynchronizerOutbox(
     val targetStore: TopologyStore[TopologyStoreId.SynchronizerStore],
     override protected val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    override protected val crypto: Crypto,
+    override protected val crypto: SynchronizerCrypto,
     broadcastBatchSize: PositiveInt,
     maybeObserverCloseable: Option[AutoCloseable] = None,
     override protected val futureSupervisor: FutureSupervisor,
@@ -410,11 +410,11 @@ class SynchronizerOutboxDynamicObserver(val loggerFactory: NamedLoggerFactory)
 }
 
 class SynchronizerOutboxFactory(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
     synchronizerTopologyManager: SynchronizerTopologyManager,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
@@ -425,7 +425,7 @@ class SynchronizerOutboxFactory(
   private val synchronizerObserverRef = new SingleUseCell[SynchronizerOutboxDynamicObserver]
 
   def create(
-      protocolVersion: ProtocolVersion,
+      protocolVersion: ProtocolVersion, // // TODO(#25482) Reduce duplication in parameters
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
       timeTracker: SynchronizerTimeTracker,
@@ -531,11 +531,11 @@ class SynchronizerOutboxFactory(
 }
 
 class SynchronizerOutboxFactorySingleCreate(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
     synchronizerTopologyManager: SynchronizerTopologyManager,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     override val timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,

@@ -8,8 +8,8 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.SigningKeyUsage
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.crypto.{SigningKeyUsage, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
@@ -61,6 +61,8 @@ class QueueBasedSynchronizerOutboxTest
   private lazy val clock = new WallClock(timeouts, loggerFactory)
   private lazy val crypto =
     SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
+  private lazy val synchronizerCrypto =
+    SynchronizerCrypto(crypto, defaultStaticSynchronizerParameters)
   private lazy val publicKey =
     crypto.generateSymbolicSigningKey(usage = SigningKeyUsage.NamespaceOnly)
   private lazy val namespace = Namespace(publicKey.id)
@@ -117,7 +119,7 @@ class QueueBasedSynchronizerOutboxTest
     val manager = new SynchronizerTopologyManager(
       participant1.uid,
       clock,
-      crypto,
+      synchronizerCrypto,
       defaultStaticSynchronizerParameters,
       target,
       queue,
@@ -129,7 +131,7 @@ class QueueBasedSynchronizerOutboxTest
     )
     val client = new StoreBasedSynchronizerTopologyClient(
       clock,
-      synchronizerId,
+      DefaultTestIdentities.physicalSynchronizerId,
       store = target,
       packageDependenciesResolver = StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       timeouts = timeouts,
@@ -271,7 +273,7 @@ class QueueBasedSynchronizerOutboxTest
   ): FutureUnlessShutdown[QueueBasedSynchronizerOutbox] = {
     val synchronizerOutbox = new QueueBasedSynchronizerOutbox(
       synchronizer,
-      synchronizerId,
+      DefaultTestIdentities.physicalSynchronizerId,
       participant1,
       testedProtocolVersion,
       handle,
@@ -280,7 +282,7 @@ class QueueBasedSynchronizerOutboxTest
       target,
       timeouts,
       loggerFactory,
-      crypto,
+      synchronizerCrypto,
       broadcastBatchSize,
     )
     synchronizerOutbox
@@ -463,7 +465,7 @@ class QueueBasedSynchronizerOutboxTest
       }
       loggerFactory.assertLogs(
         action,
-        _.errorMessage should include("failed the following topology transactions"),
+        _.warningMessage should include("failed the following topology transactions"),
       )
     }
   }

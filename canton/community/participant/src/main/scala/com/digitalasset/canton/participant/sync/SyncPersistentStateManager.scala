@@ -8,7 +8,7 @@ import cats.data.EitherT
 import cats.syntax.parallel.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.environment.{
   StoreBasedSynchronizerTopologyInitializationCallback,
   SynchronizerTopologyInitializationCallback,
@@ -56,7 +56,7 @@ class SyncPersistentStateManager(
     val indexedStringStore: IndexedStringStore,
     acsCounterParticipantConfigStore: AcsCounterParticipantConfigStore,
     parameters: ParticipantNodeParameters,
-    crypto: Crypto,
+    synchronizerCryptoFactory: StaticSynchronizerParameters => SynchronizerCrypto,
     clock: Clock,
     packageDependencyResolver: PackageDependencyResolver,
     ledgerApiStore: Eval[LedgerApiStore],
@@ -188,6 +188,7 @@ class SyncPersistentStateManager(
       }
     } yield ()
 
+  // TODO(#25483): This should be per PSId
   def staticSynchronizerParameters(
       synchronizerId: SynchronizerId
   ): Option[StaticSynchronizerParameters] =
@@ -199,6 +200,7 @@ class SyncPersistentStateManager(
   private val persistentStates: concurrent.Map[SynchronizerId, SyncPersistentState] =
     TrieMap[SynchronizerId, SyncPersistentState]()
 
+  // TODO(#25483) This should be physical
   def get(synchronizerId: SynchronizerId): Option[SyncPersistentState] =
     lock.withReadLock[Option[SyncPersistentState]](persistentStates.get(synchronizerId))
 
@@ -228,7 +230,7 @@ class SyncPersistentStateManager(
         indexedSynchronizer,
         staticSynchronizerParameters,
         clock,
-        crypto,
+        synchronizerCryptoFactory(staticSynchronizerParameters),
         parameters,
         indexedStringStore,
         acsCounterParticipantConfigStore,
@@ -247,7 +249,7 @@ class SyncPersistentStateManager(
       new TopologyComponentFactory(
         synchronizerId,
         protocolVersion,
-        crypto,
+        synchronizerCryptoFactory(state.staticSynchronizerParameters),
         clock,
         parameters.processingTimeouts,
         futureSupervisor,

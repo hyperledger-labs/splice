@@ -115,10 +115,12 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       alice = participant1.parties.enable(
         "alice",
         synchronizeParticipants = Seq(participant2),
+        synchronizer = synchronizer1,
       )
       bob = participant2.parties.enable(
         "bob",
         synchronizeParticipants = Seq(participant1),
+        synchronizer = synchronizer1,
       )
     }
 
@@ -141,7 +143,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
           List.empty.asJava,
         ).create.commands.asScala.toSeq
         val iou = clue("create-iou") {
-          val tx = participant1.ledger_api.javaapi.commands.submit_flat(
+          val tx = participant1.ledger_api.javaapi.commands.submit(
             Seq(payer),
             createIouCmd,
             commandId = "create-Iou",
@@ -161,6 +163,17 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       clue(s"connect $participant2 to $synchronizer2") {
         participant2.synchronizers.connect_local(sequencer4, alias = synchronizer2)
       }
+      participant1.parties.enable(
+        "alice",
+        synchronizeParticipants = Seq(participant2),
+        synchronizer = synchronizer2,
+      )
+      participant2.parties.enable(
+        "bob",
+        synchronizeParticipants = Seq(participant1),
+        synchronizer = synchronizer2,
+      )
+
     }
 
     // We can add the new mediator group only after the participants have connected because they govern the synchronizer.
@@ -188,7 +201,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       mediatorsD2b.foreach(mediator =>
         mediator.setup
           .assign(
-            synchronizerId2,
+            synchronizerId2.toPhysical,
             SequencerConnections.single(sequencer4.sequencerConnection),
           )
       )
@@ -212,7 +225,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
       }
 
       // Obtain a new synchronizer timestamp for the reassignment's synchronizer time proof
-      participant1.testing.fetch_synchronizer_time(synchronizerId2)
+      participant1.testing.fetch_synchronizer_time(synchronizerId2.toPhysical)
 
       val unassigned = clue(s"unassign from $synchronizer1 to $synchronizer2") {
         participant1.ledger_api.commands.submit_unassign(
@@ -245,7 +258,7 @@ trait ReassignmentTest extends CommunityIntegrationTest with SharedEnvironment {
 
       clue(s"use the contract on $synchronizer1") {
         val exerciseCallCmd = contractId.exerciseCall().commands.asScala.toSeq
-        participant2.ledger_api.javaapi.commands.submit_flat(
+        participant2.ledger_api.javaapi.commands.submit(
           Seq(owner),
           exerciseCallCmd,
           commandId = "exercise-Iou",

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.EitherT
+import cats.syntax.bifunctor.*
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.base.error.{
   Alarm,
@@ -17,8 +18,9 @@ import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.crypto.InteractiveSubmission.TransactionMetadataForHashing
 import com.digitalasset.canton.data.ViewType.TransactionViewType
+import com.digitalasset.canton.data.{CantonTimestamp, LedgerTimeBoundaries}
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.SubmissionErrorGroup
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors
@@ -48,12 +50,14 @@ import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
+import com.digitalasset.canton.protocol.hash.HashTracer.NoOp
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ProtocolVersion
 import org.slf4j.event.Level
 
 import java.time.Duration
@@ -62,7 +66,7 @@ import scala.concurrent.ExecutionContext
 class TransactionProcessor(
     override val participantId: ParticipantId,
     confirmationRequestFactory: TransactionConfirmationRequestFactory,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     damle: DAMLe,
     staticSynchronizerParameters: StaticSynchronizerParameters,
     crypto: SynchronizerCryptoClient,
@@ -134,6 +138,82 @@ class TransactionProcessor(
       "user-id" -> submissionParam.submitterInfo.userId,
       "type" -> "send-confirmation-request",
     )
+
+  override protected def preSubmissionValidations(
+      params: TransactionProcessingSteps.SubmissionParam,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TransactionProcessor.TransactionSubmissionError, Unit] =
+    validateExternalSignatures(
+      params.transaction,
+      params.submitterInfo,
+      params.disclosedContracts,
+      params.transactionMeta.timeBoundaries,
+      cryptoSnapshot,
+      protocolVersion,
+    )
+
+  // Validate that provided external signatures are valid
+  // Doing this during preSubmissionValidations allows us to fail synchronously the "execute" call of interactive submissions
+  // and give better UX to the caller in case of invalid hash or signature
+  private def validateExternalSignatures(
+      wfTransaction: WellFormedTransaction[WithoutSuffixes],
+      submitterInfo: SubmitterInfo,
+      disclosedContracts: Map[LfContractId, SerializableContract],
+      timeBoundaries: LedgerTimeBoundaries,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TransactionProcessor.TransactionSubmissionError, Unit] =
+    submitterInfo.externallySignedSubmission
+      .map { externallySignedSubmission =>
+        // Re-compute the transaction hash
+        val hashE = InteractiveSubmission.computeVersionedHash(
+          externallySignedSubmission.version,
+          wfTransaction.unwrap,
+          TransactionMetadataForHashing(
+            actAs = submitterInfo.actAs.toSet,
+            commandId = submitterInfo.commandId,
+            transactionUUID = externallySignedSubmission.transactionUUID,
+            mediatorGroup = externallySignedSubmission.mediatorGroup.value,
+            synchronizerId = synchronizerId.logical,
+            timeBoundaries = timeBoundaries,
+            preparationTime = wfTransaction.metadata.preparationTime.toLf,
+            disclosedContracts = disclosedContracts,
+          ),
+          nodeSeeds = wfTransaction.metadata.seeds,
+          protocolVersion,
+          hashTracer = NoOp,
+        )
+
+        for {
+          hash <- EitherT
+            .fromEither[FutureUnlessShutdown](hashE)
+            .leftMap(err =>
+              TransactionProcessor.SubmissionErrors.InvalidExternallySignedTransaction
+                .Error(err.message)
+            )
+            .leftWiden[TransactionProcessor.TransactionSubmissionError]
+
+          // Verify signatures
+          _ <- InteractiveSubmission
+            .verifySignatures(
+              hash,
+              externallySignedSubmission.signatures,
+              cryptoSnapshot,
+              submitterInfo.actAs.toSet,
+              logger,
+            )
+            .leftMap(TransactionProcessor.SubmissionErrors.InvalidExternalSignature.Error.apply)
+            .leftWiden[TransactionProcessor.TransactionSubmissionError]
+        } yield ()
+      }
+      .getOrElse(
+        EitherT.pure[FutureUnlessShutdown, TransactionProcessor.TransactionSubmissionError](())
+      )
 
   def submit(
       submitterInfo: SubmitterInfo,
@@ -281,7 +361,7 @@ object TransactionProcessor {
     final case class SubmissionAlreadyInFlight(
         changeId: ChangeId,
         existingSubmissionId: Option[LedgerSubmissionId],
-        existingSubmissionSynchronizerId: SynchronizerId,
+        existingSubmissionSynchronizerId: PhysicalSynchronizerId,
     ) extends TransactionErrorImpl(cause = "The submission is already in-flight")(
           ConsistencyErrors.SubmissionAlreadyInFlight.code
         )
@@ -460,8 +540,10 @@ object TransactionProcessor {
     }
   }
 
-  final case class SynchronizerParametersError(synchronizerId: SynchronizerId, context: String)
-      extends TransactionProcessorError {
+  final case class SynchronizerParametersError(
+      synchronizerId: PhysicalSynchronizerId,
+      context: String,
+  ) extends TransactionProcessorError {
     override protected def pretty: Pretty[SynchronizerParametersError] = prettyOfClass(
       param("synchronizer", _.synchronizerId),
       param("context", _.context.unquoted),

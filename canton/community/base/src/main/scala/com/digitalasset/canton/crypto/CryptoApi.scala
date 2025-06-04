@@ -31,6 +31,7 @@ import com.digitalasset.canton.health.{
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.time.Clock
@@ -43,19 +44,23 @@ import com.google.protobuf.ByteString
 
 import scala.concurrent.ExecutionContext
 
-/** Wrapper class to simplify crypto dependency management */
-class Crypto(
-    val pureCrypto: CryptoPureApi,
-    val privateCrypto: CryptoPrivateApi,
-    val cryptoPrivateStore: CryptoPrivateStore,
-    val cryptoPublicStore: CryptoPublicStore,
-    override protected val timeouts: ProcessingTimeout,
-    override protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext)
-    extends NamedLogging
-    with CloseableHealthElement
-    with CompositeHealthElement[String, HealthQuasiComponent]
-    with HealthComponent {
+/** A base trait that provides all the essential cryptographic components, offering a unified
+  * interface for cryptographic operations and key management.
+  *
+  * This includes:
+  *   - Public and private crypto APIs, providing functionality for encryption, decryption, signing,
+  *     and verification.
+  *   - Public and private key store APIs, responsible for managing the persistence and retrieval of
+  *     cryptographic keys.
+  */
+sealed trait BaseCrypto extends NamedLogging {
+
+  protected implicit val ec: ExecutionContext
+
+  def pureCrypto: CryptoPureApi
+  def privateCrypto: CryptoPrivateApi
+  def cryptoPrivateStore: CryptoPrivateStore
+  def cryptoPublicStore: CryptoPublicStore
 
   /** Helper method to generate a new signing key pair and store the public key in the public store
     * as well.
@@ -86,6 +91,24 @@ class Crypto(
       _ <- EitherT.right(cryptoPublicStore.storeEncryptionKey(publicKey, name))
     } yield publicKey
 
+}
+
+/** Wrapper class to simplify crypto dependency management. It does not validate crypto schemes
+  * against the static synchronizer parameters.
+  */
+class Crypto private[crypto] (
+    override val pureCrypto: CryptoPureApi,
+    override val privateCrypto: CryptoPrivateApi,
+    override val cryptoPrivateStore: CryptoPrivateStore,
+    override val cryptoPublicStore: CryptoPublicStore,
+    override val timeouts: ProcessingTimeout,
+    override val loggerFactory: NamedLoggerFactory,
+)(override implicit val ec: ExecutionContext)
+    extends BaseCrypto
+    with CloseableHealthElement
+    with CompositeHealthElement[String, HealthQuasiComponent]
+    with HealthComponent {
+
   override def onClosed(): Unit =
     LifeCycle.close(privateCrypto, cryptoPrivateStore, cryptoPublicStore)(logger)
 
@@ -99,6 +122,24 @@ class Crypto(
 
   override protected def initialHealthState: ComponentHealthState =
     ComponentHealthState.NotInitializedState
+}
+
+/** Similar to [[Crypto]], but includes wrappers for [[CryptoPureApi]] and [[CryptoPrivateApi]] that
+  * add crypto scheme validation checks against the static synchronizer parameters.
+  */
+final case class SynchronizerCrypto(
+    crypto: Crypto,
+    staticSynchronizerParameters: StaticSynchronizerParameters,
+)(override implicit val ec: ExecutionContext)
+    extends BaseCrypto {
+
+  override val pureCrypto: SynchronizerCryptoPureApi =
+    new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto)
+
+  override val privateCrypto: CryptoPrivateApi = crypto.privateCrypto
+  override val cryptoPrivateStore: CryptoPrivateStore = crypto.cryptoPrivateStore
+  override val cryptoPublicStore: CryptoPublicStore = crypto.cryptoPublicStore
+  override protected val loggerFactory: NamedLoggerFactory = crypto.loggerFactory
 }
 
 trait CryptoPureApi
@@ -168,6 +209,15 @@ object SyncCryptoError {
   final case class StoreError(error: CryptoPrivateStoreError) extends SyncCryptoError {
     override protected def pretty: Pretty[StoreError] =
       prettyOfClass(unnamedParam(_.error))
+  }
+
+  /** Thrown when a sign message request does not support session signing keys, e.g., for a
+    * non-protocol message.
+    */
+  final case class UnsupportedDelegationSignatureError(message: String) extends SyncCryptoError {
+    override protected def pretty: Pretty[UnsupportedDelegationSignatureError] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
   }
 
   /** Thrown when invariant checks fail during the creation of a signature delegation. This can
@@ -241,19 +291,6 @@ trait SyncCryptoApi {
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit]
 
   def verifySequencerSignatures(
-      hash: Hash,
-      signatures: NonEmpty[Seq[Signature]],
-      usage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit]
-
-  /** This verifies that at least one of the signature is a valid sequencer signature. In
-    * particular, it does not respect the participant trust threshold. This should be used only in
-    * the context of reassignment where the concept of cross-synchronizer proof of sequencing is not
-    * fully fleshed out.
-    *
-    * TODO(#12410) Remove this method and respect trust threshold
-    */
-  def unsafePartialVerifySequencerSignatures(
       hash: Hash,
       signatures: NonEmpty[Seq[Signature]],
       usage: NonEmpty[Set[SigningKeyUsage]],

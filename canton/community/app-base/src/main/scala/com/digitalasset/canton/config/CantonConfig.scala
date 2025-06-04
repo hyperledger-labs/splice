@@ -312,9 +312,11 @@ final case class CantonParameters(
     enableAdditionalConsistencyChecks: Boolean = false,
     manualStart: Boolean = false,
     startupParallelism: Option[PositiveInt] = None,
-    nonStandardConfig: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    nonStandardConfig: Boolean = true,
     sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
-    alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    alphaVersionSupport: Boolean = true,
     betaVersionSupport: Boolean = false,
     portsFile: Option[String] = None,
     timeouts: TimeoutSettings = TimeoutSettings(),
@@ -1949,7 +1951,7 @@ object CantonConfig {
         .foldLeft(c) { case (subConfig, (key, obj)) =>
           subConfig.withValue(key, goVal(key, obj))
         }
-    go(config.resolve()) // Resolve the config _before_ redacting confidential information
+    go(config.resolve()) // Resolve config _before_ redacting confidential fields
       .root()
       .get("canton")
       .render(CantonConfig.defaultConfigRenderer)

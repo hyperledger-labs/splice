@@ -171,6 +171,9 @@ object TopologyMapping {
     case object PartyToKeyMapping
         extends Code("ptk", v30Code.TOPOLOGY_MAPPING_CODE_PARTY_TO_KEY_MAPPING)
 
+    case object SynchronizerMigrationAnnouncement
+        extends Code("sma", v30Code.TOPOLOGY_MAPPING_CODE_SYNCHRONIZER_MIGRATION_ANNOUNCEMENT)
+
     lazy val all: Seq[Code] = Seq(
       NamespaceDelegation,
       DecentralizedNamespaceDefinition,
@@ -186,6 +189,7 @@ object TopologyMapping {
       PurgeTopologyTransaction,
       SequencingDynamicParametersState,
       PartyToKeyMapping,
+      SynchronizerMigrationAnnouncement,
     )
 
     def fromString(code: String): ParsingResult[Code] =
@@ -299,7 +303,7 @@ object TopologyMapping {
   def fromProtoV30(proto: v30.TopologyMapping): ParsingResult[TopologyMapping] =
     proto.mapping match {
       case Mapping.Empty =>
-        Left(ProtoDeserializationError.TransactionDeserialization("No mapping set"))
+        FieldNotSet("mapping").asLeft
       case Mapping.NamespaceDelegation(value) => NamespaceDelegation.fromProtoV30(value)
       case Mapping.DecentralizedNamespaceDefinition(value) =>
         DecentralizedNamespaceDefinition.fromProtoV30(value)
@@ -320,6 +324,8 @@ object TopologyMapping {
       case Mapping.SequencerSynchronizerState(value) =>
         SequencerSynchronizerState.fromProtoV30(value)
       case Mapping.PurgeTopologyTxs(value) => PurgeTopologyTransaction.fromProtoV30(value)
+      case Mapping.SynchronizerMigrationAnnouncement(value) =>
+        SynchronizerMigrationAnnouncement.fromProtoV30(value)
     }
 }
 
@@ -470,13 +476,23 @@ object NamespaceDelegation extends TopologyMappingCompanion {
   def uniqueKey(namespace: Namespace, target: Fingerprint): MappingHash =
     TopologyMapping.buildUniqueKey(code)(_.add(namespace.fingerprint.unwrap).add(target.unwrap))
 
+  /** Creates a namespace delegation for the given namespace to the given target key with possible
+    * restrictions on the topology mappings the target key can authorize.
+    *
+    * @param namespace
+    *   the namespace for which the target key may sign topology transaction
+    * @param target
+    *   the key must have `Namespace` listed as a usage to be eligible as the target of a namespace
+    *   delegation.
+    * @param restrictedToMappings
+    *   mappings that the target key of this delegation is allowed to sign
+    */
   def create(
       namespace: Namespace,
       target: SigningPublicKey,
       restriction: DelegationRestriction,
   ): Either[String, NamespaceDelegation] =
     for {
-      // The key must have `Namespace` listed as a usage to be eligible as the target of a namespace delegation.
       _ <- Either.cond(
         SigningKeyUsage.matchesRelevantUsages(target.usage, SigningKeyUsage.NamespaceOnly),
         (),
@@ -921,23 +937,27 @@ object SynchronizerTrustCertificate extends TopologyMappingCompanion {
   */
 sealed trait ParticipantPermission extends Product with Serializable {
   def toProtoV30: v30.Enums.ParticipantPermission
-  def canConfirm: Boolean
+
+  // For a participant to be able to confirm, having Submission or Confirmation permission
+  // is a necessary, but not sufficient condition (e.g. HostingParticipant.onboarding must
+  // be false). To prevent accidental use of this method, make canConfirm package-private.
+  private[transaction] def canConfirm: Boolean
 }
 object ParticipantPermission {
   case object Submission extends ParticipantPermission {
     lazy val toProtoV30: Enums.ParticipantPermission =
       v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_SUBMISSION
-    def canConfirm: Boolean = true
+    private[transaction] def canConfirm: Boolean = true
   }
   case object Confirmation extends ParticipantPermission {
     lazy val toProtoV30: Enums.ParticipantPermission =
       v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_CONFIRMATION
-    def canConfirm: Boolean = true
+    private[transaction] def canConfirm: Boolean = true
   }
   case object Observation extends ParticipantPermission {
     lazy val toProtoV30: Enums.ParticipantPermission =
       v30.Enums.ParticipantPermission.PARTICIPANT_PERMISSION_OBSERVATION
-    def canConfirm: Boolean = false
+    private[transaction] def canConfirm: Boolean = false
   }
 
   def fromProtoV30(
@@ -1153,9 +1173,9 @@ object PartyHostingLimits extends TopologyMappingCompanion {
   * effective time (LET) of Daml transactions.
   * @param packageId
   *   the hash of the package
-  * @param validFrom
+  * @param validFromInclusive
   *   optional inclusive start of the validity period in LET
-  * @param validUntil
+  * @param validUntilExclusive
   *   optional exclusive end of the validity period in LET
   *
   * Note that as validFrom and validUntil are in ledger effective time, the boundaries have
@@ -1163,22 +1183,23 @@ object PartyHostingLimits extends TopologyMappingCompanion {
   */
 final case class VettedPackage(
     packageId: LfPackageId,
-    validFrom: Option[CantonTimestamp],
-    validUntil: Option[CantonTimestamp],
+    validFromInclusive: Option[CantonTimestamp],
+    validUntilExclusive: Option[CantonTimestamp],
 ) extends PrettyPrinting {
 
-  def validAt(ts: CantonTimestamp): Boolean = validFrom.forall(_ <= ts) && validUntil.forall(_ > ts)
+  def validAt(ts: CantonTimestamp): Boolean =
+    validFromInclusive.forall(_ <= ts) && validUntilExclusive.forall(_ > ts)
 
   def toProtoV30: v30.VettedPackages.VettedPackage = v30.VettedPackages.VettedPackage(
     packageId,
-    validFrom = validFrom.map(_.toProtoTimestamp),
-    validUntil = validUntil.map(_.toProtoTimestamp),
+    validFromInclusive = validFromInclusive.map(_.toProtoTimestamp),
+    validUntilExclusive = validUntilExclusive.map(_.toProtoTimestamp),
   )
   override protected def pretty: Pretty[VettedPackage.this.type] = prettyOfClass(
     param("packageId", _.packageId),
-    paramIfDefined("validFrom", _.validFrom),
-    paramIfDefined("validUntil", _.validUntil),
-    paramIfTrue("unbounded", vp => vp.validFrom.isEmpty && vp.validUntil.isEmpty),
+    paramIfDefined("validFromInclusive", _.validFromInclusive),
+    paramIfDefined("validUntilExclusive", _.validUntilExclusive),
+    paramIfTrue("unbounded", vp => vp.validFromInclusive.isEmpty && vp.validUntilExclusive.isEmpty),
   )
 }
 
@@ -1192,9 +1213,9 @@ object VettedPackage {
     pkgId <- LfPackageId
       .fromString(value.packageId)
       .leftMap(ProtoDeserializationError.ValueConversionError("package_id", _))
-    validFrom <- value.validFrom.traverse(CantonTimestamp.fromProtoTimestamp)
-    validUntil <- value.validUntil.traverse(CantonTimestamp.fromProtoTimestamp)
-  } yield VettedPackage(pkgId, validFrom, validUntil)
+    validFromInclusive <- value.validFromInclusive.traverse(CantonTimestamp.fromProtoTimestamp)
+    validUntilExclusive <- value.validUntilExclusive.traverse(CantonTimestamp.fromProtoTimestamp)
+  } yield VettedPackage(pkgId, validFromInclusive, validUntilExclusive)
 }
 
 // Package vetting
@@ -1251,7 +1272,9 @@ object VettedPackages extends TopologyMappingCompanion {
       .toList
 
     val emptyValidity = packages.filter(vp =>
-      (vp.validFrom, vp.validUntil).tupled.exists { case (from, until) => from >= until }
+      (vp.validFromInclusive, vp.validUntilExclusive).tupled.exists { case (from, until) =>
+        from >= until
+      }
     )
 
     for {
@@ -1313,15 +1336,23 @@ object VettedPackages extends TopologyMappingCompanion {
 final case class HostingParticipant(
     participantId: ParticipantId,
     permission: ParticipantPermission,
+    onboarding: Boolean,
 ) {
+  def canConfirm: Boolean = permission.canConfirm && !onboarding
   def toProto: v30.PartyToParticipant.HostingParticipant =
     v30.PartyToParticipant.HostingParticipant(
       participantUid = participantId.uid.toProtoPrimitive,
       permission = permission.toProtoV30,
+      onboarding = Option.when(onboarding)(v30.PartyToParticipant.HostingParticipant.Onboarding()),
     )
 }
 
 object HostingParticipant {
+  // Helper for "normal" HostingParticipant construction (as the onboarding flag is used narrowly
+  // by party replication)
+  def apply(participantId: ParticipantId, permission: ParticipantPermission): HostingParticipant =
+    HostingParticipant(participantId, permission, onboarding = false)
+
   def fromProtoV30(
       value: v30.PartyToParticipant.HostingParticipant
   ): ParsingResult[HostingParticipant] = for {
@@ -1330,7 +1361,7 @@ object HostingParticipant {
       "participant_uid",
     )
     permission <- ParticipantPermission.fromProtoV30(value.permission)
-  } yield HostingParticipant(participantId, permission)
+  } yield HostingParticipant(participantId, permission, value.onboarding.nonEmpty)
 }
 
 final case class PartyToParticipant private (
@@ -1492,7 +1523,8 @@ final case class SynchronizerParametersState(
       previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
   ): RequiredAuth = RequiredNamespaces(Set(synchronizerId.namespace))
 
-  override def uniqueKey: MappingHash = SynchronizerParametersState.uniqueKey(synchronizerId)
+  override def uniqueKey: MappingHash =
+    SynchronizerParametersState.uniqueKey(synchronizerId)
 }
 
 object SynchronizerParametersState extends TopologyMappingCompanion {
@@ -1507,7 +1539,10 @@ object SynchronizerParametersState extends TopologyMappingCompanion {
   ): ParsingResult[SynchronizerParametersState] = {
     val v30.SynchronizerParametersState(synchronizerIdP, synchronizerParametersP) = value
     for {
-      synchronizerId <- SynchronizerId.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- SynchronizerId.fromProtoPrimitive(
+        synchronizerIdP,
+        "synchronizer_id",
+      )
       parameters <- ProtoConverter.parseRequired(
         DynamicSynchronizerParameters.fromProtoV30,
         "synchronizer_parameters",
@@ -1835,4 +1870,62 @@ object PurgeTopologyTransaction extends TopologyMappingCompanion {
     } yield result
   }
 
+}
+
+// Indicates the beginning of synchronizer migration. Only topology transactions related to synchronizer migrations are permitted
+// after this transaction has become effective. Removing this mapping effectively unfreezes the topology state again.
+final case class SynchronizerMigrationAnnouncement(
+    synchronizerId: PhysicalSynchronizerId,
+    successorSynchronizerId: PhysicalSynchronizerId,
+) extends TopologyMapping {
+
+  override def companion: SynchronizerMigrationAnnouncement.type = SynchronizerMigrationAnnouncement
+
+  def toProto: v30.SynchronizerMigrationAnnouncement =
+    v30.SynchronizerMigrationAnnouncement(
+      physicalSynchronizerId = synchronizerId.toProtoPrimitive,
+      successorPhysicalSynchronizerId = successorSynchronizerId.toProtoPrimitive,
+    )
+
+  def toProtoV30: v30.TopologyMapping =
+    v30.TopologyMapping(
+      v30.TopologyMapping.Mapping.SynchronizerMigrationAnnouncement(
+        toProto
+      )
+    )
+
+  override def namespace: Namespace = synchronizerId.namespace
+  override def maybeUid: Option[UniqueIdentifier] = Some(synchronizerId.uid)
+
+  override def restrictedToSynchronizer: Option[SynchronizerId] = Some(
+    synchronizerId.logical
+  )
+
+  override def requiredAuth(
+      previous: Option[TopologyTransaction[TopologyChangeOp, TopologyMapping]]
+  ): RequiredAuth = RequiredNamespaces(Set(synchronizerId.namespace))
+
+  override def uniqueKey: MappingHash = SynchronizerMigrationAnnouncement.uniqueKey(synchronizerId)
+}
+
+object SynchronizerMigrationAnnouncement extends TopologyMappingCompanion {
+
+  def uniqueKey(synchronizerId: PhysicalSynchronizerId): MappingHash =
+    TopologyMapping.buildUniqueKey(code)(_.add(synchronizerId.toProtoPrimitive))
+
+  override def code: TopologyMapping.Code = Code.SynchronizerMigrationAnnouncement
+
+  def fromProtoV30(
+      value: v30.SynchronizerMigrationAnnouncement
+  ): ParsingResult[SynchronizerMigrationAnnouncement] =
+    for {
+      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+        value.physicalSynchronizerId,
+        "physical_synchronizer_id",
+      )
+      successorSynchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+        value.successorPhysicalSynchronizerId,
+        "successor_physical_synchronizer_id",
+      )
+    } yield SynchronizerMigrationAnnouncement(synchronizerId, successorSynchronizerId)
 }

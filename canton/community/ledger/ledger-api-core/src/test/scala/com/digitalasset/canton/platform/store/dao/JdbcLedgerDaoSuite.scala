@@ -19,7 +19,7 @@ import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.transaction.test.{NodeIdTransactionBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.value.Value as LfValue
-import com.digitalasset.daml.lf.value.Value.{ContractId, ContractInstance, ValueText}
+import com.digitalasset.daml.lf.value.Value.{ContractId, ThinContractInstance, ValueText}
 import org.apache.pekko.stream.scaladsl.Sink
 import org.scalatest.{AsyncTestSuite, OptionValues}
 
@@ -88,7 +88,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
   protected final val somePackageName = PackageName.assertFromString("pkg-name")
   protected final val somePackageVersion = PackageVersion.assertFromString("1.0")
   protected final val someTemplateIdFilter =
-    TemplateFilter(someTemplateId, includeCreatedEventBlob = false)
+    TemplateFilter(someTemplateId.toRef, includeCreatedEventBlob = false)
   protected final val someValueText = LfValue.ValueText("some text")
   protected final val someValueInt = LfValue.ValueInt64(1)
   protected final val someValueNumeric =
@@ -143,11 +143,11 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
       ),
     )
 
-  private[this] val txVersion = LanguageVersion.StableVersions(LanguageVersion.Major.V2).min
+  private[this] val txVersion = LanguageVersion.Major.V2.maxStableVersion
   private[this] def newBuilder(): NodeIdTransactionBuilder = new NodeIdTransactionBuilder
 
   protected final val someContractInstance =
-    ContractInstance(
+    ThinContractInstance(
       packageName = somePackageName,
       template = someTemplateId,
       arg = someContractArgument,
@@ -156,7 +156,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
 
   protected final val otherTemplateId = testIdentifier("Dummy")
   protected final val otherTemplateIdFilter =
-    TemplateFilter(otherTemplateId, includeCreatedEventBlob = false)
+    TemplateFilter(otherTemplateId.toRef, includeCreatedEventBlob = false)
   protected final val otherContractArgument = LfValue.ValueRecord(
     None,
     ImmArray(None -> LfValue.ValueParty(alice)),

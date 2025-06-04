@@ -307,3 +307,20 @@ object ListPurgeTopologyTransactionResult {
       item <- PurgeTopologyTransaction.fromProtoV30(itemProto)
     } yield ListPurgeTopologyTransactionResult(context, item)
 }
+
+final case class ListSynchronizerMigrationAnnouncementResult(
+    context: BaseResult,
+    item: SynchronizerMigrationAnnouncement,
+)
+
+object ListSynchronizerMigrationAnnouncementResult {
+  def fromProtoV30(
+      value: v30.ListSynchronizerMigrationAnnouncementResponse.Result
+  ): ParsingResult[ListSynchronizerMigrationAnnouncementResult] =
+    for {
+      contextProto <- ProtoConverter.required("context", value.context)
+      context <- BaseResult.fromProtoV30(contextProto)
+      itemProto <- ProtoConverter.required("item", value.item)
+      item <- SynchronizerMigrationAnnouncement.fromProtoV30(itemProto)
+    } yield ListSynchronizerMigrationAnnouncementResult(context, item)
+}

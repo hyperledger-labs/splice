@@ -10,7 +10,7 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.common.sequencer.RegisterTopologyTransactionHandle
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
@@ -24,6 +24,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
 import com.digitalasset.canton.util.{DelayUtil, EitherTUtil, FutureUnlessShutdownUtil, retry}
 import com.digitalasset.canton.version.ProtocolVersion
+import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.*
@@ -31,7 +32,7 @@ import scala.concurrent.{ExecutionContext, Promise}
 
 class QueueBasedSynchronizerOutbox(
     synchronizerAlias: SynchronizerAlias,
-    val synchronizerId: SynchronizerId,
+    val synchronizerId: PhysicalSynchronizerId,
     val memberId: Member,
     val protocolVersion: ProtocolVersion,
     val handle: RegisterTopologyTransactionHandle,
@@ -40,7 +41,7 @@ class QueueBasedSynchronizerOutbox(
     val targetStore: TopologyStore[TopologyStoreId.SynchronizerStore],
     val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    val crypto: Crypto,
+    val crypto: SynchronizerCrypto,
     broadcastBatchSize: PositiveInt,
     maybeObserverCloseable: Option[AutoCloseable] = None,
 )(implicit executionContext: ExecutionContext)
@@ -151,7 +152,11 @@ class QueueBasedSynchronizerOutbox(
     // It's fine to ignore shutdown because we do not await the future anyway.
     if (initialized.get()) {
       TraceContext.withNewTraceContext(implicit tc =>
-        EitherTUtil.doNotAwait(flush().onShutdown(Either.unit), "synchronizer outbox flusher")
+        EitherTUtil.doNotAwait(
+          flush().onShutdown(Either.unit),
+          "synchronizer outbox flusher",
+          level = Level.WARN,
+        )
       )
     }
 

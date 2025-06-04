@@ -9,7 +9,7 @@ import com.digitalasset.canton.connection.v30
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc.ApiInfoServiceStub
 import com.digitalasset.canton.connection.v30.GetApiInfoResponse
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.crypto.{Crypto, Fingerprint}
+import com.digitalasset.canton.crypto.{Fingerprint, SynchronizerCrypto}
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.sequencer.api.v30 as SequencerService
@@ -26,6 +26,7 @@ import com.digitalasset.canton.topology.{
   Member,
   Namespace,
   ParticipantId,
+  PhysicalSynchronizerId,
   SequencerId,
   SynchronizerId,
 }
@@ -123,12 +124,17 @@ trait ConnectionPoolTestHelpers { this: BaseTest & HasExecutionContext =>
 
   protected lazy val authConfig: AuthenticationTokenManagerConfig =
     AuthenticationTokenManagerConfig()
-  protected lazy val testCrypto: Crypto =
-    SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
+  protected lazy val testCrypto: SynchronizerCrypto =
+    SynchronizerCrypto(
+      SymbolicCrypto
+        .create(testedReleaseProtocolVersion, timeouts, loggerFactory),
+      defaultStaticSynchronizerParameters,
+    )
+
   protected lazy val testMember: Member = ParticipantId("test")
 
-  protected def testSynchronizerId(index: Int): SynchronizerId =
-    SynchronizerId.tryFromString(s"test-synchronizer-$index::namespace")
+  protected def testSynchronizerId(index: Int): PhysicalSynchronizerId =
+    SynchronizerId.tryFromString(s"test-synchronizer-$index::namespace").toPhysical
 
   protected def testSequencerId(index: Int): SequencerId =
     SequencerId.tryCreate(
@@ -185,7 +191,7 @@ trait ConnectionPoolTestHelpers { this: BaseTest & HasExecutionContext =>
   protected def mkPoolConfig(
       nbConnections: PositiveInt,
       trustThreshold: PositiveInt,
-      expectedSynchronizerIdO: Option[SynchronizerId] = None,
+      expectedSynchronizerIdO: Option[PhysicalSynchronizerId] = None,
   ): SequencerConnectionXPoolConfig = {
     val configs =
       NonEmpty.from((0 until nbConnections.unwrap).map(mkDummyConnectionConfig(_))).value
@@ -193,7 +199,7 @@ trait ConnectionPoolTestHelpers { this: BaseTest & HasExecutionContext =>
     SequencerConnectionXPoolConfig(
       connections = configs,
       trustThreshold = trustThreshold,
-      expectedSynchronizerIdO = expectedSynchronizerIdO,
+      expectedPSIdO = expectedSynchronizerIdO,
     )
   }
 
@@ -201,7 +207,7 @@ trait ConnectionPoolTestHelpers { this: BaseTest & HasExecutionContext =>
       nbConnections: PositiveInt,
       trustThreshold: PositiveInt,
       attributesForConnection: Int => ConnectionAttributes,
-      expectedSynchronizerIdO: Option[SynchronizerId] = None,
+      expectedSynchronizerIdO: Option[PhysicalSynchronizerId] = None,
   )(f: (SequencerConnectionXPoolImpl, CreatedConnections, TestHealthListener) => V): V = {
     val config = mkPoolConfig(nbConnections, trustThreshold, expectedSynchronizerIdO)
 
@@ -261,7 +267,7 @@ trait ConnectionPoolTestHelpers { this: BaseTest & HasExecutionContext =>
       nbConnections: PositiveInt,
       trustThreshold: PositiveInt,
       attributesForConnection: Int => ConnectionAttributes,
-      expectedSynchronizerIdO: Option[SynchronizerId] = None,
+      expectedSynchronizerIdO: Option[PhysicalSynchronizerId] = None,
       livenessMargin: NonNegativeInt,
   )(f: (SequencerConnectionXPool, SequencerSubscriptionPool, TestHealthListener) => V): V =
     withConnectionPool(

@@ -5,7 +5,7 @@ package com.digitalasset.canton.participant.store
 
 import cats.Eval
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi}
+import com.digitalasset.canton.crypto.{CryptoPureApi, SynchronizerCrypto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageDependencyResolver
@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.{
   ParticipantId,
+  PhysicalSynchronizerId,
   SynchronizerOutboxQueue,
   SynchronizerTopologyManager,
 }
@@ -52,6 +53,9 @@ trait SyncPersistentState extends NamedLogging with AutoCloseable {
   def topologyManager: SynchronizerTopologyManager
   def synchronizerOutboxQueue: SynchronizerOutboxQueue
   def acsInspection: AcsInspection
+
+  lazy val physicalSynchronizerId: PhysicalSynchronizerId =
+    PhysicalSynchronizerId(indexedSynchronizer.synchronizerId, staticSynchronizerParameters)
 }
 
 object SyncPersistentState {
@@ -62,7 +66,7 @@ object SyncPersistentState {
       synchronizerIdx: IndexedSynchronizer,
       staticSynchronizerParameters: StaticSynchronizerParameters,
       clock: Clock,
-      crypto: Crypto,
+      crypto: SynchronizerCrypto,
       parameters: ParticipantNodeParameters,
       indexedStringStore: IndexedStringStore,
       acsCounterParticipantConfigStore: AcsCounterParticipantConfigStore,

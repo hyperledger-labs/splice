@@ -5,7 +5,10 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.co
 
 import cats.syntax.functor.*
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection.FairBoundedQueue.EnqueueResult
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection.FairBoundedQueue.{
+  DeduplicationStrategy,
+  EnqueueResult,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.util.collection.BoundedQueue
 import com.google.common.annotations.VisibleForTesting
@@ -20,17 +23,36 @@ class FairBoundedQueue[ItemType](
     maxQueueSize: Int,
     perNodeQuota: Int,
     dropStrategy: BoundedQueue.DropStrategy = BoundedQueue.DropStrategy.DropOldest,
+    deduplicationStrategy: DeduplicationStrategy = DeduplicationStrategy.Noop,
 ) {
 
   private val nodeQueues = mutable.Map[BftNodeId, mutable.Queue[ItemType]]()
   private val arrivalOrder =
-    // Uses `DropNewest` and then handles the configured drop strategy separately.
+    // Use `DropNewest` and handle the configured drop strategy separately, so that a node cannot use other nodes'
+    //  quotas when exceeding the total capacity.
     new BoundedQueue[BftNodeId](maxQueueSize, BoundedQueue.DropStrategy.DropNewest)
 
   def enqueue(nodeId: BftNodeId, item: ItemType): EnqueueResult = {
     val nodeBoundedQueue =
       nodeQueues.getOrElseUpdate(nodeId, new BoundedQueue(perNodeQuota, dropStrategy))
 
+    deduplicationStrategy match {
+      case DeduplicationStrategy.PerNode =>
+        if (nodeBoundedQueue.contains(item)) {
+          EnqueueResult.Duplicate(nodeId)
+        } else {
+          actuallyEnqueue(nodeId, item, nodeBoundedQueue)
+        }
+      case DeduplicationStrategy.Noop =>
+        actuallyEnqueue(nodeId, item, nodeBoundedQueue)
+    }
+  }
+
+  private def actuallyEnqueue(
+      nodeId: BftNodeId,
+      item: ItemType,
+      nodeBoundedQueue: mutable.Queue[ItemType],
+  ) = {
     // `ArrayDeque` is the underlying collection and its `size` implementation has constant time complexity.
     val originalNodeQueueSize = nodeBoundedQueue.size
     val originalArrivalQueueSize = arrivalOrder.size
@@ -51,8 +73,9 @@ class FairBoundedQueue[ItemType](
       if (totalCapacityWasExceeded) {
         dropStrategy match {
           case BoundedQueue.DropStrategy.DropOldest =>
-            val oldestNodeId = arrivalOrder.dequeue()
-            nodeQueues(oldestNodeId).dequeue().discard
+            // There's always at least one (just inserted) element.
+            nodeBoundedQueue.removeHead().discard
+            arrivalOrder.removeFirst(otherNodeId => otherNodeId == nodeId).discard
             arrivalOrder.enqueue(nodeId).discard
           case BoundedQueue.DropStrategy.DropNewest =>
             nodeBoundedQueue.removeLast().discard
@@ -98,6 +121,8 @@ class FairBoundedQueue[ItemType](
     dequeuedItems
   }
 
+  def size: Int = arrivalOrder.size
+
   @VisibleForTesting
   def dump: Seq[ItemType] = {
     val nodesToItemQueueCopies = nodeQueues.toMap.fmap(_.clone())
@@ -113,5 +138,12 @@ object FairBoundedQueue {
     case object Success extends EnqueueResult
     case object TotalCapacityExceeded extends EnqueueResult
     final case class PerNodeQuotaExceeded(nodeId: BftNodeId) extends EnqueueResult
+    final case class Duplicate(nodeId: BftNodeId) extends EnqueueResult
+  }
+
+  sealed trait DeduplicationStrategy extends Product with Serializable
+  object DeduplicationStrategy {
+    case object Noop extends DeduplicationStrategy
+    case object PerNode extends DeduplicationStrategy
   }
 }

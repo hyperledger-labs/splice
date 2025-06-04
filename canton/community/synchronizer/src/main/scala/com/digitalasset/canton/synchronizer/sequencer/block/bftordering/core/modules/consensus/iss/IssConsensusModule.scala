@@ -365,7 +365,7 @@ final class IssConsensusModule[E <: Env[E]](
         )
 
       case msg: Consensus.RetransmissionsMessage =>
-        retransmissionsManager.handleMessage(activeTopologyInfo.currentCryptoProvider, msg)
+        retransmissionsManager.handleMessage(activeTopologyInfo, msg)
 
       case msg: Consensus.StateTransferMessage =>
         serverStateTransferManager.handleStateTransferMessage(
@@ -437,6 +437,8 @@ final class IssConsensusModule[E <: Env[E]](
                   s"as we're still in epoch $thisNodeEpochNumber and " +
                   s"the quota for node $node for queueing future messages has been reached"
               )
+            case FairBoundedQueue.EnqueueResult.Duplicate(_) =>
+              abort("Deduplication is disabled")
           }
           startCatchupIfNeeded(updatedEpoch, epochNumber).discard
         } else

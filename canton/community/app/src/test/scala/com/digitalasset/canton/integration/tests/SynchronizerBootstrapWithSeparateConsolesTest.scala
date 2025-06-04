@@ -16,7 +16,12 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
-import com.digitalasset.canton.topology.{ForceFlag, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ForceFlag,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 
 /** This test simulates the case when the mediator and sequencer nodes are in separate consoles and
   * we want to bootstrap the synchronizer. We do that by exchanging the essential information via
@@ -37,7 +42,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
 
   // in this test we interleave various consoles, but we can assume that the individual nodes all have
   // the synchronizerId in scope after the decentralized namespace definition
-  protected var synchronizerId: SynchronizerId = _
+  protected var synchronizerId: PhysicalSynchronizerId = _
 
   "Nodes in separate consoles" should {
     "be able to bootstrap distributed synchronizer by exchanging files" in { implicit env =>
@@ -116,7 +121,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
           seqDND.writeToFile(decentralizedNamespaceFile)
           synchronizerId = SynchronizerId(
             UniqueIdentifier.tryCreate(synchronizerName, seqDND.mapping.namespace.toProtoPrimitive)
-          )
+          ).toPhysical
         }
 
         // Mediator's console:
@@ -142,6 +147,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
           // generate the synchronizer bootstrap transactions with the mediator's signature
           mediator1.topology.synchronizer_bootstrap.download_genesis_topology(
             synchronizerId,
+            testedProtocolVersion,
             synchronizerOwners = Seq(mediatorId, sequencerId),
             sequencers = Seq(sequencerId),
             mediators = Seq(mediatorId),
@@ -175,6 +181,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
           // bootstrap transactions with the sequencer's signature
           sequencer1.topology.synchronizer_bootstrap.generate_genesis_topology(
             synchronizerId,
+            testedProtocolVersion,
             synchronizerOwners = Seq(mediatorId, sequencerId),
             sequencers = Seq(sequencerId),
             mediators = Seq(mediatorId),
@@ -194,7 +201,7 @@ trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
           // share the sequencer connection via sequencerConnectionFile
           SequencerConnections
             .single(sequencer1.sequencerConnection)
-            .writeToFile(sequencerConnectionFile)
+            .writeToFile(sequencerConnectionFile, testedProtocolVersion)
         }
 
         // Mediator's console:

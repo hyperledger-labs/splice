@@ -299,7 +299,10 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
               )
             )
 
-        val LfContractId.V1(discriminator, _) = contract.contractId
+        val LfContractId.V1(discriminator, _) = contract.contractId match {
+          case cid: LfContractId.V1 => cid
+          case _ => sys.error("ContractId V2 are not supported")
+        }
         val pureCrypto = participant.underlying
           .map(_.cryptoPureApi)
           .getOrElse(sys.error("where is my crypto?"))
@@ -476,7 +479,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     ): Command =
       Command.defaultInstance.withCreate(
         CreateCommand(
-          // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
           createArguments = Some(buildArguments(arguments)),
         )
@@ -493,7 +495,6 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     ): Command =
       Command.defaultInstance.withExercise(
         ExerciseCommand(
-          // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
           choice = choice,
           choiceArgument = Some(Value(Value.Sum.Record(buildArguments(arguments)))),
@@ -698,15 +699,17 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             Left(s"${instance.id.member} is currently not active")
           case NodeStatus.Success(status: SequencerStatus) =>
             // sequencer is already fully initialized for this synchronizer
+            // TODO(#25483) This comparison should be physical
             Either.cond(
-              status.synchronizerId == synchronizerId,
+              status.synchronizerId.logical == synchronizerId,
               true,
               s"${instance.id.member} has already been initialized for synchronizer ${status.synchronizerId} instead of $synchronizerId.",
             )
           case NodeStatus.Success(status: MediatorStatus) =>
             // mediator is already fully initialized for this synchronizer
+            // TODO(#25483) This comparison should be physical
             Either.cond(
-              status.synchronizerId == synchronizerId,
+              status.synchronizerId.logical == synchronizerId,
               true,
               s"${instance.id.member} has already been initialized for synchronizer ${status.synchronizerId} instead of $synchronizerId",
             )
@@ -805,6 +808,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       val synchronizerGenesisTxs = synchronizerOwners.flatMap(
         _.topology.synchronizer_bootstrap.generate_genesis_topology(
           synchronizerId,
+          staticSynchronizerParameters.protocolVersion,
           synchronizerOwners.map(_.id.member),
           sequencers.map(_.id),
           mediators.map(_.id),
@@ -858,7 +862,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         .filter(!_._1.health.initialized())
         .foreach { case (mediator, (mediatorSequencers, threshold)) =>
           mediator.setup.assign(
-            synchronizerId,
+            PhysicalSynchronizerId(synchronizerId, staticSynchronizerParameters.toInternal),
             SequencerConnections.tryMany(
               mediatorSequencers
                 .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
@@ -887,6 +891,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
         """
     )
+    // TODO(#25483) This one should return the physical id
     def synchronizer(
         synchronizerName: String,
         sequencers: Seq[SequencerReference],

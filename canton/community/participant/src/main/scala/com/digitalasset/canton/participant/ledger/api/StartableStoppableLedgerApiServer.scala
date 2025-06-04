@@ -19,12 +19,11 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{InProcessGrpcName, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.http.HttpApiServer
-import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.ledger.api.auth.CachedJwtVerifierLoader
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
@@ -50,14 +49,17 @@ import com.digitalasset.canton.platform.apiserver.ratelimiting.{
   RateLimitingInterceptor,
   ThreadpoolCheck,
 }
-import com.digitalasset.canton.platform.apiserver.services.admin.ApiUserManagementService
-import com.digitalasset.canton.platform.apiserver.{ApiServiceOwner, LedgerFeatures}
+import com.digitalasset.canton.platform.apiserver.services.admin.Utils
+import com.digitalasset.canton.platform.apiserver.{
+  ApiServiceOwner,
+  InProcessGrpcName,
+  LedgerFeatures,
+}
 import com.digitalasset.canton.platform.config.{
   IdentityProviderManagementConfig,
   IndexServiceConfig,
 }
 import com.digitalasset.canton.platform.index.IndexServiceOwner
-import com.digitalasset.canton.platform.packages.DeduplicatingPackageLoader
 import com.digitalasset.canton.platform.store.DbSupport
 import com.digitalasset.canton.platform.store.dao.events.{ContractLoader, LfValueTranslation}
 import com.digitalasset.canton.platform.{PackagePreferenceBackend, ResourceOwnerOps}
@@ -312,18 +314,13 @@ class StartableStoppableLedgerApiServer(
       // contract IDs of the transaction yet. This means enrichment of the transaction may fail
       // when processing unsuffixed contract IDs. For that reason we disable this requirement via the flag below.
       // When CIDs are suffixed, we can re-use the LfValueTranslation from the index service created above
-      packageLoader = new DeduplicatingPackageLoader()
-      interactiveSubmissionEnricher = new InteractiveSubmissionEnricher(
-        new Engine(config.engine.config.copy(requireSuffixedGlobalContractId = false)),
-        packageResolver = packageId =>
-          traceContext =>
-            FutureUnlessShutdown.outcomeF(
-              packageLoader.loadPackage(
-                packageId = packageId,
-                delegate = packageId => timedSyncService.getLfArchive(packageId)(traceContext),
-                metric = config.metrics.index.db.translation.getLfPackage,
-              )
-            ),
+      lfValueTranslationForInteractiveSubmission = new LfValueTranslation(
+        metrics = config.metrics,
+        engineO =
+          Some(new Engine(config.engine.config.copy(requireSuffixedGlobalContractId = false))),
+        loadPackage = (packageId, loggingContext) =>
+          timedSyncService.getLfArchive(packageId)(loggingContext.traceContext),
+        loggerFactory = loggerFactory,
       )
 
       _ <- ApiServiceOwner(
@@ -347,6 +344,7 @@ class StartableStoppableLedgerApiServer(
         tls = config.serverConfig.tls,
         address = Some(config.serverConfig.address),
         maxInboundMessageSize = config.serverConfig.maxInboundMessageSize.unwrap,
+        maxInboundMetadataSize = config.serverConfig.maxInboundMetadataSize.unwrap,
         port = config.serverConfig.port,
         seeding = config.cantonParameterConfig.ledgerApiServerParameters.contractIdSeeding,
         syncService = timedSyncService,
@@ -377,7 +375,7 @@ class StartableStoppableLedgerApiServer(
         authenticateFatContractInstance = contractAuthenticator.authenticateFat,
         dynParamGetter = config.syncService.dynamicSynchronizerParameterGetter,
         interactiveSubmissionServiceConfig = config.serverConfig.interactiveSubmissionService,
-        interactiveSubmissionEnricher = interactiveSubmissionEnricher,
+        lfValueTranslation = lfValueTranslationForInteractiveSubmission,
         keepAlive = config.serverConfig.keepAliveServer,
         packagePreferenceBackend = packagePreferenceBackend,
       )
@@ -441,7 +439,7 @@ class StartableStoppableLedgerApiServer(
           )
           Future.successful(())
         case other =>
-          ApiUserManagementService.handleResult("creating extra admin user")(other).map(_ => ())
+          Utils.handleResult("creating extra admin user")(other).map(_ => ())
       }
   }
 

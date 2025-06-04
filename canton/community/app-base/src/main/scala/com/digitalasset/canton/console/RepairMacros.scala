@@ -29,6 +29,7 @@ import com.digitalasset.canton.topology.store.{
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, TextFileUtil}
+import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.annotation.tailrec
 import scala.util.control.NonFatal
@@ -71,6 +72,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
     def download(
         node: LocalInstanceReference,
         synchronizerId: SynchronizerId,
+        protocolVersion: ProtocolVersion,
         targetPath: String,
     ): Unit =
       TraceContext.withNewTraceContext { implicit traceContext =>
@@ -125,7 +127,8 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
 
         val authorizedFile = File(targetDir, TOPOLOGY_AUTHORIZED)
         StoredTopologyTransactions(transactionsFromAuthorizedStore).writeToFile(
-          authorizedFile.pathAsString
+          authorizedFile.pathAsString,
+          protocolVersion,
         )
 
         if (node.id.member.code == SequencerId.Code) { // The sequencer needs to know more than just its own identity
@@ -149,7 +152,8 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
                 .mkString("\n")}"
           )
           StoredTopologyTransactions(synchronizerGenesisTransactions).writeToFile(
-            synchronizerFile.pathAsString
+            synchronizerFile.pathAsString,
+            protocolVersion,
           )
         }
       }
@@ -273,7 +277,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
           case mediator: MediatorReference =>
             mediator.setup
               .assign(
-                synchronizerId,
+                PhysicalSynchronizerId(synchronizerId, staticSynchronizerParameters.toInternal),
                 sequencerConnections,
               )
 
@@ -486,14 +490,17 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
       partyId: PartyId,
       synchronize: Boolean,
   )(implicit env: ConsoleEnvironment): Unit = {
-    // remove any topology transaction that points to source participant
-    sourceParticipant.topology.party_to_participant_mappings
-      .propose_delta(
-        partyId,
-        removes = List(sourceParticipant.id),
-        forceFlags = ForceFlags(DisablePartyWithActiveContracts),
-      )
-      .discard
+    sourceParticipant.synchronizers.list_connected().foreach { synchronizer =>
+      // remove any topology transaction that points to source participant
+      sourceParticipant.topology.party_to_participant_mappings
+        .propose_delta(
+          partyId,
+          removes = List(sourceParticipant.id),
+          forceFlags = ForceFlags(DisablePartyWithActiveContracts),
+          store = synchronizer.synchronizerId.logical,
+        )
+        .discard
+    }
     if (synchronize) {
       // there's a gap between having received the transaction, but it hasn't been fully processed yet,
       // so the node status will return that the node is idle, when that's not really the case.
@@ -562,10 +569,11 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
   ): Iterator[Map[SynchronizerAlias, Seq[LfContractId]]] = {
     val idToAlias = targetParticipant.synchronizers
       .list_registered()
-      .map { case (synchronizerConnectionConfig, _) =>
+      .map { case (synchronizerConnectionConfig, _, _) =>
         val synchronizerAlias = synchronizerConnectionConfig.synchronizerAlias
         (
-          targetParticipant.synchronizers.id_of(synchronizerAlias),
+          // TODO(#25483) Check this projection
+          targetParticipant.synchronizers.id_of(synchronizerAlias).logical,
           synchronizerAlias,
         )
       }

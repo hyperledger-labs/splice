@@ -9,7 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.HealthListener
 import com.digitalasset.canton.lifecycle.LifeCycle
@@ -27,9 +27,10 @@ import com.digitalasset.canton.sequencing.SequencerConnectionXPool.{
 }
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, SeqUtil, SingleUseCell}
+import com.digitalasset.canton.util.collection.SeqUtil
+import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, SingleUseCell}
 import com.google.common.annotations.VisibleForTesting
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -43,7 +44,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
     clock: Clock,
     authConfig: AuthenticationTokenManagerConfig,
     member: Member,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     seedForRandomnessO: Option[Long],
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -89,7 +90,8 @@ class SequencerConnectionXPoolImpl private[sequencing] (
     }
   }
 
-  override def synchronizerId: Option[SynchronizerId] = bootstrapCell.get.map(_.synchronizerId)
+  override def physicalSynchronizerId: Option[PhysicalSynchronizerId] =
+    bootstrapCell.get.map(_.synchronizerId)
 
   override def start()(implicit
       traceContext: TraceContext
@@ -211,7 +213,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
         for {
           _ <- newConfig.validate
           _ <- Either.cond(
-            newConfig.expectedSynchronizerIdO == currentConfig.expectedSynchronizerIdO,
+            newConfig.expectedPSIdO == currentConfig.expectedPSIdO,
             (),
             SequencerConnectionXPoolError.InvalidConfigurationError(
               "The expected synchronizer ID can only be changed during a node restart."
@@ -353,7 +355,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
         bootstrapCell.get match {
           case None =>
-            if (currentConfig.expectedSynchronizerIdO.forall(_ == attributes.synchronizerId)) {
+            if (currentConfig.expectedPSIdO.forall(_ == attributes.synchronizerId)) {
               markValidated(connection)
               getBootstrapIfThresholdReached(currentConfig.trustThreshold)
                 .valueOr(ErrorUtil.invalidState(_)) // We cannot reach the threshold multiple times
@@ -365,7 +367,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
             } else {
               logger.warn(
                 s"Connection ${connection.name} is not on expected synchronizer:" +
-                  s" expected ${currentConfig.expectedSynchronizerIdO}," +
+                  s" expected ${currentConfig.expectedPSIdO}," +
                   s" got ${attributes.synchronizerId}. Closing connection."
               )
               connection.fatal(reason = "invalid synchronizer")
@@ -512,7 +514,7 @@ class SequencerConnectionXPoolImpl private[sequencing] (
 
 object SequencerConnectionXPoolImpl {
   private final case class BootstrapInfo private (
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       staticParameters: StaticSynchronizerParameters,
   )
 

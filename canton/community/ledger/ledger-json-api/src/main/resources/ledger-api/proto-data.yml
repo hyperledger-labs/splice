@@ -24,14 +24,23 @@ messages:
     message:
       comments: 'Required authorization: ``HasRight(ParticipantAdmin) OR IsAuthenticatedIdentityProviderAdmin(identity_provider_id)``'
       fieldComments:
-        party_id_hint: |-
-          A hint to the participant which party ID to allocate. It can be
-          ignored.
-          Must be a valid PartyIdString (as described in ``value.proto``).
+        synchronizer_id: |-
+          The synchronizer, on which the party should be allocated.
+          For backwards compatibility, this field may be omitted, if the participant is connected to only one synchronizer.
+          Otherwise a synchronizer must be specified.
           Optional
         local_metadata: |-
           Formerly "display_name"
           Participant-local metadata to be stored in the ``PartyDetails`` of this newly allocated party.
+          Optional
+        user_id: |-
+          The user who will get the act_as rights to the newly allocated party.
+          If set to an empty string (the default), no user will get rights to the party.
+          Optional
+        party_id_hint: |-
+          A hint to the participant which party ID to allocate. It can be
+          ignored.
+          Must be a valid PartyIdString (as described in ``value.proto``).
           Optional
         identity_provider_id: |-
           The id of the ``Identity Provider``
@@ -1559,7 +1568,6 @@ messages:
         Refer to the hashing documentation for information on how it should be hashed.
       fieldComments:
         synchronizer_id: ''
-        preparation_time: ''
         min_ledger_effective_time: ''
         mediator_group: ''
         submitter_info: ''
@@ -1567,6 +1575,7 @@ messages:
           Contextual information needed to process the transaction but not signed, either because it's already indirectly
           signed by signing the transaction, or because it doesn't impact the ledger state
         input_contracts: ''
+        submission_time: ''
         transaction_uuid: ''
         max_ledger_effective_time: ''
   MinLedgerTime:
@@ -1580,7 +1589,7 @@ messages:
           and submitted within a time window around the ledger time assigned to the transaction during the prepare method.
           The time delta around that ledger time is a configuration of the ledger, usually short, around 1 minute.
           If however the transaction does not depend on time, the available time window to sign and submit the transaction is bound
-          by the preparation time, which is also assigned in the "prepare" step (this request),
+          by the submission timestamp, which is also assigned in the "prepare" step (this request),
           but can be configured with a much larger skew, allowing for more time to sign the request (in the order of hours).
           Must not be set at the same time as min_ledger_time_rel.
           Optional
@@ -2886,7 +2895,7 @@ oneOfs:
             and submitted within a time window around the ledger time assigned to the transaction during the prepare method.
             The time delta around that ledger time is a configuration of the ledger, usually short, around 1 minute.
             If however the transaction does not depend on time, the available time window to sign and submit the transaction is bound
-            by the preparation time, which is also assigned in the "prepare" step (this request),
+            by the submission timestamp, which is also assigned in the "prepare" step (this request),
             but can be configured with a much larger skew, allowing for more time to sign the request (in the order of hours).
             Must not be set at the same time as min_ledger_time_rel.
             Optional
