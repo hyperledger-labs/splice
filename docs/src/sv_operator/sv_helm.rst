@@ -121,14 +121,15 @@ In the following, we will refer to this URL as ``OIDC_AUTHORITY_URL``.
 Both your SV node and any users that wish to authenticate to a web UI connected to your SV node must be able to reach the ``OIDC_AUTHORITY_URL``.
 We require your OIDC provider to provide a `discovery document <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ at ``OIDC_AUTHORITY_URL/.well-known/openid-configuration``.
 We furthermore require that your OIDC provider exposes a `JWK Set <https://datatracker.ietf.org/doc/html/rfc7517>`_ document.
-In this documentation, we assume that this document is available at ``OIDC_AUTHORITY_URL/.well-known/jwks.json``.
+In this documentation, we assume that this document is available at ``OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS``.
+For Auth0, ``OIDC_AUTHORITY_JWKS=/.well-known/jwks.json``.
 
 For machine-to-machine (SV node component to SV node component) authentication,
 your OIDC provider must support the `OAuth 2.0 Client Credentials Grant <https://tools.ietf.org/html/rfc6749#section-4.4>`_ flow.
 This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all SV node components that need to authenticate to others.
 Currently, these are the validator app backend and the SV app backend - both need to authenticate to the SV node's Canton participant.
 The `sub` field of JWTs issued through this flow must match the user ID configured as `ledger-api-user` in :ref:`helm-sv-auth-secrets-config`.
-In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``.
+In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``. (``@clients`` suffix is Auth0 specific)
 If this is not true for your OIDC provider, pay extra attention when configuring ``ledger-api-user`` values below.
 
 For user-facing authentication - allowing users to access the various web UIs hosted on your SV node,
@@ -154,17 +155,18 @@ In the future, your OIDC provider might additionally be required to issue JWTs w
 
 Summing up, your OIDC provider setup must provide you with the following configuration values:
 
-======================= ===========================================================================
-Name                    Value
------------------------ ---------------------------------------------------------------------------
-OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend
-VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend
-SV_CLIENT_ID            The client id of your OIDC provider for the SV app backend
-SV_CLIENT_SECRET        The client secret of your OIDC provider for the SV app backend
-WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
-SV_UI_CLIENT_ID         The client id of your OIDC provider for the SV UI.
-CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
+========================= ===========================================================================
+Name                      Value
+------------------------- ---------------------------------------------------------------------------
+OIDC_AUTHORITY_URL        The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
+VALIDATOR_CLIENT_ID       The client id of your OIDC provider for the validator app backend
+VALIDATOR_CLIENT_SECRET   The client secret of your OIDC provider for the validator app backend
+VALIDATOR_LEDGER_API_USER Same as VALIDATOR_CLIENT_ID (with ``@clients`` suffix for Auth0 only)
+SV_CLIENT_ID              The client id of your OIDC provider for the SV app backend
+SV_CLIENT_SECRET          The client secret of your OIDC provider for the SV app backend
+WALLET_UI_CLIENT_ID       The client id of your OIDC provider for the wallet UI.
+SV_UI_CLIENT_ID           The client id of your OIDC provider for the SV UI.
+CNS_UI_CLIENT_ID          The client id of your OIDC provider for the CNS UI.
 ======================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-sv-auth-secrets-config` and :ref:`helm-sv-install`.
@@ -276,8 +278,10 @@ OIDC_AUTHORITY_URL                 ``https://AUTH0_TENANT_NAME.us.auth0.com``
 OIDC_AUTHORITY_LEDGER_API_AUDIENCE The optional audience of your choice for Ledger API. e.g. ``https://ledger_api.example.com``
 VALIDATOR_CLIENT_ID                The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET            The client secret of the Auth0 app for the validator app backend
+VALIDATOR_LEDGER_API_USER          Same as VALIDATOR_CLIENT_ID (with ``@clients`` suffix for Auth0 only)
 SV_CLIENT_ID                       The client id of the Auth0 app for the SV app backend
 SV_CLIENT_SECRET                   The client secret of the Auth0 app for the SV app backend
+SV_LEDGER_API_USER                 Same as SV_CLIENT_ID (with ``@clients`` suffix for Auth0 only)
 WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI.
 SV_UI_CLIENT_ID                    The client id of the Auth0 app for the SV UI.
 CNS_UI_CLIENT_ID                   The client id of the Auth0 app for the CNS UI.
@@ -299,7 +303,7 @@ The following kubernetes secret will instruct the participant to create a servic
 .. code-block:: bash
 
     kubectl create --namespace sv secret generic splice-app-sv-ledger-api-auth \
-        "--from-literal=ledger-api-user=${SV_CLIENT_ID}@clients" \
+        "--from-literal=ledger-api-user=${SV_LEDGER_API_USER}" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${SV_CLIENT_ID}" \
         "--from-literal=client-secret=${SV_CLIENT_SECRET}" \
@@ -311,7 +315,7 @@ The validator app backend requires the following secret (omit the scope if it is
 .. code-block:: bash
 
     kubectl create --namespace sv secret generic splice-app-validator-ledger-api-auth \
-        "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
+        "--from-literal=ledger-api-user=${VALIDATOR_LEDGER_API_USER}" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}" \

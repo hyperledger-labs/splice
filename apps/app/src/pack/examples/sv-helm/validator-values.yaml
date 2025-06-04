@@ -17,14 +17,13 @@ scanAddress: "TRUSTED_SCAN_URL"
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
 # not only the suffix ``43b68e1e4978b000cefba352``:
 # You can specify multiple user ids if you want multiple users to be able to log into your wallet.
-validatorWalletUsers:
-  - "OPERATOR_WALLET_USER_ID"
+validatorWalletUsers: [OPERATOR_WALLET_USER_IDS]
 auth:
   # replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
   audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
 
-  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
-  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # replace OIDC_AUTHORITY_URL & OIDC_AUTHORITY_JWKS with your provider's OIDC base URL and sub-JWKS URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS
 
 # ENABLEWALLET_START
 # This will disable the wallet HTTP server and wallet automations when set to false
