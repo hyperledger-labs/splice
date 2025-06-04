@@ -3,8 +3,7 @@
 
 package com.digitalasset.canton.integration
 
-import com.digitalasset.canton.config.SharedCantonConfig
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.logging.NamedLogging
 
 /** Plugin to allow multiple tests to reuse behavior modifying the test config or environment
@@ -14,7 +13,7 @@ import com.digitalasset.canton.logging.NamedLogging
   * [[SharedEnvironment]] integration test setups. Must call [[EnvironmentSetup.registerPlugin]]
   * within its constructor to register the plugin.
   */
-trait EnvironmentSetupPlugin[C <: SharedCantonConfig[C], E <: Environment[C]] extends NamedLogging {
+trait EnvironmentSetupPlugin extends NamedLogging {
 
   /** Run before any of the tests in the test class have been run or an environment created */
   def beforeTests(): Unit = {}
@@ -26,18 +25,17 @@ trait EnvironmentSetupPlugin[C <: SharedCantonConfig[C], E <: Environment[C]] ex
 
   /** Hook before the environment has been created. Returned config will be used for the test.
     */
-  def beforeEnvironmentCreated(config: C): C = config
+  def beforeEnvironmentCreated(config: CantonConfig): CantonConfig = config
 
   /** Hook after the environment has been created but no tests have yet been run */
-  def afterEnvironmentCreated(config: C, environment: TestConsoleEnvironment[C, E]): Unit = {}
+  def afterEnvironmentCreated(config: CantonConfig, environment: TestConsoleEnvironment): Unit = {}
 
   /** Hook after all tests from the test class have completed but the environment is still running
     */
   def beforeEnvironmentDestroyed(
-      config: C,
-      environment: TestConsoleEnvironment[C, E],
+      environment: TestConsoleEnvironment
   ): Unit = {}
 
   /** Hook after the tests have been run and the environment has been shutdown */
-  def afterEnvironmentDestroyed(config: C): Unit = {}
+  def afterEnvironmentDestroyed(config: CantonConfig): Unit = {}
 }

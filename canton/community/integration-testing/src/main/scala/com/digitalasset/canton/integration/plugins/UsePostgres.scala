@@ -15,7 +15,6 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.InstanceReference
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{ConfigTransforms, EnvironmentSetupPlugin}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -71,7 +70,7 @@ class UsePostgres(
     customDbNames: Option[(String => String, String)] = None,
     customMaxConnectionsByNode: Option[String => Option[PositiveInt]] = None,
     forceTestContainer: Boolean = false,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with FlagCloseable
     with HasCloseContext
     with NoTracing {

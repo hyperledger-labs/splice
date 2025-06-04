@@ -19,7 +19,7 @@ class UseCommunityReferenceBlockSequencer[S <: StorageConfig](
     postgres: Option[UsePostgres] = None,
 )(implicit _c: ClassTag[S])
     extends UseReferenceBlockSequencerBase[
-      S
+      S,
     ](loggerFactory, "reference", "community-reference", sequencerGroups, postgres) {
 
   override protected val driverFactory = new CommunityReferenceSequencerDriverFactory

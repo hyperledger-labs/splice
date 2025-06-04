@@ -37,7 +37,7 @@ class ApiRequestLogger(
       headers: Metadata,
       next: ServerCallHandler[ReqT, RespT],
   ): ServerCall.Listener[ReqT] = {
-    val requestTraceContext: TraceContext = TraceContextGrpc.inferServerRequestTraceContext
+    val requestTraceContext: TraceContext = inferRequestTraceContext
 
     val sender = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR).toString)
       .getOrElse("unknown sender")
@@ -238,6 +238,15 @@ class ApiRequestLoggerBase(
     } else {
       status
     }
+
+  protected def inferRequestTraceContext: TraceContext = {
+    val grpcTraceContext = TraceContextGrpc.fromGrpcContext
+    if (grpcTraceContext.traceId.isDefined) {
+      grpcTraceContext
+    } else {
+      TraceContext.withNewTraceContext(identity)
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   protected def traceContextOfMessage[A](message: Any): Option[TraceContext] = {
