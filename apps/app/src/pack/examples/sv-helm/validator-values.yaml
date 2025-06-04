@@ -13,7 +13,7 @@ scanAddress: "TRUSTED_SCAN_URL"
 # useSequencerConnectionsFromScan: false
 # TRUSTED_SINGLE_SEQUENCER_END
 
-# Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
+# Replace OPERATOR_WALLET_USER_IDS with the user id in your IAM that you want to use to log into
 # the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
 # not only the suffix ``43b68e1e4978b000cefba352``:
 # You can specify multiple user ids if you want multiple users to be able to log into your wallet.
