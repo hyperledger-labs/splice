@@ -22,7 +22,7 @@ auth:
   # replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
   audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
 
-  # replace OIDC_AUTHORITY_URL & OIDC_AUTHORITY_JWKS with your provider's OIDC base URL and sub-JWKS URL
+  # replace OIDC_AUTHORITY_URL & OIDC_AUTHORITY_JWKS with your provider's OIDC base URL and JWKS sub-URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS
 
 # ENABLEWALLET_START
