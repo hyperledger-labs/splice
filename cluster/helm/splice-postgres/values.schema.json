@@ -39,12 +39,16 @@
     "db": {
       "type": "object",
       "required": [
+        "volumeReclaimPolicy",
         "volumeSize",
         "volumeStorageClass",
         "pvcTemplateName",
         "maxConnections"
       ],
       "properties": {
+        "volumeReclaimPolicy": {
+          "type": "string"
+        },
         "volumeSize": {
           "type": "string"
         },

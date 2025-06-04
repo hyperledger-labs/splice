@@ -17,6 +17,7 @@ pod:
 
 db:
   volumeSize: 2800Gi
+  volumeReclaimPolicy: Retain
   volumeStorageClass: standard-rwo
   pvcTemplateName: pg-data
   maxConnections: 300

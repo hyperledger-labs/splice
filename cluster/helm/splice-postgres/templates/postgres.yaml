@@ -96,6 +96,8 @@ spec:
       resources:
         requests:
           storage: {{ $.Values.db.volumeSize }}
+      reclaimPolicy: {{ $.Values.db.volumeReclaimPolicy }}
+      persistentVolumeReclaimPolicy: {{ $.Values.db.volumeReclaimPolicy }}
       storageClassName: {{ $.Values.db.volumeStorageClass }}
       volumeMode: Filesystem
 ---
