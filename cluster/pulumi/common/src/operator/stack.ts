@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as semver from 'semver';
 import {
   CLUSTER_BASENAME,
   config,
@@ -135,6 +136,10 @@ export function createStackCR(
         },
       }
     : {};
+  const pulumiVersion = spliceEnvConfig.requireEnv('PULUMI_VERSION');
+  // required because the docker images are broken
+  // TODO(#15978): remove this once pulumi is upgraded
+  const minimumPulumiVersionRequired = '3.147.0';
   return new k8s.apiextensions.CustomResource(
     name,
     {
@@ -204,7 +209,7 @@ export function createStackCR(
           // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
             spec: {
-              image: `pulumi/pulumi:${spliceEnvConfig.requireEnv('PULUMI_VERSION')}`,
+              image: `pulumi/pulumi:${semver.gt(pulumiVersion, minimumPulumiVersionRequired) ? pulumiVersion : minimumPulumiVersionRequired}-nonroot`,
               env: [
                 {
                   name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
