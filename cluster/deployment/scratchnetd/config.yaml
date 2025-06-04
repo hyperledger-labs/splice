@@ -34,4 +34,3 @@ operatorDeployment:
     deploymentDir: "cluster/deployment"
     spliceRoot: "."
     privateConfigsDir: "cluster/configs-private"
-    publicConfigsDir: "cluster/configs"
