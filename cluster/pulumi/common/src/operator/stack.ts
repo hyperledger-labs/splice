@@ -208,6 +208,10 @@ export function createStackCR(
           retryOnUpdateConflict: true,
           // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
+            metadata: {
+              name: `workspace-${name.replaceAll('.', '-')}`,
+              namespace: namespaceName,
+            },
             spec: {
               image: `pulumi/pulumi:${semver.gt(pulumiVersion, minimumPulumiVersionRequired) ? pulumiVersion : minimumPulumiVersionRequired}-nonroot`,
               env: [
