@@ -90,7 +90,7 @@ class ParticipantAdminConnection(
     _.getSchedule(_),
   )
 
-  override protected type Status = ParticipantStatus
+  override type Status = ParticipantStatus
 
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
@@ -121,7 +121,7 @@ class ParticipantAdminConnection(
         throw Status.NOT_FOUND
           .withDescription(s"Domain with alias $synchronizerAlias is not connected")
           .asRuntimeException()
-      )(_.synchronizerId)
+      )(_.synchronizerId.logical)
     )
 
   /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
@@ -133,7 +133,7 @@ class ParticipantAdminConnection(
   ): Future[SynchronizerId] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
-    )
+    ).map(_.logical)
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
@@ -339,7 +339,7 @@ class ParticipantAdminConnection(
       )
     } yield configuredDomains
       .collectFirst {
-        case (configuredDomain, _) if configuredDomain.synchronizerAlias == domain =>
+        case (configuredDomain, _, _) if configuredDomain.synchronizerAlias == domain =>
           configuredDomain
       }
 
@@ -359,6 +359,7 @@ class ParticipantAdminConnection(
   ): Future[Unit] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity.ModifySynchronizerConnection(
+        None,
         config,
         SequencerConnectionValidation.ThresholdActive,
       )

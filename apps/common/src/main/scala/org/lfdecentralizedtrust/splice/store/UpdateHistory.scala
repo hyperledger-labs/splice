@@ -9,11 +9,10 @@ import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
+  Event,
   ExercisedEvent,
   Identifier,
-  TransactionTree,
-  TreeEvent,
-}
+  Transaction}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -469,7 +468,7 @@ class UpdateHistory(
   }
 
   private def ingestTransactionTree(
-      tree: TransactionTree,
+      tree: Transaction,
       migrationId: Long,
   ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
     oMetrics.foreach(_.UpdateHistory.transactionsTrees.mark())
@@ -497,7 +496,7 @@ class UpdateHistory(
   }
 
   private def insertTransactionUpdateRow(
-      tree: TransactionTree,
+      tree: Transaction,
       migrationId: Long,
   ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
     val safeUpdateId = lengthLimited(tree.getUpdateId)
@@ -529,7 +528,7 @@ class UpdateHistory(
   private def insertCreateEventRow(
       updateId: String,
       event: CreatedEvent,
-      tree: TransactionTree,
+      tree: Transaction,
       migrationId: Long,
       updateRowId: Long,
   ): DBIOAction[?, NoStream, Effect.Write] = {
@@ -576,7 +575,7 @@ class UpdateHistory(
   private def insertExerciseEventRow(
       updateId: String,
       event: ExercisedEvent,
-      tree: TransactionTree,
+      tree: Transaction,
       migrationId: Long,
       updateRowId: Long,
       childNodeids: Seq[Int],
@@ -1392,11 +1391,7 @@ class UpdateHistory(
       exerciseRows: Seq[SelectFromExerciseEvents],
   ): UpdateHistoryResponse = {
 
-    val createEventsById = createRows
-      .map(row =>
-        Integer.valueOf(EventId.nodeIdFromEventId(row.eventId)) -> row.toCreatedEvent.event
-      )
-      .toMap
+    val createEvents = createRows .map(_.toCreatedEvent.event)
     // TODO(#17370) - remove this conversion as it's costly
     val nodesWithChildren = exerciseRows
       .map(exercise =>
@@ -1404,9 +1399,9 @@ class UpdateHistory(
           .map(EventId.nodeIdFromEventId)
       )
       .toMap
-    val exerciseEventsById = exerciseRows.map { row =>
+    val exerciseEvents = exerciseRows.map { row =>
       val nodeId = EventId.nodeIdFromEventId(row.eventId)
-      Integer.valueOf(nodeId) -> new ExercisedEvent(
+      new ExercisedEvent(
         /*witnessParties = */ java.util.Collections.emptyList(),
         /*offset = */ 0, // not populated
         /*nodeId = */ nodeId,
@@ -1432,18 +1427,18 @@ class UpdateHistory(
         /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
       )
-    }.toMap
-    val eventsById: Map[Integer, TreeEvent] = createEventsById ++ exerciseEventsById
+    }
+    val events: Seq[Event] = createEvents ++ exerciseEvents
 
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
-        new TransactionTree(
+        new Transaction(
           /*updateId = */ updateRow.updateId,
           /*commandId = */ updateRow.commandId.getOrElse(missingString),
           /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
+          /*events = */ events.asJava,
           /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
-          /*eventsById = */ eventsById.asJava,
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,

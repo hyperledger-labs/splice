@@ -34,13 +34,14 @@ import org.lfdecentralizedtrust.splice.store.UpdateHistoryTestBase.{
 }
 import org.lfdecentralizedtrust.splice.store.{PageLimit, UpdateHistory, UpdateHistoryTestBase}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
+import com.daml.ledger.api.v2.transaction_filter
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
-  TransactionTreeWrapper,
+  TransactionWrapper,
   UnassignedWrapper,
 }
-import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
@@ -58,16 +59,29 @@ trait UpdateHistoryTestUtil extends TestCommon {
   ): Seq[UpdateHistoryResponse] = {
     val ledgerEnd = participant.ledger_api.state.end()
 
+            val transactionFormat = transaction_filter.TransactionFormat(
+          eventFormat = Some(
+            transaction_filter.EventFormat(
+              filtersByParty = Seq(partyId.toLf -> transaction_filter.Filters(Nil)).toMap,
+              filtersForAnyParty = None,
+            )
+          ),
+          transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+        )
+
     participant.ledger_api.updates
-      .trees(
-        partyIds = Set(partyId),
+      .updates(
+        updateFormat = transaction_filter.UpdateFormat(
+          includeTransactions = Some(transactionFormat),
+          includeReassignments = Some(transactionFormat.getEventFormat),
+          includeTopologyEvents = None,
+        ),
         completeAfter = PositiveInt.MaxValue,
         beginOffsetExclusive = beginExclusive,
         endOffsetInclusive = Some(ledgerEnd),
-        verbose = false,
       )
       .collect {
-        case TransactionTreeWrapper(protoTree) =>
+        case TransactionWrapper(protoTree) =>
           UpdateHistoryResponse(
             TransactionTreeUpdate(LedgerClient.lapiTreeToJavaTree(protoTree)),
             SynchronizerId.tryFromString(protoTree.synchronizerId),

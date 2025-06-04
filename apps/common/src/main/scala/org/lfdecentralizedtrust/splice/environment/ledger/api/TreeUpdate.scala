@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.environment.ledger.api
 
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import com.digitalasset.canton.data.CantonTimestamp
 
 sealed abstract class TreeUpdate extends Product with Serializable {
@@ -13,7 +13,7 @@ sealed abstract class TreeUpdate extends Product with Serializable {
 }
 
 final case class TransactionTreeUpdate(
-    tree: TransactionTree
+    tree: Transaction
 ) extends TreeUpdate {
   override def recordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
 

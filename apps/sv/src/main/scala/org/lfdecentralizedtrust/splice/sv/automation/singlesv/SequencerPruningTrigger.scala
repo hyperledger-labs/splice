@@ -51,7 +51,7 @@ class SequencerPruningTrigger(
       synchronizerId <- sequencerAdminConnection.getStatus.map(_.trySuccess.synchronizerId)
       recordTimeRangeO <- store.updateHistory
         .getRecordTimeRange(migrationId)
-        .map(_.get(synchronizerId))
+        .map(_.get(synchronizerId.logical))
       _ <- recordTimeRangeO match {
         case Some(DomainRecordTimeRange(earliest, latest))
             if (latest - earliest).compareTo(retentionPeriod.asJava) > 0 =>

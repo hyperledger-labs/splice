@@ -24,7 +24,7 @@ trait CommonAppInstanceReferences {
   def decentralizedSynchronizerId(implicit env: SpliceTestConsoleEnvironment): SynchronizerId =
     sv1Backend.participantClientWithAdminToken.synchronizers.id_of(
       sv1Backend.config.domains.global.alias
-    )
+    ).logical
   def decentralizedSynchronizerAlias(implicit
       env: SpliceTestConsoleEnvironment
   ): SynchronizerAlias =

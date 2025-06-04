@@ -2716,7 +2716,7 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  protected def optionallyAwait[T](
+  def optionallyAwait[T](
       update: T,
       updateId: String,
       txSynchronizerId: String,

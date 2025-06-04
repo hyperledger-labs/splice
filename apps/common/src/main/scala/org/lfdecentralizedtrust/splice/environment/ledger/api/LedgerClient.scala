@@ -195,7 +195,7 @@ private[environment] class LedgerClient(
       for {
         stub <- withCredentialsAndTraceContext(updateServiceStub)
       } yield ClientAdapter
-        .serverStreaming(request.toProto, stub.getUpdateTrees)
+        .serverStreaming(request.toProto, stub.getUpdates)
         .mapConcat(GetTreeUpdatesResponse.fromProto)
     )
   }
@@ -236,7 +236,7 @@ private[environment] class LedgerClient(
       case NoDedup =>
     }
 
-    val request = CommandServiceOuterClass.SubmitAndWaitRequest
+    val request = CommandServiceOuterClass.SubmitAndWaitForTransactionRequest
       .newBuilder()
       .setCommands(commandsBuilder.build)
       .build()
@@ -734,25 +734,25 @@ object LedgerClient {
       impl((r: CSOC.SubmitAndWaitResponse) => r.getCompletionOffset)(
         { case (stub, r, ec) =>
           stub
-            .submitAndWait(command_service.SubmitAndWaitRequest.fromJavaProto(r))
+            .submitAndWait(command_service.SubmitAndWaitRequest.fromJavaProto(CSOC.SubmitAndWaitRequest.newBuilder().setCommands(r.getCommands).build))
             .map(r => command_service.SubmitAndWaitResponse.toJavaProto(r))(ec)
         }
       )
 
-    val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
-      impl((response: CSOC.SubmitAndWaitForTransactionTreeResponse) =>
-        jdata.TransactionTree.fromProto(response.getTransaction)
+    val TransactionTree: SubmitAndWaitFor[jdata.Transaction] =
+      impl((response: CSOC.SubmitAndWaitForTransactionResponse) =>
+        jdata.Transaction.fromProto(response.getTransaction)
       ) {
         { case (stub, r, ec) =>
           stub
-            .submitAndWaitForTransactionTree(command_service.SubmitAndWaitRequest.fromJavaProto(r))
-            .map(r => command_service.SubmitAndWaitForTransactionTreeResponse.toJavaProto(r))(ec)
+            .submitAndWaitForTransaction(command_service.SubmitAndWaitForTransactionRequest.fromJavaProto(r))
+            .map(r => command_service.SubmitAndWaitForTransactionResponse.toJavaProto(r))(ec)
         }
       }
 
     private type StubSubmit[R] = (
         CommandServiceGrpc.CommandServiceStub,
-        CSOC.SubmitAndWaitRequest,
+        CSOC.SubmitAndWaitForTransactionRequest,
         ExecutionContext,
     ) => Future[R]
 
@@ -769,6 +769,13 @@ object LedgerClient {
       updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint
   )
   def lapiTreeToJavaTree(
+      tree: lapi.transaction.Transaction
+  ): com.daml.ledger.javaapi.data.Transaction = {
+    val treeProto = scalapbToJava(tree)(_.companion)
+    com.daml.ledger.javaapi.data.Transaction.fromProto(treeProto)
+  }
+
+  def lapiTreeToJavaTree(
       tree: lapi.transaction.TransactionTree
   ): com.daml.ledger.javaapi.data.TransactionTree = {
     val treeProto = scalapbToJava(tree)(_.companion)
@@ -777,13 +784,13 @@ object LedgerClient {
 
   object GetTreeUpdatesResponse {
 
-    import lapi.update_service.GetUpdateTreesResponse.Update as TU
+    import lapi.update_service.GetUpdatesResponse.Update as TU
 
     private[splice] def fromProto(
-        proto: lapi.update_service.GetUpdateTreesResponse
+        proto: lapi.update_service.GetUpdatesResponse
     ): Option[GetTreeUpdatesResponse] = {
       proto.update match {
-        case TU.TransactionTree(tree) =>
+        case TU.Transaction(tree) =>
           val javaTree = lapiTreeToJavaTree(tree)
           val update = TransactionTreeUpdate(javaTree)
           Some(
@@ -820,6 +827,8 @@ object LedgerClient {
           )
 
         case TU.OffsetCheckpoint(_) => None
+
+        case TU.TopologyTransaction(_) => None
 
         case TU.Empty => sys.error("uninitialized update service result (update)")
       }

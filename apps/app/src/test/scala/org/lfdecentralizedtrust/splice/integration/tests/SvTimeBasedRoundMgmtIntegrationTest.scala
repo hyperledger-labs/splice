@@ -61,7 +61,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
           )
       val rounds =
         transactions.flatMap(
-          DecodeUtil.decodeAllCreatedTree(splice.round.ClosedMiningRound.COMPANION)(_)
+          DecodeUtil.decodeAllCreated(splice.round.ClosedMiningRound.COMPANION)(_)
         )
       rounds should have size 1
     }

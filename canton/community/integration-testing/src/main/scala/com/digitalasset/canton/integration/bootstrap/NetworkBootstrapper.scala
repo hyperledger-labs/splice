@@ -12,6 +12,7 @@ import com.digitalasset.canton.console.{
   MediatorReference,
   SequencerReference,
 }
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}

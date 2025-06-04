@@ -46,7 +46,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             .sequencerConnections
             .connections
             .forgetNE
-        ) { case Seq(GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)) =>
+        ) { case Seq(GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _, _)) =>
           defaultSequencerEndpoint shouldBe NonEmpty
             .mk(Seq, Endpoint("localhost", Port.tryCreate(5108)))
             .toVector
@@ -60,7 +60,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             .forgetNE
         ) {
           case Seq(
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _)
               ) =>
             localSequencerEndpoint shouldBe NonEmpty
               .mk(Seq, Endpoint("localhost", Port.tryCreate(5208)))
@@ -75,7 +75,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             .forgetNE
         ) {
           case Seq(
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _)
               ) =>
             localSequencerEndpoint shouldBe NonEmpty
               .mk(Seq, Endpoint("localhost", Port.tryCreate(5308)))
@@ -90,7 +90,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
             .forgetNE
         ) {
           case Seq(
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _)
               ) =>
             localSequencerEndpoint shouldBe NonEmpty
               .mk(Seq, Endpoint("localhost", Port.tryCreate(5408)))

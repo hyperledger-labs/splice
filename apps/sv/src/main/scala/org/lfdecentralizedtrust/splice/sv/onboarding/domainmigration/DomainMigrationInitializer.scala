@@ -58,7 +58,7 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -300,13 +300,13 @@ class DomainMigrationInitializer(
     )
     logger.info("Init new domain nodes from snapshot")
     for {
-      _ <- initializeSequencer(
+      physicalSynchronizerId <- initializeSequencer(
         synchronizerNodeInitiaizer,
         nodeIdentities.sequencer,
         genesisState,
       )
       _ <- initializeMediator(
-        nodeIdentities.synchronizerId,
+        physicalSynchronizerId,
         synchronizerNodeInitiaizer,
         nodeIdentities.mediator,
       )
@@ -340,14 +340,15 @@ class DomainMigrationInitializer(
       synchronizerNodeInitializer: SynchronizerNodeInitializer,
       identity: NodeIdentitiesDump,
       genesisState: ByteString,
-  ) = {
+  ): Future[PhysicalSynchronizerId] = {
     synchronizerNodeInitializer.synchronizerNode.sequencerAdminConnection
-      .isNodeInitialized()
-      .flatMap { isInitialized =>
-        if (isInitialized) {
+      .getStatus
+      .flatMap { status =>
+        status.successOption match {
+          case Some(success) =>
           logger.info(s"Sequencer is already initialized with id ${identity.id}")
-          Future.unit
-        } else {
+          Future.successful(success.synchronizerId)
+        case None =>
           logger.info(s"Sequencer is not initialized, initializing from dump")
           for {
             _ <- synchronizerNodeInitializer.sequencerInitializer.initializeFromDump(identity)
@@ -369,24 +370,24 @@ class DomainMigrationInitializer(
                 ),
               logger,
             )
-            _ <- retryProvider.waitUntil(
+            synchronizerId <- retryProvider.getValueWithRetries(
               RetryFor.ClientCalls,
               "sequencer_initialized",
               "sequencer is initialized",
-              localSynchronizerNode.sequencerAdminConnection.isNodeInitialized().map {
-                initialized =>
-                  if (!initialized) {
+              localSynchronizerNode.sequencerAdminConnection.getStatus.map {
+                _.successOption.fold(
                     throw Status.FAILED_PRECONDITION
                       .withDescription("Sequencer is not initialized")
-                      .asRuntimeException()
-                  }
+                      .asRuntimeException())(
+                  _.synchronizerId,
+                )
               },
               loggerFactory.getTracedLogger(getClass),
             )
-          } yield {}
+          } yield synchronizerId
         }
       }
-      .flatMap { _ =>
+      .flatMap { synchronizerId =>
         retryProvider.waitUntil(
           RetryFor.ClientCalls,
           "sequencer_initialized_id",
@@ -399,7 +400,7 @@ class DomainMigrationInitializer(
             }
           },
           loggerFactory.getTracedLogger(getClass),
-        )
+        ).map(_ => synchronizerId)
       }
   }
 
@@ -434,7 +435,7 @@ class DomainMigrationInitializer(
   }
 
   private def initializeMediator(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       synchronizerNodeInitiaizer: SynchronizerNodeInitializer,
       identity: NodeIdentitiesDump,
   ) = {

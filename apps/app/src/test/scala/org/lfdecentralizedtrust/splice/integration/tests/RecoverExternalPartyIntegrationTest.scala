@@ -259,7 +259,7 @@ class RecoverExternalPartyIntegrationTest
       tx,
       NonEmpty(Set, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
     )
   }
 }

@@ -15,7 +15,7 @@ import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.{SynchronizerAlias, SequencerAlias}
+import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -102,6 +102,7 @@ class LocalSequencerConnectionsTrigger(
               transportSecurity = internalSequencerClientConfig.tlsConfig.isDefined,
               customTrustCertificates = None,
               SequencerAlias.Default,
+              sequencerId = None,
             )
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),

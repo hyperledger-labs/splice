@@ -50,7 +50,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultAnsConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
+import com.digitalasset.canton.config. SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -162,6 +162,7 @@ class SV1Initializer(
                 transportSecurity = internalSequencerApi.tlsConfig.isDefined,
                 customTrustCertificates = None,
                 SequencerAlias.Default,
+                sequencerId = None,
               )
             ),
             PositiveInt.one,
@@ -406,7 +407,7 @@ class SV1Initializer(
             namespace,
           )
         )
-        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
+        val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v34)
         val values = initialValues.tryUpdate(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
@@ -420,7 +421,7 @@ class SV1Initializer(
             NonNegativeFiniteDuration.fromConfig(config.mediatorDeduplicationTimeout),
         )
         for {
-          _ <- retryProvider.ensureThatO(
+          physicalSynchronizerId <- retryProvider.ensureThatO(
             RetryFor.WaitingOnInitDependency,
             "init_sequencer",
             "sequencer is initialized",
@@ -495,7 +496,7 @@ class SV1Initializer(
             "mediator is initialized",
             synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             synchronizerNode.mediatorAdminConnection.initialize(
-              synchronizerId,
+              physicalSynchronizerId,
               synchronizerNode.sequencerConnection,
               synchronizerNode.mediatorSequencerAmplification,
             ),

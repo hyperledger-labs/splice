@@ -7,7 +7,7 @@ import com.daml.ledger.javaapi.data.{
   DamlRecord,
   ExercisedEvent,
   Identifier,
-  TransactionTree,
+  Transaction,
   TreeEvent,
   Unit as damlUnit,
   Value as damlValue,
@@ -969,7 +969,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         recordTime: Instant = defaultEffectiveAt,
         packageName: String = dummyPackageName,
         createdEventObservers: Seq[PartyId] = Seq.empty,
-    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
@@ -1148,25 +1148,24 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkTx(
       offset: Long,
-      events: Seq[TreeEvent],
+      events: Seq[Event],
       synchronizerId: SynchronizerId,
       effectiveAt: Instant = defaultEffectiveAt,
       workflowId: String = "",
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
-  ): TransactionTree = {
+  ): Transaction = {
     val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
     }
-    val eventsById = eventsWithId.map(e => e.getNodeId -> e).toMap
-    new TransactionTree(
+    new Transaction(
       updateId,
       commandId,
       workflowId,
       effectiveAt,
+      events,
       offset,
-      eventsById.asJava,
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,

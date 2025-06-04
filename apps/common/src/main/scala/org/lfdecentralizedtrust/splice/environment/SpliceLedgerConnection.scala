@@ -13,7 +13,7 @@ import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
-import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, Transaction, User}
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -1315,7 +1315,7 @@ object SpliceLedgerConnection {
 
   def decodeExerciseResult[T](
       update: Update[T],
-      transaction: TransactionTree,
+      transaction: Transaction,
   ): T = {
     val rootEventIds = transaction.getRootNodeIds.asScala.toSeq
     if (rootEventIds.size == 1) {

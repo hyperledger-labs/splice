@@ -19,7 +19,7 @@ object CantonDependencies {
     if (sys.props("os.name").contains("Mac")) "osx"
     else sys.props("os.name").toLowerCase
 
-  lazy val scala_version = "2.13.15"
+  lazy val scala_version = "2.13.16"
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
@@ -33,7 +33,7 @@ object CantonDependencies {
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "3.0.0"
+  lazy val ammonite_version = "3.0.1"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"
