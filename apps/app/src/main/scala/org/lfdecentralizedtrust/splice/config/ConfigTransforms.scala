@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.config
 
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppBackendConfig
+import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanAppBackendConfig}
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
@@ -27,6 +27,7 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.Port
 import monocle.macros.syntax.lens.*
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
 
 import scala.collection.mutable
 import scala.collection.parallel.CollectionConverters.ImmutableMapIsParallelizable
@@ -34,6 +35,8 @@ import scala.concurrent.duration.*
 import scala.io.Source
 
 object ConfigTransforms {
+
+  val IsTheCantonSequencerBFTEnabled: Boolean = sys.env.contains("SPLICE_USE_BFT_SEQUENCER")
 
   sealed abstract class ConfigurableApp extends Product with Serializable
 
@@ -207,6 +210,7 @@ object ConfigTransforms {
     updateAutomationConfig(ConfigurableApp.Sv)(
       _.withPausedTrigger[SvOffboardingMediatorTrigger]
         .withPausedTrigger[SvOffboardingSequencerTrigger]
+        .withPausedTrigger[SvBftSequencerPeerOffboardingTrigger]
     )
 
   def withPausedSvOffboardingMediatorAndPartyToParticipantTriggers(): ConfigTransform =
@@ -214,6 +218,14 @@ object ConfigTransforms {
       _.withPausedTrigger[SvOffboardingMediatorTrigger]
         .withPausedTrigger[SvOffboardingPartyToParticipantProposalTrigger]
     )
+
+  def withResumedOffboardingTriggers(): ConfigTransform = {
+    updateAutomationConfig(ConfigurableApp.Sv)(
+      _.withResumedTrigger[SvOffboardingMediatorTrigger]
+        .withResumedTrigger[SvOffboardingSequencerTrigger]
+        .withResumedTrigger[SvBftSequencerPeerOffboardingTrigger]
+    )
+  }
 
   def setAmuletPrice(price: BigDecimal): ConfigTransform =
     config =>
@@ -357,7 +369,9 @@ object ConfigTransforms {
     })
 
   def bumpCantonDomainPortsBy(bump: Int): ConfigTransform =
-    bumpSvAppCantonDomainPortsBy(bump) compose bumpValidatorAppCantonDomainPortsBy(bump)
+    bumpSvAppCantonDomainPortsBy(bump) compose bumpValidatorAppCantonDomainPortsBy(
+      bump
+    ) compose bumpScanCantonDomainPortsBy(bump)
 
   def bumpSvAppCantonDomainPortsBy(bump: Int): ConfigTransform = {
     updateAllSvAppConfigs_(
@@ -368,10 +382,24 @@ object ConfigTransforms {
           _.map(d =>
             d.copy(
               sequencer = d.sequencer
-                .copy(externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl))
+                .copy(
+                  externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl)
+                )
             )
           )
         )
+    )
+  }
+
+  def bumpScanCantonDomainPortsBy(bump: Int) = {
+    updateAllScanAppConfigs_(
+      _.focus(_.bftSequencers).modify(
+        _.map(
+          _.focus(_.p2pUrl).modify(
+            bumpUrl(bump, _)
+          )
+        )
+      )
     )
   }
 
@@ -400,7 +428,14 @@ object ConfigTransforms {
           .focus(_.localSynchronizerNode)
           .modify(_.map(portTransform(bump, _)))
       ),
-      updateAllScanAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
+      updateAllScanAppConfigs_(
+        _.focus(_.participantClient)
+          .modify(portTransform(bump, _))
+          .focus(_.sequencerAdminClient)
+          .modify(portTransform(bump, _))
+          .focus(_.bftSequencers)
+          .modify(_.map(_.focus(_.sequencerAdminClient).modify(portTransform(bump, _))))
+      ),
       updateAllValidatorConfigs_(
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
@@ -528,6 +563,8 @@ object ConfigTransforms {
           .modify(_.map(setPortPrefix(range)))
           .focus(_.sequencerAdminClient.port)
           .modify(setPortPrefix(range))
+          .focus(_.bftSequencers)
+          .modify(_.map(_.focus(_.sequencerAdminClient.port).modify(setPortPrefix(range))))
       } else {
         config
       }
@@ -606,6 +643,34 @@ object ConfigTransforms {
       }
     )
     transforms.foldLeft((c: SpliceConfig) => c)((f, tf) => f compose tf)
+  }
+
+  def withBftSequencers(): ConfigTransform = {
+    updateAllSvAppConfigs_(appConfig =>
+      appConfig
+        .focus(_.localSynchronizerNode)
+        .modify(
+          _.map(
+            _.focus(_.sequencer).modify(
+              _.copy(
+                isBftSequencer = true
+              )
+            )
+          )
+        )
+    ) compose {
+      updateAllScanAppConfigs((scan, config) =>
+        config.copy(
+          bftSequencers = Seq(
+            BftSequencerConfig(
+              0,
+              config.sequencerAdminClient,
+              s"http://localhost:${5010 + Integer.parseInt(scan.stripPrefix("sv").take(1)) * 100}",
+            )
+          )
+        )
+      )
+    }
   }
 
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =

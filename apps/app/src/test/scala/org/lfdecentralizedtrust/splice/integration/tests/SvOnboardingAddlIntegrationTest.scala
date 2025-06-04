@@ -48,6 +48,7 @@ class SvOnboardingAddlIntegrationTest
       startAllSync(
         sv1ScanBackend,
         sv2ScanBackend,
+        sv3ScanBackend,
         sv1Backend,
         sv2Backend,
         sv3Backend,
@@ -63,8 +64,9 @@ class SvOnboardingAddlIntegrationTest
       // active and sv3 hasn't approved sv4.
     }
     clue("SV4 starts") {
-      sv4ValidatorBackend.start()
       sv4Backend.start()
+      sv4ScanBackend.start()
+      sv4ValidatorBackend.start()
     }
     val sv1Party = sv1Backend.getDsoInfo().svParty
     // We are not using sv4.getDsoInfo() to get sv4's party id
@@ -181,6 +183,7 @@ class SvOnboardingAddlIntegrationTest
       })
     }
     sv4Backend.waitForInitialization()
+    sv4ScanBackend.waitForInitialization()
     sv4ValidatorBackend.waitForInitialization()
 
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
@@ -293,12 +296,7 @@ class SvOnboardingAddlIntegrationTest
     implicit env =>
       clue("Initialize DSO with 2 SVs") {
         startAllSync(
-          sv1ScanBackend,
-          sv2ScanBackend,
-          sv1Backend,
-          sv2Backend,
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
+          (sv1Nodes ++ sv2Nodes)*
         )
         sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
       }
@@ -322,8 +320,7 @@ class SvOnboardingAddlIntegrationTest
 
       clue("SV3 gets onboarded") {
         startAllSync(
-          sv3Backend,
-          sv3ValidatorBackend,
+          sv3Nodes*
         )
         sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
         sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 0
@@ -356,9 +353,7 @@ class SvOnboardingAddlIntegrationTest
   "fail to submit command with actAs = dso if there are more than 1 SV onboarded" in {
     implicit env =>
       startAllSync(
-        sv1ScanBackend,
-        sv1Backend,
-        sv1ValidatorBackend,
+        sv1Nodes*
       )
       sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1
 

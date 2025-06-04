@@ -70,8 +70,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       ? 'Using locally built charts by default'
       : `Using charts from the artifactory by default, version ${activeVersion.version}`
   );
-  console.error(`CLUSTER_HOSTNAME: ${CLUSTER_HOSTNAME}`);
-  console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
 
   const xns = exactNamespace(RUNBOOK_NAMESPACE, true);
 

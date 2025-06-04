@@ -91,19 +91,19 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         number: Int,
         sv: SvAppBackendReference,
         validator: ValidatorAppBackendReference,
-        scanApp: Option[ScanAppBackendReference] = None,
+        scanApp: ScanAppBackendReference,
     ) =
       clue(s"Starting SV$number app") {
         validator.start()
         sv.start()
-        scanApp.foreach(_.start())
+        scanApp.start()
         validator.waitForInitialization()
         sv.waitForInitialization()
-        scanApp.foreach(_.waitForInitialization())
+        scanApp.waitForInitialization()
       }
 
-    startSv(2, sv2Backend, sv2ValidatorBackend, Some(sv2ScanBackend))
-    startSv(3, sv3Backend, sv3ValidatorBackend)
+    startSv(2, sv2Backend, sv2ValidatorBackend, sv2ScanBackend)
+    startSv(3, sv3Backend, sv3ValidatorBackend, sv3ScanBackend)
     // Increase the decentralized namespace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
     // do this by falsely adding the sequencer namespace to the decentralized namespace
     val sv1SequencerAdminConnection =
@@ -127,7 +127,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     newDecentralizedNamespace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
 
     try {
-      startSv(4, sv4Backend, sv4ValidatorBackend)
+      startSv(4, sv4Backend, sv4ValidatorBackend, sv4ScanBackend)
 
       clue("All SVs have reported their Scan URLs in DSO rules") {
         eventually() {
@@ -140,10 +140,11 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
                 .scan
                 .toScala
             )
-            // onle sv1 and sv2 have scan apps
             .map(_.publicUrl) should contain theSameElementsAs Seq(
             "http://localhost:5012",
             "http://localhost:5112",
+            "http://localhost:5212",
+            "http://localhost:5312",
           )
         }
       }
