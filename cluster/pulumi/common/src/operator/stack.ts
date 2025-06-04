@@ -204,7 +204,7 @@ export function createStackCR(
           // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
             spec: {
-              image: `pulumi/pulumi:${spliceEnvConfig.requireEnv('PULUMI_VERSION')}-nonroot`,
+              image: `pulumi/pulumi:${spliceEnvConfig.requireEnv('PULUMI_VERSION')}`,
               env: (
                 [
                   {
