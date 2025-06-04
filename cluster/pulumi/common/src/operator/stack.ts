@@ -121,7 +121,7 @@ export function createStackCR(
         PRIVATE_CONFIGS_PATH: {
           type: 'Literal',
           literal: {
-            value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.privateConfigsDir}`,
+            value: `/share/source/${ref.config.privateConfigsDir}`,
           },
         },
       }
@@ -131,7 +131,7 @@ export function createStackCR(
         PUBLIC_CONFIGS_PATH: {
           type: 'Literal',
           literal: {
-            value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.publicConfigsDir}`,
+            value: `/share/source/${ref.config.publicConfigsDir}`,
           },
         },
       }
@@ -162,13 +162,13 @@ export function createStackCR(
             SPLICE_ROOT: {
               type: 'Literal',
               literal: {
-                value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.spliceRoot}`,
+                value: `/share/source/${ref.config.spliceRoot}`,
               },
             },
             DEPLOYMENT_DIR: {
               type: 'Literal',
               literal: {
-                value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.deploymentDir}`,
+                value: `/share/source/${ref.config.deploymentDir}`,
               },
             },
             ...privateConfigs,
