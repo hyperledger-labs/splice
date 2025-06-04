@@ -23,6 +23,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   CommandPriority,
   DarResource,
   DarResources,
+  RetryFor,
   RetryProvider,
   SpliceLedgerConnection,
 }
@@ -30,7 +31,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.CometBftConfigLimits
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
@@ -126,7 +127,8 @@ object SpliceUtil {
       ],
       priority: CommandPriority = CommandPriority.Low,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    retryProvider.retryForClientCalls(
+    retryProvider.retry(
+      RetryFor.InitializingClientCalls,
       "createValidatorRight",
       "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {

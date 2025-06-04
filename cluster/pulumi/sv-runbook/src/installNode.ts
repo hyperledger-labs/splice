@@ -90,10 +90,6 @@ export async function installNode(
 
   const xns = exactNamespace(svNamespaceStr, true);
 
-  console.error(
-    `Using migration config: ${JSON.stringify(decentralizedSynchronizerMigrationConfig)}`
-  );
-
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,

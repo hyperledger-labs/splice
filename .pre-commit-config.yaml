@@ -44,7 +44,7 @@ repos:
         # ignore external sources
         args: [-e, SC1091]
         types: [shell]
-        exclude: '^canton/'
+        exclude: '(^canton/|\.envrc)'
       - id: typescriptfmt
         name: typescriptfmt
         language: system

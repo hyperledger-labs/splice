@@ -80,3 +80,35 @@ tests:
           path: spec.template.metadata.annotations
           value:
             mock-annotation: still-an-annotation
+
+  - it: "always populates enable-wallet"
+    set:
+      # Things we need just to pass the schema
+      nodeIdentifier: "helm-mock-1-validator"
+      validatorPartyHint: "helm-mock-1"
+      validatorWalletUser: "mock-wallet-user-id"
+      scanAddress: "trusted.scan.mock.com"
+      topup:
+        enabled: false
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        audience: "mock_audience"
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      # Extra values for testing
+      enableWallet: false
+      migration:
+        migrating: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_ENABLE_WALLET')].value
+          value: |
+            canton.validator-apps.validator_backend.enable-wallet = "false"

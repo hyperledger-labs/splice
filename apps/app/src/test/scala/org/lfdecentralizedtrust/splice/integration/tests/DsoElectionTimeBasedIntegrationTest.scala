@@ -27,6 +27,8 @@ class DsoElectionTimeBasedIntegrationTest
         startAllSync(
           sv1ScanBackend,
           sv2ScanBackend,
+          sv3ScanBackend,
+          sv4ScanBackend,
           sv1Backend,
           sv2Backend,
           sv3Backend,
@@ -147,6 +149,8 @@ class DsoElectionTimeBasedIntegrationTest
       startAllSync(
         sv1ScanBackend,
         sv2ScanBackend,
+        sv3ScanBackend,
+        sv4ScanBackend,
         sv1Backend,
         sv2Backend,
         sv3Backend,

@@ -2,9 +2,11 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.{SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.{
   CometBftConfig,
   CometBftNodeConfig,
@@ -23,7 +25,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 import scala.compat.java8.OptionConverters.RichOptionForJava8
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.{MapHasAsJava, SeqHasAsJava}
 
 class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
@@ -37,19 +39,27 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
   private val sequencer2Id = SequencerId(UniqueIdentifier.tryFromProtoPrimitive("seq::2"))
   private val sequencer2Host = createP2PEndpoint("host2")
 
-  private val svDsoStore = mock[SvDsoStore]
+  private val svDsoStoreMock = mock[SvDsoStore]
   private val sequencerAdminConnection = mock[SequencerAdminConnection]
   private val scanConnection = mock[AggregatingScanConnection]
 
   when(sequencerAdminConnection.getSequencerId).thenReturn(Future.successful(selfSequencerId))
 
-  val reconciler = new SequencerBftPeerReconciler(
-    svDsoStore,
+  private val reconciler = new SequencerBftPeerReconciler(
     sequencerAdminConnection,
-    loggerFactory,
     scanConnection,
     migrationId,
-  )
+  ) {
+    override protected def svDsoStore: SvDsoStore = svDsoStoreMock
+
+    override def reconcileTask(
+        task: SequencerBftPeerReconciler.BftPeerDifference
+    )(implicit tc: TraceContext, ec: ExecutionContext): Future[TaskOutcome] =
+      Future.successful(TaskNoop)
+
+    override protected def loggerFactory: NamedLoggerFactory =
+      SequencerBftPeerReconcilerSpec.this.loggerFactory
+  }
 
   "SequencerBftPeerReconciler" should "add all sequencers when none are present in current peers, ignoring self" in {
     withConfiguredDsoSequencers(
@@ -323,7 +333,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
   private def withConfiguredDsoSequencers(dsoSequencerConfigs: Seq[SynchronizerNodeConfig]) = {
     val states = mock[DsoRulesWithSvNodeStates]
-    when(svDsoStore.getDsoRulesWithSvNodeStates())
+    when(svDsoStoreMock.getDsoRulesWithSvNodeStates())
       .thenReturn(
         Future.successful(
           states

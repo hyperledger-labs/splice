@@ -206,10 +206,10 @@ spec:
         - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
           value: |
             canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
+        {{- end }}
         - name: ADDITIONAL_CONFIG_ENABLE_WALLET
           value: |
             canton.validator-apps.validator_backend.enable-wallet = {{ .Values.enableWallet | quote }}
-        {{- end }}
         {{- if .Values.walletSweep }}
         - name: ADDITIONAL_CONFIG_WALLET_SWEEP
           value: |

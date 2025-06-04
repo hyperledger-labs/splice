@@ -148,10 +148,11 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v 'runners' |
     grep -v 'ISSUE_TEMPLATE' |
     grep -v 'settings.yml' |
-    grep -v 'post_merge.yml' |
+    grep -v 'cimain.yml' |
+    grep -v 'ciupgrade.yml' |
     grep -v '\./cluster' |
     grep -v 'LICENSE.*differ' |
-    grep -v 'README.md.*differ' |
+    grep -v 'README.md' |
     grep -v '\.gitattributes.*differ' |
     grep -v 'CODEOWNERS.*differ' || true)
 
