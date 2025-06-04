@@ -12,8 +12,8 @@ decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_HOSTNA
 auth:
   # replace OIDC_AUTHORITY_SV_AUDIENCE with the audience of your choice.
   audience: "OIDC_AUTHORITY_SV_AUDIENCE"
-  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
-  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # replace OIDC_AUTHORITY_URL & OIDC_AUTHORITY_JWKS_SUB_URL with your provider's OIDC base URL and JWKS sub-URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS_SUB_URL
 cometBFT:
   enabled: true
   connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
