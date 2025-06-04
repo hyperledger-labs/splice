@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.plugins
 
 import com.digitalasset.canton.config.CantonConfig
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.synchronizer.sequencer.ProgrammableSequencer
@@ -11,7 +12,7 @@ import com.digitalasset.canton.synchronizer.sequencer.ProgrammableSequencer
 class UseProgrammableSequencer(
     environmentId: String,
     override protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin {
+) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
   override def beforeEnvironmentCreated(config: CantonConfig): CantonConfig =
     ProgrammableSequencer.configOverride(environmentId, loggerFactory)(config)
 }

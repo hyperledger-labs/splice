@@ -117,6 +117,11 @@ case class SQLActionBuilder(sql: String, setParameter: SetParameter[Unit]) {
   ] =
     asInternal[Int, Effect.Write](GetResult.GetUpdateValue).head
 
+  def asUpdateReturning[R](implicit
+      rconv: GetResult[R]
+  ): SqlStreamingAction[Vector[R], R, Effect.Read & Effect.Write] =
+    asInternal[R, Effect.Read & Effect.Write]
+
   def concat(b: SQLActionBuilder): SQLActionBuilder =
     SQLActionBuilder(
       sql + b.sql,

@@ -28,10 +28,10 @@ import slick.util.{DumpInfo, Dumpable}
 
 import java.lang.Long as JLong
 import java.net.URI
-import java.time.{Duration as JDuration, Instant}
+import java.time.{Instant, Duration as JDuration}
 import java.util.UUID
 import scala.annotation.nowarn
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.Duration
 
 /** Collects instances of [[Pretty]] for common types.
   */
@@ -100,7 +100,7 @@ trait PrettyInstances {
     elements =>
       treeOfIterable("Map", elements.map { case (k, v) => Tree.Infix(k.toTree, "->", v.toTree) })
 
-  private def treeOfIterable[T: Pretty](prefix: String, elements: Iterable[T]): Tree =
+  def treeOfIterable[T: Pretty](prefix: String, elements: Iterable[T]): Tree =
     if (elements.sizeCompare(1) == 0) {
       elements.iterator.next().toTree
     } else {
@@ -112,14 +112,7 @@ trait PrettyInstances {
     _.toString.substring(2).replaceAll("(\\d[HMS])(?!$)", "$1 ").toLowerCase
   )
 
-  implicit def prettyDuration: Pretty[Duration] = {
-    case fduration: FiniteDuration =>
-      import scala.jdk.DurationConverters.ScalaDurationOps
-      prettyJDuration.treeOf(
-        fduration.toJava
-      )
-    case infDuration: Duration.Infinite => Tree.Literal(infDuration.toString)
-  }
+  implicit def prettyDuration: Pretty[Duration] = prettyOfString(_.toString)
 
   implicit def prettyURI: Pretty[URI] = prettyOfString(_.toString)
 
@@ -164,7 +157,7 @@ trait PrettyInstances {
 
   implicit val prettyNodeId: Pretty[LfNodeId] = prettyOfParam(_.index)
 
-  private def prettyUidString(partyStr: String): String =
+  protected def prettyUidString(partyStr: String): String =
     UniqueIdentifier.fromProtoPrimitive_(partyStr) match {
       case Right(uid) => uid.show
       case Left(_) => partyStr

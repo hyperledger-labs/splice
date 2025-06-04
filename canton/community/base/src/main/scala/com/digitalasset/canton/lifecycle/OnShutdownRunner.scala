@@ -3,16 +3,21 @@
 
 package com.digitalasset.canton.lifecycle
 
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.TryUtil.*
 import com.digitalasset.canton.util.TwoPhasePriorityAccumulator
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.util.Try
 
 trait OnShutdownRunner extends HasRunOnClosing { this: AutoCloseable =>
 
+  private val status: AtomicReference[OnShutdownRunner.Status] = new AtomicReference(
+    OnShutdownRunner.Status.Running
+  )
   private val onShutdownTasks: TwoPhasePriorityAccumulator[RunOnClosing, Unit] =
     new TwoPhasePriorityAccumulator[RunOnClosing, Unit](Some(_.done))
 
@@ -22,13 +27,25 @@ trait OnShutdownRunner extends HasRunOnClosing { this: AutoCloseable =>
     * flag to the retry lib or you really know what you're doing, prefer `performUnlessClosing` and
     * friends.
     */
-  override def isClosing: Boolean = !onShutdownTasks.isAccumulating
+  override def isClosing: Boolean = status.get() != OnShutdownRunner.Status.Running
 
-  override def runOnClose(task: RunOnClosing): UnlessShutdown[LifeCycleRegistrationHandle] =
-    onShutdownTasks.accumulate(task, 0) match {
+  def runOnShutdownWithPriority_(
+      task: RunOnClosing
+  ): Unit = {
+    runOnShutdownWithPriority(task, 0).discard
+  }
+
+  override def runOnClose(task: RunOnClosing): UnlessShutdown[LifeCycleRegistrationHandle] = {
+    val priority = 10
+    runOnShutdownWithPriority(task, priority)
+  }
+
+  private def runOnShutdownWithPriority[T](task: RunOnClosing, priority: Int) = {
+    onShutdownTasks.accumulate(task, priority) match {
       case Right(handle) => Outcome(new LifeCycleManager.LifeCycleRegistrationHandleImpl(handle))
       case Left(_) => AbortedDueToShutdown
     }
+  }
 
   override protected[this] def runTaskUnlessDone(
       task: RunOnClosing
@@ -50,6 +67,8 @@ trait OnShutdownRunner extends HasRunOnClosing { this: AutoCloseable =>
     */
   protected[this] override def close(): Unit = {
     import TraceContext.Implicits.Empty.*
+    status.set(OnShutdownRunner.Status.Closing)
+    logger.debug("Initiating shutdown.")(TraceContext.empty)
 
     val firstCallToClose = onShutdownTasks.stopAccumulating(()).isEmpty
     if (firstCallToClose) {
@@ -62,6 +81,15 @@ trait OnShutdownRunner extends HasRunOnClosing { this: AutoCloseable =>
       // TODO(i8594): Ensure we call close only once
     }
   }
+
+  /** Marks this instance as closing, but does *not* initiate shutdown tasks.
+    * Used to mark all CN RetryProviders as closing before cancelling any running tasks,
+    * thus avoiding any spurious warns/errors that may happen due to cancellation exceptions being thrown.
+    */
+  def setAsClosing(): Unit = {
+    logger.debug("Setting as closing.")(TraceContext.empty)
+    status.set(OnShutdownRunner.Status.SetAsClosing)
+  }
 }
 
 object OnShutdownRunner {
@@ -72,5 +100,12 @@ object OnShutdownRunner {
       with OnShutdownRunner {
     override protected def onFirstClose(): Unit = ()
     override def close(): Unit = super.close()
+  }
+
+  private sealed trait Status
+  private object Status {
+    case object Running extends Status
+    case object SetAsClosing extends Status
+    case object Closing extends Status
   }
 }

@@ -21,7 +21,7 @@ object Utils {
       """pekko.actor.default-mailbox.mailbox-type = "pekko.dispatch.UnboundedMailbox""""
     )
 
-    final case class TE(message: String) extends RuntimeException(message) with NoStackTrace
+  final case class TE(message: String) extends RuntimeException(message) with NoStackTrace
 
   def assertDispatcher(ref: ActorRef, dispatcher: String): Unit = ref match {
     case r: ActorRefWithCell =>
