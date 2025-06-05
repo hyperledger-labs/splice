@@ -1,13 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.P2PEndpointConfig
+import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 
+import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 
 class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
@@ -36,14 +39,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       }
       clue("Initialize DSO with 3 SVs") {
         startAllSync(
-          sv1ScanBackend,
-          sv2ScanBackend,
-          sv1Backend,
-          sv2Backend,
-          sv3Backend,
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
-          sv3ValidatorBackend,
+          (sv1Nodes ++ sv2Nodes ++ sv3Nodes)*
         )
       }
 
@@ -103,34 +99,47 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       }
 
       sv3Backend.stop()
+      sv3ScanBackend.stop()
       sv3ValidatorBackend.stop()
-      startAllSync(sv4Backend, sv4ValidatorBackend)
-
-      checkPartyToParticipant(
-        Seq(
-          sv1Backend.participantClient.id,
-          sv2Backend.participantClient.id,
-          sv4Backend.participantClient.id,
-        )
-      )
-      checkDecentralizedNamespace(Seq(sv1Backend, sv2Backend, sv4Backend))
 
       actAndCheck(
-        "start sv4 with sv3 onboarding config",
-        startAllSync(sv4Backend, sv4ValidatorBackend),
+        "start sv4 with sv3 onboarding config", {
+          sv4Nodes.foreach(_.start())
+          if (ConfigTransforms.IsTheCantonSequencerBFTEnabled) {
+            // we don't offboard the old sv3 sequencer to not break the network for other tests so we just manually connect it
+            eventuallySucceeds(5.minutes) {
+              noException should be thrownBy {
+                sv3Backend.sequencerClient.bft.add_peer_endpoint(
+                  P2PEndpointConfig(
+                    "localhost",
+                    RequireTypes.Port.tryCreate(5410),
+                    None,
+                  )
+                )
+                sv4Backend.sequencerClient.bft.add_peer_endpoint(
+                  P2PEndpointConfig(
+                    "localhost",
+                    RequireTypes.Port.tryCreate(5310),
+                    None,
+                  )
+                )
+              }
+            }
+          }
+          sv4Nodes.foreach(_.waitForInitialization())
+        },
       )(
         "old SV from PartyToParticipant is removed and sv3 is overwritten with different party id",
         _ => {
-          val mapping = sv1Backend.appState.participantAdminConnection
-            .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
-            .futureValue
-            .mapping
-          mapping.threshold shouldBe PositiveInt.tryCreate(2)
-          mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
-            sv1Backend.participantClient.id,
-            sv2Backend.participantClient.id,
-            sv4Backend.participantClient.id,
+          checkPartyToParticipant(
+            Seq(
+              sv1Backend.participantClient.id,
+              sv2Backend.participantClient.id,
+              sv4Backend.participantClient.id,
+            )
           )
+
+          checkDecentralizedNamespace(Seq(sv1Backend, sv2Backend, sv4Backend))
 
           val newSv3PartyId = sv4Backend.getDsoInfo().svParty
           val newSvs = sv1Backend

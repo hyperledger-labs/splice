@@ -1,0 +1,3 @@
+# Sequencer was offboarded
+The operation 'request current time' was not successful.*Outcome\(Left\(RequestInvalid\(Unregistered recipients: Set\(\), unregistered senders: Set\(SEQ::sv1::.*\)\)\)\)
+Now retrying operation 'request current time'

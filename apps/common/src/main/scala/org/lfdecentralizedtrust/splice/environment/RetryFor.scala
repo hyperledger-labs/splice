@@ -58,4 +58,12 @@ object RetryFor {
     maxDelay = 1.seconds,
     resetRetriesAfter = None,
   )
+
+  /** A retry intended for client calls during the init phase, timing out slower compared to the regular client calls to allow for more contention that happens during initialization. */
+  val InitializingClientCalls: RetryFor = RetryFor(
+    maxRetries = 20,
+    initialDelay = 100.millis,
+    maxDelay = 3.seconds,
+    resetRetriesAfter = None,
+  )
 }

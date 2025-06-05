@@ -7,9 +7,7 @@
   },
   "dependencies": {
     "splice-pulumi-common": "1.0.0",
-    "splice-pulumi-common-validator": "1.0.0",
-    "@pulumi/random": "4.14.0",
-    "@pulumi/std": "1.7.3"
+    "splice-pulumi-common-validator": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

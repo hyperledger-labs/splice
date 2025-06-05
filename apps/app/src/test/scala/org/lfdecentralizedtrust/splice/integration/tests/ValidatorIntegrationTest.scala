@@ -62,7 +62,10 @@ class ValidatorIntegrationTest extends IntegrationTest with WalletTestUtil {
           .modify(_.updatedWith(InstanceName.tryCreate("sv4")) {
             _.map(
               _.focus(_.localSynchronizerNode).modify(
-                _.map(_.focus(_.sequencer.externalPublicApiUrl).replace("http://example.com"))
+                _.map(
+                  _.focus(_.sequencer.externalPublicApiUrl)
+                    .replace("http://example.com")
+                )
               )
             )
           })

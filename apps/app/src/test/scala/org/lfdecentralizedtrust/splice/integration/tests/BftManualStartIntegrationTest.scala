@@ -1,11 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import monocle.Monocle.toAppliedFocusOps
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 
 class BftManualStartIntegrationTest extends IntegrationTest {
 
@@ -13,34 +10,7 @@ class BftManualStartIntegrationTest extends IntegrationTest {
     EnvironmentDefinition
       .simpleTopology4Svs("BFT")
       .withTrafficTopupsEnabled
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.updateAllSvAppConfigs((_, appConfig) =>
-          appConfig
-            .focus(_.localSynchronizerNode)
-            .modify(
-              _.map(
-                _.focus(_.sequencer).modify(
-                  _.copy(
-                    isBftSequencer = true
-                  )
-                )
-              )
-            )
-        )(config)
-      )
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.updateAllScanAppConfigs((scan, config) =>
-          config.copy(
-            bftSequencers = Seq(
-              BftSequencerConfig(
-                0,
-                config.sequencerAdminClient,
-                s"http://localhost:${5010 + Integer.parseInt(scan.stripPrefix("sv").stripSuffix("Scan")) * 100}",
-              )
-            )
-          )
-        )(config)
-      )
+      .withBftSequencers
       // By default, alice validator connects to the splitwell domain. This test doesn't start the splitwell node.
       .addConfigTransform((_, conf) =>
         conf.copy(

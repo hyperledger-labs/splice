@@ -19,6 +19,7 @@ export * from './spliceInstanceNames';
 export * from './utils';
 export * from './packageConfig';
 export * from './artifacts';
+export * from './dockerConfig';
 export * from './kms';
 export * from './serviceAccount';
 export * from './participantKms';

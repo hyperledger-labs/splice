@@ -1,0 +1,4 @@
+# TODO(#19555) - remove when fixed
+synchronizer outbox flusher The synchronizer Synchronizer 'global' failed the following topology transactions
+# TODO(#15343) - check if the sequencer is initialized before reconciling peers
+UNIMPLEMENTED: Method not found: com.digitalasset.canton.sequencer.admin.v30.SequencerBftAdministrationService/GetPeerNetworkStatus

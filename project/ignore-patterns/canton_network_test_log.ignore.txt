@@ -113,4 +113,7 @@ Failed to read bft sequencers list from scan
 
 Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
 
+# Ignore scan issues in disaster recovery tests as we don't start scan there
+Failed to connect to scan of .*DisasterRecoveryIntegrationTest
+
 # Make sure to have a trailing newline

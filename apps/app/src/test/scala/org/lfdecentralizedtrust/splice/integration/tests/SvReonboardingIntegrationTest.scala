@@ -32,10 +32,10 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
-
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeerOffboardingTrigger
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
@@ -55,6 +55,7 @@ class SvReonboardingIntegrationTest
     Seq(
       "participant_sv4_reonboard_new",
       "sequencer_sv4_reonboard_new",
+      "sequencer_sv4_reonboard_new_bft",
       "mediator_sv4_reonboard_new",
       "sv_app_sv4_reonboard_new",
       "validator_sv4_reonboard_new",
@@ -112,13 +113,23 @@ class SvReonboardingIntegrationTest
                       case _ => throw new IllegalArgumentException("Only Postgres is supported")
                     },
                     svPartyHint = Some("digital-asset-eng-4-reonboard"),
+                    // we don't start a new sv4 scan so just re-use an existing one
+                    scan = config
+                      .svApps(InstanceName.tryCreate("sv3"))
+                      .scan,
                   )
               }),
             validatorApps = config.validatorApps +
               (InstanceName.tryCreate("sv4ReonboardValidator") -> {
                 // The same as sv4Validator, but using the new participant identity,
                 // which is configured later with `.withCantonNodeNameSuffix()`
-                config.validatorApps(InstanceName.tryCreate("sv4Validator"))
+                config
+                  .validatorApps(InstanceName.tryCreate("sv4Validator"))
+                  .copy(
+                    // we don't start a new sv4 scan so just re-use an existing one
+                    scanClient =
+                      config.validatorApps(InstanceName.tryCreate("sv3Validator")).scanClient
+                  )
               }) +
               (InstanceName.tryCreate("validatorLocal") -> {
                 val referenceValidatorConfig =
@@ -183,6 +194,7 @@ class SvReonboardingIntegrationTest
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withResumedTrigger[SvOffboardingMediatorTrigger]
               .withResumedTrigger[SvOffboardingSequencerTrigger]
+              .withResumedTrigger[SvBftSequencerPeerOffboardingTrigger]
           )(config),
       )
       .withTrafficTopupsDisabled
@@ -216,18 +228,8 @@ class SvReonboardingIntegrationTest
         svs123 = false,
       )() {
         startAllSync(
-          sv1ScanBackend,
-          sv2ScanBackend,
-          sv1Backend,
-          sv2Backend,
-          sv3Backend,
-          sv4Backend,
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
-          sv3ValidatorBackend,
-          sv4ValidatorBackend,
+          (sv1Nodes ++ sv2Nodes ++ sv3Nodes ++ sv4Nodes)*
         )
-
         val sv1Party = sv1Backend.getDsoInfo().svParty
         val sv2Party = sv2Backend.getDsoInfo().svParty
         val sv3Party = sv3Backend.getDsoInfo().svParty
@@ -365,6 +367,7 @@ class SvReonboardingIntegrationTest
         // Stop SV4
         clue("Stop SV4") {
           sv4Backend.stop()
+          sv4ScanBackend.stop()
           sv4ValidatorBackend.stop()
         }
         (

@@ -3,27 +3,22 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import cats.implicits.*
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
-import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.DsoRulesTopologyStateReconciler
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
 import scala.util.control.NonFatal
 
-class SequencerBftPeerReconciler(
-    override protected val svDsoStore: SvDsoStore,
+abstract class SequencerBftPeerReconciler(
     sequencerAdminConnection: SequencerAdminConnection,
-    val loggerFactory: NamedLoggerFactory,
     scanConnection: AggregatingScanConnection,
     migrationId: Long,
 ) extends DsoRulesTopologyStateReconciler[BftPeerDifference]
@@ -86,18 +81,6 @@ class SequencerBftPeerReconciler(
         Seq(BftPeerDifference(peersToAdd.map(_._2.peerId), peersToRemove.map(_._2), currentPeers))
       else Seq()
     }
-  }
-
-  override def reconcileTask(
-      task: BftPeerDifference
-  )(implicit tc: TraceContext, ec: ExecutionContext): Future[TaskOutcome] = {
-    logger.info(
-      s"Reconciling bft peers. Current peers [${task.currentPeers}]. Removing: [${task.toRemove}]. Adding: [${task.toAdd}]"
-    )
-    for {
-      _ <- task.toRemove.toList.traverse(sequencerAdminConnection.removePeerEndpoint)
-      _ <- task.toAdd.toList.traverse(sequencerAdminConnection.addPeerEndpoint)
-    } yield TaskSuccess(s"Finished bft peer reconciling: $task")
   }
 
   private def getAllBftSequencers()(implicit ec: ExecutionContext, tc: TraceContext) = {

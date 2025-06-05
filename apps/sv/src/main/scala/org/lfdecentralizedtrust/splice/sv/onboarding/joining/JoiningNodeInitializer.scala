@@ -367,6 +367,7 @@ class JoiningNodeInitializer(
             decentralizedSynchronizer,
             Onboarding,
             config.domainMigrationId,
+            config.scan,
           )
           // Finally, fully onboard the sequencer and mediator
           _ <-
@@ -390,6 +391,7 @@ class JoiningNodeInitializer(
           decentralizedSynchronizer,
           OnboardedAfterDelay,
           config.domainMigrationId,
+          config.scan,
         )
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
         dsoAutomationService,

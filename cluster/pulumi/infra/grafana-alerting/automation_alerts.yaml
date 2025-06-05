@@ -411,8 +411,7 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        # TODO(#19239): Change "OK" to "$NODATA" when backfilling is enabled by default everywhere
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Alerting
         for: 5m
         annotations:

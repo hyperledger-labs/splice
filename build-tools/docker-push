@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+function get_amd64_digest_by_ref() {
+  img_ref=$1
+  # The docker image is multi-arch, but the digests are per architecture. We support amd64 clusters only, so pick that digest.
+  docker manifest inspect "$img_ref" | jq -r '.manifests[] | select(.platform.architecture=="amd64") | .digest'
+}
+
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
@@ -52,12 +58,24 @@ fi
 if docker-image-reference-exists "${imageReference}"; then
   remoteImageId=$(get-docker-image-id "${imageReference}")
   if [ "${imageId}" = "${remoteImageId}" ]; then
-    _log "Image with image ID '${imageId}' already exists in repo:\n${imageReference}\nSkipping push."
-    exit 0
+    digest=$(get_amd64_digest_by_ref "$imageReference" || true)
+    if [ -n "$digest" ]; then
+      _log "Image with image ID '${imageId}' already exists in repo:\n${imageReference}\nSkipping push."
+      exit 0
+    else
+      _error "Image with image ID '${imageId}' already exists in repo but does not have an amd64 manifest which indicates a partial failure:\n${imageReference}\nFailing push.\nPlease manually delete the images for this version."
+      exit 1
+    fi
   else
     if [ -z "${developerVersionUsed}" ]; then
-      _info "Image already exists in repo with image ID '${remoteImageId}'\nThis does not match local image ID:         '${imageId}'\n${imageReference}\nNot pushing image."
-      exit 0
+      digest=$(get_amd64_digest_by_ref "$imageReference" || true)
+      if [ -n "$digest" ]; then
+        _info "Image already exists in repo with image ID '${remoteImageId}'\nThis does not match local image ID:         '${imageId}'\n${imageReference}\nNot pushing image."
+        exit 0
+      else
+        _error "Image already exists in repo with image ID '${remoteImageId}'\nThis does not match local image ID:         '${imageId}'\n${imageReference}\nError: Cannot find amd64 manifest (partial failure), failing push.\nPlease manually delete the images for this version."
+        exit 1
+      fi
     fi
   fi
 fi

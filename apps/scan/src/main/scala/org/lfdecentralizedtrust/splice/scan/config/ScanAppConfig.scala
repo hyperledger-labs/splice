@@ -43,7 +43,7 @@ case class ScanAppBackendConfig(
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
-    txLogBackfillEnabled: Boolean = false,
+    txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
 ) extends SpliceBackendConfig

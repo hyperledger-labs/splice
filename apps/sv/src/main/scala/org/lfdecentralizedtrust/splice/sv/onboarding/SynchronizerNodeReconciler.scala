@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   LegacySequencerConfig,
   MediatorConfig,
+  ScanConfig,
   SequencerConfig,
   SynchronizerNodeConfig,
 }
@@ -27,6 +28,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import org.lfdecentralizedtrust.splice.sv.config.SvScanConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.MapHasAsScala
@@ -50,6 +52,7 @@ class SynchronizerNodeReconciler(
       synchronizerId: SynchronizerId,
       state: SynchronizerNodeState,
       migrationId: Long,
+      scan: Option[SvScanConfig],
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -57,6 +60,9 @@ class SynchronizerNodeReconciler(
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(synchronizerNode, migrationId)
       localMediatorConfig <- SvUtil.getMediatorConfig(synchronizerNode)
+      localScanConfig = scan
+        .map(scanConfig => new ScanConfig(scanConfig.publicUrl.toString()))
+        .toJava
       rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
       // TODO(#4901): do not use default, but reconcile all configured domains
@@ -103,6 +109,7 @@ class SynchronizerNodeReconciler(
         if (
           existingSequencerConfig != localSequencerConfig ||
           existingMediatorConfig != localMediatorConfig ||
+          existingScanConfig != localScanConfig ||
           shouldMarkSequencerAsOnboarded ||
           updatedSequencerConfigUpdate.isRight
         ) {
@@ -159,7 +166,7 @@ class SynchronizerNodeReconciler(
                 )
               )
               .toJava,
-            existingScanConfig,
+            localScanConfig,
             updatedSequencerConfigUpdate.getOrElse(existingLegacySequencerConfig).toJava,
           )
           setConfig(synchronizerId, rulesAndState, nodeConfig)

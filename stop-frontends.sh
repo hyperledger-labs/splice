@@ -7,7 +7,7 @@ source util.sh
 
 tmux_session="cn-frontends"
 
-if tmux has-session -t $tmux_session 2>/dev/null; then
+if tmux has-session -t=$tmux_session 2>/dev/null; then
   # kill-session seems to send a SIGHUP which does not seem to be quite enough
   # to tear down the processes promptly so we manually kill them.
   # parents will usually be some shell process.

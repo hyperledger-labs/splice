@@ -422,8 +422,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     import env.executionContext
 
     startAllSync(
-      sv1ScanBackend, // Used by SV 1 & 3
-      sv2ScanBackend, // Used by SV 2 & 4
+      sv1ScanBackend,
+      sv2ScanBackend,
+      sv3ScanBackend,
+      sv4ScanBackend,
       sv1Backend,
       sv2Backend,
       sv3Backend,
@@ -708,6 +710,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             }
 
             withClueAndLog("stopping old apps") {
+              // stop validators first to prevent log warnings about scans shutting down
+              stopAllAsync(
+                splitwellBackend,
+                splitwellValidatorBackend,
+                aliceValidatorBackend,
+              ).futureValue
               stopAllAsync(
                 sv1Backend,
                 sv2Backend,
@@ -719,9 +727,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 sv4ValidatorBackend,
                 sv1ScanBackend,
                 sv2ScanBackend,
-                splitwellBackend,
-                splitwellValidatorBackend,
-                aliceValidatorBackend,
+                sv3ScanBackend,
+                sv4ScanBackend,
               ).futureValue
             }
 

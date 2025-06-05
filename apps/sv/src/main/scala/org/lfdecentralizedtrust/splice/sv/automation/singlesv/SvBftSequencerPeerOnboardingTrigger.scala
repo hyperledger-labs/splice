@@ -8,15 +8,16 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
-import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler
+import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerAddReconciler
 import org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler.BftPeerDifference
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 
 import scala.concurrent.ExecutionContext
 
-/** Ensure the local BFT sequencer peer list is in sync with the peer urls configured by the other sequncers in the daml state
+/** Ensure the local BFT sequencer peer list is in sync with the peer urls configured by the other sequncers in the daml state by adding peers that are part of the
+  * daml state but not part of the local peer list
   */
-class SvBftSequencerPeerReconcilingTrigger(
+class SvBftSequencerPeerOnboardingTrigger(
     baseContext: TriggerContext,
     store: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
@@ -33,13 +34,11 @@ class SvBftSequencerPeerReconcilingTrigger(
 
   // Don't pause when the synchronizer is paused or lagging;
   // this trigger might be needed for unblocking a stuck BFT layer.
-  // TODO(#19670) Double-check how safe this is if we end up putting p2p URLs in Daml again.
   override protected lazy val context: TriggerContext =
     noParallelismContext.copy(triggerEnabledSync = TriggerEnabledSynchronization.Noop)
 
-  override val reconciler
-      : org.lfdecentralizedtrust.splice.sv.onboarding.SequencerBftPeerReconciler =
-    new SequencerBftPeerReconciler(
+  override val reconciler: SequencerBftPeerAddReconciler =
+    new SequencerBftPeerAddReconciler(
       store,
       sequencerAdminConnection,
       loggerFactory,

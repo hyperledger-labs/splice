@@ -15,7 +15,6 @@ function tmux_cmd() {
   else
     tmux new-window -t "$t" -n "$title"
   fi
-  tmux send-keys -t "$t" "nix develop path:nix" C-m
   tmux send-keys -t "$t" "cd $wd" C-m
   tmux send-keys -t "$t" "$cmd" C-m
   tmux_window=$((tmux_window + 1))
@@ -73,7 +72,7 @@ function start_frontend() {
   # This is the URL the frontend talks to which is then rewritten using th vite proxy to the actual url of the backend
   JSON_API_URL=$(jq -r '.services.jsonApiBackend.url' <"$config_file")
 
-  local log_file="${LOG_DIR}/npm-${app}-${user}.log"
+  local log_file="${LOG_DIR}/npm-${app}-${user}.out"
 
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
     "trap \"rm -f ${config_file}\" EXIT"
@@ -152,8 +151,10 @@ function wait_for_workspace_build() {
   # workspace typically includes a namespace and /, which will make tee fail;
   # remove it if present
   local log_file_suffix="${workspace##*/}"
+  local log_file="${LOG_DIR}/npm-${log_file_suffix}.out"
+  echo "Logging to ${log_file}"
 
-  tmux_cmd "$workspace" "$SPLICE_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee ${LOG_DIR}/npm-$log_file_suffix.log"
+  tmux_cmd "$workspace" "$SPLICE_ROOT/apps" "npm run start --workspace $workspace 2>&1 | tee -a $log_file"
 
   local count=0
   while [ ! -f "$SPLICE_ROOT/apps/$index" ]; do

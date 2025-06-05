@@ -296,7 +296,7 @@ function natGateway(
         filter: 'ERRORS_ONLY',
       },
     },
-    options
+    { deleteBeforeReplace: true, ...options }
   );
 
   return natGateway;

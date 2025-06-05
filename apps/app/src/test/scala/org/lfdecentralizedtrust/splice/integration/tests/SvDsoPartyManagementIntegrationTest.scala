@@ -44,7 +44,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
   "The DSO Party can be setup in the participant after SV has been confirmed to be part of the DSO" in {
     implicit env =>
       clue("Starting DSO app and SV1 app") {
-        startAllSync(sv1ScanBackend, sv1Backend, sv3Backend, sv1ValidatorBackend)
+        startAllSync((sv1Nodes ++ sv3Nodes)*)
       }
 
       val dsoParty = sv1Backend.getDsoInfo().dsoParty
@@ -137,7 +137,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
 
       clue("start onboarding new SV and DSO party setup on new SV's dedicated participant") {
         // sv3 is configured to join the DSO. After the SV is onboarded, it will start the DSO party hosting on its own dedicated participant
-        startAllSync(sv3ValidatorBackend, sv3Backend, sv3ValidatorBackend)
+        startAllSync(sv3Nodes*)
       }
 
       sv1WalletClient.tap(2.0)

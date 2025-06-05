@@ -30,6 +30,10 @@ on:
         type: string
         required: false
         default: ""
+      run_if_commit_tag:
+        type: string
+        required: false
+        default: ""
       skip_if_files_changed:
         type: string
         required: false
@@ -72,6 +76,7 @@ jobs:
           test_names_file: ${{ inputs.test_names_file }}
           skip_if_regex: ${{ inputs.skip_if_regex }}
           skip_if_files_changed: ${{ inputs.skip_if_files_changed }}
+          run_if_commit_tag: ${{ inputs.run_if_commit_tag }}
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
@@ -88,11 +93,11 @@ jobs:
         runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
       fail-fast: false
     container:
-      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
 
     services:
       postgres:
-        image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-postgres:0.3.12
+        image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
         env:
           POSTGRES_PASSWORD: postgres
 

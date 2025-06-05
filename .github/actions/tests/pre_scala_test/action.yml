@@ -11,6 +11,10 @@ inputs:
     description: "Skip the test if the commit messages on the branch match this regex"
     required: false
     default: ""
+  run_if_commit_tag:
+    description: "Run the job only if the commit message contains this tag"
+    required: false
+    default: ""
   skip_if_files_changed:
     description: "Skip the test if any of the given files was changed since the last release"
     required: false
@@ -50,6 +54,18 @@ runs:
           echo "skip=true" >> "$GITHUB_ENV"
         else
           echo "Commit message ($msg) does not match regex (${{ inputs.skip_if_regex }}), not skipping"
+        fi
+
+    - name: Check if include commit message tag matches
+      if: ${{ inputs.run_if_commit_tag != '' }}
+      shell: bash
+      run: |
+        last_commit_msg=$(git log -1 --pretty=%B)
+        if [[ $last_commit_msg =~ "[${{ inputs.run_if_commit_tag }}]" ]]; then
+          echo "Commit message ($last_commit_msg) includes tag (${{ inputs.run_if_commit_tag }}), running"
+        else
+          echo "Commit message ($last_commit_msg) does not include tag (${{ inputs.run_if_commit_tag }}), skipping"
+          echo "skip=true" >> "$GITHUB_ENV"
         fi
 
     - name: Check if skip files changed

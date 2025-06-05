@@ -43,7 +43,9 @@ import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.metrics.MetricValue
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryResponseItem
 import org.scalatest.Assertion
+
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -268,6 +270,22 @@ trait UpdateHistoryTestUtil extends TestCommon {
   }
   def shortDebugDescription(u: Seq[definitions.UpdateHistoryItem]): String = {
     u.map(shortDebugDescription).mkString("[\n", ",\n", "\n]")
+  }
+  def shortDebugDescription(u: TransactionHistoryResponseItem): String = {
+    // Minimal, human-readable description.
+    // Only contains data that is consistent across SVs (in particular, no offset).
+    u.transactionType match {
+      case TransactionHistoryResponseItem.TransactionType.members.Transfer =>
+        s"Transfer(${u.date}, ${u.transfer.value.sender}, ${u.transfer.value.receivers
+            .map(r => s"${r.party} -> ${r.amount}")
+            .mkString(", ")})"
+      case TransactionHistoryResponseItem.TransactionType.members.Mint =>
+        s"Mint(${u.date}, ${u.mint.value.amuletOwner}, ${u.mint.value.amuletAmount})"
+      case TransactionHistoryResponseItem.TransactionType.members.DevnetTap =>
+        s"DevnetTap(${u.date}, ${u.tap.value.amuletOwner}, ${u.tap.value.amuletAmount})"
+      case TransactionHistoryResponseItem.TransactionType.members.AbortTransferInstruction =>
+        s"AbortTransferInstruction(${u.date}, ${u.abortTransferInstruction.value.transferInstructionCid})"
+    }
   }
 
   def dropTrailingNones(u: UpdateHistoryResponse): UpdateHistoryResponse =

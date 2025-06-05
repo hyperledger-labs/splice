@@ -9,7 +9,7 @@ POSTGRES_MODE=${1:-docker}
 
 tmux_session="canton"
 
-if tmux has-session -t $tmux_session 2>/dev/null; then
+if tmux has-session -t=$tmux_session 2>/dev/null; then
   # kill-session seems to send a SIGHUP which does not seem to be quite enough
   echo "Killing canton tmux session"
   # to tear down the processes promptly so we manually kill them.

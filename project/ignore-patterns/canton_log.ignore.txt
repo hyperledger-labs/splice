@@ -90,6 +90,8 @@ INVALID_TRAFFIC_CONTROL_PURCHASED_MESSAGE.* signature threshold not reached
 # In ValidatorReonboardingIntegrationTest, importing the ACS on the new participant may lead to temporary ACS_COMMITMENT_MISMATCH errors.
 # The new participant can be both the sender or the counterParticipant in the error message.
 ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
+# TODO(#19470): Remove once it's fixed
+Failed to send commitment message batch for period.*RequestInvalid\(Unregistered recipients: HashSet\(PAR::alice-validatorLocalForValidatorReonboardingIT
 
 # TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
@@ -133,5 +135,8 @@ Timeout .*expired, but readers are still active
 # but could be an option for RecoverExternalPartyIntegrationTest. But it slows down the
 # test significantly so for now we don't bother.
 ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
+
+# TODO(#15343) - investigate this on the canton side
+Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
 
 # Make sure to have a trailing newline

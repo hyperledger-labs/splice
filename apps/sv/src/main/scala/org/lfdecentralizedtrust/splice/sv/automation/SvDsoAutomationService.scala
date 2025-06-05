@@ -241,7 +241,16 @@ class SvDsoAutomationService(
       synchronizerNode.sequencerConfig match {
         case BftSequencerConfig() =>
           registerTrigger(
-            new SvBftSequencerPeerReconcilingTrigger(
+            new SvBftSequencerPeerOffboardingTrigger(
+              triggerContext,
+              dsoStore,
+              synchronizerNode.sequencerAdminConnection,
+              aggregatingScanConnection,
+              config.domainMigrationId,
+            )
+          )
+          registerTrigger(
+            new SvBftSequencerPeerOnboardingTrigger(
               triggerContext,
               dsoStore,
               synchronizerNode.sequencerAdminConnection,
@@ -250,21 +259,6 @@ class SvDsoAutomationService(
             )
           )
         case _ =>
-      }
-    }
-
-    // TODO(#19670): We might want to clean this up so it's always registered at the same time
-    if (config.localSynchronizerNode.map(_.sequencer.isBftSequencer).getOrElse(false)) {
-      config.scan.foreach { scan =>
-        registerTrigger(
-          new PublishScanConfigTrigger(
-            triggerContext,
-            dsoStore,
-            connection,
-            scan,
-            upgradesConfig,
-          )
-        )
       }
     }
   }
@@ -367,19 +361,16 @@ class SvDsoAutomationService(
       )
     )
 
-    // TODO(#19670): We might want to clean this up so it's always registered at the same time
-    if (!config.localSynchronizerNode.map(_.sequencer.isBftSequencer).getOrElse(false)) {
-      config.scan.foreach { scan =>
-        registerTrigger(
-          new PublishScanConfigTrigger(
-            triggerContext,
-            dsoStore,
-            connection,
-            scan,
-            upgradesConfig,
-          )
+    config.scan.foreach { scan =>
+      registerTrigger(
+        new PublishScanConfigTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          scan,
+          upgradesConfig,
         )
-      }
+      )
     }
   }
 
@@ -507,6 +498,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReconcileDynamicSynchronizerParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[ExternalPartyAmuletRulesTrigger],
-      aTrigger[SvBftSequencerPeerReconcilingTrigger],
+      aTrigger[SvBftSequencerPeerOffboardingTrigger],
+      aTrigger[SvBftSequencerPeerOnboardingTrigger],
     )
 }
