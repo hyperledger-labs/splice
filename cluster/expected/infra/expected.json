@@ -2060,6 +2060,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "addPreviousOutputInEnv": true,
       "create": "SPLICE_ROOT/cluster/pulumi/infra/migrate-istio.sh"
     },
     "name": "migrate-istio-crds",
@@ -3867,6 +3868,7 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "addPreviousOutputInEnv": true,
       "create": "bash SPLICE_ROOT/cluster/pulumi/infra/prometheus-crd-update.sh 0.79.0"
     },
     "name": "update-prometheus-crd-0.79.0",
