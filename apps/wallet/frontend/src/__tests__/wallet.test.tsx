@@ -23,9 +23,17 @@ const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
 const walletUrl = window.splice_config.services.validator.url;
 
-function featureSupportHandler(tokenStandardSupported: boolean) {
+function featureSupportHandler(
+  tokenStandardSupported: boolean,
+  transferPreapprovalDescriptionSupported: boolean
+) {
   return rest.get(`${walletUrl}/v0/feature-support`, async (_, res, ctx) => {
-    return res(ctx.json({ token_standard: tokenStandardSupported }));
+    return res(
+      ctx.json({
+        token_standard: tokenStandardSupported,
+        transfer_preapproval_description: transferPreapprovalDescriptionSupported,
+      })
+    );
   });
 }
 
@@ -100,7 +108,7 @@ describe('Wallet user can', () => {
   });
 
   test('not see dso in list of transfer-offer receivers', async () => {
-    server.use(featureSupportHandler(true));
+    server.use(featureSupportHandler(true, true));
     const user = userEvent.setup();
     render(
       <WalletConfigProvider>
@@ -133,7 +141,7 @@ describe('Wallet user can', () => {
     transferTests(false);
 
     test('fall back to non-token standard transfers when the token standard is not supported', async () => {
-      server.use(featureSupportHandler(false));
+      server.use(featureSupportHandler(false, true));
 
       const user = userEvent.setup();
       render(
@@ -192,6 +200,121 @@ describe('Wallet user can', () => {
     // The withdraw has a dummy conversion rate of 0 so no amulet conversion rate is displayed
     expect(await screen.findAllByText('@')).toHaveLength(3);
   });
+
+  test('transfer preapproval (without token standard) does not show nor send description if not supported', async () => {
+    // token standard as not supported
+    server.use(featureSupportHandler(false, false));
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    expect(await screen.findByText('Transfer')).toBeDefined();
+
+    const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+    await user.click(transferOffersLink);
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+
+    const receiverInput = screen
+      .getAllByRole('combobox')
+      .find(e => e.id === 'create-offer-receiver')!;
+    fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+
+    // there should be no description input
+    expect(screen.queryByRole('textbox', { name: 'description' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await assertCorrectMockIsCalled(
+      true,
+      {
+        amount: '1.0',
+        receiver_party_id: 'bob::preapproval',
+        // description omitted: it is not sent
+      },
+      true
+    );
+  });
+
+  test('transfer offers have description field when unsupported for preapprovals', async () => {
+    // transfer preapprovals do not support description, but that's inconsequential to regular transfer offers
+    server.use(featureSupportHandler(false, false));
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    expect(await screen.findByText('Transfer')).toBeDefined();
+
+    const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+    await user.click(transferOffersLink);
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+
+    const receiverInput = screen
+      .getAllByRole('combobox')
+      .find(e => e.id === 'create-offer-receiver')!;
+    fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+
+    await user.click(screen.getByRole('checkbox'));
+
+    const description = 'Works';
+    const descriptionInput = screen.getByRole('textbox', { name: 'description' });
+    await user.type(descriptionInput, description);
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await assertCorrectMockIsCalled(
+      true,
+      {
+        amount: '1.0',
+        receiver_party_id: 'bob::preapproval',
+        description,
+      },
+      false
+    );
+  });
+
+  test('transfer offers have description field when party has no preapproval and transfer preapprovals do not support descriptions', async () => {
+    // transfer preapprovals do not support description, but that's inconsequential to regular transfer offers
+    server.use(featureSupportHandler(false, false));
+    const user = userEvent.setup();
+    render(
+      <WalletConfigProvider>
+        <App />
+      </WalletConfigProvider>
+    );
+    expect(await screen.findByText('Transfer')).toBeDefined();
+
+    const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+    await user.click(transferOffersLink);
+    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+
+    const receiverInput = screen
+      .getAllByRole('combobox')
+      .find(e => e.id === 'create-offer-receiver')!;
+    fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+
+    const description = 'Works';
+    const descriptionInput = screen.getByRole('textbox', { name: 'description' });
+    await user.type(descriptionInput, description);
+
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await assertCorrectMockIsCalled(
+      true,
+      {
+        amount: '1.0',
+        receiver_party_id: 'bob::nopreapproval',
+        description,
+      },
+      false
+    );
+  });
 }, 7500);
 
 function transferTests(disableTokenStandard: boolean) {
@@ -203,7 +326,7 @@ function transferTests(disableTokenStandard: boolean) {
   }
 
   test('transfer offer is used when receiver has no transfer preapproval', async () => {
-    server.use(featureSupportHandler(true));
+    server.use(featureSupportHandler(true, true));
     const user = userEvent.setup();
     render(
       <WalletConfigProvider>
@@ -236,7 +359,7 @@ function transferTests(disableTokenStandard: boolean) {
   });
 
   test('transfer preapproval is used when receiver has a transfer preapproval', async () => {
-    server.use(featureSupportHandler(true));
+    server.use(featureSupportHandler(true, true));
     const user = userEvent.setup();
     render(
       <WalletConfigProvider>
@@ -270,7 +393,7 @@ function transferTests(disableTokenStandard: boolean) {
   });
 
   test('transfer offer is used when receiver has a transfer preapproval but checkbox is unchecked', async () => {
-    server.use(featureSupportHandler(true));
+    server.use(featureSupportHandler(true, true));
     const user = userEvent.setup();
     render(
       <WalletConfigProvider>
@@ -304,7 +427,7 @@ function transferTests(disableTokenStandard: boolean) {
   });
 
   test('deduplication id is passed', async () => {
-    server.use(featureSupportHandler(true));
+    server.use(featureSupportHandler(true, true));
     const user = userEvent.setup();
     render(
       <WalletConfigProvider>
@@ -370,7 +493,7 @@ function transferTests(disableTokenStandard: boolean) {
 
 async function assertCorrectMockIsCalled(
   usesRegularTransferOffer: boolean,
-  expected: { amount: string; receiver_party_id: string; description: string },
+  expected: { amount: string; receiver_party_id: string; description?: string },
   isPreapproval: boolean
 ) {
   if (!usesRegularTransferOffer) {
@@ -382,6 +505,12 @@ async function assertCorrectMockIsCalled(
   } else if (isPreapproval) {
     expect(requestMocks.transferPreapprovalSend).toHaveBeenCalledWith(
       expect.objectContaining(expected)
+    );
+    // unfortunately 'objectContaining' does not work for `description: undefined`:
+    // the mock omits the field and the expected has it as undefined.
+    // Omitting `description` from `expected` doesn't work because then it's not checked at all.
+    expect(requestMocks.transferPreapprovalSend.mock.lastCall![0].description).equals(
+      expected.description
     );
     expect(requestMocks.createTransferOffer).not.toHaveBeenCalled();
     expect(requestMocks.createTransferViaTokenStandard).not.toHaveBeenCalled();
