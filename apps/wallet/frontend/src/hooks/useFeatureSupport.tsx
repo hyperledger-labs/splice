@@ -3,9 +3,11 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-export const useFeatureSupport = (): UseQueryResult<{
+interface WalletFeatureSupport {
   tokenStandard: boolean;
-}> => {
+  transferPreapprovalDescription: boolean;
+}
+export const useFeatureSupport = (): UseQueryResult<WalletFeatureSupport> => {
   const walletClient = useWalletClient();
   return useQuery({
     queryKey: ['featureSupport'],
@@ -13,6 +15,7 @@ export const useFeatureSupport = (): UseQueryResult<{
       const result = await walletClient.featureSupport();
       return {
         tokenStandard: result.token_standard,
+        transferPreapprovalDescription: result.transfer_preapproval_description,
       };
     },
   });

@@ -790,14 +790,21 @@ class HttpWalletHandler(
         case Some(preapproval) =>
           for {
             wallet <- getUserWallet(user)
+            sender = wallet.store.key.endUserParty
             featuredAppRight <- scanConnection
               .lookupFeaturedAppRight(PartyId.tryFromProtoPrimitive(preapproval.payload.provider))
+            supportsDescription <- packageVersionSupport
+              .supportsDescriptionInTransferPreapprovals(
+                Seq(receiver, sender, wallet.store.key.dsoParty),
+                walletManager.clock.now,
+              )
+              .map(_.supported)
             result <- exerciseWalletAmuletAction(
               new amuletoperation.CO_TransferPreapprovalSend(
                 preapproval.contractId,
                 featuredAppRight.map(_.contractId).toJava,
                 amount,
-                body.description.toJava,
+                Option.when(supportsDescription)(body.description).flatten.toJava,
               ),
               user,
               (_: amuletoperationoutcome.COO_TransferPreapprovalSend) =>
@@ -809,7 +816,7 @@ class HttpWalletHandler(
                 AmuletOperationDedupConfig(
                   CommandId(
                     "transferPreapprovalSend",
-                    Seq(wallet.store.key.endUserParty),
+                    Seq(sender),
                     body.deduplicationId,
                   ),
                   dedupDuration,
@@ -1079,8 +1086,15 @@ class HttpWalletHandler(
       val now = CantonTimestamp.now()
       for {
         tokenStandard <- packageVersionSupport.supportsTokenStandard(parties, now)
+        preapprovalDescription <- packageVersionSupport.supportsDescriptionInTransferPreapprovals(
+          parties,
+          now,
+        )
       } yield WalletResource.FeatureSupportResponse.OK(
-        d0.WalletFeatureSupportResponse(tokenStandard = tokenStandard.supported)
+        d0.WalletFeatureSupportResponse(
+          tokenStandard = tokenStandard.supported,
+          transferPreapprovalDescription = preapprovalDescription.supported,
+        )
       )
     }
   }

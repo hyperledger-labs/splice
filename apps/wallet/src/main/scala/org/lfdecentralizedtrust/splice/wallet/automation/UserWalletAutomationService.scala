@@ -42,6 +42,7 @@ class UserWalletAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
+    packageVersionSupport: PackageVersionSupport,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -109,6 +110,7 @@ class UserWalletAutomationService(
           scanConnection,
           treasury,
           dedupDuration,
+          packageVersionSupport,
         )
       )
     } else {

@@ -1275,6 +1275,9 @@ components:
       type: object
       required:
         - token_standard
+        - transfer_preapproval_description
       properties:
         token_standard:
+          type: boolean
+        transfer_preapproval_description:
           type: boolean

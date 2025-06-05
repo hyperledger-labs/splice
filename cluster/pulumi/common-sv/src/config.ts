@@ -36,6 +36,11 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
+export interface ScanBigQueryConfig {
+  dataset: string;
+  prefix: string;
+}
+
 export interface StaticSvConfig {
   nodeName: string;
   ingressName: string;
@@ -46,6 +51,7 @@ export interface StaticSvConfig {
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
+  scanBigQuery?: ScanBigQueryConfig;
 }
 
 export type SequencerPruningConfig = {

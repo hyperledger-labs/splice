@@ -106,6 +106,7 @@ export class Dso extends pulumi.ComponentResource {
         bootstrappingDumpConfig: this.args.bootstrappingDumpConfig,
         topupConfig: this.args.topupConfig,
         splitPostgresInstances: this.args.splitPostgresInstances,
+        scanBigQuery: svConf.scanBigQuery,
         sequencerPruningConfig: this.args.sequencerPruningConfig,
         disableOnboardingParticipantPromotionDelay:
           this.args.disableOnboardingParticipantPromotionDelay,
