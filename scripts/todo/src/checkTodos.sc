@@ -279,7 +279,7 @@ val todoStyleExcludePrefixes =
     "token-standard/dependencies",
   )
 val todoStyleExcludeSuffixes =
-  Seq("/checkTodos.sc", "/build.static_tests.yml")
+  Seq("/checkTodos.sc", "/build.static_tests.yml", "/migrate-github-issues.py")
 
 def addToBucket(
     acc: Map[Bucket, List[String]],
