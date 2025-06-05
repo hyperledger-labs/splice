@@ -153,7 +153,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -165,19 +165,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/deployment/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -190,7 +190,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/deployment/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -208,6 +208,10 @@
         "stack": "organization/deployment/deployment.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "deployment",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -226,9 +230,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "operator-gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -250,7 +275,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -260,7 +291,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "operator-gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -483,6 +522,28 @@
       "type": "Opaque"
     },
     "name": "operator-env",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "operator-gke-credentials",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "googleCredentials": "s3cr3t"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "operator-gke-credentials",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

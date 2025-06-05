@@ -119,7 +119,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -131,19 +131,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -156,7 +156,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -174,6 +174,10 @@
         "stack": "organization/canton-network/canton-network.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "canton-network",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -215,7 +219,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -442,7 +446,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -454,19 +458,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -479,7 +483,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -497,6 +501,10 @@
         "stack": "organization/infra/infra.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "infra",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -538,7 +546,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -715,7 +723,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -727,19 +735,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -752,7 +760,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -770,6 +778,10 @@
         "stack": "organization/multi-validator/multi-validator.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "multi-validator",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -811,7 +823,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -1403,7 +1415,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1415,19 +1427,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1440,7 +1452,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -1458,6 +1470,10 @@
         "stack": "organization/splitwell/splitwell.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "splitwell",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -1499,7 +1515,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -1676,7 +1692,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1688,7 +1704,7 @@
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1707,7 +1723,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1731,6 +1747,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-1.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-1",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -1749,9 +1769,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -1773,7 +1814,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -1783,7 +1830,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -1914,7 +1969,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1926,7 +1981,7 @@
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1945,7 +2000,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1969,6 +2024,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-2.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-2",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -1987,9 +2046,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -2011,7 +2091,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -2021,7 +2107,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -2152,7 +2246,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -2164,19 +2258,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2195,7 +2289,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -2219,6 +2313,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-3.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-3",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -2237,9 +2335,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -2261,7 +2380,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -2271,7 +2396,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -2402,7 +2535,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -2414,19 +2547,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2445,7 +2578,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -2469,6 +2602,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-4.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-4",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -2487,9 +2624,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -2511,7 +2669,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -2521,7 +2685,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -2652,7 +2824,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -2664,7 +2836,7 @@
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2683,7 +2855,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -2709,6 +2881,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-migration-1.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-1",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -2727,9 +2903,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -2751,7 +2948,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -2761,7 +2964,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -2892,7 +3103,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-2/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -2904,7 +3115,7 @@
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2923,7 +3134,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-2/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -2949,6 +3160,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-migration-2.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-2",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -2967,9 +3182,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -2991,7 +3227,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -3001,7 +3243,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -3132,7 +3382,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -3144,19 +3394,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -3175,7 +3425,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -3201,6 +3451,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-migration-3.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-3",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -3219,9 +3473,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -3243,7 +3518,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -3253,7 +3534,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -3384,7 +3673,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -3396,19 +3685,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -3427,7 +3716,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -3453,6 +3742,10 @@
         "stack": "organization/sv-canton/sv-canton.sv-migration-4.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-4",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -3471,9 +3764,30 @@
                     "name": "github"
                   }
                 }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -3495,7 +3809,13 @@
                 "containers": [
                   {
                     "name": "pulumi",
-                    "volumeMounts": []
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
                   }
                 ],
                 "tolerations": [
@@ -3505,7 +3825,15 @@
                     "operator": "Exists"
                   }
                 ],
-                "volumes": []
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
               }
             }
           }
@@ -3636,7 +3964,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -3648,19 +3976,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -3673,7 +4001,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -3693,6 +4021,10 @@
         "stack": "organization/sv-runbook/sv-runbook.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-runbook",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -3734,7 +4066,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -3911,7 +4243,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -3923,19 +4255,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -3948,7 +4280,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -3968,6 +4300,10 @@
         "stack": "organization/validator-runbook/validator-runbook.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "validator-runbook",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -4009,7 +4345,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
@@ -4186,7 +4522,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -4198,19 +4534,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
             },
             "type": "Literal"
           },
           "PULUMI_VERSION": {
             "literal": {
-              "value": "pulumi-version"
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -4223,7 +4559,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -4241,6 +4577,10 @@
         "stack": "organization/validator1/validator1.mock",
         "useLocalStackOnly": true,
         "workspaceTemplate": {
+          "metadata": {
+            "name": "validator1",
+            "namespace": "operator"
+          },
           "spec": {
             "env": [
               {
@@ -4282,7 +4622,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:pulumi-version-nonroot",
+            "image": "pulumi/pulumi:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
