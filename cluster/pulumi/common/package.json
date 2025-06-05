@@ -5,6 +5,7 @@
   "dependencies": {
     "@google-cloud/storage": "^6.11.0",
     "@kubernetes/client-node": "^0.18.1",
+    "@pulumi/command": "1.1.0",
     "@pulumi/gcp": "8.32.1",
     "@pulumi/kubernetes": "4.23.0",
     "@pulumi/pulumi": "3.173.0",

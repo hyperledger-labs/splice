@@ -8,12 +8,13 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.1
+-----
 
 - Validator
 
   - Expose token-standard endpoints on the validator scan-proxy. The paths are the normal token standard path with a ``/api/validator/v0/scan-proxy`` prefix.
+  - Fix a bug where transfers using transfer pre-approvals (both through the wallet UI and automatic via sweeps) were broken until the DARs released in 0.4.0 are effective.
 
 - Sequencer
 
@@ -23,6 +24,10 @@ Upcoming
   for most k8s resources deployed through Splice Helm charts.
   Thanks to Stephane Loeuillet for contributing an initial proposal for this change
   in https://github.com/hyperledger-labs/splice/pull/296.
+
+- Scan
+
+  - Backfilling of all Scan data is now enabled by default.
 
 0.4.0
 -----
