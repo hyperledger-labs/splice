@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.wallet.automation
 import org.lfdecentralizedtrust.splice.automation.TriggerContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperation
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
 import SpliceLedgerConnection.CommandId
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
@@ -18,8 +18,8 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-
 import io.grpc.Status
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
@@ -31,6 +31,7 @@ class WalletPreapprovalSweepTrigger(
     scanConnection: ScanConnection,
     treasury: TreasuryService,
     dedupDuration: DedupDuration,
+    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -47,6 +48,17 @@ class WalletPreapprovalSweepTrigger(
       s"outstandingDescription should never be called for ${this.getClass.getSimpleName}"
     )
     .asRuntimeException
+
+  protected def preapprovalDescriptionIfSupported(
+      parties: Seq[PartyId],
+      description: String,
+  )(implicit tc: TraceContext): Future[Option[String]] = {
+    packageVersionSupport
+      .supportsDescriptionInTransferPreapprovals(parties, context.clock.now)
+      .map { featureSupport =>
+        Option.when(featureSupport.supported)(description)
+      }
+  }
 
   private def getTransferPreapproval()(implicit tc: TraceContext) =
     scanConnection
@@ -77,12 +89,20 @@ class WalletPreapprovalSweepTrigger(
       featuredAppRight <- scanConnection.lookupFeaturedAppRight(
         PartyId.tryFromProtoPrimitive(preapproval.payload.provider)
       )
+      description <- preapprovalDescriptionIfSupported(
+        Seq(
+          store.key.endUserParty,
+          store.key.dsoParty,
+          PartyId.tryFromProtoPrimitive(preapproval.payload.receiver),
+        ),
+        "sweep",
+      )
       _ <- treasury.enqueueAmuletOperation(
         operation = new amuletoperation.CO_TransferPreapprovalSend(
           preapproval.contractId,
           featuredAppRight.map(_.contractId).toJava,
           amountToSendAfterFeesCC,
-          Some("sweep").toJava,
+          description.toJava,
         ),
         dedup = Some(
           AmuletOperationDedupConfig(
