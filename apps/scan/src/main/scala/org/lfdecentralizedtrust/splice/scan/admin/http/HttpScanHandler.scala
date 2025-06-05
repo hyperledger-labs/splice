@@ -496,7 +496,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[v0.ScanResource.GetTopProvidersByAppRewardsResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getTopProvidersByAppRewards") { _ => _ =>
-      // TODO(#4965): Provide an upper bound for limit
+      // TODO(DACH-NY/canton-network-internal#459): Provide an upper bound for limit
       store
         .getTopProvidersByAppRewards(asOfEndOfRound, limit)
         .map(res =>
@@ -522,7 +522,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[v0.ScanResource.GetTopValidatorsByValidatorRewardsResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getTopValidatorsByValidatorRewards") { _ => _ =>
-      // TODO(#4965): Provide an upper bound for limit
+      // TODO(DACH-NY/canton-network-internal#459): Provide an upper bound for limit
       store
         .getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
         .map(res =>
@@ -569,7 +569,7 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.GetTopValidatorsByPurchasedTrafficResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getTopValidatorsByPurchasedTraffic") { _ => _ =>
-      // TODO(#4965): Provide an upper bound for limit
+      // TODO(DACH-NY/canton-network-internal#459): Provide an upper bound for limit
       store
         .getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
         .map(validatorTraffic =>
@@ -1098,7 +1098,7 @@ class HttpScanHandler(
   }
 
   /** Filter the given ACS snapshot to contracts the given party is a stakeholder on */
-  // TODO(#9340) Move this logic inside a Canton gRPC API.
+  // TODO(#828) Move this logic inside a Canton gRPC API.
   private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {
     val contracts = ActiveContract
       .loadFromByteString(input)

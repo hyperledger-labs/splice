@@ -489,7 +489,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       entryUrl: String = testEntryUrl,
       entryDescription: String = testEntryDescription,
   ) = {
-    // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
+    // TODO(#979) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
       ansExternalApp.createAnsEntry(entryName, entryUrl, entryDescription)
     )
@@ -573,7 +573,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val receiverAmounts = Seq(
       receiverAmount(userParty, amount, unit)
     )
-    // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
+    // TODO(#979) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
       createPaymentRequest(
         participantClientWithAdminToken,

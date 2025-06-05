@@ -29,7 +29,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
-      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
   protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(

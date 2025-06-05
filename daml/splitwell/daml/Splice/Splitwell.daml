@@ -67,7 +67,7 @@ template SplitwellInstallRequest
       controller provider
       do pure ()
 
--- TODO(#7411) Remove this once the synchronizer migration automation
+-- TODO(DACH-NY/canton-network-node#7411) Remove this once the synchronizer migration automation
 -- no longer relies on it.
 template SplitwellInstall
   with
@@ -110,7 +110,7 @@ template SplitwellRules
         cid : ContractId GroupInvite
         user : Party
       controller user
-      -- TODO(#9464): use checked fetches to avoid this exercise being executed on the wrong contract.
+      -- TODO(DACH-NY/canton-network-internal#491): use checked fetches to avoid this exercise being executed on the wrong contract.
       do exercise cid (GroupInvite_Accept user)
 
     nonconsuming choice SplitwellRules_Join : ContractId Group
@@ -277,7 +277,7 @@ template TransferInProgress
         terminatedAppPaymentCid : ContractId TerminatedAppPayment
       controller actor
       do require "Actor is signatory" (actor `elem` signatory this)
-         -- TODO(#9464): use a checkedFetch
+         -- TODO(DACH-NY/canton-network-internal#491): use a checkedFetch
          terminated <- fetchUncheckedAndArchive terminatedAppPaymentCid
          require "Reference matches" (terminated.reference == reference)
 
@@ -288,12 +288,12 @@ template TransferInProgress
       controller group.provider
       do
          -- archival happens via the consuming AcceptedAppPayment_Colllect choice
-         -- TODO(#9464): use a checkedFetch
+         -- TODO(DACH-NY/canton-network-internal#491): use a checkedFetch
          acceptedPayment <- fetchUncheckedButArchiveLater acceptedPaymentCid
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
-         -- TODO(#9464): we should check that the DSO party matches here!
+         -- TODO(DACH-NY/canton-network-internal#491): we should check that the DSO party matches here!
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender
                provider = group.provider

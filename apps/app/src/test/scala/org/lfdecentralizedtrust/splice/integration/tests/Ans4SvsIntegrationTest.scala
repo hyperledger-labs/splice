@@ -15,7 +15,7 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
 
-  // TODO(#11927): incorporate this test into AnsIntegrationTest
+  // TODO(#787): incorporate this test into AnsIntegrationTest
   "ans" should {
     "terminated subscriptions are archived" in { implicit env =>
       val leaderTerminatedSubscriptionTrigger =

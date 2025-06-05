@@ -13,7 +13,7 @@ import com.digitalasset.canton.CantonAppDriver
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.environment.EnvironmentFactory
 
-// TODO(#736): generalize. e.g. custom Cli class for Splice Node for the console
+// TODO(DACH-NY/canton-network-node#736): generalize. e.g. custom Cli class for Splice Node for the console
 object SpliceApp extends CantonAppDriver {
 
   override type Config = SpliceConfig

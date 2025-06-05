@@ -418,7 +418,7 @@ object SpliceTests extends LazyLogging {
       value should beWithin(range._1, range._2)
 
     // Upper bound for fees in any of the above transfers
-    // TODO(#10898): Figure out something better for upper bounds of fees
+    // TODO(#806): Figure out something better for upper bounds of fees
     val smallAmount: BigDecimal = BigDecimal(1.0)
     def beWithin(lower: BigDecimal, upper: BigDecimal): Matcher[BigDecimal] =
       be >= lower and be <= upper

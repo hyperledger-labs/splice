@@ -1,4 +1,4 @@
--- TODO(#14568) Consider if we want to make one of the existing columns more generic.
+-- TODO(DACH-NY/canton-network-node#14568) Consider if we want to make one of the existing columns more generic.
 alter table scan_acs_store
   add column transfer_preapproval_receiver text,
   add column transfer_preapproval_valid_from bigint;

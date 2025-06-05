@@ -224,7 +224,7 @@ template SubscriptionInitialPayment
         transferContext : AppTransferContext
       controller actor
       do
-        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
+        -- TODO(DACH-NY/canton-network-node#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         _ <- create TerminatedSubscription with ..
         result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
@@ -314,7 +314,7 @@ template SubscriptionPayment
       do
         contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
         require ("Round at subscription payment " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
-        -- TODO(#9465): look into why we even need the separate subscription contract given that we duplicate all its data
+        -- TODO(DACH-NY/canton-network-internal#445): look into why we even need the separate subscription contract given that we duplicate all its data
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
         subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
@@ -342,7 +342,7 @@ template SubscriptionPayment
         transferContext : AppTransferContext
       controller actor
       do
-        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
+        -- TODO(DACH-NY/canton-network-node#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
         subscriptionState <- create SubscriptionIdleState with

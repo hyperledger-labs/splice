@@ -54,7 +54,7 @@ case class AutomationConfig(
     enableAutomaticRewardsCollectionAndAmuletMerging: Boolean = true,
     /** Allows disabling expiration of validator faucets. This is currently required
       * as this does not work with unavailable validators.
-      * TODO(#11828) Remove this option
+      * TODO(DACH-NY/canton-network-node#11828) Remove this option
       */
     enableExpireValidatorFaucet: Boolean = false,
     /** Only intended for testing. Disables the expiration of Amulet.

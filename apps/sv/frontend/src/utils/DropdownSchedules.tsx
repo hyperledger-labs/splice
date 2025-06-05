@@ -30,7 +30,7 @@ function stateHasValue(
 ): state is { label: string; value: Record<string, JSONValue> } {
   return state.label !== 'No Selection';
 }
-// TODO (#10209): this component is handling both the PrettyPrint and the JsonEditor. Split into two components.
+// TODO (#967): this component is handling both the PrettyPrint and the JsonEditor. Split into two components.
 export const DropdownSchedules: React.FC<{
   futureValues: Tuple2<string, AmuletConfig<USD>>[];
   initialValue?: AmuletConfig<USD>;
@@ -42,7 +42,7 @@ export const DropdownSchedules: React.FC<{
     label: string;
   }
 
-  // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
+  // TODO (#967): remove this intermediate state by lifting it to VoteRequest.tsx
   const [selectedOption, setSelectedOption] = useState<DropdownState>({ label: 'No Selection' });
 
   const dropdownOptions: DropdownOption[] = [

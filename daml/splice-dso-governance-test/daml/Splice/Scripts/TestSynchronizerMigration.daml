@@ -90,7 +90,7 @@ testSynchronizerMigration = do
 
   -- At this point we expect the validator apps to start connecting to the newly announced synchronizer,
   -- and create synchronizer connectivity proof contracts
-  -- TODO(#4894): create synchronizer connectivity proof contracts
+  -- TODO(DACH-NY/canton-network-node#4894): create synchronizer connectivity proof contracts
 
 
   -- Once the SV's are confident enough that the switch is not leaving too many users behind they

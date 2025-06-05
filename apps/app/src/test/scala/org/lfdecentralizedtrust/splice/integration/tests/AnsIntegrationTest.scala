@@ -40,7 +40,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
-      // TODO(#11927): make AnsIntegrationTest use simpleTopology4Svs
+      // TODO(#787): make AnsIntegrationTest use simpleTopology4Svs
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(

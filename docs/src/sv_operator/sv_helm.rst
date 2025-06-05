@@ -199,7 +199,7 @@ it can be beneficial to skim the instructions in :ref:`helm-sv-auth0` as well, t
 
 .. [#reach] The URL must be reachable from the Canton participant, validator app and SV app running in your cluster, as well as from all web browsers that should be able to interact with the SV and wallet UIs.
 
-    .. TODO(#2052) use a unique audience for each app
+    .. TODO(DACH-NY/canton-network-internal#502) use a unique audience for each app
 
 .. _helm-sv-auth0:
 

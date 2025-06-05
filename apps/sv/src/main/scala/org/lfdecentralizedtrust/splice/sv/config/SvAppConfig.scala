@@ -136,7 +136,7 @@ object SvOnboardingConfig {
     }
   }
 
-  // TODO(#3232) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
+  // TODO(DACH-NY/canton-network-internal#498) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
 
   case class DomainMigration(
       name: String,
@@ -232,7 +232,7 @@ case class SvAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
@@ -321,7 +321,7 @@ final case class SvSequencerConfig(
     // does not have to serve requests that have been in flight before the sequencer's signing keys became valid.
     // See also https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
     // The default value of 60 seconds is based on Canton defaulting to 30s for each of those.
-    // TODO (#8282): consider reading config value from participant instead of configuring here
+    // TODO (#845): consider reading config value from participant instead of configuring here
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,
     isBftSequencer: Boolean = false,

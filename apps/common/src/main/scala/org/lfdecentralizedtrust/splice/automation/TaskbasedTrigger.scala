@@ -62,7 +62,7 @@ abstract class TaskbasedTrigger[T: Pretty](
     // Creating a new trace here, as multiple requests can be processed in parallel.
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
       def processTaskWithStalenessCheck(): Future[TaskOutcome] =
-        // TODO(#8526) refactor for better latency reporting
+        // TODO(#842) refactor for better latency reporting
         metrics.latency
           .timeFuture(completeTask(task))
           .recoverWith { case ex =>

@@ -284,10 +284,10 @@ data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_Amu
 -- Workflow templates
 ---------------------
 
--- TODO(#7649) revise and/or remove
+-- TODO(DACH-NY/canton-network-node#7649) revise and/or remove
 data ElectionRequestReason
   = ERR_DsoDelegateUnavailable
-  -- TODO(#7649): add case for DSO delegate asking to be relieved for a graceful shutdown
+  -- TODO(DACH-NY/canton-network-node#7649): add case for DSO delegate asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   | ExtElectionRequestReason with
       dummyUnitField : ()
@@ -295,7 +295,7 @@ data ElectionRequestReason
   deriving (Eq, Ord, Show)
 
 -- | A request to elect a new DSO delegate.
--- TODO(#7649) revise and/or remove
+-- TODO(DACH-NY/canton-network-node#7649) revise and/or remove
 template ElectionRequest with
     dso : Party
     requester : Party
@@ -571,7 +571,7 @@ template DsoRules with
 
     -- Automation DSO delegate election
     ------------------------------
-    -- TODO(#7649) revise and/or remove
+    -- TODO(DACH-NY/canton-network-node#7649) revise and/or remove
     nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
       with
         requester : Party
@@ -579,14 +579,14 @@ template DsoRules with
         ranking : [Party]
       controller requester
       do
-        -- TODO(#7649): consider interaction with concurrent SV changes
+        -- TODO(DACH-NY/canton-network-node#7649): consider interaction with concurrent SV changes
         require "Requester is an SV" (requester `Map.member` svs)
         require "All svs are ranked exactly once" (sort ranking == sort (Map.keys svs))
         electionRequestCid <- create ElectionRequest with
           ..
         return DsoRules_RequestElectionResult with ..
 
-    -- TODO(#7649) revise and/or remove
+    -- TODO(DACH-NY/canton-network-node#7649) revise and/or remove
     choice DsoRules_ElectDsoDelegate : DsoRules_ElectDsoDelegateResult
       with
         actor : Party
@@ -602,7 +602,7 @@ template DsoRules with
           pure req
         let numVotes = length reqs
             numVoters = numVotes
-            -- TODO(#7649): consider whether that is the right number of votes to require
+            -- TODO(DACH-NY/canton-network-node#7649): consider whether that is the right number of votes to require
             -- as there might be more votes being taken into consideration
             numVotesForMajority = (summary.requiredNumVotes + 1) / 2
         require "Requests are from different svs" (unique $ map (.requester) reqs)
@@ -665,7 +665,7 @@ template DsoRules with
     -- Voting as part of on-ledger governance (version 3)
     -----------------------------------------------------
 
-    -- TODO(#9317): rate limit inidiviual SVs wrt requesting votes
+    -- TODO(DACH-NY/canton-network-internal#448): rate limit inidiviual SVs wrt requesting votes
     nonconsuming choice DsoRules_RequestVote : DsoRules_RequestVoteResult
       with
         requester : Party
@@ -703,7 +703,7 @@ template DsoRules with
 
 
     -- Note that this choice can be used to both cast the initial vote, and update a vote.
-    -- TODO(#9319): rate limit SVs wrt updating their votes
+    -- TODO(DACH-NY/canton-network-internal#447): rate limit SVs wrt updating their votes
     nonconsuming choice DsoRules_CastVote : DsoRules_CastVoteResult
       with
         requestCid : ContractId VoteRequest
@@ -798,8 +798,8 @@ template DsoRules with
                     None | numYays >= s.requiredNumVotes ->
                       try do
                         executeActionRequiringConfirmation self amuletRulesCid request.action
-                        -- TODO(#16139): Remove Config Schedule from AmuletConfig
-                        -- TODO(#16137): Implement effectivity on all actions
+                        -- TODO(#925): Remove Config Schedule from AmuletConfig
+                        -- TODO(DACH-NY/canton-network-node#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
                             effectiveAt = fromOptional now $
                               actionRequiringConfirmationEffectiveAt request.action
@@ -849,7 +849,7 @@ template DsoRules with
       -- Note: we do not archive the AmuletPriceVote of an SV on its removal,
       -- as that would allow that SV to block the removal via updating its AmuletPriceVote at the right time.
       --
-      -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
+      -- TODO(#824): drop this code in favor of just keeping AmuletPriceVotes around.
       with
         nonSvVoteCids : [ContractId AmuletPriceVote]
         duplicateVoteCids : [[ContractId AmuletPriceVote]]
@@ -1010,7 +1010,7 @@ template DsoRules with
         svOnboardingRequestCid: ContractId SvOnboardingRequest
       controller dsoDelegate
       do
-        -- TODO(#3756) Enable archiving also before the sv is added, after a matching `SvOnboardingConfirmed` contract is created.
+        -- TODO(DACH-NY/canton-network-node#3756) Enable archiving also before the sv is added, after a matching `SvOnboardingConfirmed` contract is created.
         svOnboardingRequest <- fetchAndArchive (ForDso with dso) svOnboardingRequestCid
         let maybeSv = Map.lookup svOnboardingRequest.candidateParty svs
         require "SV party is an SV" (isSome maybeSv)

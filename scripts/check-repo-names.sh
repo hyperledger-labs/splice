@@ -33,13 +33,13 @@ function check_patterns_locally() {
   local exceptions=(
     '(\b|[`_])cn-docs'
     '@cn-load-tester\.com'
-    '^[^:]+V001__create_schema\.sql:' # TODO (#15491) avoiding changing hashes
-    'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
-    'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
+    '^[^:]+V001__create_schema\.sql:' # TODO (DACH-NY/canton-network-node#15491) avoiding changing hashes
+    'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (DACH-NY/canton-network-internal#395) auth0 env names
+    'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (DACH-NY/canton-network-internal#397) new secret
     'Headers.scala:.*"configs"'
     'Headers.scala:.*"configs-private"'
-    'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (#15745) TLS credential names in istio-gateway
-    'bigquery-import.sql:.*da-cn-ci-2' # TODO (#18620) parameterized project
+    'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (DACH-NY/canton-network-internal#396) TLS credential names in istio-gateway
+    'bigquery-import.sql:.*da-cn-ci-2' # TODO (DACH-NY/canton-network-internal#362) parameterized project
     'GcpConfig\.scala:' # cluster-specific
     '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared|"KMS_PROJECT_ID" -> "da-cn-shared"' # gcp
     '/cn-release-bundles' # docs route

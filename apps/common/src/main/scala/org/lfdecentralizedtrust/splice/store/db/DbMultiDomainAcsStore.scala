@@ -222,7 +222,7 @@ final class DbMultiDomainAcsStore[TXE](
   def hasArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
   ): Future[Boolean] =
-    // TODO(#6458): implement this as a single DB query
+    // TODO(#838): implement this as a single DB query
     Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
 
   override def listContracts[C, TCid <: ContractId[_], T](
@@ -654,7 +654,7 @@ final class DbMultiDomainAcsStore[TXE](
   ): Source[SelectFromAcsTableWithStateResult, NotUsed] = {
     Source
       .future(
-        // TODO(#5534): this is currently waiting until the whole ACS has been ingested.
+        // TODO(#863): this is currently waiting until the whole ACS has been ingested.
         //  After switching to streaming ACS ingestion, we could start streaming contracts while
         //  the ACS is being ingested.
         waitUntilAcsIngested()
@@ -1055,7 +1055,7 @@ final class DbMultiDomainAcsStore[TXE](
                 offset,
                 DBIO
                   .sequence(
-                    // TODO (#5643): batch inserts
+                    // TODO (#989): batch inserts
                     todoAcs.map { ac =>
                       for {
                         _ <- doIngestAcsInsert(

@@ -566,7 +566,7 @@ template AmuletRules
             futureValues = []
         return AmuletRules_SetConfigResult with ..
 
-    -- TODO(#16139): mark these choices as "deprecated"
+    -- TODO(#925): mark these choices as "deprecated"
     -- This inserts a new AmuletConfig Schedule into the future Schedules
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
       with
@@ -1111,7 +1111,7 @@ exerciseAppTransfer AppTransferContext{..} transfer =
     transfer
     context = amuletTransferContext openMiningRound featuredAppRight
 
--- TODO(#14942): replace usages of this function with `exerciseCheckedPaymentTransfer`
+-- TODO(DACH-NY/canton-network-internal#405): replace usages of this function with `exerciseCheckedPaymentTransfer`
 exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
 exercisePaymentTransfer PaymentTransferContext{..} transfer =
   exercise amuletRules AmuletRules_Transfer with

@@ -9,7 +9,7 @@ on:
       - '**/expected-devnet.json'
       - '**/expected-testnet.json'
       - '**/expected-mainnet.json'
-    # TODO(#16006): other cases to consider:
+    # TODO(DACH-NY/canton-network-node#16006): other cases to consider:
     # - All commits on a release-line branch
 
 jobs:

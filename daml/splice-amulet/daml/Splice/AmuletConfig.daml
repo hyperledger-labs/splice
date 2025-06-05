@@ -10,7 +10,7 @@ import Splice.Schedule
 import DA.Time
 import Splice.Util
 
--- TODO(#14972): Get rid of the unused Amulet data type
+-- TODO(#714): Get rid of the unused Amulet data type
 data Amulet = Amulet deriving (Show, Eq)
 -- ^ Deprecated type for specifying amounts and fees in units of Amulet. Use Splice.Amulet.Amulet directly instead.
 data USD = USD deriving (Show, Eq)

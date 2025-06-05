@@ -109,7 +109,7 @@ setupValidator' app name = do
     lastActiveAt = Some now
 
   userId <- validateUserId name
-  -- TODO(#2957): remove read-as DSO party.
+  -- TODO(#881): remove read-as DSO party.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.dso]
   recordValidatorOf app validatorParty validatorParty
   tap app (AmuletUser userId validatorParty) 1.0
@@ -128,7 +128,7 @@ setupUserWithoutValidatorRight: AmuletApp -> Text -> Script AmuletUser
 setupUserWithoutValidatorRight app name = do
   user <- allocatePartyByHint (PartyIdHint name)
   userId <- validateUserId name
-  -- TODO(#2957): remove read-as DSO party.
+  -- TODO(#881): remove read-as DSO party.
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]
   return (AmuletUser userId user)
 
@@ -304,7 +304,7 @@ skipNRounds app n = do
 submitExerciseAmuletRulesByKey : Choice AmuletRules c r => AmuletApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseAmuletRulesByKey app actors readers arg = do
   (rules, _) <- fetchAmuletRulesByKey app.dso
-  -- TODO(#2957): remove read-as DSO party.
+  -- TODO(#881): remove read-as DSO party.
   let adjustedReaders = (app.dso :: readers)
   submitMulti actors adjustedReaders $ exerciseCmd rules arg
 
