@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amulet
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupOffset
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
+  PackageVersionSupport,
   ParticipantAdminConnection,
   RetryFor,
   RetryProvider,
@@ -73,6 +74,7 @@ class HttpValidatorAdminHandler(
     getAmuletRulesDomain: GetAmuletRulesDomain,
     scanConnection: ScanConnection,
     participantAdminConnection: ParticipantAdminConnection,
+    packageVersionSupport: PackageVersionSupport,
     config: ValidatorAppBackendConfig,
     clock: Clock,
     retryProvider: RetryProvider,
@@ -761,6 +763,12 @@ class HttpValidatorAdminHandler(
           }
         }
         externalPartyAmuletRules <- scanConnection.getExternalPartyAmuletRules()
+        supportsDescription <- packageVersionSupport
+          .supportsDescriptionInTransferPreapprovals(
+            Seq(receiverParty, senderParty, store.key.dsoParty),
+            clock.now,
+          )
+          .map(_.supported)
         commands = externalPartyAmuletRules.toAssignedContract
           .getOrElse(
             throw Status.Code.FAILED_PRECONDITION.toStatus
@@ -777,7 +785,7 @@ class HttpValidatorAdminHandler(
               body.amount.bigDecimal,
               body.expiresAt.toInstant,
               body.nonce,
-              body.description.toJava,
+              Option.when(supportsDescription)(body.description).flatten.toJava,
             )
           )
           .update

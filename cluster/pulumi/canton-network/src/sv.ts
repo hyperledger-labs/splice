@@ -57,6 +57,7 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
+import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
 
 export function installSvKeySecret(
@@ -213,11 +214,16 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false);
+    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false, {
+        logicalDecoding: !!baseConfig.scanBigQuery,
+      });
 
   const appsPostgres =
     defaultPostgres ||
-    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true);
+    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true, {
+      logicalDecoding: !!baseConfig.scanBigQuery,
+    });
+
   const canton = buildCrossStackCantonDependencies(
     decentralizedSynchronizerUpgradeConfig,
     {
@@ -252,6 +258,10 @@ export async function installSvNode(
     canton.participant,
     appsPostgres
   );
+
+  if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
+    configureScanBigQuery(appsPostgres, baseConfig.scanBigQuery, scan);
+  }
 
   const validatorApp = await installValidator(
     appsPostgres,

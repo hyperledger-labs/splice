@@ -252,18 +252,20 @@ const SendTransfer: React.FC = () => {
               </FormControl>
             </Stack>
           )}
-          <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h6">
-              Description <Typography variant="caption">(optional)</Typography>{' '}
-            </Typography>
-            <TextField
-              id="create-offer-description"
-              rows={4}
-              multiline
-              inputProps={{ 'aria-label': 'description' }}
-              onChange={e => setDescription(e.target.value)}
-            />
-          </Stack>
+          {featureSupport.data?.transferPreapprovalDescription ? (
+            <Stack direction="column" mb={4} spacing={1}>
+              <Typography variant="h6">
+                Description <Typography variant="caption">(optional)</Typography>{' '}
+              </Typography>
+              <TextField
+                id="create-offer-description"
+                rows={4}
+                multiline
+                inputProps={{ 'aria-label': 'description' }}
+                onChange={e => setDescription(e.target.value)}
+              />
+            </Stack>
+          ) : null}
 
           <DisableConditionally
             conditions={[
