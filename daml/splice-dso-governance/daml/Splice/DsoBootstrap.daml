@@ -37,7 +37,7 @@ template DsoBootstrap with
     signatory dso
     observer sv1Party
 
-    choice DsoBootstrap_Bootstrap : DsoBootstrap_BootstrapResult
+    choice  DsoBootstrap_Bootstrap : DsoBootstrap_BootstrapResult
       controller dso
       do
         -- create amulet-rules and the initial price vote of SV1

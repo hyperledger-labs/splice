@@ -94,7 +94,7 @@ class BaseLedgerConnection(
     client.latestPrunedOffset()
 
   def activeContracts(
-      filter: com.daml.ledger.api.v2.transaction_filter.TransactionFilter,
+      eventFormat: com.daml.ledger.api.v2.transaction_filter.EventFormat,
       offset: Long,
   )(implicit tc: TraceContext): Future[
     (
@@ -106,7 +106,7 @@ class BaseLedgerConnection(
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset,
-        filter = Some(filter),
+        eventFormat = Some(eventFormat),
       )
     )
     for {
@@ -139,7 +139,7 @@ class BaseLedgerConnection(
         Seq[IncompleteReassignmentEvent.Unassign],
         Seq[IncompleteReassignmentEvent.Assign],
     )
-  ] = activeContracts(filter.toTransactionFilter, offset)
+  ] = activeContracts(filter.toEventFormat, offset)
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext

@@ -239,6 +239,13 @@ private[environment] class LedgerClient(
     val request = CommandServiceOuterClass.SubmitAndWaitForTransactionRequest
       .newBuilder()
       .setCommands(commandsBuilder.build)
+      .setTransactionFormat(
+          transaction_filter.TransactionFormat.toJavaProto(transaction_filter.TransactionFormat(
+            eventFormat = Some(transaction_filter.EventFormat(
+            )),
+            transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+          ))
+      )
       .build()
     for {
       stubWithCredsAndTraceContext <- withCredentialsAndTraceContext(commandServiceStub)
@@ -711,12 +718,20 @@ object LedgerClient {
       end: Option[Long],
       filter: IngestionFilter,
   ) {
-    private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
+    private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest = {
+      val eventFormat = filter.toEventFormat
       lapi.update_service.GetUpdatesRequest(
         beginExclusive = begin,
         endInclusive = end,
-        filter = Some(filter.toTransactionFilter),
+        updateFormat = Some(transaction_filter.UpdateFormat(
+          includeTransactions = Some(transaction_filter.TransactionFormat(
+            eventFormat = Some(eventFormat),
+            transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+          )),
+          includeReassignments = Some(eventFormat),
+        )),
       )
+    }
   }
 
   private[environment] sealed abstract class SubmitAndWaitFor[+Z] {

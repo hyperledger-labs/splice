@@ -109,7 +109,7 @@ class LocalSequencerConnectionsTrigger(
             PositiveInt.tryCreate(1),
             submissionRequestAmplification = sequencerRequestAmplification,
           )
-          if (conf.sequencerConnections == newConnections) {
+          if (ParticipantAdminConnection.dropSequencerId(conf.sequencerConnections) == ParticipantAdminConnection.dropSequencerId(newConnections)) {
             logger.trace(
               "already set SynchronizerConnectionConfig.sequencerConnections to the local sequencer only."
             )

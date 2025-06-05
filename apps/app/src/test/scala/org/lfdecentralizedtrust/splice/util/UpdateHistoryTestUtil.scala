@@ -309,14 +309,14 @@ trait UpdateHistoryTestUtil extends TestCommon {
       case ReassignmentUpdate(r) => ReassignmentUpdate(dropTrailingNones(r))
     }
 
-  def dropTrailingNones(t: TransactionTree): TransactionTree =
-    new TransactionTree(
+  def dropTrailingNones(t: Transaction): Transaction =
+    new Transaction(
       t.getUpdateId,
       t.getCommandId,
       t.getWorkflowId,
       t.getEffectiveAt,
+      t.getEvents.asScala.map(dropTrailingNones).asJava,
       t.getOffset,
-      t.getEventsById.asScala.view.mapValues(dropTrailingNones).toMap.asJava,
       t.getSynchronizerId,
       t.getTraceContext,
       t.getRecordTime,
@@ -334,7 +334,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
         assign.copy(createdEvent = dropTrailingNones(assign.createdEvent))
     }
 
-  def dropTrailingNones(e: TreeEvent): TreeEvent = e match {
+  def dropTrailingNones(e: Event): Event = e match {
     case e: CreatedEvent => dropTrailingNones(e)
     case e: ExercisedEvent => dropTrailingNones(e)
     case _ => fail(s"Unexpected event: $e")

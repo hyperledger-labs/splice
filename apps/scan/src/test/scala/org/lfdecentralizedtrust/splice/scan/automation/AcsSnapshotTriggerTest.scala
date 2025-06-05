@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.scan.automation
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.data.Transaction
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import org.lfdecentralizedtrust.splice.automation.{TriggerContext, TriggerEnabledSynchronization}
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
@@ -554,13 +554,13 @@ class AcsSnapshotTriggerTest
     val dummyDomain = SynchronizerId.tryFromString("dummy::domain")
     def treeUpdate(recordTime: CantonTimestamp): TreeUpdate = {
       TransactionTreeUpdate(
-        new TransactionTree(
+        new Transaction(
           "updateId",
           "commandId",
           "workflowId",
           recordTime.toInstant,
+          java.util.Collections.emptyList(),
           0L,
-          java.util.Map.of(),
           dummyDomain.toProtoPrimitive,
           TraceContextOuterClass.TraceContext.getDefaultInstance,
           recordTime.toInstant,

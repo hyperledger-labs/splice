@@ -488,8 +488,8 @@ class UpdateHistory(
               updateRowId,
               tree.getChildNodeIds(exercised).asScala.toSeq.map(_.intValue()),
             )
-          case _ =>
-            throw new RuntimeException("Unsupported event type")
+          case e =>
+            throw new RuntimeException(s"Unsupported event type: $e")
         }*
       )
     })
