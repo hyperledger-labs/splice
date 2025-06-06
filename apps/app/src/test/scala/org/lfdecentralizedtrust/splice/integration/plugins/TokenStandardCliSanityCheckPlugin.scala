@@ -131,6 +131,7 @@ class TokenStandardCliSanityCheckPlugin(
       token: String,
       participantPort: Int,
       extraArgs: Seq[String],
+      retries: Int = 3,
   )(implicit
       tc: TraceContext
   ): String = {
@@ -159,8 +160,16 @@ class TokenStandardCliSanityCheckPlugin(
     if (exitCodeTry.toOption.exists(_ != 0) || exitCodeTry.isFailure) {
       logger.error(s"Failed to run $args: $exitCodeTry. Dumping output.")(TraceContext.empty)
       readLines.foreach(logger.error(_)(TraceContext.empty))
-      // sometimes readlines is empty...?
-      throw new RuntimeException(s"$args failed: ${readLines}")
+      if (retries > 0) {
+        // node commands sometimes give no logs whatsoever, and sometimes they segfault and dump a native stack trace,
+        // so retrying seems like the best solution.
+        // If the cause of the error is not-node-related, it should fail quick enough that it won't slow down tests too much.
+        logger.info(s"Retrying command $args")
+        runCommand(command, partyId, token, participantPort, extraArgs, retries - 1)
+      } else {
+        // sometimes readlines is empty...?
+        throw new RuntimeException(s"$args failed: ${readLines}")
+      }
     }
     val result = readLines
       .dropWhile(line => !line.startsWith("[") && !line.startsWith("{")) // remove npm noise
