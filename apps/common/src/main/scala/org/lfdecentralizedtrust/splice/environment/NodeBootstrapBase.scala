@@ -33,7 +33,9 @@ object NodeBootstrap {
 /** Modelled after CantonNodeBootstrap
   */
 trait NodeBootstrap[+N <: CantonNode]
-    extends CantonNodeBootstrap[N] // TODO(DACH-NY/canton-network-node#736): remove the dependency on this trait.
+    extends CantonNodeBootstrap[
+      N
+    ] // TODO(DACH-NY/canton-network-node#736): remove the dependency on this trait.
     {
 
   def name: InstanceName
