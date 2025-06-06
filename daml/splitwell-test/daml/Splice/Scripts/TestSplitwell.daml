@@ -97,7 +97,7 @@ queryBalances p k = do
   where
     f acc BalanceUpdate{..} = case update of
       ExternalPayment {..} ->
-        let split = amount / intToNumeric (length group.members + 1) -- TODO(DACH-NY/canton-network-node#1451) Make sure nothing gets lost here.
+        let split = amount / intToNumeric (length group.members + 1) -- TODO(#1451) Make sure nothing gets lost here.
         in if payer == p.primaryParty
              then let g acc x
                         | x == payer = acc

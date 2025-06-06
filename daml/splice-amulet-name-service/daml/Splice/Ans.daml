@@ -179,7 +179,7 @@ data ExpectedPayment = ExpectedPayment
 fetchAndValidateInitialPayment : ContractId SubscriptionInitialPayment -> ExpectedPayment -> Update SubscriptionInitialPayment
 fetchAndValidateInitialPayment cid ExpectedPayment{..} = do
   payment <- fetchUncheckedButArchiveLater cid
-  -- TODO(DACH-NY/canton-network-internal#445): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
+  -- TODO(#9465): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
   require "matching DSO party" (dso == payment.subscriptionData.provider)
   require "Sender matches" (sender == payment.subscriptionData.sender)
   pure payment
@@ -187,7 +187,7 @@ fetchAndValidateInitialPayment cid ExpectedPayment{..} = do
 fetchAndValidatePayment : ContractId SubscriptionPayment -> ExpectedPayment -> Update SubscriptionPayment
 fetchAndValidatePayment cid ExpectedPayment{..} = do
   payment <- fetchUncheckedButArchiveLater cid
-  -- TODO(DACH-NY/canton-network-internal#445): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
+  -- TODO(#9465): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
   require "matching DSO party" (dso == payment.subscriptionData.provider)
   require "Sender matches" (sender == payment.subscriptionData.sender)
   pure payment

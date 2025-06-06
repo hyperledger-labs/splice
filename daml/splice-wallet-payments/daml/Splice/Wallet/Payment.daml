@@ -243,7 +243,7 @@ template AcceptedAppPayment
       with
         context : AppTransferContext
       controller sender
-      do -- TODO(DACH-NY/canton-network-node#3152) Split out amulet unlocking from payment expiry
+      do -- TODO(#3152) Split out amulet unlocking from payment expiry
          create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
          result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock context.openMiningRound)
          return AcceptedAppPayment_ExpireResult with

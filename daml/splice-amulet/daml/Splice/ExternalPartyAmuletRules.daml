@@ -45,7 +45,7 @@ template ExternalPartyAmuletRules
         nonce : Int
         description : Optional Text
       controller sender
-      do -- TODO(DACH-NY/canton-network-node#18633): once the `isLedgerTimeXX` primitives are in, enforce that `expiresAt` is in the future
+      do -- TODO(#18633): once the `isLedgerTimeXX` primitives are in, enforce that `expiresAt` is in the future
          -- We don't do that yet, as otherwise this would be a regression, as it would introduce a time-bound
          -- on the prepared transaction creating the transfer command.
          cmd <- create TransferCommand with

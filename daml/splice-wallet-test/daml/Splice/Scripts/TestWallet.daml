@@ -58,7 +58,7 @@ createSingleReceiverPaymentRequest app provider sender receiver amount = do
 acceptPaymentRequest : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Amulet -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest amulet = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputAmulet amulet]
     context
@@ -933,7 +933,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
@@ -942,7 +942,7 @@ testInsufficientFundsBatchSubscriptions = script do
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
 
   amulet <- tap app alice 15.0
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
@@ -956,7 +956,7 @@ testInsufficientFundsBatchSubscriptions = script do
   passTime (days 27)
   runNextIssuance app
   amulet <- tap app alice 5.0
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
@@ -964,7 +964,7 @@ testInsufficientFundsBatchSubscriptions = script do
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
 
   amulet <- tap app alice 15.0
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
@@ -1165,7 +1165,7 @@ executeAmuletOperation app user op = do
   [(installCid, install)] <- queryFilter @WalletAppInstall user.primaryParty (\i -> i.endUserParty == user.primaryParty)
   context <- getPaymentTransferContext app user
   amulets <- queryFilter @Amulet user.primaryParty (\amulet -> amulet.owner == user.primaryParty)
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   result <- submitMulti [install.validatorParty] [install.endUserParty, install.validatorParty, app.dso] $
     exerciseCmd installCid WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet amulet._1 | amulet <- amulets]

@@ -251,7 +251,7 @@ acceptSubscriptionRequestAndMakePayment
 acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeaturedAppRight request = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs
     context
@@ -265,7 +265,7 @@ makeSubscriptionPayment
 makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
-  -- TODO(#881): remove read-as DSO party.
+  -- TODO(#2957): remove read-as DSO party.
   result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context
