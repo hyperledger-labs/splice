@@ -344,13 +344,24 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Seq[AssignedContract[
-    transferOffersCodegen.TransferOffer.ContractId,
-    transferOffersCodegen.TransferOffer,
-  ]]] = {
+  ): Future[
+    (
+        Seq[AssignedContract[
+          transferOffersCodegen.TransferOffer.ContractId,
+          transferOffersCodegen.TransferOffer,
+        ]],
+        Seq[AssignedContract[
+          transferOffersCodegen.AcceptedTransferOffer.ContractId,
+          transferOffersCodegen.AcceptedTransferOffer,
+        ]],
+    )
+  ] = {
     for {
       transferOffers <- multiDomainAcsStore.listAssignedContracts(
         transferOffersCodegen.TransferOffer.COMPANION
+      )
+      acceptedTransferOffers <- multiDomainAcsStore.listAssignedContracts(
+        transferOffersCodegen.AcceptedTransferOffer.COMPANION
       )
     } yield {
       val offersFilteredFrom = fromParty match {
@@ -363,7 +374,18 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
         case Some(toParty) =>
           offersFilteredFrom.filter(_.payload.receiver == toParty.toProtoPrimitive)
       }
-      offersFilteredTo
+
+      val acceptedOffersFilteredFrom = fromParty match {
+        case None => acceptedTransferOffers
+        case Some(fromParty) =>
+          acceptedTransferOffers.filter(_.payload.sender == fromParty.toProtoPrimitive)
+      }
+      val acceptedOffersFilteredTo = toParty match {
+        case None => acceptedOffersFilteredFrom
+        case Some(toParty) =>
+          acceptedOffersFilteredFrom.filter(_.payload.receiver == toParty.toProtoPrimitive)
+      }
+      (offersFilteredTo, acceptedOffersFilteredTo)
     }
   }
 
