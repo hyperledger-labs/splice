@@ -28,10 +28,12 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
+import org.scalatest.concurrent.PatienceConfiguration
 import org.slf4j.event.Level
 
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters.*
 
 class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
@@ -60,8 +62,8 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           )(config)
       )
 
-  def dsoDelegateExpiredAnsEntryTrigger(implicit env: SpliceTestConsoleEnvironment) =
-    sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger]
+  def dsoDelegateExpiredAnsEntryTriggers(implicit env: SpliceTestConsoleEnvironment) =
+    activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAnsEntryTrigger])
 
   // created by the expiry test
   override protected lazy val sanityChecksIgnoredRootCreates: Seq[Identifier] = Seq(
@@ -87,7 +89,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           bobRefs,
         ).parTraverse { ref =>
           Future { requestAndPayForEntry(ref, testEntryName) }
-        }.futureValue,
+        }.futureValue(timeout = PatienceConfiguration.Timeout(FiniteDuration(40, "seconds"))),
         lines => {
           forAll(lines) { line =>
             line.message should (include(s"entry already exists and owned by") or include(
@@ -360,7 +362,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
 
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
-        triggersToResumeAtStart = Seq(dsoDelegateExpiredAnsEntryTrigger),
+        triggersToResumeAtStart = dsoDelegateExpiredAnsEntryTriggers,
       ) {
 
         val ansRules = sv1ScanBackend.getAnsRules()
@@ -411,7 +413,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
         setTriggersWithin(
           Seq.empty,
           triggersToResumeAtStart =
-            Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
+            activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
         ) {
           withClue("contracts removed with subscription trigger reenabled") {
             // Wait for subscription to be expired.

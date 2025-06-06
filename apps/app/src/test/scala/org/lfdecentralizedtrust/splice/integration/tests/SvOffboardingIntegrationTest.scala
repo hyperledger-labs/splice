@@ -3,9 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.instances.future.*
-import cats.instances.seq.*
-import cats.syntax.foldable.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -35,6 +32,13 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
 }
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
+import cats.syntax.foldable.*
+import cats.instances.future.*
+import cats.instances.seq.*
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -96,10 +100,8 @@ class SvOffboardingIntegrationTest
         )
       }
 
-      sv1Backend.dsoDelegateBasedAutomation
-        .trigger[ExecuteConfirmedActionTrigger]
-        .pause()
-        .futureValue
+      pauseAllDsoDelegateTriggers[ExecuteConfirmedActionTrigger]
+
       val externalPartyAmuletRules = sv1ScanBackend.getExternalPartyAmuletRules()
       // Create TransferCommand to trigger creation of confirmations for creating the transfer command counter.
       // We don't want to test external parties in this test so we just create it directly from SV1.
@@ -240,7 +242,7 @@ class SvOffboardingIntegrationTest
       ) shouldBe None
       actAndCheck(timeUntilSuccess = 60.seconds)(
         "Resume ExecuteConfirmedActionTrigger",
-        sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
+        resumeAllDsoDelegateTriggers[ExecuteConfirmedActionTrigger],
       )(
         "TransferCommandCounter gets created",
         (_: Unit) =>

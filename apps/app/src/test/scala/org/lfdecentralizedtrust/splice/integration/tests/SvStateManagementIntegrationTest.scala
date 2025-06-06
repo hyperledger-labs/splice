@@ -326,7 +326,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         setTriggersWithin(
           // Pause so SV3 can be stopped before it gets offboarded
           triggersToPauseAtStart =
-            Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger])
+            activeSvs.map(_.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger])
         ) {
           // We need SV3's vote here for immediate offboarding
           Seq(sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
@@ -612,7 +612,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       }
     }
     clue("Pausing vote request expiration automation") {
-      sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
+      Seq(sv1Backend, sv2Backend).foreach(
+        _.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
+      )
     }
     actAndCheck(
       "SV2 creates a vote request for removing SV1", {
@@ -640,7 +642,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       },
     )
     clue("Resuming vote request expiration automation") {
-      sv1Backend.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+      Seq(sv1Backend, sv2Backend).foreach(
+        _.dsoDelegateBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
+      )
     }
     clue("Eventually the vote request expires and gets archived") {
       eventually() {

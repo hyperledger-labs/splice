@@ -57,6 +57,11 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
+import {
+  delegatelessAutomation,
+  expectedTaskDuration,
+  expiredRewardCouponBatchSize,
+} from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
 
@@ -464,6 +469,9 @@ function installSvApp(
     },
     contactPoint: daContactPoint,
     nodeIdentifier: config.onboardingName,
+    delegatelessAutomation: delegatelessAutomation,
+    expectedTaskDuration: expectedTaskDuration,
+    expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

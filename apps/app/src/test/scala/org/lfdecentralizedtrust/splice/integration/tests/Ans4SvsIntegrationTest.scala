@@ -7,6 +7,10 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.TerminatedSub
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import org.lfdecentralizedtrust.splice.validator.automation.ReconcileSequencerConnectionsTrigger
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 import org.scalatest.Assertion
 
 class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
@@ -18,9 +22,6 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
   // TODO(#787): incorporate this test into AnsIntegrationTest
   "ans" should {
     "terminated subscriptions are archived" in { implicit env =>
-      val leaderTerminatedSubscriptionTrigger =
-        sv1Backend.dsoDelegateBasedAutomation.trigger[TerminatedSubscriptionTrigger]
-
       setTriggersWithin[Assertion](
         // Figure out how to make the `onboardUser` part of `onboardWalletUser` not time out
         // in the even of an untimely domain disconnect
@@ -72,7 +73,7 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
         )
 
         clue("Pausing TerminatedSubscriptionTrigger") {
-          leaderTerminatedSubscriptionTrigger.pause().futureValue
+          pauseAllDsoDelegateTriggers[TerminatedSubscriptionTrigger]
         }
 
         actAndCheck(
@@ -92,7 +93,7 @@ class Ans4SvsIntegrationTest extends IntegrationTest with WalletTestUtil with Tr
             ) should not be empty
         }
         clue("Resuming TerminatedSubscriptionTrigger") {
-          leaderTerminatedSubscriptionTrigger.resume()
+          resumeAllDsoDelegateTriggers[TerminatedSubscriptionTrigger]
         }
 
         eventually() {

@@ -6,9 +6,9 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
+  TaskFailed,
   TaskOutcome,
   TaskSuccess,
-  TaskFailed,
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
@@ -61,7 +61,8 @@ class ExecuteConfirmedActionTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      confirmationContract: AssignedContract[Confirmation.ContractId, Confirmation]
+      confirmationContract: AssignedContract[Confirmation.ContractId, Confirmation],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val action = confirmationContract.payload.action
     isStaleAction(confirmationContract).flatMap { isStale =>
@@ -91,6 +92,7 @@ class ExecuteConfirmedActionTrigger(
             if (uniqueConfirmations.size >= requiredNumConfirmations) {
               for {
                 amuletRules <- store.getAmuletRules()
+                controllerArgument <- getSvControllerArgument(controller)
                 amuletRulesId = amuletRules.contractId
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_ExecuteConfirmedAction(
@@ -99,7 +101,8 @@ class ExecuteConfirmedActionTrigger(
                       java.util.Optional.of(amuletRulesId),
                       uniqueConfirmations
                         .map(_.contractId)
-                        .asJava, // TODO(DACH-NY/canton-network-node#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                        .asJava, // TODO(DACH-NY/canton-network-node##3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                      controllerArgument,
                     )
                   )
                 )
