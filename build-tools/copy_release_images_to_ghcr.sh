@@ -79,11 +79,7 @@ fi
 for VERSION in $VERSIONS; do
   # Iterate through the directories in the cluster images directory
   for IMAGE_NAME in $IMAGES; do
-    if [ "$IMAGE_NAME" == "pulumi-kubernetes-operator" ]; then
-      TAG="v${VERSION}"
-    else
-      TAG="$VERSION"
-    fi
+    TAG="$VERSION"
     # Construct the full image names
     SOURCE_IMAGE="$SRC_REGISTRY/$IMAGE_NAME:$TAG"
     TARGET_IMAGE="$DEST_REGISTRY/$IMAGE_NAME:$TAG"
