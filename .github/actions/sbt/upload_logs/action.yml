@@ -22,6 +22,16 @@ runs:
           pigz -r log/* || true
         fi
 
+    - name: Move potential additional debugging artifacts to log directory
+      shell: bash
+      run: |
+        mkdir -p log
+        # When Java crashes, it sometimes saves an error report such as hs_err_pid*.log to the working directory.
+        mv *.log log/ || true
+        # Possible locations of core dumps (/ is apparently a default, but who knows)
+        mv core* log/ || true
+        mv /core* log/ || true
+
     # Certain characters are disallowed in artifact filenames in GHA, so we need to sanitize them
     - name: Sanitize filenames
       # Runs in nix to have access to `rename`
