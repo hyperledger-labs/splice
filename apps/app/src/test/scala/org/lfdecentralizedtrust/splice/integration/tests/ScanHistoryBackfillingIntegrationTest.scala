@@ -2,19 +2,13 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  ConfigurableApp,
-  updateAutomationConfig,
-}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
-}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest, SpliceTestConsoleEnvironment}
 import org.lfdecentralizedtrust.splice.scan.admin.http.ProtobufJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.automation.ScanHistoryBackfillingTrigger
 import org.lfdecentralizedtrust.splice.store.{PageLimit, TreeUpdateWithMigrationId}
@@ -27,12 +21,14 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.automation.TxLogBackfillingTrigger
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
+import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalactic.source.Position
 
 import scala.annotation.nowarn
+import scala.collection.immutable.SortedMap
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -377,6 +373,24 @@ class ScanHistoryBackfillingIntegrationTest
     }
 
     clue("Compare scan histories with each other using the v1 HTTP endpoint") {
+      // The v1 endpoint is deprecated, but we still have users using it
+      @nowarn("cat=deprecation")
+      val sv1HttpUpdates =
+        sv1ScanBackend.getUpdateHistoryV1(1000, None, encoding = CompactJson)
+
+      @nowarn("cat=deprecation")
+      val sv2HttpUpdates =
+        sv2ScanBackend.getUpdateHistoryV1(1000, None, encoding = CompactJson)
+
+      // Compare common prefix, as there might be concurrent activity
+      val commonLength = sv1HttpUpdates.length min sv2HttpUpdates.length
+      commonLength should be > 10
+      val sv1Items = sv1HttpUpdates.take(commonLength)
+      val sv2Items = sv2HttpUpdates.take(commonLength)
+      sv1Items should contain theSameElementsInOrderAs sv2Items
+    }
+
+    clue("Compare scan histories with each other using the v2 HTTP endpoint") {
       val sv1HttpUpdates =
         readUpdateHistoryFromScan(sv1ScanBackend)
       val sv2HttpUpdates =
@@ -387,6 +401,19 @@ class ScanHistoryBackfillingIntegrationTest
       commonLength should be > 10
       val sv1Items = sv1HttpUpdates.take(commonLength)
       val sv2Items = sv2HttpUpdates.take(commonLength)
+      def collectEventsById(items: Seq[UpdateHistoryItemV2]) = items.collect {
+        case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(http) =>
+          http.eventsById
+      }
+      val eventsByIdSv1 = collectEventsById(sv1Items)
+      val eventsByIdSv2 = collectEventsById(sv2Items)
+
+      def assertOrderedEventsById(eventsByIdSeq: Seq[SortedMap[String, definitions.TreeEvent]]) =
+        forAll(eventsByIdSeq) { eventsById =>
+          eventsById.keys.toSeq should contain theSameElementsInOrderAs SortedMap.from(eventsById).keys.toSeq
+        }
+      assertOrderedEventsById(eventsByIdSv1)
+      assertOrderedEventsById(eventsByIdSv2)
       sv1Items should contain theSameElementsInOrderAs sv2Items
     }
 
