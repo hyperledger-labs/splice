@@ -1,0 +1,65 @@
+function get_postgres_type() {
+  local instance=$1
+  local stack=$2
+
+  _debug "Getting postgres type for instance $instance in stack $stack"
+
+  cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*canton:.*:postgres::${instance}\")) | .type"
+}
+
+function get_cloudsql_id() {
+  local instance=$1
+  local stack=$2
+  local cluster=${3:-""} # optional, defaults to CWD
+
+  if [ -n "$cluster" ]; then
+    local path="$SPLICE_ROOT/cluster/deployment/$cluster"
+    local cwd; cwd="$(pwd)"
+
+    cd "$path" || _error "Failed to enter deployment directory $cluster"
+    direnv exec . cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
+    cd "$cwd" || _error "Failed to return to original directory"
+  else
+    cncluster pulumi "$stack" stack export | grep -v "Running Pulumi Command" | jq -r ".deployment.resources[] | select(.urn | test(\".*DatabaseInstance::${instance}\")) | .id"
+  fi
+}
+
+function get_stack_for_namespace_component() {
+  local namespace=$1
+  local component=$2
+  local internal=$3
+
+  local stack=""
+  if [[ "${namespace}" =~ sv.* ]]; then
+    if [[ "${component}" == "participant" && "${internal}" != "true" ]]; then
+      stack="sv-canton"
+    elif [[ "${component}" == "sequencer" && "${internal}" != "true" ]]; then
+      stack="sv-canton"
+    elif [[ "${component}" == "mediator" && "${internal}" != "true" ]]; then
+      stack="sv-canton"
+    else
+      stack="canton-network"
+    fi
+  else
+    stack="$namespace"
+  fi
+
+  echo $stack
+}
+
+create_component_instance() {
+    local component="$1"
+    local migration_id="$2"
+    local namespace="$3"
+    local internal="$4"
+
+    if [[ ("$component" == "sequencer" || "$component" == "mediator" || "$component" == "participant")
+       && ("$namespace" != "splitwell" && "$namespace" != "validator1" && "$namespace" != "sv")
+       && ("$internal" != "true") ]]; then
+        component_instance="${component}-${migration_id}"
+    else
+        component_instance="${component}"
+    fi
+
+    echo "$component_instance"
+}
