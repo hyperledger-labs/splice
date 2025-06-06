@@ -2,6 +2,10 @@
 
 Developer Documentation for all Splice functionalities.
 
+## Contributing to the Splice docs
+
+In order to setup your development environment, please see the [Development README](../DEVELOPMENT.md).
+
 ## Development Builds
 
 ### Live-preview
