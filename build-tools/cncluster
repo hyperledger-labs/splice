@@ -1,0 +1,2053 @@
+#!/usr/bin/env bash
+
+SUBCOMMAND_NAME="$1"
+shift
+
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source "${TOOLS_LIB}/libcli.source"
+
+SCRIPTNAME=${0##*/}
+
+# Ensure we're running in a cluster deployment context
+
+if [ -z "${GCP_CLUSTER_BASENAME-}" ]; then
+    _error "GCP_CLUSTER_BASENAME is undefined, this script must be run in a deployment/ directory."
+fi
+
+##
+
+GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
+
+################################
+### Utilities
+################################
+
+function _contained() {
+    local needle="$1" item
+    shift
+    for item; do
+        if [[ "$item" == "$needle" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+function _cluster_exists() {
+  CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)')
+
+  if [ -z "${CLUSTER}" ]; then
+      return 1
+  else
+      return 0
+  fi
+}
+
+function _cluster_must_exist() {
+    if ! _cluster_exists; then
+        _error "Cluster does not exist, cannot continue."
+    fi
+}
+
+function _docker_must_be_running() {
+    if ! docker ps  > /dev/null 2>&1; then
+        _error "Docker Daemon not found to be running."
+    fi
+}
+
+function _production_gate() {
+    if [ -n "${GCP_CLUSTER_PROD_LIKE-}" ] && [ -z "${CI-}" ]; then
+        _error "Please deploy to this cluster only via CircleCI (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
+    fi
+}
+
+function _cluster_ip() {
+    gcloud compute addresses list \
+           --regions="${CLOUDSDK_COMPUTE_REGION}" \
+           --filter "name:${GCP_CLUSTER_NAME}-ip" \
+           --format 'value(address)'
+}
+
+function _needs_auth0_management_api_creds() {
+    if [ -z "${AUTH0_CN_MANAGEMENT_API_CLIENT_ID-}" ]; then
+        _error "Environment variable AUTH0_CN_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+      exit 1
+    fi
+
+    if [ -z "${AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
+      _error "Environment variable AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+      exit 1
+    fi
+}
+
+
+function _needs_auth0_sv_management_api_creds() {
+    if [ -z "${AUTH0_SV_MANAGEMENT_API_CLIENT_ID-}" ]; then
+        _error "Environment variable AUTH0_SV_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+        exit 1
+    fi
+
+    if [ -z "${AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
+        _error "Environment variable AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+        exit 1
+    fi
+}
+
+function _needs_auth0_validator_management_api_creds() {
+    if [ -z "${AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID-}" ]; then
+        _error "Environment variable AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+        exit 1
+    fi
+
+    if [ -z "${AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
+        _error "Environment variable AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/canton-network-node#configure-auth0-environment"
+        exit 1
+    fi
+}
+function _cluster_show() {
+    _log "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
+    _log "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
+
+    _log "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
+    _log "GCP_CLUSTER_BASENAME    : ${GCP_CLUSTER_BASENAME}"
+    _log "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
+    _log "GCP_CLUSTER_HOSTNAME    : ${GCP_CLUSTER_HOSTNAME}"
+    _log "PULUMI_BACKEND_URL      : ${PULUMI_BACKEND_URL}"
+
+    _log ""
+}
+
+function _retry_until_success() {
+    local -r cmd="${1-}"
+    local -r msg="${2-}"
+
+    if [ -z "$cmd" ]; then
+        _error "Missing command in _retry_until_success"
+        exit 1
+    fi
+
+    # with 5 second sleep + 1 second kubectl timeout, this is roughly 10 minutes
+    # See also max_wait which caps the overall wait time
+    local -i -r max_retries=$((100))
+    local -i num_retries=0
+    local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
+    local -i -r start_time=$(date +%s)
+
+    _log "Running command with retry: $cmd"
+
+    set +e
+    until $cmd; do
+        ((++num_retries))
+        if ((num_retries>max_retries)); then
+            echo "Too many attempts, exiting"
+            exit 1
+        fi
+        if (($(date +%s) > (start_time+max_wait))); then
+            echo "Timed out after $max_wait seconds, exiting"
+            exit 1
+        fi
+        sleep 5
+    done
+    set -e
+}
+
+function _retry_until_value() {
+    local -r cmd="${1-}"
+    local -r msg="${2-}"
+    local -r expected="${3-}"
+    local -r is_regex="${4-}"
+
+    if [ -z "$cmd" ] || [ -z "$expected" ]; then
+        _error "Missing command or expected value in _retry_until_value"
+        exit 1
+    fi
+
+    # with 5 second sleep, this takes roughly 30 minutes + 360*N, where N is time it takes to run `cmd` in minutes.
+    # Usually this is negligible, but beware if `cmd` is resource heavy or does retries of its own.
+    # See also max_wait which caps the overall wait time
+    local -i -r max_retries=$((12*30))
+    local -i num_retries=0
+    local -i -r max_wait=$((60*60)) # do not wait longer than 60m in any case
+    local -i -r start_time=$(date +%s)
+
+    _log "Running command with retry (until $expected): $cmd"
+
+    function is_expected() {
+        local -r found="${1-}"
+        if [ -z "$is_regex" ]; then
+            if [ "$found" == "$expected" ]; then
+                true
+            else
+                _log "Waiting for $msg (found: \"$found\", expecting: \"$expected\")"
+                false
+            fi
+        else
+            if [[ "$found" =~ $expected ]]; then
+                true
+            else
+                _log "Waiting for $msg (found: \"$found\", expecting regex: \"$expected\")"
+                false
+            fi
+        fi
+    }
+
+    until found=$($cmd 2>&1 || true) && (is_expected "$found"); do
+        ((++num_retries))
+        if ((num_retries>max_retries)); then
+            echo "Too many attempts, exiting"
+            exit 1
+        fi
+        if (($(date +%s) > (start_time+max_wait))); then
+            echo "Timed out after $max_wait seconds, exiting"
+            exit 1
+        fi
+        sleep 5
+    done
+
+    # no functions currently use it
+    # shellcheck disable=SC2034
+    ret=$found
+}
+
+
+### Cluster management
+
+
+function _current_lockholder() {
+    local secret
+    local errorcode
+    errorcode=0
+    secret=$(kubectl get secret cluster-lock -o jsonpath='{.data.lockholder}' 2>&1) || errorcode=$?
+    if [ $errorcode != 0 ]; then
+        if [[ $secret == "Unable to connect to the server"* ]]; then
+            _error "Failed to get secret cluster-lock from the cluster. Please check that you are on VPN, and if so, try running \`cncluster activate\`"
+        elif [[ $secret == "Error from server (NotFound)"* ]]; then
+            echo ""
+        else
+            _error "Unknown error when fetching lock secret: $secret"
+        fi
+    else
+        echo "$secret" | base64 --decode
+    fi
+}
+
+function _current_lock_age() {
+    lock_timestamp=$(kubectl get secret cluster-lock -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null | xargs -0 -I X date -d X +%s)
+    current_timestamp=$(date +%s)
+    echo "$((current_timestamp-lock_timestamp))"
+}
+
+
+function _current_lock_age_formatted() {
+    age_secs="$(_current_lock_age)"
+    echo "$((age_secs / 86400)) days(s), $(((age_secs % 86400) / 3600)) hour(s), $(((age_secs % 3600) / 60)) minute(s)"
+}
+
+function _get_holder_names() {
+    jq -r --arg login "$1" '.[$login][]?' "$SPLICE_ROOT/.circleci/cluster-lock-users.json"
+}
+
+function _assert_lock() {
+    if ! (env-bool SHARED_CLUSTER); then
+        return
+    fi
+
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        if ! (env-bool CI); then
+            if [ "${lockholder}" != "$(whoami)" ]; then
+                _error "Cluster already locked by: ${lockholder}"
+            fi
+            return
+        fi
+
+        # Check lock for CI...
+        if ! approver=$( "$SPLICE_ROOT/.circleci/approved-by.sh" ); then
+            _error "Could not determine approver for CI workflow"
+        fi
+
+        if [[ -n "$approver" ]]; then
+            local -a names
+            readarray -t names < <( _get_holder_names "$approver" )
+
+            if _contained "$lockholder" "${names[@]}"; then
+                _info "CI workflow approved by $approver and locked by ${lockholder}"
+            else
+                _error "CI workflow approved by $approver alias ${names[*]}, but cluster locked by ${lockholder}"
+            fi
+        else
+            # running for CI, but no approved workflow; we only require the lock
+            _info "CI running with cluster lock held by: ${lockholder}"
+        fi
+    else
+        _error "Cluster not locked. (See: https://github.com/DACH-NY/canton-network-node/tree/main/cluster#deploy-a-build-to-a-cluster))"
+    fi
+}
+
+################################
+### Commands
+################################
+
+## Subcommand dictionary
+##
+##    This is a map from subcommand name to help text. The definition of the
+##    sumcommand's functionality itself is in a shell function named
+##    cluster_${subcommand_name}. The subcommand must be defined in the
+##    whitelist dictionary to be invoked.
+
+declare -A subcommand_whitelist
+
+source "${TOOLS_LIB}/pulumi-helpers"
+source "${TOOLS_LIB}/pulumi-commands"
+source "${TOOLS_LIB}/hard-domain-migration-commands"
+source "${TOOLS_LIB}/disaster-recovery-commands"
+
+function _prompt_to_confirm() {
+    # Assert lock before checking if prompt was confirmed previously.
+    # This is to ensure the current invocation obeys the lock guard
+    # regardless of prior invocations using --no-lock or not
+    if [ "${1-}" != "--no-lock" ]; then
+        _assert_lock
+    fi
+
+    # Many subcommands invoke other subcommands to do their work. This
+    # keeps a record of the first confirmation prompt to avoid
+    # prompting the user at every one of these steps.  We also
+    # autoconfirm on CI instead of having to be careful to avoid all
+    # calls to _prompt_to_confirm.
+    if [ -n "${USER_PROMPT_CONFIRMED:-}" ] || [ -n "${CI:-}" ]; then
+        return
+    fi
+
+    _cluster_show
+
+    if ! (env-bool GCP_CLUSTER_PROD_LIKE) ; then
+        if (env-bool CNCLUSTER_AUTOCONFIRM) ; then
+            _warning "Automatically confirmed (via environment variable): ${subcommand_whitelist[${SUBCOMMAND_NAME}]}"
+            return
+        fi
+    fi
+
+    _confirm "Confirm: ${subcommand_whitelist[${SUBCOMMAND_NAME}]}"
+   USER_PROMPT_CONFIRMED=1
+}
+
+###
+
+subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to administer the cluster.'
+
+function subcmd_activate() {
+    _cluster_must_exist
+
+    # Only mainnet explicitly sets CLOUDSDK_COMPUTE_ZONE
+    gcloud container clusters get-credentials "${GCP_CLUSTER_NAME}"
+}
+
+###
+
+subcommand_whitelist[rlogs]='Stream a running application log stream to standard output'
+
+function _json_log_format() {
+    jq -R 'fromjson? | select(type == "object")' \
+        | jq -r '"\(.["@timestamp"]) \(.level) [\(.logger_name)] - \(.message)"'
+}
+
+function subcmd_rlogs() {
+    if [ "${1-}" = "--raw" ]; then
+        raw=yes
+        shift
+    fi
+
+    if [ -z "${1-}" ]; then
+        _error "No namespace specified"
+    fi
+
+    if [ -z "${2-}" ]; then
+        _error "No app specified"
+    fi
+
+    _cluster_must_exist
+
+    namespace=$1
+    app=$2
+    domain=${3:-0}
+    app_container="$app"
+
+    k8s_labels_for_app
+
+    if POD_SPEC=$(kubectl get pod \
+                          -n "${namespace}" \
+                          -l app="${app}" \
+                          -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
+                          2> /dev/null); then
+
+
+        if [ -n "${raw-}" ] ; then
+            # shellcheck disable=SC2086
+            kubectl logs ${POD_SPEC} "${app_container}" -f
+        else
+            # shellcheck disable=SC2086
+            kubectl logs ${POD_SPEC} "${app_container}" -f | _json_log_format
+        fi
+    else
+        _error "No pod for app found: ${app}"
+    fi
+}
+
+###
+
+subcommand_whitelist[logs]='View an running application log stream in lnav'
+
+function subcmd_logs() {
+
+    if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+       echo "Usage: $0 <namespace> <app> [domain]"
+       exit 1
+    fi
+
+    _cluster_must_exist
+
+    namespace=$1
+    app=$2
+
+    domain=${3:-0}
+
+    app_container="$app"
+
+    k8s_labels_for_app
+
+    echo "Getting logs for app: ${app} in namespace: ${namespace} and container ${app_container}"
+    kubectl lnav -n "${namespace}" -l app="${app}" -c "${app_container}"
+}
+
+
+function k8s_labels_for_app() {
+    local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
+    local domain_specific_apps=("participant")
+
+    # shellcheck disable=SC2076
+    if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " ]]; then
+       # If the app is in the list, append the domain to the app
+       app_container=${app#"global-domain-"}
+       app="global-domain-${domain}-${app#"global-domain-"}"
+    elif [[ " ${domain_specific_apps[*]} " =~ " ${app} " ]]; then
+       # If the app is in the list, append the domain to the app
+       app="${app}-${domain}"
+    fi
+}
+
+subcommand_whitelist[gcloud_logs]='View the logs of an application through gcloud. This allows viewing historical logs'
+
+function subcmd_gcloud_logs() {
+    if [ "${1-}" = "--download-only" ]; then
+        download_only=yes
+        shift
+    fi
+
+    if [ -z "${1-}" ]; then
+        _error "No namespace specified"
+    fi
+
+    if [ -z "${2-}" ]; then
+        _error "No app specified"
+    fi
+
+    if [ -z "${3-}" ]; then
+        _error "No filter specified. See https://cloud.google.com/logging/docs/view/logging-query-language for docs on the query language."
+    fi
+
+    namespace="$1"
+    app="$2"
+    filter="$3"
+
+    _cluster_must_exist
+
+    local postgres glr_format
+    postgres="$(if [ "$app" = postgres ]; then echo 1; else echo 0; fi)"
+    if [ "$postgres" -ne 0 ]; then
+        glr_format='text(textPayload)'
+    else
+        glr_format='json(jsonPayload)'
+    fi
+
+    LOGFILE=$(mktemp "$namespace"-"$app"-XXXX.clog)
+    _info "Writing log to $LOGFILE"
+
+    function gcloud_read() {
+        gcloud logging read --order asc --format "$glr_format" \
+          "resource.labels.cluster_name=$GCP_CLUSTER_NAME AND resource.labels.namespace_name=$namespace AND resource.labels.container_name=$app AND $filter"
+    }
+    function parse_gcloud_format() {
+        if [ "$postgres" -eq 0 ]; then
+            jq --stream -cn 'fromstream(1 | truncate_stream(inputs) | select(.[0][0] == "jsonPayload")) | .jsonPayload'
+        else
+            awk '/^---$|^: None$/ {next} {sub("^text_payload: ", ""); print}'
+        fi
+    }
+
+
+    if [ -z "${download_only-}" ]
+    then
+        gcloud_read | parse_gcloud_format > "$LOGFILE" &
+        lnav "$LOGFILE"
+    else
+        gcloud_read | parse_gcloud_format > "$LOGFILE"
+    fi
+}
+
+###
+
+subcommand_whitelist[upgrade]='Upgrades the cluster to the latest GKE version'
+
+function subcmd_upgrade() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Upgrading cluster master..."
+    gcloud container clusters upgrade "cn-${GCP_CLUSTER_BASENAME}net" --master --quiet
+
+    _info "Upgrading cluster nodes..."
+    gcloud container clusters upgrade "cn-${GCP_CLUSTER_BASENAME}net" --quiet
+}
+
+###
+
+function _get_gcloud_secret() {
+  local -r secret_name="$1"
+  gcloud secrets versions access 1 --secret="$secret_name"
+}
+
+function _get_service_account_key_id() {
+    local -r secret_name="$1"
+    _get_gcloud_secret "$secret_name" | jq -r '.private_key_id'
+}
+
+subcommand_whitelist[get_dns01_key_id]='Get the gcloud service account key id used for dns challenges.'
+
+function subcmd_get_dns01_key_id() {
+    _get_service_account_key_id "${DNS01_SA_KEY_SECRET}"
+}
+
+subcommand_whitelist[get_data_export_bucket_key_id]='Get the gcloud service account key id used for data exports.'
+
+function subcmd_get_data_export_bucket_key_id() {
+    _get_service_account_key_id "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}"
+}
+
+###
+
+function _install_service_account_key() {
+    local -r secret_name="$1"
+    local -r iam_account="$2"
+
+    SECRET=$(gcloud secrets list --filter "name:$secret_name" --format 'value(name)')
+
+    if [ -z "${SECRET}" ]; then
+        _info "Allocating service account key and storing as secret."
+        gcloud iam service-accounts keys create /tmp/key.json \
+               --iam-account "$iam_account"
+
+        gcloud secrets create "$secret_name" --data-file=/tmp/key.json
+
+        rm /tmp/key.json
+    else
+        SA_KEY_ID=$(_get_service_account_key_id "$secret_name")
+
+        _info "Service Account key secret already exists: ${SA_KEY_ID}"
+    fi
+}
+
+subcommand_whitelist[install_dns01_key]='Allocate a DNS SA Key for the project and store it in a secret.'
+
+function subcmd_install_dns01_key() {
+    _prompt_to_confirm --no-lock
+
+    _install_service_account_key "${DNS01_SA_KEY_SECRET}" "${DNS01_SA_IAM_ACCOUNT}"
+}
+
+subcommand_whitelist[install_data_export_bucket_key]='Allocate a data export SA key for the project and store it in a secret.'
+
+function subcmd_install_data_export_bucket_key() {
+    _prompt_to_confirm --no-lock
+
+    _install_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
+}
+###
+
+function _uninstall_service_account_key() {
+    local -r secret_name="$1"
+    local -r iam_account="$2"
+
+    SECRET=$(gcloud secrets list --filter "name:$secret_name" --format 'value(name)')
+
+    if [ -z "${SECRET}" ]; then
+        _warning "No service account key secret to delete."
+    else
+        SA_KEY_ID=$(_get_service_account_key_id "$secret_name")
+
+        _info "Deleting SA Key: ${SA_KEY_ID}"
+
+        gcloud iam service-accounts keys delete \
+               --iam-account "$iam_account" \
+               --quiet \
+               "${SA_KEY_ID}" || true
+
+        gcloud secrets delete --quiet "$secret_name"
+
+        _info "Service account key deleted."
+    fi
+}
+
+subcommand_whitelist[uninstall_dns01_key]='Delete the DNS SA Key for the project and the corresponding secret'
+
+function subcmd_uninstall_dns01_key() {
+    _prompt_to_confirm --no-lock
+
+    _uninstall_service_account_key "${DNS01_SA_KEY_SECRET}" "${DNS01_SA_IAM_ACCOUNT}"
+}
+
+subcommand_whitelist[uninstall_data_export_bucket_key]='Delete the data export SA key for the project and the corresponding secret'
+
+function subcmd_uninstall_data_export_bucket_key() {
+    _prompt_to_confirm --no-lock
+
+    _uninstall_service_account_key "${DATA_EXPORT_BUCKET_SA_KEY_SECRET}" "${DATA_EXPORT_BUCKET_SA_IAM_ACCOUNT}"
+}
+###
+
+subcommand_whitelist[create]='Create a cluster from scratch.'
+
+function subcmd_create() {
+    _prompt_to_confirm --no-lock
+
+    if _cluster_exists; then
+        _warning "Cluster already exists."
+    else
+
+        if [ -n "${CLOUDSDK_COMPUTE_ZONE:-}" ]; then
+            location_arg=(--zone "${CLOUDSDK_COMPUTE_ZONE}" --node-locations "${CLOUDSDK_COMPUTE_ZONE}")
+        else
+            # When the compute zone is not specified explicitly, we deploy the cluster in the region,
+            # but restrict its nodes to only one zone in that region (the '-a' one), as we don't utilize
+            # cross-zone redundancy.
+            location_arg=(--region "${CLOUDSDK_COMPUTE_REGION}" --node-locations "${CLOUDSDK_COMPUTE_REGION}-a")
+        fi
+
+        #### Cluster can be resized from deployment directories with the following command:
+        ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
+        gcloud container clusters create "${GCP_CLUSTER_NAME}" \
+               --create-subnetwork name="${GCP_CLUSTER_NAME}-subnet" \
+               --enable-dataplane-v2 \
+               --enable-master-authorized-networks \
+               --enable-ip-alias \
+               --enable-private-nodes \
+               --machine-type "${GCP_CLUSTER_NODE_TYPE}" \
+               --num-nodes 1 \
+               --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
+               --node-labels digitalasset.com/cluster-name="${GCP_CLUSTER_NAME}" \
+               --addons=GcePersistentDiskCsiDriver \
+               --addons=NodeLocalDNS \
+               --cluster-dns=clouddns \
+               --cluster-dns-scope=cluster \
+               --enable-autoscaling \
+               --min-nodes 0 \
+               --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
+               --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
+               "${location_arg[@]}"
+
+        #### Set maintenance window
+        gcloud container clusters update "${GCP_CLUSTER_NAME}" \
+               --maintenance-window-start 2024-01-01T08:00:00 \
+               --maintenance-window-end 2024-01-01T12:00:00 \
+               --maintenance-window-recurrence 'FREQ=WEEKLY;BYDAY=TU,WE,TH'
+
+        #### Enable Firewall Access
+        subcmd_cluster_update_access
+
+        #### Delete default firewall rules, if they exist.
+        if (gcloud compute firewall-rules delete\
+                         default-allow-rdp \
+                         default-allow-icmp \
+                         default-allow-ssh \
+                         --quiet 2> /dev/null); then
+            _warning "Deleted default firewall rules."
+        else
+            _log "Default firewalls already removed and do not need to be deleted."
+        fi
+    fi
+
+    _log "Authenticating to newly created cluster."
+    subcmd_activate
+
+    #### Open port 15017 in GKE firewall, see https://istio.io/latest/docs/setup/platform-setup/gke/
+    _log "Opening port 15017 in GKE firewall"
+    FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
+    if [ -z "${FW_NAME}" ]; then
+        # For some reason, GKE recently stopped auto-creating the master firewall rule. We therefore recreate it here if it's missing.
+        _warning "Master firewall rule not found. Creating a new one."
+        FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-all" --format=json | jq -r '.[].name' | sed s/-all/-master/)
+        TAGS=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-all" --format=json | jq -r '.[].name' | sed s/-all/-node/)
+        gcloud compute firewall-rules create "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017 --source-ranges "${GCP_MASTER_IPV4_CIDR}" --target-tags "${TAGS}"
+    else
+        gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
+    fi
+
+    # Check if a keyring exists in the region
+    set +e
+    gcloud kms keyrings describe pulumi --location "$CLOUDSDK_COMPUTE_REGION"
+    exit_code=$?
+    set -e
+
+    if [ $exit_code -ne 0 ]; then
+        # Create a keyring for pulumi
+        gcloud kms keyrings create pulumi --location "$CLOUDSDK_COMPUTE_REGION"
+    fi
+
+    # Create a kms key for pulumi.
+    set +e
+    error_message=$(gcloud kms keys create "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --purpose "encryption" 2>&1)
+    exit_code=$?
+    set -e
+
+    if [ $exit_code -ne 0 ]; then
+      if [[ $error_message == *"ALREADY_EXISTS"* ]]; then
+        # Rotate the key if it exists
+        _log "ALREADY_EXISTS error encountered. Rotating the key..."
+        gcloud kms keys versions create --key "${GCP_CLUSTER_BASENAME}" --location "$CLOUDSDK_COMPUTE_REGION" --keyring "pulumi" --primary
+      else
+        _warning "Failed to create a KMS key for Pulumi."
+        _log "$error_message"
+        exit $exit_code
+      fi
+    fi
+
+    for stack in infra canton-network sv-runbook validator-runbook; do
+      _uses_pulumi_stack $stack
+    done
+
+    subcmd_pulumi cluster up --yes --skip-preview
+
+    _infra_up
+
+    _log "Determining cluster ingress IP address"
+    IPADDR=$(_cluster_ip)
+
+    if [ -z "${IPADDR}" ]; then
+        _error "Could not determine cluster IP address."
+    fi
+
+    _log "Cluster at IP ${IPADDR} ready"
+}
+
+###
+
+subcommand_whitelist[delete]='Delete all cluster resources.'
+
+function subcmd_delete() {
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    _info "Taking down pulumi infrastructure stack."
+    subcmd_pulumi infra down --yes --skip-preview
+
+    _info "Deleting GKE cluster."
+    gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
+
+    _info "Cluster deleted."
+}
+
+
+subcommand_whitelist[cluster_update_access]='Update cluster master authorized networks.'
+
+function subcmd_cluster_update_access() {
+    gcloud container clusters update "${GCP_CLUSTER_NAME}" \
+           --enable-master-authorized-networks \
+           --master-authorized-networks "${K8S_CONTROL_PLANE_NETS}"
+}
+###
+
+subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'
+
+function subcmd_ci_warn_lock_expiry() {
+    if ! (env-bool SHARED_CLUSTER); then
+        _info "Cluster not marked as shared. No lock to check."
+        exit 0
+    fi
+
+    lockholder=$(_current_lockholder);
+    if [ -n "$lockholder" ]; then
+        age_secs="$(_current_lock_age)"
+
+        # Warn about lock expiry 1 hour before lock expiry. Assumes 6 hour lock expiries.
+        if (( age_secs > 18000 )); then
+            _error "Cluster lock held by ${lockholder} will expire in an hour. Lock age: $(_current_lock_age_formatted)"
+        else
+            _info "Cluster lock held by ${lockholder} is not close to expiry. Lock age: $(_current_lock_age_formatted)"
+        fi
+    else
+        _info "Cluster sharable but not locked. No lock to check."
+    fi
+}
+
+###
+
+subcommand_whitelist[ci_assert_fresh_lock]='Run only by CircleCI'
+
+function subcmd_ci_assert_fresh_lock() {
+    if ! (env-bool SHARED_CLUSTER); then
+        _info "Cluster not marked as shared. No lock to check."
+        exit 0
+    fi
+
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        age_secs="$(_current_lock_age)"
+
+        if (( age_secs > 21600 )); then
+            _error "Cluster lock held by ${lockholder} is stale. Lock age: $(_current_lock_age_formatted)"
+        else
+            _info "Cluster lock held by ${lockholder} is fresh. Lock age: $(_current_lock_age_formatted)"
+        fi
+    else
+        _info "Cluster sharable but not locked. No lock to check."
+    fi
+}
+
+###
+
+subcommand_whitelist[ci_reset_unlock]='Run only by CircleCI'
+
+function subcmd_ci_reset_unlock() {
+    # A CI-specific variant of 'cncluster reset' and 'cncluster unlock' that
+    # removes the need for manual confirmation and is executed only on shared
+    # clusters (like scratchnet).
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    if ! (env-bool SHARED_CLUSTER); then
+        _info "Not resetting and unlocking because not on a shared cluster (like scratchnet)."
+        return
+    fi
+
+    _cluster_reset
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        _unlock
+        _info "Cluster unlocked. Former lockholder was: ${lockholder}"
+    else
+        _info "Cluster was not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[ipaddr]='Display the cluster\s main IP address.'
+
+function subcmd_ipaddr() {
+    _cluster_must_exist
+    _cluster_ip
+}
+
+###
+
+subcommand_whitelist[eipaddr]='Display the cluster\s Egress IP address. (May not be comprehensive)'
+
+function subcmd_eipaddr() {
+    _cluster_must_exist
+
+    kubectl exec -n cluster-ingress "$(kubectl get pods -n cluster-ingress -lapp=istio-ingress -o name)" -- \
+            curl -sSLf http://checkip.amazonaws.com
+}
+
+###
+
+subcommand_whitelist[load_test]='Run the k6 load test against the cluster'
+
+function subcmd_load_test() {
+    _log "Starting k6 load test"
+
+    cd "$SPLICE_ROOT" && sbt load-tester/npmBuild
+
+    hostname="$GCP_CLUSTER_HOSTNAME"
+
+    export K6_WALLET_BASE_URL="https://wallet.validator1.$hostname"
+    prometheus_rw="https://prometheus.$hostname/api/v1/write"
+
+    K6_PROMETHEUS_RW_SERVER_URL="$prometheus_rw" k6 \
+        --verbose \
+        --out experimental-prometheus-rw \
+        --env EXTERNAL_CONFIG="$(envsubst < "$SPLICE_ROOT/load-tester/config.sample.json")" \
+        run "$SPLICE_ROOT/load-tester/dist/generate-load.js"
+}
+
+###
+
+subcommand_whitelist[preflight]='Run the runbook preflight test against the cluster'
+
+function subcmd_preflight() {
+    _log "Starting preflight"
+
+    preflight_tests=$(_get_preflight_test_names "core")
+    preflight_tests="$preflight_tests $(_get_preflight_test_names "validator1")"
+    _log "Starting preflight tests: $preflight_tests"
+    subcmd_sbt_for_preflight "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[sbt_for_preflight]='Runs Sbt, as if for the runbook preflight test.'
+
+function subcmd_sbt_for_preflight() {
+    _needs_auth0_management_api_creds
+
+    (cd "${SPLICE_ROOT}" && \
+         MIGRATION_ID=0 \
+         NETWORK_APPS_ADDRESS=${GCP_CLUSTER_HOSTNAME} \
+         NETWORK_APPS_ADDRESS_PROTOCOL=https \
+         VALIDATOR_USER_NAME=manual_preflight \
+             sbt "$@")
+}
+
+###
+
+subcommand_whitelist[preflight_global_domain_upgrade]='Run the global doamin upgrade preflights, preparing the cluster for the upgrade'
+
+function subcmd_preflight_global_domain_upgrade() {
+    _needs_auth0_management_api_creds
+
+    preflight_tests=$(_get_preflight_test_names "global-domain-upgrade")
+    _log "Starting global domain upgrade preflight tests: $preflight_tests"
+    cd "${SPLICE_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[get_token]='Get an auth0 token for a given admin user'
+
+function subcmd_get_token() {
+    if [ "$#" -ne 2 ]; then
+        _error "Usage: $0 get_token <namespace> <app>"
+    fi
+
+    namespace="$1"
+    app="$2"
+    get-auth0-token.py --namespace "$namespace" --app "$app"
+}
+
+###
+
+subcommand_whitelist[preflight_sv]='Run the SV runbook preflight tests against the cluster'
+
+function subcmd_preflight_sv() {
+    preflight_tests=$(_get_preflight_test_names "sv")
+    _log "Starting runbook SV preflight tests: $preflight_tests"
+    cd "${SPLICE_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[preflight_validator]='Run the validator runbook preflight tests against the cluster'
+
+function subcmd_preflight_validator() {
+    preflight_tests=$(_get_preflight_test_names "validator")
+    _log "Starting runbook validator preflight tests: $preflight_tests"
+    cd "${SPLICE_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[info]='Display information on current cluster configuration, including image tags'
+
+function subcmd_info() {
+    _cluster_show
+    _cluster_must_exist
+
+    kubectl get po -o json \
+            --all-namespaces \
+            --field-selector metadata.namespace!=kube-system \
+        | jq -r '(["NAMESPACE", "POD-NAME", "CONTAINER", "IMAGE", "MEM-LIMIT", "CPU-REQ", "CPU-LIMIT"],(.items[] | .metadata as $pod | .spec.containers[] as $c | $c.resources as $r | [$pod.namespace, $pod.name, $c.name, ($c.image | split(":")[1]), $r.limits.memory, $r.requests.cpu, $r.limits.cpu]))|@tsv' \
+        | sort \
+        | column -t
+
+}
+
+###
+
+subcommand_whitelist[show]='Display information on current cluster configuration'
+
+function subcmd_show() {
+    _cluster_show
+    _cluster_must_exist
+}
+
+###
+
+subcommand_whitelist[top]='Display current CPU and memory usage by both node and pod'
+
+function subcmd_top() {
+    _cluster_show
+    _cluster_must_exist
+
+	_log "Node Usage:"
+    kubectl top node
+
+    _log ""
+	_log "Pod Usage:"
+    kubectl top pod --all-namespaces -l clusterName="${GCP_CLUSTER_NAME}"
+}
+
+###
+
+subcommand_whitelist[pods]='Display a list of cluster pods'
+
+function subcmd_pods() {
+    _cluster_show
+
+    kubectl top node
+
+    _log ""
+    kubectl get pods -A | grep -v kube-system
+}
+
+###
+
+subcommand_whitelist[wait_version]="Wait for the cluster's version endpoint to return a specific version"
+
+function subcmd_wait_version() {
+    _cluster_show
+
+    expected="${1-}"
+
+    if [ -z "$expected" ]; then
+        _error "Missing expected version"
+        exit 1
+    fi
+
+    _retry_until_value "curl -sSLf --connect-timeout 5 http://${GCP_CLUSTER_HOSTNAME}/version" "expected version" "$expected"
+
+    _log "Done. Cluster is now reporting version: $expected"
+}
+
+###
+
+subcommand_whitelist[wait]='Wait for the cluster to reach a fully ready state'
+
+function subcmd_wait() {
+    _cluster_show
+
+    namespace="${1-}"
+    app="${2-}"
+    migration_id=${3:-0}
+
+    if [ -z "$namespace" ]; then
+        _log "Waiting for all pods to become ready"
+        kubectl wait --for=condition=Ready --all pod --timeout=5m --all-namespaces
+    else
+        _retry_until_value "kubectl get ns $namespace -o jsonpath='{.status.phase}'" "namespace $namespace to be active" "'Active'"
+        if [ -z "$app" ]; then
+            _log "Namespace $namespace ready, waiting for all pods"
+            _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=3s --namespace $namespace"
+        else
+            _log "Namespace $namespace ready, waiting for $app"
+            _retry_until_success "kubectl wait pod --for=condition=Ready --timeout=3s --namespace $namespace --selector=app=$app,migration=$migration_id"
+            _log "Pod for app $app ready in namespace $namespace for migration id $migration_id"
+        fi
+    fi
+}
+
+###
+
+subcommand_whitelist[help]='Display this help message.'
+
+function subcmd_help() {
+    _info "Usage: $SCRIPTNAME {subcommand} [options...]"
+
+    _info "Valid subcommands: "
+    readarray -t sorted < <(printf '%s\n' "${!subcommand_whitelist[@]}" | sort)
+
+    for ii in "${sorted[@]}";
+    do
+        if [[ "$ii" != ci_* && "$ii" != _* ]]; then
+            printf '%s\t%s\n' "${ii}" "${subcommand_whitelist[${ii}]}"
+        fi
+    done | column -ts $'\t'
+}
+
+###
+
+subcommand_whitelist[_autocomplete]='Utility for autocomplete.'
+
+function subcmd__autocomplete() {
+    readarray -t sorted < <(printf '%s\n' "${!subcommand_whitelist[@]}" | sort)
+
+    for ii in "${sorted[@]}";
+    do
+        if [[ "$ii" != ci_* && "$ii" != _* ]]; then
+            echo "${ii}"
+        fi
+    done
+
+}
+
+subcommand_whitelist[export_to]="Exports the stack to the file passed as first argument."
+
+subcmd_export_to() {
+  local exportTo="$1"
+  _info "Exporting to $exportTo"
+  # remove first "Running Pulumi Command" line
+  subcmd_pulumi canton-network stack export | tail -n +2 | "$SPLICE_ROOT"/cluster/scripts/versions-from-dump.py > "$exportTo"
+}
+
+###
+
+subcommand_whitelist[partial_upgrade]="Upgrades SV-1's sv-app and validator1's validator-app to the version passed"
+
+function subcmd_partial_upgrade() {
+    new_version=$1
+    original_versions_file=$2
+    json=$(cat "$original_versions_file")
+
+    json_paths=(
+        '["sv-1","splice-participant"]'
+        '["sv-1","splice-global-domain"]'
+        '["sv-1","splice-cometbft"]'
+        '["sv-1","splice-scan"]'
+        '["sv-1","splice-sv-node"]'
+        '["sv-1","splice-validator"]'
+        '["validator1","splice-validator"]'
+        '["validator1","splice-participant"]'
+        '["validator1","splice-splitwell-web-ui"]'
+    )
+    for json_path in "${json_paths[@]}"; do
+      json=$(jq "setpath($json_path; \"$new_version\")" <<< "$json")
+    done
+
+    _info "Upgrading sv-1 sv-app & validator1 validator-app to version $new_version"
+    local -x IMAGE_VERSIONS_FILE="/tmp/partial_upgrade_versions.json"
+    echo "$json" > "$IMAGE_VERSIONS_FILE"
+
+    _pulumi_automation_run_up
+}
+
+###
+
+subcommand_whitelist[wait_for_daml_upgrade]="Waits for daml upgrade after a vote in ciupgrade"
+
+function subcmd_wait_for_daml_upgrade() {
+    _info "Fetching DSO rules"
+    token=$(subcmd_get_token sv-1 sv)
+    dso=$(curl -s "https://sv.sv-2.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/dso" -H "authorization: Bearer ${token}")
+    # get the first futureValue's effective date, which corresponds to the vote from DamlCIUpgradeVotePreflightTest
+    effective_date=$(jq -r '.amulet_rules.payload.configSchedule.futureValues[0]._1' <<< "$dso")
+
+    echo "Effective date is $effective_date, sleeping until then"
+    while [ "$(date -d "$effective_date" +%s)" -gt "$(date +%s)" ]; do
+      echo "Sleeping..." # we need to log often enough that CircleCI doesn't stop the job
+      sleep 10
+    done
+
+    echo "Done."
+}
+###
+
+subcommand_whitelist[lock]="Attempt to claim the lock on a cluster."
+
+function subcmd_lock() {
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _info "Cluster is already locked to you. Lock age: $(_current_lock_age_formatted)."
+        else
+            _error "Cluster already locked by: ${lockholder}. Lock age: $(_current_lock_age_formatted)."
+        fi
+    else
+        local lockholder
+        lockholder=$(whoami)
+        kubectl create secret generic cluster-lock --from-literal=lockholder="$lockholder" > /dev/null
+        _info "Cluster lock claimed successfully."
+        if ! jq --arg login "$lockholder" -e 'to_entries | map(.value) | flatten | any(. == $login)' "$SPLICE_ROOT/.circleci/cluster-lock-users.json" >/dev/null; then
+            echo
+            _warning \
+                "There is no corresponding entry for $lockholder in '$SPLICE_ROOT/.circleci/cluster-lock-users.json'.\n" \
+                "You will not be able to run preflight checks on CI, until you add an entry with your CI username to that file."
+        fi
+    fi
+}
+
+###
+
+subcommand_whitelist[lockholder]="Print the current lockholder, if any, for the cluster."
+
+function subcmd_lockholder() {
+    _current_lockholder
+}
+
+###
+
+subcommand_whitelist[unlock]="Release the lock on a cluster"
+
+function _unlock() {
+  kubectl delete secret cluster-lock > /dev/null
+}
+
+function _check_stateful_sets() {
+    # Checks if any StatefulSets EXCEPT those with a prometheus image (which are part of the infra stack)
+    # are currently deployed
+    # grep exits with return code 1 if it finds no matches so we account for that
+    query_result=$(kubectl get StatefulSets -A -o json 2> /dev/null | jq '.items[].spec.template.spec.containers[].image' |  { grep -v prometheus || test $? = 1; })
+    echo "$query_result"
+}
+
+function _check_reset_and_unlock() {
+    s=$(_check_stateful_sets)
+
+    if [ -n "$s" ]; then
+        echo -e "Cluster not reset, it is recommended to reset it before unlocking. Reset now?"
+        read -r -p '[y/n]: '
+        if [ "${REPLY}" != 'n' ]; then
+            _cluster_reset
+            echo "Done resetting, unlocking.."
+        fi
+    else
+        echo "Cluster does not need reset, unlocking.."
+    fi
+
+    _unlock
+}
+
+function subcmd_unlock() {
+    _assert_lock
+
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _check_reset_and_unlock
+            _info "Cluster lock successfully released."
+        else
+            _error "You cannot unlock cluster locked by: ${lockholder}"
+        fi
+    else
+        _info "Cluster not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[unlock_force]="Forcibly release the lock on a cluster."
+
+function subcmd_unlock_force() {
+    _prompt_to_confirm --no-lock
+
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        _check_reset_and_unlock
+        _warning "Cluster forcibly unlocked, please let former lockholder know: ${lockholder}"
+    else
+        _info "Cluster was not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[kill_sv_app]='Spin down sv-app to zero replicas for the specified namespace'
+
+function subcmd_kill_sv_app() {
+    _cluster_must_exist
+
+    _assert_lock
+
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _info "Killing sv-app for $1"
+            kubectl patch deployment sv-app --namespace "$1" -p '{"spec":{"replicas":0}}'
+        else
+            _error "You cannot edit a cluster locked by: ${lockholder}"
+        fi
+    else
+        _error "Cluster not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[revive_sv_app]='Spin up sv-app to one replica for the specified namespace'
+
+function subcmd_revive_sv_app() {
+    _cluster_must_exist
+
+    _assert_lock
+
+    lockholder=$(_current_lockholder)
+    if [ -n "$lockholder" ]; then
+        if [ "${lockholder}" = "$(whoami)" ]; then
+            _info "Reviving sv-app for $1"
+            kubectl patch deployment sv-app --namespace "$1" -p '{"spec":{"replicas":1}}'
+        else
+            _error "You cannot edit a cluster locked by: ${lockholder}"
+        fi
+    else
+        _error "Cluster not locked."
+    fi
+}
+
+###
+
+subcommand_whitelist[debug_shell]='Spin up a debug container on the cluster, and open a shell terminal in it'
+
+function subcmd_debug_shell() {
+  _cluster_must_exist
+
+  VERSION_NUMBER=$(get-snapshot-version)
+  repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
+
+  _info "Deploying debug pod"
+  kubectl apply --wait -f - <<EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: splice-debug
+  labels:
+    app: splice-debug
+spec:
+  containers:
+  - name: splice-debug
+    image: $repo/splice-debug:${VERSION_NUMBER}
+    command: ["/bin/sleep", "2h"]
+    imagePullPolicy: Always
+  restartPolicy: Never
+  tolerations:
+  - key: "cn_apps"
+    operator: "Exists"
+    effect: "NoSchedule"
+EOF
+
+  ( _info "Waiting for debug pod to become ready" && \
+    kubectl wait --for=condition=Ready pod splice-debug --timeout=30s && \
+    _info "Opening terminal on debug pod" && \
+    kubectl exec -it splice-debug -- /bin/bash ) || true
+
+  _info "Deleting debug pod"
+  kubectl delete pod splice-debug
+}
+
+###
+
+subcommand_whitelist[participant_console]='Open a Canton console against a single participant running in the target namespace'
+
+function subcmd_participant_console() {
+    _cluster_must_exist
+
+    namespace="${1-}"
+    domain=${2:-0}
+
+    if [ -z "${namespace}" ]; then
+        _error "Usage: $SCRIPTNAME participant_console <namespace-name> [domain_migration_id]"
+    fi
+
+    app="participant"
+    app_container="$app"
+    k8s_labels_for_app
+
+    if ! participant_pod=$(_get_single_pod "$namespace" "$app"); then
+      _error "No participant found in namespace $app '$namespace'."
+    fi
+
+    if (netstat -an | grep ".1100[12].*LISTEN"); then
+      _error "Ports 11001 and/or 11002 are already in use on localhost. Please close any processes that might be listening on them."
+    fi
+
+    app="sv-app"
+    k8s_labels_for_app
+    sv_app_pod_label=$app
+    app="validator-app"
+    k8s_labels_for_app
+    validator_app_pod_label=$app
+
+    if [ ! "${LEDGER_API_AUTH_TOKEN-}" ] && sv_app_pod=$(_get_single_pod "$namespace" "$sv_app_pod_label"); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_TOKEN); then
+        _info "Using Ledger API token from '$sv_app_pod'..."
+      else
+        _info "Getting Ledger API Auth0 credentials from '$sv_app_pod'..."
+        if \
+          client_id=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$sv_app_pod" sv-app SPLICE_APP_SV_LEDGER_API_AUTH_URL) && \
+          audience=$(_get_env_value "$namespace" "$participant_pod" participant AUTH_TARGET_AUDIENCE)
+        then
+          _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$sv_app_pod'..."
+          LEDGER_API_AUTH_TOKEN=$(_get_ledger_api_auth_token_from_auth0 "$client_id" "$client_secret" "$url" "$audience")
+        else
+          _info "Failed getting Ledger API Auth0 credentials from '$sv_app_pod'..."
+        fi
+      fi
+    elif validator_app_pod=$(_get_single_pod "$namespace" "$validator_app_pod_label"); then
+      if LEDGER_API_AUTH_TOKEN=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_TOKEN); then
+        _info "Using Ledger API token from '$validator_app_pod'..."
+      else
+        _info "Getting Ledger API Auth0 credentials from '$validator_app_pod'..."
+        if \
+          client_id=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$validator_app_pod" validator-app SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_URL) && \
+          audience=$(_get_env_value "$namespace" "$participant_pod" participant AUTH_TARGET_AUDIENCE)
+        then
+          _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$validator_app_pod'..."
+          LEDGER_API_AUTH_TOKEN=$(_get_ledger_api_auth_token_from_auth0 "$client_id" "$client_secret" "$url" "$audience")
+        else
+          _info "Failed getting Ledger API Auth0 credentials from '$validator_app_pod'..."
+        fi
+      fi
+    fi
+    if [ "${LEDGER_API_AUTH_TOKEN-}" ]; then
+      _info "Using Ledger API token \"$LEDGER_API_AUTH_TOKEN\"".
+      export LEDGER_API_AUTH_TOKEN
+    else
+      _warning "No Ledger API token found/set. Only the admin API will work."
+    fi
+
+    _info "Starting port forwarding from '$participant_pod'..."
+    kubectl port-forward -n "$namespace" "$participant_pod" 11001:5001 11002:5002 &
+    port_forwarding_pid=$!
+
+    _info "Starting Canton console..."
+    canton -v -c "$SPLICE_ROOT/build-tools/local-participant.conf"
+
+    _info "Stopping port forwarding."
+    kill $port_forwarding_pid
+}
+
+subcommand_whitelist[sequencer_console]='Open a Canton console against a single sequencer running in the target namespace'
+
+function subcmd_sequencer_console() {
+    _cluster_must_exist
+
+    namespace="${1-}"
+    domain=${2:-0}
+
+    if [ -z "${namespace}" ]; then
+        _error "Usage: $SCRIPTNAME sequencer_console <namespace-name> [<migration_id>]"
+    fi
+
+    app="global-domain-sequencer"
+    app_container="$app"
+    k8s_labels_for_app
+
+    if ! sequencer_pod=$(_get_single_pod "$namespace" "$app"); then
+      _error "No sequencer found in namespace '$namespace' for migration ID $domain."
+    fi
+
+    if (netstat -an | grep ".1100[12].*LISTEN"); then
+      _error "Ports 11001 and/or 11002 are already in use on localhost. Please close any processes that might be listening on them."
+    fi
+
+    _info "Starting port forwarding from '$sequencer_pod'..."
+    kubectl port-forward -n "$namespace" "$sequencer_pod" 11001:5008 11002:5009 &
+    port_forwarding_pid=$!
+
+    _info "Starting Canton console..."
+    canton -v -c "$SPLICE_ROOT/build-tools/local-sequencer.conf"
+
+    _info "Stopping port forwarding."
+    kill $port_forwarding_pid
+}
+
+subcommand_whitelist[mediator_console]='Open a Canton console against a single mediator running in the target namespace'
+
+function subcmd_mediator_console() {
+    _cluster_must_exist
+
+    namespace="${1-}"
+    domain=${2:-0}
+
+    if [ -z "${namespace}" ]; then
+        _error "Usage: $SCRIPTNAME mediator_console <namespace-name>"
+    fi
+
+    app="global-domain-mediator"
+    app_container="$app"
+    k8s_labels_for_app
+
+    if ! mediator_pod=$(_get_single_pod "$namespace" "$app"); then
+      _error "No mediator found in namespace '$namespace'."
+    fi
+
+    if (netstat -an | grep ".11001.*LISTEN"); then
+      _error "Ports 11001 are already in use on localhost. Please close any processes that might be listening on them."
+    fi
+
+    _info "Starting port forwarding from '$mediator_pod'..."
+    kubectl port-forward -n "$namespace" "$mediator_pod" 11001:5007 &
+    port_forwarding_pid=$!
+
+    _info "Starting Canton console..."
+    canton -v -c "$SPLICE_ROOT/build-tools/local-mediator.conf"
+
+    _info "Stopping port forwarding."
+    kill $port_forwarding_pid
+}
+
+function _get_single_pod() {
+    namespace="${1-}"
+    app_name="${2-}"
+    readarray -d ' ' -t matching_pods < <(kubectl get pods -n "$namespace" -l app="$app_name"  -o 'jsonpath={.items[*].metadata.name}')
+
+    if [ ${#matching_pods[@]} -gt 1 ]; then
+      _error "More than one pods running the '$app_name' app found in namespace '$namespace'."
+    elif [ ${#matching_pods[@]} -eq 1 ]; then
+      echo "${matching_pods[0]}"
+    else
+      return 1
+    fi
+}
+
+function _get_env_value() {
+    namespace=$1
+    pod_name=$2
+    container=$3
+    env_name=$4
+
+    if output=$(kubectl exec -n "$namespace" "$pod_name" -c "$container" -- printenv "$env_name" 2>&1); then
+      echo "$output"
+    else
+      return 1
+    fi
+}
+
+function _get_ledger_api_auth_token_from_auth0() {
+    LEDGER_API_AUTH_CLIENT_ID=$1
+    LEDGER_API_AUTH_CLIENT_SECRET=$2
+    LEDGER_API_AUTH_URL=$3
+    LEDGER_API_AUTH_AUDIENCE=$4
+
+    TOKEN_URL=${LEDGER_API_AUTH_URL//\/.well-known\/openid-configuration/\/oauth\/token/}
+
+    curl -sSLf --request POST \
+      --url "$TOKEN_URL" \
+      --header "content-type: application/json" \
+      --data "{\"client_id\":\"$LEDGER_API_AUTH_CLIENT_ID\",\"client_secret\":\"$LEDGER_API_AUTH_CLIENT_SECRET\",\"audience\":\"$LEDGER_API_AUTH_AUDIENCE\",\"grant_type\":\"client_credentials\"}" \
+      | jq '.access_token' \
+      | sed s/\"//g
+}
+
+function _get_preflight_test_names() {
+  hint="${1-}"
+
+  if (env-bool IS_DEVNET); then
+    tests_filename="test-full-class-names-$hint-preflight.log"
+  else
+    tests_filename="test-full-class-names-$hint-preflight-non-devnet.log"
+  fi
+
+  awk '{print $1}' "$SPLICE_ROOT"/"$tests_filename" | paste -s -d' ' -
+}
+
+###
+
+subcommand_whitelist[backup_nodes]='Backup one or more CN nodes in the cluster'
+
+function subcmd_backup_nodes() {
+    _cluster_must_exist
+
+    if [ "$#" -lt 2 ]; then
+       echo "Usage: $0 <migration_id> <internal_stack> [node...]"
+       exit 1
+    fi
+
+    if [[ ! "$1" =~ ^[0-9]+$ ]]; then
+        echo "Usage: $0 <migration_id> [node...]"
+        _error "<migration_id> must be a positive integer"
+    fi
+
+    if [[ "$2" != "true" && "$2" != "false" ]]; then
+        echo "Usage: $0 <internal_stack> [node...]"
+        _error "<internal_stack> must be either \"true\" or \"false\""
+    fi
+
+    migration_id=$1
+    internal_stack=$2
+
+    if [ $# -eq 2 ]; then
+        nodes="sv-1 sv-2 sv-3 sv-4 validator1 splitwell"
+    else
+        shift 2
+        nodes="$*"
+    fi
+
+    for node in $nodes; do
+        case "$node" in
+            sv-1|sv-2|sv-3|sv-4)
+                _info "Backing up sv node $node"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh sv "$node" "$migration_id" "$internal_stack"
+                ;;
+            validator1|splitwell)
+                _info "Backing up validator node $node"
+                SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-backup.sh validator "$node" "$migration_id" "$internal_stack"
+                ;;
+            *)
+                _error "Unknown node $node"
+                ;;
+        esac
+    done
+}
+
+###
+
+subcommand_whitelist[restore_node]='Restore a full CN node from backup'
+
+function subcmd_restore_node() {
+    _cluster_must_exist
+
+    local force=""
+    POSITIONAL_ARGS=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --force)
+                force="--force"
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+            *)
+                POSITIONAL_ARGS+=("$1")
+                shift
+                ;;
+        esac
+    done
+    set -- "${POSITIONAL_ARGS[@]}"
+
+    node="${1-}"
+    migration_id="${2-}"
+    internal_stack="${3-}"
+    backup_run_id="${4-}"
+
+    if [ -z "$node" ] || [ -z "$migration_id" ]; then
+        _error "Usage: $SCRIPTNAME restore_node <namespace_name> <migration_id> <internal_stack> [<backup_run_id>]"
+    fi
+
+    if [ -z "$backup_run_id" ]; then
+        _info "No backup run_id given, looking for the latest full backup"
+        backup_run_id=$(SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/find-recent-backup.sh "$node" "$migration_id" "$internal_stack")
+        if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
+            _error "No recent backup found for $node"
+        fi
+        _info "Found latest backup run ID: $backup_run_id"
+    fi
+
+    case "$node" in
+        sv-1|sv-2|sv-3|sv-4)
+            if [ "$node" == "sv-1" ]; then
+                sv_name="Digital-Asset-2"
+            else
+                sv_name=${node/sv/Digital-Asset-Eng}
+            fi
+            _info "Silencing SV report creation alerts for $sv_name for 1 hour"
+            subcmd_silence_grafana_alerts "1 hour" "alertname=Report Creation Time Lag" "report_publisher=$sv_name"
+            _info "Restoring sv node $node"
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" cometbft sequencer participant mediator cn-apps
+            ;;
+        validator1|splitwell)
+            _info "Restoring validator node $node"
+            SPLICE_SV=$node SPLICE_MIGRATION_ID=$migration_id "$SPLICE_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$migration_id" "$backup_run_id" "$internal_stack" participant validator
+            ;;
+        *)
+            _error "Unknown node $node"
+            ;;
+    esac
+}
+###
+
+subcommand_whitelist[preflight_sv_reonboard]='Run the sv reonboard preflights'
+
+function subcmd_preflight_sv_reonboard() {
+    _needs_auth0_management_api_creds
+
+    preflight_tests=$(_get_preflight_test_names "re-onboard-sv-runbook")
+    _log "Starting sv re onboard preparation preflight tests: $preflight_tests"
+    cd "${SPLICE_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_HOSTNAME}" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[list_sv_cometbft_addresses]='List the sv cometbft addresses'
+
+function subcmd_list_sv_cometbft_addresses() {
+  sv="${1-}"
+
+  if [ -z "${sv}" ]; then
+    _error "Usage: $SCRIPTNAME list_sv_cometbft_addresses <sv-name>"
+  fi
+
+  pubkey_sv=$(mktemp)
+  pubkey_address=$(mktemp)
+  curl -sSLf "https://sv.$sv.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/dso" | jq '[.sv_node_states[] | .contract.payload as $payload | .contract.payload.state.synchronizerNodes[] | select(.[0] | startswith("global"))[1].cometBft.nodes[]|{ sv: $payload.svName, pub_key: .[1].validatorPubKey, peer_id: .[0]}]' > "$pubkey_sv"
+  curl -sSLf --header "Content-Type: application/json" -X POST -d '{"id": 0, "method": "validators"}' "https://sv.$sv.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/cometbft/json-rpc" | \
+    jq '[.result.validators[] | { address: .address, pub_key:  .pub_key.value}] | to_entries | map({index: .key, pub_key: .value.pub_key, address: .value.address})' > "$pubkey_address"
+
+  jq -s '[ .[0] + .[1] | group_by(.pub_key)[] | select(length > 1) | add ] | sort_by(.index)' "$pubkey_address" "$pubkey_sv"
+}
+
+###
+
+subcommand_whitelist[list_cometbft_peers]="List sv1's cometbft peers"
+
+function subcmd_list_cometbft_peers() {
+  migration_id=${1:-}
+
+  if [ -z "${migration_id}" ]; then
+    _error "Usage: $SCRIPTNAME list_cometbft_peers <migration-id>"
+  fi
+
+  cleanup() {
+    kill $port_forward_pid
+  }
+  trap cleanup EXIT
+
+  kubectl port-forward -n "sv-1" deployment/global-domain-"$migration_id"-cometbft 26657:26657 > /dev/null &
+  port_forward_pid=$!
+
+  if ! kill -0 $port_forward_pid; then
+    _error "Failed to start port forwarding"
+    exit 1
+  fi
+
+  start=$(date +%s)
+  while ! nc -z -w 1 localhost 26657 > /dev/null 2>&1; do
+    sleep 0.1
+    now=$(date +%s)
+    if (( (now - start) > 5 )); then
+      echo "Failed to port-forward to sv-1 migration_id ${migration_id} cometbft pod"
+      cleanup
+      exit 1
+    fi
+  done
+
+  curl -sSLf "http://localhost:26657/net_info" | jq -S '.result.peers | map({sv: .node_info.moniker, peer_id: .node_info.id, listen_addr: .node_info.listen_addr, is_outbound: .is_outbound}) | sort_by(.sv)'
+}
+
+###
+
+subcommand_whitelist[unprotect_dbs]='Unprotects all DB resources corresponding'
+
+function subcmd_unprotect_dbs() {
+
+  if [ "$#" -lt 1 ]; then
+    _error "Usage: $SCRIPTNAME unprotect_dbs <namespace1> [<namespace2> ...]"
+  fi
+
+  namespaces=("$@")
+
+  _info "The following namespaces' DBs will be unprotected: ${namespaces[*]}"
+  _prompt_to_confirm
+
+  for ns in "${namespaces[@]}";
+  do
+    _info "Unprotecting $ns"
+    protected_dbs=(
+      "participant"
+      "apps"
+    )
+    if [[ "$ns" =~ "sv" ]]; then
+      protected_dbs+=(
+        "mediator"
+        "sequencer"
+      )
+    fi
+    if [[ "$ns" == "sv" ]]; then
+      stack="sv-runbook"
+    else
+      stack="canton-network"
+    fi
+    for db in "${protected_dbs[@]}";
+    do
+      subcmd_pulumi $stack state unprotect "urn:pulumi:$stack.$GCP_CLUSTER_BASENAME::$stack::canton:cloud:postgres\$gcp:sql/user:User::user-$ns-$db-pg" --yes || true
+      subcmd_pulumi $stack state unprotect "urn:pulumi:$stack.$GCP_CLUSTER_BASENAME::$stack::canton:cloud:postgres\$gcp:sql/database:Database::$ns-db-$db-pg-cantonnet" --yes || true
+      subcmd_pulumi $stack state unprotect "urn:pulumi:$stack.$GCP_CLUSTER_BASENAME::$stack::canton:cloud:postgres\$random:index/randomPassword:RandomPassword::$ns-$db-pg-passwd" --yes || true
+      subcmd_pulumi $stack state unprotect "urn:pulumi:$stack.$GCP_CLUSTER_BASENAME::$stack::canton:cloud:postgres\$gcp:sql/databaseInstance:DatabaseInstance::$ns-$db-pg" --yes || true
+      subcmd_pulumi $stack state unprotect "urn:pulumi:$stack.$GCP_CLUSTER_BASENAME::$stack::canton:cloud:postgres::$ns-$db-pg" --yes || true
+    done
+  done
+}
+
+###
+
+subcommand_whitelist[silence_grafana_alerts]='Silence grafana alerts'
+
+function subcmd_silence_grafana_alerts() {
+
+    if [ "$#" -lt 2 ]; then
+        echo "Usage: cncluster silence_grafana_alerts <duration> <matcher1> [<matcher2> ...]"
+        echo " or    cncluster silence_grafana_alerts <duration> -f <file>"
+        echo ""
+        echo "Examples:"
+        echo "  cncluster silence_grafana_alerts \"2 minutes\" \"alertname=Report Creation Time Lag\" \"report_publisher=Digital-Asset-Eng-3\""
+        echo "  cncluster silence_grafana_alerts \"2 minutes\" -f ./silences.json"
+        echo ""
+        echo "File format:"
+        echo "  The file passed to -f should be a JSON file with a root array of silences. Each silence is an object containing a"
+        echo "  valid silence payload for the grafana/alertmanager API, excluding the startsAt and endsAt fields."
+
+        exit 1
+    fi
+
+    duration=$1
+    now=$(date -u '+%FT%TZ')
+    until=$(date -u -d "+${duration}" '+%FT%TZ')
+
+    _info "Fetching token"
+    token=$(kubectl get secret -n observability grafana-service-account-token-secret --template="{{.data.token}}" | base64 --decode)
+
+    shift 1
+
+    local file=""
+
+    while getopts "f:" opt; do
+        case ${opt} in
+            f)
+                file=$OPTARG
+                _info "Reading from filename: $file"
+                ;;
+            *)
+                _error "No valid options provided. Valid options: -f <filename>"
+                ;;
+        esac
+    done
+
+    if [ -n "$file" ]; then
+        _info "Reading silence payload(s) from file."
+        if [ ! -f "$file" ]; then
+            _error "File $file does not exist"
+        fi
+
+        silences=$(jq -c '.[]' < "$file")
+        while read -r silence; do
+            _create_grafana_silence "$now" "$until" \
+                "$(echo "$silence" | jq -r .createdBy)" \
+                "$(echo "$silence" | jq -r .comment)" \
+                "$(echo "$silence" | jq -c .matchers)" \
+                "$token"
+        done < <(echo "$silences")
+    else
+        _info "Reading non-regex matchers from command line."
+        matchers="[]"
+        for matcher in "$@"; do
+            name=${matcher%=*}
+            value=${matcher#*=}
+            matchers=$(echo "$matchers" | jq ". +=  [{\"name\":\"${name}\",\"value\":\"${value}\",\"isEqual\":true,\"isRegex\":false}]")
+        done
+        _create_grafana_silence "$now" "$until" "cncluster" "Silence created via cncluster command" "$matchers" "$token"
+    fi
+}
+
+function _create_grafana_silence() {
+    local startsAt="$1"
+    local endsAt="$2"
+    local createdBy="$3"
+    local comment="$4"
+    local matchers="$5"
+
+    local token="$6"
+
+    _info "Adding silence with the following: $startsAt, $endsAt, $createdBy, $comment"
+
+    curl -sSL --fail-with-body \
+        "https://public.${GCP_CLUSTER_HOSTNAME}/grafana/api/alertmanager/grafana/api/v2/silences" \
+        -H 'content-type: application/json' \
+        --request POST \
+        -H "x-non-jwt-auth: Bearer ${token}" \
+         --data "{
+            \"startsAt\":\"${startsAt}\",\
+            \"endsAt\":\"${endsAt}\",\
+            \"createdBy\":\"${createdBy}\",\
+            \"comment\":\"${comment}\",\
+            \"matchers\":$matchers
+            }" || _warning "Failed to silence alerts (see comment in the cncluster code)"
+    # If the above fails with a 401 Unauthorized:
+    # - Confirm that the observability namespace has a label: istio-injection=enabled
+    # - Restart the grafana pod so that the sidecar is injected (the pod should have 5 containers including the istio-proxy sidecar):
+    #   `kubectl delete pod -n observability -l 'app.kubernetes.io/name=grafana'`
+    # - Delete the grafana-authorization-header-filter EnvoyFilter if one exists:
+    #   `kubectl delete envoyfilter -n observability grafana-authorization-header-filter`
+    # - Refresh and `up` the pulumi infra stack:
+    #   `cncluster pulumi infra refresh && cncluster pulumi infra up`
+}
+
+###
+
+subcommand_whitelist[unprotect_all]='Unprotects ALL resources in given stack'
+
+function subcmd_unprotect_all() {
+  stack="${1:-}"
+
+  if [ -z "${stack:-}" ]; then
+    _error "Usage: $SCRIPTNAME unprotect_all <stack>"
+  fi
+
+  _info "ALL resources in the pulumi stack $stack will be unprotected."
+  _prompt_to_confirm
+
+  # ignore "Running pulumi command..."
+  export=$(subcmd_pulumi "$stack" stack export | tail -n +2)
+
+  # find all the protected urns
+  jq -r '.deployment.resources[] | select(.protect == true) | .urn' <<< "$export" | while read -r urn; do
+    subcmd_pulumi "$stack" state unprotect "$urn" --yes || true
+  done
+}
+
+###
+
+subcommand_whitelist[cci_upgrade_test]='Launches a CircleCI upgrade test on the current cluster'
+
+function subcmd_cci_upgrade_test() {
+  cci_cluster_name=$(basename "$PWD")
+  "$SPLICE_ROOT/.circleci/launch-upgrade.sh" --cluster "$cci_cluster_name" "$@"
+}
+
+###
+subcommand_whitelist[request_pam]="Request PAM for the current cluster"
+
+# mostly stolen from https://github.com/DACH-NY/hub-sv/blob/main/tools/bin/request-access
+function subcmd_request_pam() {
+    local folder_id
+    if [ "$CLOUDSDK_CORE_PROJECT" == "da-cn-devnet" ]; then
+      folder_id="98574387291"
+      entitlement_name="cn-devnet-admin-entitlement"
+    elif (env-bool IS_MAINNET); then
+      folder_id="113800715154"
+      entitlement_name="cn-mainnet-admin-entitlement"
+    else
+      _error >&2 "you don't need PAM for this cluster"
+    fi
+    entitlement_id="folders/${folder_id}/locations/global/entitlements/${entitlement_name}"
+
+    echo -en "enter your reason: "
+    read -r reason
+    read -r -p "requesting 4 hours of access because \"${reason}\" -- ok? (y/N) "
+    if [ "${REPLY}" == 'y' ]; then
+      gcloud beta pam grants create --entitlement="${entitlement_id}" --requested-duration='14400s' --justification="${reason}"
+      open "https://console.cloud.google.com/iam-admin/pam/grants/my?folder=${folder_id}"
+    fi
+}
+
+###
+subcommand_whitelist[dump_identities]="Dump all node identities to a file"
+function subcmd_dump_identities() {
+    _cluster_must_exist
+
+    all='{}'
+    for i in sv-1 sv-2 sv-3 sv-4; do
+        if [ "$i" == "sv-1" ]; then
+            domain="sv-2"
+        else
+            domain="$i-eng"
+        fi
+        token=$(subcmd_get_token $i sv)
+        url="https://sv.${domain}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump"
+        echo "Getting identities from $url"
+        full_identities=$(curl -sSLf -H "authorization: Bearer $token" "$url")
+        identities=$(echo "$full_identities" | jq "{\"$i\": {participant: .identities.participant.id, sequencer: .identities.sequencer.id, mediator: .identities.mediator.id}}")
+        all=$(echo "$all" "$identities" | jq -s add)
+    done
+
+    _add_validator_identities validator
+    _add_validator_identities validator1
+    _add_validator_identities splitwell
+
+    echo "$all" | jq -S .
+}
+
+function _add_validator_identities() {
+    local namespace="$1"
+    local token
+    local url
+    local full_identities
+    local identities
+
+    token=$(subcmd_get_token "$namespace" validator)
+    url="https://wallet.${namespace}.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/participant/identities"
+    echo "Getting identities from $url"
+    full_identities=$(curl -sSLf -H "authorization: Bearer $token" "$url")
+    identities=$(echo "$full_identities" | jq "{\"${namespace}\": {participant: .id}}")
+
+    all=$(echo "$all" "$identities" | jq -s add)
+}
+
+###
+subcommand_whitelist[vote_for_migration]="Creates a vote request to migrate to a new migration id and has all SVs vote in favour"
+function subcmd_vote_for_migration() {
+  if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <migration_id>"
+    exit 1
+  fi
+
+  _cluster_must_exist
+
+  "$SPLICE_ROOT/cluster/scripts/vote-for-migration.sh" "$1"
+}
+
+###
+subcommand_whitelist[purge_unused_dbs]="Purges all unused DBs (those labeled with the cluster, but not controlled by Pulumi are assumed to be unused)"
+function subcmd_purge_unused_dbs() {
+    _cluster_must_exist
+
+    args=()
+    if [ -n "${CI:-}" ]; then
+        args=("--yes")
+    fi
+
+    local -x PULUMI_CONFIG_PASSPHRASE=''
+    npx --prefix "${SPLICE_ROOT}/cluster/pulumi" ts-node "${SPLICE_ROOT}/cluster/pulumi/purge_unused_dbs.ts" "${args[@]}"
+}
+
+###
+subcommand_whitelist[set_operator_deployment_reference]="Set the git reference for the operator deployment in the cluster config file"
+function subcmd_set_operator_deployment_reference() {
+
+    if [ "$#" -lt 2 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
+        exit 1
+    fi
+    if [ "$#" -gt 2 ]; then
+        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
+        exit 1
+    fi
+    deployment_config=$(cat <<EOF
+      reference:
+$(_get_flux_reference_config "$1" "$2" "        ")
+EOF
+    )
+    _update_cluster_config "$deployment_config" "operatorDeployment"
+}
+
+################################
+### Main
+################################
+
+if [ -z "${SUBCOMMAND_NAME-}" ]; then
+    subcmd_help
+
+    _error  "Missing subcommand"
+fi
+
+
+if [ ! ${subcommand_whitelist[${SUBCOMMAND_NAME}]+_} ]; then
+    subcmd_help
+
+    _error  "Unknown subcommand: ${SUBCOMMAND_NAME}"
+fi
+
+"subcmd_${SUBCOMMAND_NAME}" "$@"

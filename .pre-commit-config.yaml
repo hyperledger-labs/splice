@@ -1,0 +1,82 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+
+repos:
+  - repo: local
+    hooks:
+      - id: copyright
+        name: Check that all source files have the correct copyright header
+        language: system
+        require_serial: true
+        entry: "bash -c 'sbt --client \"headerCreate\"' bash"
+        files: '(.*\.daml|.*\.scala|.*\.sh|.*\.py|.*\.tsx|.*\.rst)'
+      - id: scalafmt
+        name: scalafmt
+        language: system
+        require_serial: true
+        entry: "bash -c 'sbt --client \"scalafmtOnly $@\"' bash"
+        types: [scala]
+      - id: sbt_tests
+        name: sbt_tests
+        language: system
+        require_serial: true
+        pass_filenames: false
+        entry: "bash -c 'git diff --staged --diff-filter=AD --name-only --exit-code -- '**/test/**/*.scala' || sbt --client \"printTests\"' bash"
+        always_run: true
+      - id: dars_lock
+        name: dars_lock
+        language: system
+        pass_filenames: false
+        require_serial: true
+        entry: "bash -c 'sbt --client \"damlDarsLockFileUpdate $@\"' bash"
+        files: '(daml\.yaml|.*\.daml)'
+      - id: no_illegal_daml_references
+        name: no_illegal_daml_references
+        language: system
+        pass_filenames: false
+        require_serial: true
+        entry: "./scripts/rename.sh no_illegal_daml_references"
+        files: '(daml\.yaml|.*\.daml)'
+      - id: shellcheck
+        name: shellcheck
+        language: system
+        entry: "shellcheck"
+        # ignore external sources
+        args: [-e, SC1091]
+        types: [shell]
+        exclude: '(^canton/|\.envrc)'
+      - id: typescriptfmt
+        name: typescriptfmt
+        language: system
+        entry: "scripts/fix-ts.py"
+        types_or: [javascript, jsx, ts, tsx]
+        exclude: "/[.]prettierrc[.]cjs$"
+      - id: circleci_config
+        name: check circleci config is updated
+        language: system
+        entry: ".circleci/build-config.sh --check"
+        files: '^.circleci/config/.*[.]yml$'
+      - id: gha_lint
+        name: static check github actions
+        language: system
+        entry: "actionlint"
+        files: '^.github/.*$'
+        pass_filenames: false
+      - id: check-trailing-whitespace
+        name: Check for trailing whitespace
+        language: system
+        entry: "./scripts/check-trailing-whitespace.sh"
+        pass_filenames: false
+        always_run: true
+      - id: check-daml-warts
+        name: Check for Daml warts
+        language: system
+        entry: "./scripts/check-daml-warts.sh"
+        pass_filenames: false
+        always_run: true
+      - id: check-daml-return-types
+        name: Check all Daml return types
+        language: system
+        entry: "./scripts/check-daml-return-types.sh"
+        pass_filenames: false
+        always_run: true

@@ -1439,8 +1439,6 @@ printTests := {
   def isDockerComposeValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("DockerComposeValidator")
 
-  def isGlobalSoftMigrationTest(name: String): Boolean =
-    name contains "SoftDomainMigrationIntegrationTest"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
   // These are tests that are particularly resource intensive and need larger runners.
@@ -1525,11 +1523,6 @@ printTests := {
       "Non-DevNet Preflight tests against runbook validator",
       "test-full-class-names-validator-preflight-non-devnet.log",
       (t: String) => isRunbookValidatorPreflightIntegrationTest(t) && isNonDevNetTest(t),
-    ),
-    (
-      "global domain soft migration test",
-      "test-full-class-names-global-soft-migration.log",
-      (t: String) => isGlobalSoftMigrationTest(t),
     ),
     (
       "disaster recovery tests",

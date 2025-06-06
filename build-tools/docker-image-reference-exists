@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+if [ -z "$1" ]; then
+    _error "Usage: $0 <image-reference> [--err-missing]"
+else
+    imageReference=$1
+fi
+
+if [ -n "$2" ]; then
+    if [ "$2" = "--err-missing" ]; then
+        err_missing=yes
+    else
+        _error "Invalid command line option: $2"
+        exit 1
+    fi
+fi
+
+# check if docker is running
+out="$(docker info 2>&1)" || _error "Cannot check for image, docker seems to be down:\n${out}"
+
+# check if the image exists in the repo
+docker buildx imagetools inspect "${imageReference}" > /dev/null 2>&1
+IMAGE_CHECK=$?
+
+if [ "${IMAGE_CHECK}" -eq 0 ] ; then
+  _log "Image exists in repo: ${imageReference}"
+  exit 0
+else
+  # fail with error if --err-missing is used
+  if [ -z "${err_missing}" ]; then
+    _log "Image does not exist in repo: ${imageReference}"
+  else
+    _error "Image does not exist in repo: ${imageReference}"
+  fi
+  exit 1
+fi

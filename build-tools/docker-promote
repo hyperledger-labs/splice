@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+set -eou pipefail
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+if [ -z "${1-}" ] || [ -z "${2-}" ]; then
+    _error "Usage: $0 <from-image-tag> <to-image-tag>"
+else
+    fromImageTag=$1
+    toImageTag=$2
+fi
+
+[[ -z "${MAKE-}"  ]] && _error 'must be run from within make'
+
+docker buildx imagetools create -t "${toImageTag}" "${fromImageTag}"
+
+echo "${toImageTag}" > target/docker.promote
