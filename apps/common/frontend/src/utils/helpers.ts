@@ -58,7 +58,7 @@ export const retrySynchronizerError = (failureCount: number, error: Error): bool
   // because that then also retries on invalid user input.
   const errResponse = error as JsonApiError;
   const keywords = ['NOT_CONNECTED_TO_SYNCHRONIZER', 'NOT_CONNECTED_TO_ANY_SYNCHRONIZER'];
-  const isDomainConnectionError = keywords.some(k => errResponse.body?.error?.includes(k));
+  const isDomainConnectionError = keywords.some(k => errResponse.body?.error?.code.includes(k));
 
   return isDomainConnectionError && failureCount < 10;
 };
