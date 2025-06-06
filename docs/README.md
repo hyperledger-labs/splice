@@ -1,6 +1,6 @@
 # Docs
 
-Documentation for all CC functionality.
+Developer Documentation for all Splice functionalities.
 
 ## Development Builds
 

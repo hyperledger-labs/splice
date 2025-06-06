@@ -206,3 +206,5 @@ We publish docs from each commit from `main` to
 https://digital-asset.github.io/decentralized-canton-sync/. This can
 often be useful to answer support requests with a docs link even if
 those docs are still very recent.
+
+Refer to [docs/README.md](docs/README.md) for details on how to contribute to the documentation.
