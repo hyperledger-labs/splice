@@ -93,7 +93,7 @@ object DarResources {
   val dsoGovernance_0_1_10 = DarResource("splice-dso-governance-0.1.10.dar")
   val dsoGovernance_0_1_11 = DarResource("splice-dso-governance-0.1.11.dar")
   val dsoGovernance_0_1_12 = DarResource("splice-dso-governance-0.1.12.dar")
-
+  val dsoGovernance_0_1_13 = DarResource("splice-dso-governance-0.1.13.dar")
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
@@ -111,6 +111,7 @@ object DarResources {
       dsoGovernance_0_1_10,
       dsoGovernance_0_1_11,
       dsoGovernance_0_1_12,
+      dsoGovernance_0_1_13,
     ),
   )
 

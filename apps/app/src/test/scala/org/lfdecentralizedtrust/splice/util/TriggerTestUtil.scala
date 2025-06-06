@@ -1,12 +1,13 @@
 package org.lfdecentralizedtrust.splice.util
 
+import com.digitalasset.canton.{BaseTest, ScalaFuturesWithPatience}
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition.sv1Backend
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
-import com.digitalasset.canton.{BaseTest, ScalaFuturesWithPatience}
 
 import scala.concurrent.duration.FiniteDuration
+import scala.reflect.ClassTag
 
 trait TriggerTestUtil { self: BaseTest =>
 
@@ -50,5 +51,23 @@ object TriggerTestUtil extends ScalaFuturesWithPatience {
       triggersToPauseAtStart.foreach(_.resume())
       triggersToResumeAtStart.foreach(_.pause().futureValue)
     }
+  }
+
+  def pauseAllDsoDelegateTriggers[T <: Trigger](implicit
+      tag: ClassTag[T],
+      env: SpliceTestConsoleEnvironment,
+  ): Unit = {
+    env.svs.local.foreach(
+      _.dsoDelegateBasedAutomation.trigger[T].pause().futureValue
+    )
+  }
+
+  def resumeAllDsoDelegateTriggers[T <: Trigger](implicit
+      tag: ClassTag[T],
+      env: SpliceTestConsoleEnvironment,
+  ): Unit = {
+    env.svs.local.foreach(
+      _.dsoDelegateBasedAutomation.trigger[T].resume()
+    )
   }
 }

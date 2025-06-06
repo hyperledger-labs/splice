@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   aTrigger,
 }
 import org.lfdecentralizedtrust.splice.automation.{AutomationService, AutomationServiceCompanion}
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -30,7 +30,6 @@ class DsoDelegateBasedAutomationService(
     svTaskContext: SvTaskBasedTrigger.Context,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -78,14 +77,13 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new MergeSvRewardStateContractsTrigger(triggerContext, svTaskContext))
     registerTrigger(
-      new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext, packageVersionSupport)
+      new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext)
     )
 
     registerTrigger(
       new MergeValidatorLicenseContractsTrigger(
         triggerContext,
         svTaskContext,
-        packageVersionSupport,
       )
     )
 

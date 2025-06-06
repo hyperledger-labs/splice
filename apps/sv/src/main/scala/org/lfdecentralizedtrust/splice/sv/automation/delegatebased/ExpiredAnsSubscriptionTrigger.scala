@@ -39,14 +39,17 @@ class ExpiredAnsSubscriptionTrigger(
     store.listExpiredAnsSubscriptions(now, PageLimit.tryCreate(limit))
 
   override protected def completeTaskAsDsoDelegate(
-      task: ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleAnsSubscription]
+      task: ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleAnsSubscription],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
+    controllerArgument <- getSvControllerArgument(controller)
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ExpireSubscription(
         task.work.context.contractId,
         task.work.state.contractId,
         new SubscriptionIdleState_ExpireSubscription(store.key.dsoParty.toProtoPrimitive),
+        controllerArgument,
       )
     )
     result <- svTaskContext.connection

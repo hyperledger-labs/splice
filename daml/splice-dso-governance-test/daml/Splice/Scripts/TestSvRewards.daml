@@ -169,14 +169,14 @@ test_SvRewardStateMerge = do
   rewardStates <- queryFilter @SvRewardState dso (\state -> state.svName == "sv1")
   length rewardStates === 2
   [(rulesCid, _)] <- query @DsoRules dso
-  DsoRules_MergeSvRewardStateResult sv1RewardStateCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid1, sv1RewardStateCid2])
+  DsoRules_MergeSvRewardStateResult sv1RewardStateCid3 <- submitMulti [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid1, sv1RewardStateCid2] (Some sv1))
   rewardStates <- queryFilter @SvRewardState dso (\state -> state.svName == "sv1")
   length rewardStates === 1
   -- Can't merge a single contract
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3])
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3] (Some sv1))
   -- Cannot merge contracts for different SV names
   [(sv2RewardStateCid1, _)] <- queryFilter @SvRewardState dso (\state -> state.svName == "sv2")
-  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3, sv2RewardStateCid1])
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeSvRewardState "sv1" [sv1RewardStateCid3, sv2RewardStateCid1] (Some sv1))
   pure ()
 
 test_SvRewardUpdatedWeight : Script ()

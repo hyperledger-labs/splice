@@ -367,6 +367,9 @@ components:
       type: object
       required:
         - new_governance_flow
+        - delegateless_automation
       properties:
         new_governance_flow:
+          type: boolean
+        delegateless_automation:
           type: boolean

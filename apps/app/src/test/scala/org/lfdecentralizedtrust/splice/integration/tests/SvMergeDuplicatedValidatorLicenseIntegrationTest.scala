@@ -6,6 +6,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.Vali
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.MergeValidatorLicenseContractsTrigger
 import org.lfdecentralizedtrust.splice.util.TriggerTestUtil
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
@@ -42,7 +46,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
     }
     setTriggersWithin(
       triggersToPauseAtStart =
-        Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[MergeValidatorLicenseContractsTrigger]),
+        activeSvs.map(_.dsoDelegateBasedAutomation.trigger[MergeValidatorLicenseContractsTrigger]),
       triggersToResumeAtStart = Seq.empty,
     ) {
       actAndCheck(
@@ -61,9 +65,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
       // The trigger can process both validator licenses in parallel so we might get multiple log messages.
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
-          sv1Backend.dsoDelegateBasedAutomation
-            .trigger[MergeValidatorLicenseContractsTrigger]
-            .resume()
+          resumeAllDsoDelegateTriggers[MergeValidatorLicenseContractsTrigger]
           clue("Trigger merges the duplicated validator licenses contracts") {
             eventually() {
               val newValidatorLicenses = getValidatorLicenses()
@@ -71,10 +73,7 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
             }
           }
           // Pause to make sure we don't get more log messages.
-          sv1Backend.dsoDelegateBasedAutomation
-            .trigger[MergeValidatorLicenseContractsTrigger]
-            .pause()
-            .futureValue
+          pauseAllDsoDelegateTriggers[MergeValidatorLicenseContractsTrigger]
         },
         forAll(_)(
           _.warningMessage should include(

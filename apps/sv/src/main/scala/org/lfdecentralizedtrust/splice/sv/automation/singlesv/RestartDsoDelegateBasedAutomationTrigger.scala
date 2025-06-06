@@ -137,6 +137,10 @@ class RestartDsoDelegateBasedAutomationTrigger(
         connection,
         PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
         epoch,
+        config.delegatelessAutomation,
+        config.expectedTaskDuration,
+        config.expiredRewardCouponBatchSize,
+        packageVersionSupport,
       )
 
     (if (appLevelRetryProvider.isClosing) {
@@ -165,7 +169,6 @@ class RestartDsoDelegateBasedAutomationTrigger(
          svTaskContext,
          retryProvider,
          leaderLoggerFactory,
-         packageVersionSupport,
        )
 
        epochStateVar = Some(

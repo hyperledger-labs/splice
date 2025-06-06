@@ -20,25 +20,33 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
   protected implicit val tracer: Tracer
 
   def readFeatureSupport(
-      party: PartyId
+      party: PartyId,
+      delegateAutomationEnvironmentFlag: Boolean = true,
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
       tracer: Tracer,
   ): Future[FeatureSupportResponse] = {
     withSpan(s"$workflowId.featureSupport") { implicit tc => _ =>
-      packageVersionSupport
-        .supportsNewGovernanceFlow(
-          Seq(
-            party
-          ),
-          CantonTimestamp.now(),
-        )
-        .map { featureSupport =>
-          FeatureSupportResponse(
-            featureSupport.supported
+      for {
+        newGovernanceFlow <- packageVersionSupport
+          .supportsNewGovernanceFlow(
+            Seq(
+              party
+            ),
+            CantonTimestamp.now(),
           )
-        }
+        delegatelessAutomation <- packageVersionSupport
+          .supportsDelegatelessAutomation(
+            Seq(
+              party
+            ),
+            CantonTimestamp.now(),
+          )
+      } yield FeatureSupportResponse(
+        newGovernanceFlow.supported,
+        delegatelessAutomation.supported && delegateAutomationEnvironmentFlag,
+      )
     }
 
   }

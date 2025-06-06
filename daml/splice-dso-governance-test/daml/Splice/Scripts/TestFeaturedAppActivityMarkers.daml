@@ -55,6 +55,7 @@ testFeaturedAppActivityMarkers = do
         action
         amuletRulesCid = None
         confirmationCids
+        sv = Some sv1
 
   [(featuredAppRightCid1, _)] <- queryInterface @Splice.Api.FeaturedAppRightV1.FeaturedAppRight provider1
   [(featuredAppRightCid2, _)] <- queryInterface @Splice.Api.FeaturedAppRightV1.FeaturedAppRight provider2
@@ -88,6 +89,7 @@ testFeaturedAppActivityMarkers = do
     argument = AmuletRules_ConvertFeaturedAppActivityMarkers with
       markerCids = [marker1, marker3, marker2, marker4] -- interleave different providers to test grouping
       openMiningRoundCid
+    sv = Some sv1
 
   -- markers are archived
   [None, None, None, None] <- mapA (queryContractId @FeaturedAppActivityMarker dso) [marker1, marker2, marker3, marker4]

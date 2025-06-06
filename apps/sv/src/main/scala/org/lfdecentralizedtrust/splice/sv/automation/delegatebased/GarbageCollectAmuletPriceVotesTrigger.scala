@@ -44,13 +44,15 @@ class GarbageCollectAmuletPriceVotesTrigger(
   val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      dsoRules: DsoRulesContract
+      dsoRules: DsoRulesContract,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       amuletPriceVotes <- store.listAllAmuletPriceVotes()
       (svVotes, nonSvVotes) = amuletPriceVotes.partition(v =>
         dsoRules.payload.svs.asScala.contains(v.payload.sv)
       )
+      controllerArgument <- getSvControllerArgument(controller)
       nonSvVoteCids = nonSvVotes.map(_.contractId)
       svDuplicatedVoteCids =
         svVotes
@@ -65,6 +67,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
             _.exerciseDsoRules_GarbageCollectAmuletPriceVotes(
               nonSvVoteCids.asJava,
               svDuplicatedVoteCids.asJava,
+              controllerArgument,
             )
           )
           svTaskContext.connection
