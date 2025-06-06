@@ -5,18 +5,9 @@ package org.lfdecentralizedtrust.splice.setup
 
 import cats.data.EitherT
 import cats.implicits.catsSyntaxOptionId
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  DarResource,
-  ParticipantAdminConnection,
-  RetryFor,
-  RetryProvider,
-}
-import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -24,9 +15,16 @@ import com.digitalasset.canton.topology.transaction.{
   PartyToParticipant,
   TopologyChangeOp,
 }
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
+  ParticipantAdminConnection,
+  RetryFor,
+}
+import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -34,7 +32,6 @@ class ParticipantPartyMigrator(
     connection: BaseLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
     decentralizedSynchronizerAlias: SynchronizerAlias,
-    retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -47,7 +44,6 @@ class ParticipantPartyMigrator(
       ledgerApiUser: String,
       synchronizerAlias: SynchronizerAlias,
       getAcsSnapshot: PartyId => Future[ByteString],
-      requiredDars: Seq[DarResource] = Seq.empty,
       overridePartiesToMigrate: Option[Seq[PartyId]],
   ): Future[Unit] = {
     for {
@@ -97,7 +93,7 @@ class ParticipantPartyMigrator(
         case None =>
           logger.info(s"Importing ACS for party ids $partiesToMigrateFinal from scan")
           for {
-            _ <- importAcs(partiesToMigrateFinal, getAcsSnapshot, requiredDars)
+            _ <- importAcs(partiesToMigrateFinal, getAcsSnapshot)
             _ <- connection.ensureUserHasPrimaryParty(ledgerApiUser, validatorPartyId)
           } yield ()
       }
@@ -343,25 +339,8 @@ class ParticipantPartyMigrator(
   private def importAcs(
       partyIds: Seq[PartyId],
       getAcsSnapshot: PartyId => Future[ByteString],
-      requiredDars: Seq[DarResource],
   ): Future[Unit] = {
     for {
-      // dars are uploaded async during the init phase
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        "dars_uploaded",
-        "Required dars are uploaded",
-        participantAdminConnection.listDars().map { dars =>
-          val availablePackageIds = dars.map(_.mainPackageId)
-          if (!requiredDars.forall(dar => availablePackageIds.contains(dar.packageId)))
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Required dars $requiredDars are not yet available"
-              )
-              .asRuntimeException()
-        },
-        logger,
-      )
       _ <- participantAdminConnection.disconnectFromAllDomains()
       _ <- Future.traverse(partyIds) { partyId =>
         for {

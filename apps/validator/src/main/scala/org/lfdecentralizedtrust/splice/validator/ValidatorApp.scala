@@ -134,9 +134,6 @@ class ValidatorApp(
   override def packagesForJsonDecoding =
     super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
-  def packagesForUploading =
-    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
-
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
@@ -298,7 +295,6 @@ class ValidatorApp(
                   connection,
                   participantAdminConnection,
                   config.domains.global.alias,
-                  retryProvider,
                   loggerFactory,
                 )
                 appInitStep("Migrating party data") {
@@ -319,10 +315,6 @@ class ValidatorApp(
                             logger,
                             retryProvider,
                           ),
-                        Seq(
-                          DarResources.amulet.bootstrap,
-                          DarResources.amuletNameService.bootstrap,
-                        ),
                         partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                       )
                   } yield ()
