@@ -79,7 +79,6 @@ class DomainMigrationDumpGenerator(
       timestamp: Instant,
       domain: SynchronizerId,
       migrationId: Long,
-      force: Boolean,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -97,7 +96,6 @@ class DomainMigrationDumpGenerator(
       acsSnapshot <- acsExporter.exportAcsAtTimestamp(
         domain,
         timestamp,
-        force,
         parties*
       )
       dars <- darExporter.exportAllDars()
