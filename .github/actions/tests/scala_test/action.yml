@@ -147,7 +147,7 @@ runs:
     - name: Set RUN_SPLITTED_TESTS_CMD
       id: list_tests
       shell: bash
-      run: echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests)\"" >> "$GITHUB_OUTPUT"
+      run: echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests) -- -l org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck -l org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9\"" >> "$GITHUB_OUTPUT"
 
     # webpack uses inotify to watch for changes, and we need to increase the limit
     - name: increase inotify limit

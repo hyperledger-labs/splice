@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.environment.{
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorCantonIdentifierConfig
 import org.scalatest.matchers.should.Matchers
@@ -103,6 +104,23 @@ case class EnvironmentDefinition(
         }
       })
     })
+
+  def withInitialPackageVersions: EnvironmentDefinition =
+    addConfigTransform((_, config) =>
+      ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+        _.copy(
+          // FIXME: read config from env var or something
+          initialPackageConfig = InitialPackageConfig(
+            amuletVersion = "0.1.8",
+            amuletNameServiceVersion = "0.1.8",
+            dsoGovernanceVersion = "0.1.11",
+            validatorLifecycleVersion = "0.1.2",
+            walletVersion = "0.1.8",
+            walletPaymentsVersion = "0.1.8",
+          )
+        )
+      )(config)
+    )
 
   def withInitializedNodes(): EnvironmentDefinition =
     copy(setup = implicit env => {
@@ -391,6 +409,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+      .withInitialPackageVersions
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
@@ -398,6 +417,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+      .withInitialPackageVersions
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =

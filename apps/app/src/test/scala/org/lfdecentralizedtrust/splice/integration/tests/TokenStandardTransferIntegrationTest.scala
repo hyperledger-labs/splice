@@ -32,6 +32,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 import java.util.UUID
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
 class TokenStandardTransferIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
