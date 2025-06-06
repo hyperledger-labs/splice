@@ -106,7 +106,7 @@ case class EnvironmentDefinition(
     })
 
   def withInitialPackageVersions: EnvironmentDefinition =
-    addConfigTransform((_, config) =>
+    addConfigTransforms((_, config) =>
       ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
         _.copy(
           // FIXME: read config from env var or something
@@ -118,6 +118,16 @@ case class EnvironmentDefinition(
             walletVersion = "0.1.8",
             walletPaymentsVersion = "0.1.8",
           )
+        )
+      )(config),
+      (_, config) =>
+      ConfigTransforms.updateAllValidatorAppConfigs_( c =>
+        c.copy(
+          appInstances = c.appInstances.transform {
+            // FIXME
+            case ("splitwell", instance) => instance.copy(dars = Seq(java.nio.file.Paths.get("daml/dars/splitwell-0.1.8.dar")))
+            case (_, instance) => instance
+          }
         )
       )(config)
     )

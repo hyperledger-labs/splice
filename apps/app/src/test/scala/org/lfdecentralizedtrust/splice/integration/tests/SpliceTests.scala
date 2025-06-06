@@ -571,6 +571,9 @@ object SpliceTests extends LazyLogging {
           Http().shutdownAllConnectionPools().map(_ => Done)
       }
     }
+
+    // FIXME
+    protected def splitwellDarPath = "daml/dars/splitwell-0.1.8.dar"
   }
 
   object BracketSynchronous {
