@@ -46,7 +46,8 @@ class AdvanceOpenMiningRoundTrigger(
 
   /** How to process a task. */
   override protected def completeTaskAsDsoDelegate(
-      task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
+      task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
     for {
@@ -54,6 +55,7 @@ class AdvanceOpenMiningRoundTrigger(
       _ = logger.debug(
         s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
       )
+      controllerArgument <- getSvControllerArgument(controller)
       amuletPriceVotes <- store.listSvAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(
@@ -62,6 +64,7 @@ class AdvanceOpenMiningRoundTrigger(
           rounds.middle.contractId,
           rounds.newest.contractId,
           amuletPriceVotes.map(_.contractId).asJava,
+          controllerArgument,
         )
       )
       _ <- svTaskContext.connection
