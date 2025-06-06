@@ -1,0 +1,17 @@
+{
+  "name": "split_tests",
+  "version": "1.0.0",
+  "main": "dist/split_tests.js",
+  "scripts": {
+    "build": "npx tsc && npx ncc build"
+  },
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "fast-xml-parser": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.2",
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.7.3"
+  }
+}

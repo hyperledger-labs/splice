@@ -1,0 +1,28 @@
+name: "Save Precompiled Classes"
+description: "Saves the precompiled classes to the cache"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+  load_cache_hit:
+    description: "Cache hit from the load precompiled classes job (should be the cache_hit output from the load precompiled classes job)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Archive precompiled classes
+      if: ${{ ! fromJson(inputs.load_cache_hit) }}
+      shell: bash
+      run: ./.github/actions/scripts/archive_precompiled_classes.sh
+    - name: Not archiving preceompiled classes
+      if: ${{ fromJson(inputs.load_cache_hit) }}
+      shell: bash
+      run: |
+        echo "Skipping precompiled classes cache, as there was a cache hit"
+    - name: Cache precompiled classes
+      if: ${{ ! fromJson(inputs.load_cache_hit) }}
+      uses: actions/cache/save@v4
+      with:
+        path: /tmp/classes
+        key: classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}

@@ -1,0 +1,4 @@
+secretsprovider: >-
+  gcpkms://projects/da-cn-scratchnet/locations/us-central1/keyRings/pulumi/cryptoKeys/scratchd
+encryptedkey: >-
+  CiQAzqJiPr7C7yIjBti4xRe4LdpGWdN3BOY8oS+/UOoD8sjB0l0SSQCTtku3GWAdJ1VYjWQzig2PORSv1HOymUR/f/vi4z1v8Zc5TMH6T6xppsbs7kgFE5/rIiB3nLIkddTYBuWsoMeMZMD+5MTCuIo=

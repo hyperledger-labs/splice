@@ -1,0 +1,83 @@
+name: "Execute SBT command"
+description: "A context within which SBT commands can be run correctly for our needs"
+
+inputs:
+  cmd:
+    # This may contain several commands.
+    # The caller needs to quote commands that contain spaces, e.g. "\"testOnly myTest\"".
+    description: "The SBT command to run"
+    required: true
+  artifactory_user:
+    description: "Artifactory user"
+    required: false
+  artifactory_password:
+    description: "Artifactory password"
+    required: false
+  extra_env_vars:
+    description: "Extra environment variables to set before running the SBT command"
+    required: false
+    default: ""
+  extra_parameters:
+    description: "Extra parameters to pass to SBT"
+    required: false
+    default: ""
+  pre_sbt_cmd:
+    description: "Extra command to run before running the SBT command"
+    required: false
+    default: ""
+  post_sbt_cmd:
+    description: "Extra command to run after running the SBT command"
+    required: false
+    default: ""
+  timeout:
+    description: "Timeout for the SBT command"
+    required: false
+    default: "25m"
+  additional_nix_args:
+    description: "Additional arguments to pass to the Nix command"
+    required: false
+    default: ""
+  fail_on_error_in_output:
+    description: "Whether to fail if the SBT command output contains errors"
+    required: false
+    default: "true"
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Execute SBT command"
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD ${{ inputs.additional_nix_args }}"
+        cmd: |
+            # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
+            export PROTOCBRIDGE_NO_CLEANUP="1"
+
+            run_sbt() {
+              export ${{ inputs.extra_env_vars }}
+              # Define sbt command
+              SBT_CMD=(sbt)
+
+              # Add extra parameters
+              SBT_CMD+=(${{ inputs.extra_parameters }})
+
+              # Add sbt commands.
+              # Do not quote this, to allow the caller to pass in several commands.
+              # The caller needs to take care of quoting, if a command contains spaces.
+              SBT_CMD+=(${{ inputs.cmd }})
+
+              # Run command
+              timeout --kill-after=30s ${{ inputs.timeout }} "${SBT_CMD[@]}" 2>&1 |
+                tee sbt_output
+
+              echo "After SBT"
+
+              if [[ "${{ inputs.fail_on_error_in_output }}" == "true" ]]; then
+                .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
+              fi
+            }
+            export ARTIFACTORY_USER="${{ inputs.artifactory_user }}"
+            export ARTIFACTORY_PASSWORD="${{ inputs.artifactory_password }}"
+            ${{ inputs.pre_sbt_cmd }}
+            run_sbt
+            ${{ inputs.post_sbt_cmd }}

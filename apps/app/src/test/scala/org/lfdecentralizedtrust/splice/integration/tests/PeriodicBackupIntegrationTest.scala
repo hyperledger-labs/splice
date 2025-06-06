@@ -3,7 +3,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.config.{
   BackupDumpConfig,
   ConfigTransforms,
-  GcpBucketConfig,
   PeriodicBackupDumpConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.EnvironmentImpl
@@ -13,7 +12,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   SpliceTestConsoleEnvironment,
 }
-import org.lfdecentralizedtrust.splice.util.GcpBucket
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -99,14 +97,4 @@ final class DirectoryPeriodicBackupIntegrationTest
     dumpFile.contentAsString
   }
 
-}
-
-final class GcpBucketPeriodicBackupIntegrationTest
-    extends PeriodicBackupIntegrationTestBase[BackupDumpConfig.Gcp] {
-  override def backupDumpLocation =
-    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None)
-  val bucket = new GcpBucket(backupDumpLocation.bucket, loggerFactory)
-  override def readDump(filename: String) = {
-    bucket.readStringFromBucket(Paths.get(filename))
-  }
 }

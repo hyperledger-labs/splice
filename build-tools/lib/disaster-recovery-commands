@@ -1,0 +1,287 @@
+# -*- shell-script -*-
+# TODO(#9531): Currently, this is not tested regularly.
+subcommand_whitelist[disaster_recovery_test]='Test disaster recovery in a cluster'
+
+function subcmd_disaster_recovery_test() {
+  local tmpdir
+  tmpdir=$(mktemp -d)
+
+  local svIngressNames
+  # keys are node names with sv-
+  svIngressNames[1]=2
+  svIngressNames[2]=2-eng
+  svIngressNames[3]=3-eng
+  svIngressNames[4]=4-eng
+  local svIngressName
+
+  _cluster_reset
+
+  _info "Deploying original domain"
+  # We test that splitwell can onboard after the DR, so don't deploy it just yet
+  export SPLICE_DEPLOY_SPLITWELL="false"
+  _cluster_apply
+
+  _info "Getting identity dumps"
+  for sv in "${!svIngressNames[@]}"; do
+    svIngressName=${svIngressNames[$sv]}
+    token=$(subcmd_get_token sv-"$sv" sv)
+    id=$(curl -sSL --fail-with-body "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
+    echo "$id" > "$tmpdir/id-${sv}.json"
+  done
+
+  local taps tapsTokenNamespace
+  declare -A taps
+  declare -A tapsTokenNamespace
+  taps[sv-${svIngressNames[1]}]=42042042.0
+  tapsTokenNamespace[sv-${svIngressNames[1]}]=sv-1
+  taps[sv-${svIngressNames[2]}]=21021021.0
+  tapsTokenNamespace[sv-${svIngressNames[2]}]=sv-2
+  taps[sv-${svIngressNames[3]}]=63063063.0
+  tapsTokenNamespace[sv-${svIngressNames[3]}]=sv-3
+  taps[sv-${svIngressNames[4]}]=84084084.0
+  tapsTokenNamespace[sv-${svIngressNames[4]}]=sv-4
+  taps[validator1]=105105105.0
+  tapsTokenNamespace[validator1]=validator1
+
+  _info "Tapping amulet before disaster"
+  local ingressName
+  for ingressName in "${!taps[@]}"; do
+    _info "Tapping ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
+    # TODO(#12764) remove register when validator does it for us
+    curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/register" \
+         -H "authorization: Bearer ${token}" \
+         -H "content-type: application/json" \
+         --data-raw '{}'
+    curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/tap" \
+         -H "authorization: Bearer ${token}" \
+         -H "content-type: application/json" \
+         --data-raw '{"amount":"'"${taps[$ingressName]}"'"}'
+  done
+
+  _info "Checking that taps are complete"
+  for ingressName in "${!taps[@]}"; do
+    _info "Checking tap of ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
+    local amuletPrice=0.005
+    local fuzzFactorForFees=0.95
+    totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
+                   -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
+    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $amuletPrice * $fuzzFactorForFees")" ]; then
+        _error "$ingressName only sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    else
+        _info "$ingressName sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    fi
+  done
+
+  local sortableDateFormat="+%Y-%m-%dT%R:%SZ"
+  local timeAfterTaps
+  timeAfterTaps=$(date "$sortableDateFormat")
+  _info "Completed taps at $timeAfterTaps"
+
+  _info "Finding agreed upon timestamp"
+  for sv in "${!svIngressNames[@]}"; do
+    svIngressName=${svIngressNames[$sv]}
+    token=$(subcmd_get_token sv-"$sv" sv)
+    done=0
+    acs_time=$(date "$sortableDateFormat")
+    while [ $done == 0 ]; do
+        _info "Attempting to get ACS from time $acs_time"
+        data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$acs_time" -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+        snapshot=$(echo "$data" | jq .data_snapshot)
+        if [ "$snapshot" == "null" ]; then
+            error=$(echo "$data" | jq -r .error)
+            if [[ "$error" == UNAVAILABLE_ACS_SNAPSHOT* ]]; then
+                _error "Participant has been pruned, ACS snapshot for requested timestamp is not available (look for UNAVAILABLE_ACS_SNAPSHOT in participant log for more details). Consider increasing journal-garbage-collection-delay in the participants"
+            elif [[ "$error" == INVALID_ACS_SNAPSHOT_TIMESTAMP* ]]; then
+                _info "SV $sv does not have an ACS snapshot for timestamp, trying an earlier one"
+                acs_time=$(date --date="$acs_time"'-5 seconds' "$sortableDateFormat")
+            fi
+        else
+            _info "SV $sv has an ACS snapshot for timestamp $acs_time"
+            if [[ $timeAfterTaps > $acs_time ]]; then
+                _info "...and SV $sv is too early, last tap was at $timeAfterTaps"
+                acs_time=$(date --date="$timeAfterTaps"'+6 seconds' "$sortableDateFormat")
+                sleep 1
+            else
+                done=1
+            fi
+        fi
+    done
+    date --date "$acs_time" "+%s" >> "$tmpdir/acs_times"
+  done
+
+  _info "Scaling down cometbft"
+  for sv in "${!svIngressNames[@]}"; do
+    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-cometbft
+  done
+
+  # TODO(#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
+
+  earliest=$(sort -n "$tmpdir/acs_times" | head -1)
+  dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "$sortableDateFormat")
+  _info "Decided on timestamp for dumps: $dump_timestamp"
+
+  _info "Getting data dumps"
+  for sv in "${!svIngressNames[@]}"; do
+    svIngressName=${svIngressNames[$sv]}
+    token=$(subcmd_get_token sv-"$sv" sv)
+    data=$(curl -sSL "https://sv.sv-${svIngressName}.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
+           -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+    snapshot=$(echo "$data" | jq .data_snapshot)
+    if [ "$snapshot" == "null" ]; then
+        error=$(echo "$data" | jq -r .error)
+        if [[ "$error" == UNAVAILABLE_ACS_SNAPSHOT* ]]; then
+            _error "Participant has been pruned, ACS snapshot for requested timestamp is not available (look for UNAVAILABLE_ACS_SNAPSHOT in participant log for more details). Consider increasing journal-garbage-collection-delay in the participants"
+        elif [[ "$error" == INVALID_ACS_SNAPSHOT_TIMESTAMP* ]]; then
+            _error "ACS dump not available, but is expected to be available from all SV apps for timestamp $dump_timestamp"
+        fi
+    fi
+    id=$(cat "$tmpdir/id-${sv}.json")
+    dump=$(echo "$id $data" | jq -s add)
+    echo "$dump" > "$tmpdir/dump${sv}.json"
+  done
+
+  _info "Scaling down sequencers and mediators"
+  for sv in "${!svIngressNames[@]}"; do
+    kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-sequencer global-domain-0-mediator
+  done
+
+  for sv in "${!svIngressNames[@]}"; do
+    pod=$(kubectl get pod -n sv-"$sv" -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
+
+    # Copy dump file to the pvc on the sv-app
+    kubectl cp "$tmpdir/dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
+  done
+
+  token=$(subcmd_get_token validator1 validator)
+  dump=$(curl -sSL --fail-with-body "https://wallet.validator1.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$dump_timestamp&migration_id=1&force=true" \
+         -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json")
+  echo "$dump" | jq .data_snapshot > "$tmpdir/dump-validator1.json"
+  pod=$(kubectl get pod -n validator1 -l 'app=validator-app' -o json | jq -r .items[0].metadata.name)
+  kubectl cp "$tmpdir/dump-validator1.json" "validator1/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
+
+  _info "Deploying new domain"
+  local migration_config
+  export DISABLE_COMETBFT_STATE_SYNC="true"
+  migration_config=$(cat <<EOF
+  upgrade:
+    id: 1
+    provider: internal
+EOF
+  )
+  _update_cluster_config "$migration_config" "synchronizerMigration"
+
+  _cluster_apply
+
+  _info "Switching to new domain"
+
+  migration_config=$(cat <<EOF
+  active:
+    id: 1
+    provider: internal
+    migratingFrom: 0
+EOF
+  )
+  _update_cluster_config "$migration_config" "synchronizerMigration"
+  _cluster_apply
+
+  _info "Checking amulet on restored svs/validators"
+  for ingressName in "${!taps[@]}"; do
+    _info "Checking restore of tap ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
+    token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
+    local amuletPrice=0.005
+    local fuzzFactorForFees=0.95
+    _info "balance url: https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance"
+    totalBalance=$(curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/wallet/balance" \
+                   -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq -r '.effective_unlocked_qty')
+    if [ 0 -eq "$(bc -e "$totalBalance >= ${taps[$ingressName]} / $amuletPrice * $fuzzFactorForFees")" ]; then
+        _error "$ingressName only sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    else
+        _info "$ingressName sees $totalBalance amulet of tapped ${taps[$ingressName]}USD"
+    fi
+  done
+
+  # TODO(#12123) Reenable this.
+  # _info "Installing Splitwell"
+  # export SPLICE_DEPLOY_SPLITWELL="true"
+  # _cluster_apply
+}
+
+function take_sv_disaster_recovery_dump() {
+    local timestamp="$1"
+    local migration_id="$2"
+    local output_directory="$3"
+    local namespace="$4"
+    echo "Taking dump of SV $namespace"
+    token=$(subcmd_get_token "$namespace" sv)
+
+    declare -A svIngressNames
+    svIngressNames['sv-1']='sv-2'
+    svIngressNames['sv-2']='sv-2-eng'
+    svIngressNames['sv-3']='sv-3-eng'
+    svIngressNames['sv-4']='sv-4-eng'
+    svIngressNames['sv']='sv'
+    local svIngressName=${svIngressNames[$namespace]}
+
+    data_dump_file="$output_directory/${namespace}_id_dump.json"
+    id_dump_file="$output_directory/${namespace}_data_dump.json"
+    mkdir -p "$output_directory"
+    curl -sSLf "https://sv.$svIngressName.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/identities-dump" \
+         -H "Authorization: Bearer $token" > "$data_dump_file"
+    curl -sSLf "https://sv.$svIngressName.${GCP_CLUSTER_HOSTNAME}/api/sv/v0/admin/domain/data-snapshot?timestamp=$timestamp&migration_id=$migration_id" \
+         -H "authorization: Bearer $token" -X GET -H "Content-Type: application/json" > "$id_dump_file"
+    cat "$data_dump_file" "$id_dump_file" | jq -s add > "$output_directory/${namespace}_dump.json"
+}
+
+function take_validator_disaster_recovery_dump() {
+    local timestamp="$1"
+    local migration_id="$2"
+    local output_directory="$3"
+    local namespace="$4"
+    echo "Taking dump of validator $namespace"
+    token=$(subcmd_get_token "$namespace" validator)
+    mkdir -p "$output_directory"
+    dump="$(curl -sSLf "https://wallet.$namespace.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/admin/domain/data-snapshot?timestamp=$timestamp" \
+            -H "authorization: Bearer ${token}" -X GET -H "Content-Type: application/json" | jq .data_snapshot)"
+    echo "$dump" > "$output_directory/${namespace}_dump.json"
+}
+
+subcommand_whitelist[take_disaster_recovery_dumps]='Take disaster recovery dumps of the specified namespaces'
+function subcmd_take_disaster_recovery_dumps() {
+    if [ $# -lt 4 ]; then
+        _error "Usage: $SCRIPTNAME take_disaster_recovery_dumps <timestamp> <new_migration_id> <output_directory> <namespaces>"
+    fi
+    timestamp=$1
+    shift
+    migration_id=$1
+    shift
+    output_directory=$1
+    shift
+    for namespace in "$@"; do
+        if [[ "$namespace" == sv* ]]; then
+            take_sv_disaster_recovery_dump "$timestamp" "$migration_id" "$output_directory" "$namespace"
+        else
+            take_validator_disaster_recovery_dump "$timestamp" "$migration_id" "$output_directory" "$namespace"
+        fi
+    done
+}
+
+subcommand_whitelist[copy_disaster_recovery_dumps]='Copy disaster recovery dumps into the pods in the cluster'
+function subcmd_copy_disaster_recovery_dumps() {
+    if [ $# -lt 2 ]; then
+        _error "Usage: $SCRIPTNAME copy_disaster_recovery_dumps <dump_directory> <namespaces>"
+    fi
+    dump_directory="$1"
+    shift
+    for namespace in "$@"; do
+        echo "Copying dump to $namespace"
+        dump_src_path="$dump_directory/${namespace}_dump.json"
+        if [[ "$namespace" == sv* ]]; then
+            pod=$(kubectl get pod -n "$namespace" -l app=sv-app -o name)
+        else
+            pod=$(kubectl get pod -n "$namespace" -l app=validator-app -o name)
+        fi
+        kubectl cp "$dump_src_path" "$namespace/${pod#pod/}:/domain-upgrade-dump/domain_migration_dump.json"
+    done
+}

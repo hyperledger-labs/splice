@@ -1,0 +1,34 @@
+name: "Restore Daml artifacts"
+description: "Restore the Daml artifacts cache"
+inputs:
+  cache_version:
+    description: "Version of the cache"
+    required: true
+outputs:
+  cache_hit:
+    description: "Cache hit"
+    value: ${{ steps.restore.outputs.cache-hit }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Restore Daml artifacts cache
+      id: restore
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          /tmp/daml
+          apps/common/frontend/daml.js
+        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }} rev:${{ github.sha }}
+        restore-keys: |
+          daml-artifacts-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }}
+          daml-artifacts-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }}
+    - name: Extract Daml artifacts
+      shell: bash
+      run: |
+        if [[ -e /tmp/daml/daml.tar.gz ]]; then
+          tar --use-compress-program=pigz -xf /tmp/daml/daml.tar.gz
+        else
+          echo "No cached daml artifacts files found. Skipping..."
+        fi
+

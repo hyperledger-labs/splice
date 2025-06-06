@@ -1,4 +1,5 @@
-# SPDX-License-Identifier: Apache-2.0
-
-# Splice maintainers
-*       @hyperledger-labs/splice-maintainers
+# Daml code is at the architectural core of CN, and in some cases defines far-reaching public APIs.
+# We thus would like to have approval from one of the architects for .daml code changes; and in case
+# they are not available from one of the tech leads.
+/daml/     @moritzkiefer-da @meiersi-da @ray-roestenburg-da @martinflorian-da @isegall-da
+daml.yaml  @moritzkiefer-da @meiersi-da @ray-roestenburg-da @martinflorian-da @isegall-da

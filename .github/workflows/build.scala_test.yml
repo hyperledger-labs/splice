@@ -1,0 +1,116 @@
+name: Scala Test
+on:
+  workflow_call:
+    inputs:
+      start_canton_options:
+        type: string
+        required: false
+        default: "-h" # Prints version and exits, we want this input to be required unless with_canton is false
+      runs_on:
+        type: string
+        required: true
+      parallelism:
+        type: number
+        required: true
+      test_names_file:
+        type: string
+        required: true
+      test_name:
+        type: string
+        required: true
+      with_gcp_creds:
+        type: boolean
+        required: false
+        default: false
+      is_frontend_test:
+        type: boolean
+        required: false
+        default: false
+      skip_if_regex:
+        type: string
+        required: false
+        default: ""
+      skip_if_files_changed:
+        type: string
+        required: false
+        default: ""
+      pre_sbt_cmd:
+        type: string
+        required: false
+        default: ""
+      with_canton:
+        type: boolean
+        required: false
+        default: true
+
+jobs:
+
+  split_tests:
+    runs-on: self-hosted-docker-tiny
+    name: Split the tests into parallel runs
+    outputs:
+      indices: ${{ steps.prep.outputs.indices }}
+      test_names: ${{ steps.prep.outputs.test_names }}
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          # Checkout the PR head commit to get the commit message
+          ref: ${{ github.event.pull_request.head.sha }}
+          # Checkout with full history to get all commit messages on the branch
+          fetch-depth: 0
+
+      - name: Split tests
+        id: prep
+        uses: ./.github/actions/tests/pre_scala_test
+        with:
+          parallelism: ${{ inputs.parallelism }}
+          test_names_file: ${{ inputs.test_names_file }}
+          skip_if_regex: ${{ inputs.skip_if_regex }}
+          skip_if_files_changed: ${{ inputs.skip_if_files_changed }}
+
+  scala_test:
+    runs-on: ${{ inputs.runs_on }}
+    name: ${{ inputs.test_name }} (${{ matrix.runner-index }})
+    timeout-minutes: 35
+    needs:
+      - split_tests
+    if: ${{ needs.split_tests.outputs.indices != '[]' }}
+    strategy:
+      matrix:
+        runner-index: ${{ fromjson(needs.split_tests.outputs.indices) }}
+      fail-fast: false
+    container:
+      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+
+    services:
+      postgres:
+        image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-postgres:0.3.12
+        env:
+          POSTGRES_PASSWORD: postgres
+
+    steps:
+
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Run Tests
+        uses: ./.github/actions/tests/scala_test
+        with:
+          with_canton: ${{ inputs.with_canton }}
+          start_canton_options: ${{ inputs.start_canton_options }}
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          test_suite_name: ${{ inputs.test_name }}
+          test_names: ${{ needs.split_tests.outputs.test_names }}
+          runner_index: ${{ matrix.runner-index }}
+          with_gcp_creds: ${{ inputs.with_gcp_creds }}
+          gcp_kms_creds: ${{ secrets.GCP_KMS_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}
+          gcp_data_export_creds: ${{ secrets.GCP_DATA_EXPORT_INTEGRATION_TEST_SERVICE_ACCOUNT_CREDENTIALS }}
+          is_frontend_test: ${{ inputs.is_frontend_test }}
+          auth0_management_api_client_id: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID }}
+          auth0_management_api_client_secret: ${{ secrets.AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET }}
+          auth0_validator_audience: ${{ secrets.AUTH0_TESTS_VALIDATOR_AUDIENCE }}
+          slack_access_token: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          github_token: ${{ secrets.GH_ISSUES }}
+          pre_sbt_cmd: ${{ inputs.pre_sbt_cmd }}

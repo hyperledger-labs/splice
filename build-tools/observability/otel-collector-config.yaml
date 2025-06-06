@@ -1,0 +1,60 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: "0.0.0.0:4317"
+
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'cometbft'
+          scrape_interval: 15s
+          static_configs:
+            - targets: [ 'localhost:26610', 'localhost:26620', 'localhost:26630', 'localhost:26640']
+        - job_name: 'cn_app'
+          scrape_interval: 15s
+          static_configs:
+            - targets: [ 'localhost:25000' ]
+          metric_relabel_configs:
+            - source_labels: [ application_id ]
+              regex: .*
+              target_label: application_id
+              replacement: ""
+        - job_name: 'tests'
+          scrape_interval: 15s
+          static_configs:
+            - targets: [ 'localhost:25001' ]
+          metric_relabel_configs:
+            - source_labels: [ application_id ]
+              regex: .*
+              target_label: application_id
+              replacement: ""
+
+exporters:
+  prometheusremotewrite:
+    endpoint: "https://public.observability.network.canton.global/api/v1/write"
+    tls:
+      insecure: false
+    auth:
+      authenticator: bearertokenauth
+    external_labels:
+      env: ${env:ENVIRONMENT}
+      user: ${env:BUILD_USER}
+      branch: ${env:BUILD_BRANCH}
+      build_num: ${env:BUILD_NUM}
+      build_job: ${env:BUILD_JOB}
+
+processors:
+  batch:
+
+service:
+  extensions: [bearertokenauth]
+  pipelines:
+    metrics:
+      receivers: [ otlp, prometheus ]
+      processors: [ batch ]
+      exporters: [ prometheusremotewrite ]
+
+extensions:
+  bearertokenauth:
+    filename: "/etc/file-containing.token"

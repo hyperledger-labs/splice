@@ -1,0 +1,15 @@
+infra:
+  prometheus:
+    retentionDuration: "30d"
+    retentionSize: "200GB"
+    storageSize: "600Gi"
+pulumiProjectConfig:
+  default:
+    cloudSql:
+      protected: false
+validator1:
+  participantPruningSchedule:
+    cron: "0 /10 * * * ?" # Run every 10min
+    maxDuration: "5m"
+    retention: "1h" # Keep 1h
+  deduplicationDuration: 30m

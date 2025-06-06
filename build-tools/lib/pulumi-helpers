@@ -1,0 +1,230 @@
+# -*- shell-script -*-
+
+function _pulumi() {
+    if ! [ -v PULUMI_BACKEND_URL ]; then
+        # shellcheck disable=SC2016
+      	_error 'The `PULUMI_BACKEND_URL` variable is not set. It should point to a GCP bucket, e.g. `gs://a-bucket-name`.'
+    fi
+
+    # shellcheck disable=SC2145
+    _log "Running Pulumi Command : pulumi $@"
+
+    pulumi "$@"
+}
+
+# Create a pulumi stack for a given project (for the current cluster) if one does not yet exist.
+# While `pulumi up` can create a stack implicitly if one does not exist, we want to also configure
+# it to use gcpkms, so we explicitly initialize it first here.
+# We also call this before `pulumi down`, otherwise that command will fail if the stack happens not to exist yet,
+# which we typically don't want.
+function _uses_pulumi_stack() {
+
+    pulumi_project=$1
+    pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
+
+    if [ ! -f "${PULUMI_STACKS_DIR}/${pulumi_project}/Pulumi.$pulumi_stack.yaml" ]; then
+        _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
+                --cwd "${PULUMI_STACKS_DIR}/${pulumi_project}" \
+                stack init \
+                --secrets-provider="gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}" \
+                2> /dev/null || true
+
+        # Even though we do not use pulumi configs, pulumi insists on creating a local settings file, and on having a secrets-provider for it. We therefore create it here if it doesn't exist.
+        _info "Creating Pulumi stack for ${pulumi_project} project (file ${PULUMI_STACKS_DIR}/${pulumi_project}/Pulumi.$pulumi_stack.yaml does not exist)"
+        local -x PULUMI_CONFIG_PASSPHRASE=''
+        _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
+                --cwd "${PULUMI_STACKS_DIR}/${pulumi_project}" \
+                stack change-secrets-provider "gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}"
+    fi
+}
+
+function _resolve_pulumi_stack() {
+    pulumi_project=$1
+    if [[ $pulumi_project == "gcp" ]] || [[ $pulumi_project == "gcp-project" ]]; then
+        pulumi_stack="$CLOUDSDK_CORE_PROJECT"
+    elif [[ $pulumi_project == "sv-canton" ]]; then
+        pulumi_stack="$pulumi_project.${SPLICE_SV}-migration-${SPLICE_MIGRATION_ID}.$GCP_CLUSTER_BASENAME"
+    else
+        pulumi_stack="$pulumi_project.$GCP_CLUSTER_BASENAME"
+    fi
+    echo "$pulumi_stack"
+}
+
+function _cluster_reset() {
+    # not used but required to pass config validation
+    if [ -z "${CHARTS_VERSION:-}" ]; then
+        export CHARTS_VERSION="local"
+    fi
+    _info "Uninstalling Pulumi canton-network and runbook stacks"
+
+    _pulumi_automation_run_down
+
+    _info "Cluster in reset/idle state."
+}
+
+function _infra_up() {
+      _info "Activating infrastructure Pulumi stack"
+
+      subcmd_install_dns01_key
+
+      _uses_pulumi_stack infra
+
+      subcmd_pulumi infra up --yes --skip-preview
+}
+
+function _cluster_apply() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --skip-infra)
+                skipInfra="yes"
+                shift
+                ;;
+            --sv1-only)
+                sv1Only="yes"
+                shift
+                ;;
+            --fully-parallel)
+                fullyParallel="yes"
+                shift
+                ;;
+            -*)
+                _error "Unknown option $1"
+                ;;
+        esac
+    done
+
+    if [ -z "${skipInfra:-}" ]; then
+      _info "Applying Pulumi Cluster stack"
+      subcmd_pulumi cluster up --yes --skip-preview
+      _info "Applying Pulumi Infra Stack"
+      _infra_up
+    else
+        _info "Skipping infra deployment"
+    fi
+
+    _info "Applying Pulumi Stack"
+
+    subcmd_install_data_export_bucket_key
+
+    if [ -n "${sv1Only:-}" ] || [ -z "${fullyParallel:-}" ]; then
+      _info "Applying SV1 only"
+      DSO_SIZE=1 \
+        SPLICE_DEPLOY_VALIDATOR1=false \
+        SPLICE_DEPLOY_SPLITWELL=false \
+        SPLICE_DEPLOY_SV_RUNBOOK=false \
+        SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
+        _pulumi_automation_run_up
+    fi
+    if [ -z "${sv1Only:-}" ]; then
+      _info "Applying all"
+      DISABLE_COMETBFT_STATE_SYNC=true \
+        SPLICE_DEPLOY_SV_RUNBOOK=false \
+        SPLICE_DEPLOY_VALIDATOR_RUNBOOK=false \
+        _pulumi_automation_run_up
+    fi
+}
+
+function _pulumi_automation_run_up() {
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run up
+    else
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run up
+    fi
+}
+
+function _pulumi_automation_run_down() {
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run down
+    else
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run down
+    fi
+}
+
+function _pulumi_automation_run_refresh() {
+  _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run refresh
+}
+
+function _pulumi_automation_run_cancel() {
+    if [ $# -eq 1 ]; then
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run cancel
+    else
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run cancel
+    fi
+}
+
+# If we run npm [...] pulumi in the same process group as us, then when we ctrl-c,
+# it will signal pulumi at least twice, sometimes even three: once through the ctrl-c
+# signalling the whole process group, and once through pulumiXX.ts catching the signal
+# (and if we're not careful, it will catch it twice). Signaling pulumi twice is like hitting
+# ctrl-c twice, thus telling pulumi to exit immediately and not cleanup after itself, thus
+# ending with locked and/or polluted stacks.
+# Similarly, in CCI's run_bash_command_in_nix, we signal the whole process group, which is equivalend
+# to hitting ctrl-c in the terminal.
+# We solve this by running pulumi in a separate process group (using `set -m`), and killing it
+# using /bin/kill, which signals only the process and not its whole process group.
+function _killable_pulumi_automation_run() {
+  set -m
+  npm $@ &
+  PID=$!
+  set +m
+  trap 'echo "caught signal, killing $PID"; kill -2 $PID; wait $PID' SIGINT SIGTERM
+  wait $PID
+  trap - SIGINT SIGTERM
+}
+
+function _get_flux_reference_config() {
+    gitRef="$1"
+    repo="$2"
+    indentation="$3"
+    if [ "$repo" == "canton-network-node" ]; then
+
+        cat <<EOF
+${indentation}repoUrl: https://github.com/DACH-NY/canton-network-node
+${indentation}gitReference: $gitRef
+${indentation}pulumiStacksDir: "cluster/stacks/$(basename $PULUMI_STACKS_DIR)"
+${indentation}pulumiBaseDir: "cluster/pulumi"
+${indentation}deploymentDir: "cluster/deployment"
+${indentation}spliceRoot: "."
+${indentation}privateConfigsDir: "cluster/configs-private"
+${indentation}publicConfigsDir: "cluster/configs"
+EOF
+
+    elif [ "$repo" == "canton-network-internal" ]; then
+
+        if [ -z "${DA_REPO_ROOT:-}" ]; then
+            _error "Deploying from canton-network-internal should be configured only from that repo"
+        fi
+        # TODO(#17841): once we stop symlinking deployment directories from splice
+        # to canton-network-internal, assert here that the cluster has been fully
+        # migrated to the internal repo (i.e. its deployment dir and stack files
+        # exist there)
+
+        cat <<EOF
+${indentation}repoUrl: https://github.com/DACH-NY/canton-network-internal
+${indentation}gitReference: $gitRef
+${indentation}pulumiBaseDir: "splice/cluster/pulumi"
+${indentation}pulumiStacksDir: "cluster/stacks/$(basename $PULUMI_STACKS_DIR)"
+${indentation}deploymentDir: "cluster/deployment"
+${indentation}spliceRoot: "splice"
+${indentation}privateConfigsDir: "cluster/configs/configs-private"
+${indentation}publicConfigsDir: "cluster/configs/configs"
+EOF
+    else
+        _error "Unknown repo $repo"
+    fi
+}
+
+# Update the cluster config file
+function _update_cluster_config() {
+  local yaml_content="$1"
+  local field="$2"
+  local file
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    file="config.yaml"
+  else
+    file="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
+  fi
+  tmp_file=$(mktemp)
+  echo "$yaml_content" > "$tmp_file"
+  yq eval-all --inplace ".${field} = load(\"${tmp_file}\")" "$file"
+}

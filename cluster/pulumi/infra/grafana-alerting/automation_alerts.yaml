@@ -1,0 +1,367 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: automation
+    folder: canton-network
+    interval: 5m
+    rules:
+      - uid: fe73c0e7-dcb3-4975-a7d1-04ed8da087be
+        title: Automation Failures
+        condition: threshold
+        data:
+          - refId: total
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by(namespace, node_type, trigger_name, migration) (delta(splice_trigger_completed_total{trigger_name=~".+", outcome=~".+"}[10m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: total
+          - refId: failures
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: sum by(namespace, node_type, trigger_name, migration) (delta(splice_trigger_completed_total{trigger_name=~".+", outcome=~"failure"}[10m])) or on() vector(0)
+              hide: false
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: failures
+          - refId: failure_pct
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: ${failures} / ${total} * 100
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: failure_pct
+              type: math
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: failure_pct
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: threshold
+              type: threshold
+        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
+        panelId: 14
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
+          __panelId__: "14"
+          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "failure_pct" }}% failures in the last 10 minutes.
+          severity: |-
+            {{- if (gt $values.failure_pct.Value 50.0) -}}
+            critical
+            {{- else -}}
+            warning
+            {{- end -}}
+          summary: '{{ index $values "failure_pct" }}% fatal errors occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
+        labels:
+          gcloud_filter: 'resource.labels.namespace_name=%22{{ index $labels "namespace" }}%22%0A%22{{ index $labels "trigger_name" }}%22'
+        isPaused: false
+      - uid: adwt1yr5xuscge
+        title: ACS snapshot taking too long
+        condition: too_long
+        data:
+          - refId: latency
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: histogram_quantile(0.99, rate(splice_trigger_latency_duration_seconds{trigger_name="AcsSnapshotTrigger", namespace="sv-1"}[10m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: latency
+          - refId: too_long
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 600
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: latency
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: too_long
+              type: threshold
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: ""
+          runbook_url: ""
+          severity: warning
+          summary: ACS snapshot took longer than 10m in {{ index $labels "namespace" }}'s Scan
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
+        isPaused: false
+      - uid: ady2ks9ehbw1sb
+        title: Busy task-based automation
+        condition: threshold
+        data:
+          - refId: runs
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_completed_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: runs
+          - refId: threshold
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - 1
+                          - 0
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: runs
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: threshold
+              type: threshold
+        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
+        panelId: 14
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
+          __panelId__: "14"
+          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
+          runbook_url: ""
+          severity: |-
+              {{- if (gt $values.runs.Value 2) -}}
+              critical
+              {{- else -}}
+              warning
+              {{- end -}}
+          summary: '{{ index $values "runs" }} trigger runs per second occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
+        isPaused: false
+      - uid: edz6eq1kc543ke
+        title: Busy polling-based automation
+        condition: threshold
+        data:
+          - refId: runs
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum by(namespace, node_type, node_name, job, trigger_name, migration, party) (rate(splice_trigger_iterations_total{trigger_name!~"ScanHistoryBackfillingTrigger|AcsSnapshotTrigger|ScanBackfillAggregatesTrigger"}[5m]))
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: runs
+          - refId: threshold
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                  - evaluator:
+                      params:
+                          - 1
+                          - 0
+                      type: gt
+                    operator:
+                      type: and
+                    query:
+                      params: []
+                    reducer:
+                      params: []
+                      type: avg
+                    type: query
+              datasource:
+                  name: Expression
+                  type: __expr__
+                  uid: __expr__
+              expression: runs
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: threshold
+              type: threshold
+        dashboardUid: a3e1385f-6f03-46d9-908c-34aca0f507a6
+        panelId: 14
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          __dashboardUid__: a3e1385f-6f03-46d9-908c-34aca0f507a6
+          __panelId__: "14"
+          description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
+          runbook_url: ""
+          severity: |-
+              {{- if (gt $values.runs.Value 2) -}}
+              critical
+              {{- else -}}
+              warning
+              {{- end -}}
+          summary: '{{ index $values "runs" }} trigger runs per second occurred in {{ index $labels "namespace" }} - {{ index $labels "trigger_name" }} automation trigger'
+        labels:
+          "": ""
+          gcloud_filter: resource.labels.namespace_name=%22{{ index  "namespace" }}%22%0A%22{{ index  "trigger_name" }}%22
+        isPaused: false
+      - uid: fe12i7xur3eo0d
+        title: Backfilling not progressing
+        condition: C
+        data:
+          - refId: Max (rate vs completed)
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by(namespace)(rate(splice_history_backfilling_transaction_count[5m]) > 0 or splice_history_backfilling_completed)
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: Max (rate vs completed)
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1e-11
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: Max (rate vs completed)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        noDataState: $NODATA
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          description: ""
+          runbook_url: ""
+          summary: History backfilling is not making any progress in {{ index $labels "namespace" }}
+        labels:
+          "": ""
+        isPaused: false

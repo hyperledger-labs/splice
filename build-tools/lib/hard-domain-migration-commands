@@ -1,0 +1,111 @@
+# -*- shell-script -*-
+
+subcommand_whitelist[hard_domain_migration_trigger]='Propose a (nearly immediate) hard domain migration start and vote with SVs 1-4'
+
+function subcmd_hard_domain_migration_trigger() {
+  _prompt_to_confirm
+  _cluster_must_exist
+
+  subcmd_preflight_global_domain_upgrade
+}
+
+subcommand_whitelist[update_config]='Upgrade the hard domain migration config'
+
+function subcmd_update_config() {
+  local migration_type
+  local migration_id
+  if [ "$#" -ge 2 ]; then
+    migration_type="$1"
+    migration_id="$2"
+    shift 2
+  else
+    _error "Usage: $0 $SCRIPTNAME migration_type migration_id [version] [<git_reference> <git_repo>]"
+  fi
+  local migration_config
+  migration_config=$(cat <<EOF
+      id: $migration_id
+EOF
+  )
+  if [ "$#" -gt 0 ]; then
+    migration_config+=$(cat <<EOF
+
+      version: $1
+EOF
+  )
+    shift
+  fi
+  if [ "$#" -gt 0 ]; then
+    if [ "$#" -lt 2 ]; then
+      _error "Usage: $0 $SCRIPTNAME migration_type migration_id [version] [<git_reference> <git_repo>]"
+    fi
+    git_reference="$1"
+    git_repo="$2"
+    shift
+    migration_config+=$(cat <<EOF
+
+      releaseReference:
+$(_get_flux_reference_config $git_reference $git_repo "        ")
+EOF
+  )
+  fi
+  _update_cluster_config "$migration_config" "synchronizerMigration.$migration_type"
+}
+
+subcommand_whitelist[update_active_version]='Upgrade the version of the active migration id including CHARTS_VERSION'
+
+function subcmd_update_active_version() {
+    local cluster_directory
+    if [ "$#" -ne 1 ]; then
+        _error "Usage: $0 $SCRIPTNAME [version]"
+    fi
+    # yq doesn't like the version being unquoted so we quote it here
+    _update_cluster_config "\"$1\"" "synchronizerMigration.active.version"
+    if [ -z "${TARGET_CLUSTER-}" ]; then
+        cluster_directory="$(pwd)"
+    else
+        cluster_directory="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}"
+    fi
+    set -x
+    sed -i "s/^export CHARTS_VERSION=.*$/export CHARTS_VERSION=\"$1\"/" "$cluster_directory/.envrc.vars"
+}
+
+subcommand_whitelist[update_config_to_migrate]='Upgrade the cluster config.yaml to migrate cluster'
+
+function subcmd_update_config_to_migrate() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e 'with(.synchronizerMigration; .legacy = .active | .active = .upgrade | del(.upgrade))' -i $configFile
+  yq e '.synchronizerMigration.active.migratingFrom = 0' -i $configFile
+  yq e 'del(.synchronizerMigration.legacy.releaseReference)' -i $configFile
+}
+
+subcommand_whitelist[update_config_to_archive_legacy_migration]='Upgrade the cluster config.yaml to archive legacy migration'
+
+function subcmd_update_config_to_archive_legacy_migration() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e '.synchronizerMigration.archived = [ .synchronizerMigration.legacy ] | del(.synchronizerMigration.legacy)' -i $configFile
+}
+
+subcommand_whitelist[update_config_to_remove_migrating_from]='Upgrade the cluster config.yaml to remove migratingFrom field from active migration'
+
+function subcmd_update_config_to_remove_migrating_from() {
+  local configFile
+  if [ -z "${TARGET_CLUSTER-}" ]; then
+    configFile="config.yaml"
+  else
+    configFile="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}/config.yaml"
+  fi
+
+  yq e 'del(.synchronizerMigration.active.migratingFrom)' -i $configFile
+}

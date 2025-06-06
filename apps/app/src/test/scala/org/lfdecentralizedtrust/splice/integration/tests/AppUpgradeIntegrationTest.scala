@@ -268,17 +268,15 @@ class AppUpgradeIntegrationTest
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
-              clue(s"sv2-3 accept") {
-                Seq(sv2Backend, sv3Backend).map(sv =>
-                  eventuallySucceeds() {
-                    sv.castVote(
-                      voteRequest.contractId,
-                      true,
-                      "url",
-                      "description",
-                    )
-                  }
-                )
+              clue(s"sv2 accepts, resulting in a super-majority approval") {
+                eventuallySucceeds() {
+                  sv2Backend.castVote(
+                    voteRequest.contractId,
+                    isAccepted = true,
+                    "url",
+                    "description",
+                  )
+                }
               }
             },
           )(
