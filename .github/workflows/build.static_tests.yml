@@ -36,26 +36,6 @@ jobs:
         with:
           cmd: ./scripts/check-daml-return-types.sh
 
-      - name: Checking TODOs
-        uses: ./.github/actions/nix/run_bash_command_in_nix
-        with:
-          cmd: |
-            echo "PR number: $CIRCLE_PULL_REQUEST"
-            ./scripts/check-todos.sh
-          additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
-        env:
-          # The script assumes CCI env vars, so we map GHA ones to CCI ones here
-          GH_USER: ${{ github.actor }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CIRCLE_BRANCH: ${{ github.ref }}
-          CIRCLE_PULL_REQUEST: ${{ github.event.pull_request.number }}
-
-      - name: Store TODOs as artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: todos
-          path: todo-out/todos
-
       - name: Lint GHA
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
