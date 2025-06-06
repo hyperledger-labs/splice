@@ -1,0 +1,41 @@
+metadata:
+  annotations:
+    annotated-by: "extension"
+  labels:
+    labeled-by: "extension"
+spec:
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 3000
+  restartPolicy: Never
+  containers:
+  - name: $job # overwrites job container
+    env:
+    - name: ENV1
+      value: "value1"
+    imagePullPolicy: Always
+    image: "busybox:1.28" # Ignored
+    command:
+    - sh
+    args:
+    - -c
+    - sleep 50
+  - name: $redis # overwrites redis service
+    env:
+      - name: ENV2
+        value: "value2"
+    image: "busybox:1.28" # Ignored
+    resources:
+      requests:
+        memory: "1Mi"
+        cpu: "1"
+      limits:
+        memory: "1Gi"
+        cpu: "2"
+  - name: side-car
+    image: "ubuntu:latest" # required
+    command:
+      - sh
+    args:
+      - -c
+      - sleep 60
