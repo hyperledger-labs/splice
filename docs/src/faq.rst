@@ -8,7 +8,7 @@
 FAQ
 ===
 
-Contributin
+Contributing
 ++++++++++++++++
 
 .. glossary::
