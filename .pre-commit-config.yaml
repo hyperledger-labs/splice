@@ -51,11 +51,6 @@ repos:
         entry: "scripts/fix-ts.py"
         types_or: [javascript, jsx, ts, tsx]
         exclude: "/[.]prettierrc[.]cjs$"
-      - id: circleci_config
-        name: check circleci config is updated
-        language: system
-        entry: ".circleci/build-config.sh --check"
-        files: '^.circleci/config/.*[.]yml$'
       - id: gha_lint
         name: static check github actions
         language: system
