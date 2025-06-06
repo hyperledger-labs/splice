@@ -176,7 +176,6 @@ class HttpValidatorAdminHandler(
             synchronizerId,
             // TODO(DACH-NY/canton-network-node#9731): get migration id from scan instead of configuring here
             migrationId getOrElse (config.domainMigrationId + 1),
-            force.getOrElse(false),
           )
           .map { response =>
             v0.ValidatorAdminResource.GetValidatorDomainDataSnapshotResponse.OK(
