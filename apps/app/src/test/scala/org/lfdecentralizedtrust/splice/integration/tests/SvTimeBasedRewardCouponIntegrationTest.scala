@@ -30,6 +30,7 @@ import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.slf4j.event.Level
 
 import scala.math.Ordering.Implicits.*
@@ -53,7 +54,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         config
           .focus(_.svApps)
           .modify(_.map { case (name, svConfig) =>
-            // sv4 gives part of its reward to alice
+            // sv4 gives part of its reward to aliceValidator
             val newConfig = if (name.unwrap == "sv4") {
               val aliceParticipant =
                 ConfigTransforms
@@ -82,6 +83,12 @@ class SvTimeBasedRewardCouponIntegrationTest
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Sv)(
+          // needs to be disabled until alice has vetted the latest packages (to be checked at the beginning of the test)
+          _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
+        )(config)
+      )
       .withTrafficTopupsDisabled
 
   private val feesUpperBoundCC = walletUsdToAmulet(smallAmount)
@@ -89,6 +96,28 @@ class SvTimeBasedRewardCouponIntegrationTest
   "SVs" should {
 
     "receive and claim SvRewardCoupons" in { implicit env =>
+      // ensure alice has vetted the latest packages
+      val expectedVettedPackages = ReceiveSvRewardCouponTrigger.svLatestVettedPackages(
+        InitialPackageConfig.defaultInitialPackageConfig.toPackageConfig
+      )
+      eventually() {
+        val vettedByAlice =
+          aliceValidatorBackend.participantClientWithAdminToken.topology.vetted_packages
+            .list()
+            .flatMap(
+              _.item.packages.map(_.packageId)
+            )
+        forAll(expectedVettedPackages) { expectedPackage =>
+          vettedByAlice should contain(expectedPackage)
+        }
+      }
+      // now that we know that alice has vetted the latest packages, we can resume the trigger for the rest of the test
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(
+        _.dsoAutomation
+          .trigger[ReceiveSvRewardCouponTrigger]
+          .resume()
+      )
+
       val openRounds = eventually() {
         val openRounds = sv1ScanBackend
           .getOpenAndIssuingMiningRounds()

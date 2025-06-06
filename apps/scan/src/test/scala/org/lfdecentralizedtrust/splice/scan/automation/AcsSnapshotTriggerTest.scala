@@ -54,9 +54,8 @@ class AcsSnapshotTriggerTest
 
         // but there's still updates pending
         when(
-          updateHistory.getUpdates(
+          updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, lastSnapshotTime.plusSeconds(3600L)))),
-            eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
@@ -96,9 +95,8 @@ class AcsSnapshotTriggerTest
         noPreviousSnapshot()
 
         when(
-          updateHistory.getUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
-            eqTo(true),
+          updateHistory.getUpdatesWithoutImportUpdates(
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
@@ -113,9 +111,8 @@ class AcsSnapshotTriggerTest
 
         // data after ACS
         when(
-          updateHistory.getUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
-            eqTo(true),
+          updateHistory.getUpdatesWithoutImportUpdates(
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(
@@ -133,9 +130,8 @@ class AcsSnapshotTriggerTest
 
         // but there's still updates pending
         when(
-          updateHistory.getUpdates(
+          updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, firstSnapshotTime))),
-            eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(Future.successful(Seq.empty))
@@ -150,9 +146,8 @@ class AcsSnapshotTriggerTest
 
         // data after ACS
         when(
-          updateHistory.getUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
-            eqTo(true),
+          updateHistory.getUpdatesWithoutImportUpdates(
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(
@@ -171,9 +166,8 @@ class AcsSnapshotTriggerTest
 
         // no updates pending
         when(
-          updateHistory.getUpdates(
+          updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, firstSnapshotTime))),
-            eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(
@@ -201,9 +195,8 @@ class AcsSnapshotTriggerTest
 
           // data after ACS
           when(
-            updateHistory.getUpdates(
-              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
-              eqTo(true),
+            updateHistory.getUpdatesWithoutImportUpdates(
+              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
               eqTo(PageLimit.tryCreate(1)),
             )(any[TraceContext])
           ).thenReturn(
@@ -222,6 +215,69 @@ class AcsSnapshotTriggerTest
           trigger.retrieveTasks().futureValue should be(empty)
         }
 
+        "when update history backfilling has not finished import updates: return no task" in new AcsSnapshotTriggerTestScope(
+          true
+        ) {
+          noPreviousSnapshot()
+
+          // data after ACS
+          when(
+            updateHistory.getUpdatesWithoutImportUpdates(
+              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
+              eqTo(PageLimit.tryCreate(1)),
+            )(any[TraceContext])
+          ).thenReturn(
+            Future.successful(
+              Seq(
+                TreeUpdateWithMigrationId(
+                  UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                  1L,
+                )
+              )
+            )
+          )
+
+          historyPartiallyBackfilled(
+            currentMigrationId,
+            complete = true,
+            importUpdatesComplete = false,
+          )
+
+          trigger.retrieveTasks().futureValue should be(empty)
+        }
+
+        // Currently, import updates are always backfilled after regular updates, but we do not want to depend on that in the trigger
+        "when update history backfilling has not finished regular updates: return no task" in new AcsSnapshotTriggerTestScope(
+          true
+        ) {
+          noPreviousSnapshot()
+
+          // data after ACS
+          when(
+            updateHistory.getUpdatesWithoutImportUpdates(
+              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
+              eqTo(PageLimit.tryCreate(1)),
+            )(any[TraceContext])
+          ).thenReturn(
+            Future.successful(
+              Seq(
+                TreeUpdateWithMigrationId(
+                  UpdateHistoryResponse(treeUpdate(now.minusSeconds(1800L)), dummyDomain),
+                  1L,
+                )
+              )
+            )
+          )
+
+          historyPartiallyBackfilled(
+            currentMigrationId,
+            complete = false,
+            importUpdatesComplete = true,
+          )
+
+          trigger.retrieveTasks().futureValue should be(empty)
+        }
+
         // this is the case of when an SV joins late (and the history is backfilled),
         // or was present at the beginning of a migration (no backfilling required).
         "when update history backfilling has finished: return the first task when due and no updates pending" in new AcsSnapshotTriggerTestScope(
@@ -231,9 +287,8 @@ class AcsSnapshotTriggerTest
 
           // data after ACS
           when(
-            updateHistory.getUpdates(
-              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
-              eqTo(true),
+            updateHistory.getUpdatesWithoutImportUpdates(
+              eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
               eqTo(PageLimit.tryCreate(1)),
             )(any[TraceContext])
           ).thenReturn(
@@ -254,9 +309,8 @@ class AcsSnapshotTriggerTest
 
           // no updates pending
           when(
-            updateHistory.getUpdates(
+            updateHistory.getUpdatesWithoutImportUpdates(
               eqTo(Some((currentMigrationId, firstSnapshotTime))),
-              eqTo(true),
               eqTo(PageLimit.tryCreate(1)),
             )(any[TraceContext])
           ).thenReturn(
@@ -308,7 +362,7 @@ class AcsSnapshotTriggerTest
             noPreviousSnapshot(previousMigrationId)
             firstUpdateAt(
               previousMigrationId,
-              queryRecordTime = CantonTimestamp.MinValue.plusSeconds(1L),
+              queryRecordTime = CantonTimestamp.MinValue,
               // first update happened 10d ~3h before the last update
               updateRecordTime = cantonTimestamp("2007-01-03T07:55:30.00Z"),
             )
@@ -380,7 +434,7 @@ class AcsSnapshotTriggerTest
             // first update at 2007-11-20T10:15:30.00Z
             firstUpdateAt(
               previousMigrationId - 1,
-              queryRecordTime = CantonTimestamp.MinValue.plusSeconds(1L),
+              queryRecordTime = CantonTimestamp.MinValue,
               updateRecordTime = cantonTimestamp("2007-11-20T10:15:30.00Z"),
             )
 
@@ -434,9 +488,8 @@ class AcsSnapshotTriggerTest
 
         // data after ACS
         when(
-          updateHistory.getUpdates(
-            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue.plusSeconds(1L)))),
-            eqTo(true),
+          updateHistory.getUpdatesWithoutImportUpdates(
+            eqTo(Some((currentMigrationId, CantonTimestamp.MinValue))),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(
@@ -455,9 +508,8 @@ class AcsSnapshotTriggerTest
 
         // no updates pending
         when(
-          updateHistory.getUpdates(
+          updateHistory.getUpdatesWithoutImportUpdates(
             eqTo(Some((currentMigrationId, firstSnapshotTime))),
-            eqTo(true),
             eqTo(PageLimit.tryCreate(1)),
           )(any[TraceContext])
         ).thenReturn(
@@ -535,7 +587,15 @@ class AcsSnapshotTriggerTest
     when(sourceHistory.migrationInfo(anyLong)(any[TraceContext]))
       .thenReturn(
         Future.successful(
-          Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete = true))
+          Some(
+            HistoryBackfilling.SourceMigrationInfo(
+              previousMigrationId = None,
+              recordTimeRange = Map.empty,
+              lastImportUpdateId = None,
+              complete = true,
+              importUpdatesComplete = true,
+            )
+          )
         )
       )
     when(updateHistory.sourceHistory).thenReturn(sourceHistory)
@@ -586,9 +646,8 @@ class AcsSnapshotTriggerTest
         updateRecordTime: CantonTimestamp,
     ) = {
       when(
-        updateHistory.getUpdates(
+        updateHistory.getUpdatesWithoutImportUpdates(
           eqTo(Some((migrationId, queryRecordTime))),
-          eqTo(true),
           eqTo(PageLimit.tryCreate(1)),
         )(any[TraceContext])
       ).thenReturn(
@@ -612,7 +671,38 @@ class AcsSnapshotTriggerTest
       )
         .thenReturn(
           Future.successful(
-            Some(HistoryBackfilling.SourceMigrationInfo(None, Map.empty, complete))
+            Some(
+              HistoryBackfilling.SourceMigrationInfo(
+                previousMigrationId = None,
+                recordTimeRange = Map.empty,
+                lastImportUpdateId = None,
+                complete = complete,
+                importUpdatesComplete = complete,
+              )
+            )
+          )
+        )
+    }
+
+    def historyPartiallyBackfilled(
+        migrationId: Long,
+        complete: Boolean,
+        importUpdatesComplete: Boolean,
+    ): Unit = {
+      when(
+        updateHistory.sourceHistory.migrationInfo(eqTo(migrationId))(any[TraceContext])
+      )
+        .thenReturn(
+          Future.successful(
+            Some(
+              HistoryBackfilling.SourceMigrationInfo(
+                previousMigrationId = None,
+                recordTimeRange = Map.empty,
+                lastImportUpdateId = None,
+                complete = complete,
+                importUpdatesComplete = importUpdatesComplete,
+              )
+            )
           )
         )
     }

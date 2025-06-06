@@ -20,6 +20,8 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.util.EventId
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.util.Contract
 import org.scalatest.Assertion
 
 import scala.concurrent.Future
@@ -45,6 +47,7 @@ abstract class UpdateHistoryTestBase
       party: PartyId,
       store: UpdateHistory,
       txEffectiveAt: CantonTimestamp,
+      otherSignatories: Seq[PartyId] = Seq.empty,
   ) = {
     DomainSyntax(domain).create(
       c = appRewardCoupon(
@@ -54,8 +57,32 @@ abstract class UpdateHistoryTestBase
       ),
       offset = offset,
       txEffectiveAt = txEffectiveAt.toInstant,
-      createdEventSignatories = Seq(party),
+      createdEventSignatories = party +: otherSignatories,
       recordTime = txEffectiveAt.toInstant,
+    )(
+      store
+    )
+  }
+
+  /** Ingests an import update for a transaction previously ingested using the [[create]] call */
+  protected def importUpdate(
+      tx: TransactionTree,
+      offset: Long,
+      store: UpdateHistory,
+  ) = {
+    val createEvent = tx.getEventsById.asScala.loneElement._2 match {
+      case created: CreatedEvent => created
+      case _ => throw new RuntimeException("Unexpected event type")
+    }
+    val contract =
+      Contract.fromCreatedEvent(amuletCodegen.AppRewardCoupon.COMPANION)(createEvent).value
+    DomainSyntax(SynchronizerId.tryFromString(tx.getSynchronizerId)).create(
+      c = contract,
+      offset = offset,
+      txEffectiveAt = tx.getEffectiveAt,
+      createdEventSignatories =
+        createEvent.getSignatories.asScala.toSeq.map(PartyId.tryFromProtoPrimitive),
+      recordTime = importUpdateRecordTime.toInstant,
     )(
       store
     )
@@ -147,6 +174,7 @@ abstract class UpdateHistoryTestBase
     i.toLong
   }
 
+  protected val importUpdateRecordTime: CantonTimestamp = CantonTimestamp.MinValue
   protected def time(i: Int): CantonTimestamp =
     CantonTimestamp.assertFromInstant(defaultEffectiveAt.plusMillis(i.toLong))
 

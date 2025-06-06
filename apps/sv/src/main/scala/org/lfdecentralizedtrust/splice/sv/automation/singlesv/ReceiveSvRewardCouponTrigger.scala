@@ -31,8 +31,8 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
 
-import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -63,9 +63,6 @@ class ReceiveSvRewardCouponTrigger(
       packages = AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(context.clock.now)
         .packageConfig
-      svLatestVettedPackages = Seq(
-        DarResources.amulet.getPackageIdWithVersion(packages.amulet)
-      )
       beneficiariesWithLatestVettedPackages <- extraBeneficiaries.filterA { beneficiary =>
         val filterParty = beneficiary.beneficiary.filterString
         participantAdminConnection
@@ -85,7 +82,7 @@ class ReceiveSvRewardCouponTrigger(
             }) { partyToParticipant =>
               isVettingLatestPackages(
                 partyToParticipant.mapping.participantIds,
-                svLatestVettedPackages.flatMap(_.toList),
+                ReceiveSvRewardCouponTrigger.svLatestVettedPackages(packages),
               )
             }
           )
@@ -240,5 +237,9 @@ object ReceiveSvRewardCouponTrigger {
         param("round", _.round),
       )
   }
+
+  def svLatestVettedPackages(packages: PackageConfig): Seq[String] = Seq(
+    DarResources.amulet.getPackageIdWithVersion(packages.amulet)
+  ).flatten
 
 }

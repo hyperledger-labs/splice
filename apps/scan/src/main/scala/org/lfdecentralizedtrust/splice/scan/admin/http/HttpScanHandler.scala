@@ -731,7 +731,7 @@ class HttpScanHandler(
                 "This scan instance has not yet loaded its updates history. Wait a short time and retry."
               )
               .asRuntimeException()
-          case BackfillingState.InProgress =>
+          case BackfillingState.InProgress(_, _) =>
             throw Status.UNAVAILABLE
               .withDescription(
                 "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
@@ -740,11 +740,17 @@ class HttpScanHandler(
               .asRuntimeException()
           case BackfillingState.Complete =>
             for {
-              txs <- updateHistory.getUpdates(
-                afterO,
-                includeImportUpdates = includeImportUpdates,
-                PageLimit.tryCreate(pageSize),
-              )
+              txs <-
+                if (includeImportUpdates)
+                  updateHistory.getAllUpdates(
+                    afterO,
+                    PageLimit.tryCreate(pageSize),
+                  )
+                else
+                  updateHistory.getUpdatesWithoutImportUpdates(
+                    afterO,
+                    PageLimit.tryCreate(pageSize),
+                  )
             } yield txs
               .map(
                 ScanHttpEncodings.encodeUpdate(
@@ -1727,6 +1733,8 @@ class HttpScanHandler(
             definitions.GetMigrationInfoResponse(
               previousMigrationId = info.previousMigrationId,
               complete = info.complete,
+              importUpdatesComplete = Some(info.importUpdatesComplete),
+              lastImportUpdateId = info.lastImportUpdateId,
               recordTimeRange = info.recordTimeRange.iterator.map { case (synchronizerId, range) =>
                 definitions.RecordTimeRange(
                   synchronizerId = synchronizerId.toProtoPrimitive,
@@ -1761,6 +1769,34 @@ class HttpScanHandler(
         )
         .map { txs =>
           definitions.GetUpdatesBeforeResponse(
+            txs
+              .map(
+                ScanHttpEncodings.encodeUpdate(
+                  _,
+                  encoding = definitions.DamlValueEncoding.members.ProtobufJson,
+                  version = ScanHttpEncodings.V1,
+                )
+              )
+              .toVector
+          )
+        }
+    }
+  }
+
+  override def getImportUpdates(respond: ScanResource.GetImportUpdatesResponse.type)(
+      body: definitions.GetImportUpdatesRequest
+  )(extracted: TraceContext): Future[ScanResource.GetImportUpdatesResponse] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getImportUpdates") { _ => _ =>
+      val updateHistory = store.updateHistory
+      updateHistory
+        .getImportUpdates(
+          migrationId = body.migrationId,
+          afterUpdateId = body.afterUpdateId,
+          limit = PageLimit.tryCreate(body.limit),
+        )
+        .map { txs =>
+          definitions.GetImportUpdatesResponse(
             txs
               .map(
                 ScanHttpEncodings.encodeUpdate(
