@@ -8,6 +8,18 @@
 FAQ
 ===
 
+Contributin
+++++++++++++++++
+
+.. glossary::
+
+  How can I contribute to the project?
+
+    The project welcomes contributions! Please see the
+    `contribution guidelines <https://github.com/hyperledger-labs/splice/blob/main/CONTRIBUTING.md>`_
+    for instructions on how to get started.
+
+
 Super Validators
 ++++++++++++++++
 
