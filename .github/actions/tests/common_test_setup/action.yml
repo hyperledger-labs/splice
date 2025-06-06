@@ -1,0 +1,53 @@
+name: Common Test Setup
+description: Common setup for tests
+inputs:
+  test_name:
+    description: "Name of the test suite"
+    required: true
+  with_sbt:
+    description: "Whether to set up SBT"
+    required: false
+    default: "true"
+  save_nix_cache:
+    description: "Whether to save the Nix cache"
+    required: false
+    default: "false"
+  artifactory_user:
+    description: "The Artifactory user"
+    required: true
+  artifactory_password:
+    description: "The Artifactory password"
+    required: true
+
+outputs:
+  sbt_cache_hits:
+    description: "Cache hits"
+    value: ${{ steps.setup_sbt.outputs.cache_hits }}
+
+runs:
+  using: "composite"
+  steps:
+
+    - name: Publish test name metric
+      uses: miguelteixeiraa/action-run-in-background@v1
+      with:
+        script: ./.github/actions/scripts/publish_gha_metrics.py --test_suite ${{ inputs.test_name }}
+
+    - name: Setup
+      shell: bash
+      run: ./.github/actions/scripts/common_setup.sh
+
+    - name: Set up Nix
+      uses: ./.github/actions/nix/setup_self_hosted_nix
+      with:
+        artifactory_user: ${{ inputs.artifactory_user }}
+        artifactory_password: ${{ inputs.artifactory_password }}
+        cache_version: 1
+        should_save: ${{ inputs.save_nix_cache }}
+
+    - name: Set up SBT
+      if: inputs.with_sbt == 'true'
+      id: setup_sbt
+      uses: ./.github/actions/sbt/setup_sbt
+      with:
+        cache_version: 1
