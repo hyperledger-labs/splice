@@ -18,6 +18,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.featuredapprightv
 import org.lfdecentralizedtrust.splice.wallet.store.TransferTxLogEntry
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
 class FeaturedAppActivityMarkerIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with WalletTestUtil
