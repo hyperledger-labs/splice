@@ -2123,16 +2123,16 @@ subcommand_whitelist[set_operator_deployment_reference]="Set the git reference f
 function subcmd_set_operator_deployment_reference() {
 
     if [ "$#" -lt 2 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
     if [ "$#" -gt 2 ]; then
-        echo "Usage: $0 set_operator_deployment_reference <branch> <repo>"
+        echo "Usage: $0 set_operator_deployment_reference <branch>"
         exit 1
     fi
     deployment_config=$(cat <<EOF
       reference:
-$(_get_flux_reference_config "$1" "$2" "        ")
+$(_get_flux_reference_config "$1" "        ")
 EOF
     )
     _update_cluster_config "$deployment_config" "operatorDeployment"
