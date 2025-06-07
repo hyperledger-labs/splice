@@ -86,6 +86,18 @@ The `*.localhost` domains will resolve to your local host IP `127.0.0.1`.
 - **App Provider**: app-provider
 - **SV**: sv
 
+## Swagger UI
+
+When the `swagger-ui` profile is enabled, the Swagger UI for the `JSON Ledger API HTTP Endpoints` across all running participants is available at [http://localhost:9090](http://localhost:9090).
+Note: Some endpoints require a JWT token when using the **Try it out** feature. One method to obtain this token is via the Canton Console. Start the Canton Console and execute the following command:
+```
+app-provider.adminToken
+```
+
+For proper functionality, Swagger UI relies on a localhost nginx proxy for `canton.localhost` configured for each participant. For example, the `JSON Ledger API HTTP Endpoints` for the app-provider
+can be accessed at the nginx proxy URL `http://canton.localhost:${APP_PROVIDER_UI_PORT}` via Swagger UI, which corresponds to accessing `localhost:3${PARTICIPANT_JSON_API_PORT}` directly.
+The nginx proxy only adds additional headers to resolve CORS issues within Swagger UI.
+
 
 ## Run in localnet
 ### start
@@ -110,7 +122,30 @@ docker compose --env-file $LOCALNET_DIR/compose.env \
                --profile app-provider \
                --profile app-user down -v
 ```
-
+### start with swagger-ui
+```
+docker compose --env-file $LOCALNET_DIR/compose.env \
+               --env-file $LOCALNET_DIR/env/common.env \
+               --env-file $LOCALNET_DIR/env/local.env \
+               -f $LOCALNET_DIR/compose.yaml \
+               -f $LOCALNET_DIR/resource-constraints.yaml \
+               --profile sv \
+               --profile app-provider \
+               --profile app-user \
+               --profile swagger-ui up -d
+```
+### stop with swagger-ui
+```
+docker compose --env-file $LOCALNET_DIR/compose.env \
+               --env-file $LOCALNET_DIR/env/common.env \
+               --env-file $LOCALNET_DIR/env/local.env \
+               -f $LOCALNET_DIR/compose.yaml \
+               -f $LOCALNET_DIR/resource-constraints.yaml \
+               --profile sv \
+               --profile app-provider \
+               --profile app-user \
+               --profile swagger-ui down -v
+```
 ### console
 ```
 docker compose --env-file $LOCALNET_DIR/compose.env \
