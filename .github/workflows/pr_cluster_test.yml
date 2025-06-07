@@ -33,7 +33,6 @@ jobs:
     with:
       workflow: cluster_test
       sha: ${{ needs.get_head.outputs.sha }}
-      public_splice: ${{ github.repository == 'hyperledger-labs/splice' }}
 
   result:
     runs-on: self-hosted-docker-tiny
@@ -54,7 +53,6 @@ jobs:
     with:
       workflow: hdm_test
       sha: ${{ needs.get_head.outputs.sha }}
-      public_splice: ${{ github.repository == 'hyperledger-labs/splice' }}
 
   result_hdm:
     runs-on: self-hosted-docker-tiny
