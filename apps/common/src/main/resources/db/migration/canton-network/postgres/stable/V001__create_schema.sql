@@ -74,7 +74,7 @@ create table acs_store_template(
 
     -- expiry time of expiring contracts in micros since unix epoch
     -- part of the template as we expect all stores to support expiry
-    -- TODO(#3822): wire this up with the generic expiry interface on contracts
+    -- TODO(DACH-NY/canton-network-node#3822): wire this up with the generic expiry interface on contracts
     contract_expires_at bigint,
 
     -- A monotonically increasing number for events in a store, which is used to serve paginated queries that in
@@ -285,7 +285,7 @@ create table user_wallet_txlog_store(
 
     -- index columns
     ----------------
-    -- which txlog this entry belongs to TODO (#7153): this might be separate tables, so this column would be unnecessary
+    -- which txlog this entry belongs to TODO (#837): this might be separate tables, so this column would be unnecessary
     tx_log_id text not null,
 
     -- used for pagination of transaction history
@@ -669,7 +669,7 @@ create table dso_acs_store
     -- the provider partyid of a FeaturedAppRight contract
     featured_app_right_provider   text,
 
-    -- TODO(#10711): use the index columns below for all templates where they make sense
+    -- TODO(DACH-NY/canton-network-node#10711): use the index columns below for all templates where they make sense
 
     -- generic by sv party field for templates with one instance per svParty
     -- templates: SvStatusReport
@@ -873,7 +873,7 @@ create table update_history_transactions
 
     -- Information useful for ordering or partitioning updates
     record_time                 bigint not null, -- When was this update sequenced
-    participant_offset          text not null,   -- TODO(#10605): local to the participant, drop this once we have the record time
+    participant_offset          text not null,   -- TODO(DACH-NY/canton-network-node#10605): local to the participant, drop this once we have the record time
     domain_id                   text not null,
     migration_id                int not null,    -- The thing that increments with each hard domain migration
 
@@ -980,7 +980,7 @@ create table update_history_assignments
 
     -- Information useful for ordering or partitioning updates
     record_time                 bigint not null, -- When was this update sequenced
-    participant_offset          text not null,   -- TODO(#10605): local to the participant, drop this once we have the record time
+    participant_offset          text not null,   -- TODO(DACH-NY/canton-network-node#10605): local to the participant, drop this once we have the record time
     domain_id                   text not null,   -- The target domain
     migration_id                int not null,    -- The thing that increments with each hard domain migration
 
@@ -1024,7 +1024,7 @@ create table update_history_unassignments
 
     -- Information useful for ordering or partitioning updates
     record_time                 bigint not null, -- When was this update sequenced
-    participant_offset          text not null,   -- TODO(#10605): local to the participant, drop this once we have the record time
+    participant_offset          text not null,   -- TODO(DACH-NY/canton-network-node#10605): local to the participant, drop this once we have the record time
     domain_id                   text not null,   -- The source domain
     migration_id                int not null,    -- The thing that increments with each hard domain migration
 

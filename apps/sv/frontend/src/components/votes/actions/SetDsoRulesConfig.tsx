@@ -24,7 +24,7 @@ const SetDsoRulesConfig: React.FC<{
   isEffective: boolean;
 }> = ({ chooseAction, setIsValidSynchronizerPauseTime, expiration, effectivity, isEffective }) => {
   const dsoInfosQuery = useDsoInfos();
-  // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
+  // TODO (#967): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue> | undefined>(
     undefined
   );

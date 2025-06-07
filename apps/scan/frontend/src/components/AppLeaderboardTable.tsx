@@ -26,7 +26,7 @@ export const AppLeaderboardTable: React.FC = () => {
     case 'success': {
       const appProviders = topAppProvidersQuery.data.providersAndRewards.map(provider => ({
         name: provider.provider,
-        // TODO(#5280) - add transfer totals to API response
+        // TODO(DACH-NY/canton-network-node#5280) - add transfer totals to API response
         totalRewards: BigNumber(provider.rewards),
       }));
 

@@ -189,7 +189,7 @@ EOF
         if [ -z "${DA_REPO_ROOT:-}" ]; then
             _error "Deploying from canton-network-internal should be configured only from that repo"
         fi
-        # TODO(#17841): once we stop symlinking deployment directories from splice
+        # TODO(#910): once we stop symlinking deployment directories from splice
         # to canton-network-internal, assert here that the cluster has been fully
         # migrated to the internal repo (i.e. its deployment dir and stack files
         # exist there)

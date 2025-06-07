@@ -100,7 +100,7 @@ class UpdateIngestionService(
       offset: Long
   )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
-      // TODO(#5534): stream contracts instead of ingesting them as a single Seq
+      // TODO(#863): stream contracts instead of ingesting them as a single Seq
       (acs, incompleteOut, incompleteIn) <- connection.activeContracts(filter, offset)
       _ <- ingestionSink.ingestAcs(
         offset,

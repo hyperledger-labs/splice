@@ -408,7 +408,7 @@ class SV1Initializer(
         )
         val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
         val values = initialValues.tryUpdate(
-          // TODO(#6055) Consider increasing topology change delay again
+          // TODO(DACH-NY/canton-network-node#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =

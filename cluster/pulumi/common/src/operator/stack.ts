@@ -157,7 +157,7 @@ export function createStackCR(
           ? {
               continueResyncOnCommitMatch: true,
               resyncFrequencySeconds: 300,
-              // TODO(#16186): consider scaling down the operator instead
+              // TODO(#924): consider scaling down the operator instead
               refresh: true,
             }
           : {}),

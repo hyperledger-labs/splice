@@ -45,7 +45,7 @@ You can find their Daml docs in the :ref:`app_dev_daml_api` section.
    - the workflows work across different wallet implementations, not just the splice-wallet
 
 .. todo::
-   - TODO(#17505): update the text above and below with the changes from the token-standard
+   - TODO(#552): update the text above and below with the changes from the token-standard
 
 
 Decentralized Transaction Validation and Automation

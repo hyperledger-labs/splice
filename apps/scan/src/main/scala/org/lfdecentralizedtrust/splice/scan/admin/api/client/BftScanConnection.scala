@@ -929,7 +929,7 @@ object BftScanConnection {
             }
             (newScansFailedConnections ++ retriedScansFailedConnections).foreach {
               case (url, (err, svName)) =>
-                // TODO(#10660): abstract this pattern into the RetryProvider
+                // TODO(#815): abstract this pattern into the RetryProvider
                 if (retryProvider.isClosing)
                   logger.info(
                     s"Suppressed warning, as we're shutting down: Failed to connect to scan of $svName ($url).",

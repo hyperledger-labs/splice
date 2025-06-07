@@ -107,7 +107,7 @@ case class SpliceConfig(
 
   override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
 
-  // TODO(#736): we want to remove all of the configurations options below:
+  // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
   override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
   override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty
   override val mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty

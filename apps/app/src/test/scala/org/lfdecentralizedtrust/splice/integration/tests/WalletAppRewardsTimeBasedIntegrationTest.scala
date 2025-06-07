@@ -30,10 +30,10 @@ class WalletAppRewardsTimeBasedIntegrationTest
           _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
         )(config)
       )
-      // TODO (#10859) remove and fix test failures
+      // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
-  // TODO (#10859) remove and fix test failures
+  // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "A wallet" should {

@@ -91,7 +91,7 @@ jobs:
           echo "Backporting commit $commit_sha to branch $base_branch (using branch $new_branch)"
           git fetch origin $base_branch
           git fetch origin $commit_sha
-          # TODO(#16006): should this be the original author instead?
+          # TODO(DACH-NY/canton-network-node#16006): should this be the original author instead?
           git config user.email "splice-maintainers@digitalasset.com"
           git config user.name "DA Automation"
           git checkout -b $new_branch origin/$base_branch
@@ -156,7 +156,7 @@ jobs:
           pr_number: ${{ inputs.pr_number }}
           base_branch: ${{ inputs.base_branch }}
         with:
-          # TODO(#16006): link to the logs
+          # TODO(DACH-NY/canton-network-node#16006): link to the logs
           retries: 3
           script: |
             await github.rest.issues.createComment({

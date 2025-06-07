@@ -196,7 +196,7 @@ it can be beneficial to skim the instructions in :ref:`helm-validator-auth0` as 
 
 .. [#reach] The URL must be reachable from the Canton participant and validator app running in your cluster, as well as from all web browsers that should be able to interact with the wallet and CNS UIs.
 
-    .. TODO(#2052) use a unique audience for each app
+    .. TODO(DACH-NY/canton-network-internal#502) use a unique audience for each app
 
 .. _helm-validator-auth0:
 

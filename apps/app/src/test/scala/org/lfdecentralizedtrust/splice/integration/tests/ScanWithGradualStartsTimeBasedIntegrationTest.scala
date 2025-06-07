@@ -25,7 +25,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
         updateAutomationConfig(ConfigurableApp.Sv)(
           // SVs's sequencer connection choice is not relevant to this test
           // but the reconciliation can cause flakiness
-          // TODO(#8300): Unpause again once this reconciliation is less disruptive
+          // TODO(#979): Unpause again once this reconciliation is less disruptive
           _.withPausedTrigger[LocalSequencerConnectionsTrigger]
         )(config)
       )
@@ -73,7 +73,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       aliceWalletClient.tap(3)
     }
 
-    // TODO(#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
+    // TODO(DACH-NY/canton-network-node#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
     // we must advance rounds until round 3 closes, which is the first round that sv2's scan is guaranteed to have seen.
     (firstOpenRound.payload.round.number.toInt to (firstOpenRound.payload.round.number.toInt + 6))
       .foreach { n =>

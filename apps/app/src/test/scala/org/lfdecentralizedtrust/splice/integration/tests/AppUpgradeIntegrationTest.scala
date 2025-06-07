@@ -69,7 +69,7 @@ class AppUpgradeIntegrationTest
       .withInitializedNodes()
       .withTrafficTopupsEnabled
       .withManualStart
-      // TODO(#8300) Consider removing this once domain config updates are less disruptive, particularly
+      // TODO(#979) Consider removing this once domain config updates are less disruptive, particularly
       // to the tests after SVs 2 and 3 have been upgraded
       .withSequencerConnectionsFromScanDisabled()
       .addConfigTransforms((_, config) =>
@@ -252,7 +252,7 @@ class AppUpgradeIntegrationTest
             java.util.Optional.empty(),
             java.util.Optional.empty(),
           )
-          // TODO(#16139): adaptation to this test required
+          // TODO(#925): adaptation to this test required
           val upgradeAction = new ARC_AmuletRules(
             new CRARC_AddFutureAmuletConfigSchedule(
               new AmuletRules_AddFutureAmuletConfigSchedule(
@@ -652,7 +652,7 @@ object AppUpgradeIntegrationTest {
     val result = Process(
       Seq("bash", "-c", cmd),
       None,
-      // TODO(#10595): consider reading these from config files:
+      // TODO(DACH-NY/canton-network-node#10595): consider reading these from config files:
       "SV1_URL" -> "http://127.0.0.1:5114",
       "SV1_SCAN_URL" -> "http://127.0.0.1:5012",
       "SV2_SCAN_URL" -> "http://127.0.0.1:5112",

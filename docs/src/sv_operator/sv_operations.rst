@@ -83,7 +83,7 @@ Participant identities
   - Quorums for administering the domain topology on behalf of the DSO party (>⅔ of onboarded SVs once activated)
   - Quorums for confirmation-based DSO Daml workflows (>⅔ of onboarded SVs; on DevNet instead usually >½)
 
-  .. TODO(#7746): remove "once activated"
+  .. TODO(DACH-NY/canton-network-node#7746): remove "once activated"
 
 - In general, participant identities *can't* be reused on the same global synchronizer,
   i.e., without the network being reset/redeployed.

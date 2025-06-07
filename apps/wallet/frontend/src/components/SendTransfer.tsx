@@ -89,7 +89,7 @@ const SendTransfer: React.FC = () => {
       navigate('/transactions');
     },
     onError: error => {
-      // TODO (#5491): show an error to the user.
+      // TODO (DACH-NY/canton-network-node#5491): show an error to the user.
       console.error(
         `Failed to create transfer offer to ${receiver} of ${ccAmount} CC with trackingId ${deduplicationId}`,
         error
@@ -119,7 +119,7 @@ const SendTransfer: React.FC = () => {
       navigate('/transactions');
     },
     onError: error => {
-      // TODO (#5491): show an error to the user.
+      // TODO (DACH-NY/canton-network-node#5491): show an error to the user.
       console.error(
         `Failed to send transfer to ${receiver} of ${ccAmount} CC with deduplicationId ${deduplicationId}`,
         error

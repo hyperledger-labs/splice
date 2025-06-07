@@ -160,8 +160,8 @@ trait TimeTestUtil extends TestCommon {
     * for arbitrary number of rounds to be ingested by the store in between the two calls to the Scan API, resulting in
     * test failures.
     *
-    * TODO(#5317): Modify this to be less susceptible to flakes.
-    * TODO (#7609): consider using automation control
+    * TODO(DACH-NY/canton-network-node#5317): Modify this to be less susceptible to flakes.
+    * TODO (#996): consider using automation control
     */
   @nowarn("msg=match may not be exhaustive")
   def advanceTimeAndWaitForRoundAutomation(

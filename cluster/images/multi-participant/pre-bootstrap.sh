@@ -69,7 +69,7 @@ canton.participants.participant_$index = {
             type = unsafe-jwt-hmac-256
             secret = "test"
 
-            # TODO(#2052) Use different audiences per participant.
+            # TODO(DACH-NY/canton-network-internal#502) Use different audiences per participant.
             target-audience = \${AUTH_TARGET_AUDIENCE}
         }]
         # We need to bump this because we run one stream per user +
@@ -88,7 +88,7 @@ canton.participants.participant_$index = {
         }
     }
 
-    # TODO(#8331) Tune cache sizes
+    # TODO(DACH-NY/canton-network-node#8331) Tune cache sizes
     # from https://docs.daml.com/2.8.0/canton/usermanual/performance.html#configuration
     # tune caching configs of the ledger api server
     ledger-api {

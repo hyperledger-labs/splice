@@ -2,7 +2,7 @@
 LOCAL_VERDICT_TIMEOUT.* Rejected transaction due to a participant determined timeout.*c.d.c.p.p.TransactionProcessingSteps:participant=sv
 SEQUENCER_SENDER_UNKNOWN.*MED::sv4
 
-# TODO(#13011):Remove once canton fixes https://github.com/DACH-NY/canton/issues/20594
+# TODO(DACH-NY/canton-network-node#13011):Remove once canton fixes https://github.com/DACH-NY/canton/issues/20594
 Submission was refused because traffic control validation failed: IncorrectEventCost
 The domain Domain 'global' failed the following topology transactions
 INCORRECT_EVENT_COST.*: Missing or incorrect event cost provided by member

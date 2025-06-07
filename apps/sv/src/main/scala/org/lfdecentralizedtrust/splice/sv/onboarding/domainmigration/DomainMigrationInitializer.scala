@@ -276,7 +276,7 @@ class DomainMigrationInitializer(
       _ <- participantAdminConnection
         .ensureDomainParameters(
           domainMigrationDump.nodeIdentities.synchronizerId,
-          // TODO(#8761) hard code for now
+          // TODO(DACH-NY/canton-network-node#8761) hard code for now
           _.tryUpdate(confirmationRequestsMaxRate =
             DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
           ),

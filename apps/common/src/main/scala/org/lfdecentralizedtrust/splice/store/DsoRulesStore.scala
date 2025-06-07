@@ -183,7 +183,7 @@ object DsoRulesStore {
 
     def currentSynchronizerNodeConfigs()
         : Seq[splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig] = {
-      // TODO(#4906): make its callers work with soft-domain migration
+      // TODO(#998): make its callers work with soft-domain migration
       svNodeStates.values
         .flatMap(_.payload.state.synchronizerNodes.asScala.get(dsoRules.domain.toProtoPrimitive))
         .toSeq
@@ -248,7 +248,7 @@ object DsoRulesStore {
         store: MultiDomainAcsStore
     )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] =
       for {
-        // TODO(#4906): check whether we also need to compare the domain-id to detect staleness
+        // TODO(#998): check whether we also need to compare the domain-id to detect staleness
         checkDsoRules <- store.lookupContractById(splice.dsorules.DsoRules.COMPANION)(
           dsoRules.contractId
         )

@@ -97,7 +97,7 @@ trait HttpWalletHandlerUtil extends Spanning with NamedLogging {
       userWallet <- getUserWallet(user)
       userStore = userWallet.store
       userParty = userStore.key.endUserParty
-      // TODO (#4906) pick install based on disclosed contracts' domain IDs
+      // TODO (#998) pick install based on disclosed contracts' domain IDs
       install <- userStore.getInstall()
       unadornedUpdate <- getUpdate(install.contractId, userStore)
       update = install.exercise(_ => unadornedUpdate)
