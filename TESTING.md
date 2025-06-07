@@ -84,6 +84,8 @@ To speed up our tests run against a long-running Canton instance.
 To start the instance run `./start-canton.sh` for backend test and `./start-canton.sh -m` for frontend test.
 It can be stopped via `./stop-canton.sh`.
 
+> **NOTICE**: If you face bundling issues while setting up your local development environment, refer to the [TROUBLESHOOTING](./TROUBLESHOOTING.md) file for guidance.
+
 There are 3 tmux windows open in the tmux session for Canton in wallclock time, Canton in simtime and
 toxyproxy. You can switch between those with `Ctrl-b w`.
 
