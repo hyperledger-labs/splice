@@ -9,10 +9,11 @@ concurrency:
 
 permissions:
   id-token: write # Required for GCP Workload Identity for failure notifications
-  contents: read
+  #contents: read # FIXME
   pull-requests: read # Required for the static tests
   issues: read # Required for the static tests
   actions: write # To cancel itself if not opted in
+  contents: write # Required for GitHub Pages deployment # FIXME: should be in post_merge only
   pages: write # Required for GitHub Pages deployment # FIXME: should be in post_merge only
 
 jobs:
