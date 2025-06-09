@@ -40,7 +40,7 @@ jobs:
 
       - name: Upload documentation artifacts
         uses: actions/upload-pages-artifact@2d163be3ddce01512f3eea7ac5b7023b5d643ce1
-        # if: github.ref == 'refs/heads/main' && github.event_name == 'push' #FIXME: uncomment
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         with:
           path: docs/html/html
 

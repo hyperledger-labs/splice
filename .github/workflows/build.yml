@@ -39,12 +39,11 @@ jobs:
             echo "Current commit opts in, letting it run."
           fi
 
-  # FIXME
-  # static_tests:
-  #   uses: ./.github/workflows/build.static_tests.yml
-  #   secrets: inherit
-  #   with:
-  #     commit_sha: ${{ inputs.commit_sha }}
+  static_tests:
+    uses: ./.github/workflows/build.static_tests.yml
+    secrets: inherit
+    with:
+      commit_sha: ${{ inputs.commit_sha }}
 
   deployment_test:
     uses: ./.github/workflows/build.deployment_test.yml
@@ -225,10 +224,6 @@ jobs:
   docs:
     uses: ./.github/workflows/build.docs.yml
     secrets: inherit
-    # permissions:
-    #   contents: write # Required to push the documentation
-    #   pages: write # Required to push the documentation
-    #   id-token: write # Required for publishing the documentation
     with:
       commit_sha: ${{ inputs.commit_sha }}
 
@@ -244,11 +239,11 @@ jobs:
       commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
-  # FIXME: bring back static tests
   final_result:
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
     needs:
     - cancel_if_not_opt_in
+    - static_tests
     - deployment_test
     - daml_test
     - scala_test_sim_time
@@ -287,7 +282,7 @@ jobs:
             # shellcheck disable=SC2129
             echo "FORCE=false" >> "$GITHUB_ENV"
             echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "docs", "deployment_test"}' >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           else
             echo "Checking if all jobs succeeded."
