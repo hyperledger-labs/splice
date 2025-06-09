@@ -20,6 +20,7 @@ if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
   # On PRs from forks, GITHUB_HEAD_REF is the name of the branch in the forked repo, so we cannot actually checkout that branch directly.
   git checkout "$GITHUB_HEAD_REF" || true
 fi
+
 git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
 
 echo "GITHUB_SHA: ${GITHUB_SHA:-}"
