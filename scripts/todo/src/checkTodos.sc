@@ -77,7 +77,8 @@ val fixedIssuesCurrentPR: Set[Int] = {
   prNumO.fold(Set.empty[Int])({ prNum =>
     val prInfo = Seq("hub", "pr", "show", "-f", "%b", prNum).!!
     val branch = Seq("hub", "pr", "show", "-f", "%H", prNum).!!.trim
-    val commits = Seq("git", "log", s"main..$branch").!!
+    // When running from forks, we don't currently check the commit messages on the branch
+    val commits = Try(Seq("git", "log", s"main..$branch").!!).getOrElse("")
     val issueCloseKeywords =
       Seq("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved")
         .map(w => s"($w)")

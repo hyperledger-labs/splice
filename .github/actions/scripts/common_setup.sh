@@ -17,7 +17,8 @@ git checkout main
 echo "GITHUB_HEAD_REF: ${GITHUB_HEAD_REF:-}"
 if [ -n "${GITHUB_HEAD_REF:-}" ] && [ "$GITHUB_HEAD_REF" != "main" ]; then
   echo "Checking out $GITHUB_HEAD_REF"
-  git checkout "$GITHUB_HEAD_REF"
+  # On PRs from forks, GITHUB_HEAD_REF is the name of the branch in the forked repo, so we cannot actually checkout that branch directly.
+  git checkout "$GITHUB_HEAD_REF" || true
 fi
 git fetch origin 'refs/heads/release-line*:refs/heads/origin/release-line*' --force
 
