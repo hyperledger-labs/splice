@@ -38,6 +38,12 @@ jobs:
           # as it finishes fastest and we want to ensure that it includes test sources.
           cmd: "Test/compile docs/bundle"
 
+      - name: Upload documentation artifacts
+        uses: actions/upload-pages-artifact@2d163be3ddce01512f3eea7ac5b7023b5d643ce1
+        # if: github.ref == 'refs/heads/main' && github.event_name == 'push' #FIXME: uncomment
+        with:
+          path: docs/html/html
+
       # TODO(#1028): Reenable this
       # - name: Push documentation
       #   uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -77,3 +83,22 @@ jobs:
           service_account: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}'
           notifications_url: '${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}'
           slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
+
+  publish_docs:
+    #if: github.event_name == 'push' && github.ref == 'refs/heads/main' #FIXME: uncomment
+    needs: docs
+    runs-on: self-hosted-docker-tiny
+
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@854d7aa1b99e4509c4d1b53d69b7ba4eaf39215a
