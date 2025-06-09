@@ -41,7 +41,7 @@ in pkgs.mkShell {
     k6
     k9s
     kubectl
-    kubernetes-helm
+    (wrapHelm kubernetes-helm { plugins = with pkgs.kubernetes-helmPlugins; [ helm-unittest ]; })
     lnav
     nix
     nodejs
@@ -70,12 +70,14 @@ in pkgs.mkShell {
     python3Packages.GitPython
     python3Packages.gql
     python3Packages.humanize
+    python3Packages.json-logging
     python3Packages.jsonpickle
     python3Packages.kubernetes
     python3Packages.marshmallow-dataclass
     python3Packages.polib
+    python3Packages.pydantic
+    python3Packages.pygithub
     python3Packages.pyjwt
-    python3Packages.json-logging
     python3Packages.pyyaml
     python3Packages.regex
     python3Packages.requests

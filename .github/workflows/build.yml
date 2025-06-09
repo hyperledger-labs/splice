@@ -136,10 +136,23 @@ jobs:
       commit_sha: ${{ inputs.commit_sha }}
     secrets: inherit
 
-  scala_test_frontend_wall_clock_time:
+  scala_test_wall_clock_time_bft:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-large
+      test_names_file: 'test-full-class-names.log'
+      start_canton_options: -we
+      parallelism: 10
+      test_name: wall-clock-time-bft
+      with_gcp_creds: true
+      pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
+      run_if_commit_tag: 'bft'
+    secrets: inherit
+
+  scala_test_frontend_wall_clock_time:
+    uses: ./.github/workflows/build.scala_test.yml
+    with:
+      runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names-frontend.log'
       start_canton_options: -w
       parallelism: 5
@@ -169,6 +182,17 @@ jobs:
       parallelism: 2
       test_name: docker-compose
       commit_sha: ${{ inputs.commit_sha }}
+    secrets: inherit
+
+  scala_test_local_net:
+    uses: ./.github/workflows/build.scala_test_for_compose.yml
+    with:
+      runs_on: self-hosted-docker-large
+      test_names_file: 'test-full-class-names-local-net-based.log'
+      parallelism: 1
+      test_name: docker-compose
+      with_canton: false
+      start_canton_options: ""
     secrets: inherit
 
   scala_test_app_upgrade:
@@ -232,6 +256,7 @@ jobs:
     - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
     - scala_test_docker_compose
+    - scala_test_local_net
     - scala_test_app_upgrade
     - scala_test_without_canton
     - ui_tests
@@ -239,7 +264,7 @@ jobs:
     - docs
     runs-on: self-hosted-docker-tiny
     container:
-      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

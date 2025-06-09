@@ -9,7 +9,7 @@ metadata:
   name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ $appIdentifier }}
+    {{- include "splice-util-lib.default-labels" (set . "app" $appIdentifier) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
@@ -23,7 +23,7 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ $appIdentifier }}
+        {{- include "splice-util-lib.default-labels" (set . "app" $appIdentifier) | nindent 8 }}
         migration: {{ .Values.migration.id | quote }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
@@ -326,6 +326,18 @@ spec:
               value: {{ .Values.nodeIdentifier | quote }}
             - name: SPLICE_APP_SV_MEDIATOR_IDENTIFIER
               value: {{ .Values.nodeIdentifier | quote }}
+            {{- if .Values.delegatelessAutomation }}
+            - name: SPLICE_APP_DELEGATELESS_AUTOMATION
+              value: {{ .Values.delegatelessAutomation | quote }}
+            {{- end }}
+            {{- if .Values.expectedTaskDuration }}
+            - name: SPLICE_APP_EXPECTED_TASK_DURATION
+              value: {{ .Values.expectedTaskDuration | quote }}
+            {{- end }}
+            {{- if .Values.expiredRewardCouponBatchSize }}
+            - name: SPLICE_APP_EXPIRED_REWARD_COUPON_BATCH_SIZE
+              value: {{ .Values.expiredRewardCouponBatchSize | quote }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014
@@ -413,7 +425,7 @@ metadata:
   name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ $appIdentifier }}
+    {{- include "splice-util-lib.default-labels" (set . "app" $appIdentifier) | nindent 4 }}
     migration: {{ .Values.migration.id | quote }}
 spec:
   selector:

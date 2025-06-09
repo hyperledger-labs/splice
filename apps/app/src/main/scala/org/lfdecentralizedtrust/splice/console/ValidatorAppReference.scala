@@ -15,7 +15,12 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   SignedTopologyTx,
 }
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import org.lfdecentralizedtrust.splice.util.ContractWithState
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
+import org.lfdecentralizedtrust.splice.util.{
+  ChoiceContextWithDisclosures,
+  ContractWithState,
+  FactoryChoiceWithDisclosures,
+}
 import org.lfdecentralizedtrust.splice.validator.admin.api.client.commands.*
 import org.lfdecentralizedtrust.splice.validator.automation.ValidatorAutomationService
 import org.lfdecentralizedtrust.splice.validator.config.{
@@ -25,11 +30,17 @@ import org.lfdecentralizedtrust.splice.validator.config.{
 import org.lfdecentralizedtrust.splice.validator.migration.DomainMigrationDump
 import org.lfdecentralizedtrust.splice.validator.{ValidatorApp, ValidatorAppBootstrap}
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
+import org.lfdecentralizedtrust.tokenstandard.{metadata, transferinstruction}
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.actor.ActorSystem
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationv1,
+  allocationinstructionv1,
+  transferinstructionv1,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommandCounter
 
 import java.time.Instant
@@ -358,6 +369,121 @@ abstract class ValidatorAppReference(
       consoleEnvironment.run {
         httpCommand(
           HttpScanProxyAppClient.LookupTransferCommandStatus(sender, nonce)
+        )
+      }
+    }
+
+    private val scanProxyPrefix = "/api/validator/v0/scan-proxy"
+
+    def getRegistryInfo(): metadata.v1.definitions.GetRegistryInfoResponse = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetRegistryInfo,
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def lookupInstrument(instrumentId: String) =
+      consoleEnvironment.run {
+        httpCommand(HttpScanAppClient.LookupInstrument(instrumentId), Some(scanProxyPrefix))
+      }
+
+    def listInstruments() =
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.ListInstruments(pageSize = None, pageToken = None),
+          Some(scanProxyPrefix),
+        )
+      }
+
+    def getTransferFactory(
+        choiceArgs: transferinstructionv1.TransferFactory_Transfer
+    ): (
+        FactoryChoiceWithDisclosures[
+          transferinstructionv1.TransferFactory.ContractId,
+          transferinstructionv1.TransferFactory_Transfer,
+        ],
+        transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind,
+    ) = {
+      consoleEnvironment.run {
+        httpCommand(HttpScanAppClient.GetTransferFactory(choiceArgs), Some(scanProxyPrefix))
+      }
+    }
+
+    def getTransferInstructionAcceptContext(
+        transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetTransferInstructionAcceptContext(transferInstructionId),
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def getTransferInstructionRejectContext(
+        transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetTransferInstructionRejectContext(transferInstructionId),
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def getTransferInstructionWithdrawContext(
+        transferInstructionId: transferinstructionv1.TransferInstruction.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetTransferInstructionWithdrawContext(transferInstructionId),
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def getAllocationFactory(
+        choiceArgs: allocationinstructionv1.AllocationFactory_Allocate
+    ): FactoryChoiceWithDisclosures[
+      allocationinstructionv1.AllocationFactory.ContractId,
+      allocationinstructionv1.AllocationFactory_Allocate,
+    ] = {
+      consoleEnvironment.run {
+        httpCommand(HttpScanAppClient.GetAllocationFactory(choiceArgs), Some(scanProxyPrefix))
+      }
+    }
+
+    def getAllocationTransferContext(
+        allocationId: allocationv1.Allocation.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetAllocationTransferContext(allocationId),
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def getAllocationCancelContext(
+        allocationId: allocationv1.Allocation.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetAllocationCancelContext(allocationId),
+          Some(scanProxyPrefix),
+        )
+      }
+    }
+
+    def getAllocationWithdrawContext(
+        allocationId: allocationv1.Allocation.ContractId
+    ): ChoiceContextWithDisclosures = {
+      consoleEnvironment.run {
+        httpCommand(
+          HttpScanAppClient.GetAllocationWithdrawContext(allocationId),
+          Some(scanProxyPrefix),
         )
       }
     }

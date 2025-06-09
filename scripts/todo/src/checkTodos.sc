@@ -188,6 +188,13 @@ object ExcludedBucket extends Bucket {
   override val shouldNotExist = false
 }
 
+case class CrossRefIssueBucket(number: Int, org: String, repo: String) extends Bucket {
+  override val name = s"Issue #$number in $org/$repo"
+  override val classPosition = 7
+  override val withinClassPosition = (0, "")
+  override val shouldNotExist = false
+}
+
 trait RegexCategory {
   val regex: Regex
   def getBucket(name: String): Bucket
@@ -208,6 +215,12 @@ object Issue extends RegexCategory {
   override val regex = "[#][0-9]+".r
 
   override def getBucket(str: String) = numsToIssue(str)
+}
+
+object CrossRefIssue extends RegexCategory {
+  override val regex = "\\(\\S+/\\S+#[0-9]+\\)".r
+
+  override def getBucket(str: String) = parseCrossRefIssue(str)
 }
 
 object Milestone extends RegexCategory {
@@ -238,12 +251,21 @@ def numsToIssue(str: String): IssueBucket =
     }
   }
 
+def parseCrossRefIssue(str: String): CrossRefIssueBucket = {
+  val ori = "\\((\\S+)/(\\S+)#([0-9]+)\\)".r.unanchored
+  str match {
+    case ori(org, repo, issue) =>
+      CrossRefIssueBucket(issue.toInt, org, repo)
+    case _ => throw new RuntimeException(s"The given string ($str) does not match the expected format")
+  }
+}
+
 val tags: List[RegexCategory] = List(
   Tag(List("tech-debt")),
   Tag(List("Mx-90")),
 )
 
-val allRegexps: List[RegexCategory] = tags ++ List(Issue, Milestone)
+val allRegexps: List[RegexCategory] = tags ++ List(Issue, Milestone, CrossRefIssue)
 
 val identifierRegex = "(TODO)(.*?)\\((.+?)\\)".r
 
@@ -257,14 +279,14 @@ val todoStyleExcludePrefixes =
     "token-standard/dependencies",
   )
 val todoStyleExcludeSuffixes =
-  Seq("/checkTodos.sc", "/build.static_tests.yml")
+  Seq("/checkTodos.sc", "/build.static_tests.yml", "/migrate-github-issues.py")
 
 def addToBucket(
     acc: Map[Bucket, List[String]],
     bucket: Bucket,
     line: String,
 ): Map[Bucket, List[String]] = {
-  acc + (bucket -> (line :: acc.getOrElse(bucket, List())))
+  acc ++ Map(bucket -> (line :: acc.getOrElse(bucket, List())))
 }
 
 def matchTODOWithBuckets(line: String, bucketsForLine: String): List[(Bucket, String)] = {

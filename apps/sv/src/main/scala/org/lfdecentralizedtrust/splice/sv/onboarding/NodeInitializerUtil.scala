@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{CometBftNode, CometBftRequestSigner}
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
@@ -109,7 +109,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
       localSynchronizerNode: Option[LocalSynchronizerNode],
-      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
       upgradesConfig: UpgradesConfig,
       packageVersionSupport: PackageVersionSupport,
   )(implicit
@@ -131,7 +130,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       retryProvider,
       cometBftNode,
       localSynchronizerNode,
-      extraSynchronizerNodes,
       upgradesConfig,
       spliceInstanceNamesConfig,
       loggerFactory,

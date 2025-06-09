@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
@@ -40,6 +42,11 @@ const MonitoringConfigSchema = z.object({
 });
 export const InfraConfigSchema = z.object({
   infra: z.object({
+    ipWhitelisting: z
+      .object({
+        extraWhitelistedIngress: z.array(z.string()).default([]),
+      })
+      .optional(),
     prometheus: z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
@@ -99,5 +106,9 @@ export function loadIPRanges(): pulumi.Output<string[]> {
     return ret;
   });
 
-  return internalWhitelistedIps.apply(whitelists => whitelists.concat(externalIpRanges));
+  const configWhitelistedIps = infraConfig.ipWhitelisting?.extraWhitelistedIngress || [];
+
+  return internalWhitelistedIps.apply(whitelists =>
+    whitelists.concat(externalIpRanges).concat(configWhitelistedIps)
+  );
 }

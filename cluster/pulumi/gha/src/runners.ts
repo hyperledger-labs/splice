@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
@@ -6,12 +8,13 @@ import { Resource } from '@pulumi/pulumi';
 import yaml from 'js-yaml';
 import {
   appsAffinityAndTolerations,
+  DOCKER_REPO,
   HELM_MAX_HISTORY_SIZE,
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
-import { ArtifactoryCreds } from 'splice-pulumi-common/src/artifactory';
 import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
+import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
 
 import { createCachePvc } from './cache';
 import { ghaConfig } from './config';
@@ -166,8 +169,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image:
-                  'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-docker-runner:0.4.0-snapshot.20250519.9323.0.vdb543d93',
+                image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.1`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -344,36 +346,9 @@ function installDockerRunnerScaleSets(
     }
   );
 
-  const artifactoryCreds = ArtifactoryCreds.getCreds().creds;
-  const configJsonBas64 = artifactoryCreds.apply(artifactoryKeys => {
-    const artifactoryCreds = `${artifactoryKeys.username}:${artifactoryKeys.password}`;
-    const artifactoryCredsBase64 = Buffer.from(artifactoryCreds).toString('base64');
-
-    return Buffer.from(
-      JSON.stringify({
-        auths: {
-          'digitalasset-canton-enterprise-docker.jfrog.io': {
-            auth: artifactoryCredsBase64,
-          },
-          'digitalasset-canton-network-docker.jfrog.io': {
-            auth: artifactoryCredsBase64,
-          },
-          'digitalasset-canton-network-docker-dev.jfrog.io': {
-            auth: artifactoryCredsBase64,
-          },
-        },
-      })
-    ).toString('base64');
-  });
-  const dockerClientConfigSecret = new k8s.core.v1.Secret('docker-client-config', {
-    metadata: {
-      namespace: runnersNamespace.metadata.name,
-      name: 'docker-client-config',
-    },
-    data: {
-      'config.json': configJsonBas64,
-    },
-  });
+  const dockerClientConfigSecret = DockerConfig.getConfig().createDockerClientConfigSecret(
+    runnersNamespace.metadata.name
+  );
 
   const dependsOn = [tokenSecret, controller, configMap, cachePvc, dockerClientConfigSecret];
 
@@ -491,8 +466,7 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  const runnerImage =
-    'ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-runner-hook:0.3.21';
+  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:0.3.21`;
 
   const repo = ghaConfig.githubRepo;
 

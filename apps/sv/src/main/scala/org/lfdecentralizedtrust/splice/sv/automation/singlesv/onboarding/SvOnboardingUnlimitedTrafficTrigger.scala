@@ -13,7 +13,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
-import org.lfdecentralizedtrust.splice.sv.ExtraSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AmuletConfigSchedule
@@ -36,7 +35,6 @@ class SvOnboardingUnlimitedTrafficTrigger(
     override protected val context: TriggerContext,
     dsoStore: SvDsoStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
-    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
@@ -62,9 +60,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
         decentralizedSynchronizerConfig.activeSynchronizer
       )
       sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
-        activeSynchronizerId,
-        sequencerAdminConnectionO,
-        extraSynchronizerNodes,
+        sequencerAdminConnectionO
       )
       svMembersWithTrafficState <- dsoRulesAndStates
         .activeSvParticipantAndMediatorIds(activeSynchronizerId)
@@ -92,9 +88,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
-      task.synchronizerId,
-      sequencerAdminConnectionO,
-      extraSynchronizerNodes,
+      sequencerAdminConnectionO
     )
     for {
       // We must read the state here again to pick up on new serials
@@ -118,9 +112,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     val sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
-      task.synchronizerId,
-      sequencerAdminConnectionO,
-      extraSynchronizerNodes,
+      sequencerAdminConnectionO
     )
     for {
       dsoRulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()

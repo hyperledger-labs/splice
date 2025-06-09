@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
@@ -56,20 +58,6 @@ export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING',
 export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
-
-// TODO(#15528) Remove once backfilling is enabled by default
-export const ENABLE_TXLOG_BACKFILLING = config.envFlag('ENABLE_TXLOG_BACKFILLING', false);
-export const TXLOG_BACKFILLING_BATCH_SIZE = parseInt(
-  config.optionalEnv('TXLOG_BACKFILLING_BATCH_SIZE') || '100'
-);
-export const txLogBackfillingValues = ENABLE_TXLOG_BACKFILLING
-  ? {
-      txLogBackfilling: {
-        enabled: true,
-        batchSize: TXLOG_BACKFILLING_BATCH_SIZE,
-      },
-    }
-  : {};
 
 export type LogLevel = 'INFO' | 'DEBUG';
 

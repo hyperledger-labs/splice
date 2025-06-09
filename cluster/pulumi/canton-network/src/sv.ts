@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as postgres from 'splice-pulumi-common/src/postgres';
@@ -35,7 +37,6 @@ import {
   svCometBftGovernanceKeySecret,
   SvIdKey,
   svUserIds,
-  txLogBackfillingValues,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
@@ -56,6 +57,12 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
+import {
+  delegatelessAutomation,
+  expectedTaskDuration,
+  expiredRewardCouponBatchSize,
+} from '../../common/src/automation';
+import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
 
 export function installSvKeySecret(
@@ -212,11 +219,16 @@ export async function installSvNode(
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
-    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false);
+    : postgres.installPostgres(xns, 'postgres', 'postgres', activeVersion, false, {
+        logicalDecoding: !!baseConfig.scanBigQuery,
+      });
 
   const appsPostgres =
     defaultPostgres ||
-    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true);
+    postgres.installPostgres(xns, `cn-apps-pg`, `cn-apps-pg`, activeVersion, true, {
+      logicalDecoding: !!baseConfig.scanBigQuery,
+    });
+
   const canton = buildCrossStackCantonDependencies(
     decentralizedSynchronizerUpgradeConfig,
     {
@@ -251,6 +263,10 @@ export async function installSvNode(
     canton.participant,
     appsPostgres
   );
+
+  if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
+    configureScanBigQuery(appsPostgres, baseConfig.scanBigQuery, scan);
+  }
 
   const validatorApp = await installValidator(
     appsPostgres,
@@ -453,6 +469,9 @@ function installSvApp(
     },
     contactPoint: daContactPoint,
     nodeIdentifier: config.onboardingName,
+    delegatelessAutomation: delegatelessAutomation,
+    expectedTaskDuration: expectedTaskDuration,
+    expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -521,7 +540,6 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
-    ...txLogBackfillingValues,
   };
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {

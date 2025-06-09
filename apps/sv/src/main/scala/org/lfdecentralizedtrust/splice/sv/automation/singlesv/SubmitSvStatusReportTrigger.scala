@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
   TopologyAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.ExtraSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
@@ -35,7 +34,6 @@ class SubmitSvStatusReportTrigger(
     ledgerApiConnection: SpliceLedgerConnection,
     cometBft: Option[CometBftNode],
     mediatorAdminConnectionO: Option[MediatorAdminConnection],
-    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -55,11 +53,8 @@ class SubmitSvStatusReportTrigger(
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
-      // TODO(#17018) Switch to per-synchronizer SV status reports
       mediatorAdminConnection = SvUtil.getMediatorAdminConnection(
-        dsoRules.domain,
-        mediatorAdminConnectionO,
-        extraSynchronizerNodes,
+        mediatorAdminConnectionO
       )
       mediatorSynchronizerTimeLb <- getDomainTimeLowerBound(
         mediatorAdminConnection,

@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as glob from 'glob';
 import { config as dotenvConfig } from 'dotenv';
 import { expand } from 'dotenv-expand';

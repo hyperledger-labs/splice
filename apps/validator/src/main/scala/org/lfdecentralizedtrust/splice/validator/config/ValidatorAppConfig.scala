@@ -189,13 +189,11 @@ case class ValidatorAppBackendConfig(
     // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
-    // TODO(#13301) Remove this flag
-    supportsSoftDomainMigrationPoc: Boolean = false,
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
     participantPruningSchedule: Option[ParticipantPruningConfig] = None,
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
-    txLogBackfillEnabled: Boolean = false,
+    txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {

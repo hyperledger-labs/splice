@@ -2,6 +2,8 @@ package org.lfdecentralizedtrust.splice.util
 
 import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.splice.console.{
+  AnsExternalAppClientReference,
+  AppBackendReference,
   ScanAppBackendReference,
   ScanAppClientReference,
   SplitwellAppBackendReference,
@@ -13,8 +15,7 @@ import org.lfdecentralizedtrust.splice.console.{
   WalletAppClientReference,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
-import org.lfdecentralizedtrust.splice.console.AnsExternalAppClientReference
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.SynchronizerAlias
 
 // TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
@@ -30,6 +31,9 @@ trait CommonAppInstanceReferences {
     sv1Backend.config.domains.global.alias
 
   def dsoParty(implicit env: SpliceTestConsoleEnvironment): PartyId = sv1ScanBackend.getDsoPartyId()
+
+  def activeSvs(implicit env: SpliceTestConsoleEnvironment): Seq[SvAppBackendReference] =
+    env.svs.local
 
   def sv1Backend(implicit env: SpliceTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 
@@ -77,6 +81,26 @@ trait CommonAppInstanceReferences {
   def sv3ScanBackend(implicit env: SpliceTestConsoleEnvironment): ScanAppBackendReference = scanb(
     "sv3Scan"
   )
+
+  def sv4ScanBackend(implicit env: SpliceTestConsoleEnvironment): ScanAppBackendReference = scanb(
+    "sv4Scan"
+  )
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+  def sv1Nodes(implicit env: SpliceTestConsoleEnvironment): Seq[AppBackendReference] =
+    Seq(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+  def sv2Nodes(implicit env: SpliceTestConsoleEnvironment): Seq[AppBackendReference] =
+    Seq(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+  def sv3Nodes(implicit env: SpliceTestConsoleEnvironment): Seq[AppBackendReference] =
+    Seq(sv3Backend, sv3ScanBackend, sv3ValidatorBackend)
+
+  @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
+  def sv4Nodes(implicit env: SpliceTestConsoleEnvironment): Seq[AppBackendReference] =
+    Seq(sv4Backend, sv4ScanBackend, sv4ValidatorBackend)
 
   def aliceWalletClient(implicit env: SpliceTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"

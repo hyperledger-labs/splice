@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { KubeConfig, CoreV1Api } from '@kubernetes/client-node';
@@ -478,7 +480,6 @@ export function getAuth0Config(clientType: Auth0ClientType): Output<Auth0Fetch> 
 }
 
 export const svUserIds = (auth0Cfg: Auth0Config): Output<string[]> => {
-  console.error(auth0Cfg);
   const temp = getSecretVersionOutput({
     secret: `pulumi-user-configs-${auth0Cfg.auth0Domain.replace('.us.auth0.com', '')}`,
   });

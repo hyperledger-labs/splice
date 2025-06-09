@@ -102,7 +102,7 @@ done
 tmux_session="canton"
 tmux_window=0
 
-if tmux has-session -t $tmux_session 2>/dev/null; then
+if tmux has-session -t=$tmux_session 2>/dev/null; then
   >&2 echo "Canton seems to already be running. Did you mean to run stop-canton.sh first?"
   exit 1
 fi

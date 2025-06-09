@@ -12,7 +12,7 @@ $(dir)/$(docker-build): $(target-dir) $(dir)/target/LICENSE $(dir)/target/.npm_i
 $(target-dir):
 	mkdir -p $(target-dir)
 
-$(dir)/target/LICENSE: LICENSE
+$(dir)/target/LICENSE: ${SPLICE_ROOT}/cluster/images/LICENSE
 	cp $< $@
 
 $(dir)/target/.npm_installed: $(package_files)

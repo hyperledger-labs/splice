@@ -3,28 +3,63 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.lifecycle.UnlessShutdown
+import com.digitalasset.canton.logging.pretty.PrettyPrinting
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.DelayUtil
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
+import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  RetryFor,
+  SpliceLedgerConnection,
+}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
-import com.digitalasset.canton.lifecycle.UnlessShutdown
-import com.digitalasset.canton.logging.pretty.PrettyPrinting
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.RichOption
 import scala.util.Random
 
-trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
+trait SvTaskBasedTrigger[T <: PrettyPrinting] {
+  this: TaskbasedTrigger[T] =>
+
+  override final val taskRetry: RetryFor =
+    RetryFor.Automation.copy(
+      initialDelay = FiniteDuration.apply(svTaskContext.expectedTaskDuration, MILLISECONDS),
+      maxDelay = FiniteDuration.apply(2 * svTaskContext.expectedTaskDuration, MILLISECONDS),
+    )
   protected implicit def ec: ExecutionContext
+
   protected def svTaskContext: SvTaskBasedTrigger.Context
+
   protected def enableAutomaticDsoDelegateElection: Boolean = false
+
   private val store = svTaskContext.dsoStore
+  private val packageVersionSupport = svTaskContext.packageVersionSupport
+
+  final protected def supportsDelegateLessAutomation()(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] =
+    packageVersionSupport.supportsDelegatelessAutomation(
+      Seq(store.key.svParty, store.key.dsoParty),
+      context.clock.now,
+    )
+
+  final protected def getSvControllerArgument(controller: String)(implicit
+      tc: TraceContext
+  ): Future[java.util.Optional[String]] = {
+    for {
+      supportsDelegateLessAutomation <- supportsDelegateLessAutomation()
+    } yield Option.when(supportsDelegateLessAutomation.supported)(controller).toJava
+  }
 
   final protected override def completeTask(
       task: T
@@ -32,11 +67,17 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     for {
       dsoRules <- store.getDsoRules()
       sameEpoch = dsoRules.payload.epoch == svTaskContext.epoch
-      isLeader = dsoRules.payload.dsoDelegate == store.key.svParty.toProtoPrimitive
+      dsoDelegate = dsoRules.payload.dsoDelegate
+      svParty = store.key.svParty.toProtoPrimitive
+      isLeader = dsoDelegate == svParty
+      supportsDelegateLessAutomation <- supportsDelegateLessAutomation()
       result <-
         if (sameEpoch) {
-          if (isLeader) {
-            completeTaskAsDsoDelegate(task)
+          if (svTaskContext.delegatelessAutomation && supportsDelegateLessAutomation.supported) {
+            completeTaskAsAnySv(task, svParty, dsoRules)
+          } else if (isLeader) {
+            // TODO(#17956): remove delegate-based automation
+            completeTaskAsDsoDelegate(task, dsoDelegate)
           } else {
             monitorTaskAsFollower(task)
           }
@@ -53,6 +94,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
 
   /** Handle delegate failure by voting for a new delegate
     */
+  // TODO(#17959): remove delegate election
   final protected def voteForNewDsoDelegate(
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       currentLeader: String,
@@ -110,8 +152,49 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     } yield retVal
   }
 
+  private def completeTaskAsAnySv(
+      task: T,
+      svParty: String,
+      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    // default pollingInterval is 30 seconds
+    val pollingTriggerInterval = context.config.pollingInterval.underlying.toMillis
+    // Pick a random delay in Uniform~(0, upperBound) to avoid all nodes triggering at the same time
+    // This formula ensures a uniform random delay across SVs that never exceeds the pollingTriggerInterval
+    // and helps to distribute the load between nodes.
+    val upperBound =
+      Math.min(
+        dsoRules.payload.svs.size().toLong * svTaskContext.expectedTaskDuration,
+        pollingTriggerInterval,
+      )
+    val delay = Random.nextLong(upperBound)
+    DelayUtil
+      .delayIfNotClosing(
+        "dso-delegate-task-delay",
+        FiniteDuration.apply(delay, TimeUnit.MILLISECONDS),
+        this,
+      )
+      .onShutdown(logger.debug(s"Closing after waiting $delay ms"))
+      .flatMap(_ =>
+        isStaleTask(task).flatMap {
+          case true =>
+            Future.successful(
+              TaskSuccess(
+                s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
+              )
+            )
+          case false =>
+            logger.info(
+              s"Completing dso delegate task ${task.toString} after waiting a delay of $delay ms"
+            )
+            completeTaskAsDsoDelegate(task, svParty)
+        }
+      )
+  }
+
   protected def completeTaskAsDsoDelegate(
-      task: T
+      task: T,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome]
 
   final protected def monitorTaskAsFollower(
@@ -191,5 +274,9 @@ object SvTaskBasedTrigger {
       connection: SpliceLedgerConnection,
       dsoDelegate: PartyId,
       epoch: Long,
+      delegatelessAutomation: Boolean,
+      expectedTaskDuration: Long,
+      expiredRewardCouponBatchSize: Int,
+      packageVersionSupport: PackageVersionSupport,
   )
 }

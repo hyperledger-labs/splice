@@ -27,11 +27,12 @@ import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, AssignedContract}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
 
-import scala.collection.immutable.Seq
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.math.Ordering.Implicits.*
@@ -62,20 +63,28 @@ class ReceiveSvRewardCouponTrigger(
       packages = AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(context.clock.now)
         .packageConfig
-      svLatestVettedPackages = Seq(
-        DarResources.amulet.getPackageIdWithVersion(packages.amulet)
-      )
       beneficiariesWithLatestVettedPackages <- extraBeneficiaries.filterA { beneficiary =>
+        val filterParty = beneficiary.beneficiary.filterString
         participantAdminConnection
-          .getPartyToParticipant(
-            dsoRules.domain,
-            beneficiary.beneficiary,
+          .listPartyToParticipant(
+            store = Some(TopologyStoreId.SynchronizerStore(dsoRules.domain)),
+            filterParty = filterParty,
           )
-          .flatMap(partyToParticipant =>
-            isVettingLatestPackages(
-              partyToParticipant.mapping.participantIds,
-              svLatestVettedPackages.flatMap(_.toList),
-            )
+          .map { txs =>
+            txs.headOption
+          }
+          .flatMap(partyToParticipantO =>
+            partyToParticipantO.fold({
+              logger.warn(
+                s"Party to participant mapping not found for synchronizer = ${dsoRules.domain}, party = $filterParty."
+              )
+              Future.successful(false)
+            }) { partyToParticipant =>
+              isVettingLatestPackages(
+                partyToParticipant.mapping.participantIds,
+                ReceiveSvRewardCouponTrigger.svLatestVettedPackages(packages),
+              )
+            }
           )
       }
       result <- retrieveNextRoundToClaim(beneficiariesWithLatestVettedPackages).value.map(_.toList)
@@ -228,5 +237,9 @@ object ReceiveSvRewardCouponTrigger {
         param("round", _.round),
       )
   }
+
+  def svLatestVettedPackages(packages: PackageConfig): Seq[String] = Seq(
+    DarResources.amulet.getPackageIdWithVersion(packages.amulet)
+  ).flatten
 
 }

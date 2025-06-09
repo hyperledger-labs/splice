@@ -13,11 +13,18 @@ import dayjs from 'dayjs';
 import { ContractId } from '@daml/types';
 import {
   ActionRequiringConfirmation,
+  Vote,
   VoteRequest,
+  VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
+import {
+  VoteListingData,
+  VoteListingStatus,
+  VotesListingSection,
+} from '../components/governance/VotesListingSection';
 
-export type YourVoteStatus = 'accepted' | 'rejected' | 'not-voted';
+export type YourVoteStatus = 'accepted' | 'rejected' | 'no-vote';
 
 type SupportedActionTag =
   | 'CRARC_AddFutureAmuletConfigSchedule'
@@ -39,6 +46,25 @@ function getAction(action: ActionRequiringConfirmation): string {
   }
 }
 
+function computeVoteStats(votes: Vote[]): { accepted: number; rejected: number } {
+  return votes.reduce(
+    (acc, vote) => ({
+      accepted: acc.accepted + (vote.accept ? 1 : 0),
+      rejected: acc.rejected + (vote.accept ? 0 : 1),
+    }),
+    { accepted: 0, rejected: 0 }
+  );
+}
+
+function computeYourVote(votes: Vote[], svPartyId: string | undefined): YourVoteStatus {
+  if (svPartyId === undefined) {
+    return 'no-vote';
+  }
+
+  const vote = votes.find(vote => vote.sv === svPartyId);
+  return vote ? (vote.accept ? 'accepted' : 'rejected') : 'no-vote';
+}
+
 const QUERY_LIMIT = 50;
 
 export const Governance: React.FC = () => {
@@ -58,12 +84,39 @@ export const Governance: React.FC = () => {
     [amuletName]
   );
 
+  const getVoteResultStatus = (outcome: VoteRequestOutcome): VoteListingStatus => {
+    switch (outcome.tag) {
+      case 'VRO_Accepted': {
+        const effectiveAt = dayjs(outcome.value.effectiveAt);
+        const now = dayjs();
+        if (dayjs(effectiveAt).isBefore(now)) return 'Implemented';
+        else return 'Accepted';
+      }
+      case 'VRO_Expired':
+        return 'Expired';
+      case 'VRO_Rejected':
+        return 'Rejected';
+      default:
+        return 'Unknown';
+    }
+  };
+
   const [tabValue, setTabValue] = useState('voting');
 
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
   const listVoteRequestsQuery = votesHooks.useListDsoRulesVoteRequests();
-  const voteResultsQuery = votesHooks.useListVoteRequestResult(QUERY_LIMIT);
+  const voteResultsWithAcceptedQuery = (accepted: boolean) =>
+    votesHooks.useListVoteRequestResult(
+      QUERY_LIMIT,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      accepted
+    );
+  const acceptedResultsQuery = voteResultsWithAcceptedQuery(true);
+  const notAcceptedResultsQuery = voteResultsWithAcceptedQuery(false);
 
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.payload.trackingCid || v.contractId)
@@ -81,16 +134,24 @@ export const Governance: React.FC = () => {
     dsoInfosQuery.isPending ||
     listVoteRequestsQuery.isPending ||
     votesQuery.isPending ||
-    voteResultsQuery.isPending
+    acceptedResultsQuery.isPending ||
+    notAcceptedResultsQuery.isPending
   ) {
     return <Loading />;
   }
 
-  if (dsoInfosQuery.isError || listVoteRequestsQuery.isError || votesQuery.isError) {
-    return <p>Error, something went wrong.</p>;
+  if (
+    dsoInfosQuery.isError ||
+    listVoteRequestsQuery.isError ||
+    votesQuery.isError ||
+    acceptedResultsQuery.isError ||
+    notAcceptedResultsQuery.isError
+  ) {
+    return <Typography variant="body1">Error, something went wrong.</Typography>;
   }
 
   const voteRequests = listVoteRequestsQuery.data;
+  const votingThreshold = dsoInfosQuery.data.votingThreshold;
 
   const actionRequiredRequests = voteRequests
     .filter(v => !alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
@@ -104,9 +165,58 @@ export const Governance: React.FC = () => {
       } as ActionRequiredData;
     });
 
+  const inflightRequests = voteRequests
+    .filter(v => alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
+    .map(v => {
+      const effectiveAt = v.payload.targetEffectiveAt
+        ? dayjs(v.payload.targetEffectiveAt).format(dateTimeFormatISO)
+        : 'Threshold';
+
+      const votes = v.payload.votes.entriesArray().map(e => e[1]);
+
+      return {
+        actionName: actionTagToTitle[getAction(v.payload.action) as SupportedActionTag],
+        votingCloses: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
+        voteTakesEffect: effectiveAt,
+        yourVote: computeYourVote(votes, svPartyId),
+        status: 'In Progress',
+        voteStats: computeVoteStats(votes),
+        acceptanceThreshold: votingThreshold,
+      } as VoteListingData;
+    });
+
+  const acceptedRequests = acceptedResultsQuery.data.filter(
+    vr => vr.outcome.tag === 'VRO_Accepted' && dayjs(vr.outcome.value.effectiveAt).isBefore(dayjs())
+  );
+
+  const notAcceptedRequests = notAcceptedResultsQuery.data.filter(
+    vr => vr.outcome.tag === 'VRO_Expired' || vr.outcome.tag === 'VRO_Rejected'
+  );
+
+  const allRequests = [...acceptedRequests, ...notAcceptedRequests];
+
+  const voteHistory = allRequests
+    .map(vr => {
+      const votes = vr.request.votes.entriesArray().map(e => e[1]);
+
+      return {
+        actionName: actionTagToTitle[getAction(vr.request.action) as SupportedActionTag],
+        votingCloses: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
+        voteTakesEffect:
+          (vr.outcome.tag === 'VRO_Accepted' &&
+            dayjs(vr.outcome.value.effectiveAt).format(dateTimeFormatISO)) ||
+          dayjs(vr.completedAt).format(dateTimeFormatISO),
+        yourVote: computeYourVote(votes, svPartyId),
+        status: getVoteResultStatus(vr.outcome),
+        voteStats: computeVoteStats(votes),
+        acceptanceThreshold: votingThreshold,
+      } as VoteListingData;
+    })
+    .sort((a, b) => (dayjs(a.voteTakesEffect).isAfter(dayjs(b.voteTakesEffect)) ? -1 : 1));
+
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h1" gutterBottom>
+      <Typography variant="h1" gutterBottom data-testid="governance-page-title">
         Governance
       </Typography>
 
@@ -118,6 +228,19 @@ export const Governance: React.FC = () => {
       </Box>
 
       <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
+      <VotesListingSection
+        sectionTitle="Inflight Votes"
+        data={inflightRequests}
+        uniqueId="inflight-vote-requests"
+        showVoteStats
+        showAcceptanceThreshold
+      />
+      <VotesListingSection
+        sectionTitle="Vote History"
+        data={voteHistory}
+        uniqueId="vote-history"
+        showStatus
+      />
     </Box>
   );
 };

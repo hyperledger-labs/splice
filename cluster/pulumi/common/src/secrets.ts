@@ -1,13 +1,14 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Output } from '@pulumi/pulumi';
+import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
 
-import { ArtifactoryCreds } from './artifactory';
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
 import { config } from './config';
-import { artifactories } from './config/consts';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
 
@@ -83,7 +84,6 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   serviceAccountName: string,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource[] {
-  const keys = ArtifactoryCreds.getCreds().creds;
   const kubecfg = config.optionalEnv('KUBECONFIG');
   // k8sProvider saves the absolute path to kubeconfig if it's defined in KUBECONFIG env var, which makes
   // it not portable between machines, so we temporarily remove this env var to avoid that.
@@ -95,41 +95,10 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   // eslint-disable-next-line no-process-env
   kubecfg && (process.env['KUBECONFIG'] = kubecfg);
 
-  type DockerConfig = { [key: string]: { auth: string; username: string; password: string } };
-
-  const dockerConfigJson = pulumi.output(keys).apply(creds => {
-    const auths: DockerConfig = {};
-
-    artifactories.forEach(art => {
-      auths[art] = {
-        auth: btoa(creds.username + ':' + creds.password),
-        username: creds.username,
-        password: creds.password,
-      };
-    });
-    return JSON.stringify({ auths });
-  });
-
   // We do this to avoid having to rename existing secrets
   const secretName =
     serviceAccountName === 'default' ? 'docker-reg-cred' : `${serviceAccountName}-docker-reg-cred`;
-
-  const secret = new k8s.core.v1.Secret(
-    `${ns}-${secretName}`,
-    {
-      metadata: {
-        name: secretName,
-        namespace: ns,
-      },
-      type: 'kubernetes.io/dockerconfigjson',
-      stringData: {
-        '.dockerconfigjson': dockerConfigJson,
-      },
-    },
-    {
-      dependsOn,
-    }
-  );
+  const secret = DockerConfig.getConfig().createImagePullSecret(ns, secretName, dependsOn);
   return [
     secret,
     patchServiceAccountWithImagePullSecret(

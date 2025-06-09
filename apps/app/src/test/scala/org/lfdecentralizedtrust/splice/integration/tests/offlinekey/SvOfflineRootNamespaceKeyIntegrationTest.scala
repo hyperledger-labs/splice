@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.offlinekey
 
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
+import org.lfdecentralizedtrust.splice.console.{ScanAppBackendReference, SvAppBackendReference}
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
@@ -48,17 +48,18 @@ class SvOfflineRootNamespaceKeyIntegrationTest
       logSuffix = "offline-root-keys",
       sv4 = false,
     )() {
-      initSvNodesWithOfflineRootNamespaceKey(sv1Backend)
-      initSvNodesWithOfflineRootNamespaceKey(sv2Backend)
+      initSvNodesWithOfflineRootNamespaceKey(sv1Backend, sv1ScanBackend)
+      initSvNodesWithOfflineRootNamespaceKey(sv2Backend, sv2ScanBackend)
     }
   }
 
   private def initSvNodesWithOfflineRootNamespaceKey(
-      backend: SvAppBackendReference
+      backend: SvAppBackendReference,
+      scan: ScanAppBackendReference,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val participantClient = backend.participantClientWithAdminToken
-    val sequencerClient = backend.sequencerClient(decentralizedSynchronizerAlias)
-    val mediatorClient = backend.mediatorClient(decentralizedSynchronizerAlias)
+    val sequencerClient = backend.sequencerClient
+    val mediatorClient = backend.mediatorClient
     initializeInstanceWithOfflineRootNamespaceKey(
       s"${backend.name}$cantonNameSuffix",
       participantClient,
@@ -71,7 +72,9 @@ class SvOfflineRootNamespaceKeyIntegrationTest
       s"${backend.name}$cantonNameSuffix",
       mediatorClient,
     )
+    scan.start()
     backend.startSync()
+    scan.waitForInitialization()
     instanceHasNoRootNamespaceKey(participantClient)
     instanceHasNoRootNamespaceKey(sequencerClient)
     instanceHasNoRootNamespaceKey(mediatorClient)

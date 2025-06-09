@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import {
   ApprovedSvIdentity,
@@ -34,6 +36,11 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
+export interface ScanBigQueryConfig {
+  dataset: string;
+  prefix: string;
+}
+
 export interface StaticSvConfig {
   nodeName: string;
   ingressName: string;
@@ -44,6 +51,7 @@ export interface StaticSvConfig {
   cometBft: StaticCometBftConfig;
   onboardingPollingInterval?: string;
   sweep?: SweepConfig;
+  scanBigQuery?: ScanBigQueryConfig;
 }
 
 export type SequencerPruningConfig = {

@@ -26,7 +26,7 @@ jobs:
               echo "FOUND_DOCUMENT_CHANGES=true" ;
               echo "GITHUB_COMMIT_URL=\"https://github.com/DACH-NY/canton-network-node/commit/${commit}\"" >> "$GITHUB_OUTPUT"
               echo "CHANGED_DOC_FILES=\"${changed_files_list}\""
-              echo "GIT_LOG=\"$(git log -1 --oneline --no-color | sed s/\"//g)\""
+              echo "GIT_LOG=\"$(git log -1 --oneline --no-color | sed s/\"//g | sed s/\`//g)\""
             } >> "$GITHUB_OUTPUT"
           else
             echo "No document changes are detected."
@@ -38,7 +38,16 @@ jobs:
         shell: bash
         run: |
           # shellcheck disable=SC2028
-          echo "MESSAGE=*Changes to \`.md\` or \`.rst\` files have been detected and merged into the main branch.*\n<${{steps.detect_changes.outputs.GITHUB_COMMIT_URL}}| View change at ${{steps.detect_changes.outputs.GIT_LOG}}>\n\nChanged files:\n\`\`\`\n${{steps.detect_changes.outputs.CHANGED_DOC_FILES}}\n\`\`\`" >> "$GITHUB_OUTPUT"
+          echo "MESSAGE=*Changes to \`.md\` or \`.rst\` files have been detected and merged into the main branch.*\n<${{ steps.detect_changes.outputs.GITHUB_COMMIT_URL }}| View change at ${{ steps.detect_changes.outputs.GIT_LOG }}>\n\nChanged files:\n\`\`\`\n${{ steps.detect_changes.outputs.CHANGED_DOC_FILES }}\n\`\`\`" >> "$GITHUB_OUTPUT"
+
+      - name: Dry run
+        if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
+        shell: bash
+        run: |
+          echo "Dry run: The following message would be sent to Slack:"
+          echo ""
+          echo '${{ steps.construct_message.outputs.MESSAGE }}'
+
       - name: Notify on document changes
         if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
         uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d  # v2.0.0
@@ -48,6 +57,4 @@ jobs:
           payload: |
             channel: C03J6NCPSE4
             text: "${{ steps.construct_message.outputs.MESSAGE }}"
-
-
 

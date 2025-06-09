@@ -8,6 +8,28 @@
 Release Notes
 =============
 
+0.4.1
+-----
+
+- Validator
+
+  - Expose token-standard endpoints on the validator scan-proxy. The paths are the normal token standard path with a ``/api/validator/v0/scan-proxy`` prefix.
+  - Fix a bug where transfers using transfer pre-approvals (both through the wallet UI and automatic via sweeps) were broken until the DARs released in 0.4.0 are effective.
+  - Fix a bug that requires the latest dars to be uploaded when `re-onboarding a validator and recovering the balances of all the users <https://dev.global.canton.network.digitalasset.com/validator_operator/validator_disaster_recovery.html#re-onboard-a-validator-and-recover-balances-of-all-users-it-hosts>`_
+
+- Sequencer
+
+  - Improve sequencer startup time by fixing a slow query.
+
+- Define `standard k8s labels <https://helm.sh/docs/chart_best_practices/labels/#standard-labels>`_
+  for most k8s resources deployed through Splice Helm charts.
+  Thanks to Stephane Loeuillet for contributing an initial proposal for this change
+  in https://github.com/hyperledger-labs/splice/pull/296.
+
+- Scan
+
+  - Backfilling of all Scan data is now enabled by default.
+
 0.4.0
 -----
 

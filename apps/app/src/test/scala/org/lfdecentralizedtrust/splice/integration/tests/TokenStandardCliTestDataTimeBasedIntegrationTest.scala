@@ -384,13 +384,21 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 }
               },
             )(
-              "There are three open transfer instructions left",
+              "There are three open transfer instructions left and bob observers their updated holdings",
               _ => {
                 val instructions = listTransferInstructions(
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice.partyId,
                 )
                 instructions should have size 3
+                val bobHoldings = listHoldings(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob.partyId,
+                )
+                val (unlockedHoldings, lockedHoldings) =
+                  bobHoldings.partition(h => h._2.lock.isEmpty)
+                unlockedHoldings should have size 4
+                lockedHoldings should have size 1
               },
             )
           }
@@ -409,6 +417,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
               )
             },
           )(
+            // 1 locked holding, untouched by the transfer. two unlocked holdings as the output of the self transfer.
             "Bob's has three holdings and the balance remained the same (modulo fees)",
             _ => {
               listHoldings(

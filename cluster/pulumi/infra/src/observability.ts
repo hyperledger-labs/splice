@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as grafana from '@pulumiverse/grafana';
@@ -12,12 +14,12 @@ import {
   CLUSTER_NAME,
   clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
-  config,
   ENABLE_COMETBFT_PRUNING,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   isMainNet,
+  loadTesterConfig,
   MOCK_SPLICE_ROOT,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
@@ -770,12 +772,9 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'load-tester_alerts.yaml': readGrafanaAlertingFile('load-tester_alerts.yaml')
               .replace(
                 '$LOAD_TESTER_MIN_RATE',
-                monitoringConfig.alerting.alerts.loadTester.minRate.toString()
+                loadTesterConfig?.minRate ? loadTesterConfig?.minRate.toString() : '1.0'
               )
-              .replaceAll(
-                '$NODATA',
-                config.envFlag('K6_ENABLE_LOAD_GENERATOR') ? 'Alerting' : 'OK'
-              ),
+              .replaceAll('$NODATA', loadTesterConfig?.enable ? 'Alerting' : 'OK'),
             'cometbft_alerts.yaml': readGrafanaAlertingFile('cometbft_alerts.yaml')
               .replaceAll(
                 '$EXPECTED_MAX_BLOCK_RATE_PER_SECOND',

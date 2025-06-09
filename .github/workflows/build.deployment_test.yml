@@ -12,7 +12,7 @@ jobs:
     runs-on: self-hosted-k8s-x-small
 
     container:
-      image: ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-test-ci:0.3.12
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
 
     steps:
 
@@ -29,7 +29,12 @@ jobs:
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
-      - name: Deployment test
+      - name: Helm tests
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: make cluster/helm/test
+
+      - name: Pulumi tests
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
           cmd_retry_count: 5 # Retry in case of dependency download errors

@@ -74,6 +74,10 @@ import org.lfdecentralizedtrust.splice.wallet.admin.http.{
 }
 import org.lfdecentralizedtrust.splice.wallet.automation.UserWalletAutomationService
 import org.lfdecentralizedtrust.splice.wallet.util.ValidatorTopupConfig
+import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStandardMetadataResource
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
+import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
+import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -129,9 +133,6 @@ class ValidatorApp(
 
   override def packagesForJsonDecoding =
     super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
-
-  def packagesForUploading =
-    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
@@ -294,7 +295,6 @@ class ValidatorApp(
                   connection,
                   participantAdminConnection,
                   config.domains.global.alias,
-                  retryProvider,
                   loggerFactory,
                 )
                 appInitStep("Migrating party data") {
@@ -315,10 +315,6 @@ class ValidatorApp(
                             logger,
                             retryProvider,
                           ),
-                        Seq(
-                          DarResources.amulet.bootstrap,
-                          DarResources.amuletNameService.bootstrap,
-                        ),
                         partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                       )
                   } yield ()
@@ -742,6 +738,11 @@ class ValidatorApp(
         com.google.protobuf.duration.Duration
           .toJavaProto(DurationConversion.toProto(config.deduplicationDuration.asJavaApproximation))
       )
+      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        synchronizerId,
+        readOnlyLedgerConnection,
+      )
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
@@ -773,6 +774,7 @@ class ValidatorApp(
             storage: Storage,
             retryProvider,
             scanConnection,
+            packageVersionSupport,
             loggerFactory,
             domainMigrationInfo,
             participantId,
@@ -781,7 +783,6 @@ class ValidatorApp(
             validatorTopupConfig,
             config.walletSweep,
             config.autoAcceptTransfers,
-            config.supportsSoftDomainMigrationPoc,
             dedupDuration,
             txLogBackfillEnabled = config.txLogBackfillEnabled,
             txLogBackfillingBatchSize = config.txLogBackfillBatchSize,
@@ -791,7 +792,6 @@ class ValidatorApp(
           logger.info("Not starting wallet as it's disabled")
           None
         }
-      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       automation = new ValidatorAutomationService(
         config.automation,
         config.participantIdentitiesBackup,
@@ -825,13 +825,9 @@ class ValidatorApp(
         config.svValidator,
         config.sequencerRequestAmplificationPatience,
         config.contactPoint,
-        config.supportsSoftDomainMigrationPoc,
         initialSynchronizerTime,
         loggerFactory,
-        packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-          synchronizerId,
-          readOnlyLedgerConnection,
-        ),
+        packageVersionSupport,
       )
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
@@ -887,6 +883,11 @@ class ValidatorApp(
           loggerFactory,
         )
 
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        synchronizerId,
+        readOnlyLedgerConnection,
+      )
+
       adminHandler =
         new HttpValidatorAdminHandler(
           automation,
@@ -897,16 +898,12 @@ class ValidatorApp(
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           scanConnection = scanConnection,
           participantAdminConnection,
+          packageVersionSupport,
           config,
           clock,
           retryProvider = retryProvider,
           loggerFactory,
         )
-
-      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        synchronizerId,
-        readOnlyLedgerConnection,
-      )
 
       walletInternalHandler = walletManagerOpt.map(walletManager =>
         new HttpWalletHandler(
@@ -944,6 +941,11 @@ class ValidatorApp(
         loggerFactory,
       )
 
+      tokenStandardScanProxyHandler = new HttpTokenStandardScanProxyHandler(
+        scanConnection,
+        loggerFactory,
+      )
+
       publicHandler = new HttpValidatorPublicHandler(
         automation.store,
         config.ledgerApiUser,
@@ -976,6 +978,26 @@ class ValidatorApp(
                     scanProxyHandler,
                     AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
                   ),
+                  pathPrefix("api" / "validator" / "v0" / "scan-proxy") {
+                    concat(
+                      TokenStandardMetadataResource.routes(
+                        tokenStandardScanProxyHandler,
+                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                      ),
+                      TokenStandardTransferInstructionResource.routes(
+                        tokenStandardScanProxyHandler,
+                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                      ),
+                      TokenStandardAllocationInstructionResource.routes(
+                        tokenStandardScanProxyHandler,
+                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                      ),
+                      TokenStandardAllocationResource.routes(
+                        tokenStandardScanProxyHandler,
+                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                      ),
+                    )
+                  },
                   ValidatorAdminResource.routes(
                     adminHandler,
                     operationId =>

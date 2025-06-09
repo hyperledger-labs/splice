@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import {
   Auth0Client,
   auth0UserNameEnvVarSource,
@@ -87,22 +89,15 @@ export function installCantonComponents(
       `participant-pg`,
       migrationInfo.version,
       true,
-      migrationStillRunning,
-      migrationId,
-      disableProtection
+      { isActive: migrationStillRunning, migrationId, disableProtection }
     );
   const mediatorPostgres =
     dbs?.mediator ||
-    installPostgres(
-      xns,
-      `mediator-${migrationId}-pg`,
-      `mediator-pg`,
-      migrationInfo.version,
-      true,
-      migrationStillRunning,
+    installPostgres(xns, `mediator-${migrationId}-pg`, `mediator-pg`, migrationInfo.version, true, {
+      isActive: migrationStillRunning,
       migrationId,
-      disableProtection
-    );
+      disableProtection,
+    });
   const sequencerPostgres =
     dbs?.sequencer ||
     installPostgres(
@@ -111,9 +106,7 @@ export function installCantonComponents(
       `sequencer-pg`,
       migrationInfo.version,
       true,
-      migrationStillRunning,
-      migrationId,
-      disableProtection
+      { isActive: migrationStillRunning, migrationId, disableProtection }
     );
   if (migrationStillRunning) {
     const participant = installSvParticipant(

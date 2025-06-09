@@ -22,7 +22,7 @@ import org.lfdecentralizedtrust.splice.store.{
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.*
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.automation.{SvDsoAutomationService, SvSvAutomationService}
 import org.lfdecentralizedtrust.splice.sv.cometbft.CometBftNode
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
@@ -98,7 +98,6 @@ import scala.jdk.CollectionConverters.*
 /** Container for the methods required by the SvApp to initialize sv1. */
 class SV1Initializer(
     localSynchronizerNode: LocalSynchronizerNode,
-    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     sv1Config: SvOnboardingConfig.FoundDso,
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
@@ -282,7 +281,6 @@ class SV1Initializer(
         svStore,
         dsoStore,
         Some(localSynchronizerNode),
-        extraSynchronizerNodes,
         upgradesConfig,
         packageVersionSupport,
       )
@@ -573,6 +571,7 @@ class SV1Initializer(
         synchronizerId,
         SynchronizerNodeState.OnboardedImmediately,
         migrationId,
+        config.scan,
       )
     }
 

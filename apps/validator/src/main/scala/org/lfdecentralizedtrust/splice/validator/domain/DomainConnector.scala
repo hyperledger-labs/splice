@@ -85,17 +85,10 @@ class DomainConnector(
       case None =>
         waitForSequencerConnectionsFromScan(time)
       case Some(url) =>
-        if (config.supportsSoftDomainMigrationPoc) {
-          // TODO (#13301) Make this work by making the config more flexible.
-          sys.error(
-            "Soft domain migration PoC is incompatible with manually specified sequencer connections"
-          )
-        } else {
-          Map(
-            config.domains.global.alias -> SequencerConnections
-              .single(GrpcSequencerConnection.tryCreate(url))
-          ).pure[Future]
-        }
+        Map(
+          config.domains.global.alias -> SequencerConnections
+            .single(GrpcSequencerConnection.tryCreate(url))
+        ).pure[Future]
     }
   }
 
@@ -181,18 +174,12 @@ class DomainConnector(
     } yield {
       val filteredSequencers = domainSequencers
         .filter(sequencers =>
-          if (config.supportsSoftDomainMigrationPoc) true
-          // This filter should be a noop since we only ever expect to have one synchronizer here without soft domain migrations
+          // This filter should be a noop since we only ever expect to have one synchronizer here
           // so this is just an extra safeguard.
-          else sequencers.synchronizerId == decentralizedSynchronizerId
+          sequencers.synchronizerId == decentralizedSynchronizerId
         )
       filteredSequencers.map { domainSequencer =>
-        val alias = if (config.supportsSoftDomainMigrationPoc)
-          SynchronizerAlias.tryCreate(
-            s"${config.domains.global.alias.unwrap}-${domainSequencer.synchronizerId.uid.identifier.unwrap}"
-          )
-        else config.domains.global.alias
-        alias ->
+        config.domains.global.alias ->
           extractValidConnections(domainSequencer.sequencers, domainTime, migrationId)
       }.toMap
     }

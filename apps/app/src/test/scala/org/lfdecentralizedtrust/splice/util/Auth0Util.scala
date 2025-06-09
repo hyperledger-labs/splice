@@ -41,7 +41,8 @@ class Auth0Util(
   def createUser()(implicit tc: TraceContext): Auth0User = {
     val user = new User()
     val rand = new scala.util.Random
-    val password = s"${rand.alphanumeric.take(20).mkString}${rand.nextInt()}"
+    // The randomly generated password is prefixed with enough constants to prevent unfortunate weak passwords that fail auth0 checks
+    val password = s"aB3${rand.alphanumeric.take(20).mkString}${rand.nextInt()}"
     val username = (new scala.util.Random).alphanumeric.take(20).mkString
     val email = s"$username@canton-network-test.com"
     user.setPassword(password.toCharArray)

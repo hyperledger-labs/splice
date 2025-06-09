@@ -228,8 +228,6 @@ case class SvAppBackendConfig(
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[SvCometBftConfig] = None,
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
-    // This is for the Poc from #13301
-    synchronizerNodes: Map[String, SvSynchronizerNodeConfig] = Map.empty,
     scan: Option[SvScanConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
@@ -254,8 +252,6 @@ case class SvAppBackendConfig(
     // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
-    // TODO(#13301) Remove this flag
-    supportsSoftDomainMigrationPoc: Boolean = false,
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
@@ -264,6 +260,9 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    delegatelessAutomation: Boolean = true,
+    expectedTaskDuration: Long = 5000, // milliseconds
+    expiredRewardCouponBatchSize: Int = 100,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

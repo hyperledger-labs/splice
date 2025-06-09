@@ -789,6 +789,97 @@ function subcmd_cluster_update_access() {
            --enable-master-authorized-networks \
            --master-authorized-networks "${K8S_CONTROL_PLANE_NETS}"
 }
+
+maintenance_windows=(
+  # CI-ish window
+  "FREQ=WEEKLY;BYDAY=SA,SU" "2024-01-01T08:00:00Z" "2024-01-01T20:00:00Z"
+  "cn-cimainnet,cn-cinet,cn-ghanet,cn-cidailynet,cn-ciupgradenet,cn-ciperiodicnet,cn-splicenet,cn-scratchanet,cn-scratchbnet,cn-scratchcnet,cn-scratchdnet,cn-scratchenet"
+  # prod-like window
+  "FREQ=WEEKLY;BYDAY=TU,WE,TH" "2024-01-01T08:00:00Z" "2024-01-01T12:00:00Z"
+  "cn-cilrnet,cn-token-std-devnet,cn-testnet,cn-devnet,cn-testzrhnet,cn-mainnet,cn-mainzrhnet"
+)
+
+subcommand_whitelist[cluster_set_maintenance_window]='Ensure the cluster'\''s maintenance window matches configuration.'
+
+function subcmd_cluster_set_maintenance_window() {
+    local i recurrence start end clusters found=0
+    for ((i=0; i<${#maintenance_windows[@]}; i+=4)); do
+        clusters="${maintenance_windows[i+3]}"
+        IFS=',' read -ra cluster_list <<< "$clusters"
+        if _contained "$GCP_CLUSTER_NAME" "${cluster_list[@]}"; then
+            found=1
+            recurrence="${maintenance_windows[i]}"
+            start="${maintenance_windows[i+1]}"
+            end="${maintenance_windows[i+2]}"
+            break
+        fi
+    done
+
+    local dry_run=""
+    if [[ ${1-} == --dry-run ]]; then
+        dry_run='echo'
+    fi
+
+    if [[ $found -eq 1 ]]; then
+        # Check the existing maintenance window
+        local current
+        current=$(gcloud container clusters list --format="json" | jq -r \
+            --arg name "$GCP_CLUSTER_NAME" '
+                .[] | select(.name == $name) |
+                .maintenancePolicy.window.recurringWindow as $w |
+                "\($w.recurrence) \($w.window.startTime) \($w.window.endTime)"'
+        )
+        local desired="$recurrence $start $end"
+        if [[ $current == "$desired" ]]; then
+            _info "Maintenance window for $GCP_CLUSTER_NAME is already set to: $desired"
+            return
+        elif [[ -n $current ]]; then
+            _warning "Changing maintenance window for $GCP_CLUSTER_NAME from: $current to: $desired"
+        else
+            _info "Setting maintenance window for $GCP_CLUSTER_NAME to: $desired"
+        fi
+        $dry_run gcloud container clusters update "${GCP_CLUSTER_NAME}" \
+            --maintenance-window-recurrence "$recurrence" \
+            --maintenance-window-start "$start" \
+            --maintenance-window-end "$end"
+    else
+        _error "No maintenance window found for cluster ${GCP_CLUSTER_NAME}"
+    fi
+}
+
+subcommand_whitelist[cluster_set_all_maintenance_windows]='Synchronize all clusters'\'' maintenance windows with configuration.'
+
+function subcmd_cluster_set_all_maintenance_windows() {
+    # move to the deployment directory
+    cd ..
+    if [[ ! $PWD =~ /cluster/deployment$ ]]; then
+        _error "This command must be run from a cluster/deployment subdirectory"
+    fi
+
+    # find subdirectories that include all required files
+    failed_dirs=()
+    found_any=0
+    for dir in */ ; do
+        [[ -d $dir ]] || continue
+        if [[ -f "$dir/.envrc" && -f "$dir/.envrc.vars" && -f "$dir/.kubecfg" && -f "$dir/config.yaml" ]]; then
+            found_any=1
+            pushd "$dir" > /dev/null
+            if ! direnv exec . cncluster cluster_set_maintenance_window "$@"; then
+                failed_dirs+=("$dir")
+            fi
+            popd > /dev/null
+        fi
+    done
+
+    if [[ $found_any -eq 0 ]]; then
+        _error "No subdirectories found with .envrc, .envrc.vars, .kubecfg, and config.yaml"
+    fi
+
+    # If any directories failed, list them
+    if [[ ${#failed_dirs[@]} -ne 0 ]]; then
+        _error "Failed to update maintenance window in the following directories: ${failed_dirs[*]}"
+    fi
+}
 ###
 
 subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'

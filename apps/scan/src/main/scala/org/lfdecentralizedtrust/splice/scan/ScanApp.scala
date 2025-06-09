@@ -25,11 +25,9 @@ import org.lfdecentralizedtrust.tokenstandard.metadata.v1.Resource as TokenStand
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.Resource as TokenStandardTransferInstructionResource
 import org.lfdecentralizedtrust.tokenstandard.allocation.v1.Resource as TokenStandardAllocationResource
 import org.lfdecentralizedtrust.tokenstandard.allocationinstruction.v1.Resource as TokenStandardAllocationInstructionResource
-import org.lfdecentralizedtrust.splice.http.v0.scan_soft_domain_migration_poc.ScanSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.http.{
   HttpScanHandler,
-  HttpScanSoftDomainMigrationPocHandler,
   HttpTokenStandardAllocationHandler,
   HttpTokenStandardAllocationInstructionHandler,
   HttpTokenStandardMetadataHandler,
@@ -281,21 +279,6 @@ class ScanApp(
         clock,
         loggerFactory,
       )
-      softDomainMigrationPocHandler =
-        if (config.supportsSoftDomainMigrationPoc)
-          Seq(
-            new HttpScanSoftDomainMigrationPocHandler(
-              participantAdminConnection,
-              store,
-              loggerFactory,
-              amuletAppParameters,
-              nodeMetrics,
-              config.synchronizers,
-              retryProvider,
-            )
-          )
-        else Seq.empty
-
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
       ) {
@@ -305,26 +288,23 @@ class ScanApp(
             requestLogger(traceContext) {
               HttpErrorHandler(loggerFactory)(traceContext) {
                 concat(
-                  (ScanResource.routes(scanHandler, _ => provide(traceContext)) +:
-                    TokenStandardTransferInstructionResource.routes(
-                      tokenStandardTransferInstructionHandler,
-                      _ => provide(traceContext),
-                    ) +:
-                    TokenStandardAllocationInstructionResource.routes(
-                      tokenStandardAllocationInstructionHandler,
-                      _ => provide(traceContext),
-                    ) +:
-                    TokenStandardMetadataResource.routes(
-                      tokenStandardMetadataHandler,
-                      _ => provide(traceContext),
-                    ) +:
-                    TokenStandardAllocationResource.routes(
-                      tokenStandardAllocationHandler,
-                      _ => provide(traceContext),
-                    ) +:
-                    softDomainMigrationPocHandler.map(handler =>
-                      ScanSoftDomainMigrationPocResource.routes(handler, _ => provide(traceContext))
-                    ))*
+                  ScanResource.routes(scanHandler, _ => provide(traceContext)),
+                  TokenStandardTransferInstructionResource.routes(
+                    tokenStandardTransferInstructionHandler,
+                    _ => provide(traceContext),
+                  ),
+                  TokenStandardAllocationInstructionResource.routes(
+                    tokenStandardAllocationInstructionHandler,
+                    _ => provide(traceContext),
+                  ),
+                  TokenStandardMetadataResource.routes(
+                    tokenStandardMetadataHandler,
+                    _ => provide(traceContext),
+                  ),
+                  TokenStandardAllocationResource.routes(
+                    tokenStandardAllocationHandler,
+                    _ => provide(traceContext),
+                  ),
                 )
               }
             }

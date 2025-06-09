@@ -22,6 +22,7 @@
     - [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
     - [Testing App Upgrades](#testing-app-upgrades)
+  - [Deployment Tests](#deployment-tests)
 
 # Testing in Splice
 
@@ -35,6 +36,7 @@ Splice code is tested in the following ways:
 - Integration tests. Extensive integration tests are located under `apps/app/src/test/scala/`. Integration tests
   include tests that use frontends (whose names must end with `FrontendIntegrationTest`), and ones which do not
   (whose names ends with IntegrationTest).
+- [Deployment tests](#deployment-tests) to catch errors in Helm and Pulumi before deploying to a cluster.
 - Cluster tests. Various different cluster tests are currently run by Digital Asset on Splice codebase.
   This includes:
   - Deploying and testing a PR on a scratch cluster. See (TBD)
@@ -69,6 +71,10 @@ There are two types of cluster tests that can be requested on a PR:
 To request a cluster test to be run on your PR, comment on your pr `/cluster_test` or `/hdm_test`
 for a basic test or a hard-migration test respectively. After commenting, reach out to the
 [Splice Contributors](CONTRIBUTORS.md) to approve and trigger the actual test on your behalf.
+
+### Enabling the new Canton bft ordering layer
+
+If you want to run the integration tests with the new Canton bft, you can do so by including the message `[bft]` in your commit message.
 
 ## Running Tests Locally
 
@@ -206,6 +212,17 @@ No installation of `lnav` is required, as it is provided by default by our `dire
 Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/README.md).
 If you wish to extend our testing topology please also consult [this README](/apps/app/src/test/resources/README.md) about name and port allocation.
 
+### Enabling the new Canton bft ordering layer
+
+If you want to run the integration tests locally with the new Canton bft, canton must be started with the `-e` flag.
+This can be done by running `./start-canton.sh -we`.
+Furthermore the integration test must run with the `SPLICE_USE_BFT_SEQUENCER` environment variable set to `true`.
+Eg of test run:
+
+```bash
+ SPLICE_USE_BFT_SEQUENCER=1 sbt 'apps-app/ testOnly org.lfdecentralizedtrust.splice.integration.tests.SvDevNetReonboardingIntegrationTest'
+```
+
 ### Testing App Behaviour Outside of Tests Without Running Bundle
 
 Sometimes, you may need to debug startup behaviour of the Splice apps that is causing issues for the
@@ -306,7 +323,7 @@ If you have never used `lnav` to inspect Canton or CometBFT logs, then we recomm
 3. Create the following symlinks to automatically keep the format definitions up to date:
    ```
    ln -sf $PWD/canton/canton-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/canton_logstash_json.json
-   ln -sf $PWD/support/cometbft-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/cometbft-json.json
+   ln -sf $PWD/network-health/cometbft-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/cometbft-json.json
    ```
 4. Type `lnav log/canton_network_test.clog` to inspect the test logs.
 5. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
@@ -365,3 +382,29 @@ PRs/commits that include `[breaking]` in their commit message, or that bump the 
 
 The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
 one-by-one to the current commit's version.
+
+## Deployment Tests
+
+Static deployment tests are run on every commit to `main` and on every PR tagged with `[static]` or `[ci]`.
+They guard against unintended changes to deployed state resulting from changes to Helm charts and Pulumi deployment scripts.
+The tests described here are **not a replacement for testing via cluster deployment**.
+They are meant to provide a quick feedback loop and to offer additional protection against regressions for code paths that are not sufficiently well covered by automatic cluster tests.
+
+### Helm checks
+
+We use [helm-unittest](https://github.com/helm-unittest/helm-unittest/) for some of our Helm charts.
+To run all Helm chart tests locally run `make cluster/helm/test`.
+To run only the tests for a specific chart `CHART`, run `helm unittest cluster/helm/CHART`.
+If this produces an error: "### Error:  Chart.yaml file is missing", please run `make cluster/helm/build`.
+
+Refer to the documentation of `helm-unittest` for more information on how to extend our Helm tests.
+When writing or debugging Helm tests, it is often useful to run `helm unittest` with the `-d` flag.
+This produces rendered yaml files under a local `.debug` folder
+that can be inspected to understand errors or determine the correct paths for assertions.
+
+### Pulumi checks
+
+Our pulumi checks are based on checked in `expected` files that need to be updated whenever the expected deployment state changes.
+
+Please run `make cluster/pulumi/update-expected` whenever you intend to change Pulumi deployment scripts in a way that alters deployed state.
+Compare the diff of the resulting `expected` files to confirm that the changes are as intended.

@@ -7,8 +7,6 @@ import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
@@ -23,15 +21,9 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
   TransferFollowTrigger,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
-  IssuingMiningRound,
-  OpenMiningRound,
-}
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ConstrainedTemplate
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -54,11 +46,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPacka
 import org.lfdecentralizedtrust.splice.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
-import org.lfdecentralizedtrust.splice.sv.{
-  BftSequencerConfig,
-  ExtraSynchronizerNode,
-  LocalSynchronizerNode,
-}
+import org.lfdecentralizedtrust.splice.sv.{BftSequencerConfig, LocalSynchronizerNode}
 import org.lfdecentralizedtrust.splice.util.{QualifiedName, TemplateJsonDecoder}
 
 import java.nio.file.Path
@@ -76,7 +64,6 @@ class SvDsoAutomationService(
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
     localSynchronizerNode: Option[LocalSynchronizerNode],
-    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     upgradesConfig: UpgradesConfig,
     spliceInstanceNamesConfig: SpliceInstanceNamesConfig,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -250,52 +237,20 @@ class SvDsoAutomationService(
       triggerContext.retryProvider,
       triggerContext.loggerFactory,
     )
-    if (config.supportsSoftDomainMigrationPoc) {
-      registerTrigger(
-        new AmuletConfigReassignmentTrigger(
-          triggerContext,
-          dsoStore,
-          connection,
-          dsoStore.key.dsoParty,
-          Seq[ConstrainedTemplate](
-            AmuletRules.COMPANION,
-            OpenMiningRound.COMPANION,
-            IssuingMiningRound.COMPANION,
-          ),
-          (tc: TraceContext) => dsoStore.lookupAmuletRules()(tc),
-        )
-      )
-
-      registerTrigger(
-        new SignSynchronizerBootstrappingStateTrigger(
-          dsoStore,
-          participantAdminConnection,
-          triggerContext,
-          localSynchronizerNode.getOrElse(
-            throw Status.INTERNAL
-              .withDescription("Soft domain migrations require a configured synchronizer node")
-              .asRuntimeException
-          ),
-          extraSynchronizerNodes,
-          aggregatingScanConnection,
-        )
-      )
-
-      registerTrigger(
-        new InitializeSynchronizerTrigger(
-          dsoStore,
-          participantAdminConnection,
-          triggerContext,
-          extraSynchronizerNodes,
-          aggregatingScanConnection,
-        )
-      )
-    }
     localSynchronizerNode.foreach { synchronizerNode =>
       synchronizerNode.sequencerConfig match {
         case BftSequencerConfig() =>
           registerTrigger(
-            new SvBftSequencerPeerReconcilingTrigger(
+            new SvBftSequencerPeerOffboardingTrigger(
+              triggerContext,
+              dsoStore,
+              synchronizerNode.sequencerAdminConnection,
+              aggregatingScanConnection,
+              config.domainMigrationId,
+            )
+          )
+          registerTrigger(
+            new SvBftSequencerPeerOnboardingTrigger(
               triggerContext,
               dsoStore,
               synchronizerNode.sequencerAdminConnection,
@@ -306,21 +261,6 @@ class SvDsoAutomationService(
         case _ =>
       }
     }
-
-    // TODO(#19670): We might want to clean this up so it's always registered at the same time
-    if (config.localSynchronizerNode.map(_.sequencer.isBftSequencer).getOrElse(false)) {
-      config.scan.foreach { scan =>
-        registerTrigger(
-          new PublishScanConfigTrigger(
-            triggerContext,
-            dsoStore,
-            connection,
-            scan,
-            upgradesConfig,
-          )
-        )
-      }
-    }
   }
 
   def registerTrafficReconciliationTriggers(): Unit = {
@@ -329,7 +269,6 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         localSynchronizerNode.map(_.sequencerAdminConnection),
-        extraSynchronizerNodes,
         config.trafficBalanceReconciliationDelay,
       )
     )
@@ -338,7 +277,6 @@ class SvDsoAutomationService(
         onboardingTriggerContext,
         dsoStore,
         localSynchronizerNode.map(_.sequencerAdminConnection),
-        extraSynchronizerNodes,
         config.trafficBalanceReconciliationDelay,
       )
     )
@@ -390,7 +328,6 @@ class SvDsoAutomationService(
         connection,
         cometBft,
         localSynchronizerNode.map(_.mediatorAdminConnection),
-        extraSynchronizerNodes,
         participantAdminConnection,
       )
     )
@@ -424,19 +361,16 @@ class SvDsoAutomationService(
       )
     )
 
-    // TODO(#19670): We might want to clean this up so it's always registered at the same time
-    if (!config.localSynchronizerNode.map(_.sequencer.isBftSequencer).getOrElse(false)) {
-      config.scan.foreach { scan =>
-        registerTrigger(
-          new PublishScanConfigTrigger(
-            triggerContext,
-            dsoStore,
-            connection,
-            scan,
-            upgradesConfig,
-          )
+    config.scan.foreach { scan =>
+      registerTrigger(
+        new PublishScanConfigTrigger(
+          triggerContext,
+          dsoStore,
+          connection,
+          scan,
+          upgradesConfig,
         )
-      }
+      )
     }
   }
 
@@ -564,8 +498,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReconcileDynamicSynchronizerParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
       aTrigger[ExternalPartyAmuletRulesTrigger],
-      aTrigger[SignSynchronizerBootstrappingStateTrigger],
-      aTrigger[InitializeSynchronizerTrigger],
-      aTrigger[SvBftSequencerPeerReconcilingTrigger],
+      aTrigger[SvBftSequencerPeerOffboardingTrigger],
+      aTrigger[SvBftSequencerPeerOnboardingTrigger],
     )
 }

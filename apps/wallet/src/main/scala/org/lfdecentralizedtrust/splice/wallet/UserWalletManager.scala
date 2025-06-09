@@ -7,7 +7,11 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.WalletAppInstall
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  PackageVersionSupport,
+  RetryProvider,
+  SpliceLedgerClient,
+}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -52,6 +56,7 @@ class UserWalletManager(
     storage: Storage,
     retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
+    packageVersionSupport: PackageVersionSupport,
     override val loggerFactory: NamedLoggerFactory,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
@@ -60,7 +65,6 @@ class UserWalletManager(
     validatorTopupConfig: ValidatorTopupConfig,
     walletSweep: Map[String, WalletSweepConfig],
     autoAcceptTransfers: Map[String, AutoAcceptTransfersConfig],
-    supportsSoftDomainMigrationPoc: Boolean,
     dedupDuration: DedupDuration,
     txLogBackfillEnabled: Boolean,
     txLogBackfillingBatchSize: Int,
@@ -228,6 +232,7 @@ class UserWalletManager(
       userRetryProvider,
       userLoggerFactory,
       scanConnection,
+      packageVersionSupport,
       domainMigrationInfo,
       participantId,
       ingestFromParticipantBegin,
@@ -236,7 +241,6 @@ class UserWalletManager(
       // TODO(#12554): make it easier to configure the sweep functionality and guard better against operator errors (typos, etc.)
       walletSweep.get(endUserParty.toProtoPrimitive),
       autoAcceptTransfers.get(endUserParty.toProtoPrimitive),
-      supportsSoftDomainMigrationPoc,
       dedupDuration,
       txLogBackfillEnabled = txLogBackfillEnabled,
       txLogBackfillingBatchSize = txLogBackfillingBatchSize,

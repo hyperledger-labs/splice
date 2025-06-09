@@ -16,16 +16,14 @@ jobs:
       sha: ${{ steps.get_head.outputs.sha }}
       repo: ${{ steps.get_head.outputs.repo }}
     steps:
-      - name: Get head SHA & repo
+      - name: Get head SHA
         id: get_head
         run: |
           set -euo pipefail
-          query='query pullRequestDetails { repository(name: \"${{ github.event.repository.name }}\", owner: \"${{ github.repository_owner }}\") { pullRequest(number: ${{ github.event.issue.number }}) { headRef { target { oid } } headRepository { sshUrl } } } }'
+          query='query pullRequestDetails { repository(name: \"${{ github.event.repository.name }}\", owner: \"${{ github.repository_owner }}\") { pullRequest(number: ${{ github.event.issue.number }}) { headRef { target { oid } } } } }'
           result=$(curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -X POST -d " { \"query\": \"$query\" } " https://api.github.com/graphql)
           sha=$(echo "$result" | jq -r '.data.repository.pullRequest.headRef.target.oid')
-          repo=$(echo "$result" | jq -r '.data.repository.pullRequest.headRepository.sshUrl')
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "repo=$repo" >> "$GITHUB_OUTPUT"
 
   trigger_cluster_test_basic:
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/cluster_test')
@@ -35,7 +33,6 @@ jobs:
     with:
       workflow: cluster_test
       sha: ${{ needs.get_head.outputs.sha }}
-      splice_url: ${{ needs.get_head.outputs.repo }}
 
   result:
     runs-on: self-hosted-docker-tiny
@@ -56,7 +53,6 @@ jobs:
     with:
       workflow: hdm_test
       sha: ${{ needs.get_head.outputs.sha }}
-      splice_url: ${{ needs.get_head.outputs.repo }}
 
   result_hdm:
     runs-on: self-hosted-docker-tiny

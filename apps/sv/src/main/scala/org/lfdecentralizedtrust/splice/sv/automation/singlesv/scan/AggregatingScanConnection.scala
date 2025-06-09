@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan
 
 import cats.implicits.toTraverseOps
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.stream.Materializer
@@ -25,13 +25,13 @@ class AggregatingScanConnection(
     upgradesConfig: UpgradesConfig,
     clock: Clock,
     retryProvider: RetryProvider,
-    loggerFactory: NamedLoggerFactory,
+    val loggerFactory: NamedLoggerFactory,
 )(implicit
     httpClient: HttpClient,
     mat: Materializer,
     templateJsonDecoder: TemplateJsonDecoder,
     ec: ExecutionContextExecutor,
-) {
+) extends NamedLogging {
 
   def fromAllScans[T](includeSelf: Boolean)(f: SingleScanConnection => Future[T])(implicit
       tc: TraceContext

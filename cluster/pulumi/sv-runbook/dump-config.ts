@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import {
   initDumpConfig,
   SecretsFixtureMap,
@@ -12,7 +14,7 @@ async function main() {
 
   const installNode = await import('./src/installNode');
   const secrets = new SecretsFixtureMap();
-    // Need to import this directly to avoid initializing any configs before the mocks are initialized
+  // Need to import this directly to avoid initializing any configs before the mocks are initialized
   const { svRunbookConfig } = await import('splice-pulumi-common-sv');
 
   const authOClient = {

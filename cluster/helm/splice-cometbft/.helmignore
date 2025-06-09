@@ -16,10 +16,12 @@
 *.tmp
 *.orig
 *~
+*#
 # Various IDEs
 .project
 .idea/
 *.tmproj
 .vscode/
-
-README.md
+*-template.yaml
+# helm-unittest
+tests

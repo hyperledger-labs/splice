@@ -27,11 +27,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
-import org.lfdecentralizedtrust.splice.sv.{
-  ExtraSynchronizerNode,
-  LocalSynchronizerNode,
-  SynchronizerNode,
-}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SynchronizerNode}
 import org.lfdecentralizedtrust.splice.sv.cometbft.{
   CometBftClient,
   CometBftNode,
@@ -335,37 +331,23 @@ object SvUtil {
     duration.toInternal.toScala.toMicros
   )
 
-  // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
   def getSequencerAdminConnection(
-      synchronizerId: SynchronizerId,
-      primarySequencerAdminConnection: Option[SequencerAdminConnection],
-      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
+      primarySequencerAdminConnection: Option[SequencerAdminConnection]
   ): SequencerAdminConnection =
-    extraSynchronizerNodes.get(synchronizerId.uid.identifier.str) match {
-      case Some(synchronizer) => synchronizer.sequencerAdminConnection
-      case None =>
-        primarySequencerAdminConnection.getOrElse(
-          throw Status.FAILED_PRECONDITION
-            .withDescription("No sequencer admin connection configured for SV App")
-            .asRuntimeException()
-        )
-    }
+    primarySequencerAdminConnection.getOrElse(
+      throw Status.FAILED_PRECONDITION
+        .withDescription("No sequencer admin connection configured for SV App")
+        .asRuntimeException()
+    )
 
-  // TODO(#13301) Handle this in a nicer way, at least make the primary connection less magic.
   def getMediatorAdminConnection(
-      synchronizerId: SynchronizerId,
-      primaryMediatorAdminConnection: Option[MediatorAdminConnection],
-      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
+      primaryMediatorAdminConnection: Option[MediatorAdminConnection]
   ): MediatorAdminConnection =
-    extraSynchronizerNodes.get(synchronizerId.uid.identifier.str) match {
-      case Some(synchronizer) => synchronizer.mediatorAdminConnection
-      case None =>
-        primaryMediatorAdminConnection.getOrElse(
-          throw Status.FAILED_PRECONDITION
-            .withDescription("No mediator admin connection configured for SV App")
-            .asRuntimeException()
-        )
-    }
+    primaryMediatorAdminConnection.getOrElse(
+      throw Status.FAILED_PRECONDITION
+        .withDescription("No mediator admin connection configured for SV App")
+        .asRuntimeException()
+    )
 
   def mapToCometBftNode(
       cometBftClient: Option[CometBftClient],

@@ -121,13 +121,16 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
   def httpClientConfig: NetworkAppClientConfig
 
   override protected[splice] def httpCommand[Result](
-      httpCommand: HttpCommand[_, Result]
+      httpCommand: HttpCommand[_, Result],
+      basePath: Option[String] = None,
   ): ConsoleCommandResult[Result] =
     spliceConsoleEnvironment.httpCommandRunner.runCommand(
       name,
       httpCommand,
       headers,
-      httpClientConfig,
+      basePath.fold(httpClientConfig)(p =>
+        httpClientConfig.copy(url = httpClientConfig.url.withPath(httpClientConfig.url.path + p))
+      ),
     )
 
   @Help.Summary("Health and diagnostic related commands (HTTP)")

@@ -5,7 +5,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ .Release.Name }}
+    {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 4 }}
   name: {{ .Release.Name }}
   namespace: {{ .Release.Namespace }}
 spec:
@@ -20,7 +20,7 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ .Release.Name }}
+        {{- include "splice-util-lib.default-labels" (set . "app" .Release.Name) | nindent 8 }}
     spec:
       {{- include "splice-util-lib.service-account" .Values | nindent 6 }}
       containers:

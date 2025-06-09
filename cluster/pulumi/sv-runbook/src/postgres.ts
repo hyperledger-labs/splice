@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as _ from 'lodash';
 import {
   clusterSmallDisk,
@@ -17,7 +19,9 @@ export function installPostgres(
   isActive: boolean = true
 ): SplicePostgres | CloudPostgres {
   if (spliceConfig.pulumiProjectConfig.cloudSql.enabled) {
-    return new CloudPostgres(xns, name, name, secretName, isActive, supportsSvRunbookReset);
+    return new CloudPostgres(xns, name, name, secretName, isActive, {
+      disableProtection: supportsSvRunbookReset,
+    });
   } else {
     const valuesFromFile = loadYamlFromFile(
       `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/${selfHostedValuesFile}`

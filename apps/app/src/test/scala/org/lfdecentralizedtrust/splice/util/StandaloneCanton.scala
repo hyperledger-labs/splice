@@ -4,6 +4,7 @@ import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.IsTheCantonSequencerBFTEnabled
 import org.scalatest.Suite
 
 trait StandaloneCanton extends PostgresAroundEach with NamedLogging with ProcessTestUtil {
@@ -22,6 +23,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         Seq(
           s"participant_sv${index}_${dbsSuffix}",
           s"sequencer_sv${index}_${dbsSuffix}",
+          s"sequencer_sv${index}_${dbsSuffix}_bft",
           s"mediator_sv${index}_${dbsSuffix}",
         )
       )
@@ -59,8 +61,16 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
           svs123 && sequencersMediators,
           "standalone-sequencers-mediators-sv123.conf",
         ) ++
+        conditionalConf(
+          svs123 && sequencersMediators && IsTheCantonSequencerBFTEnabled,
+          "standalone-sequencers-sv123-extra-enable-bft.conf",
+        ) ++
         conditionalConf(sv4 && participants, "standalone-participant-sv4.conf") ++
         conditionalConf(sv4 && sequencersMediators, "standalone-sequencer-mediator-sv4.conf") ++
+        conditionalConf(
+          sv4 && sequencersMediators && IsTheCantonSequencerBFTEnabled,
+          "standalone-sequencer-sv4-extra-enable-bft.conf",
+        ) ++
         extraParticipantsConfigFileNames.toList.map(testResourcesPath / _)
 
     def adminUserEnv(index: Integer) = {
@@ -77,6 +87,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         .map(i =>
           Seq(
             s"SV${i}_PARTICIPANT_DB" -> s"participant_sv${i}_${svDbsSuffix}",
+            s"SV${i}_SEQUENCER_DB_BFT" -> s"sequencer_sv${i}_${svDbsSuffix}_bft",
             s"SV${i}_SEQUENCER_DB" -> s"sequencer_sv${i}_${svDbsSuffix}",
             s"SV${i}_MEDIATOR_DB" -> s"mediator_sv${i}_${svDbsSuffix}",
           )

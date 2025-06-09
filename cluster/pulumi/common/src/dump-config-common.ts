@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import * as path from 'path';
 import * as sinon from 'sinon';
@@ -212,6 +214,25 @@ export async function initDumpConfig(): Promise<void> {
               const secretData = JSON.stringify({
                 username: 'art_user',
                 password: 's3cr3t',
+              });
+              return {
+                ...args.inputs,
+                secretData,
+              };
+            } else if (args.inputs.secret == 'us-central1-artifact-reader-key') {
+              const secretData = JSON.stringify({
+                type: 'service_account',
+                project_id: 'fake-project',
+                private_key_id: 'fake_id',
+                private_key: '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n',
+                client_email: 'fake@fake-project.iam.gserviceaccount.com',
+                client_id: 'fake-client-id',
+                auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+                token_uri: 'https://oauth2.googleapis.com/token',
+                auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+                client_x509_cert_url:
+                  'https://www.googleapis.com/robot/v1/metadata/x509/fake%40fake-project.iam.gserviceaccount.com',
+                universe_domain: 'googleapis.com',
               });
               return {
                 ...args.inputs,

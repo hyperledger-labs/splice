@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import _ from 'lodash';
 import {
@@ -104,6 +106,7 @@ export class Dso extends pulumi.ComponentResource {
         bootstrappingDumpConfig: this.args.bootstrappingDumpConfig,
         topupConfig: this.args.topupConfig,
         splitPostgresInstances: this.args.splitPostgresInstances,
+        scanBigQuery: svConf.scanBigQuery,
         sequencerPruningConfig: this.args.sequencerPruningConfig,
         disableOnboardingParticipantPromotionDelay:
           this.args.disableOnboardingParticipantPromotionDelay,

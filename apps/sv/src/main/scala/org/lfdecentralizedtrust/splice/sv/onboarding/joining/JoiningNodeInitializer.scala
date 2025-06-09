@@ -58,7 +58,7 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
 }
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.{SvOnboardingToken, SvUtil}
-import org.lfdecentralizedtrust.splice.sv.{ExtraSynchronizerNode, LocalSynchronizerNode, SvApp}
+import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
 import org.lfdecentralizedtrust.splice.util.{Contract, PackageVetting, TemplateJsonDecoder}
 import com.digitalasset.canton.config.SynchronizerTimeTrackerConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
@@ -83,7 +83,6 @@ import scala.jdk.CollectionConverters.*
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
 class JoiningNodeInitializer(
     localSynchronizerNode: Option[LocalSynchronizerNode],
-    extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
@@ -237,7 +236,6 @@ class JoiningNodeInitializer(
                 svStore,
                 dsoStore,
                 localSynchronizerNode,
-                extraSynchronizerNodes,
                 upgradesConfig,
                 packageVersionSupport,
               )
@@ -369,6 +367,7 @@ class JoiningNodeInitializer(
             decentralizedSynchronizer,
             Onboarding,
             config.domainMigrationId,
+            config.scan,
           )
           // Finally, fully onboard the sequencer and mediator
           _ <-
@@ -392,6 +391,7 @@ class JoiningNodeInitializer(
           decentralizedSynchronizer,
           OnboardedAfterDelay,
           config.domainMigrationId,
+          config.scan,
         )
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
         dsoAutomationService,
@@ -763,7 +763,6 @@ class JoiningNodeInitializer(
                   svStore,
                   dsoStore,
                   localSynchronizerNode,
-                  extraSynchronizerNodes,
                   upgradesConfig,
                   packageVersionSupport,
                 )

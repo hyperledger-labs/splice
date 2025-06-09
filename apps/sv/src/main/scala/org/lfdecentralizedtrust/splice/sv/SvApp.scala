@@ -30,16 +30,11 @@ import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.http.v0.sv.SvResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
-import org.lfdecentralizedtrust.splice.http.v0.sv_soft_domain_migration_poc.SvSoftDomainMigrationPocResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
 import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
-import org.lfdecentralizedtrust.splice.sv.admin.http.{
-  HttpSvAdminHandler,
-  HttpSvHandler,
-  HttpSvSoftDomainMigrationPocHandler,
-}
+import org.lfdecentralizedtrust.splice.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import org.lfdecentralizedtrust.splice.sv.automation.{
   DsoDelegateBasedAutomationService,
   SvDsoAutomationService,
@@ -101,7 +96,6 @@ import java.nio.file.Paths
 import java.time.Instant
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -234,28 +228,16 @@ class SvApp(
           ),
         )
       )
-    val extraSynchronizerNodes = config.synchronizerNodes.view.mapValues { c =>
-      ExtraSynchronizerNode.fromConfig(
-        c,
-        config.cometBftConfig,
-        amuletAppParameters.loggingConfig.api,
-        loggerFactory,
-        metrics.grpcClientMetrics,
-        retryProvider,
-      )
-    }.toMap
     initialize(
       participantAdminConnection,
       ledgerClient,
       localSynchronizerNode,
-      extraSynchronizerNodes,
     )
       .recoverWith { case err =>
         // TODO(#3474) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
         localSynchronizerNode.foreach(_.close())
-        extraSynchronizerNodes.values.foreach(_.close())
         Future.failed(err)
       }
   }
@@ -264,7 +246,6 @@ class SvApp(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: SpliceLedgerClient,
       localSynchronizerNode: Option[LocalSynchronizerNode],
-      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
 
@@ -300,7 +281,6 @@ class SvApp(
       ) =>
         new JoiningNodeInitializer(
           localSynchronizerNode,
-          extraSynchronizerNodes,
           joiningConfig,
           participantId,
           config,
@@ -344,7 +324,6 @@ class SvApp(
                 localSynchronizerNode.getOrElse(
                   sys.error("SV1 must always specify a domain config")
                 ),
-                extraSynchronizerNodes,
                 sv1Config,
                 participantId,
                 config,
@@ -395,7 +374,6 @@ class SvApp(
               localSynchronizerNode.getOrElse(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
-              extraSynchronizerNodes,
               domainMigrationConfig,
               participantId,
               cometBftConfig,
@@ -578,24 +556,6 @@ class SvApp(
         loggerFactory,
       )
 
-      softDomainMigrationPocHandler =
-        if (config.supportsSoftDomainMigrationPoc)
-          Seq(
-            new HttpSvSoftDomainMigrationPocHandler(
-              dsoAutomation,
-              extraSynchronizerNodes,
-              participantAdminConnection,
-              config.domainMigrationId,
-              config.legacyMigrationId,
-              clock,
-              retryProvider,
-              loggerFactory,
-              amuletAppParameters,
-              packageVersionSupport,
-            )
-          )
-        else Seq.empty
-
       route = cors(
         CorsSettings(ac)
           .withAllowedMethods(
@@ -614,35 +574,20 @@ class SvApp(
           requestLogger(traceContext) {
             HttpErrorHandler(loggerFactory)(traceContext) {
               concat(
-                (SvResource.routes(
+                SvResource.routes(
                   handler,
                   _ => provide(traceContext),
-                ) +:
-                  SvAdminResource.routes(
-                    adminHandler,
-                    AdminAuthExtractor(
-                      verifier,
-                      svStore.key.svParty,
-                      svAutomation.connection,
-                      loggerFactory,
-                      "splice sv admin realm",
-                    )(traceContext),
-                  ) +:
-                  softDomainMigrationPocHandler.map(handler =>
-                    // TODO(#15921) setting a longer timeout for now just for the migration poc.
-                    withRequestTimeout(60.seconds) {
-                      SvSoftDomainMigrationPocResource.routes(
-                        handler,
-                        AdminAuthExtractor(
-                          verifier,
-                          svStore.key.svParty,
-                          svAutomation.connection,
-                          loggerFactory,
-                          "splice sv admin realm",
-                        )(traceContext),
-                      )
-                    }
-                  ))*
+                ),
+                SvAdminResource.routes(
+                  adminHandler,
+                  AdminAuthExtractor(
+                    verifier,
+                    svStore.key.svParty,
+                    svAutomation.connection,
+                    loggerFactory,
+                    "splice sv admin realm",
+                  )(traceContext),
+                ),
               )
             }
           }
@@ -654,7 +599,6 @@ class SvApp(
       SvApp.State(
         participantAdminConnection,
         localSynchronizerNode,
-        extraSynchronizerNodes,
         storage,
         domainTimeAutomationService,
         domainParamsAutomationService,
@@ -796,7 +740,6 @@ object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
       localSynchronizerNode: Option[LocalSynchronizerNode],
-      extraSynchronizerNodes: Map[String, ExtraSynchronizerNode],
       storage: Storage,
       domainTimeAutomationService: DomainTimeAutomationService,
       domainParamsAutomationService: DomainParamsAutomationService,
@@ -819,10 +762,6 @@ object SvApp {
         SyncCloseable(
           s"Domain connections",
           localSynchronizerNode.foreach(_.close()),
-        ),
-        SyncCloseable(
-          s"Extra synchronizer nodes",
-          extraSynchronizerNodes.values.foreach(_.close()),
         ),
         SyncCloseable(
           s"Participant Admin connection",
