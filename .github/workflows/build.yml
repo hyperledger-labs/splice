@@ -225,10 +225,10 @@ jobs:
   docs:
     uses: ./.github/workflows/build.docs.yml
     secrets: inherit
-    permissions:
-      contents: write # Required to push the documentation
-      pages: write # Required to push the documentation
-      id-token: write # Required for publishing the documentation
+    # permissions:
+    #   contents: write # Required to push the documentation
+    #   pages: write # Required to push the documentation
+    #   id-token: write # Required for publishing the documentation
     with:
       commit_sha: ${{ inputs.commit_sha }}
 
