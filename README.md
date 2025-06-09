@@ -132,4 +132,4 @@ As of now, it has the following limitations:
   are in the process of a thorough renaming, and will complete that over the coming months.
   Note that this repository will still vendor Canton from its
   [open source repository](https://github.com/digital-asset/canton)
-  as some of its code is reused by the Splice apps for convenience.
+  as some of its code is reused by the Splice apps for convenience..
