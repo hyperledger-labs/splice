@@ -85,7 +85,7 @@ jobs:
           slack_channel: '${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}'
 
   publish_docs:
-    #if: github.event_name == 'push' && github.ref == 'refs/heads/main' #FIXME: uncomment
+    #if: github.event_name == 'push' && github.ref == 'refs/heads/main' #FIXME:  uncomment
     needs: docs
     runs-on: self-hosted-docker-tiny
 
