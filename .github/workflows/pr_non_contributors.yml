@@ -2,8 +2,7 @@ name: CI on PRs from forks
 on:
   pull_request_target:
     types: [ opened, synchronize, reopened ]
-    branches: [ main, isegall/fix-fork-ci ] # Only run on PRs with `main` as their base
-    # FIXME
+    branches: [ main ] # Only run on PRs with `main` as their base
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref }}
