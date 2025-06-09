@@ -1,0 +1,10 @@
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  foo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run a simple command
+        run: echo "I'm a malicious PR"
