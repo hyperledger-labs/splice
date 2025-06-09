@@ -13,6 +13,7 @@ permissions:
   pull-requests: read # Required for the static tests
   issues: read # Required for the static tests
   actions: write # To cancel itself if not opted in
+  pages: write # Required for GitHub Pages deployment # FIXME: should be in post_merge only
 
 jobs:
   ci:
