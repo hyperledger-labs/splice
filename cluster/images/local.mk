@@ -29,7 +29,6 @@ images := \
 	load-tester \
 	multi-validator \
 	multi-participant \
-	pulumi-kubernetes-operator \
 	\
 	splice-test-postgres \
 	splice-test-ci \

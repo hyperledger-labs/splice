@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as k8s from '@pulumi/kubernetes';
 import {
   CLUSTER_BASENAME,
   config,
@@ -35,34 +36,59 @@ export function getSpliceStacksFromMainReference(): StackFromRef[] {
   return ret;
 }
 
-export function installSpliceStacks(reference: GitFluxRef, envRefs: EnvRefs): void {
+export function installSpliceStacks(
+  reference: GitFluxRef,
+  envRefs: EnvRefs,
+  namespace: string,
+  gcpSecret: k8s.core.v1.Secret
+): void {
   if (DeploySvRunbook) {
     createStackCR(
       'sv-runbook',
       'sv-runbook',
+      namespace,
       config.envFlag('SUPPORTS_SV_RUNBOOK_RESET'),
       reference,
-      envRefs
+      envRefs,
+      gcpSecret
     );
   }
   if (config.envFlag('SPLICE_DEPLOY_MULTI_VALIDATOR', false)) {
-    createStackCR('multi-validator', 'multi-validator', false, reference, envRefs);
+    createStackCR(
+      'multi-validator',
+      'multi-validator',
+      namespace,
+      false,
+      reference,
+      envRefs,
+      gcpSecret
+    );
   }
   if (DeployValidatorRunbook) {
     createStackCR(
       'validator-runbook',
       'validator-runbook',
+      namespace,
       config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET'),
       reference,
-      envRefs
+      envRefs,
+      gcpSecret
     );
   }
   if (mustInstallValidator1) {
-    createStackCR('validator1', 'validator1', false, reference, envRefs);
+    createStackCR('validator1', 'validator1', namespace, false, reference, envRefs, gcpSecret);
   }
   if (mustInstallSplitwell) {
-    createStackCR('splitwell', 'splitwell', false, reference, envRefs);
+    createStackCR('splitwell', 'splitwell', namespace, false, reference, envRefs, gcpSecret);
   }
-  createStackCR('infra', 'infra', false, reference, envRefs);
-  createStackCR('canton-network', 'canton-network', false, reference, envRefs);
+  createStackCR('infra', 'infra', namespace, false, reference, envRefs, gcpSecret);
+  createStackCR(
+    'canton-network',
+    'canton-network',
+    namespace,
+    false,
+    reference,
+    envRefs,
+    gcpSecret
+  );
 }
