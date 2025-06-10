@@ -154,9 +154,8 @@ runs:
           cat "$GITHUB_OUTPUT"
 
     - name: DEBUG
-      uses: ./.github/actions/nix/run_bash_command_in_nix
-      with:
-        cmd: |
+      shell: bash
+      run: |
           echo 'VERSIONS: ${{ steps.daml_package_versions.outputs.initial_package_versions }}END'
           echo $GITHUB_OUTPUT
 
