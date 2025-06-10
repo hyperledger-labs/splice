@@ -321,12 +321,25 @@ class UpdateHistory(
               )
             case Some(lastIngestedOffset) =>
               if (offset <= lastIngestedOffset) {
-                logger.warn(
-                  s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                    "This is expected if the SQL query was automatically retried after a transient database error. " +
-                    "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                    "ingesting into the same logical database."
-                )
+                updateOrCheckpoint match {
+                  case _: TreeUpdateOrOffsetCheckpoint.Update =>
+                    logger.warn(
+                      s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                        "This is expected if the SQL query was automatically retried after a transient database error. " +
+                        "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                        "ingesting into the same logical database."
+                    )
+                  case _: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
+                    // we can receive an offset equal to the last ingested and that can be safely ignore
+                    if (offset < lastIngestedOffset) {
+                      logger.warn(
+                        s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                          "This is expected if the SQL query was automatically retried after a transient database error. " +
+                          "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                          "ingesting into the same logical database."
+                      )
+                    }
+                }
                 DBIO.successful(())
               } else {
                 logger.debug(
