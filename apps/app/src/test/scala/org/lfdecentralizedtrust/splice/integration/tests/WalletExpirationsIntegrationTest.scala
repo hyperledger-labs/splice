@@ -175,7 +175,7 @@ class WalletExpirationsIntegrationTest
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger]),
+          activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredAmuletTrigger]),
       ) {
         clue("Check wallet after advancing to next 2 rounds") {
           eventually()(aliceWalletClient.list().amulets shouldBe empty)

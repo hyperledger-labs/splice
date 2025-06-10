@@ -39,14 +39,16 @@ class WalletTransferOfferSweepTrigger(
       currentAmuletConfig: AmuletConfig[USD],
   )(implicit tc: TraceContext): scala.concurrent.Future[BigDecimal] = {
     for {
-      filteredTransferOffers <- store.getOutstandingTransferOffers(
-        None,
-        Some(config.receiver),
-      )
-    } yield filteredTransferOffers
-      .map(c => {
-        BigDecimal(ccToDollars(c.payload.amount.amount, amuletPrice)) + computeTransferFees(
-          BigDecimal(c.payload.amount.amount),
+      (filteredTransferOffers, filteredAcceptedTransferOffers) <- store
+        .getOutstandingTransferOffers(
+          None,
+          Some(config.receiver),
+        )
+    } yield (filteredTransferOffers.map(_.payload.amount.amount) ++ filteredAcceptedTransferOffers
+      .map(_.payload.amount.amount))
+      .map(amount => {
+        BigDecimal(ccToDollars(amount, amuletPrice)) + computeTransferFees(
+          BigDecimal(amount),
           currentAmuletConfig.transferConfig.transferFee,
         ) + computeCreateFees(currentAmuletConfig)
       })
@@ -64,11 +66,14 @@ class WalletTransferOfferSweepTrigger(
       amountToSendAfterFeesCC: java.math.BigDecimal,
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
-      filteredTransferOffers <- store.getOutstandingTransferOffers(
-        None,
-        Some(config.receiver),
-      )
+      (filteredTransferOffers, acceptedFilteredTransferOffers) <- store
+        .getOutstandingTransferOffers(
+          None,
+          Some(config.receiver),
+        )
       transferOfferAlreadyExists = filteredTransferOffers.exists(
+        _.payload.trackingId == task.trackingId
+      ) || acceptedFilteredTransferOffers.exists(
         _.payload.trackingId == task.trackingId
       )
       install <- store.getInstall()

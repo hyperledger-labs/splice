@@ -41,13 +41,17 @@ class ExpiredAnsEntryTrigger(
 
   private val store = svTaskContext.dsoStore
 
-  override def completeTaskAsDsoDelegate(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
+  override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
+      controllerArgument <- getSvControllerArgument(controller)
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireAnsEntry(
           co.work.contractId,
           new AnsEntry_Expire(store.key.dsoParty.toProtoPrimitive),
+          controllerArgument,
         )
       )
       _ <- svTaskContext.connection
