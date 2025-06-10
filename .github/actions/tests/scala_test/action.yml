@@ -147,7 +147,8 @@ runs:
             ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
             echo "Initial package config" $(cat initial_package_config)
             echo "ScalaTest tags: $(cat scala_test_tags)"
-            echo "initial_package_versions='$(cat initial_package_config)'\n" >> "$GITHUB_OUTPUT"
+            # echo "initial_package_versions='$(cat initial_package_config)'\n" >> "$GITHUB_OUTPUT"
+            echo "initial_package_versions=\"{}\"" >> "$GITHUB_OUTPUT"
           else
             echo "daml_base_version is not set, using the latest versions"
           fi
