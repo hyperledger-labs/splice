@@ -138,7 +138,6 @@ runs:
         cache_version: 4
 
     - name: Set Daml package versions
-      id: daml_package_versions
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
@@ -147,17 +146,24 @@ runs:
             ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
             echo "Initial package config" $(cat initial_package_config)
             echo "ScalaTest tags: $(cat scala_test_tags)"
-            # echo "initial_package_versions='$(cat initial_package_config)'\n" >> "$GITHUB_OUTPUT"
-            echo "initial_package_versions=\"{}\"" >> "$GITHUB_OUTPUT"
           else
             echo "daml_base_version is not set, using the latest versions"
           fi
-          cat "$GITHUB_OUTPUT"
+
+    - name: Export Daml package versions output
+      id: daml_package_versions
+      shell: bash
+      run: |
+        # We can't export from within run_bash_command_in_nix so we do it here.
+        if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
+          echo "initial_package_versions='$(cat initial_package_config)'" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: DEBUG
       shell: bash
       run: |
           echo 'VERSIONS: ${{ steps.daml_package_versions.outputs.initial_package_versions }}END'
+          echo 'OTHER: ${{ steps.daml_package_versions.outputs.other_output }}END'
           echo $GITHUB_OUTPUT
 
     - name: Prepare list of tests to run for sbt
@@ -210,14 +216,6 @@ runs:
         cmd_retry_count: 5 # Retry in case of dependency download errors
         additional_nix_args: "--keep DOCKER_CERT_PATH --keep DOCKER_HOST --keep DOCKER_MACHINE_NAME --keep DOCKER_TLS_VERIFY --keep PULUMI_VERSION --keep NO_PROXY --keep CIRCLE_REPOSITORY_URL --keep CIRCLE_SHA1"
 
-    - name: TEST
-      uses: ./.github/actions/nix/run_bash_command_in_nix
-      with:
-        cmd: |
-          cat "$GITHUB_OUTPUT"
-          echo "done with github output"
-          echo ${{ steps.daml_package_versions.outputs.initial_package_versions }}
-
     - name: Wait for Canton to be ready
       shell: bash
       run: |
@@ -235,7 +233,7 @@ runs:
     - name: Run tests
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
-        extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS='${{ steps.daml_package_versions.outputs.initial_package_versions }}'
+        extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }}"
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
         cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}
