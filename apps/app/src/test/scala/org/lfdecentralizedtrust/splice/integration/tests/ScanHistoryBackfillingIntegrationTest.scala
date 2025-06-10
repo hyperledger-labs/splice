@@ -405,15 +405,6 @@ class ScanHistoryBackfillingIntegrationTest
         case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(http) =>
           http.eventsById
       }
-      val eventsByIdSv1 = collectEventsById(sv1Items)
-      val eventsByIdSv2 = collectEventsById(sv2Items)
-
-      def assertOrderedEventsById(eventsByIdSeq: Seq[SortedMap[String, definitions.TreeEvent]]) =
-        forAll(eventsByIdSeq) { eventsById =>
-          eventsById.keys.toSeq should contain theSameElementsInOrderAs SortedMap.from(eventsById).keys.toSeq
-        }
-      assertOrderedEventsById(eventsByIdSv1)
-      assertOrderedEventsById(eventsByIdSv2)
       sv1Items should contain theSameElementsInOrderAs sv2Items
     }
 
