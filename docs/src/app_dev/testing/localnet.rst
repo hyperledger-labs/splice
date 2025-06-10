@@ -43,11 +43,13 @@ Exposed Ports
 - The default database port is **DB_PORT=5432**.
 
 Other ports follow a specific pattern based on the validator:
+
 - ``4${PORT}``: Super Validator (sv) port
 - ``3${PORT}``: App Provider port
 - ``2${PORT}``: App User port
 
 These patterns apply to the following ports:
+
 - **PARTICIPANT_LEDGER_API_PORT**: 5001
 - **PARTICIPANT_ADMIN_API_PORT**: 5002
 - **PARTICIPANT_JSON_API_PORT**: 7575
@@ -56,6 +58,7 @@ These patterns apply to the following ports:
 - **CANTON_GRPC_HEALTHCHECK_PORT**: 5061
 
 UI Ports are defined as follows:
+
 - **APP_USER_UI_PORT**: 2000
 - **APP_PROVIDER_UI_PORT**: 3000
 - **SV_UI_PORT**: 4000
@@ -189,6 +192,8 @@ console
 
 Run in devnet
 -------------
+   Please ensure that the MIGRATION_ID and IMAGE_TAG environment variables are correctly configured for the development network.
+   For more information and the correct values, please visit: https://sync.global/sv-network/
 
 .. code-block:: bash
    export ENV=dev
@@ -202,7 +207,3 @@ Run in devnet
                   -f ${LOCALNET_DIR}/resource-constraints.yaml \
                   --profile app-provider \
                   --profile app-user up -d
-
-.. note::
-   Please ensure that the MIGRATION_ID and IMAGE_TAG environment variables are correctly configured for the development network. 
-   For more information and the correct values, please visit: https://sync.global/sv-network/
