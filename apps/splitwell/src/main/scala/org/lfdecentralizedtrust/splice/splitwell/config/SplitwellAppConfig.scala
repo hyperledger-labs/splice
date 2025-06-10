@@ -12,7 +12,9 @@ import org.lfdecentralizedtrust.splice.config.{
   HttpClientConfig,
   NetworkAppClientConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.config.*
 
 case class SplitwellSynchronizerConfig(
@@ -40,6 +42,7 @@ case class SplitwellAppBackendConfig(
     domainMigrationId: Long = 0L,
     domains: SplitwellSynchronizerConfig,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
+    requiredDarVersion: PackageVersion = DarResources.splitwell.bootstrap.metadata.version,
 ) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"

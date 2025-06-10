@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResources,
   SpliceConsoleEnvironment,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
@@ -106,30 +107,40 @@ case class EnvironmentDefinition(
     })
 
   def withInitialPackageVersions: EnvironmentDefinition =
-    addConfigTransforms((_, config) =>
-      ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-        _.copy(
-          // FIXME: read config from env var or something
-          initialPackageConfig = InitialPackageConfig(
-            amuletVersion = "0.1.8",
-            amuletNameServiceVersion = "0.1.8",
-            dsoGovernanceVersion = "0.1.11",
-            validatorLifecycleVersion = "0.1.2",
-            walletVersion = "0.1.8",
-            walletPaymentsVersion = "0.1.8",
-          )
-        )
-      )(config),
+    addConfigTransforms(
       (_, config) =>
-      ConfigTransforms.updateAllValidatorAppConfigs_( c =>
-        c.copy(
-          appInstances = c.appInstances.transform {
-            // FIXME
-            case ("splitwell", instance) => instance.copy(dars = Seq(java.nio.file.Paths.get("daml/dars/splitwell-0.1.8.dar")))
-            case (_, instance) => instance
-          }
-        )
-      )(config)
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(
+            // FIXME: read config from env var or something
+            initialPackageConfig = InitialPackageConfig(
+              amuletVersion = "0.1.8",
+              amuletNameServiceVersion = "0.1.8",
+              dsoGovernanceVersion = "0.1.11",
+              validatorLifecycleVersion = "0.1.2",
+              walletVersion = "0.1.8",
+              walletPaymentsVersion = "0.1.8",
+            )
+          )
+        )(config),
+      (_, config) =>
+        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+          c.copy(
+            appInstances = c.appInstances.transform {
+              // FIXME
+              case ("splitwell", instance) =>
+                instance.copy(dars = Seq(java.nio.file.Paths.get("daml/dars/splitwell-0.1.8.dar")))
+              case (_, instance) => instance
+            }
+          )
+        )(config),
+      (_, config) =>
+        ConfigTransforms.updateAllSplitwellAppConfigs_(c =>
+          c.copy(
+            requiredDarVersion =
+              // FIXME
+              DarResources.splitwell_0_1_8.metadata.version
+          )
+        )(config),
     )
 
   def withInitializedNodes(): EnvironmentDefinition =
