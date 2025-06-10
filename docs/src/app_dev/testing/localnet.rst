@@ -192,10 +192,9 @@ console
 
 Run in devnet
 -------------
-   Please ensure that the MIGRATION_ID and IMAGE_TAG environment variables are correctly configured for the development network.
-   For more information and the correct values, please visit: https://sync.global/sv-network/
 
 .. code-block:: bash
+
    export ENV=dev
    export SV_PROFILE=off
    export MIGRATION_ID=??? # Set the migration ID to the desired value
@@ -207,3 +206,8 @@ Run in devnet
                   -f ${LOCALNET_DIR}/resource-constraints.yaml \
                   --profile app-provider \
                   --profile app-user up -d
+
+Please ensure that the MIGRATION_ID and IMAGE_TAG environment variables are correctly configured for the development network.
+For more information and the correct values, please visit: https://sync.global/sv-network/
+
+
