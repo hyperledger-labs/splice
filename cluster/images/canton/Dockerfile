@@ -34,7 +34,7 @@ RUN ln -s bin/canton splice-image-bin
 
 FROM fullstorydev/grpcurl:v1.9.2 AS grpcurl
 
-FROM eclipse-temurin:17-jdk-jammy
+FROM eclipse-temurin:21-jdk-noble
 COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY --from=build /usr/bin/screen /usr/bin/screen
 COPY --from=grpcurl /bin/grpcurl /bin/grpcurl
