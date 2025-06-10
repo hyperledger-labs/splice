@@ -121,14 +121,15 @@ In the following, we will refer to this URL as ``OIDC_AUTHORITY_URL``.
 Both your Validator node and any users that wish to authenticate to a web UI connected to your Validator node must be able to reach the ``OIDC_AUTHORITY_URL``.
 We require your OIDC provider to provide a `discovery document <https://openid.net/specs/openid-connect-discovery-1_0.html>`_ at ``OIDC_AUTHORITY_URL/.well-known/openid-configuration``.
 We furthermore require that your OIDC provider exposes a `JWK Set <https://datatracker.ietf.org/doc/html/rfc7517>`_ document.
-In this documentation, we assume that this document is available at ``OIDC_AUTHORITY_URL/.well-known/jwks.json``.
+In this documentation, we assume that this document is available at ``OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS_SUB_URL``.
+For Auth0, ``OIDC_AUTHORITY_JWKS_SUB_URL=/.well-known/jwks.json``.
 
 For machine-to-machine (Validator node component to Validator node component) authentication,
 your OIDC provider must support the `OAuth 2.0 Client Credentials Grant <https://tools.ietf.org/html/rfc6749#section-4.4>`_ flow.
 This means that you must be able to configure (`CLIENT_ID`, `CLIENT_SECRET`) pairs for all Validator node components that need to authenticate themselves to other components.
 Currently, this is the validator app backend - which needs to authenticate to the Validator node's Canton participant.
 The `sub` field of JWTs issued through this flow must match the user ID configured as ``ledger-api-user`` in :ref:`helm-validator-auth-secrets-config`.
-In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``.
+In this documentation, we assume that the `sub` field of these JWTs is formed as ``CLIENT_ID@clients``. (``@clients`` suffix is Auth0 specific)
 If this is not true for your OIDC provider, pay extra attention when configuring ``ledger-api-user`` values below.
 
 For user-facing authentication - allowing users to access the various web UIs hosted on your Validator node,
@@ -156,15 +157,16 @@ In the future, your OIDC provider might additionally be required to issue JWTs w
 
 Summing up, your OIDC provider setup must provide you with the following configuration values:
 
-======================= ===========================================================================
-Name                    Value
------------------------ ---------------------------------------------------------------------------
-OIDC_AUTHORITY_URL      The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
-VALIDATOR_CLIENT_ID     The client id of your OIDC provider for the validator app backend.
-VALIDATOR_CLIENT_SECRET The client secret of your OIDC provider for the validator app backend.
-WALLET_UI_CLIENT_ID     The client id of your OIDC provider for the wallet UI.
-CNS_UI_CLIENT_ID        The client id of your OIDC provider for the CNS UI.
-======================= ===========================================================================
+========================= ===========================================================================
+Name                      Value
+------------------------- ---------------------------------------------------------------------------
+OIDC_AUTHORITY_URL        The URL of your OIDC provider for obtaining the ``openid-configuration`` and ``jwks.json``.
+VALIDATOR_CLIENT_ID       The client id of your OIDC provider for the validator app backend.
+VALIDATOR_CLIENT_SECRET   The client secret of your OIDC provider for the validator app backend.
+VALIDATOR_LEDGER_API_USER ID of the user associated with the client VALIDATOR_CLIENT_ID (value of `sub` in the access token)
+WALLET_UI_CLIENT_ID       The client id of your OIDC provider for the wallet UI.
+CNS_UI_CLIENT_ID          The client id of your OIDC provider for the CNS UI.
+========================= ===========================================================================
 
 We are going to use these values, exported to environment variables named as per the `Name` column, in :ref:`helm-validator-auth-secrets-config` and :ref:`helm-validator-install`.
 
@@ -260,6 +262,7 @@ OIDC_AUTHORITY_URL                 ``https://AUTH0_TENANT_NAME.us.auth0.com``
 OIDC_AUTHORITY_LEDGER_API_AUDIENCE The optional audience of your choice for Ledger API. e.g. ``https://ledger_api.example.com``
 VALIDATOR_CLIENT_ID                The client id of the Auth0 app for the validator app backend
 VALIDATOR_CLIENT_SECRET            The client secret of the Auth0 app for the validator app backend
+VALIDATOR_LEDGER_API_USER          ID of the user associated with the client VALIDATOR_CLIENT_ID (value of `sub` in the access token)
 WALLET_UI_CLIENT_ID                The client id of the Auth0 app for the wallet UI
 CNS_UI_CLIENT_ID                   The client id of the Auth0 app for the CNS UI
 ================================== ===========================================================================
@@ -280,7 +283,7 @@ The validator app backend requires the following secret (omit the scope if it is
 .. code-block:: bash
 
     kubectl create --namespace validator secret generic splice-app-validator-ledger-api-auth \
-        "--from-literal=ledger-api-user=${VALIDATOR_CLIENT_ID}@clients" \
+        "--from-literal=ledger-api-user=${VALIDATOR_LEDGER_API_USER}" \
         "--from-literal=url=${OIDC_AUTHORITY_URL}/.well-known/openid-configuration" \
         "--from-literal=client-id=${VALIDATOR_CLIENT_ID}" \
         "--from-literal=client-secret=${VALIDATOR_CLIENT_SECRET}" \
@@ -335,7 +338,7 @@ To configure the validator app, please modify the file ``splice-node/examples/sv
   (This Scan instance will be used for obtaining additional Scan URLs for BFT Scan reads.)
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, set the ``audience`` field in the `splice-app-validator-ledger-api-auth` k8s secret with the audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
-- Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
+- Replace ``OPERATOR_WALLET_USER_IDS`` with the quoted user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``"auth0|43b68e1e4978b000cefba352"``, *not* only the suffix ``"43b68e1e4978b000cefba352"``
 - Replace ``YOUR_CONTACT_POINT`` by a slack user name or email address that can be used by node operators to contact you in case there are issues with your node. Note that this contact information will be publicly visible. If you do not want to share contact information, you can put an empty string.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
