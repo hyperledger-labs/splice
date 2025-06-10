@@ -53,12 +53,13 @@ export const unitToCurrency = (unit: Unit): string => {
   return unitStringToCurrency(unit.toUpperCase());
 };
 
-export const retrySynchronizerError = (failureCount: number, error: Error): boolean => {
-  // We only retry certain JSON API errors. Retrying everything is more confusing than helpful
-  // because that then also retries on invalid user input.
+export const isDomainConnectionError: (error: Error) => boolean = (error: Error) => {
   const errResponse = error as JsonApiError;
   const keywords = ['NOT_CONNECTED_TO_SYNCHRONIZER', 'NOT_CONNECTED_TO_ANY_SYNCHRONIZER'];
-  const isDomainConnectionError = keywords.some(k => errResponse.body?.error?.includes(k));
 
-  return isDomainConnectionError && failureCount < 10;
+  return keywords.some(k => errResponse.body?.error?.includes(k));
+};
+
+export const retrySynchronizerError = (failureCount: number, error: Error): boolean => {
+  return isDomainConnectionError(error) && failureCount < 10;
 };

@@ -10,14 +10,14 @@ import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const ANS_LEDGER_NAME = 'ans-ledger';
 
+interface JsonApiErrorBody {
+  error: string;
+}
+
 interface JsonApiErrorResponse {
   status: number;
   statusText: string;
   body: JsonApiErrorBody;
-}
-
-interface JsonApiErrorBody {
-  error: string;
 }
 
 export class JsonApiError extends Error {
