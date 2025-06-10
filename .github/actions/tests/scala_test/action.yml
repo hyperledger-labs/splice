@@ -100,19 +100,6 @@ runs:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
 
-    - name: Set Daml package versions
-      id: daml_package_versions
-      uses: ./.github/actions/nix/run_bash_command_in_nix
-      with:
-        cmd: |
-          if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
-            echo "Running with initial package config from ${{ inputs.daml_base_version }}"
-            ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
-            echo "Initial package config" $(cat initial_package_config)
-            echo "ScalaTest tags: $(cat scala_test_tags)"
-          else
-            echo "daml_base_version is not set, using the latest versions"
-          fi
     - name: Wait for postgres
       uses: ./.github/actions/nix/run_bash_command_in_nix
       env:
@@ -161,6 +148,21 @@ runs:
           echo "$splitted"
           echo "$tests" > /tmp/tests
 
+    - name: Set Daml package versions
+      id: daml_package_versions
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
+            echo "Running with initial package config from ${{ inputs.daml_base_version }}"
+            ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
+            echo "Initial package config" $(cat initial_package_config)
+            echo "ScalaTest tags: $(cat scala_test_tags)"
+            echo "initial_package_versions='$(cat initial_package_config)'\n" >> $GITHUB_OUTPUT
+          else
+            echo "daml_base_version is not set, using the latest versions"
+          fi
+
     - name: Set RUN_SPLITTED_TESTS_CMD
       id: list_tests
       shell: bash
@@ -168,8 +170,10 @@ runs:
         tags=""
         if [ -f scala_test_tags ]
         then
-          tags=$(cat scala_test_tags)
+          tags="$(cat scala_test_tags)"
           echo "Using scalatest tags: $tags"
+        else
+          echo "No scala test tags configured"
         fi
         echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests) -- $tags\"" >> "$GITHUB_OUTPUT"
 
@@ -215,7 +219,7 @@ runs:
     - name: Run tests
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
-        extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+        extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS='${{ steps.daml_package_versions.outputs.initial_package_versions }}'
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
         cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}

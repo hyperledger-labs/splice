@@ -51,6 +51,7 @@ runs:
             --keep RUN_SPLITTED_TESTS_CMD \
             --keep COURSIER_CACHE \
             --keep SBT_OPTS \
+            --keep GITHUB_OUTPUT \
             --command echo "Confirmed that we can build and enter the nix environment!" \
             && break
           NIX_ENV_TRY_COUNT=$((NIX_ENV_TRY_COUNT+1))
@@ -158,4 +159,3 @@ runs:
         PID=$!
 
         wait $PID
-
