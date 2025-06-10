@@ -10,20 +10,14 @@ import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
 const ANS_LEDGER_NAME = 'ans-ledger';
 
+interface JsonApiErrorBody {
+  error: string;
+}
+
 interface JsonApiErrorResponse {
   status: number;
   statusText: string;
   body: JsonApiErrorBody;
-}
-
-interface JsCantonError {
-  code: string;
-  cause: string;
-  correlationId: string;
-}
-
-interface JsonApiErrorBody {
-  error: JsCantonError;
 }
 
 export class JsonApiError extends Error {
@@ -175,7 +169,7 @@ export class LedgerApiClient {
           console.debug(`${describeChoice} succeeded.`);
           return r.json();
         } else {
-          const body = JSON.parse(await r.text());
+          const body = await r.text();
           throw new JsonApiError({
             status: r.status,
             body: { error: body },

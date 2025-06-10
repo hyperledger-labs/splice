@@ -57,7 +57,7 @@ export const isDomainConnectionError: (error: Error) => boolean = (error: Error)
   const errResponse = error as JsonApiError;
   const keywords = ['NOT_CONNECTED_TO_SYNCHRONIZER', 'NOT_CONNECTED_TO_ANY_SYNCHRONIZER'];
 
-  return keywords.some(k => errResponse.body?.error?.code.includes(k));
+  return keywords.some(k => errResponse.body?.error?.includes(k));
 };
 
 export const retrySynchronizerError = (failureCount: number, error: Error): boolean => {
