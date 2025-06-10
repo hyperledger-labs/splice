@@ -1259,16 +1259,16 @@ object HttpScanAppClient {
   }
 
   case class GetUpdateHistoryV2(
-                                 count: Int,
-                                 after: Option[(Long, String)],
-                                 damlValueEncoding: definitions.DamlValueEncoding,
-                               ) extends InternalBaseCommand[http.GetUpdateHistoryV2Response, Seq[
-    definitions.UpdateHistoryItemV2
-  ]] {
+      count: Int,
+      after: Option[(Long, String)],
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[http.GetUpdateHistoryV2Response, Seq[
+        definitions.UpdateHistoryItemV2
+      ]] {
     override def submitRequest(
-                                client: http.ScanClient,
-                                headers: List[HttpHeader],
-                              ): EitherT[Future, Either[
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
     ], http.GetUpdateHistoryV2Response] = {

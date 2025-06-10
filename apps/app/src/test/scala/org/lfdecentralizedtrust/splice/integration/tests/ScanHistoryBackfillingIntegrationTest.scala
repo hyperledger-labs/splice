@@ -2,13 +2,19 @@ package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
+}
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.http.v0.definitions
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTest, SpliceTestConsoleEnvironment}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.scan.admin.http.ProtobufJsonScanHttpEncodings
 import org.lfdecentralizedtrust.splice.scan.automation.ScanHistoryBackfillingTrigger
 import org.lfdecentralizedtrust.splice.store.{PageLimit, TreeUpdateWithMigrationId}
@@ -21,14 +27,12 @@ import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.automation.TxLogBackfillingTrigger
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
-import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2
 import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalactic.source.Position
 
 import scala.annotation.nowarn
-import scala.collection.immutable.SortedMap
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -401,10 +405,6 @@ class ScanHistoryBackfillingIntegrationTest
       commonLength should be > 10
       val sv1Items = sv1HttpUpdates.take(commonLength)
       val sv2Items = sv2HttpUpdates.take(commonLength)
-      def collectEventsById(items: Seq[UpdateHistoryItemV2]) = items.collect {
-        case definitions.UpdateHistoryItemV2.members.UpdateHistoryTransactionV2(http) =>
-          http.eventsById
-      }
       sv1Items should contain theSameElementsInOrderAs sv2Items
     }
 

@@ -853,24 +853,6 @@ class HttpScanHandler(
         )
     }
 
-  override def getUpdateByIdV2(respond: ScanResource.GetUpdateByIdV2Response.type)(
-      updateId: String,
-      damlValueEncoding: Option[DamlValueEncoding],
-  )(extracted: TraceContext): Future[ScanResource.GetUpdateByIdV2Response] = {
-    getUpdateById(
-      updateId = updateId,
-      encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
-      consistentResponses = true,
-      extracted,
-    )
-      .map {
-        case Left(error) =>
-          ScanResource.GetUpdateByIdV2Response.NotFound(error)
-        case Right(update) =>
-          ScanResource.GetUpdateByIdV2Response.OK(toUpdateV2(update))
-      }
-  }
-
   override def listActivity(
       respond: v0.ScanResource.ListActivityResponse.type
   )(
@@ -1484,24 +1466,22 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getUpdateById") { _ => _ =>
-      for {
-        tx <- store.updateHistory.getUpdate(updateId)
-      } yield {
-        tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
-          Left(
-            definitions.ErrorResponse(s"Transaction with id $updateId not found")
-          )
-        )(txWithMigration =>
-          Right(
-            ScanHttpEncodings.encodeUpdate(
-              txWithMigration,
-              encoding = encoding,
-              version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            )
+    for {
+      tx <- store.updateHistory.getUpdate(updateId)
+    } yield {
+      tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
+        Left(
+          definitions.ErrorResponse(s"Transaction with id $updateId not found")
+        )
+      )(txWithMigration =>
+        Right(
+          ScanHttpEncodings.encodeUpdate(
+            txWithMigration,
+            encoding = encoding,
+            version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
           )
         )
-      }
+      )
     }
   }
 
@@ -1510,18 +1490,27 @@ class HttpScanHandler(
   )(updateId: String, lossless: Option[Boolean])(
       extracted: TraceContext
   ): Future[ScanResource.GetUpdateByIdResponse] = {
-    val encoding = if (lossless.getOrElse(false)) {
-      definitions.DamlValueEncoding.ProtobufJson
-    } else {
-      definitions.DamlValueEncoding.CompactJson
-    }
-    getUpdateById(updateId = updateId, encoding = encoding, consistentResponses = false, extracted)
-      .map {
-        case Left(error) =>
-          ScanResource.GetUpdateByIdResponse.NotFound(error)
-        case Right(update) =>
-          ScanResource.GetUpdateByIdResponse.OK(update)
+    implicit val tc = extracted
+    // in openAPI the operationID for /v0/updates/{update_id} is `getUpdateById`, logging as `getUpdateByIdV0` for clarity
+    withSpan(s"$workflowId.getUpdateByIdV0") { _ => _ =>
+      val encoding = if (lossless.getOrElse(false)) {
+        definitions.DamlValueEncoding.ProtobufJson
+      } else {
+        definitions.DamlValueEncoding.CompactJson
       }
+      getUpdateById(
+        updateId = updateId,
+        encoding = encoding,
+        consistentResponses = false,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByIdResponse.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByIdResponse.OK(update)
+        }
+    }
   }
 
   override def getUpdateByIdV1(
@@ -1529,18 +1518,42 @@ class HttpScanHandler(
   )(updateId: String, damlValueEncoding: Option[definitions.DamlValueEncoding])(
       extracted: TraceContext
   ): Future[ScanResource.GetUpdateByIdV1Response] = {
-    getUpdateById(
-      updateId = updateId,
-      encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
-      consistentResponses = true,
-      extracted,
-    )
-      .map {
-        case Left(error) =>
-          ScanResource.GetUpdateByIdV1Response.NotFound(error)
-        case Right(update) =>
-          ScanResource.GetUpdateByIdV1Response.OK(update)
-      }
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByIdV1") { _ => _ =>
+      getUpdateById(
+        updateId = updateId,
+        encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+        consistentResponses = true,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByIdV1Response.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByIdV1Response.OK(update)
+        }
+    }
+  }
+
+  override def getUpdateByIdV2(respond: ScanResource.GetUpdateByIdV2Response.type)(
+      updateId: String,
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateByIdV2Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByIdV2") { _ => _ =>
+      getUpdateById(
+        updateId = updateId,
+        encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+        consistentResponses = true,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByIdV2Response.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByIdV2Response.OK(toUpdateV2(update))
+        }
+    }
   }
 
   private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(
