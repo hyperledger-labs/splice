@@ -311,7 +311,7 @@ function createPostgresReplicatorUser(
   postgres: CloudPostgres,
   password: PostgresPassword
 ): gcp.sql.User {
-    const name = `${postgres.namespace.logicalName}-user-${replicatorUserName}`;
+  const name = `${postgres.namespace.logicalName}-user-${replicatorUserName}`;
   return new gcp.sql.User(
     name,
     {
@@ -331,7 +331,7 @@ function createPostgresReplicatorUser(
 
 function databaseCommandBracket(postgres: CloudPostgres) {
   return {
-      header: pulumi.interpolate`
+    header: pulumi.interpolate`
         set -e
         TMP_BUCKET="da-cn-tmp-sql-$(date +%s)-$RANDOM"
         TMP_SQL_FILE="$(mktemp tmp_pub_rep_slots_XXXXXXXXXX.sql --tmpdir)"
@@ -347,7 +347,7 @@ function databaseCommandBracket(postgres: CloudPostgres) {
 
         cat > "$TMP_SQL_FILE" <<'EOT'
   `,
-      footer: pulumi.interpolate`
+    footer: pulumi.interpolate`
 EOT
 
         # upload SQL to temporary bucket
@@ -379,7 +379,7 @@ function createPublicationAndReplicationSlots(
 ) {
   const dbName = scanAppDatabaseName(postgres);
   const schemaName = dbName;
-  const {header, footer} = databaseCommandBracket(postgres);
+  const { header, footer } = databaseCommandBracket(postgres);
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
     {
