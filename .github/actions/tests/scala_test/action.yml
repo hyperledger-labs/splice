@@ -83,6 +83,10 @@ inputs:
   failure_notifications_slack_channel:
     description: "Slack channel for failure notifications (for failure notifications)"
     required: true
+  daml_base_version:
+    type: string
+    required: false
+    default: "0.3.21"
 
 runs:
   using: "composite"
@@ -96,6 +100,21 @@ runs:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
 
+    - name: Set Daml package versions
+      id: daml_package_versions
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          if [[ "${{ inputs.daml_base_version }}" != ""]; then
+            echo "Running with initial package config from ${{ inputs.daml_base_version }}"
+            ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
+            echo "Initial package config"
+            cat initial_package_config
+            echo "ScalaTest tags"
+            cat scala_test_tags
+          else
+            echo "daml_base_version is not set, using the latest versions"
+          fi
     - name: Wait for postgres
       uses: ./.github/actions/nix/run_bash_command_in_nix
       env:
@@ -147,7 +166,14 @@ runs:
     - name: Set RUN_SPLITTED_TESTS_CMD
       id: list_tests
       shell: bash
-      run: echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests) -- -l org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck -l org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9\"" >> "$GITHUB_OUTPUT"
+      run: |
+        tags=""
+        if [ -f scala_test_tags ]
+        then
+          tags=$(cat scala_test_tags)
+          echo "Using scalatest tags: $tags"
+        fi
+        echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests) -- $tags\"" >> "$GITHUB_OUTPUT"
 
     # webpack uses inotify to watch for changes, and we need to increase the limit
     - name: increase inotify limit
