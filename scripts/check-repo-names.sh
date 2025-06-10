@@ -7,7 +7,6 @@
 
 set -euo pipefail
 
-SPLICE_ROOT=$( git rev-parse --show-toplevel )
 rename_script="scripts/check-repo-names.sh"
 
 function check_patterns_locally() {
