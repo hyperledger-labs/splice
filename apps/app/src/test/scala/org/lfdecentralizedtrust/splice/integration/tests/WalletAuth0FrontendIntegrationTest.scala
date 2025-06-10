@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import monocle.macros.syntax.lens.*
 
-import java.net.URL
+import java.net.URI
 
 class WalletAuth0FrontendIntegrationTest
     extends FrontendIntegrationTest("randomUser")
@@ -31,7 +31,9 @@ class WalletAuth0FrontendIntegrationTest
             .replace(
               Rs256(
                 sys.env("OIDC_AUTHORITY_VALIDATOR_AUDIENCE"),
-                new URL(s"https://${sys.env("SPLICE_OAUTH_TEST_AUTHORITY")}/.well-known/jwks.json"),
+                new URI(
+                  s"https://${sys.env("SPLICE_OAUTH_TEST_AUTHORITY")}/.well-known/jwks.json"
+                ).toURL,
               )
             )
         )(spliceConfig)

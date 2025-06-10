@@ -3,6 +3,67 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "canton-network-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "canton-network-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "canton-network-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "canton-network:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "canton-network-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "canton-network:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "pulumi.com/v1",
       "kind": "Stack",
       "metadata": {
@@ -58,7 +119,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -70,13 +131,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -89,7 +156,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/canton-network/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -103,8 +170,106 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "canton-network-sa",
         "stack": "organization/canton-network/canton-network.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "canton-network",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "canton-network",
@@ -138,6 +303,89 @@
     "name": "deployment-env",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "gke-credentials",
+        "namespace": "operator"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "googleCredentials": "s3cr3t"
+        }
+      },
+      "type": "Opaque"
+    },
+    "name": "gke-credentials",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "infra-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "infra-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "infra-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "infra:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "infra-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "infra:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -198,7 +446,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -210,13 +458,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -229,7 +483,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/infra/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -243,13 +497,172 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "infra-sa",
         "stack": "organization/infra/infra.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "infra",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "infra",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "multi-validator-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "multi-validator-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "multi-validator-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "multi-validator:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "multi-validator-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "multi-validator:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -310,7 +723,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -322,13 +735,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -341,7 +760,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/multi-validator/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -355,8 +774,106 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "multi-validator-sa",
         "stack": "organization/multi-validator/multi-validator.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "multi-validator",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "multi-validator",
@@ -782,6 +1299,67 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "splitwell-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "splitwell-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "splitwell-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "splitwell:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "splitwell-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "splitwell:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "pulumi.com/v1",
       "kind": "Stack",
       "metadata": {
@@ -837,7 +1415,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -849,13 +1427,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -868,7 +1452,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/splitwell/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -882,13 +1466,172 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "splitwell-sa",
         "stack": "organization/splitwell/splitwell.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "splitwell",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "splitwell",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-1-migration-1-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-1-migration-1-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-1-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-1:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-1-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-1:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -949,13 +1692,19 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -974,7 +1723,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-1/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -994,13 +1743,172 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-1-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-1.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-1",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-1-migration-1",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-1-migration-2-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-1-migration-2-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-2-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-2:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-2-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-2:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1061,13 +1969,19 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1086,7 +2000,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-2/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1106,13 +2020,172 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-1-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-2.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-2",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-1-migration-2",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-1-migration-3-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-1-migration-3-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-3-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-3:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-3-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-3:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1173,7 +2246,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1185,13 +2258,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1210,7 +2289,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-3/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1230,13 +2309,172 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-1-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-3.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-3",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-1-migration-3",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-1-migration-4-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-1-migration-4-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-4-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-4:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-1-migration-4-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-1-migration-4:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1297,7 +2535,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1309,13 +2547,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1334,7 +2578,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-1-migration-4/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1354,13 +2598,172 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-1-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-4.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-1-migration-4",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-1-migration-4",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-migration-1-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-migration-1-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-1-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-1:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-1-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-1:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1421,13 +2824,19 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1446,7 +2855,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-1/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1468,13 +2877,172 @@
         "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-1.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-1",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-migration-1",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-migration-2-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-migration-2-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-2-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-2:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-2-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-2:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1535,13 +3103,19 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-2/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
           "GCP_CLUSTER_BASENAME": {
             "literal": {
               "value": "mock"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1560,7 +3134,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-2/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1582,13 +3156,172 @@
         "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-2.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-2",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-migration-2",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-migration-3-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-migration-3-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-3-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-3:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-3-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-3:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1649,7 +3382,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1661,13 +3394,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1686,7 +3425,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-3/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1708,13 +3447,172 @@
         "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-3.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-3",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-migration-3",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-canton.sv-migration-4-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-canton.sv-migration-4-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-4-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-4:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-canton.sv-migration-4-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-canton.sv-migration-4:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1775,7 +3673,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1787,13 +3685,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1812,7 +3716,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-canton.sv-migration-4/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           },
@@ -1834,13 +3738,172 @@
         "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-canton.sv-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-4.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-canton-sv-migration-4",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-canton.sv-migration-4",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "sv-runbook-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "sv-runbook-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-runbook-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-runbook:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "sv-runbook-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "sv-runbook:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -1901,7 +3964,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -1913,13 +3976,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -1932,7 +4001,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/sv-runbook/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -1948,13 +4017,172 @@
         "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "sv-runbook-sa",
         "stack": "organization/sv-runbook/sv-runbook.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "sv-runbook",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "sv-runbook",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "validator-runbook-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "validator-runbook-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "validator-runbook-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "validator-runbook:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "validator-runbook-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "validator-runbook:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -2015,7 +4243,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -2027,13 +4255,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2046,7 +4280,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator-runbook/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -2062,13 +4296,172 @@
         "refresh": true,
         "resyncFrequencySeconds": 300,
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "validator-runbook-sa",
         "stack": "organization/validator-runbook/validator-runbook.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "validator-runbook",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "validator-runbook",
     "provider": "",
     "type": "kubernetes:pulumi.com/v1:Stack"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "validator1-sa",
+        "namespace": "operator"
+      }
+    },
+    "name": "validator1-sa",
+    "provider": "",
+    "type": "kubernetes:core/v1:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "cluster-admin"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "validator1-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "validator1:cluster-admin",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "ClusterRoleBinding",
+      "roleRef": {
+        "apiGroup": "rbac.authorization.k8s.io",
+        "kind": "ClusterRole",
+        "name": "system:auth-delegator"
+      },
+      "subjects": [
+        {
+          "kind": "ServiceAccount",
+          "name": "validator1-sa",
+          "namespace": "operator"
+        }
+      ]
+    },
+    "name": "validator1:system:auth-delegator",
+    "provider": "",
+    "type": "kubernetes:rbac.authorization.k8s.io/v1:ClusterRoleBinding"
   },
   {
     "custom": true,
@@ -2129,7 +4522,7 @@
           },
           "DEPLOYMENT_DIR": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/deployment"
+              "value": "/share/source/cluster/deployment"
             },
             "type": "Literal"
           },
@@ -2141,13 +4534,19 @@
           },
           "PRIVATE_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/configs/configs-private"
+              "value": "/share/source/cluster/configs/configs-private"
             },
             "type": "Literal"
           },
           "PUBLIC_CONFIGS_PATH": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/cluster/configs/configs"
+              "value": "/share/source/cluster/configs/configs"
+            },
+            "type": "Literal"
+          },
+          "PULUMI_VERSION": {
+            "literal": {
+              "value": "0.0.0"
             },
             "type": "Literal"
           },
@@ -2160,7 +4559,7 @@
           },
           "SPLICE_ROOT": {
             "literal": {
-              "value": "/tmp/pulumi-working/operator/validator1/workspace/splice"
+              "value": "/share/source/splice"
             },
             "type": "Literal"
           }
@@ -2174,8 +4573,106 @@
           }
         },
         "retryOnUpdateConflict": true,
+        "serviceAccountName": "validator1-sa",
         "stack": "organization/validator1/validator1.mock",
-        "useLocalStackOnly": true
+        "useLocalStackOnly": true,
+        "workspaceTemplate": {
+          "metadata": {
+            "name": "validator1",
+            "namespace": "operator"
+          },
+          "spec": {
+            "env": [
+              {
+                "name": "CN_PULUMI_LOAD_ENV_CONFIG_FILE",
+                "value": "true"
+              },
+              {
+                "name": "SPLICE_OPERATOR_DEPLOYMENT",
+                "value": "true"
+              },
+              {
+                "name": "GITHUB_TOKEN",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "password",
+                    "name": "github"
+                  }
+                }
+              },
+              {
+                "name": "CLOUDSDK_CORE_PROJECT",
+                "value": "da-cn-devnet"
+              },
+              {
+                "name": "CLOUDSDK_COMPUTE_REGION",
+                "value": "europe-west6"
+              },
+              {
+                "name": "GOOGLE_APPLICATION_CREDENTIALS",
+                "value": "/app/gcp-credentials.json"
+              },
+              {
+                "name": "GOOGLE_CREDENTIALS",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "key": "googleCredentials",
+                    "name": "gke-credentials"
+                  }
+                }
+              }
+            ],
+            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "podTemplate": {
+              "spec": {
+                "affinity": {
+                  "nodeAffinity": {
+                    "requiredDuringSchedulingIgnoredDuringExecution": {
+                      "nodeSelectorTerms": [
+                        {
+                          "matchExpressions": [
+                            {
+                              "key": "cn_infra",
+                              "operator": "Exists"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "containers": [
+                  {
+                    "name": "pulumi",
+                    "volumeMounts": [
+                      {
+                        "mountPath": "/app/gcp-credentials.json",
+                        "name": "gcp-credentials",
+                        "subPath": "googleCredentials"
+                      }
+                    ]
+                  }
+                ],
+                "tolerations": [
+                  {
+                    "effect": "NoSchedule",
+                    "key": "cn_infra",
+                    "operator": "Exists"
+                  }
+                ],
+                "volumes": [
+                  {
+                    "name": "gcp-credentials",
+                    "secret": {
+                      "optional": false,
+                      "secretName": "gke-credentials"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "name": "validator1",

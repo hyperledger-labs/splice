@@ -68,6 +68,7 @@ services:
       - ${LOCALNET_DIR}/conf/nginx/app-provider.conf:/etc/nginx/templates/app-provider.c${APP_PROVIDER_PROFILE}f.template
       - ${LOCALNET_DIR}/conf/nginx/app-user.conf:/etc/nginx/templates/app-user.c${APP_USER_PROFILE}f.template
       - ${LOCALNET_DIR}/conf/nginx/sv.conf:/etc/nginx/templates/sv.c${SV_PROFILE}f.template
+      - ${LOCALNET_DIR}/conf/nginx/swagger-ui:/etc/nginx/includes
     ports:
       - "${SV_UI_PORT}:${SV_UI_PORT}"
       - "${APP_PROVIDER_UI_PORT}:${APP_PROVIDER_UI_PORT}"
@@ -191,6 +192,20 @@ services:
     tty: true
     profiles:
       - console
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: swagger-ui
+    volumes:
+      - ${LOCALNET_DIR}/docker/swagger-ui/entrypoint.sh:/entrypoint.sh
+    environment:
+      URLS: '[{"url": "http://canton.localhost:${APP_PROVIDER_UI_PORT}/docs/openapi", "name": "app-provider"},
+              {"url": "http://canton.localhost:${APP_USER_UI_PORT}/docs/openapi", "name": "app-user"},
+              {"url": "http://canton.localhost:${SV_UI_PORT}/docs/openapi", "name": "sv"}]'
+    ports:
+      - "${SWAGGER_UI_PORT}:8080"
+    profiles:
+      - swagger-ui
 
   ###############################################################################################################
   ### Application User

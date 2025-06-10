@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Deployment
+
+  - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
+  - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
+
 0.4.1
 -----
 
