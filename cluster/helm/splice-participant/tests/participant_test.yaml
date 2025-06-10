@@ -37,7 +37,7 @@ tests:
       # Sanity check
       - equal:
           path: spec.template.spec.containers[0].name
-          value: participant-1
+          value: participant
       # Labels on deployment
       - isSubset:
           path: metadata.labels
@@ -99,7 +99,7 @@ tests:
       # Sanity check
       - equal:
           path: spec.template.spec.containers[0].name
-          value: participant-1
+          value: participant
       # KMS config
       - contains:
           path: spec.template.spec.containers[0].env
@@ -139,7 +139,7 @@ tests:
       # Sanity check
       - equal:
           path: spec.template.spec.containers[0].name
-          value: participant-1
+          value: participant
       # multi-line env var
       - contains:
           path: spec.template.spec.containers[0].env

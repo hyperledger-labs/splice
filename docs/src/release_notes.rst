@@ -8,6 +8,13 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Deployment
+
+  - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
+
 0.4.1
 -----
 
