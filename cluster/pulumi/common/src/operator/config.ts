@@ -7,7 +7,7 @@ import { z } from 'zod';
 export const OperatorDeploymentConfigSchema = z.object({
   operatorDeployment: z.object({
     reference: GitReferenceSchema,
-    // TODO(https://github.com/DACH-NY/canton-network-internal/issues/544 #544) - delete this and move the config back to the operator project
+    // TODO(DACH-NY/canton-network-internal#544) - delete this and move the config back to the operator project
     useOperatorV2: z.boolean().default(true),
   }),
 });
