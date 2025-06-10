@@ -1571,7 +1571,18 @@ unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
 ------------------------
 
 -- | Represents an offer to mint an Amulet for a given beneficiary.
+--
 -- This offer must be accepted before minting.
+-- 
+-- Thie choice `AmuletMintOffer_Accept` must be exercised by the beneficiary to accept the mint offer.
+-- It triggers the minting logic in the `AmuletRules` contract and archives a sufficient
+-- number of `UnclaimedReward` contracts to cover the amount being minted.
+--
+-- If the last archived `UnclaimedReward` exceeds the required amount, a new
+-- `UnclaimedReward` is created for the leftover.
+--
+-- Note: the beneficiary exercises this choice leveraging explicit disclosure.
+-- 
 template AmuletMintOffer
   with
     dso : Party
@@ -1583,17 +1594,6 @@ template AmuletMintOffer
     observer beneficiary
     ensure amount > 0.0
 
-    -- | Accepts an `AmuletMintOffer` and proceeds to mint the `Amulet` for the beneficiary.
-    -- 
-    -- This choice must be exercised by the beneficiary to accept the mint offer.
-    -- It triggers the minting logic in the `AmuletRules` contract and archives a sufficient
-    -- number of `UnclaimedReward` contracts to cover the amount being minted.
-    --
-    -- If the last archived `UnclaimedReward` exceeds the required amount, a new
-    -- `UnclaimedReward` is created for the leftover.
-    --
-    -- Note: he beneficiary exercises this choice leveraging explicit disclosure.
-    -- 
     choice AmuletMintOffer_Accept : AmuletMintOffer_AcceptResult
       with 
         amuletRulesCid : ContractId AmuletRules 
@@ -1601,10 +1601,9 @@ template AmuletMintOffer
         openRoundCid : ContractId OpenMiningRound 
           -- ^ The current `OpenMiningRound` contract
         unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
-          -- ^ A sufficient list of `UnclaimedReward`s to be archived.
+          -- ^ A sufficient list of `UnclaimedReward` to be archived.
           -- It must cover at least the requested amount.
       controller beneficiary
-      
       do
         AmuletRules_MintResult amuletSum <- exercise amuletRulesCid AmuletRules_Mint with 
           receiver = beneficiary
