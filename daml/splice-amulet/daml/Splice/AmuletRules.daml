@@ -9,7 +9,7 @@ import DA.Action (when, void, foldlA)
 import DA.Assert
 import DA.Exception
 import DA.Foldable (forA_)
-import DA.List (dedupSort)
+import DA.List (dedupSort, sortOn)
 import DA.Map (Map)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, optionalToList)
@@ -88,6 +88,9 @@ data AmuletRules_UpdateFutureAmuletConfigScheduleResult = AmuletRules_UpdateFutu
 
 data AmuletRules_ConvertFeaturedAppActivityMarkersResult = AmuletRules_ConvertFeaturedAppActivityMarkersResult with
     appRewardCouponCids : [ContractId AppRewardCoupon]
+
+data AmuletRules_CreateAmuletMintOfferResult = AmuletRules_CreateAmuletMintOfferResult with 
+    amuletMintOfferCid : ContractId AmuletMintOffer
 
 -- | The rules governing how Amulet users can modify the Amulet state managed by the DSO party.
 template AmuletRules
@@ -626,6 +629,17 @@ template AmuletRules
                    amount = amountAmulet * weight
              else pure []
          pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
+
+    nonconsuming choice AmuletRules_CreateAmuletMintOffer : AmuletRules_CreateAmuletMintOfferResult
+      with
+        beneficiary : Party 
+        amount : Decimal 
+        reason : Text
+      controller dso
+      do 
+        amuletMintOfferCid <- create AmuletMintOffer with ..
+        pure $ AmuletRules_CreateAmuletMintOfferResult with ..
+
 
 -- Transfer logic
 -- ==============
@@ -1551,3 +1565,83 @@ unfeaturedPaymentContextFromChoiceContext dso choiceContext = do
   pure PaymentTransferContext with
     amuletRules
     context = context with featuredAppRight = None
+
+
+-- Amulet minting offer
+------------------------
+
+-- | Represents an offer to mint an Amulet for a given beneficiary.
+-- This offer must be accepted before minting.
+template AmuletMintOffer
+  with
+    dso : Party
+    beneficiary : Party -- ^ The owner of the `Amulet` to be minted
+    amount : Decimal -- ^ The amount of `Amulet` to be minted 
+    reason : Text -- ^ A reason to mint the `Amulet`
+  where 
+    signatory dso
+    observer beneficiary
+    ensure amount > 0.0
+
+    -- | Accepts an `AmuletMintOffer` and proceeds to mint the `Amulet` for the beneficiary.
+    -- 
+    -- This choice must be exercised by the beneficiary to accept the mint offer.
+    -- It triggers the minting logic in the `AmuletRules` contract and archives a sufficient
+    -- number of `UnclaimedReward` contracts to cover the amount being minted.
+    --
+    -- If the last archived `UnclaimedReward` exceeds the required amount, a new
+    -- `UnclaimedReward` is created for the leftover.
+    --
+    -- Note: he beneficiary exercises this choice leveraging explicit disclosure.
+    -- 
+    choice AmuletMintOffer_Accept : AmuletMintOffer_AcceptResult
+      with 
+        amuletRulesCid : ContractId AmuletRules 
+          -- ^ The current `AmuletRules` contract
+        openRoundCid : ContractId OpenMiningRound 
+          -- ^ The current `OpenMiningRound` contract
+        unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
+          -- ^ A sufficient list of `UnclaimedReward`s to be archived.
+          -- It must cover at least the requested amount.
+      controller beneficiary
+      
+      do
+        AmuletRules_MintResult amuletSum <- exercise amuletRulesCid AmuletRules_Mint with 
+          receiver = beneficiary
+          amount
+          openRound = openRoundCid
+        
+        -- Sorting in descending order minimizes the number of `UnclaimedReward`s we need to archive
+        sortedUnclaimedRewards <- sortOn (Down . (._2)) <$> 
+          forA unclaimedRewardsToBurnCids (\cid -> do
+            unclaimedReward <- fetchChecked (ForDso with dso) cid
+            pure (cid, unclaimedReward.amount)
+          )
+        leftoverAmount <- archiveUntilTargetReached dso amount sortedUnclaimedRewards
+        optUnclaimedRewardCid <- 
+          if leftoverAmount == 0.0 
+          then pure None
+          else Some <$> create UnclaimedReward with dso; amount = leftoverAmount
+        
+        pure AmuletMintOffer_AcceptResult with amuletSum; optUnclaimedRewardCid 
+        
+
+archiveUntilTargetReached : Party -> Decimal -> [(ContractId UnclaimedReward, Decimal)] -> Update Decimal
+archiveUntilTargetReached _dso remaining [] 
+  | remaining == 0.0 = pure remaining
+  | otherwise = abort "insufficient unclaimed rewards"
+archiveUntilTargetReached dso remaining ((cid, amount) :: rest)
+  | remaining <= 0.0 = pure remaining
+  | amount <= remaining
+  = do void $ fetchAndArchive (ForDso with dso) cid
+       archiveUntilTargetReached dso (remaining - amount) rest
+  | otherwise
+  = do void $ fetchAndArchive (ForDso with dso) cid
+       pure (amount - remaining)
+
+data AmuletMintOffer_AcceptResult = AmuletMintOffer_AcceptResult with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
+    optUnclaimedRewardCid : Optional (ContractId UnclaimedReward)
+
+instance HasCheckedFetch AmuletMintOffer ForOwner where
+  contractGroupId AmuletMintOffer{..} = ForOwner with dso; owner = beneficiary

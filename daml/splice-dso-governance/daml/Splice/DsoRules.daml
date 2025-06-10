@@ -92,6 +92,8 @@ data AmuletRules_ActionRequiringConfirmation
     -- ^ Voted action to update a config schedule in the `AmuletRules`.
   | CRARC_SetConfig AmuletRules_SetConfig
     -- ^ Voted action to change the `AmuletConfig`. Not idempotent.
+  | CRARC_CreateAmuletMintOffer AmuletRules_CreateAmuletMintOffer
+    -- ^ Voted action to create an `AmuletMintOffer`. 
   deriving (Eq, Show)
 
 data DsoRules_ActionRequiringConfirmation
@@ -1413,6 +1415,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
           CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_CreateAmuletMintOffer choiceArg -> void $ exercise amuletRulesCid choiceArg
   ARC_DsoRules with .. ->
     case dsoAction of
       SRARC_AddSv choiceArg -> void $ exercise dsoRulesCid choiceArg
@@ -1527,6 +1530,7 @@ actionRequiringConfirmationEffectiveAt action =
         CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
         CRARC_MiningRound_Archive _ -> None
         CRARC_MiningRound_StartIssuing _ -> None
+        CRARC_CreateAmuletMintOffer _ -> None
     ARC_DsoRules with .. -> None
     ARC_AnsEntryContext with .. -> None
     ExtActionRequiringConformation _dummyUnitField ->
