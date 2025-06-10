@@ -45,10 +45,12 @@ trait AmuletConfigUtil extends TestCommon {
     val existingTransferConfig = existingAmuletConfig.transferConfig
     new splice.amuletconfig.AmuletConfig(
       new splice.amuletconfig.TransferConfig(
-        new splice.fees.FixedFee(createFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal),
+        new splice.fees.FixedFee(
+          createFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+        ),
         new splice.fees.RatePerRound(
-        holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
-      ),
+          holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+        ),
         existingTransferConfig.transferFee,
         existingTransferConfig.lockHolderFee,
         existingTransferConfig.extraFeaturedAppRewardAmount,

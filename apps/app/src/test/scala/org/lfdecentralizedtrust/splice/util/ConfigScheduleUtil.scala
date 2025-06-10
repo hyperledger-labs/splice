@@ -50,8 +50,8 @@ trait ConfigScheduleUtil extends TestCommon {
       new splice.amuletconfig.TransferConfig(
         existingTransferConfig.createFee,
         new splice.fees.RatePerRound(
-        holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
-      ),
+          holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+        ),
         existingTransferConfig.transferFee,
         existingTransferConfig.lockHolderFee,
         existingTransferConfig.extraFeaturedAppRewardAmount,
