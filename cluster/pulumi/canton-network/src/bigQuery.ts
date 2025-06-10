@@ -311,8 +311,24 @@ function createPostgresReplicatorUser(
   postgres: CloudPostgres,
   password: PostgresPassword
 ): gcp.sql.User {
+    const schemaName = scanAppDatabaseName(postgres);
+    const name = `${postgres.namespace.logicalName}-user-${replicatorUserName}`;
+    const {header, footer} = databaseCommandBracket(postgres);
+    const cleanup = new command.local.Command(
+        `${name}-cleanup`,
+        {delete: pulumi.interpolate`
+        ${header}
+          ALTER DEFAULT PRIVILEGES IN SCHEMA ${schemaName}
+            REVOKE SELECT ON TABLES TO ${replicatorUserName};
+          REVOKE USAGE ON SCHEMA ${schemaName} TO ${replicatorUserName};
+          REVOKE SELECT ON ALL TABLES
+            IN SCHEMA ${schemaName} TO ${replicatorUserName};
+          ALTER USER ${replicatorUserName} WITH NOREPLICATION;
+          COMMIT;
+        ${footer}
+    `});
   return new gcp.sql.User(
-    `${postgres.namespace.logicalName}-user-${replicatorUserName}`,
+    name,
     {
       instance: postgres.databaseInstance.name,
       name: replicatorUserName,
