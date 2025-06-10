@@ -17,7 +17,7 @@ groups:
             model:
               disableTextWrap: false
               editorMode: builder
-              expr: max(max_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace) - min(min_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace)
+              expr: min(max(max_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace) - min(min_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace))
               fullMetaSearch: false
               includeNullMetadata: true
               instant: true
@@ -69,7 +69,7 @@ groups:
           __panelId__: "1"
           runbook_url: ""
           summary: "The open mining rounds have not advanced in the last 30m"
-          description: 'The SV app in namespace {{ index $labels "namespace" }} has not seen the open mining round advancing for the last 30m. Either this SV, the DSO delegate, or a high enough number of SVs to break BFT guarantees are failing'
+          description: 'None of our SV apps have seen the open mining round advancing in the last 30m. Either all of our SVs or a high enough number of SVs to break BFT guarantees are failing'
           severity: critical
         labels:
           priority: high
