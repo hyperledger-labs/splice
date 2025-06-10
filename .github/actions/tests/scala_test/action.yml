@@ -108,10 +108,8 @@ runs:
           if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
             echo "Running with initial package config from ${{ inputs.daml_base_version }}"
             ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
-            echo "Initial package config"
-            cat initial_package_config
-            echo "ScalaTest tags"
-            cat scala_test_tags
+            echo "Initial package config" $(cat initial_package_config)
+            echo "ScalaTest tags: $(cat scala_test_tags)"
           else
             echo "daml_base_version is not set, using the latest versions"
           fi
