@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Deployment
+
+  - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
+  - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
+
 0.4.1
 -----
 
@@ -15,6 +23,7 @@ Release Notes
 
   - Expose token-standard endpoints on the validator scan-proxy. The paths are the normal token standard path with a ``/api/validator/v0/scan-proxy`` prefix.
   - Fix a bug where transfers using transfer pre-approvals (both through the wallet UI and automatic via sweeps) were broken until the DARs released in 0.4.0 are effective.
+  - Fix a bug that requires the latest dars to be uploaded when `re-onboarding a validator and recovering the balances of all the users <https://dev.global.canton.network.digitalasset.com/validator_operator/validator_disaster_recovery.html#re-onboard-a-validator-and-recover-balances-of-all-users-it-hosts>`_
 
 - Sequencer
 

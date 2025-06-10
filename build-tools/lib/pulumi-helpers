@@ -169,32 +169,12 @@ function _killable_pulumi_automation_run() {
 
 function _get_flux_reference_config() {
     gitRef="$1"
-    repo="$2"
-    indentation="$3"
-    if [ "$repo" == "canton-network-node" ]; then
+    indentation="$2"
+    if [ -z "${DA_REPO_ROOT:-}" ]; then
+        _error "Deploying from canton-network-internal should be configured only from that repo"
+    fi
 
-        cat <<EOF
-${indentation}repoUrl: https://github.com/DACH-NY/canton-network-node
-${indentation}gitReference: $gitRef
-${indentation}pulumiStacksDir: "cluster/stacks/$(basename $PULUMI_STACKS_DIR)"
-${indentation}pulumiBaseDir: "cluster/pulumi"
-${indentation}deploymentDir: "cluster/deployment"
-${indentation}spliceRoot: "."
-${indentation}privateConfigsDir: "cluster/configs-private"
-${indentation}publicConfigsDir: "cluster/configs"
-EOF
-
-    elif [ "$repo" == "canton-network-internal" ]; then
-
-        if [ -z "${DA_REPO_ROOT:-}" ]; then
-            _error "Deploying from canton-network-internal should be configured only from that repo"
-        fi
-        # TODO(#910): once we stop symlinking deployment directories from splice
-        # to canton-network-internal, assert here that the cluster has been fully
-        # migrated to the internal repo (i.e. its deployment dir and stack files
-        # exist there)
-
-        cat <<EOF
+    cat <<EOF
 ${indentation}repoUrl: https://github.com/DACH-NY/canton-network-internal
 ${indentation}gitReference: $gitRef
 ${indentation}pulumiBaseDir: "splice/cluster/pulumi"
@@ -204,9 +184,6 @@ ${indentation}spliceRoot: "splice"
 ${indentation}privateConfigsDir: "cluster/configs/configs-private"
 ${indentation}publicConfigsDir: "cluster/configs/configs"
 EOF
-    else
-        _error "Unknown repo $repo"
-    fi
 }
 
 # Update the cluster config file
