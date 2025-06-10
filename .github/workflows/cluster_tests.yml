@@ -39,5 +39,5 @@ jobs:
         run: |
           set -euo pipefail
           result=$(curl -sSfL -H "Authorization: Bearer ${{ steps.auth.outputs.id_token }}" \
-            "${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}&public-splice=true")
+            "${{ secrets.CLUSTER_TEST_INVOKER_URL }}?workflow=${{ inputs.workflow }}&splice-git-ref=${{ inputs.sha }}")
           echo "result=$result" >> "$GITHUB_OUTPUT"
