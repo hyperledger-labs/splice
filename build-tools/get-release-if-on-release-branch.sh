@@ -15,15 +15,15 @@ if [[ $branch =~ ^release-line-[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 0
 fi
 
-# Check if we are on a commit that is on a release branch but not on the main branch.
+# Check if we are on a commit that is on a release branch ~but not on the main branch.~
 # (when checking out Splice as a submodule, we might be losing the branch information).
+#
+# Attention: We skip the main check on 0.4.1 due to a bug related to switching repos.
 sha=$(git rev-parse HEAD)
-if ! (git branch -r --contains "$sha" | grep -q "\borigin/main\b"); then
-    if [[ $(git branch -r --contains "$sha") =~ origin/release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then
-        branch=$(git branch -r --contains "$sha" | grep -o 'origin/release-line-.*' | head -n 1)
-        echo "${branch#origin/release-line-}"
-        exit 0
-    fi
+if [[ $(git branch -r --contains "$sha") =~ origin/release-line-[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+    branch=$(git branch -r --contains "$sha" | grep -o 'origin/release-line-.*' | head -n 1)
+    echo "${branch#origin/release-line-}"
+    exit 0
 fi
 
 exit 0
