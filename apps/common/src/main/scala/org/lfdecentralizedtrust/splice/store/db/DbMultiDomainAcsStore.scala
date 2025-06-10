@@ -1006,10 +1006,12 @@ final class DbMultiDomainAcsStore[TXE](
           case Some(lastIngestedOffset) =>
             if (offset <= lastIngestedOffset) {
               /* we can receive an offset equal to the last ingested and that can be safely ignore */
-              if (offset < lastIngestedOffset && isOffsetCheckpoint) {
-                logger.warn(
-                  s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$acsStoreId), skipping database actions. This is expected if the SQL query was automatically retried after a transient database error. Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances ingesting into the same logical database."
-                )
+              if (isOffsetCheckpoint) {
+                if (offset < lastIngestedOffset) {
+                  logger.warn(
+                    s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$acsStoreId), skipping database actions. This is expected if the SQL query was automatically retried after a transient database error. Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances ingesting into the same logical database."
+                  )
+                }
               } else {
                 logger.warn(
                   s"Update offset $offset <= last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$acsStoreId), skipping database actions. This is expected if the SQL query was automatically retried after a transient database error. Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances ingesting into the same logical database."
