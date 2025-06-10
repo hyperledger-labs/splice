@@ -137,17 +137,6 @@ runs:
       with:
         cache_version: 4
 
-    - name: Prepare list of tests to run for sbt
-      uses: ./.github/actions/nix/run_bash_command_in_nix
-      with:
-        cmd: |
-          splitted=$(echo "${{ toJson(inputs.test_names) }}" | jq -r '.[${{ inputs.runner_index }}].[]')
-          tests=$(echo "$splitted" | tr '\n' ' ')
-          count=$(echo "$tests" | wc -w)
-          echo "We are running $count tests in this batch:"
-          echo "$splitted"
-          echo "$tests" > /tmp/tests
-
     - name: Set Daml package versions
       id: daml_package_versions
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -162,6 +151,25 @@ runs:
           else
             echo "daml_base_version is not set, using the latest versions"
           fi
+          cat "$GITHUB_OUTPUT"
+
+    - name: DEBUG
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          echo 'VERSIONS: ${{ steps.daml_package_versions.outputs.initial_package_versions }}END'
+          echo $GITHUB_OUTPUT
+
+    - name: Prepare list of tests to run for sbt
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          splitted=$(echo "${{ toJson(inputs.test_names) }}" | jq -r '.[${{ inputs.runner_index }}].[]')
+          tests=$(echo "$splitted" | tr '\n' ' ')
+          count=$(echo "$tests" | wc -w)
+          echo "We are running $count tests in this batch:"
+          echo "$splitted"
+          echo "$tests" > /tmp/tests
 
     - name: Set RUN_SPLITTED_TESTS_CMD
       id: list_tests
@@ -201,6 +209,14 @@ runs:
           make docker-build -j
         cmd_retry_count: 5 # Retry in case of dependency download errors
         additional_nix_args: "--keep DOCKER_CERT_PATH --keep DOCKER_HOST --keep DOCKER_MACHINE_NAME --keep DOCKER_TLS_VERIFY --keep PULUMI_VERSION --keep NO_PROXY --keep CIRCLE_REPOSITORY_URL --keep CIRCLE_SHA1"
+
+    - name: TEST
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          cat "$GITHUB_OUTPUT"
+          echo "done with github output"
+          echo ${{ steps.daml_package_versions.outputs.initial_package_versions }}
 
     - name: Wait for Canton to be ready
       shell: bash
