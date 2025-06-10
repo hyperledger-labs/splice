@@ -13,24 +13,3 @@ validator1:
     maxDuration: "5m"
     retention: "1h" # Keep 1h
   deduplicationDuration: 30m
-synchronizerMigration:
-  active:
-    id: 0
-    version: 0.4.0
-    releaseReference:
-      repoUrl: https://github.com/DACH-NY/canton-network-node
-      gitReference: refs/heads/nicuda/pulumi/operator_v2
-      pulumiStacksDir: "cluster/stacks/scratchnets"
-      pulumiBaseDir: "cluster/pulumi"
-      deploymentDir: "cluster/deployment"
-      spliceRoot: "."
-      privateConfigsDir: "cluster/configs-private"
-operatorDeployment:
-  reference:
-    repoUrl: https://github.com/DACH-NY/canton-network-node
-    gitReference: refs/heads/nicuda/pulumi/operator_v2
-    pulumiStacksDir: "cluster/stacks/scratchnets"
-    pulumiBaseDir: "cluster/pulumi"
-    deploymentDir: "cluster/deployment"
-    spliceRoot: "."
-    privateConfigsDir: "cluster/configs-private"
