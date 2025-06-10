@@ -53,6 +53,8 @@ runs:
             # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
 
+            echo 'EXTRA_ENV_VARS: ${{ inputs.extra_env_vars }}'
+
             run_sbt() {
               export ${{ inputs.extra_env_vars }}
               # Define sbt command
