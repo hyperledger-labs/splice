@@ -7,14 +7,7 @@
 
 set -euo pipefail
 
-SPLICE_ROOT=$( git rev-parse --show-toplevel )
-copy_script="scripts/copy-to-splice.sh"
 rename_script="scripts/check-repo-names.sh"
-if [[ -f "$SPLICE_ROOT/$copy_script" ]]; then
-  in_copy_src=yes
-else
-  in_copy_src=no
-fi
 
 function check_patterns_locally() {
   # removing NEVERMATCHES alternative causes these to never match
@@ -63,6 +56,7 @@ function check_patterns_locally() {
     'cluster/stacks'
     'cluster/images/LICENSE'
     'expected.json'
+    'README.md'
   )
 
   local exception exceptions_args=()
@@ -97,44 +91,4 @@ function check_patterns_locally() {
   fi
 }
 
-function setup_temp_splice() {
-  local src="$1" tempsplice
-  tempsplice="$(mktemp -d)"
-  cd "$src"
-  local script_prefix
-  case $in_copy_src in
-    yes) script_prefix=;;
-    no) script_prefix='direnv exec .';;
-  esac
-  $script_prefix "$copy_script" "$tempsplice"
-  cd "$tempsplice"
-}
-
-function check_patterns() {
-  local optstring
-  case "$in_copy_src" in
-    yes)
-      optstring='h'
-      setup_temp_splice "$SPLICE_ROOT";;
-    no) optstring='hs:';;
-  esac
-
-  while getopts "$optstring" arg; do
-    case "$arg" in
-      h)
-        echo '  Options: [-s SPLICE_REPO]
-    -s: Run copy-to-splice from SPLICE_REPO first, and scan the result' 1>&2
-        exit 0;;
-      s)
-        if [[ ! -d $OPTARG ]]; then
-          echo "-s requires a splice repo directory" 1>&2
-          exit 1
-        fi
-        setup_temp_splice "$OPTARG";;
-      :|?) exit 1;;
-    esac
-  done
-  check_patterns_locally
-}
-
-check_patterns "$@"
+check_patterns_locally
