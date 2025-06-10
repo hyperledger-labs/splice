@@ -96,7 +96,8 @@ copy_file "cluster/local.mk"
 
 copy_dir ".github/actions"
 copy_dir ".github/workflows"
-rm "${SPLICE_DIR}/.github/workflows/post_merge.yml" # Don't invoke cimain & ciupgrade on Splice (yet)
+rm "${SPLICE_DIR}/.github/workflows/cimain.yml" # Don't invoke cimain on Splice (yet)
+rm "${SPLICE_DIR}/.github/workflows/ciupgrade.yml" # Don't invoke ciupgrade on Splice (yet)
 copy_file ".github/actionlint.yml"
 copy_file ".github/pull_request_template.md"
 
@@ -147,10 +148,11 @@ unknown=$(diff -qr . "${SPLICE_DIR}" |
     grep -v 'runners' |
     grep -v 'ISSUE_TEMPLATE' |
     grep -v 'settings.yml' |
-    grep -v 'post_merge.yml' |
+    grep -v 'cimain.yml' |
+    grep -v 'ciupgrade.yml' |
     grep -v '\./cluster' |
     grep -v 'LICENSE.*differ' |
-    grep -v 'README.md.*differ' |
+    grep -v 'README.md' |
     grep -v '\.gitattributes.*differ' |
     grep -v 'CODEOWNERS.*differ' || true)
 

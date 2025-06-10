@@ -35,7 +35,7 @@ class SvTimeBasedOnboardingIntegrationTest
       def activeSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend)
       clue("Initialize DSO with 3 SVs") {
         startAllSync(
-          Seq[AppBackendReference](sv1ScanBackend, sv2ScanBackend) ++
+          Seq[AppBackendReference](sv1ScanBackend, sv2ScanBackend, sv3ScanBackend) ++
             activeSvBackends ++
             Seq(
               sv1ValidatorBackend,

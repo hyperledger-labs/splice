@@ -25,6 +25,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.lfdecentralizedtrust.splice.automation.TxLogBackfillingTrigger
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest.SortOrder
+import org.lfdecentralizedtrust.splice.scan.store.TxLogEntry
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
 import org.scalactic.source.Position
 
@@ -50,6 +54,7 @@ class ScanHistoryBackfillingIntegrationTest
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Scan)(
           _.withPausedTrigger[ScanHistoryBackfillingTrigger]
+            .withPausedTrigger[TxLogBackfillingTrigger[TxLogEntry]]
         )(config)
       )
       .addConfigTransforms((_, config) =>
@@ -61,7 +66,8 @@ class ScanHistoryBackfillingIntegrationTest
         ConfigTransforms.updateAllScanAppConfigs((_, scanConfig) =>
           scanConfig.copy(
             // Small batch size to force multiple backfilling rounds
-            updateHistoryBackfillBatchSize = 2
+            updateHistoryBackfillBatchSize = 2,
+            txLogBackfillBatchSize = 2,
           )
         )(config)
       )
@@ -116,7 +122,7 @@ class ScanHistoryBackfillingIntegrationTest
     def currentRoundInScan(backend: ScanAppBackendReference): Long =
       backend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
 
-    actAndCheck(
+    val (previousRound, currentRound) = actAndCheck(
       "Advance one round, to commit transactions related to the round infrastructure", {
         val previousRound = currentRoundInScan(sv1ScanBackend)
         // Note: runOnce() does nothing if there is no work to be done.
@@ -245,6 +251,21 @@ class ScanHistoryBackfillingIntegrationTest
       }
     }
 
+    clue(
+      "Backfilling triggers state. SV1+SV2: update is about to initialize, txlog is not doing anything yet"
+    ) {
+      sv1BackfillTrigger
+        .retrieveTasks()
+        .futureValue
+        .loneElement shouldBe a[ScanHistoryBackfillingTrigger.InitializeBackfillingTask]
+      sv2BackfillTrigger
+        .retrieveTasks()
+        .futureValue
+        .loneElement shouldBe a[ScanHistoryBackfillingTrigger.InitializeBackfillingTask]
+      sv1ScanTxLogBackfillTrigger.retrieveTasks().futureValue should be(empty)
+      sv2ScanTxLogBackfillTrigger.retrieveTasks().futureValue should be(empty)
+    }
+
     actAndCheck(
       "Run backfilling once on all scans", {
         sv1BackfillTrigger.runOnce().futureValue
@@ -256,12 +277,14 @@ class ScanHistoryBackfillingIntegrationTest
         sv1ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
-        sv1ScanBackend.getBackfillingStatus().complete shouldBe true
+        // Update history is complete at this point, but the status endpoint only reports
+        // as complete if the txlog is also backfilled
+        sv1ScanBackend.getBackfillingStatus().complete shouldBe false
         readUpdateHistoryFromScan(sv1ScanBackend) should not be empty
 
         sv2ScanBackend.appState.store.updateHistory
           .getBackfillingState()
-          .futureValue should be(BackfillingState.InProgress)
+          .futureValue should be(BackfillingState.InProgress(false, false))
         sv2ScanBackend.getBackfillingStatus().complete shouldBe false
         assertThrowsAndLogsCommandFailures(
           readUpdateHistoryFromScan(sv2ScanBackend),
@@ -275,6 +298,21 @@ class ScanHistoryBackfillingIntegrationTest
       },
     )
 
+    clue(
+      "Backfilling triggers state. SV1: update is done and txlog is about to initialize. SV2: update is about to backfill, txlog is not doing anything yet"
+    ) {
+      sv1BackfillTrigger.retrieveTasks().futureValue should be(empty)
+      sv2BackfillTrigger
+        .retrieveTasks()
+        .futureValue
+        .loneElement shouldBe a[ScanHistoryBackfillingTrigger.BackfillTask]
+      sv1ScanTxLogBackfillTrigger
+        .retrieveTasks()
+        .futureValue
+        .loneElement shouldBe a[TxLogBackfillingTrigger.InitializeBackfillingTask]
+      sv2ScanTxLogBackfillTrigger.retrieveTasks().futureValue should be(empty)
+    }
+
     actAndCheck(
       "Resume backfilling on all scans", {
         sv1BackfillTrigger.resume()
@@ -286,11 +324,13 @@ class ScanHistoryBackfillingIntegrationTest
         sv1ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
-        sv1ScanBackend.getBackfillingStatus().complete shouldBe true
+        // Update history is complete, TxLog is not
+        sv1ScanBackend.getBackfillingStatus().complete shouldBe false
         sv2ScanBackend.appState.store.updateHistory
           .getBackfillingState()
           .futureValue should be(BackfillingState.Complete)
-        sv2ScanBackend.getBackfillingStatus().complete shouldBe true
+        // Update history is complete, TxLog is not
+        sv2ScanBackend.getBackfillingStatus().complete shouldBe false
       },
     )
 
@@ -358,10 +398,89 @@ class ScanHistoryBackfillingIntegrationTest
       )
     }
 
-    clue("Backfilling triggers are not doing any work after backfilling is complete") {
+    clue(
+      "Backfilling triggers state. SV1+SV2: update is done and txlog is about to initialize."
+    ) {
       sv1BackfillTrigger.retrieveTasks().futureValue should be(empty)
       sv2BackfillTrigger.retrieveTasks().futureValue should be(empty)
+      sv1ScanTxLogBackfillTrigger
+        .retrieveTasks()
+        .futureValue
+        .loneElement shouldBe a[TxLogBackfillingTrigger.InitializeBackfillingTask]
+      sv2ScanTxLogBackfillTrigger
+        .retrieveTasks()
+        .futureValue
+        .loneElement shouldBe a[TxLogBackfillingTrigger.InitializeBackfillingTask]
     }
+
+    clue("TxLog based historical queries differ") {
+      val sv1Transactions =
+        sv1ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
+      val sv2Transactions =
+        sv2ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
+
+      // We tapped 4 times before SV2 joined, and once after
+      sv1Transactions.size should be >= 5
+      sv2Transactions.size should be >= 1
+      sv1Transactions.size should be > sv2Transactions.size
+      sv1Transactions should contain allElementsOf sv2Transactions
+      sv2Transactions should not contain sv1Transactions.headOption.value
+    }
+
+    actAndCheck(
+      "Run txlog backfilling once on all scans", {
+        sv1ScanTxLogBackfillTrigger.runOnce().futureValue
+        sv2ScanTxLogBackfillTrigger.runOnce().futureValue
+      },
+    )(
+      "TxLog backfilling is in progress",
+      _ => {
+        // Unlike update history backfilling, the txlog backfilling initalization task
+        // never marks the backfilling as complete.
+        // Txlog backfilling needs at least one trigger execution to iterate over the updates
+        // between the first txlog entry and the beginning of the update history.
+        sv1ScanBackend.appState.store.multiDomainAcsStore
+          .getTxLogBackfillingState()
+          .futureValue should be(TxLogBackfillingState.InProgress)
+        sv1ScanBackend.getBackfillingStatus().complete shouldBe false
+
+        sv2ScanBackend.appState.store.multiDomainAcsStore
+          .getTxLogBackfillingState()
+          .futureValue should be(TxLogBackfillingState.InProgress)
+        sv2ScanBackend.getBackfillingStatus().complete shouldBe false
+      },
+    )
+
+    actAndCheck(
+      "Resume txlog backfilling", {
+        sv1ScanTxLogBackfillTrigger.resume()
+        sv2ScanTxLogBackfillTrigger.resume()
+      },
+    )(
+      "TxLog backfilling is complete",
+      _ => {
+        sv1ScanBackend.appState.store.multiDomainAcsStore
+          .getTxLogBackfillingState()
+          .futureValue should be(TxLogBackfillingState.Complete)
+        sv1ScanBackend.getBackfillingStatus().complete shouldBe true
+
+        sv2ScanBackend.appState.store.multiDomainAcsStore
+          .getTxLogBackfillingState()
+          .futureValue should be(TxLogBackfillingState.Complete)
+        sv2ScanBackend.getBackfillingStatus().complete shouldBe true
+      },
+    )
+
+    clue("TxLog based historical queries return same results") {
+      val sv1Transactions =
+        sv1ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
+      val sv2Transactions =
+        sv2ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
+
+      // TODO(#16798): switch to theSameElementsInOrderAs once the endpoint sorts by record time instead of row id.
+      sv1Transactions should contain theSameElementsAs sv2Transactions
+    }
+
   }
 
   private def readUpdateHistoryFromScan(backend: ScanAppBackendReference) = {
@@ -373,11 +492,15 @@ class ScanHistoryBackfillingIntegrationTest
     sv1ScanBackend.automation.trigger[ScanHistoryBackfillingTrigger]
   private def sv2BackfillTrigger(implicit env: SpliceTestConsoleEnvironment) =
     sv2ScanBackend.automation.trigger[ScanHistoryBackfillingTrigger]
+  private def sv1ScanTxLogBackfillTrigger(implicit env: SpliceTestConsoleEnvironment) =
+    sv1ScanBackend.automation.trigger[TxLogBackfillingTrigger[TxLogEntry]]
+  private def sv2ScanTxLogBackfillTrigger(implicit env: SpliceTestConsoleEnvironment) =
+    sv2ScanBackend.automation.trigger[TxLogBackfillingTrigger[TxLogEntry]]
 
   private def allUpdatesFromScanBackend(scanBackend: ScanAppBackendReference) = {
     // Need to use the store directly, as the HTTP endpoint refuses to return data unless it's completely backfilled
     scanBackend.appState.store.updateHistory
-      .getUpdates(None, includeImportUpdates = true, PageLimit.tryCreate(1000))
+      .getAllUpdates(None, PageLimit.tryCreate(1000))
       .futureValue
   }
 

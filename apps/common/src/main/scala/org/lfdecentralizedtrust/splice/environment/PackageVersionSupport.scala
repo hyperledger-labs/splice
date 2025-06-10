@@ -17,6 +17,17 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait PackageVersionSupport {
 
+  def supportsDelegatelessAutomation(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance_0_1_13,
+    )
+  }
+
   def supportsValidatorLicenseMetadata(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
@@ -98,6 +109,18 @@ trait PackageVersionSupport {
       PackageIdResolver.Package.SpliceWallet,
       now,
       // this is the first version implementing the token standard
+      DarResources.wallet_0_1_9,
+    )
+  }
+
+  def supportsDescriptionInTransferPreapprovals(parties: Seq[PartyId], now: CantonTimestamp)(
+      implicit tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceWallet,
+      now,
+      // this is when the description field was added to transfer preapprovals
       DarResources.wallet_0_1_9,
     )
   }

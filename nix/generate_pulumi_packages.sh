@@ -13,19 +13,26 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 declare -a plugins
 plugins=(
-  "pulumi/auth0=3.1.0"
-  "pulumi/auth0=3.3.1"
-  "pulumi/command=0.9.2"
-  "pulumi/kubernetes-cert-manager=0.0.5"
-  "pulumi/gcp=6.67.0"
-  "pulumi/kubernetes=4.7.1"
   # currently used
-  "pulumi/kubernetes=4.11.0"
+  "pulumi/gcp=8.32.1"
+  "pulumi/kubernetes=4.23.0"
+  "pulumi/random=4.18.2"
+  "pulumi/std=2.2.0"
+  "pulumi/auth0=3.21.0"
+  "pulumi/command=1.1.0"
+  "pulumi/kubernetes-cert-manager=0.2.0"
+  "pulumiverse/grafana=0.16.3"
+  # old versions so that old pulumi state can be interpreted
+  # each can be removed once MainNet uses a newer version
+  "pulumi/auth0=3.3.1"
+  "pulumi/auth0=3.3.2"
+  "pulumi/command=0.9.2"
+  "pulumi/gcp=7.2.1"
+  "pulumi/gcp=7.38.0"
+  "pulumi/kubernetes-cert-manager=0.0.5"
+  "pulumi/kubernetes=4.22.0"
   "pulumi/kubernetes=4.21.1"
   "pulumi/random=4.14.0"
-  "pulumi/gcp=7.2.1" # TODO (#19680) move above when unused
-  "pulumi/gcp=7.38.0"
-  "pulumi/auth0=3.3.2"
   "pulumi/std=1.7.3"
   "pulumiverse/grafana=0.4.2"
 )

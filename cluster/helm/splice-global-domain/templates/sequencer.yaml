@@ -1,18 +1,22 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+{{- $sequencerLabel := (printf "%s-sequencer" .Release.Name) }}
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ .Release.Name }}-sequencer
+    {{- include "splice-util-lib.default-labels" (set . "app" $sequencerLabel) | nindent 4 }}
+    splice-component: sequencer
+    app.kubernetes.io/component: sequencer
   name: {{ .Release.Name }}-sequencer
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ .Release.Name }}-sequencer
+      app: {{ $sequencerLabel }}
   strategy:
     type: Recreate
   template:
@@ -20,8 +24,9 @@ spec:
       annotations:
         {{- toYaml .Values.pod.annotations | nindent 8 }}
       labels:
-        app: {{ .Release.Name }}-sequencer
+        {{- include "splice-util-lib.default-labels" (set . "app" $sequencerLabel) | nindent 8 }}
         splice-component: sequencer
+        app.kubernetes.io/component: sequencer
         {{- with $.Values.metrics.migration }}
         migration_id: {{ .id | quote }}
         {{- end }}
@@ -211,16 +216,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-sequencer
+  name: {{ $sequencerLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-sequencer
+    {{- include "splice-util-lib.default-labels" (set . "app" $sequencerLabel) | nindent 4 }}
     {{- with $.Values.metrics.migration }}
     migration_id: {{ .id | quote }}
     {{- end }}
 spec:
   selector:
-    app: {{ .Release.Name }}-sequencer
+    app: {{ $sequencerLabel }}
   ports:
     - name: grpc-cs-pub-api
       port: 5008
@@ -248,7 +253,7 @@ metadata:
   name: {{ .Release.Name }}-sequencer-pvc
   namespace: {{ .Release.Namespace }}
   labels:
-    app: {{ .Release.Name }}-sequencer
+    {{- include "splice-util-lib.default-labels" (set . "app" $sequencerLabel) | nindent 4 }}
   annotations:
     helm.sh/resource-policy: keep
 spec:

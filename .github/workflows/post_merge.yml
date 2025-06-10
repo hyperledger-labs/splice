@@ -1,0 +1,41 @@
+name: CI post-merge to main or release-line branches
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release-line-**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+  pull-requests: read # Required for the static tests
+  issues: read # Required for the static tests
+  actions: write # Required for the cancel_if_not_opt_in job
+
+jobs:
+  ci:
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  publish_docs:
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: self-hosted-docker-tiny
+
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@854d7aa1b99e4509c4d1b53d69b7ba4eaf39215a

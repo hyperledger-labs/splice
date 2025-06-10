@@ -411,8 +411,7 @@ groups:
               maxDataPoints: 43200
               refId: C
               type: threshold
-        # TODO(#19239): Change "OK" to "$NODATA" when backfilling is enabled by default everywhere
-        noDataState: OK
+        noDataState: $NODATA
         execErrState: Alerting
         for: 5m
         annotations:
@@ -421,4 +420,71 @@ groups:
           summary: TxLog backfilling is not making any progress in {{ index $labels "namespace" }}
         labels:
           "": ""
+        isPaused: false
+      - uid: fentlrcbcrsaoa
+        title: Delegateless trigger contention
+        condition: threshold
+        data:
+          - refId: total_attempts
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: sum(rate(splice_trigger_attempted_total{isDsoDelegateTrigger="true", node_type="sv"}[15m])) by (trigger_name, namespace)
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: total_attempts
+          - refId: total_contention
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: sum(rate(splice_trigger_attempted_total{statusCode!~"OK", isDsoDelegateTrigger="true", node_type="sv", contentionFailure="true"}[15m])) by (trigger_name, namespace)
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: total_contention
+          - refId: threshold
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [ ]
+                  reducer:
+                    params: [ ]
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: (${total_contention} > 0.1 * ${total_attempts}) && (${total_contention} > 0)
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: threshold
+              type: math
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: '{{ index $labels "trigger_name" }} in {{ index $labels "namespace" }} reached contention threshold over the total attempts'
         isPaused: false

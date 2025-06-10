@@ -28,7 +28,7 @@ class TxLogBackfillingTrigger[TXE](
     override val ec: ExecutionContext,
     override val tracer: Tracer,
     mat: Materializer,
-) extends PollingParallelTaskExecutionTrigger[ScanHistoryBackfillingTrigger.Task] {
+) extends PollingParallelTaskExecutionTrigger[TxLogBackfillingTrigger.Task] {
 
   private def party: PartyId = store.updateHistory.updateStreamParty
 
@@ -54,7 +54,7 @@ class TxLogBackfillingTrigger[TXE](
 
   override def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[ScanHistoryBackfillingTrigger.Task]] = {
+  ): Future[Seq[TxLogBackfillingTrigger.Task]] = {
     if (!store.updateHistory.isReady) {
       logger.debug("UpdateHistory is not yet ready")
       Future.successful(Seq.empty)
@@ -73,9 +73,9 @@ class TxLogBackfillingTrigger[TXE](
                 historyMetrics.TxLogBackfilling.completed.updateValue(1)
                 Seq.empty
               case TxLogBackfillingState.InProgress =>
-                Seq(ScanHistoryBackfillingTrigger.BackfillTask(party))
+                Seq(TxLogBackfillingTrigger.BackfillTask(party))
               case TxLogBackfillingState.NotInitialized =>
-                Seq(ScanHistoryBackfillingTrigger.InitializeBackfillingTask(party))
+                Seq(TxLogBackfillingTrigger.InitializeBackfillingTask(party))
             }
           case _ =>
             logger.debug("UpdateHistory is not yet complete")
@@ -86,16 +86,16 @@ class TxLogBackfillingTrigger[TXE](
     }
   }
 
-  override protected def isStaleTask(task: ScanHistoryBackfillingTrigger.Task)(implicit
+  override protected def isStaleTask(task: TxLogBackfillingTrigger.Task)(implicit
       tc: TraceContext
   ): Future[Boolean] = Future.successful(false)
 
-  override protected def completeTask(task: ScanHistoryBackfillingTrigger.Task)(implicit
+  override protected def completeTask(task: TxLogBackfillingTrigger.Task)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = task match {
-    case ScanHistoryBackfillingTrigger.BackfillTask(_) =>
+    case TxLogBackfillingTrigger.BackfillTask(_) =>
       performBackfilling()
-    case ScanHistoryBackfillingTrigger.InitializeBackfillingTask(_) =>
+    case TxLogBackfillingTrigger.InitializeBackfillingTask(_) =>
       initializeBackfilling()
   }
 
@@ -129,7 +129,7 @@ class TxLogBackfillingTrigger[TXE](
       case HistoryBackfilling.Outcome.BackfillingIsComplete =>
         historyMetrics.TxLogBackfilling.completed.updateValue(1)
         logger.info(
-          "UpdateHistory backfilling is complete, this trigger should not do any work ever again"
+          "TxLog backfilling is complete, this trigger should not do any work ever again"
         )
         TaskSuccess("Backfilling completed")
     }
@@ -137,7 +137,7 @@ class TxLogBackfillingTrigger[TXE](
 
 }
 
-object ScanHistoryBackfillingTrigger {
+object TxLogBackfillingTrigger {
   sealed trait Task extends PrettyPrinting
   final case class BackfillTask(party: PartyId) extends Task {
     override def pretty: Pretty[this.type] =

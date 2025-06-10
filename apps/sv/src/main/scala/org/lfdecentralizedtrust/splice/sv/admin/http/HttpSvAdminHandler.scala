@@ -695,9 +695,14 @@ class HttpSvAdminHandler(
 
   override def featureSupport(respond: SvAdminResource.FeatureSupportResponse.type)()(
       extracted: TracedUser
-  ): Future[SvAdminResource.FeatureSupportResponse] =
-    readFeatureSupport(dsoStore.key.dsoParty)(extracted.traceContext, ec, tracer)
+  ): Future[SvAdminResource.FeatureSupportResponse] = {
+    readFeatureSupport(dsoStore.key.dsoParty, config.delegatelessAutomation)(
+      extracted.traceContext,
+      ec,
+      tracer,
+    )
       .map(SvAdminResource.FeatureSupportResponseOK(_))
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = blocking {
     this.synchronized {

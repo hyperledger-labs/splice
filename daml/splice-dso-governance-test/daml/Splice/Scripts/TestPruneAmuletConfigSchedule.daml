@@ -38,7 +38,7 @@ testPruneAmuletConfigSchedule = do
 
   -- Fails because there is no future config
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   initiateAndAcceptVote app (Map.keys dsoRules.svs) $
     ARC_AmuletRules with
@@ -55,12 +55,12 @@ testPruneAmuletConfigSchedule = do
 
   -- Fails because the time is not yet reached
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   passTime (hours 1)
 
   submitMulti [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === Schedule with
@@ -69,7 +69,7 @@ testPruneAmuletConfigSchedule = do
 
   -- Fails because the time is not yet reached
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   initiateAndAcceptVote app (Map.keys dsoRules.svs) $
     ARC_AmuletRules with
@@ -83,12 +83,12 @@ testPruneAmuletConfigSchedule = do
 
   -- Fails because the time is not yet reached
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   passTime (hours 2)
 
   submitMulti [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === Schedule with
@@ -97,7 +97,7 @@ testPruneAmuletConfigSchedule = do
 
   -- Fails because there is no future config
   submitMultiMustFail [sv1] [app.dso] $
-    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid)
+    exerciseCmd dsoRulesCid (DsoRules_PruneAmuletConfigSchedule amuletRulesCid (Some sv1))
 
   return ()
 

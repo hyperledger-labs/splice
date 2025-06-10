@@ -3,9 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.instances.future.*
-import cats.instances.seq.*
-import cats.syntax.foldable.*
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
@@ -19,18 +16,29 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_act
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
+  IsTheCantonSequencerBFTEnabled,
   updateAutomationConfig,
 }
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.LocalSequencerConnectionsTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{
+  LocalSequencerConnectionsTrigger,
+  SvBftSequencerPeerOffboardingTrigger,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }
 import org.lfdecentralizedtrust.splice.util.{ProcessTestUtil, StandaloneCanton}
 import org.scalatest.time.{Minute, Span}
+import cats.syntax.foldable.*
+import cats.instances.future.*
+import cats.instances.seq.*
+import org.lfdecentralizedtrust.splice.util.TriggerTestUtil.{
+  pauseAllDsoDelegateTriggers,
+  resumeAllDsoDelegateTriggers,
+}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -65,11 +73,10 @@ class SvOffboardingIntegrationTest
       .withSequencerConnectionsFromScanDisabled(22_000)
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
-          _.withResumedTrigger[SvOffboardingMediatorTrigger]
-            .withResumedTrigger[SvOffboardingSequencerTrigger]
-            .withPausedTrigger[LocalSequencerConnectionsTrigger]
+          _.withPausedTrigger[LocalSequencerConnectionsTrigger]
         )(config)
       )
+      .addConfigTransform((_, config) => ConfigTransforms.withResumedOffboardingTriggers()(config))
       .withCantonNodeNameSuffix("SvOffboarding")
       .withManualStart
 
@@ -89,23 +96,12 @@ class SvOffboardingIntegrationTest
     )() {
       clue("Initialize DSO with 4 SVs") {
         startAllSync(
-          sv1ScanBackend,
-          sv2ScanBackend,
-          sv1Backend,
-          sv2Backend,
-          sv3Backend,
-          sv4Backend,
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
-          sv3ValidatorBackend,
-          sv4ValidatorBackend,
+          (sv1Nodes ++ sv2Nodes ++ sv3Nodes ++ sv4Nodes)*
         )
       }
 
-      sv1Backend.dsoDelegateBasedAutomation
-        .trigger[ExecuteConfirmedActionTrigger]
-        .pause()
-        .futureValue
+      pauseAllDsoDelegateTriggers[ExecuteConfirmedActionTrigger]
+
       val externalPartyAmuletRules = sv1ScanBackend.getExternalPartyAmuletRules()
       // Create TransferCommand to trigger creation of confirmations for creating the transfer command counter.
       // We don't want to test external parties in this test so we just create it directly from SV1.
@@ -183,7 +179,13 @@ class SvOffboardingIntegrationTest
         Seq(
           svb.dsoAutomation.trigger[SvOffboardingMediatorTrigger],
           svb.dsoAutomation.trigger[SvOffboardingSequencerTrigger],
-        )
+        ) ++ {
+          if (IsTheCantonSequencerBFTEnabled) {
+            Seq(svb.dsoAutomation.trigger[SvBftSequencerPeerOffboardingTrigger])
+          } else {
+            Seq.empty
+          }
+        }
       }
       withClue("pause offboarding triggers") {
         cantonMediatorSequencerTriggers.traverse_(_.pause()).futureValue
@@ -240,7 +242,7 @@ class SvOffboardingIntegrationTest
       ) shouldBe None
       actAndCheck(timeUntilSuccess = 60.seconds)(
         "Resume ExecuteConfirmedActionTrigger",
-        sv1Backend.dsoDelegateBasedAutomation.trigger[ExecuteConfirmedActionTrigger].resume(),
+        resumeAllDsoDelegateTriggers[ExecuteConfirmedActionTrigger],
       )(
         "TransferCommandCounter gets created",
         (_: Unit) =>
@@ -336,6 +338,15 @@ class SvOffboardingIntegrationTest
                     )
                 )
                 .toSet
+            }
+
+            if (IsTheCantonSequencerBFTEnabled) {
+              clue("check sequencer offboarded from p2p connections") {
+                sv3Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
+                  .listCurrentPeerEndpoints()
+                  .futureValue
+                  .size shouldBe 2
+              }
             }
           },
       )

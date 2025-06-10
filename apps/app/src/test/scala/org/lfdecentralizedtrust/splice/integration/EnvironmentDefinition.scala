@@ -1,20 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration
 
 import better.files.{File, Resource}
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceConfig}
-import org.lfdecentralizedtrust.splice.console.{
-  ParticipantClientReference,
-  ValidatorAppBackendReference,
-}
-import org.lfdecentralizedtrust.splice.environment.{
-  SpliceConsoleEnvironment,
-  SpliceEnvironment,
-  SpliceEnvironmentFactory,
-}
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
-import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
-import org.lfdecentralizedtrust.splice.validator.config.ValidatorCantonIdentifierConfig
 import com.digitalasset.canton.admin.api.client.data.User
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
 import com.digitalasset.canton.config.{
@@ -34,6 +20,20 @@ import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
+import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceConfig}
+import org.lfdecentralizedtrust.splice.console.{
+  ParticipantClientReference,
+  ValidatorAppBackendReference,
+}
+import org.lfdecentralizedtrust.splice.environment.{
+  SpliceConsoleEnvironment,
+  SpliceEnvironment,
+  SpliceEnvironmentFactory,
+}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
+import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
+import org.lfdecentralizedtrust.splice.validator.config.ValidatorCantonIdentifierConfig
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Inside, Inspectors, OptionValues}
 
@@ -59,8 +59,14 @@ case class EnvironmentDefinition(
     with NamedLogging
     with OptionValues
     with Inside {
+
   override def loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
-  override val configTransforms = configTransformsWithContext(context)
+  override val configTransforms: Seq[SpliceConfig => SpliceConfig] = {
+    // add the BFT sequencers config transform to the front if enabled to ensure that it modifies the ports before any other transforms updates the ports
+    if (ConfigTransforms.IsTheCantonSequencerBFTEnabled)
+      ConfigTransforms.withBftSequencers() +: this.configTransformsWithContext(context)
+    else configTransformsWithContext(context)
+  }
 
   def withManualStart: EnvironmentDefinition = {
     this
@@ -220,6 +226,9 @@ case class EnvironmentDefinition(
       )(config)
     )
 
+  def withBftSequencers: EnvironmentDefinition =
+    addConfigTransformToFront((_, config) => ConfigTransforms.withBftSequencers()(config))
+
   def withAmuletPrice(price: BigDecimal): EnvironmentDefinition =
     addConfigTransforms((_, conf) => ConfigTransforms.setAmuletPrice(price)(conf))
 
@@ -377,17 +386,19 @@ case class EnvironmentDefinition(
 object EnvironmentDefinition extends CommonAppInstanceReferences {
 
   // Prefer this to `4Svs` for better test performance (unless your really need >1 SV of course).
-  def simpleTopology1Sv(testName: String): EnvironmentDefinition =
+  def simpleTopology1Sv(testName: String): EnvironmentDefinition = {
     fromResources(Seq("simple-topology-1sv.conf"), testName)
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+  }
 
-  def simpleTopology4Svs(testName: String): EnvironmentDefinition =
+  def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
     fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+  }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =
     simpleTopology1Sv(testName).withSimTime

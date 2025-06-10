@@ -146,6 +146,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
     return res(
       ctx.json<FeatureSupportResponse>({
         new_governance_flow: true,
+        delegateless_automation: true,
       })
     );
   }),

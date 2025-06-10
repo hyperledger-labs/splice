@@ -134,9 +134,6 @@ class ValidatorApp(
   override def packagesForJsonDecoding =
     super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
-  def packagesForUploading =
-    super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all
-
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
@@ -298,7 +295,6 @@ class ValidatorApp(
                   connection,
                   participantAdminConnection,
                   config.domains.global.alias,
-                  retryProvider,
                   loggerFactory,
                 )
                 appInitStep("Migrating party data") {
@@ -319,10 +315,6 @@ class ValidatorApp(
                             logger,
                             retryProvider,
                           ),
-                        Seq(
-                          DarResources.amulet.bootstrap,
-                          DarResources.amuletNameService.bootstrap,
-                        ),
                         partiesToMigrate.map(_.map(party => PartyId.tryFromProtoPrimitive(party))),
                       )
                   } yield ()
@@ -746,6 +738,11 @@ class ValidatorApp(
         com.google.protobuf.duration.Duration
           .toJavaProto(DurationConversion.toProto(config.deduplicationDuration.asJavaApproximation))
       )
+      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        synchronizerId,
+        readOnlyLedgerConnection,
+      )
       walletManagerOpt =
         if (config.enableWallet) {
           val externalPartyWalletManager = new ExternalPartyWalletManager(
@@ -777,6 +774,7 @@ class ValidatorApp(
             storage: Storage,
             retryProvider,
             scanConnection,
+            packageVersionSupport,
             loggerFactory,
             domainMigrationInfo,
             participantId,
@@ -794,7 +792,6 @@ class ValidatorApp(
           logger.info("Not starting wallet as it's disabled")
           None
         }
-      synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       automation = new ValidatorAutomationService(
         config.automation,
         config.participantIdentitiesBackup,
@@ -830,10 +827,7 @@ class ValidatorApp(
         config.contactPoint,
         initialSynchronizerTime,
         loggerFactory,
-        packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-          synchronizerId,
-          readOnlyLedgerConnection,
-        ),
+        packageVersionSupport,
       )
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
@@ -889,6 +883,11 @@ class ValidatorApp(
           loggerFactory,
         )
 
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        synchronizerId,
+        readOnlyLedgerConnection,
+      )
+
       adminHandler =
         new HttpValidatorAdminHandler(
           automation,
@@ -899,16 +898,12 @@ class ValidatorApp(
           getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           scanConnection = scanConnection,
           participantAdminConnection,
+          packageVersionSupport,
           config,
           clock,
           retryProvider = retryProvider,
           loggerFactory,
         )
-
-      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        synchronizerId,
-        readOnlyLedgerConnection,
-      )
 
       walletInternalHandler = walletManagerOpt.map(walletManager =>
         new HttpWalletHandler(

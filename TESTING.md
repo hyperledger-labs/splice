@@ -72,6 +72,10 @@ To request a cluster test to be run on your PR, comment on your pr `/cluster_tes
 for a basic test or a hard-migration test respectively. After commenting, reach out to the
 [Splice Contributors](CONTRIBUTORS.md) to approve and trigger the actual test on your behalf.
 
+### Enabling the new Canton bft ordering layer
+
+If you want to run the integration tests with the new Canton bft, you can do so by including the message `[bft]` in your commit message.
+
 ## Running Tests Locally
 
 ### Managing Canton for Tests
@@ -210,6 +214,17 @@ No installation of `lnav` is required, as it is provided by default by our `dire
 Documentation about common pitfalls when writing new integration tests and debugging existing ones can be found [here](/apps/app/src/test/scala/org/lfdecentralizedtrust/splice/integration/tests/README.md).
 If you wish to extend our testing topology please also consult [this README](/apps/app/src/test/resources/README.md) about name and port allocation.
 
+### Enabling the new Canton bft ordering layer
+
+If you want to run the integration tests locally with the new Canton bft, canton must be started with the `-e` flag.
+This can be done by running `./start-canton.sh -we`.
+Furthermore the integration test must run with the `SPLICE_USE_BFT_SEQUENCER` environment variable set to `true`.
+Eg of test run:
+
+```bash
+ SPLICE_USE_BFT_SEQUENCER=1 sbt 'apps-app/ testOnly org.lfdecentralizedtrust.splice.integration.tests.SvDevNetReonboardingIntegrationTest'
+```
+
 ### Testing App Behaviour Outside of Tests Without Running Bundle
 
 Sometimes, you may need to debug startup behaviour of the Splice apps that is causing issues for the
@@ -310,7 +325,7 @@ If you have never used `lnav` to inspect Canton or CometBFT logs, then we recomm
 3. Create the following symlinks to automatically keep the format definitions up to date:
    ```
    ln -sf $PWD/canton/canton-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/canton_logstash_json.json
-   ln -sf $PWD/support/cometbft-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/cometbft-json.json
+   ln -sf $PWD/network-health/cometbft-json.lnav.json $LNAV_CONFIG_DIR/formats/installed/cometbft-json.json
    ```
 4. Type `lnav log/canton_network_test.clog` to inspect the test logs.
 5. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
@@ -382,9 +397,12 @@ They are meant to provide a quick feedback loop and to offer additional protecti
 We use [helm-unittest](https://github.com/helm-unittest/helm-unittest/) for some of our Helm charts.
 To run all Helm chart tests locally run `make cluster/helm/test`.
 To run only the tests for a specific chart `CHART`, run `helm unittest cluster/helm/CHART`.
+If this produces an error: "### Error:  Chart.yaml file is missing", please run `make cluster/helm/build`.
 
 Refer to the documentation of `helm-unittest` for more information on how to extend our Helm tests.
-When writing or debugging Helm tests, it is often useful to run `helm template` to see the rendered templates.
+When writing or debugging Helm tests, it is often useful to run `helm unittest` with the `-d` flag.
+This produces rendered yaml files under a local `.debug` folder
+that can be inspected to understand errors or determine the correct paths for assertions.
 
 ### Pulumi checks
 

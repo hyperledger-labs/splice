@@ -945,35 +945,51 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
     for {
       store <- mkStore(user1)
       offer1 = transferOffer(user1, user2, 10.0, paymentCodegen.Unit.AMULETUNIT, time(1))
+      acceptedOffer = acceptedTransferOffer(
+        user1,
+        user2,
+        10.0,
+        paymentCodegen.Unit.AMULETUNIT,
+        time(1),
+      )
       _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
         store.multiDomainAcsStore
       )
-      unfiltered <- store.getOutstandingTransferOffers(
+      _ <- dummyDomain.create(acceptedOffer, createdEventSignatories = Seq(user1))(
+        store.multiDomainAcsStore
+      )
+      (unfiltered, unfilteredAccepted) <- store.getOutstandingTransferOffers(
         None,
         None,
       )
-      filteredSenderMatch <- store.getOutstandingTransferOffers(
+      (filteredSenderMatch, filteredSenderMatchAccepted) <- store.getOutstandingTransferOffers(
         Some(user1),
         None,
       )
-      filteredSenderNoMatch <- store.getOutstandingTransferOffers(
+      (filteredSenderNoMatch, filteredSenderNoMatchAccepted) <- store.getOutstandingTransferOffers(
         Some(user2),
         None,
       )
-      filteredReceiverMatch <- store.getOutstandingTransferOffers(
+      (filteredReceiverMatch, filteredReceiverMatchAccepted) <- store.getOutstandingTransferOffers(
         None,
         Some(user2),
       )
-      filteredReceiverNoMatch <- store.getOutstandingTransferOffers(
-        None,
-        Some(user1),
-      )
+      (filteredReceiverNoMatch, filteredReceiverNoMatchAccepted) <- store
+        .getOutstandingTransferOffers(
+          None,
+          Some(user1),
+        )
     } yield {
       unfiltered.map(_.contractId) shouldBe Seq(offer1.contractId)
+      unfilteredAccepted.map(_.contractId) shouldBe Seq(acceptedOffer.contractId)
       filteredSenderMatch.map(_.contractId) shouldBe Seq(offer1.contractId)
+      filteredSenderMatchAccepted.map(_.contractId) shouldBe Seq(acceptedOffer.contractId)
       filteredSenderNoMatch.map(_.contractId) shouldBe Seq()
+      filteredSenderNoMatchAccepted.map(_.contractId) shouldBe Seq()
       filteredReceiverMatch.map(_.contractId) shouldBe Seq(offer1.contractId)
+      filteredReceiverMatchAccepted.map(_.contractId) shouldBe Seq(acceptedOffer.contractId)
       filteredReceiverNoMatch.map(_.contractId) shouldBe Seq()
+      filteredReceiverNoMatchAccepted.map(_.contractId) shouldBe Seq()
     }
   }
 

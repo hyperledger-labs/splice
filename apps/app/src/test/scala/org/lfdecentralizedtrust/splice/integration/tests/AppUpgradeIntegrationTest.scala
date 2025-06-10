@@ -201,7 +201,6 @@ class AppUpgradeIntegrationTest
             spliceProcs.stopBundledSplice("sv2-node")
             startAllSync(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
             spliceProcs.stopBundledSplice("sv3-node")
-            // No scan for sv3
             startAllSync(sv3Backend, sv3ScanBackend, sv3ValidatorBackend)
           }
 
@@ -435,7 +434,7 @@ class AppUpgradeIntegrationTest
 
           // SV4 can join after the upgrade.
           clue("SV4 can join after upgrade") {
-            startAllSync(sv4Backend, sv4ValidatorBackend)
+            startAllSync(sv4Backend, sv4ScanBackend, sv4ValidatorBackend)
           }
 
           clue("Splitwell works") {
@@ -657,7 +656,8 @@ object AppUpgradeIntegrationTest {
       "SV1_URL" -> "http://127.0.0.1:5114",
       "SV1_SCAN_URL" -> "http://127.0.0.1:5012",
       "SV2_SCAN_URL" -> "http://127.0.0.1:5112",
-      "SV3_SCAN_URL" -> "http://127.0.0.1:5112",
+      "SV3_SCAN_URL" -> "http://127.0.0.1:5212",
+      "SV4_SCAN_URL" -> "http://127.0.0.1:5312",
     ).!
     if (result != 0) {
       throw new RuntimeException(s"Command $cmd returned: $result")

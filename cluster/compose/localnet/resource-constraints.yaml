@@ -7,15 +7,15 @@ services:
   postgres:
     mem_limit: 2g
   canton:
-    mem_limit: 4g
+    mem_limit: 6g
     environment:
-      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx2560m"
+      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx3072m"
   splice:
     mem_limit: 3g
     environment:
       _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx2560m"
   console:
-    mem_limit: 1g
+    mem_limit: 2g
     environment:
       _JAVA_OPTIONS: "-XX:+UseContainerSupport -XX:-UseCompressedOops"
   scan-web-ui:
@@ -28,3 +28,5 @@ services:
     mem_limit: 256mb
   wallet-web-ui-sv:
     mem_limit: 256mb
+  swagger-ui:
+    mem_limit: 128mb
