@@ -2387,7 +2387,7 @@ components:
         events_by_id:
           x-scala-map-type: "scala.collection.immutable.SortedMap"
           description: |
-            Changes to the ledger that were caused by this transaction, keyed by ID and sorted by ID for display consistency.
+            Changes to the ledger that were caused by this transaction, keyed by ID and sorted lexicographically by ID for display consistency.
             Values are nodes of the transaction tree.
             Within a transaction, IDs may be referenced by `root_event_ids` or
             `child_event_ids` in `ExercisedEvent` herein, which are sorted in the order as they occurred in the transaction.
