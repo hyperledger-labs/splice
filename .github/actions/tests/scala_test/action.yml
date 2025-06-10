@@ -105,7 +105,7 @@ runs:
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
         cmd: |
-          if [[ "${{ inputs.daml_base_version }}" != ""]; then
+          if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
             echo "Running with initial package config from ${{ inputs.daml_base_version }}"
             ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
             echo "Initial package config"
