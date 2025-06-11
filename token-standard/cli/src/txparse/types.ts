@@ -59,12 +59,12 @@ export const EmptyHoldingsChangeSummary: HoldingsChangeSummary = {
  * otherwise just meta and transfer.
  */
 export interface TransferInstructionView {
-  // currentInstructionCid: string // TODO (#19379): add
+  // currentInstructionCid: string // TODO (#505): add
   originalInstructionCid: string | null;
   transfer: any;
   status: {
     before: any;
-    // current: any; // TODO (#19379): add
+    // current: any; // TODO (#505): add
   };
   meta: any;
 }

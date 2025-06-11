@@ -76,7 +76,7 @@ class GcpProject extends pulumi.ComponentResource {
     // Note: this should be fine when ran against devnet itself...
     //  - But since we can automate this now, we might want to simply generate new SV secrets per project
     //  - We also want to move this to the infra stack so we can parameterize # of SVs
-    // TODO(#11109): generate new SV secrets per project
+    // TODO(DACH-NY/canton-network-internal#435): generate new SV secrets per project
     this.importSecretIdFromDevnet('sv-id');
     this.importSecretIdFromDevnet('sv2-id');
     this.importSecretIdFromDevnet('sv3-id');

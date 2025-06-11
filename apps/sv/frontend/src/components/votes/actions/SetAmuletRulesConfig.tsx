@@ -20,7 +20,7 @@ const SetAmuletRulesConfig: React.FC<{
 }> = ({ chooseAction }) => {
   const dsoInfosQuery = useDsoInfos();
 
-  // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
+  // TODO (#967): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue>>();
 
   if (dsoInfosQuery.isLoading) {

@@ -876,7 +876,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListDsoSequencersResponse.OK(response) =>
         response.domainSequencers.traverse { domain =>
-          // TODO (#9309): malicious scans can make these decoding fail
+          // TODO (DACH-NY/canton-network-internal#449): malicious scans can make these decoding fail
           Codec.decode(Codec.SynchronizerId)(domain.domainId).flatMap { synchronizerId =>
             domain.sequencers
               .traverse { s =>
@@ -947,7 +947,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListDsoScansResponse.OK(response) =>
         response.scans.traverse { domain =>
-          // TODO (#9309): malicious scans can make this decoding fail
+          // TODO (DACH-NY/canton-network-internal#449): malicious scans can make this decoding fail
           Codec.decode(Codec.SynchronizerId)(domain.domainId).map { synchronizerId =>
             // all SVs validate the Uri, so this should only fail to parse for malicious SVs.
             val (malformed, scanList) =

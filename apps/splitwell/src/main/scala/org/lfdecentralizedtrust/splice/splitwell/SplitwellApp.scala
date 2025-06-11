@@ -114,7 +114,7 @@ class SplitwellApp(
       participantAdminConnection.getParticipantId()
     }
     storeKey = SplitwellStore.Key(providerParty = partyId)
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     migrationInfo = DomainMigrationInfo(
       config.domainMigrationId,
       None,

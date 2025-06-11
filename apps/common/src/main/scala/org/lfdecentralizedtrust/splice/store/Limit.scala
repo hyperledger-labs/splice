@@ -14,7 +14,7 @@ sealed trait Limit {
 
 object Limit {
 
-  // TODO (#12610): make configurable
+  // TODO (#767): make configurable
   val MaxPageSize: Int = 1000
   val DefaultLimit: Limit = HardLimit.tryCreate(MaxPageSize)
 

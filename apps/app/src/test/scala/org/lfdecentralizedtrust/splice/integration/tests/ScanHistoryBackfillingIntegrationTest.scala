@@ -495,7 +495,7 @@ class ScanHistoryBackfillingIntegrationTest
       val sv2Transactions =
         sv2ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
 
-      // TODO(#16798): switch to theSameElementsInOrderAs once the endpoint sorts by record time instead of row id.
+      // TODO(#666): switch to theSameElementsInOrderAs once the endpoint sorts by record time instead of row id.
       sv1Transactions should contain theSameElementsAs sv2Transactions
     }
 

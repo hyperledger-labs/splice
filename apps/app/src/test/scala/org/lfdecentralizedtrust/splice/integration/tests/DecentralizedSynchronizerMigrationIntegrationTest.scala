@@ -403,7 +403,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
               )
           )(conf),
-        // TODO(#9014) Consider keeping this running and instead
+        // TODO(DACH-NY/canton-network-node#9014) Consider keeping this running and instead
         // making the test check history instead of balance once our
         // stores handle hard domain migrations properly.
         (_, conf) =>
@@ -412,10 +412,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           )(conf),
       )
       .withManualStart
-      // TODO (#10859) remove and fix test failures
+      // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
-  // TODO (#10859) remove and fix test failures
+  // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes with downtime" in { implicit env =>

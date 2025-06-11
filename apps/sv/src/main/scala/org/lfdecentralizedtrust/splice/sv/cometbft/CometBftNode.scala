@@ -292,7 +292,7 @@ class CometBftNode(
               cometBftRequestSigner.fingerprint,
             )
           ),
-          // TODO(#5882): add support for sequencing keys
+          // TODO(DACH-NY/canton-network-node#5882): add support for sequencing keys
           sequencingKeys = List.empty,
         )
       }
@@ -486,7 +486,7 @@ object CometBftNode {
       nodeState: daml.dso.svstate.SvNodeState,
       synchronizerId: SynchronizerId,
   ) = {
-    // TODO(#4901): reconcile all configured CometBFT networks
+    // TODO(DACH-NY/canton-network-node#4901): reconcile all configured CometBFT networks
     nodeState.state.synchronizerNodes.asScala.get(synchronizerId.toProtoPrimitive)
   }
 

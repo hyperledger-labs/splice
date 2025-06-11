@@ -20,7 +20,7 @@ class WalletSubscriptionsIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
   "A wallet" should {

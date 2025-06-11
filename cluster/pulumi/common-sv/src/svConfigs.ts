@@ -38,11 +38,11 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
       svCometBftKeysFromSecret('sv16-cometbft-keys'),
     ];
 // to generate new keys: https://cimain.network.canton.global/sv_operator/sv_helm.html#generating-your-cometbft-node-keys
-// TODO(#11109): rotate the non-mainNet keys as they have been exposed in github (once mechanism is in place)
+// TODO(DACH-NY/canton-network-internal#435): rotate the non-mainNet keys as they have been exposed in github (once mechanism is in place)
 export const svConfigs: StaticSvConfig[] = isMainNet
   ? [
       {
-        // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)
+        // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
         nodeName: 'sv-1',
         ingressName: 'sv-2', // fun, right?
         onboardingName: 'Digital-Asset-2',
@@ -67,7 +67,7 @@ export const svConfigs: StaticSvConfig[] = isMainNet
     ]
   : [
       {
-        // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)
+        // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
         nodeName: 'sv-1',
         ingressName: 'sv-2', // fun, right?
         onboardingName: 'Digital-Asset-2',
@@ -91,7 +91,7 @@ export const svConfigs: StaticSvConfig[] = isMainNet
         ...(sv1ScanBigQuery ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } } : {}),
       },
       {
-        // TODO(#12169): consider making nodeName and ingressName the same (also for all other SVs)
+        // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
         nodeName: 'sv-2',
         ingressName: 'sv-2-eng',
         onboardingName: 'Digital-Asset-Eng-2',

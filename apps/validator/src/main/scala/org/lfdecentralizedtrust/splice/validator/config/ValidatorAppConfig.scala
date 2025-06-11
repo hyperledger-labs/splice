@@ -71,7 +71,7 @@ final case class BuyExtraTrafficConfig(
       * This is used to set the deadline for grpc calls to the participant.
       * If the call takes longer than this, it will be cancelled and retried.
       * This is only intended for testing purposes.
-      * TODO(#11501) block and unblock submissions on domain reconnect
+      * TODO(DACH-NY/canton-network-node#11501) block and unblock submissions on domain reconnect
       */
     grpcDeadline: Option[NonNegativeFiniteDuration] = None,
 )
@@ -168,7 +168,7 @@ case class ValidatorAppBackendConfig(
     svUser: Option[String] = None,
     domainMigrationDumpPath: Option[Path] = None,
     restoreFromMigrationDump: Option[Path] = None,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     parameters: SpliceParametersConfig = SpliceParametersConfig(),
     ingestFromParticipantBegin: Boolean = true,
@@ -195,7 +195,7 @@ case class ValidatorAppBackendConfig(
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
-) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
+) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
 

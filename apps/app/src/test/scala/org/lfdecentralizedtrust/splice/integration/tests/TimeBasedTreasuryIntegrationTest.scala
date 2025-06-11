@@ -28,10 +28,10 @@ class TimeBasedTreasuryIntegrationTest
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
-      // TODO (#10859) remove and fix test failures
+      // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
-  // TODO (#10859) remove and fix test failures
+  // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
