@@ -3,8 +3,6 @@ on:
   push:
     branches:
       - 'main'
-  pull_request: # FIXME: remove this
-    types: [opened, synchronize, reopened]
 
 jobs:
   trigger_ciupgrade:
@@ -57,6 +55,6 @@ jobs:
           method: chat.postMessage
           token: ${{ secrets.SLACK_ACCESS_TOKEN }}
           payload: |
-            channel: C08QJCYS63F
+            channel: C03J6NCPSE4
             text: "${{ steps.construct_message.outputs.MESSAGE }}"
 
