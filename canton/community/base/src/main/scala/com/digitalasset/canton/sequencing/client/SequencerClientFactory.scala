@@ -237,7 +237,8 @@ object SequencerClientFactory {
                   config.startupConnectionRetryDelay.asFiniteApproximation,
                   config.maxConnectionRetryDelay.asFiniteApproximation,
                   "Traffic State Initialization",
-                  longDescription = s"Initialize traffic state from a BFT read with threshold ${sequencerConnections.sequencerTrustThreshold} from ${sequencerConnections.connections.length} total connections",
+                  longDescription =
+                    s"Initialize traffic state from a BFT read with threshold ${sequencerConnections.sequencerTrustThreshold} from ${sequencerConnections.connections.length} total connections",
                   retryLogLevel = Some(Level.INFO),
                 )
                 .unlessShutdown(

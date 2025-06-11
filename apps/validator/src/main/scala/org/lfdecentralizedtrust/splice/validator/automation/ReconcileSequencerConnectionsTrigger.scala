@@ -142,9 +142,13 @@ class ReconcileSequencerConnectionsTrigger(
       sequencerConnections: SequencerConnections,
       connections: NonEmpty[Seq[SequencerConnection]],
   )(implicit tc: TraceContext) =
-    sequencerConnections.connections.forgetNE.map(ParticipantAdminConnection.dropSequencerId)
+    sequencerConnections.connections.forgetNE
+      .map(ParticipantAdminConnection.dropSequencerId)
       .flatMap(c => sequencerConnectionEndpoint(c).toList)
-      .toSet != connections.forgetNE.map(ParticipantAdminConnection.dropSequencerId).flatMap(c => sequencerConnectionEndpoint(c).toList).toSet
+      .toSet != connections.forgetNE
+      .map(ParticipantAdminConnection.dropSequencerId)
+      .flatMap(c => sequencerConnectionEndpoint(c).toList)
+      .toSet
 
   private def sequencerConnectionEndpoint(
       connection: SequencerConnection

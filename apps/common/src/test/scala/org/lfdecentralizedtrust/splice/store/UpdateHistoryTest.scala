@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.{
   ExercisedEvent,
   Int64,
   OffsetCheckpoint,
-  Value
+  Value,
 }
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp

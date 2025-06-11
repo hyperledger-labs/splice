@@ -22,7 +22,12 @@ import com.digitalasset.canton.topology.transaction.TopologyMapping.Code.{
   NamespaceDelegation,
   OwnerToKeyMapping,
 }
-import com.digitalasset.canton.topology.{ForceFlag, PhysicalSynchronizerId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ForceFlag,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{SequencerAlias, SynchronizerAlias}
@@ -405,7 +410,11 @@ final class LocalSynchronizerNode(
                 onboardingState
               )
               status <- sequencerAdminConnection.getStatus
-            } yield status.successOption.fold(throw Status.INTERNAL.withDescription("Sequencer did not report as initialized after we initialized it").asRuntimeException)(_.synchronizerId)
+            } yield status.successOption.fold(
+              throw Status.INTERNAL
+                .withDescription("Sequencer did not report as initialized after we initialized it")
+                .asRuntimeException
+            )(_.synchronizerId)
           case NodeStatus.Success(status) =>
             logger.info("Sequencer is already initialized")
             Future.successful(status.synchronizerId)

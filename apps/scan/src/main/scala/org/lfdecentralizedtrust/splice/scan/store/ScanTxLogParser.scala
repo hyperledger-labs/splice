@@ -54,8 +54,8 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: Transaction, synchronizerId: SynchronizerId, root: Event)(
-      implicit tc: TraceContext
+  private def parseTree(tree: Transaction, synchronizerId: SynchronizerId, root: Event)(implicit
+      tc: TraceContext
   ): State = {
     // TODO(#2930) add more checks on the nodes, at least that the DSO party is correct
     root match {

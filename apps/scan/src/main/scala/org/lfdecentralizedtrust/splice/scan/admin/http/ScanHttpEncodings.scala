@@ -232,12 +232,17 @@ sealed trait ScanHttpEncodings {
             "",
             http.workflowId,
             Instant.parse(http.effectiveAt),
-            http.eventsById.map { case (eventId, treeEventHttp) =>
-              Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
-                nodesWithChildren,
-                treeEventHttp,
-              )
-            }.toSeq.sortBy(_._1).map(_._2).asJava,
+            http.eventsById
+              .map { case (eventId, treeEventHttp) =>
+                Integer.valueOf(EventId.nodeIdFromEventId(eventId)) -> httpToJavaEvent(
+                  nodesWithChildren,
+                  treeEventHttp,
+                )
+              }
+              .toSeq
+              .sortBy(_._1)
+              .map(_._2)
+              .asJava,
             LegacyOffset.Api.assertFromStringToLong(http.offset),
             http.synchronizerId,
             TraceContextOuterClass.TraceContext.getDefaultInstance,

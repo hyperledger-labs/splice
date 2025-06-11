@@ -341,66 +341,68 @@ class DomainMigrationInitializer(
       identity: NodeIdentitiesDump,
       genesisState: ByteString,
   ): Future[PhysicalSynchronizerId] = {
-    synchronizerNodeInitializer.synchronizerNode.sequencerAdminConnection
-      .getStatus
+    synchronizerNodeInitializer.synchronizerNode.sequencerAdminConnection.getStatus
       .flatMap { status =>
         status.successOption match {
           case Some(success) =>
-          logger.info(s"Sequencer is already initialized with id ${identity.id}")
-          Future.successful(success.synchronizerId)
-        case None =>
-          logger.info(s"Sequencer is not initialized, initializing from dump")
-          for {
-            _ <- synchronizerNodeInitializer.sequencerInitializer.initializeFromDump(identity)
-            _ = logger.info(
-              s"Restoring sequencer topology from genesis state"
-            )
-            _ = waitForNodeReadyToInitialize(
-              localSynchronizerNode.sequencerAdminConnection,
-              identity,
-            )
-            _ <- retryProvider.retry(
-              RetryFor.ClientCalls,
-              "init_sequencer_genesis",
-              s"Initialize sequencer ${identity.id} from genesis state",
-              localSynchronizerNode.sequencerAdminConnection
-                .initializeFromGenesisState(
-                  genesisState,
-                  localSynchronizerNode.staticDomainParameters,
-                ),
-              logger,
-            )
-            synchronizerId <- retryProvider.getValueWithRetries(
-              RetryFor.ClientCalls,
-              "sequencer_initialized",
-              "sequencer is initialized",
-              localSynchronizerNode.sequencerAdminConnection.getStatus.map {
-                _.successOption.fold(
+            logger.info(s"Sequencer is already initialized with id ${identity.id}")
+            Future.successful(success.synchronizerId)
+          case None =>
+            logger.info(s"Sequencer is not initialized, initializing from dump")
+            for {
+              _ <- synchronizerNodeInitializer.sequencerInitializer.initializeFromDump(identity)
+              _ = logger.info(
+                s"Restoring sequencer topology from genesis state"
+              )
+              _ = waitForNodeReadyToInitialize(
+                localSynchronizerNode.sequencerAdminConnection,
+                identity,
+              )
+              _ <- retryProvider.retry(
+                RetryFor.ClientCalls,
+                "init_sequencer_genesis",
+                s"Initialize sequencer ${identity.id} from genesis state",
+                localSynchronizerNode.sequencerAdminConnection
+                  .initializeFromGenesisState(
+                    genesisState,
+                    localSynchronizerNode.staticDomainParameters,
+                  ),
+                logger,
+              )
+              synchronizerId <- retryProvider.getValueWithRetries(
+                RetryFor.ClientCalls,
+                "sequencer_initialized",
+                "sequencer is initialized",
+                localSynchronizerNode.sequencerAdminConnection.getStatus.map {
+                  _.successOption.fold(
                     throw Status.FAILED_PRECONDITION
                       .withDescription("Sequencer is not initialized")
-                      .asRuntimeException())(
-                  _.synchronizerId,
-                )
-              },
-              loggerFactory.getTracedLogger(getClass),
-            )
-          } yield synchronizerId
+                      .asRuntimeException()
+                  )(
+                    _.synchronizerId
+                  )
+                },
+                loggerFactory.getTracedLogger(getClass),
+              )
+            } yield synchronizerId
         }
       }
       .flatMap { synchronizerId =>
-        retryProvider.waitUntil(
-          RetryFor.ClientCalls,
-          "sequencer_initialized_id",
-          "sequencer is initialized with restored id",
-          localSynchronizerNode.sequencerAdminConnection.getSequencerId.map { id =>
-            if (id != identity.id) {
-              throw Status.FAILED_PRECONDITION
-                .withDescription("Sequencer is not initialized with dump id")
-                .asRuntimeException()
-            }
-          },
-          loggerFactory.getTracedLogger(getClass),
-        ).map(_ => synchronizerId)
+        retryProvider
+          .waitUntil(
+            RetryFor.ClientCalls,
+            "sequencer_initialized_id",
+            "sequencer is initialized with restored id",
+            localSynchronizerNode.sequencerAdminConnection.getSequencerId.map { id =>
+              if (id != identity.id) {
+                throw Status.FAILED_PRECONDITION
+                  .withDescription("Sequencer is not initialized with dump id")
+                  .asRuntimeException()
+              }
+            },
+            loggerFactory.getTracedLogger(getClass),
+          )
+          .map(_ => synchronizerId)
       }
   }
 

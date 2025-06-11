@@ -7,12 +7,7 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
-import com.daml.ledger.javaapi.data.{
-  CreatedEvent,
-  Event,
-  ExercisedEvent,
-  Identifier,
-  Transaction}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -1404,7 +1399,7 @@ class UpdateHistory(
       exerciseRows: Seq[SelectFromExerciseEvents],
   ): UpdateHistoryResponse = {
 
-    val createEvents = createRows .map(_.toCreatedEvent.event)
+    val createEvents = createRows.map(_.toCreatedEvent.event)
     // TODO(#17370) - remove this conversion as it's costly
     val nodesWithChildren = exerciseRows
       .map(exercise =>

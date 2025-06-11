@@ -101,8 +101,8 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  private def parseTree(tree: Transaction, root: Event, synchronizerId: SynchronizerId)(
-      implicit tc: TraceContext
+  private def parseTree(tree: Transaction, root: Event, synchronizerId: SynchronizerId)(implicit
+      tc: TraceContext
   ): Eval[State] = {
     import Eval.{now, defer}
     root match {

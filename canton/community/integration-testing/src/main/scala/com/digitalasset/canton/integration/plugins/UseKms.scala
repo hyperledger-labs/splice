@@ -30,7 +30,10 @@ import monocle.macros.syntax.lens.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
-abstract class UseKms extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] with AutoCloseable with NoTracing {
+abstract class UseKms
+    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+    with AutoCloseable
+    with NoTracing {
 
   protected def keyId: Option[KmsKeyId]
   protected def nodes: Set[String]
@@ -128,8 +131,8 @@ abstract class UseKms extends EnvironmentSetupPlugin[CantonConfig, CantonEnviron
   }
 
   override def beforeEnvironmentDestroyed(
-    config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      config: CantonConfig,
+      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
   ): Unit = {
     implicit val ec: ExecutionContext = kmsKeyDeletionExecutionContext
 

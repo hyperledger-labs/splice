@@ -89,28 +89,38 @@ class WalletTransferOfferStatusIntegrationTest
     ): (Transaction, Event) = {
       val eventFormat = EventFormat(
         filtersByParty = parties.toSeq
-        .map(party =>
-          party.toLf -> Filters(
-            Seq(
-              CumulativeFilter(
-                IdentifierFilter.WildcardFilter(
-                  transaction_filter.WildcardFilter(includeCreatedEventBlob = false)
+          .map(party =>
+            party.toLf -> Filters(
+              Seq(
+                CumulativeFilter(
+                  IdentifierFilter.WildcardFilter(
+                    transaction_filter.WildcardFilter(includeCreatedEventBlob = false)
+                  )
                 )
               )
             )
           )
-        )
-        .toMap,
-      filtersForAnyParty = None,
-      verbose = false,
-    )
-      val txTree = inside(aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
-        .update_by_id(txId, UpdateFormat(
-          includeTransactions = Some(TransactionFormatProto(Some(eventFormat), transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS)),
-        ))
-        .getOrElse(fail("Expected to see the transaction tree in the ledger."))) {
-          case TransactionWrapper(tx) => tx
-        }
+          .toMap,
+        filtersForAnyParty = None,
+        verbose = false,
+      )
+      val txTree = inside(
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
+          .update_by_id(
+            txId,
+            UpdateFormat(
+              includeTransactions = Some(
+                TransactionFormatProto(
+                  Some(eventFormat),
+                  transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                )
+              )
+            ),
+          )
+          .getOrElse(fail("Expected to see the transaction tree in the ledger."))
+      ) { case TransactionWrapper(tx) =>
+        tx
+      }
       val root = txTree.events.headOption.value
       txTree -> root
     }

@@ -38,7 +38,7 @@ import java.util.concurrent.atomic.AtomicReference
 import org.scalatest.AppendedClues
 import org.scalatest.matchers.should.Matchers
 import scala.annotation.nowarn
-      import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters.*
 
 trait LedgerApiExtensions extends AppendedClues with Matchers {
   implicit class LedgerApiSyntax(
@@ -336,7 +336,15 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
         ): Seq[JavaTransaction] = {
           ledgerApi.ledger_api.updates
-            .transactions(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout, transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS)
+            .transactions(
+              partyIds,
+              completeAfter,
+              beginOffset,
+              endOffset,
+              verbose,
+              timeout,
+              transactionShape = TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+            )
             .collect { case LedgerApiCommands.UpdateService.TransactionWrapper(tree) =>
               JavaTransaction.fromProto(Transaction.toJavaProto(tree))
             }

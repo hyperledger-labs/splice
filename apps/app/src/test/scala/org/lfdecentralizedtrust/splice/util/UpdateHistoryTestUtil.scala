@@ -59,15 +59,15 @@ trait UpdateHistoryTestUtil extends TestCommon {
   ): Seq[UpdateHistoryResponse] = {
     val ledgerEnd = participant.ledger_api.state.end()
 
-            val transactionFormat = transaction_filter.TransactionFormat(
-          eventFormat = Some(
-            transaction_filter.EventFormat(
-              filtersByParty = Seq(partyId.toLf -> transaction_filter.Filters(Nil)).toMap,
-              filtersForAnyParty = None,
-            )
-          ),
-          transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+    val transactionFormat = transaction_filter.TransactionFormat(
+      eventFormat = Some(
+        transaction_filter.EventFormat(
+          filtersByParty = Seq(partyId.toLf -> transaction_filter.Filters(Nil)).toMap,
+          filtersForAnyParty = None,
         )
+      ),
+      transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+    )
 
     participant.ledger_api.updates
       .updates(

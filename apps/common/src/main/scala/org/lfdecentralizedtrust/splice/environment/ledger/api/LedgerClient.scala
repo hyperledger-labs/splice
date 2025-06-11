@@ -247,11 +247,29 @@ private[environment] class LedgerClient(
       .newBuilder()
       .setCommands(commandsBuilder.build)
       .setTransactionFormat(
-          transaction_filter.TransactionFormat.toJavaProto(transaction_filter.TransactionFormat(
-            eventFormat = Some(transaction_filter.EventFormat(
-            )),
+        transaction_filter.TransactionFormat.toJavaProto(
+          transaction_filter.TransactionFormat(
+            eventFormat = Some(
+              transaction_filter.EventFormat(
+                filtersByParty = actAs
+                  .map(p =>
+                    p -> com.daml.ledger.api.v2.transaction_filter.Filters(
+                      Seq(
+                        com.daml.ledger.api.v2.transaction_filter.CumulativeFilter(
+                          com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
+                            .WildcardFilter(
+                              com.daml.ledger.api.v2.transaction_filter.WildcardFilter(false)
+                            )
+                        )
+                      )
+                    )
+                  )
+                  .toMap
+              )
+            ),
             transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
-          ))
+          )
+        )
       )
       .build()
     for {
@@ -730,13 +748,18 @@ object LedgerClient {
       lapi.update_service.GetUpdatesRequest(
         beginExclusive = begin,
         endInclusive = end,
-        updateFormat = Some(transaction_filter.UpdateFormat(
-          includeTransactions = Some(transaction_filter.TransactionFormat(
-            eventFormat = Some(eventFormat),
-            transactionShape = transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
-          )),
-          includeReassignments = Some(eventFormat),
-        )),
+        updateFormat = Some(
+          transaction_filter.UpdateFormat(
+            includeTransactions = Some(
+              transaction_filter.TransactionFormat(
+                eventFormat = Some(eventFormat),
+                transactionShape =
+                  transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+              )
+            ),
+            includeReassignments = Some(eventFormat),
+          )
+        ),
       )
     }
   }
@@ -756,7 +779,11 @@ object LedgerClient {
       impl((r: CSOC.SubmitAndWaitResponse) => r.getCompletionOffset)(
         { case (stub, r, ec) =>
           stub
-            .submitAndWait(command_service.SubmitAndWaitRequest.fromJavaProto(CSOC.SubmitAndWaitRequest.newBuilder().setCommands(r.getCommands).build))
+            .submitAndWait(
+              command_service.SubmitAndWaitRequest.fromJavaProto(
+                CSOC.SubmitAndWaitRequest.newBuilder().setCommands(r.getCommands).build
+              )
+            )
             .map(r => command_service.SubmitAndWaitResponse.toJavaProto(r))(ec)
         }
       )
@@ -767,7 +794,9 @@ object LedgerClient {
       ) {
         { case (stub, r, ec) =>
           stub
-            .submitAndWaitForTransaction(command_service.SubmitAndWaitForTransactionRequest.fromJavaProto(r))
+            .submitAndWaitForTransaction(
+              command_service.SubmitAndWaitForTransactionRequest.fromJavaProto(r)
+            )
             .map(r => command_service.SubmitAndWaitForTransactionResponse.toJavaProto(r))(ec)
         }
       }
