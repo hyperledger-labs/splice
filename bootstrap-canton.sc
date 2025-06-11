@@ -44,7 +44,7 @@ def bootstrapOtherDomain(
   )
   // For some stupid reason bootstrap.domain does not allow changing the dynamic domain parameters
   // so we overwrite it here.
-  val synchronizerId = sequencer.synchronizer_id.logical
+  val synchronizerId = sequencer.synchronizer_id
   // Align the reconciliation interval and catchup config with what our triggers set.
   // This doesn't really matter for splitwell but it matters for the soft synchronizer upgrade test.
   sequencer.topology.synchronizer_parameters.propose_update(
