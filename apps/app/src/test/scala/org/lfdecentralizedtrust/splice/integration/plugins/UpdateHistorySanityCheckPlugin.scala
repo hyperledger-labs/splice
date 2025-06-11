@@ -7,8 +7,8 @@ import org.lfdecentralizedtrust.splice.config.SpliceConfig
 import org.lfdecentralizedtrust.splice.console.ScanAppBackendReference
 import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
-import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, UpdateHistoryItem}
-import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.members
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, UpdateHistoryItemV2}
+import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
@@ -90,13 +90,13 @@ class UpdateHistorySanityCheckPlugin(
   private def paginateHistory(
       scan: ScanAppBackendReference,
       after: Option[(Long, String)],
-      acc: Chain[UpdateHistoryItem],
-  ): Chain[UpdateHistoryItem] = {
+      acc: Chain[UpdateHistoryItemV2],
+  ): Chain[UpdateHistoryItemV2] = {
     val result = scan.getUpdateHistory(10, after, encoding = CompactJson)
     val newAcc = acc ++ Chain.fromSeq(result)
     result.lastOption match {
       case None => acc // done
-      case Some(members.UpdateHistoryTransaction(last)) =>
+      case Some(members.UpdateHistoryTransactionV2(last)) =>
         paginateHistory(
           scan,
           Some((last.migrationId, last.recordTime)),
