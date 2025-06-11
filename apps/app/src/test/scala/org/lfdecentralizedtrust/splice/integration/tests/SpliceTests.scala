@@ -572,8 +572,8 @@ object SpliceTests extends LazyLogging {
       }
     }
 
-    // FIXME
-    protected def splitwellDarPath = "daml/dars/splitwell-0.1.8.dar"
+    protected def splitwellDarPath =
+      "daml/dars/splitwell-InitialPackageVersions.initialPackageVersion(DarResources.splitwell).dar"
   }
 
   object BracketSynchronous {

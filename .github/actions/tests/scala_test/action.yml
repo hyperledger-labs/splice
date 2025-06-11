@@ -85,8 +85,7 @@ inputs:
     required: true
   daml_base_version:
     type: string
-    required: false
-    default: "0.3.21"
+    required: true
 
 runs:
   using: "composite"

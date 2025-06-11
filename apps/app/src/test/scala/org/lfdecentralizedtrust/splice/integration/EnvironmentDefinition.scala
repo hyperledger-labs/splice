@@ -28,7 +28,6 @@ import org.lfdecentralizedtrust.splice.console.{
 }
 import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
-  PackageResource,
   SpliceConsoleEnvironment,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
@@ -108,35 +107,22 @@ case class EnvironmentDefinition(
       })
     })
 
-  private lazy val initialPackageVersionMap: Map[String, String] = {
-    import cats.syntax.either.*, io.circe.parser.*
-    val envVar = sys.env.getOrElse("INITIAL_PACKAGE_VERSIONS", "{}")
-    decode[Map[String, String]](envVar).valueOr(err =>
-      throw new IllegalArgumentException(
-        s"Failed to decode initial package versions: $envVar, error: $err"
-      )
-    )
-  }
-
-  def initialPackageVersion(pkg: PackageResource): String =
-    initialPackageVersionMap.getOrElse(
-      pkg.bootstrap.metadata.name,
-      pkg.bootstrap.metadata.version.toString,
-    )
-
   def withInitialPackageVersions: EnvironmentDefinition =
     addConfigTransforms(
       (_, config) =>
         ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
           _.copy(
-            // FIXME: read config from env var or something
             initialPackageConfig = InitialPackageConfig(
-              amuletVersion = initialPackageVersion(DarResources.amulet),
-              amuletNameServiceVersion = initialPackageVersion(DarResources.amuletNameService),
-              dsoGovernanceVersion = initialPackageVersion(DarResources.dsoGovernance),
-              validatorLifecycleVersion = initialPackageVersion(DarResources.validatorLifecycle),
-              walletVersion = initialPackageVersion(DarResources.wallet),
-              walletPaymentsVersion = initialPackageVersion(DarResources.walletPayments),
+              amuletVersion = InitialPackageVersions.initialPackageVersion(DarResources.amulet),
+              amuletNameServiceVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.amuletNameService),
+              dsoGovernanceVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.dsoGovernance),
+              validatorLifecycleVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.validatorLifecycle),
+              walletVersion = InitialPackageVersions.initialPackageVersion(DarResources.wallet),
+              walletPaymentsVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.walletPayments),
             )
           )
         )(config),
@@ -148,7 +134,7 @@ case class EnvironmentDefinition(
                 instance.copy(dars =
                   Seq(
                     java.nio.file.Paths.get(
-                      s"daml/dars/splitwell-${initialPackageVersion(DarResources.splitwell)}.dar"
+                      s"daml/dars/splitwell-${InitialPackageVersions.initialPackageVersion(DarResources.splitwell)}.dar"
                     )
                   )
                 )
@@ -159,8 +145,9 @@ case class EnvironmentDefinition(
       (_, config) =>
         ConfigTransforms.updateAllSplitwellAppConfigs_(c =>
           c.copy(
-            requiredDarVersion =
-              PackageVersion.assertFromString(initialPackageVersion(DarResources.splitwell))
+            requiredDarVersion = PackageVersion.assertFromString(
+              InitialPackageVersions.initialPackageVersion(DarResources.splitwell)
+            )
           )
         )(config),
     )
