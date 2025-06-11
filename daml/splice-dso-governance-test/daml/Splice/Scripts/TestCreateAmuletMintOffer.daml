@@ -1,0 +1,71 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestCreateAmuletMintOffer where
+
+import DA.Assert
+import DA.Action (void, when)
+import DA.Optional (fromSome)
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.Scripts.Util
+import Splice.DsoRules
+import Splice.AmuletRules
+import Splice.Scripts.DsoTestUtils
+
+test_createAmuletMintOfferVoting : Script ()
+test_createAmuletMintOfferVoting = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+  let 
+    amountToMint = 10.0
+    reason = "sv1 has achieved milestone 1"
+
+  -- start issuing
+  runNextIssuance app
+
+  -- merge unclaimed rewards 
+  mergeUnclaimedRewards app 
+  [(unclaimedRewardCid, unclaimedReward)] <- query @UnclaimedReward app.dso
+
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_CreateAmuletMintOffer AmuletRules_CreateAmuletMintOffer with
+        beneficiary = sv1
+        amount = amountToMint
+        reason
+
+  [(amuletMintOfferCid, amuletMintOffer)] <- query @AmuletMintOffer sv1 
+  amuletMintOffer === AmuletMintOffer with dso; beneficiary = sv1; amount = amountToMint; reason 
+
+  (openRoundCid, openRound) <- getLatestActiveOpenRound app
+  amuletRulesCid <- (.amuletRules) <$> getAppTransferContext app app.dsoUser
+  -- Diclose contracts
+  disclosedOpenRound <- fromSome <$> queryDisclosure dso openRoundCid
+  disclosedAmuletRules <- fromSome <$> queryDisclosure dso amuletRulesCid
+  disclosedUnclaimedReward <- fromSome <$> queryDisclosure dso unclaimedRewardCid
+
+  submitWithDisclosures sv1 [disclosedOpenRound, disclosedAmuletRules, disclosedUnclaimedReward] $ 
+    exerciseCmd amuletMintOfferCid AmuletMintOffer_Accept with 
+      amuletRulesCid 
+      openRoundCid
+      unclaimedRewardsToBurnCids = [unclaimedRewardCid] 
+
+  [(_, leftoverUnclaimedReward)] <- query @UnclaimedReward app.dso
+  leftoverUnclaimedReward.amount === unclaimedReward.amount - amountToMint
+  [(_, sv1Amulet)] <- query @Amulet sv1
+  sv1Amulet.amount.initialAmount === amountToMint
+  sv1Amulet.amount.createdAt === openRound.round
+  sv1Amulet.owner === sv1
+  pure ()
+
+
+-- | Merge all unclaimed reward contracts.
+mergeUnclaimedRewards : AmuletApp -> Script ()
+mergeUnclaimedRewards app = do
+  unclaimedRewards <- query @UnclaimedReward app.dso
+  when (length unclaimedRewards > 1) $
+    void $ submitExerciseAmuletRulesByKey app [app.dso] []
+      AmuletRules_MergeUnclaimedRewards with
+        unclaimedRewardCids = map fst unclaimedRewards

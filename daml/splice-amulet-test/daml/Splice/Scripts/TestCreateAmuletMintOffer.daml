@@ -1,0 +1,166 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestCreateAmuletMintOffer where
+
+import DA.Assert
+import DA.Optional (fromSome, whenSome)
+
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Scripts.Util
+
+test_AmuletRules_CreateAmuletMintOffer: Script ()
+test_AmuletRules_CreateAmuletMintOffer = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  amuletRulesCid <- fst <$> fetchAmuletRulesByKey app.dso
+  let 
+    amountToMint = 15.0
+    reason = "sv1 has achieved milestone 1"
+
+  -- Unhappy path - invalid amounts
+  submitMultiMustFail [app.dso] [app.dso] $
+    exerciseCmd amuletRulesCid AmuletRules_CreateAmuletMintOffer with
+      beneficiary = aliceValidator.primaryParty
+      amount = 0.0
+      reason 
+  submitMultiMustFail [app.dso] [app.dso] $
+    exerciseCmd amuletRulesCid AmuletRules_CreateAmuletMintOffer with
+      beneficiary = aliceValidator.primaryParty
+      amount = -10.0
+      reason
+
+  -- Happy path
+  submitMulti [app.dso] [app.dso] $
+    exerciseCmd amuletRulesCid AmuletRules_CreateAmuletMintOffer with
+      beneficiary = aliceValidator.primaryParty
+      amount = amountToMint
+      reason
+
+  [(_, amuletMintOffer)] <- query @AmuletMintOffer aliceValidator.primaryParty 
+  amuletMintOffer === AmuletMintOffer with 
+    dso = app.dso
+    beneficiary = aliceValidator.primaryParty
+    amount = amountToMint
+    reason 
+  pure ()
+
+test_AmuletMintOffer_Accept: Script ()
+test_AmuletMintOffer_Accept = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+  let dso = app.dso
+  amuletRulesCid <- fst <$> fetchAmuletRulesByKey app.dso
+
+  -- start issuing
+  runNextIssuance app
+
+  -- Retrieve open round and amuletRules
+  (openRoundCid, _) <- getLatestActiveOpenRound app
+  -- Diclose contracts
+  disclosedOpenRound <- fromSome <$> queryDisclosure dso openRoundCid
+  disclosedAmuletRules <- fromSome <$> queryDisclosure dso amuletRulesCid
+
+  let 
+    amountToMint = 15.0
+    beneficiary = aliceValidator.primaryParty 
+    disclosures = [disclosedOpenRound, disclosedAmuletRules]
+    context = AcceptAmuletMintOfferContext with 
+      dso 
+      beneficiary 
+      amuletRulesCid 
+      disclosures 
+      amountToMint
+      openRoundCid
+
+  -- Unhappy paths - insufficient unclaimed rewards 
+  -------------------------------------------------
+  amuletMintOfferCid <- mkCreateAmuletMintOffer dso beneficiary amountToMint amuletRulesCid 
+  acceptAmuletMintOfferAndVerifyFailure context amuletMintOfferCid []
+  acceptAmuletMintOfferAndVerifyFailure context amuletMintOfferCid [10.0]
+  acceptAmuletMintOfferAndVerifyFailure context amuletMintOfferCid [4.0, 10.0]
+
+  -- Happy paths
+  --------------
+  acceptAmuletMintOfferAndVerifySuccess context [5.0, 10.0] None 
+  acceptAmuletMintOfferAndVerifySuccess context [8.0, 10.0] (Some 3.0)
+  acceptAmuletMintOfferAndVerifySuccess context [4.0, 8.0, 10.0] (Some 3.0)
+  acceptAmuletMintOfferAndVerifySuccess context [4.0, 5.0, 10.0] None 
+  pure ()
+
+data AcceptAmuletMintOfferContext = AcceptAmuletMintOfferContext with 
+  dso : Party 
+  beneficiary : Party
+  amuletRulesCid : ContractId AmuletRules 
+  disclosures : [Disclosure]
+  amountToMint : Decimal
+  openRoundCid : ContractId OpenMiningRound 
+
+acceptAmuletMintOfferAndVerifyFailure 
+   : AcceptAmuletMintOfferContext 
+  -> ContractId AmuletMintOffer 
+  -> [Decimal]
+  -> Script ()
+acceptAmuletMintOfferAndVerifyFailure AcceptAmuletMintOfferContext{..} amuletMintOfferCid 
+  unclaimedRewardAmounts = do
+    -- Create UnclaimedRewards
+    (unclaimedRewardsToBurnCids, unclaimedRewardsDisclosures) <- 
+      unzip <$> forA unclaimedRewardAmounts (mkUnclaimedReward dso)
+    -- Accept the AmuletMintOffer
+    let amuletMintOffer_Accept = AmuletMintOffer_Accept with 
+          amuletRulesCid 
+          openRoundCid
+          unclaimedRewardsToBurnCids
+    submitWithDisclosuresMustFail beneficiary (disclosures <> unclaimedRewardsDisclosures) $ 
+      exerciseCmd amuletMintOfferCid amuletMintOffer_Accept
+
+acceptAmuletMintOfferAndVerifySuccess 
+   : AcceptAmuletMintOfferContext 
+  -> [Decimal] 
+  -> Optional Decimal 
+  -> Script ()
+acceptAmuletMintOfferAndVerifySuccess AcceptAmuletMintOfferContext{..} unclaimedRewardAmounts 
+  optExpectedLeftover = do 
+    -- Create an AmuletMintOffer
+    amuletMintOfferCid <- mkCreateAmuletMintOffer dso beneficiary amountToMint amuletRulesCid 
+    -- Create UnclaimedRewards
+    (unclaimedRewardsToBurnCids, unclaimedRewardsDisclosures) <- 
+      unzip <$> forA unclaimedRewardAmounts (mkUnclaimedReward dso)
+    -- Accept the AmuletMintOffer
+    let amuletMintOffer_Accept = AmuletMintOffer_Accept with 
+          amuletRulesCid 
+          openRoundCid
+          unclaimedRewardsToBurnCids
+    result <- submitWithDisclosures beneficiary (disclosures <> unclaimedRewardsDisclosures) $ 
+      exerciseCmd amuletMintOfferCid amuletMintOffer_Accept  
+    -- assertions
+    Some expectedRound <- queryContractId @OpenMiningRound dso openRoundCid
+    Some amulet <- queryContractId @Amulet beneficiary result.amuletSum.amulet
+    amulet.amount.initialAmount === amountToMint
+    amulet.amount.createdAt === expectedRound.round
+    result.amuletSum.round === expectedRound.round
+    whenSome (result.optUnclaimedRewardCid) $ \unclaimedRewardCid -> do
+      Some unclaimedReward <- queryContractId @UnclaimedReward dso unclaimedRewardCid
+      Some unclaimedReward.amount === optExpectedLeftover
+
+mkCreateAmuletMintOffer 
+    : Party 
+   -> Party 
+   -> Decimal 
+   -> ContractId AmuletRules 
+   -> Script (ContractId AmuletMintOffer)
+mkCreateAmuletMintOffer dso beneficiary amount amuletRulesCid = do
+  result <- submitMulti [dso] [dso] $
+    exerciseCmd amuletRulesCid AmuletRules_CreateAmuletMintOffer with
+      beneficiary 
+      amount
+      reason = "milestone achieved by " <> show beneficiary
+  pure result.amuletMintOfferCid
+
+mkUnclaimedReward : Party -> Decimal -> Script (ContractId UnclaimedReward, Disclosure)
+mkUnclaimedReward dso amount = do 
+  cid <- submit [dso] $ createCmd UnclaimedReward with dso; amount
+  disclosure <- fromSome <$> queryDisclosure dso cid
+  pure (cid, disclosure)
