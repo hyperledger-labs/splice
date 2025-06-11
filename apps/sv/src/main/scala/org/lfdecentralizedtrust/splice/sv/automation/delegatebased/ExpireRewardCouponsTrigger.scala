@@ -22,9 +22,11 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import scala.util.Random
 
 class ExpireRewardCouponsTrigger(
     override protected val context: TriggerContext,
@@ -41,25 +43,34 @@ class ExpireRewardCouponsTrigger(
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = for {
     dsoRules <- store.getDsoRules()
-    batches <- store.getExpiredRewards(dsoRules.domain, context.config.enableExpireValidatorFaucet)
+    numSvs = dsoRules.payload.svs.size()
+    batches <- store
+      .getExpiredRewards(
+        dsoRules.domain,
+        context.config.enableExpireValidatorFaucet,
+      )
+      .map(seq => Random.shuffle(seq).take(svTaskContext.expiredRewardCouponBatchSize))
   } yield batches
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
       tc: TraceContext
   ): Future[Boolean] = store.multiDomainAcsStore.hasArchived(
-    expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons ++ expiredRewardsTask.validatorLivenessActivityRecords
+    expiredRewardsTask.validatorCoupons ++ expiredRewardsTask.appCoupons ++ expiredRewardsTask.validatorLivenessActivityRecords ++ expiredRewardsTask.svRewardCoupons
   )
 
   override def completeTaskAsDsoDelegate(
-      expiredRewardsTask: ExpiredRewardCouponsBatch
+      expiredRewardsTask: ExpiredRewardCouponsBatch,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      controllerArgument <- getSvControllerArgument(controller)
       numCoupons <- expireRewardCouponsForRound(
         expiredRewardsTask,
         dsoRules,
         amuletRules,
+        controllerArgument,
       )
     } yield TaskSuccess(
       show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
@@ -70,6 +81,7 @@ class ExpireRewardCouponsTrigger(
       expiredRewardsTask: ExpiredRewardCouponsBatch,
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
+      controller: Optional[String],
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
@@ -85,6 +97,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
+          controller,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorCoupons.nonEmpty)
@@ -100,6 +113,7 @@ class ExpireRewardCouponsTrigger(
             Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
             None.toJava,
           ),
+          controller,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorFaucets.nonEmpty)
@@ -115,6 +129,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             Some(expiredRewardsTask.validatorLivenessActivityRecords.asJava).toJava,
           ),
+          controller,
         )
       )
     ).filter(_ => expiredRewardsTask.validatorLivenessActivityRecords.nonEmpty)
@@ -130,6 +145,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
+          controller,
         )
       )
     ).filter(_ => expiredRewardsTask.appCoupons.nonEmpty)
@@ -145,6 +161,7 @@ class ExpireRewardCouponsTrigger(
             None.toJava,
             None.toJava,
           ),
+          controller,
         )
       )
     ).filter(_ => expiredRewardsTask.svRewardCoupons.nonEmpty)

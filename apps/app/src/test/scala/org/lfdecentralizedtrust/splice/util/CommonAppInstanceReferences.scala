@@ -32,6 +32,9 @@ trait CommonAppInstanceReferences {
 
   def dsoParty(implicit env: SpliceTestConsoleEnvironment): PartyId = sv1ScanBackend.getDsoPartyId()
 
+  def activeSvs(implicit env: SpliceTestConsoleEnvironment): Seq[SvAppBackendReference] =
+    env.svs.local
+
   def sv1Backend(implicit env: SpliceTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 
   def sv1LocalBackend(implicit env: SpliceTestConsoleEnvironment): SvAppBackendReference = svb(

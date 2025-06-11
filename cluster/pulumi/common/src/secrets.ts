@@ -8,7 +8,6 @@ import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
 
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';
-import { config } from './config';
 import { CnInput } from './helm';
 import { btoa, ExactNamespace } from './utils';
 
@@ -84,7 +83,8 @@ export function imagePullSecretByNamespaceNameForServiceAccount(
   serviceAccountName: string,
   dependsOn: pulumi.Resource[] = []
 ): pulumi.Resource[] {
-  const kubecfg = config.optionalEnv('KUBECONFIG');
+  // eslint-disable-next-line no-process-env
+  const kubecfg = process.env['KUBECONFIG'];
   // k8sProvider saves the absolute path to kubeconfig if it's defined in KUBECONFIG env var, which makes
   // it not portable between machines, so we temporarily remove this env var to avoid that.
   // eslint-disable-next-line no-process-env

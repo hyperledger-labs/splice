@@ -723,6 +723,7 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "delegatelessAutomation": false,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -735,6 +736,7 @@
           "sequencerPublicUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com"
         },
         "enablePostgresMetrics": true,
+        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -757,6 +759,7 @@
             }
           }
         ],
+        "expiredRewardCouponBatchSize": 100,
         "failOnAppVersionMismatch": true,
         "identitiesExport": {
           "bucket": {

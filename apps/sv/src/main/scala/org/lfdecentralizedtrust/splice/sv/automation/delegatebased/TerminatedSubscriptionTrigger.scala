@@ -41,13 +41,16 @@ class TerminatedSubscriptionTrigger(
       task: AssignedContract[
         subsCodegen.TerminatedSubscription.ContractId,
         subsCodegen.TerminatedSubscription,
-      ]
+      ],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       ansEntryContextO <- svTaskContext.dsoStore.lookupAnsEntryContext(
         task.contract.payload.reference
       )
       dsoRules <- svTaskContext.dsoStore.getDsoRules()
+      controllerArgument <- getSvControllerArgument(controller)
+
       _ <- ansEntryContextO match {
         case None =>
           throw Status.NOT_FOUND
@@ -65,6 +68,7 @@ class TerminatedSubscriptionTrigger(
                   _.exerciseDsoRules_TerminateSubscription(
                     ansEntryContext.contractId,
                     task.contractId,
+                    controllerArgument,
                   )
                 ),
               )
@@ -76,4 +80,5 @@ class TerminatedSubscriptionTrigger(
       "Archived AnsEntryContext because corresponding subscription got terminated"
     )
   }
+
 }

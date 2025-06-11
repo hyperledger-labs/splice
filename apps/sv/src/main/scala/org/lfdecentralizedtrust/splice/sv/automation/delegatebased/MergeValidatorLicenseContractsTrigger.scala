@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Codec, Contract}
 import com.digitalasset.canton.tracing.TraceContext
@@ -26,7 +25,6 @@ import scala.jdk.CollectionConverters.*
 class MergeValidatorLicenseContractsTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -42,11 +40,12 @@ class MergeValidatorLicenseContractsTrigger(
   private val MAX_VALIDATOR_LICENSE_CONTRACTS = PageLimit.tryCreate(10)
 
   override def completeTaskAsDsoDelegate(
-      validatorLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense]
+      validatorLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
-      pruneAmuletConfigScheduleFeatureSupport <- packageVersionSupport
+      pruneAmuletConfigScheduleFeatureSupport <- svTaskContext.packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
           Seq(
             store.key.svParty,
@@ -72,6 +71,7 @@ class MergeValidatorLicenseContractsTrigger(
           mergeValidatorLicenseContracts(
             validator,
             validatorLicenses,
+            controller,
             pruneAmuletConfigScheduleFeatureSupport.packageIds,
           )
         } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
@@ -91,12 +91,15 @@ class MergeValidatorLicenseContractsTrigger(
   private def mergeValidatorLicenseContracts(
       validator: String,
       validatorLicenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]],
+      controller: String,
       preferredPackages: Seq[String],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      controllerArgument <- getSvControllerArgument(controller)
       arg = new DsoRules_MergeValidatorLicense(
-        validatorLicenses.map(_.contractId).asJava
+        validatorLicenses.map(_.contractId).asJava,
+        controllerArgument,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorLicense(arg))
       _ <- svTaskContext.connection

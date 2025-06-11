@@ -1,0 +1,77 @@
+{
+    "$schema": "https://lnav.org/schemas/format-v1.schema.json",
+    "cometbft_json": {
+        "title": "CometBFT JSON Log",
+        "url": "https://github.com/DACH-NY/canton-drivers/tree/main/drivers/cometbft/canton-network/abci",
+        "description": "CometBFT log files",
+        "json": true,
+        "hide-extra": false,
+        "file-pattern": ".*cometbft.*\\.log.*",
+        "line-format": [
+          { "field" : "ts" }, " [", { "field": "level", "text-transform": "uppercase" }, "] - ",
+          { "field": "module" }, " (", {"field": "height", "default-value" : ""}, ") - ",
+          { "field" : "_msg" }
+        ],
+        "timestamp-field" : "ts",
+        "body-field" : "_msg",
+        "level-field" : "level",
+        "level" : {
+            "trace" : "trace",
+            "debug" : "debug",
+            "info" : "info",
+            "error" : "error",
+            "warning" : "warn"
+        },
+        "opid-field" : "height",
+        "value" : {
+            "msg" : {
+                "kind" : "string",
+                "identifier" : false
+            },
+            "module" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "impl" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "hash" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "block_hash" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "commit_round" : {
+                "kind" : "integer",
+                "identifier" : true
+            },
+            "round" : {
+                "kind" : "integer",
+                "identifier" : true
+            },
+            "height" : {
+                "kind" : "integer",
+                "identifier" : true
+            },
+            "current" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "addr" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "validator" : {
+                "kind" : "string",
+                "identifier" : true
+            },
+            "pubkey" : {
+                "kind" : "string",
+                "identifier" : true
+            }
+        }
+    }
+}

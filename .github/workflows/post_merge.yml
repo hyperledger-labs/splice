@@ -20,3 +20,22 @@ jobs:
   ci:
     uses: ./.github/workflows/build.yml
     secrets: inherit
+
+  publish_docs:
+    if: github.ref == 'refs/heads/main'
+    needs: ci
+    runs-on: self-hosted-docker-tiny
+
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@854d7aa1b99e4509c4d1b53d69b7ba4eaf39215a

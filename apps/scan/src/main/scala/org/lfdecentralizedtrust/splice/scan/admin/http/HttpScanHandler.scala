@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
-import cats.data.OptionT
+import cats.data.{NonEmptyVector, OptionT}
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
 import cats.syntax.traverseFilter.*
@@ -33,10 +33,13 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   AcsRequest,
   BatchListVotesByVoteRequestsRequest,
+  DamlValueEncoding,
   HoldingsStateRequest,
   HoldingsSummaryRequest,
   ListVoteResultsRequest,
   MaybeCachedContractWithState,
+  UpdateHistoryItemV2,
+  UpdateHistoryRequestV2,
 }
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
@@ -86,6 +89,8 @@ import com.digitalasset.canton.util.ErrorUtil
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
+
+import scala.collection.immutable.SortedMap
 
 class HttpScanHandler(
     svParty: PartyId,
@@ -713,97 +718,140 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Vector[definitions.UpdateHistoryItem]] = {
     implicit val tc: TraceContext = extracted
-    withSpan(s"$workflowId.getUpdateHistory") { _ => _ =>
-      val updateHistory = store.updateHistory
-      val afterO = after.map { after =>
-        val afterRecordTime = parseTimestamp(after.afterRecordTime)
-        (
-          after.afterMigrationId,
-          afterRecordTime,
-        )
-      }
-      updateHistory
-        .getBackfillingState()
-        .flatMap {
-          case BackfillingState.NotInitialized =>
-            throw Status.UNAVAILABLE
-              .withDescription(
-                "This scan instance has not yet loaded its updates history. Wait a short time and retry."
-              )
-              .asRuntimeException()
-          case BackfillingState.InProgress(_, _) =>
-            throw Status.UNAVAILABLE
-              .withDescription(
-                "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
-                  "Wait until replication is complete, or connect to a different scan instance."
-              )
-              .asRuntimeException()
-          case BackfillingState.Complete =>
-            for {
-              txs <-
-                if (includeImportUpdates)
-                  updateHistory.getAllUpdates(
-                    afterO,
-                    PageLimit.tryCreate(pageSize),
-                  )
-                else
-                  updateHistory.getUpdatesWithoutImportUpdates(
-                    afterO,
-                    PageLimit.tryCreate(pageSize),
-                  )
-            } yield txs
-              .map(
-                ScanHttpEncodings.encodeUpdate(
-                  _,
-                  encoding = encoding,
-                  version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-                )
-              )
-              .toVector
-        }
+    val updateHistory = store.updateHistory
+    val afterO = after.map { after =>
+      val afterRecordTime = parseTimestamp(after.afterRecordTime)
+      (
+        after.afterMigrationId,
+        afterRecordTime,
+      )
     }
+    updateHistory
+      .getBackfillingState()
+      .flatMap {
+        case BackfillingState.NotInitialized =>
+          throw Status.UNAVAILABLE
+            .withDescription(
+              "This scan instance has not yet loaded its updates history. Wait a short time and retry."
+            )
+            .asRuntimeException()
+        case BackfillingState.InProgress(_, _) =>
+          throw Status.UNAVAILABLE
+            .withDescription(
+              "This scan instance has not yet replicated all data. This process can take an extended period of time to complete. " +
+                "Wait until replication is complete, or connect to a different scan instance."
+            )
+            .asRuntimeException()
+        case BackfillingState.Complete =>
+          for {
+            txs <-
+              if (includeImportUpdates)
+                updateHistory.getAllUpdates(
+                  afterO,
+                  PageLimit.tryCreate(pageSize),
+                )
+              else
+                updateHistory.getUpdatesWithoutImportUpdates(
+                  afterO,
+                  PageLimit.tryCreate(pageSize),
+                )
+          } yield txs
+            .map(
+              ScanHttpEncodings.encodeUpdate(
+                _,
+                encoding = encoding,
+                version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
+              )
+            )
+            .toVector
+      }
   }
 
   override def getUpdateHistory(respond: v0.ScanResource.GetUpdateHistoryResponse.type)(
       request: definitions.UpdateHistoryRequest
   )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryResponse] = {
-    val encoding =
-      if (request.lossless.contains(true)) {
-        definitions.DamlValueEncoding.ProtobufJson
-      } else {
-        definitions.DamlValueEncoding.CompactJson
-      }
-    getUpdateHistory(
-      after = request.after,
-      pageSize = request.pageSize,
-      encoding = encoding,
-      consistentResponses = false,
-      // Originally this endpoint included import updates. This is changed in the V1 endpoint.
-      // Almost all clients will want to filter them out to prevent duplicate contracts
-      // (once from the actual create event and once from the import update).
-      // Also, all import updates have a record time of 0 and thus don't work with pagination by record time.
-      // In this v0 version, we keep `includeImportUpdates = true` to maintain backward compatibility.
-      includeImportUpdates = true,
-      extracted,
-    ).map(
-      definitions.UpdateHistoryResponse(_)
-    )
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getUpdateHistoryV0") { _ => _ =>
+      val encoding =
+        if (request.lossless.contains(true)) {
+          definitions.DamlValueEncoding.ProtobufJson
+        } else {
+          definitions.DamlValueEncoding.CompactJson
+        }
+      getUpdateHistory(
+        after = request.after,
+        pageSize = request.pageSize,
+        encoding = encoding,
+        consistentResponses = false,
+        // Originally this endpoint included import updates. This is changed in the V1 endpoint.
+        // Almost all clients will want to filter them out to prevent duplicate contracts
+        // (once from the actual create event and once from the import update).
+        // Also, all import updates have a record time of 0 and thus don't work with pagination by record time.
+        // In this v0 version, we keep `includeImportUpdates = true` to maintain backward compatibility.
+        includeImportUpdates = true,
+        extracted,
+      ).map(
+        definitions.UpdateHistoryResponse(_)
+      )
+    }
   }
 
   override def getUpdateHistoryV1(respond: v0.ScanResource.GetUpdateHistoryV1Response.type)(
       request: definitions.UpdateHistoryRequestV1
-  )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryV1Response] =
-    getUpdateHistory(
-      after = request.after,
-      pageSize = request.pageSize,
-      encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
-      consistentResponses = true,
-      includeImportUpdates = false,
-      extracted,
-    )
-      .map(
-        definitions.UpdateHistoryResponse(_)
+  )(extracted: TraceContext): Future[v0.ScanResource.GetUpdateHistoryV1Response] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getUpdateHistoryV1") { _ => _ =>
+      getUpdateHistory(
+        after = request.after,
+        pageSize = request.pageSize,
+        encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+        consistentResponses = true,
+        includeImportUpdates = false,
+        extracted,
       )
+        .map(
+          definitions.UpdateHistoryResponse(_)
+        )
+    }
+  }
+
+  override def getUpdateHistoryV2(respond: ScanResource.GetUpdateHistoryV2Response.type)(
+      request: UpdateHistoryRequestV2
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateHistoryV2Response] = {
+    implicit val tc: TraceContext = extracted
+    withSpan(s"$workflowId.getUpdateHistoryV2") { _ => _ =>
+      getUpdateHistory(
+        after = request.after,
+        pageSize = request.pageSize,
+        encoding = request.damlValueEncoding.getOrElse(definitions.DamlValueEncoding.CompactJson),
+        consistentResponses = true,
+        includeImportUpdates = false,
+        extracted,
+      )
+        .map(items => definitions.UpdateHistoryResponseV2(items.map(toUpdateV2)))
+    }
+  }
+
+  private def toUpdateV2(update: definitions.UpdateHistoryItem): definitions.UpdateHistoryItemV2 =
+    update match {
+      case definitions.UpdateHistoryItem.members.UpdateHistoryReassignment(r) =>
+        UpdateHistoryItemV2(
+          definitions.UpdateHistoryItemV2.members.UpdateHistoryReassignment(r)
+        )
+      case definitions.UpdateHistoryItem.members.UpdateHistoryTransaction(t) =>
+        UpdateHistoryItemV2(
+          definitions.UpdateHistoryTransactionV2(
+            updateId = t.updateId,
+            migrationId = t.migrationId,
+            workflowId = t.workflowId,
+            recordTime = t.recordTime,
+            synchronizerId = t.synchronizerId,
+            effectiveAt = t.effectiveAt,
+            rootEventIds = t.rootEventIds,
+            eventsById = SortedMap.from(t.eventsById),
+          )
+        )
+    }
 
   override def listActivity(
       respond: v0.ScanResource.ListActivityResponse.type
@@ -1313,7 +1361,7 @@ class HttpScanHandler(
               CantonTimestamp.assertFromInstant(recordTime.toInstant),
               after,
               PageLimit.tryCreate(pageSize),
-              ownerPartyIds.map(PartyId.tryFromProtoPrimitive),
+              nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
             )
             .map { result =>
               ScanResource.GetHoldingsStateAtResponseOK(
@@ -1362,7 +1410,7 @@ class HttpScanHandler(
               .getHoldingsSummary(
                 migrationId,
                 CantonTimestamp.assertFromInstant(recordTime.toInstant),
-                partyIds.map(PartyId.tryFromProtoPrimitive),
+                nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
                 round,
               )
           } yield ScanResource.GetHoldingsSummaryAtResponse.OK(
@@ -1388,6 +1436,18 @@ class HttpScanHandler(
           )
       }
     }
+  }
+
+  private def nonEmptyOrFail[A](fieldName: String, vec: Vector[A]): NonEmptyVector[A] = {
+    NonEmptyVector
+      .fromVector(vec)
+      .getOrElse(
+        throw io.grpc.Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Expected '$fieldName' to contain at least one item, but contained none."
+          )
+          .asRuntimeException()
+      )
   }
 
   override def getAggregatedRounds(respond: ScanResource.GetAggregatedRoundsResponse.type)()(
@@ -1418,24 +1478,22 @@ class HttpScanHandler(
       extracted: TraceContext,
   ): Future[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getUpdateById") { _ => _ =>
-      for {
-        tx <- store.updateHistory.getUpdate(updateId)
-      } yield {
-        tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
-          Left(
-            definitions.ErrorResponse(s"Transaction with id $updateId not found")
-          )
-        )(txWithMigration =>
-          Right(
-            ScanHttpEncodings.encodeUpdate(
-              txWithMigration,
-              encoding = encoding,
-              version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
-            )
+    for {
+      tx <- store.updateHistory.getUpdate(updateId)
+    } yield {
+      tx.fold[Either[definitions.ErrorResponse, definitions.UpdateHistoryItem]](
+        Left(
+          definitions.ErrorResponse(s"Transaction with id $updateId not found")
+        )
+      )(txWithMigration =>
+        Right(
+          ScanHttpEncodings.encodeUpdate(
+            txWithMigration,
+            encoding = encoding,
+            version = if (consistentResponses) ScanHttpEncodings.V1 else ScanHttpEncodings.V0,
           )
         )
-      }
+      )
     }
   }
 
@@ -1444,18 +1502,27 @@ class HttpScanHandler(
   )(updateId: String, lossless: Option[Boolean])(
       extracted: TraceContext
   ): Future[ScanResource.GetUpdateByIdResponse] = {
-    val encoding = if (lossless.getOrElse(false)) {
-      definitions.DamlValueEncoding.ProtobufJson
-    } else {
-      definitions.DamlValueEncoding.CompactJson
-    }
-    getUpdateById(updateId = updateId, encoding = encoding, consistentResponses = false, extracted)
-      .map {
-        case Left(error) =>
-          ScanResource.GetUpdateByIdResponse.NotFound(error)
-        case Right(update) =>
-          ScanResource.GetUpdateByIdResponse.OK(update)
+    implicit val tc = extracted
+    // in openAPI the operationID for /v0/updates/{update_id} is `getUpdateById`, logging as `getUpdateByIdV0` for clarity
+    withSpan(s"$workflowId.getUpdateByIdV0") { _ => _ =>
+      val encoding = if (lossless.getOrElse(false)) {
+        definitions.DamlValueEncoding.ProtobufJson
+      } else {
+        definitions.DamlValueEncoding.CompactJson
       }
+      getUpdateById(
+        updateId = updateId,
+        encoding = encoding,
+        consistentResponses = false,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByIdResponse.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByIdResponse.OK(update)
+        }
+    }
   }
 
   override def getUpdateByIdV1(
@@ -1463,18 +1530,42 @@ class HttpScanHandler(
   )(updateId: String, damlValueEncoding: Option[definitions.DamlValueEncoding])(
       extracted: TraceContext
   ): Future[ScanResource.GetUpdateByIdV1Response] = {
-    getUpdateById(
-      updateId = updateId,
-      encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
-      consistentResponses = true,
-      extracted,
-    )
-      .map {
-        case Left(error) =>
-          ScanResource.GetUpdateByIdV1Response.NotFound(error)
-        case Right(update) =>
-          ScanResource.GetUpdateByIdV1Response.OK(update)
-      }
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByIdV1") { _ => _ =>
+      getUpdateById(
+        updateId = updateId,
+        encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+        consistentResponses = true,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByIdV1Response.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByIdV1Response.OK(update)
+        }
+    }
+  }
+
+  override def getUpdateByIdV2(respond: ScanResource.GetUpdateByIdV2Response.type)(
+      updateId: String,
+      damlValueEncoding: Option[DamlValueEncoding],
+  )(extracted: TraceContext): Future[ScanResource.GetUpdateByIdV2Response] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getUpdateByIdV2") { _ => _ =>
+      getUpdateById(
+        updateId = updateId,
+        encoding = damlValueEncoding.getOrElse(definitions.DamlValueEncoding.members.CompactJson),
+        consistentResponses = true,
+        extracted,
+      )
+        .map {
+          case Left(error) =>
+            ScanResource.GetUpdateByIdV2Response.NotFound(error)
+          case Right(update) =>
+            ScanResource.GetUpdateByIdV2Response.OK(toUpdateV2(update))
+        }
+    }
   }
 
   private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(

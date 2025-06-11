@@ -17,7 +17,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import ExpireStaleConfirmationsTrigger.*
 
 class ExpireStaleConfirmationsTrigger(
@@ -40,13 +39,16 @@ class ExpireStaleConfirmationsTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
+      controllerArgument <- getSvControllerArgument(controller)
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireStaleConfirmation(
-          task.work.contractId
+          task.work.contractId,
+          controllerArgument,
         )
       )
       _ <- svTaskContext.connection

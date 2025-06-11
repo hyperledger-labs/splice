@@ -58,14 +58,17 @@ class MergeUnclaimedRewardsTrigger(
   )
 
   override def completeTaskAsDsoDelegate(
-      unclaimedRewardsTask: MergeUnclaimedRewardsTask
+      unclaimedRewardsTask: MergeUnclaimedRewardsTask,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
+      controllerArgument <- getSvControllerArgument(controller)
       arg = new DsoRules_MergeUnclaimedRewards(
         amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
+        controllerArgument,
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeUnclaimedRewards(arg))
       res <- for {

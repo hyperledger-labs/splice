@@ -19,9 +19,16 @@ import com.daml.ledger.api.v2.admin.party_management_service.{
 }
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.InteractiveSubmissionServiceGrpc
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
+import com.daml.ledger.api.v2.offset_checkpoint.OffsetCheckpoint.toJavaProto
 import com.daml.ledger.api.v2.package_reference.PackageReference
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
-import com.daml.ledger.javaapi.data.{Command, CreateUserResponse, ListUserRightsResponse, User}
+import com.daml.ledger.javaapi.data.{
+  Command,
+  CreateUserResponse,
+  ListUserRightsResponse,
+  OffsetCheckpoint,
+  User,
+}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.User.Right
 import org.lfdecentralizedtrust.splice.auth.AuthToken
@@ -841,7 +848,14 @@ object LedgerClient {
             )
           )
 
-        case TU.OffsetCheckpoint(_) => None
+        case TU.OffsetCheckpoint(offset) =>
+          Some(
+            GetTreeUpdatesResponse(
+              TreeUpdateOrOffsetCheckpoint.Checkpoint(
+                OffsetCheckpoint.fromProto(toJavaProto(offset))
+              )
+            )
+          )
 
         case TU.TopologyTransaction(_) => None
 

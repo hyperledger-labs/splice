@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances}
@@ -25,7 +24,6 @@ import scala.jdk.CollectionConverters.*
 class PruneAmuletConfigScheduleTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -39,7 +37,7 @@ class PruneAmuletConfigScheduleTrigger(
       tc: TraceContext
   ): Future[Seq[PruneAmuletConfigScheduleTrigger.Task]] = for {
     amuletRules <- store.getAssignedAmuletRules()
-    pruneAmuletConfigScheduleFeatureSupport <- packageVersionSupport
+    pruneAmuletConfigScheduleFeatureSupport <- svTaskContext.packageVersionSupport
       .supportsPruneAmuletConfigSchedule(
         Seq(
           store.key.svParty,
@@ -63,13 +61,18 @@ class PruneAmuletConfigScheduleTrigger(
         ScheduledTaskTrigger.ReadyTask[
           PruneAmuletConfigScheduleTrigger.Task
         ],
-      )
+      ),
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val (amuletRules, preferredPackageIds) = rulesWithPreferredPackages.work
     for {
       dsoRules <- store.getDsoRules()
+      controllerArgument <- getSvControllerArgument(controller)
       cmd = dsoRules.exercise(
-        _.exerciseDsoRules_PruneAmuletConfigSchedule(amuletRules.contractId)
+        _.exerciseDsoRules_PruneAmuletConfigSchedule(
+          amuletRules.contractId,
+          controllerArgument,
+        )
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)

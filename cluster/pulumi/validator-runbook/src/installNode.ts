@@ -38,10 +38,10 @@ import {
   ValidatorTopupConfig,
   InstalledHelmChart,
   ansDomainPrefix,
+  failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
-import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import {
   VALIDATOR_MIGRATE_PARTY,
@@ -246,7 +246,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     },
     participantAddress,
     participantIdentitiesDumpPeriodicBackup: backupConfig,
-    failOnAppVersionMismatch: failOnAppVersionMismatch(),
+    failOnAppVersionMismatch: failOnAppVersionMismatch,
     validatorPartyHint: VALIDATOR_PARTY_HINT || 'digitalasset-testValidator-1',
     migrateValidatorParty: VALIDATOR_MIGRATE_PARTY,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret

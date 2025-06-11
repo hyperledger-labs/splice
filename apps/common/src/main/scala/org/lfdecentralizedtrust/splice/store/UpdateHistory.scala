@@ -320,12 +320,25 @@ class UpdateHistory(
               )
             case Some(lastIngestedOffset) =>
               if (offset <= lastIngestedOffset) {
-                logger.warn(
-                  s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                    "This is expected if the SQL query was automatically retried after a transient database error. " +
-                    "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                    "ingesting into the same logical database."
-                )
+                updateOrCheckpoint match {
+                  case _: TreeUpdateOrOffsetCheckpoint.Update =>
+                    logger.warn(
+                      s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                        "This is expected if the SQL query was automatically retried after a transient database error. " +
+                        "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                        "ingesting into the same logical database."
+                    )
+                  case _: TreeUpdateOrOffsetCheckpoint.Checkpoint =>
+                    // we can receive an offset equal to the last ingested and that can be safely ignore
+                    if (offset < lastIngestedOffset) {
+                      logger.warn(
+                        s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                          "This is expected if the SQL query was automatically retried after a transient database error. " +
+                          "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                          "ingesting into the same logical database."
+                      )
+                    }
+                }
                 DBIO.successful(())
               } else {
                 logger.debug(
@@ -1693,14 +1706,11 @@ class UpdateHistory(
           -- Note: to make update ids consistent across SVs, we use the contract id as the update id.
           max(c.contract_id)
         from
-          update_history_transactions tx,
           update_history_creates c
         where
-          tx.history_id = $historyId and
-
-          tx.migration_id = $migrationId and
-          tx.record_time = ${CantonTimestamp.MinValue} and
-          tx.row_id = c.update_row_id
+          history_id = $historyId and
+          migration_id = $migrationId and
+          record_time = ${CantonTimestamp.MinValue}
       """.as[Option[String]].head,
       s"getLastImportUpdateId",
     )

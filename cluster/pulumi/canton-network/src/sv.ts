@@ -20,6 +20,7 @@ import {
   DEFAULT_AUDIENCE,
   ExactNamespace,
   exactNamespace,
+  failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
   imagePullSecret,
   initialPackageConfigJson,
@@ -55,8 +56,12 @@ import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { initialAmuletPrice } from 'splice-pulumi-common/src/initialAmuletPrice';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
-import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
+import {
+  delegatelessAutomation,
+  expectedTaskDuration,
+  expiredRewardCouponBatchSize,
+} from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
 
@@ -454,7 +459,7 @@ function installSvApp(
       enable: true,
     },
     additionalJvmOptions: jmxOptions(),
-    failOnAppVersionMismatch: failOnAppVersionMismatch(),
+    failOnAppVersionMismatch: failOnAppVersionMismatch,
     participantAddress: participant.internalClusterAddress,
     onboardingPollingInterval: config.onboardingPollingInterval,
     enablePostgresMetrics: true,
@@ -464,6 +469,9 @@ function installSvApp(
     },
     contactPoint: daContactPoint,
     nodeIdentifier: config.onboardingName,
+    delegatelessAutomation: delegatelessAutomation,
+    expectedTaskDuration: expectedTaskDuration,
+    expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -514,7 +522,7 @@ function installScan(
     isFirstSv: isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
-    failOnAppVersionMismatch: failOnAppVersionMismatch(),
+    failOnAppVersionMismatch: failOnAppVersionMismatch,
     sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
     participantAddress: participant.internalClusterAddress,
     migration: {

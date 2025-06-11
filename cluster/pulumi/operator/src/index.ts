@@ -4,7 +4,7 @@ import { CLUSTER_BASENAME } from 'splice-pulumi-common';
 import { gitRepoForRef } from 'splice-pulumi-common/src/operator/flux-source';
 import { createEnvRefs } from 'splice-pulumi-common/src/operator/stack';
 
-import { operatorDeploymentConfig } from './config';
+import { operatorDeploymentConfig } from '../../common/src/operator/config';
 import { flux } from './flux';
 import { namespace } from './namespace';
 import { installDeploymentStack } from './stacks/deployment';

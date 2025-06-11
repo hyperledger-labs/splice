@@ -170,12 +170,14 @@ generateUnclaimedReward app provider1 = do
 dsoDelegateSubmits : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script a
 dsoDelegateSubmits app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  submitMulti [dsoRules.dsoDelegate] [app.dso] $ mkCommands dsoRulesCid
+  let sv = head (Map.keys dsoRules.svs)
+  submitMulti [sv] [app.dso] $ mkCommands dsoRulesCid
 
 dsoDelegateSubmitsMustFail : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script ()
 dsoDelegateSubmitsMustFail app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  submitMultiMustFail [dsoRules.dsoDelegate] [app.dso] $ mkCommands dsoRulesCid
+  let sv = head (Map.keys dsoRules.svs)
+  submitMultiMustFail [sv] [app.dso] $ mkCommands dsoRulesCid
 
 svSubmits : AmuletApp -> Party -> (ContractId DsoRules -> Commands a) -> Script a
 svSubmits app sv mkCommands = do
@@ -196,6 +198,7 @@ runNextIssuanceD app amuletPrice = do
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.dso
     [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+    [(_, dsoRules)] <- query @DsoRules app.dso
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
 
       -- collect all unclaimed rewards into the unclaimed rewards fund
@@ -214,6 +217,7 @@ runNextIssuanceD app amuletPrice = do
             svRewardCouponCids = map fst svRewards
             optValidatorFaucetCouponCids = Some (map fst validatorFaucetCoupons)
             optValidatorLivenessActivityRecordCids = Some (map fst validatorLivenessActivityRecords)
+          sv = Some (head (Map.keys dsoRules.svs))
 
       -- the closed round
       confirmAWC_MiningRound_Archive app
@@ -240,6 +244,7 @@ runNextIssuanceD app amuletPrice = do
           middleRoundCid = r2Cid
           latestRoundCid = r3Cid
           amuletPriceVoteCids
+          sv = Some (head (Map.keys dsoRules.svs))
     let summarizingRoundCid = advanceResult.summarizingRound
 
     -- compute total burn
@@ -299,6 +304,7 @@ executeAllConfirmedActions app = do
       action = (head cs)._2.action
       amuletRulesCid = Some amuletRulesCid
       confirmationCids = map fst cs
+      sv = Some s.dsoDelegate
 
 executeAllDefinitiveVotes : AmuletApp -> Script ()
 executeAllDefinitiveVotes app = do
@@ -316,6 +322,7 @@ executeAllDefinitiveVotes app = do
       void $ submitMulti [s.dsoDelegate] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
         requestCid
         amuletRulesCid = Some amuletRulesCid
+        sv = Some s.dsoDelegate
 
 initiateAndAcceptVote : AmuletApp -> [Party] -> ActionRequiringConfirmation -> Script ()
 initiateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"

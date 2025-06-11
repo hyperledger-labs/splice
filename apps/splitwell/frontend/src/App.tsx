@@ -4,6 +4,7 @@ import {
   AuthProvider,
   UserProvider,
   theme,
+  isDomainConnectionError,
   PackageIdResolver,
   JsonApiError,
 } from '@lfdecentralizedtrust/splice-common-frontend';
@@ -60,11 +61,9 @@ const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
           // We only retry certain JSON API errors. Retrying everything is more confusing than helpful
           // because that then also retries on invalid user input.
           const errResponse = error as JsonApiError;
-          const keywords = ['NOT_CONNECTED_TO_ANY_DOMAIN', 'NOT_CONNECTED_TO_DOMAIN'];
-          const isDomainConnectionError = keywords.some(k => errResponse.body?.error?.includes(k));
           const is404or409 = [404, 409].includes(errResponse.status);
 
-          return (is404or409 || isDomainConnectionError) && failureCount < 10;
+          return (is404or409 || isDomainConnectionError(error)) && failureCount < 10;
         },
         // Exponential backoff up to a maximum of 30 seconds
         retryDelay: attemptIndex => Math.min(1000 * 1.5 ** attemptIndex, 30000),

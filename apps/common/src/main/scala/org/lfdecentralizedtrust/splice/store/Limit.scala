@@ -89,6 +89,28 @@ trait LimitHelpers { _: NamedLogging =>
     }
   }
 
+  protected final def applyLimitOrFail[CC[_], C](
+      name: String,
+      limit: Limit,
+      result: C & scala.collection.IterableOps[?, CC, C],
+  ): C = {
+    limit match {
+      case PageLimit(limit) =>
+        result.take(limit.intValue())
+      case HardLimit(limit) =>
+        val resultSize = result.size
+        if (resultSize > limit) {
+          throw io.grpc.Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Size of the result exceeded the limit in $name. Result size: ${resultSize.toLong}. Limit: ${limit.toLong}"
+            )
+            .asRuntimeException()
+        } else {
+          result
+        }
+    }
+  }
+
   protected def sqlLimit(limit: Limit): Int = {
     limit match {
       case HardLimit(limit) => limit + 1

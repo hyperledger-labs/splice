@@ -28,3 +28,7 @@ export const publicPrometheusRemoteWrite = spliceEnvConfig.envFlag(
   'PUBLIC_PROMETHEUS_REMOTE_WRITE',
   false
 );
+export const failOnAppVersionMismatch: boolean = spliceEnvConfig.envFlag(
+  'FAIL_ON_APP_VERSION_MISMATCH',
+  true
+);

@@ -20,7 +20,6 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
-
 import FeaturedAppActivityMarkerTrigger.Task
 
 class FeaturedAppActivityMarkerTrigger(
@@ -53,12 +52,14 @@ class FeaturedAppActivityMarkerTrigger(
     }
 
   override def completeTaskAsDsoDelegate(
-      task: Task
+      task: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       openMiningRound <- store.getLatestUsableOpenMiningRound(context.clock.now)
+      controllerArgument <- getSvControllerArgument(controller)
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
       update = dsoRules.exercise(
@@ -68,6 +69,7 @@ class FeaturedAppActivityMarkerTrigger(
             task.markers.map(_.contractId).asJava,
             openMiningRound.contractId,
           ),
+          controllerArgument,
         )
       )
       _ <- svTaskContext.connection

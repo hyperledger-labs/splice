@@ -11,7 +11,6 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
-
 import ExpiredLockedAmuletTrigger.*
 
 class ExpiredLockedAmuletTrigger(
@@ -33,16 +32,19 @@ class ExpiredLockedAmuletTrigger(
   private val store = svTaskContext.dsoStore
 
   override protected def completeTaskAsDsoDelegate(
-      co: Task
+      co: Task,
+      controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     dsoRules <- store.getDsoRules()
+    controllerArgument <- getSvControllerArgument(controller)
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
         co.work.contractId,
         new splice.amulet.LockedAmulet_ExpireAmulet(
           latestOpenMiningRound.contractId
         ),
+        controllerArgument,
       )
     )
     _ <- svTaskContext.connection

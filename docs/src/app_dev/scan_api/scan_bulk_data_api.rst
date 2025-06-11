@@ -63,9 +63,9 @@ The below table provides a quick overview of the endpoints that the Scan Bulk Da
 
    * - Endpoint
      - Description
-   * - `POST /v1/updates <scan_openapi.html#post--v1-updates>`_
+   * - `POST /v2/updates <scan_openapi.html#post--v2-updates>`_
      - Returns the update history
-   * - `GET /v0/updates/\{update_id\} <scan_openapi.html#get--v0-updates-update_id>`_
+   * - `GET /v2/updates/\{update_id\} <scan_openapi.html#get--v2-updates-update_id>`_
      - Returns the update with the given update_id
    * - `GET /v0/state/acs/snapshot-timestamp <scan_openapi.html#get--v0-state-acs-snapshot-timestamp>`_
      - Returns the timestamp of the most recent snapshot
@@ -77,7 +77,7 @@ If you would rather read the yaml Open API specification file directly, this can
 
 Example URLs for accessing the Scan Bulk Data API are:
 
-- |gsf_scan_url|/api/scan/v1/updates
+- |gsf_scan_url|/api/scan/v2/updates
 - |gsf_scan_url|/api/scan/v0/state/acs/snapshot-timestamp
 
 Please note the `api/scan` prefix in the URLs, which is the base path for the Scan API.
@@ -93,17 +93,17 @@ An update can be one of two things:
   They will begin to appear in the update stream as the global synchronizer introduces rolling upgrades later in 2025 or early 2026;
   for this reason we'll omit further details for now, you can safely ignore reassignments and only handle transactions.
 
-`/v1/updates <scan_openapi.html#post--v1-updates>`_
+`/v2/updates <scan_openapi.html#post--v2-updates>`_
 provides a JSON encoded version of the recorded update history. Once you have an ``update_id`` for a specific update, you can retrieve the details by using
-`/v0/updates/\{update_id\} <scan_openapi.html#get--v0-updates-update_id>`_.
+`/v2/updates/\{update_id\} <scan_openapi.html#get--v2-updates-update_id>`_.
 
-.. _v1_updates:
+.. _v2_updates:
 
-POST /v1/updates
+POST /v2/updates
 ^^^^^^^^^^^^^^^^
 
 Post a paged update history request to get all updates up to ``page_size``.
-Please see `POST /v1/updates <scan_openapi.html#post--v1-updates>`_ for more details.
+Please see `POST /v2/updates <scan_openapi.html#post--v2-updates>`_ for more details.
 
 Requesting all updates
 """"""""""""""""""""""
@@ -193,7 +193,6 @@ An example list of transactions response for the beginning of the network is sho
               "record_time": "2024-09-20T13:31:28.405180Z",
               "synchronizer_id": "global-domain::122084177677350389dd0710d6516f700a33fe348c5f2702dffef6d36e1dedcbfc17",
               "effective_at": "2024-09-20T13:31:29.552807Z",
-              "offset": "000000000000000001",
               "root_event_ids": [
                 "1220e04f50c4b00024dd3a225611ad96441abd854e461c144b872c0eedac1dc784c7:0",
                 "1220e04f50c4b00024dd3a225611ad96441abd854e461c144b872c0eedac1dc784c7:1"
@@ -483,7 +482,7 @@ POST /v0/state/acs/force
 .. note:: This is a **development environment only** endpoint, and is unavailable in production environments.
 
 During testing, the :ref:`last snapshot timestamp <v0_state_acs_snapshot-timestamp>` can be inconveniently old.
-A production app must be able to deal with this by using :ref:`v1_updates`, but an app's ability to deal with data in the snapshot is important too.
+A production app must be able to deal with this by using :ref:`v2_updates`, but an app's ability to deal with data in the snapshot is important too.
 Therefore, on properly-configured testing Scans, `/v0/state/acs/force <scan_openapi.html#post--v0-state-acs-force>`_ will cause Scan to immediately snapshot the ACS, returning the new snapshot time in the ``record_time`` property.
 But most environments will return an error, as this endpoint is disabled.
 
@@ -601,7 +600,7 @@ If the ``exercised_event`` is consuming, the contract is removed from the ``acti
 .. note::
     To build up an ACS snapshot for any ``record_time``, first
     get a periodic snapshot using the `/v0/state/acs <scan_openapi.html#post--v0-state-acs>`_ endpoint, store the ACS in a dictionary keyed by ``contract_id``
-    and then process the updates from the timestamp of that snapshot via the ``/v1/updates``, adding
+    and then process the updates from the timestamp of that snapshot via the ``/v2/updates``, adding
     ``created_event``\ s to the dictionary under its ``contract_id`` key and
     remove the contract from the dictionary by ``contract_id`` if ``exercised_event``\ s are consuming.
 

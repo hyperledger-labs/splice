@@ -33,7 +33,7 @@ import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig/mod
 import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
 import { useListDsoRulesVoteRequests } from '../hooks';
-import { useFeatureSupport } from '../hooks/useFeatureSupport';
+import useFeatureSupport from '../hooks/useFeatureSupport';
 import { useScanConfig } from '../utils';
 
 const NetworkInfo: React.FC = () => {

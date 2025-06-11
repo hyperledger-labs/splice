@@ -41,7 +41,7 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
     aliceWalletClient.tap(100.0)
     bobWalletClient.tap(100.0)
 
-    actAndCheck(
+    actAndCheck()(
       "Generate some reward coupons by executing a few direct transfers", {
         p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10.0)
         p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10.0)
@@ -57,7 +57,6 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
           ) should have length 8 // 4 app rewards + 4 validator
       },
     )
-
     actAndCheck(
       timeUntilSuccess = 30.seconds
     )(
@@ -76,7 +75,9 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
           .getClosedRounds()
           .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
         val (lastRound, _) = sv1ScanBackend.getRoundOfLatestData()
-        sv1WalletClient.listSvRewardCoupons().filter(_.payload.round.number <= lastRound) should be(
+        sv1WalletClient
+          .listSvRewardCoupons()
+          .filter(_.payload.round.number <= lastRound) should be(
           empty
         )
       },

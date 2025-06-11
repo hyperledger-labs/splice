@@ -75,6 +75,11 @@ jobs:
         with:
           cmd: actionlint
 
+      - name: Check for strings that should not be used in Splice
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-repo-names.sh
+
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
