@@ -1,20 +1,28 @@
 package org.lfdecentralizedtrust.splice.store.db
 
+import cats.data.NonEmptyVector
 import com.daml.ledger.javaapi.data.Unit as damlUnit
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore
-import org.lfdecentralizedtrust.splice.store.{PageLimit, StoreErrors, StoreTest, UpdateHistory}
+import org.lfdecentralizedtrust.splice.store.{
+  HardLimit,
+  PageLimit,
+  StoreErrors,
+  StoreTest,
+  UpdateHistory,
+}
 import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQualifiedName}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import io.grpc.StatusRuntimeException
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.scalatest.Succeeded
 
@@ -490,14 +498,14 @@ class AcsSnapshotStoreTest
             timestamp1,
             None,
             PageLimit.tryCreate(10),
-            Seq(dsoParty),
+            NonEmptyVector.of(dsoParty),
           )
           resultWanteds <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
-            Seq(wantedParty1, wantedParty2),
+            NonEmptyVector.of(wantedParty1, wantedParty2),
           )
         } yield {
           resultDso.createdEventsInPage should be(empty)
@@ -526,14 +534,14 @@ class AcsSnapshotStoreTest
             timestamp1,
             None,
             PageLimit.tryCreate(10),
-            Seq(owner),
+            NonEmptyVector.of(owner),
           )
           resultHolder <- store.getHoldingsState(
             DefaultMigrationId,
             timestamp1,
             None,
             PageLimit.tryCreate(10),
-            Seq(holder),
+            NonEmptyVector.of(holder),
           )
         } yield {
           resultHolder.createdEventsInPage should be(empty)
@@ -541,6 +549,39 @@ class AcsSnapshotStoreTest
             Seq(amulet.contractId.contractId)
           )
         }
+      }
+
+      "fail if too many contracts were returned by HardLimit" in {
+        val owner = providerParty(1)
+        val holder = providerParty(2)
+        val amulet1 = lockedAmulet(owner, 10, 1L, 0.5)
+        val amulet2 = lockedAmulet(owner, 10, 2L, 0.5)
+        (for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          _ <- ingestCreate(
+            updateHistory,
+            amulet1,
+            timestamp1.minusSeconds(10L),
+            Seq(owner, holder),
+          )
+          _ <- ingestCreate(
+            updateHistory,
+            amulet2,
+            timestamp1.minusSeconds(10L),
+            Seq(owner, holder),
+          )
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          _result <- store.getHoldingsState(
+            DefaultMigrationId,
+            timestamp1,
+            None,
+            HardLimit.tryCreate(1),
+            NonEmptyVector.of(owner),
+          )
+        } yield fail("should not get here, call should've failed")).failed.futureValue shouldBe a[
+          StatusRuntimeException
+        ]
       }
 
     }
@@ -581,19 +622,19 @@ class AcsSnapshotStoreTest
           summaryAtRound3 <- store.getHoldingsSummary(
             DefaultMigrationId,
             timestamp1,
-            Seq(wantedParty1, wantedParty2),
+            NonEmptyVector.of(wantedParty1, wantedParty2),
             asOfRound = 3L,
           )
           summaryAtRound10 <- store.getHoldingsSummary(
             DefaultMigrationId,
             timestamp1,
-            Seq(wantedParty1, wantedParty2),
+            NonEmptyVector.of(wantedParty1, wantedParty2),
             asOfRound = 10L,
           )
           summaryAtRound100 <- store.getHoldingsSummary(
             DefaultMigrationId,
             timestamp1,
-            Seq(wantedParty1, wantedParty2),
+            NonEmptyVector.of(wantedParty1, wantedParty2),
             asOfRound = 100L,
           )
         } yield {

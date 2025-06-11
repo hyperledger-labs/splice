@@ -19,6 +19,11 @@ Upcoming
     The `/v2/updates` endpoints no longer return the `offset` field in responses,
     and `events_by_id` are now lexicographically ordered by ID for conveniently viewing JSON results.
 
+- Scan
+
+  - Fix a bug where the ``/v0/holdings/summary`` endpoint would return incomplete results when the requested parties had more than 1000 holdings.
+    Additionally, that endpoint and ``/v0/holdings/state`` will now fail if an empty list of parties is provided.
+
 0.4.1
 -----
 
