@@ -16,6 +16,7 @@ import {
   DEFAULT_AUDIENCE,
   DomainMigrationIndex,
   ExactNamespace,
+  failOnAppVersionMismatch,
   fetchAndInstallParticipantBootstrapDump,
   installAuth0Secret,
   installAuth0UISecret,
@@ -30,7 +31,6 @@ import {
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
 import { jmxOptions } from 'splice-pulumi-common/src/jmx';
-import { failOnAppVersionMismatch } from 'splice-pulumi-common/src/upgrades';
 
 import { SweepConfig } from './sweep';
 
@@ -214,7 +214,7 @@ export async function installValidatorApp(
       },
       participantAddress: config.participantAddress,
       additionalJvmOptions: jmxOptions(),
-      failOnAppVersionMismatch: failOnAppVersionMismatch(),
+      failOnAppVersionMismatch: failOnAppVersionMismatch,
       enablePostgresMetrics: true,
       auth: {
         audience:
