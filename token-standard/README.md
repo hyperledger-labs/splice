@@ -211,4 +211,4 @@ npm run cli -- transfer \
 Output:
 
 If the output is `{}`, the transfer was successful.
-TODO (#18610): record_time and update_id will be added to the output.
+TODO (#908): record_time and update_id will be added to the output.

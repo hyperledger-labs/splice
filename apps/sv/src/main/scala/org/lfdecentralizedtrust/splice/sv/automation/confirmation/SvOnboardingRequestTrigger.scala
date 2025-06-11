@@ -93,7 +93,7 @@ class SvOnboardingRequestTrigger(
       (party, name, weightBps) <- approval match {
         case Left(reason) => {
           // we fail so that the task is retried; it's possible that an approval happens eventually
-          // TODO(#4073) Add a warning log
+          // TODO(#990) Add a warning log
           Future.failed(
             Status.NOT_FOUND
               .withDescription(s"Could not match with an approved SV identity; reason: $reason")

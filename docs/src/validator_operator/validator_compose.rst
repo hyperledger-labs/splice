@@ -3,7 +3,7 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-.. TODO(#14303): consider reducing duplication. Some requirements & validator onboarding can be moved to a section before we choose the deployment method
+.. TODO(DACH-NY/canton-network-node#14303): consider reducing duplication. Some requirements & validator onboarding can be moved to a section before we choose the deployment method
 
 
 .. _compose_validator:

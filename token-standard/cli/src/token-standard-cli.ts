@@ -60,7 +60,7 @@ export function createProgram(): Command {
         "The receiver party of the holdings",
       )
       .requiredOption("--amount <value>", "The amount to be transferred")
-      // TODO (#18611): remove this option
+      // TODO (#907): remove this option
       .requiredOption(
         "-e --instrument-admin <value>",
         `The expected admin of the instrument.`,

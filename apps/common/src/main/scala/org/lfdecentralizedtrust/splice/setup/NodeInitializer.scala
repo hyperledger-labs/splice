@@ -64,7 +64,7 @@ class NodeInitializer(
       namespaceKey <- connection.generateKeyPair("namespace", SigningKeyUsage.NamespaceOnly)
 
       // All nodes need a signing key
-      // TODO(#16017) consider splitting keys instead of using `All`
+      // TODO(DACH-NY/canton-network-internal#392) consider splitting keys instead of using `All`
       signingKey <- connection.generateKeyPair("signing", SigningKeyUsage.All)
 
       // Only participants need an encryption key, but for simplicity every node gets one
@@ -168,7 +168,7 @@ class NodeInitializer(
       _ <- ownerToKeyMapping match {
         case Some(mapping) =>
           for {
-            // TODO(#16017) consider splitting keys instead of using `All`
+            // TODO(DACH-NY/canton-network-internal#392) consider splitting keys instead of using `All`
             newSigningKey <- connection.generateKeyPair("signing", SigningKeyUsage.All)
             _ <- connection.ensureOwnerToKeyMapping(
               member = nodeIdentity(id),

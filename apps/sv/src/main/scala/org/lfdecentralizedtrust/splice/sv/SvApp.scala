@@ -234,7 +234,7 @@ class SvApp(
       localSynchronizerNode,
     )
       .recoverWith { case err =>
-        // TODO(#3474) Replace this by a more general solution for closing resources on
+        // TODO(#879) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
         localSynchronizerNode.foreach(_.close())
@@ -778,7 +778,7 @@ object SvApp {
       )
   }
 
-  // TODO(#5364): move this and like functions into appropriate utility namespaces
+  // TODO(DACH-NY/canton-network-node#5364): move this and like functions into appropriate utility namespaces
   def prepareValidatorOnboarding(
       secret: ValidatorOnboardingSecret,
       expiresIn: NonNegativeFiniteDuration,

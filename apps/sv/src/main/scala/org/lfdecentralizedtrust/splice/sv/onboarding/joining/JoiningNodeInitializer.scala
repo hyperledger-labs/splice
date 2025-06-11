@@ -863,7 +863,7 @@ class JoiningNodeInitializer(
 
     private def startHostingDsoPartyInParticipant(): Future[Unit] = {
       dsoPartyHosting
-        // TODO(#5364): consider inlining the relevant parts from DsoPartyHosting
+        // TODO(DACH-NY/canton-network-node#5364): consider inlining the relevant parts from DsoPartyHosting
         .hostPartyOnOwnParticipant(
           config.domains.global.alias,
           synchronizerId,

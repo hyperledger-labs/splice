@@ -83,7 +83,7 @@ class TopupMemberTrafficTrigger(
         validatorTopupConfig.topupTriggerPollingInterval,
       )
       _ = assert(topupParameters.topupAmount > 0, "topupAmount must be positive")
-      // TODO(#13301) This switches over to purchasing traffic for the new synchronizer
+      // TODO(DACH-NY/canton-network-node#13301) This switches over to purchasing traffic for the new synchronizer
       // as soon as it is active. This might be sufficient for Amulet where
       // there a validator has a relatively small amount of contracts and everything is
       // forced to switch over so the remaining extra traffic + the base rate might

@@ -101,7 +101,7 @@ class ExecuteConfirmedActionTrigger(
                       java.util.Optional.of(amuletRulesId),
                       uniqueConfirmations
                         .map(_.contractId)
-                        .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                        .asJava, // TODO(DACH-NY/canton-network-node##3300) report duplicated and add test cases to make sure no duplicated confirmations here
                       controllerArgument,
                     )
                   )

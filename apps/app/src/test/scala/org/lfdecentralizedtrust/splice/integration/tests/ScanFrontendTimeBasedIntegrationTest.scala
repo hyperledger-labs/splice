@@ -102,7 +102,7 @@ class ScanFrontendTimeBasedIntegrationTest
           },
         )
 
-        // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
+        // TODO(DACH-NY/canton-network-node#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
         clue("Compare app leaderboard values") {
           compareLeaderboardTable(
             "app-leaderboard-row",
@@ -592,7 +592,7 @@ class ScanFrontendTimeBasedIntegrationTest
               closeVoteModalsIfOpen
               reviewButton.underlying.click()
 
-              // TODO(#14813): needs to be changed by using parseAmuletConfigValue() once the diff exists for the first change
+              // TODO(#934): needs to be changed by using parseAmuletConfigValue() once the diff exists for the first change
               try {
                 val newScheduleItem = webDriver.findElement(By.id("accordion-details"))
                 val json = newScheduleItem.findElement(By.tagName("pre")).getText

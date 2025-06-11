@@ -587,7 +587,7 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/GetDsoInfoResponse"
 
-  # TODO(#13301) Replace by automation
+  # TODO(DACH-NY/canton-network-node#13301) Replace by automation
   /v0/synchronizer/{domain_id_prefix}/reconcile-daml-state:
     post:
       tags: [sv]
@@ -603,7 +603,7 @@ paths:
         "200":
           description: ok
 
-  # TODO(#13301) Replace by automation
+  # TODO(DACH-NY/canton-network-node#13301) Replace by automation
   /v0/synchronizer/{domain_id_prefix}/sign_dso_party_to_participant:
     post:
       tags: [sv]

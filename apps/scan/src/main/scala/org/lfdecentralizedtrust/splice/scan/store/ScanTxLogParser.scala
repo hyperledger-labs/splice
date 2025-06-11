@@ -57,7 +57,7 @@ class ScanTxLogParser(
   private def parseTree(tree: TransactionTree, synchronizerId: SynchronizerId, root: TreeEvent)(
       implicit tc: TraceContext
   ): State = {
-    // TODO(#2930) add more checks on the nodes, at least that the DSO party is correct
+    // TODO(DACH-NY/canton-network-node#2930) add more checks on the nodes, at least that the DSO party is correct
     root match {
       case exercised: ExercisedEvent =>
         val eventId = EventId.prefixedFromUpdateIdAndNodeId(

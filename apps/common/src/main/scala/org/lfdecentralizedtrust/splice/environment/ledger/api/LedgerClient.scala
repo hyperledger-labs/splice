@@ -803,7 +803,7 @@ object LedgerClient {
           )
 
         case TU.Reassignment(x) =>
-          // TODO(#18782) Support reassignment batching
+          // TODO(DACH-NY/canton-network-internal#361) Support reassignment batching
           val event: lapi.reassignment.ReassignmentEvent = x.events match {
             case Seq(event) => event
             case events =>

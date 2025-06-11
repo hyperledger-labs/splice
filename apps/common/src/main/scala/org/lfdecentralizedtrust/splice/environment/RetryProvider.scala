@@ -63,7 +63,7 @@ final class RetryProvider(
 
   // Keep track of promises directly to avoid the promise accumulating references to stale futures that it should complete.
   // For more details check https://github.com/DACH-NY/canton-network-node/issues/9178
-  // TODO(#4405) Derive from FlagCloseable isClosing state.
+  // TODO(DACH-NY/canton-network-node#4405) Derive from FlagCloseable isClosing state.
   private val promisesRunningThatAreShutdownAware: java.util.Set[Promise[UnlessShutdown[?]]] =
     Collections.synchronizedSet(
       Collections.newSetFromMap(
@@ -608,7 +608,7 @@ object RetryProvider {
               case _
                   if retryableStatusCodes.contains(statusCode) ||
                     (
-                      // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
+                      // TODO(DACH-NY/canton-network-node#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
                       statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                         "An error occurred. Please contact the operator and inquire about the request"
                       ) ||
@@ -621,7 +621,7 @@ object RetryProvider {
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"The following stakeholders are not active on the target synchronizer".r
                           .findFirstMatchIn(description)
-                          .isDefined || // TODO(#10160) Remove this once Canton fixes the error code.
+                          .isDefined || // TODO(#822) Remove this once Canton fixes the error code.
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           description.contains(
                             SequencerErrors.MaxSequencingTimeTooFar.id

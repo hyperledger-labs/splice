@@ -346,7 +346,7 @@ object MultiDomainAcsStore {
       ],
   ) extends ContractFilter[R] {
 
-    // TODO(#9197) Drop this once the ledger API exposes package names
+    // TODO(#829) Drop this once the ledger API exposes package names
     // on the read path.
     private val templateFiltersWithoutPackageNames =
       templateFilters.view.map { case (name, filter) =>

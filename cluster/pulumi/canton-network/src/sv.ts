@@ -543,7 +543,7 @@ function installScan(
   };
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
-    // TODO(#19670) if possible, don't require parallel start of sv app and scan when using CantonBft
+    // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft
     dependsOn: dependsOn
       .concat(decentralizedSynchronizerNode.dependencies)
       .concat(

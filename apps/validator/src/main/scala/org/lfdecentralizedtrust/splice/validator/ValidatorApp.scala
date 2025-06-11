@@ -213,7 +213,7 @@ class ValidatorApp(
                     case Seq() =>
                       sys.error("Expected at least one sequencer connection but got 0")
                     case Seq(connections) => connections
-                    // TODO (#13301) handle this in a cleaner way (or just drop hard domain migration support at some point)
+                    // TODO (DACH-NY/canton-network-node#13301) handle this in a cleaner way (or just drop hard domain migration support at some point)
                     case _ =>
                       sys.error(
                         s"Hard domain migrations and soft domain migrations are incompatible, got sequencer connections: $allSequencerConnections"
@@ -697,7 +697,7 @@ class ValidatorApp(
           val acsTimestamp =
             readRestoreDump.map(dump => CantonTimestamp.assertFromInstant(dump.acsTimestamp))
           Future.successful(
-            // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+            // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
             DomainMigrationInfo(
               config.domainMigrationId,
               acsTimestamp,
@@ -843,7 +843,7 @@ class ValidatorApp(
       })
       _ <- appInitStep(s"Onboard validator wallet users") {
         val users = if (config.validatorWalletUsers.isEmpty) {
-          // TODO(#12764) also onboard ledgerApiUser if both users are set
+          // TODO(#760) also onboard ledgerApiUser if both users are set
           Seq(config.ledgerApiUser)
         } else {
           config.validatorWalletUsers

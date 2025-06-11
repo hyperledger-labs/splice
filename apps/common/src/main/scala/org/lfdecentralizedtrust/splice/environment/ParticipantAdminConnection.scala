@@ -293,7 +293,7 @@ class ParticipantAdminConnection(
       show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
     )
     val requestComplete = Promise[ByteString]()
-    // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
+    // TODO(DACH-NY/canton-network-node#3298) just concatenate the byteString here. Make it scale to 2M contracts.
     val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsOldResponse](requestComplete)
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(

@@ -122,7 +122,7 @@ class TokenStandardCliIntegrationTest
             "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
           )
           val exitCode = Process(args, cwd).!(logProcessor)
-          // TODO (#18610): check that recordtime and updateid are present
+          // TODO (#908): check that recordtime and updateid are present
           inside(readLines) { case _ :+ last =>
             last should be("{}")
           }

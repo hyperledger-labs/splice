@@ -146,7 +146,7 @@ describe('Votes list should', () => {
     const actionNeeded = await screen.findByText('Action Needed');
     expect(actionNeeded).toBeDefined();
     fireEvent.click(actionNeeded);
-    // TODO(#15151): Test diffs for SRARC_UpdateSvRewardWeight
+    // TODO(#712): Test diffs for SRARC_UpdateSvRewardWeight
     const actionNeededRows = await screen.findAllByText('SRARC_UpdateSvRewardWeight');
     expect(actionNeededRows).toHaveLength(2);
   });

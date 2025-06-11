@@ -9,7 +9,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{PostgresAroundEach, ProcessTestUtil, WalletTestUtil}
 
-// TODO(#17027) use KMS for this test; whoever goes through the trouble of offline root namespace keys probably also uses KMS
+// TODO(#917) use KMS for this test; whoever goes through the trouble of offline root namespace keys probably also uses KMS
 class ValidatorOfflineRootNamespaceKeyIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil

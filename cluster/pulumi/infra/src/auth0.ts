@@ -15,7 +15,7 @@ function newUiApp(
   name: string,
   description: string,
   urlPrefixes: string[],
-  // TODO(#12169) Make ingressName the same as the namespace (and rename this argument back to namespace)
+  // TODO(DACH-NY/canton-network-node#12169) Make ingressName the same as the namespace (and rename this argument back to namespace)
   ingressName: string,
   clusterBasename: string,
   clusterDnsNames: string[],
@@ -97,7 +97,7 @@ function spliceAuth0(clusterBasename: string, dnsNames: string[]) {
       `SV${sv} UI`,
       `Used for the Wallet, ANS and SV UIs for SV${sv}`,
       ['wallet', ansDomainPrefix, 'sv'],
-      // TODO(#12169) Clean up this fun
+      // TODO(DACH-NY/canton-network-node#12169) Clean up this fun
       sv == 1 ? 'sv-2' : `sv-${sv}-eng`,
       clusterBasename,
       dnsNames,

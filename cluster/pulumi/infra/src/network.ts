@@ -191,7 +191,7 @@ function clusterCertificate(
         },
         type: 'Opaque',
         data: {
-          // TODO(#9227): Handle this correctly in dump-config. Currently it gets here with an undefined value.
+          // TODO(#973): Handle this correctly in dump-config. Currently it gets here with an undefined value.
           'key.json': btoa(dns01SaKeySecret || 'dns-secret'),
         },
       },

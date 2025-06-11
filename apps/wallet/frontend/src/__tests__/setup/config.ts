@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// TODO(#7579) -- remove duplication from default config
+// TODO(#986) -- remove duplication from default config
 
 const config = {
   // HMAC256-based auth with browser self-signed tokens

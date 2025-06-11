@@ -9,5 +9,5 @@
 set -euo pipefail
 
 # latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
-# TODO(#19695) Change this back to latest release after mainnet is on 0.4.x
+# TODO(#471) Change this back to latest release after mainnet is on 0.4.x
 echo "release-line-0.3.21"

@@ -1449,7 +1449,7 @@ class WalletTxLogIntegrationTest
       // Automation will attempt to make the payment at any time after collecting the accepted subscription request,
       // each of these attempts will fail due to insufficient funds, and automation will retry the payment forever.
       // Each failed attempt will produce one WARN and one ERROR log entry, which we need to suppress.
-      // TODO(#2034): simplify this test once automation stops retrying forever
+      // TODO(DACH-NY/canton-network-node#2034): simplify this test once automation stops retrying forever
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
         {
           val (subscriptionResult, _) = actAndCheck(

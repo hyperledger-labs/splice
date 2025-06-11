@@ -1,5 +1,5 @@
 # -*- shell-script -*-
-# TODO(#9531): Currently, this is not tested regularly.
+# TODO(DACH-NY/canton-network-node#9531): Currently, this is not tested regularly.
 subcommand_whitelist[disaster_recovery_test]='Test disaster recovery in a cluster'
 
 function subcmd_disaster_recovery_test() {
@@ -48,7 +48,7 @@ function subcmd_disaster_recovery_test() {
   for ingressName in "${!taps[@]}"; do
     _info "Tapping ${taps[$ingressName]} on ingress $ingressName with token labelled ${tapsTokenNamespace[$ingressName]}"
     token=$(subcmd_get_token "${tapsTokenNamespace[$ingressName]}" validator)
-    # TODO(#12764) remove register when validator does it for us
+    # TODO(#760) remove register when validator does it for us
     curl -sSL --fail-with-body "https://wallet.$ingressName.${GCP_CLUSTER_HOSTNAME}/api/validator/v0/register" \
          -H "authorization: Bearer ${token}" \
          -H "content-type: application/json" \
@@ -116,7 +116,7 @@ function subcmd_disaster_recovery_test() {
     kubectl scale deployment -n sv-"$sv" --replicas=0 global-domain-0-cometbft
   done
 
-  # TODO(#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
+  # TODO(DACH-NY/canton-network-node#11099): we cannot stop the sequencers here because they are currently needed for the data dumps, so for now we do it after taking the dumps
 
   earliest=$(sort -n "$tmpdir/acs_times" | head -1)
   dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "$sortableDateFormat")
@@ -200,7 +200,7 @@ EOF
     fi
   done
 
-  # TODO(#12123) Reenable this.
+  # TODO(#736) Reenable this.
   # _info "Installing Splitwell"
   # export SPLICE_DEPLOY_SPLITWELL="true"
   # _cluster_apply

@@ -107,4 +107,4 @@ the authentication credentials you supply must correspond to an entity with the 
 * `kms:DescribeKey`
 * `kms:GetPublicKey`
 
-.. TODO(#16720): Add a section about offline root namespace keys
+.. TODO(DACH-NY/canton-network-internal#479): Add a section about offline root namespace keys

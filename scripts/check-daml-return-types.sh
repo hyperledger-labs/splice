@@ -11,7 +11,7 @@ source "${TOOLS_LIB}/libcli.source"
 ## Check that all Daml choice return types follow the pattern that choice `X` returns type `XResult`, except for:
 # - tests
 # - splitwell models
-# TODO (#17133): remove the exclude of TradingApp
+# TODO (DACH-NY/canton-network-node#17133): remove the exclude of TradingApp
 # - token-standard trading app example
 # - `AmuletRules_Transfer` returning `TransferResult` which seems acceptable to keep, given how common it is in the codebase
 # - WalletAppInstall choices proxying token standard choices

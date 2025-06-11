@@ -27,7 +27,7 @@ object Reassignment {
   private[splice] def fromProto(
       proto: multidomain.Reassignment
   ): Reassignment[ReassignmentEvent] = {
-    // TODO(#18782) Support reassignment batching
+    // TODO(DACH-NY/canton-network-internal#361) Support reassignment batching
     val singleEvent = proto.events match {
       case Seq(e) => e
       case events =>

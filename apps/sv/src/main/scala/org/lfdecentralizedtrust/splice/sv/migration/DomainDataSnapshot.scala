@@ -11,7 +11,7 @@ import com.google.protobuf.ByteString
 import java.time.Instant
 import java.util.Base64
 
-// TODO(#11100) Split domain data snapshots for validators and SVs to avoid
+// TODO(DACH-NY/canton-network-node#11100) Split domain data snapshots for validators and SVs to avoid
 // the optional mess.
 final case class DomainDataSnapshot(
     genesisState: Option[ByteString],

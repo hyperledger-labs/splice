@@ -195,7 +195,7 @@ in the format `"2024-04-17T19:12:02Z"`.
 Please note that both the participant and the sequencer components must still be running
 and reachable for this call to succeed.
 
-.. TODO(#11099): Update this once the sequencer is no longer required
+.. TODO(DACH-NY/canton-network-node#11099): Update this once the sequencer is no longer required
 
 If the `curl` command fails with a 400 error, that typically means that your participant has been pruned beyond the chosen timestamp,
 and your node cannot generate the requested dump. Discuss with other SVs whether a later timestamp can be chosen.
