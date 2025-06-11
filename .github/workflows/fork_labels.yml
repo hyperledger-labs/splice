@@ -1,0 +1,23 @@
+name: Add labels to PRs from forks
+
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+
+jobs:
+  add_labels:
+    runs-on: self-hosted-docker-tiny
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    steps:
+      - name: Add labels to PRs from forks
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const labels = ['fork'];
+            await github.rest.issues.addLabels({
+              issue_number: pr.number,
+              owner: pr.base.repo.owner.login,
+              repo: pr.base.repo.name,
+              labels: labels,
+            });
