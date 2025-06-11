@@ -690,5 +690,37 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         }
       }
     }
+
+    "mergeRowRanges" should {
+      "merge empty sequence" in {
+        val result = UpdateHistory.mergeRowRanges(Seq.empty)
+        result shouldBe Seq.empty
+      }
+      "merge sequence with one element" in {
+        val result = UpdateHistory.mergeRowRanges(Seq((1L, 2L)))
+        result shouldBe Seq((1L, 2L))
+      }
+      "merge sequence with two adjacent ranges" in {
+        val result = UpdateHistory.mergeRowRanges(Seq((1L, 2L), (3L, 4L)))
+        result shouldBe Seq((1L, 4L))
+      }
+      "merge sequence with two adjacent ranges in reverse order" in {
+        val result = UpdateHistory.mergeRowRanges(Seq((3L, 4L), (1L, 2L)))
+        result shouldBe Seq((1L, 4L))
+      }
+      "merge sequence with two non-adjacent ranges" in {
+        val result = UpdateHistory.mergeRowRanges(Seq((1L, 2L), (4L, 5L)))
+        result shouldBe Seq((1L, 2L), (4L, 5L))
+      }
+      "merge sequence with many adjacent ranges" in {
+        val result = UpdateHistory.mergeRowRanges(Seq((5L, 6L), (1L, 2L), (3L, 4L), (7L, 8L)))
+        result shouldBe Seq((1L, 8L))
+      }
+      "merge sequence with several groups of ranges" in {
+        val result =
+          UpdateHistory.mergeRowRanges(Seq((6L, 7L), (1L, 2L), (9L, 10L), (3L, 4L), (11L, 12L)))
+        result shouldBe Seq((1L, 4L), (6L, 7L), (9L, 12L))
+      }
+    }
   }
 }
