@@ -28,7 +28,7 @@ jobs:
               echo "FOUND_DOCUMENT_CHANGES=true" ;
               echo "GITHUB_COMMIT_URL=https://github.com/hyperledger-labs/splice/commit/${commit}"
               echo "CHANGED_DOC_FILES=${changed_files_list}"
-              echo "GIT_LOG=\"$(git log -1 --oneline --no-color | sed s/\"//g | sed s/\`//g | sed s/\'//g)\""
+              echo "GIT_LOG=\\\"$(git log -1 --oneline --no-color | sed s/\"//g | sed s/\`//g | sed s/\'//g)\\\""
             } >> "$GITHUB_OUTPUT"
           else
             echo "No document changes are detected."
