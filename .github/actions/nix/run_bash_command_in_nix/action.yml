@@ -41,7 +41,6 @@ runs:
             echo "Failed to build and enter the nix environment, retrying in $SLEEP_DURATION seconds..."
             sleep $SLEEP_DURATION
           fi
-          echo "github output: $GITHUB_OUTPUT"
           nix develop \
             path:nix \
             --ignore-environment \
@@ -145,7 +144,6 @@ runs:
           --keep CI \
           --keep COURSIER_CACHE \
           --keep SBT_OPTS \
-          --keep GITHUB_OUTPUT \
           --keep RUN_SPLITTED_TESTS_CMD \
           --keep GCP_DA_CN_DEVNET_KEY \
           --keep GCP_DA_CN_CI_KEY \
@@ -160,3 +158,4 @@ runs:
         PID=$!
 
         wait $PID
+
