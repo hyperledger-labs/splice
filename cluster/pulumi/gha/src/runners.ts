@@ -139,7 +139,7 @@ function installDockerRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.10.1',
+      version: '0.11.0',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
@@ -474,7 +474,7 @@ function installK8sRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.10.1',
+      version: '0.11.0',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
