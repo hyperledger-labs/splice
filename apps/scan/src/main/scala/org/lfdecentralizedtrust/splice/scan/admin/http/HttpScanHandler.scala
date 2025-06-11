@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
-import cats.data.OptionT
+import cats.data.{NonEmptyVector, OptionT}
 import cats.implicits.toTraverseOps
 import cats.syntax.either.*
 import cats.syntax.traverseFilter.*
@@ -1313,7 +1313,7 @@ class HttpScanHandler(
               CantonTimestamp.assertFromInstant(recordTime.toInstant),
               after,
               PageLimit.tryCreate(pageSize),
-              ownerPartyIds.map(PartyId.tryFromProtoPrimitive),
+              nonEmptyOrFail("ownerPartyIds", ownerPartyIds).map(PartyId.tryFromProtoPrimitive),
             )
             .map { result =>
               ScanResource.GetHoldingsStateAtResponseOK(
@@ -1362,7 +1362,7 @@ class HttpScanHandler(
               .getHoldingsSummary(
                 migrationId,
                 CantonTimestamp.assertFromInstant(recordTime.toInstant),
-                partyIds.map(PartyId.tryFromProtoPrimitive),
+                nonEmptyOrFail("partyIds", partyIds).map(PartyId.tryFromProtoPrimitive),
                 round,
               )
           } yield ScanResource.GetHoldingsSummaryAtResponse.OK(
@@ -1388,6 +1388,18 @@ class HttpScanHandler(
           )
       }
     }
+  }
+
+  private def nonEmptyOrFail[A](fieldName: String, vec: Vector[A]): NonEmptyVector[A] = {
+    NonEmptyVector
+      .fromVector(vec)
+      .getOrElse(
+        throw io.grpc.Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Expected '$fieldName' to contain at least one item, but contained none."
+          )
+          .asRuntimeException()
+      )
   }
 
   override def getAggregatedRounds(respond: ScanResource.GetAggregatedRoundsResponse.type)()(
