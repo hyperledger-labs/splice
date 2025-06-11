@@ -135,6 +135,7 @@ services:
     image: "${IMAGE_REPO}splice-app:${IMAGE_TAG}"
     container_name: splice
     env_file:
+      - ${LOCALNET_ENV_DIR}/${ENV}.env
       - ${LOCALNET_ENV_DIR}/common.env
       - ${LOCALNET_ENV_DIR}/splice.env
       - *app-provider-auth-env
