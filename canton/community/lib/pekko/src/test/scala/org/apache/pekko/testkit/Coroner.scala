@@ -12,7 +12,7 @@ import java.util.Date
 import java.util.concurrent.{CountDownLatch, TimeoutException}
 
 import scala.concurrent.{Await, Awaitable, CanAwait, Promise}
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 /** The Coroner can be used to print a diagnostic report of the JVM state,
@@ -221,7 +221,7 @@ object Coroner {
         val ste = stackTrace(i)
         appendMsg("\tat ", ste)
         if (i == 0 && ti.getLockInfo != null) {
-          import java.lang.Thread.State.*
+          import java.lang.Thread.State._
           ti.getThreadState match {
             case BLOCKED => appendMsg("\t-  blocked on ", ti.getLockInfo)
             case WAITING => appendMsg("\t-  waiting on ", ti.getLockInfo)

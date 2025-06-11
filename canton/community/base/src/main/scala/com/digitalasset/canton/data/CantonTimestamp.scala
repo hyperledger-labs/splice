@@ -118,16 +118,6 @@ object CantonTimestamp {
   def fromInstant(i: Instant): Either[String, CantonTimestamp] =
     LfTimestamp.fromInstant(i).map(t => new CantonTimestamp(t))
 
-  def tryFromInstant(time: Instant) =
-    fromInstant(time)
-      .fold(
-        err =>
-          throw new IllegalArgumentException(
-            s"cannot parse the instant $time for the topology snapshot: $err"
-          ),
-        identity,
-      )
-
   def fromDate(javaDate: Date): Either[String, CantonTimestamp] =
     for {
       instant <- TryUtil.tryCatchInterrupted(javaDate.toInstant).toEither.leftMap(_.getMessage)

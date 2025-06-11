@@ -127,24 +127,6 @@ trait PerformUnlessClosing extends OnShutdownRunner with HasSynchronizeWithReade
         FutureUnlessShutdown.abortedDueToShutdown
     }
 
-  /** Performs the EitherT[Future] given by `etf` unless a shutdown has been initiated, in which
-    * case the provided error is returned instead. Both `etf` and the error are lazy; `etf` is only
-    * evaluated if there is no shutdown, the error only if we're shutting down. The shutdown will
-    * only begin after `etf` completes, but other tasks may execute concurrently with `etf`, if
-    * started using this function, or one of the other variants ([[performUnlessClosing]] and
-    * [[performUnlessClosingF]]). The tasks are assumed to take less than [[closingTimeout]] to
-    * complete.
-    *
-    * DO NOT CALL `this.close` as part of `etf`, because it will result in a deadlock.
-    *
-    * @param etf
-    *   The task to perform
-    */
-  def performUnlessClosingEitherT[E, R](name: String, onClosing: => E)(
-      etf: => EitherT[Future, E, R]
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, E, R] =
-    EitherT(performUnlessClosingF(name)(etf.value).unwrap.map(_.onShutdown(Left(onClosing))))
-
   def performUnlessClosingEitherUSF[E, R](name: String)(
       etf: => EitherT[FutureUnlessShutdown, E, R]
   )(implicit

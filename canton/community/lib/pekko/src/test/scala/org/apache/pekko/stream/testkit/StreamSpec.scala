@@ -7,15 +7,15 @@
 package org.apache.pekko.stream.testkit
 
 import scala.concurrent.Future
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{ Config, ConfigFactory }
 import org.scalatest.Failed
 
-import org.apache.pekko.actor.{ActorRef, ActorSystem}
+import org.apache.pekko.actor.{ ActorRef, ActorSystem }
 import org.apache.pekko.stream.impl.StreamSupervisor
-import org.apache.pekko.stream.snapshot.{MaterializerState, StreamSnapshotImpl}
-import org.apache.pekko.testkit.{PekkoSpec, TestProbe}
+import org.apache.pekko.stream.snapshot.{ MaterializerState, StreamSnapshotImpl }
+import org.apache.pekko.testkit.{ PekkoSpec, TestProbe }
 import org.apache.pekko.testkit.TestKitUtils
 
 abstract class StreamSpec(_system: ActorSystem) extends PekkoSpec(_system) {
@@ -23,17 +23,13 @@ abstract class StreamSpec(_system: ActorSystem) extends PekkoSpec(_system) {
     this(
       ActorSystem(
         TestKitUtils.testNameFromCallStack(classOf[StreamSpec], "".r),
-        ConfigFactory.load(config.withFallback(PekkoSpec.testConf)),
-      )
-    )
+        ConfigFactory.load(config.withFallback(PekkoSpec.testConf))))
 
   def this(s: String) = this(ConfigFactory.parseString(s))
 
   def this(configMap: Map[String, _]) = this(PekkoSpec.mapToConfig(configMap))
 
-  def this() = this(
-    ActorSystem(TestKitUtils.testNameFromCallStack(classOf[StreamSpec], "".r), PekkoSpec.testConf)
-  )
+  def this() = this(ActorSystem(TestKitUtils.testNameFromCallStack(classOf[StreamSpec], "".r), PekkoSpec.testConf))
 
   override def withFixture(test: NoArgTest) = {
     super.withFixture(test) match {
@@ -45,8 +41,8 @@ abstract class StreamSpec(_system: ActorSystem) extends PekkoSpec(_system) {
         val streamSupervisors = system.actorSelection("/user/" + StreamSupervisor.baseName + "*")
         streamSupervisors.tell(StreamSupervisor.GetChildren, probe.ref)
         val children: Seq[ActorRef] = probe
-          .receiveWhile(2.seconds) { case StreamSupervisor.Children(children) =>
-            children
+          .receiveWhile(2.seconds) {
+            case StreamSupervisor.Children(children) => children
           }
           .flatten
         println("--- Stream actors debug dump ---")
@@ -57,10 +53,7 @@ abstract class StreamSpec(_system: ActorSystem) extends PekkoSpec(_system) {
             .sequence(children.map(MaterializerState.requestFromChild))
             .foreach(snapshots =>
               snapshots.foreach(s =>
-                org.apache.pekko.stream.testkit.scaladsl.StreamTestKit
-                  .snapshotString(s.asInstanceOf[StreamSnapshotImpl])
-              )
-            )
+                org.apache.pekko.stream.testkit.scaladsl.StreamTestKit.snapshotString(s.asInstanceOf[StreamSnapshotImpl])))
         }
         failed
       case other => other

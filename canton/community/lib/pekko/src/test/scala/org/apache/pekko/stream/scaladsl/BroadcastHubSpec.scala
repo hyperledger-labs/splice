@@ -9,14 +9,14 @@
 package org.apache.pekko.stream.scaladsl
 
 import scala.concurrent.{Await, ExecutionContext}
-import scala.concurrent.duration.*
+import scala.concurrent.duration._
 import org.apache.pekko.stream.KillSwitches
 import org.apache.pekko.stream.ThrottleMode
 import org.apache.pekko.stream.testkit.StreamSpec
 import org.apache.pekko.stream.testkit.TestPublisher
 import org.apache.pekko.stream.testkit.TestSubscriber
 import org.apache.pekko.stream.testkit.Utils.TE
-import org.apache.pekko.stream.testkit.scaladsl.StreamTestKit.*
+import org.apache.pekko.stream.testkit.scaladsl.StreamTestKit._
 import org.apache.pekko.stream.testkit.scaladsl.TestSink
 import org.apache.pekko.stream.testkit.scaladsl.TestSource
 

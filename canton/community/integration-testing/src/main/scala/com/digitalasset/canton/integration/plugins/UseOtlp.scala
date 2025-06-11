@@ -9,7 +9,6 @@ import com.daml.metrics.grpc.DamlGrpcServerMetrics
 import com.daml.tracing.NoOpTelemetry
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{AdminServerConfig, ApiLoggingConfig, CantonConfig}
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentSetupPlugin, TestConsoleEnvironment}
 import com.digitalasset.canton.lifecycle.LifeCycle.{CloseableServer, toCloseableServer}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -77,7 +76,7 @@ class OtlpGrpcServer(protected val loggerFactory: NamedLoggerFactory)
 class UseOtlp(
     protected val port: Port,
     protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
+) extends EnvironmentSetupPlugin
     with AutoCloseable {
 
   private var otlpServer: OtlpGrpcServer = _
@@ -91,7 +90,7 @@ class UseOtlp(
       .replace(BatchSpanProcessor(batchSize = Some(64), scheduleDelay = Some(50.millis)))
 
   private def startServer(implicit
-      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+      env: TestConsoleEnvironment
   ): CloseableServer = {
     import env.*
     val serverConfig = AdminServerConfig(internalPort = port.some)
@@ -123,13 +122,12 @@ class UseOtlp(
 
   override def afterEnvironmentCreated(
       config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment,
   ): Unit =
     grpcServer = startServer(environment)
 
   override def beforeEnvironmentDestroyed(
-      config: CantonConfig,
-      environment: TestConsoleEnvironment[CantonConfig, CantonEnvironment],
+      environment: TestConsoleEnvironment
   ): Unit = {}
 
   override def afterEnvironmentDestroyed(config: CantonConfig): Unit =

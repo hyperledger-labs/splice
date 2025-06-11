@@ -203,7 +203,8 @@ object AssignmentValidationResult {
       // the activeness check can be considered valid.
       val isReassignmentActive: Boolean =
         !isUnassignmentDataNotFound && !isAssignmentCompleted && activenessResult.inactiveReassignments
-          .contains(reassignmentId) && activenessResult.contracts.isSuccessful
+          .contains(reassignmentId)
+          && activenessResult.contracts.isSuccessful
 
       activenessResult.isSuccessful || isReassignmentActive
     }

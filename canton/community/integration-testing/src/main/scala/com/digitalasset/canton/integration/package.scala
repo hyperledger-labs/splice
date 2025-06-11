@@ -3,13 +3,12 @@
 
 package com.digitalasset.canton
 
-import com.digitalasset.canton.config.{CantonConfig, SharedCantonConfig, StorageConfig}
-import com.digitalasset.canton.environment.Environment
+import com.digitalasset.canton.config.{CantonConfig, StorageConfig}
+import com.digitalasset.canton.console.ConsoleEnvironment
 import com.digitalasset.canton.integration.ConfigTransforms.ConfigNodeType
 
 package object integration {
-  type TestConsoleEnvironment[C <: SharedCantonConfig[C], E <: Environment[C]] = E#Console
-    with TestEnvironment[C]
+  type TestConsoleEnvironment = ConsoleEnvironment & TestEnvironment
   type ConfigTransform = CantonConfig => CantonConfig
   type StorageConfigTransform =
     (ConfigNodeType, String, StorageConfig) => StorageConfig
