@@ -1,7 +1,7 @@
 name: Integration tests against mainnet Daml version
 on:
-  pull_request:
-    types: [ opened, synchronize, reopened ]
+  schedule:
+    - cron: '0 5 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
