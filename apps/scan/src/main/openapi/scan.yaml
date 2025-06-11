@@ -2619,6 +2619,7 @@ components:
           type: array
           items:
             type: string
+          minItems: 1
           description: |
             Filters by contracts in which these party_ids are the owners of the amulets.
 
@@ -2644,6 +2645,7 @@ components:
           type: array
           items:
             type: string
+          minItems: 1
           description: |
             The owners for which to compute the summary.
         as_of_round:
