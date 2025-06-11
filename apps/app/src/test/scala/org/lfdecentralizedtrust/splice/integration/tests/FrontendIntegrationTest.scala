@@ -308,19 +308,21 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   protected def clearWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Clearing web drivers")
-    webDrivers.values.toList.parTraverse { implicit webDriver =>
-      Future {
-        // Reset session storage so we see the login window again.
-        // You cannot reset session storage of about:blank so
-        // we exclude this.
-        if (currentUrl != "about:blank") {
-          webDriver.getSessionStorage().clear()
-          eventually() {
-            webDriver.getSessionStorage().keySet.asScala shouldBe empty
+    eventually(60.seconds) {
+      webDrivers.values.toList.parTraverse { implicit webDriver =>
+        Future {
+          // Reset session storage so we see the login window again.
+          // You cannot reset session storage of about:blank so
+          // we exclude this.
+          if (currentUrl != "about:blank") {
+            webDriver.getSessionStorage().clear()
+            eventually() {
+              webDriver.getSessionStorage().keySet.asScala shouldBe empty
+            }
           }
         }
-      }
-    }.futureValue
+      }.futureValue
+    }
     logger.info("Cleared web drivers")
   }
 
