@@ -599,6 +599,10 @@
             "name": "docker-reg-cred"
           }
         ],
+        "limits": {
+          "cpu": 1,
+          "memory": "2G"
+        },
         "maxHistory": 10,
         "resources": {
           "requests": {
