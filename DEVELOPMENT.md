@@ -386,7 +386,7 @@ or does not make sense (e.g. because you're testing functionality that
 did not have an equivalent before), tag the test with a scalatest tag
 corresponding to the version of the Daml package that introduced the
 functionality, e.g.,
-`org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmuelt_0_1_9`. This
+`org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9`. This
 ensures the test will be excluded if we are running against earlier
 Daml versions.
 
