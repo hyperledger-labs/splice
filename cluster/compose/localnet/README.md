@@ -23,8 +23,6 @@ Additional environment variables include:
 - **LOCALNET_DIR/compose.env**: Contains Docker Compose configuration variables.
 - **LOCALNET_ENV_DIR/common.env**: Shared environment variables across Docker Compose and container configurations. It sets default ports, DB credentials, and Splice UI configurations.
 
-Depending on the desired environment **ENV** (local or dev), either `LOCALNET_ENV_DIR/dev.env` or `LOCALNET_ENV_DIR/local.env` will be applied to both Docker Compose and Splice containers, with `local` set as the default.
-
 Resource constraints for containers can be configured via:
 - **LOCALNET_DIR/resource-constraints.yaml**
 
@@ -57,6 +55,14 @@ UI Ports are defined as follows:
 Localnet uses a single PostgreSQL database for all components. Database configurations are sourced from `LOCALNET_ENV_DIR/postgres.env`.
 
 ## Application UIs
+
+- **App User ANS UI**
+    - **URL**: [http://ans.localhost:2000](http://ans.localhost:2000)
+    - **Description**: Interface for registering names.
+
+- **App Provider ANS UI**
+    - **URL**: [http://ans.localhost:3000](http://ans.localhost:3000)
+    - **Description**: Interface for registering names.
 
 - **App User Wallet UI**
     - **URL**: [http://wallet.localhost:2000](http://wallet.localhost:2000)
@@ -104,7 +110,6 @@ The nginx proxy only adds additional headers to resolve CORS issues within Swagg
 ```
 docker compose --env-file $LOCALNET_DIR/compose.env \
                --env-file $LOCALNET_DIR/env/common.env \
-               --env-file $LOCALNET_DIR/env/local.env \
                -f $LOCALNET_DIR/compose.yaml \
                -f $LOCALNET_DIR/resource-constraints.yaml \
                --profile sv \
@@ -115,7 +120,6 @@ docker compose --env-file $LOCALNET_DIR/compose.env \
 ```
 docker compose --env-file $LOCALNET_DIR/compose.env \
                --env-file $LOCALNET_DIR/env/common.env \
-               --env-file $LOCALNET_DIR/env/local.env \
                -f $LOCALNET_DIR/compose.yaml \
                -f $LOCALNET_DIR/resource-constraints.yaml \
                --profile sv \
@@ -126,7 +130,6 @@ docker compose --env-file $LOCALNET_DIR/compose.env \
 ```
 docker compose --env-file $LOCALNET_DIR/compose.env \
                --env-file $LOCALNET_DIR/env/common.env \
-               --env-file $LOCALNET_DIR/env/local.env \
                -f $LOCALNET_DIR/compose.yaml \
                -f $LOCALNET_DIR/resource-constraints.yaml \
                --profile sv \
@@ -138,7 +141,6 @@ docker compose --env-file $LOCALNET_DIR/compose.env \
 ```
 docker compose --env-file $LOCALNET_DIR/compose.env \
                --env-file $LOCALNET_DIR/env/common.env \
-               --env-file $LOCALNET_DIR/env/local.env \
                -f $LOCALNET_DIR/compose.yaml \
                -f $LOCALNET_DIR/resource-constraints.yaml \
                --profile sv \
@@ -150,19 +152,7 @@ docker compose --env-file $LOCALNET_DIR/compose.env \
 ```
 docker compose --env-file $LOCALNET_DIR/compose.env \
                --env-file $LOCALNET_DIR/env/common.env \
-               --env-file $LOCALNET_DIR/env/local.env \
                -f $LOCALNET_DIR/compose.yaml \
                -f $LOCALNET_DIR/resource-constraints.yaml \
                run --rm console
-```
-
-## Run in devnet
-```
-docker compose --env-file ${LOCALNET_DIR}/compose.env \
-               --env-file ${LOCALNET_DIR}/env/common.env \
-               --env-file ${LOCALNET_DIR}/env/dev.env \
-               -f ${LOCALNET_DIR}/compose.yaml \
-               -f ${LOCALNET_DIR}/resource-constraints.yaml \
-               --profile app-provider \
-               --profile app-user up -d
 ```

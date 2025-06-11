@@ -135,7 +135,6 @@ services:
     image: "${IMAGE_REPO}splice-app:${IMAGE_TAG}"
     container_name: splice
     env_file:
-      - ${LOCALNET_ENV_DIR}/${ENV}.env
       - ${LOCALNET_ENV_DIR}/common.env
       - ${LOCALNET_ENV_DIR}/splice.env
       - *app-provider-auth-env
@@ -176,7 +175,6 @@ services:
       args:
         BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
     env_file:
-      - ${LOCALNET_ENV_DIR}/${ENV}.env
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
       - *app-user-auth-env
@@ -219,6 +217,17 @@ services:
     profiles:
       - app-user
 
+  ans-web-ui-app-user:
+    image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
+    container_name: ans-web-ui-app-user
+    env_file:
+      - ${LOCALNET_ENV_DIR}/common.env
+      - *app-user-auth-env
+    environment:
+      - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost:${APP_USER_UI_PORT}
+    profiles:
+      - app-user
+
   ###############################################################################################################
   ### Application Provider
   ###############################################################################################################
@@ -228,6 +237,17 @@ services:
     env_file:
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
+    profiles:
+      - app-provider
+
+  ans-web-ui-app-provider:
+    image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
+    container_name: ans-web-ui-app-provider
+    env_file:
+      - ${LOCALNET_ENV_DIR}/common.env
+      - *app-provider-auth-env
+    environment:
+      - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost:${APP_PROVIDER_UI_PORT}
     profiles:
       - app-provider
 
