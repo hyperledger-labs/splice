@@ -27,14 +27,14 @@ export const operator = new k8s.helm.v3.Release(
     version: '2.1.0',
     namespace: namespace.ns.metadata.name,
     values: {
+      limits: {
+        cpu: 1,
+        memory: config.optionalEnv('OPERATOR_MEMORY_LIMIT') || '2G',
+      },
       resources: {
-        limits: {
-          cpu: 2,
-          memory: config.optionalEnv('OPERATOR_MEMORY_LIMIT') || '4G',
-        },
         requests: {
-          cpu: 1,
-          memory: config.optionalEnv('OPERATOR_MEMORY_REQUESTS') || '2G',
+          cpu: 0.2,
+          memory: config.optionalEnv('OPERATOR_MEMORY_REQUESTS') || '1G',
         },
       },
       imagePullSecrets: [{ name: secretName }],
