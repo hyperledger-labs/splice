@@ -141,4 +141,4 @@ In the [daml](https://github.com/digital-asset/daml/) repository:
 3. Merge the PR. Anyone with write access to the repo can merge the PR.
 4. Wait for release to be published.
 
-Once the release is published, update `CantonDependencies.scala`.
+Once the release is published, update `CantonDependencies.scala`..
