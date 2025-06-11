@@ -158,13 +158,6 @@ runs:
           echo "initial_package_versions='$(cat initial_package_config)'" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: DEBUG
-      shell: bash
-      run: |
-          echo 'VERSIONS: ${{ steps.daml_package_versions.outputs.initial_package_versions }}END'
-          echo 'OTHER: ${{ steps.daml_package_versions.outputs.other_output }}END'
-          echo $GITHUB_OUTPUT
-
     - name: Prepare list of tests to run for sbt
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
