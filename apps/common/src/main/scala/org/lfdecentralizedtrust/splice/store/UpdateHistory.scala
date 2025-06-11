@@ -1711,14 +1711,11 @@ class UpdateHistory(
           -- Note: to make update ids consistent across SVs, we use the contract id as the update id.
           max(c.contract_id)
         from
-          update_history_transactions tx,
           update_history_creates c
         where
-          tx.history_id = $historyId and
-
-          tx.migration_id = $migrationId and
-          tx.record_time = ${CantonTimestamp.MinValue} and
-          tx.row_id = c.update_row_id
+          history_id = $historyId and
+          migration_id = $migrationId and
+          record_time = ${CantonTimestamp.MinValue}
       """.as[Option[String]].head,
       s"getLastImportUpdateId",
     )
