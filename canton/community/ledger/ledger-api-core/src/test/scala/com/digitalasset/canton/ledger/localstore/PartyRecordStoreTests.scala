@@ -3,6 +3,8 @@
 
 package com.digitalasset.canton.ledger.localstore
 
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{LedgerString, Party}
 import com.digitalasset.canton.ledger.api.{
   IdentityProviderConfig,
   IdentityProviderId,
@@ -20,8 +22,6 @@ import com.digitalasset.canton.ledger.localstore.api.{
   PartyRecordUpdate,
 }
 import com.digitalasset.canton.logging.LoggingContextWithTrace
-import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.{LedgerString, Party}
 import org.scalatest.freespec.AsyncFreeSpec
 
 import scala.language.implicitConversions

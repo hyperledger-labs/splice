@@ -1369,13 +1369,13 @@ class UpdateHistory(
 
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
-        new TransactionTree(
+        new Transaction(
           /*updateId = */ updateId,
           /*commandId = */ updateRow.commandId.getOrElse(missingString),
           /*workflowId = */ updateRow.workflowId.getOrElse(missingString),
           /*effectiveAt = */ updateRow.effectiveAt.toInstant,
+          /*events = */ java.util.Collections.singletonList(createEvent),
           /*offset = */ LegacyOffset.Api.assertFromStringToLong(updateRow.participantOffset),
-          /*eventsById = */ java.util.Map.of(eventNodeId, createEvent),
           /*synchronizerId = */ updateRow.synchronizerId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
           /*recordTime = */ updateRow.recordTime.toInstant,

@@ -7,7 +7,12 @@ import cats.data.EitherT
 import com.daml.grpc.AuthCallCredentials
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcClient, GrpcManagedChannel}
+import com.digitalasset.canton.networking.grpc.{
+  CantonGrpcUtil,
+  GrpcClient,
+  GrpcError,
+  GrpcManagedChannel,
+}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.LoggerUtil
 import io.grpc.ManagedChannel
@@ -34,6 +39,7 @@ class GrpcCtlRunner(
       managedChannel: GrpcManagedChannel,
       token: Option[String],
       timeout: Duration,
+      retryPolicy: GrpcError => Boolean,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Result] = {
 
     def service(channel: ManagedChannel): command.Svc = {
@@ -46,15 +52,20 @@ class GrpcCtlRunner(
 
     for {
       request <- EitherT.fromEither[Future](command.createRequestInternal())
-      response <- submitRequest(command)(instanceName, client, request, timeout)
+      response <- submitRequest(command)(instanceName, client, request, timeout, retryPolicy)
       result <- EitherT.fromEither[Future](command.handleResponseInternal(response))
     } yield result
   }
 
   private def submitRequest[Svc <: AbstractStub[Svc], Req, Res, Result](
       command: GrpcAdminCommand[Req, Res, Result]
-  )(instanceName: String, service: GrpcClient[command.Svc], request: Req, timeout: Duration)(
-      implicit
+  )(
+      instanceName: String,
+      service: GrpcClient[command.Svc],
+      request: Req,
+      timeout: Duration,
+      retryPolicy: GrpcError => Boolean,
+  )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[Future, String, Res] = CantonGrpcUtil.shutdownAsGrpcErrorE(
@@ -67,7 +78,7 @@ class GrpcCtlRunner(
         timeout,
         logger,
         CantonGrpcUtil.SilentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
-        _ => false, // no retry to optimize for low latency
+        retryPolicy,
       )
       .leftMap(_.toString)
   )

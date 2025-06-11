@@ -39,9 +39,9 @@ object EnforceVisibleForTesting extends WartTraverser {
       def currentlyVisitingParents(symbol: Symbol): Boolean =
         if (symbol == null || symbol == u.universe.NoSymbol || symbol.isPackage) false
         else
-          (symbol.owner != null
-            && currentlyVisitingDefitions.contains(symbol.owner.fullName))
-          || currentlyVisitingParents(symbol.owner)
+          (symbol.owner != null && currentlyVisitingDefitions.contains(
+            symbol.owner.fullName
+          )) || currentlyVisitingParents(symbol.owner)
 
       @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
       object AccessToMemberWithVisibleforTestingAnnotation {
@@ -50,11 +50,14 @@ object EnforceVisibleForTesting extends WartTraverser {
             case select @ Select(receiver, name)
                 if
                 // we are not currently in the companion's body
-                !currentlyVisitingDefitions.contains(receiver.tpe.typeSymbol.companion.fullName)
-                // and we are not currently in the body of the receiver (i.e. this)
-                  && !currentlyVisitingDefitions.contains(receiver.tpe.typeSymbol.fullName)
-                  // and we are not currently in the enclosing scope of the receiver's type
-                  && !currentlyVisitingParents(receiver.tpe.typeSymbol) =>
+                !currentlyVisitingDefitions.contains(
+                  receiver.tpe.typeSymbol.companion.fullName
+                ) /* and we are not currently in the body of the receiver (i.e. this) */ && !currentlyVisitingDefitions
+                  .contains(
+                    receiver.tpe.typeSymbol.fullName
+                  ) /* and we are not currently in the enclosing scope of the receiver's type */ && !currentlyVisitingParents(
+                  receiver.tpe.typeSymbol
+                ) =>
               val member = receiver.tpe.member(name)
               Option.when(
                 (

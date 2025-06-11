@@ -94,7 +94,7 @@ case class ConfirmationResultMessage private (
 
 object ConfirmationResultMessage
     extends VersioningCompanionMemoization[
-      ConfirmationResultMessage,
+      ConfirmationResultMessage
     ] {
   override val name: String = "ConfirmationResultMessage"
 

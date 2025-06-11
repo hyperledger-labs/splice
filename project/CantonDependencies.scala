@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.4.0-snapshot.20250513.13844.0.vbc99348c"
+  val version: String = "3.4.0-snapshot.20250605.13883.0.vb0255fb1"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by

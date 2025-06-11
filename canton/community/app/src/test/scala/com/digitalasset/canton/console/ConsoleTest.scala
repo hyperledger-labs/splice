@@ -73,7 +73,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
   )
 
   abstract class TestEnvironment(val config: CantonConfig = DefaultConfig) {
-    val environment: Environment = mock[Environment]
+    val environment: CantonEnvironment = mock[CantonEnvironment]
     val participants: ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode] =
       mock[ParticipantNodes[ParticipantNodeBootstrap, ParticipantNode]]
     val sequencers: SequencerNodes = mock[SequencerNodes]
@@ -128,7 +128,7 @@ class ConsoleTest extends AnyWordSpec with BaseTest {
       .thenReturn(GenericCommandError("Mocked error"))
 
     val consoleEnvironment =
-      new ConsoleEnvironment(
+      new CantonConsoleEnvironment(
         environment,
         consoleOutput = testConsoleOutput,
       ) {

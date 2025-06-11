@@ -66,7 +66,7 @@ abstract class UpdateHistoryTestBase
 
   /** Ingests an import update for a transaction previously ingested using the [[create]] call */
   protected def importUpdate(
-      tx: TransactionTree,
+      tx: Transaction,
       offset: Long,
       store: UpdateHistory,
   ) = {
