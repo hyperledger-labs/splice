@@ -15,6 +15,8 @@ import { StaticSvConfig } from './config';
 import { dsoSize } from './dsoConfig';
 import { cometbftRetainBlocks } from './synchronizer/cometbftConfig';
 
+const sv1ScanBigQuery = spliceEnvConfig.envFlag('SV1_SCAN_BIGQUERY', false);
+
 const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = isMainNet
   ? [svCometBftKeysFromSecret('sv1-cometbft-keys')]
   : [
@@ -58,6 +60,9 @@ export const svConfigs: StaticSvConfig[] = isMainNet
           },
         },
         sweep: sweepConfigFromEnv('SV1'),
+        ...(sv1ScanBigQuery
+          ? { scanBigQuery: { dataset: 'mainnet_da2_scan', prefix: 'da2' } }
+          : {}),
       },
     ]
   : [
@@ -83,6 +88,7 @@ export const svConfigs: StaticSvConfig[] = isMainNet
           },
         },
         sweep: sweepConfigFromEnv('SV1'),
+        ...(sv1ScanBigQuery ? { scanBigQuery: { dataset: 'devnet_da2_scan', prefix: 'da2' } } : {}),
       },
       {
         // TODO(DACH-NY/canton-network-node#12169): consider making nodeName and ingressName the same (also for all other SVs)
