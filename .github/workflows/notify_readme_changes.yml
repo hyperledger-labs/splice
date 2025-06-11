@@ -50,13 +50,13 @@ jobs:
           echo ""
           echo '${{ steps.construct_message.outputs.MESSAGE }}'
 
-      # - name: Notify on document changes
-      #   if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
-      #   uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d  # v2.0.0
-      #   with:
-      #     method: chat.postMessage
-      #     token: ${{ secrets.SLACK_ACCESS_TOKEN }}
-      #     payload: |
-      #       channel: C03J6NCPSE4
-      #       text: "${{ steps.construct_message.outputs.MESSAGE }}"
+      - name: Notify on document changes
+        if: steps.detect_changes.outputs.FOUND_DOCUMENT_CHANGES == 'true'
+        uses: slackapi/slack-github-action@485a9d42d3a73031f12ec201c457e2162c45d02d  # v2.0.0
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.SLACK_ACCESS_TOKEN }}
+          payload: |
+            channel: C08QJCYS63F
+            text: "${{ steps.construct_message.outputs.MESSAGE }}"
 
