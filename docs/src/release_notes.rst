@@ -15,6 +15,9 @@ Upcoming
 
   - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
   - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
+  - `/v2/updates` endpoints are now available on the Scan app, `/v1/updates` endpoints are deprecated.
+    The `/v2/updates` endpoints no longer return the `offset` field in responses,
+    and `events_by_id` are now lexicographically ordered by ID for conveniently viewing JSON results.
 
 0.4.1
 -----
