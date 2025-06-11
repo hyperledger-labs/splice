@@ -1,5 +1,5 @@
 [(self: super: {
-  openapi-generator-cli = (super.openapi-generator-cli.override { jre = super.openjdk17; }).overrideAttrs(oldAttrs: rec {
+  openapi-generator-cli = (super.openapi-generator-cli.override { jre = super.openjdk21; }).overrideAttrs(oldAttrs: rec {
     # 7.0.1 causes some issues in the generated package.json which break module resolution.
     version = "6.6.0";
     jarfilename = "${oldAttrs.pname}-${version}.jar";
@@ -8,7 +8,7 @@
       sha256 = "sha256-lxj/eETolGLHXc2bIKNRNvbbJXv+G4dNseMALpneRgk=";
     };
   });
-  jre = super.openjdk17;
+  jre = super.openjdk21;
   lnav = super.callPackage ./lnav.nix {};
   canton = super.callPackage ./canton.nix {};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
