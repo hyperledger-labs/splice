@@ -396,4 +396,4 @@ To make sure your lock files match CI, run the following steps:
 
 1. `find . -name '.daml' | xargs rm -r`
 2. `sbt compile`
-3. Check-in the updated lock file which should now match CI..
+3. Check-in the updated lock file which should now match CI.
