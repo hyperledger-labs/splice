@@ -382,7 +382,7 @@ object BaseWalletTransfersFrontendIntegrationTest {
   )
 }
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class WalletTransferOffersFrontendIntegrationTest
     extends BaseWalletTransfersFrontendIntegrationTest {
   override protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(
@@ -409,7 +409,7 @@ class WalletTransferOffersFrontendIntegrationTest
   override protected def shouldDisableTokenStandardSwitch: Boolean = true
 }
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardWalletTransfersFrontendIntegrationTest
     extends BaseWalletTransfersFrontendIntegrationTest {
   override protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(

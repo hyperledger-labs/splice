@@ -35,7 +35,7 @@ import org.slf4j.event.Level
 
 import scala.math.Ordering.Implicits.*
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class SvTimeBasedRewardCouponIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil
@@ -280,7 +280,7 @@ class SvTimeBasedRewardCouponIntegrationTest
     }
   }
 
-  "filter out beneficiaries that did not vet the latest packages" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.NoDamlCompatibilityCheck) in { implicit env =>
+  "filter out beneficiaries that did not vet the latest packages" in { implicit env =>
     val dso = sv1Backend.getDsoInfo().dsoParty
 
     def getSvRewardCoupon(party: String) =

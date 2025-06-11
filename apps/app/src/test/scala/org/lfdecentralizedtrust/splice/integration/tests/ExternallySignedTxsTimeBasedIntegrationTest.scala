@@ -15,7 +15,7 @@ import java.time.Duration
 import java.util.Base64
 
 // does token standard stuff
-@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class ExternallySignedTxsTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil

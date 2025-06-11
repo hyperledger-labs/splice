@@ -21,7 +21,7 @@ import java.nio.file.Files
 import java.time.Duration
 import scala.concurrent.duration.*
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.Amulet_0_1_9
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class RecoverExternalPartyIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with ExternallySignedPartyTestUtil

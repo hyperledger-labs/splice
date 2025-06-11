@@ -6,4 +6,4 @@ import org.scalatest.TagAnnotation;
 @TagAnnotation
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
-public @interface Amulet_0_1_9 {}
+public @interface SpliceAmulet_0_1_9 {}

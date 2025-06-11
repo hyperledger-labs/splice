@@ -142,7 +142,7 @@ class ExternalPartySetupProposalIntegrationTest
       .lookupTransferPreapprovalByParty(aliceValidatorBackend.getValidatorPartyId()) shouldBe None
   }
 
-  "TransferPreapproval allows to transfer between externally signed parties" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.Amulet_0_1_9) in {
+  "TransferPreapproval allows to transfer between externally signed parties" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_9) in {
     implicit env =>
       // Onboard and Create/Accept ExternalPartySetupProposal for Alice
       val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
