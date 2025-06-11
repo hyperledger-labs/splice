@@ -16,6 +16,11 @@ Upcoming
   - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
   - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
 
+- Scan
+
+  - Fix a bug where the ``/v0/holdings/summary`` endpoint would return incomplete results when the requested parties had more than 1000 holdings.
+    Additionally, that endpoint and ``/v0/holdings/state`` will now fail if an empty list of parties is provided.
+
 0.4.1
 -----
 
