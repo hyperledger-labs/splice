@@ -280,7 +280,7 @@ class SvTimeBasedRewardCouponIntegrationTest
     }
   }
 
-  "filter out beneficiaries that did not vet the latest packages" in { implicit env =>
+  "filter out beneficiaries that did not vet the latest packages" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.Amulet_0_1_9) in { implicit env =>
     val dso = sv1Backend.getDsoInfo().dsoParty
 
     def getSvRewardCoupon(party: String) =
