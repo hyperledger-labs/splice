@@ -1,0 +1,36 @@
+name: Integration tests against mainnet Daml version
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # Required for GCP Workload Identity for failure notifications
+  contents: read
+  pull-requests: read # Required for the static tests
+  issues: read # Required for the static tests
+  actions: write # To cancel itself if not opted in
+
+jobs:
+  get_mainnet_version:
+    runs-on: self-hosted-docker-tiny
+    outputs:
+      version: ${{ steps.get_mainnet_version.outputs.version }}
+    steps:
+      - name: Get MainNet version
+        id: get_mainnet_version
+        run: |
+          set -eou pipefail
+          version="$(curl -sSL --fail-with-body https://docs.global.canton.network.sync.global/info | jq -r '.sv.version')"
+          echo "MainNet version is $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: get_mainnet_version
+    uses: ./.github/workflows/build.yml
+    with:
+      daml_base_version: ${{ needs.get_mainnet_version.outputs.version }}
+    secrets: inherit

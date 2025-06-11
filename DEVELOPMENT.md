@@ -369,6 +369,26 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
 
+## Daml Version Guards in Integration Tests
+
+Our backends need to handle the case where we compile against Daml
+version X+1 but the vote to switch to those models is not yet done and
+only Daml version X can be used. This is done by checking the active
+version endpoints in triggers, UIs and similar. However, those checks
+can be easily forgotten and the normal integration tests do not catch
+that as they run against the latest version.
+
+To catch this, we periodically run all integration tests against the
+latest Daml version that was shipped to mainnet. This means tests that
+do actually depend on the newer versions won't work. Default to making
+tests backwards compatible where possible. Where this is not possible
+or does not make sense (e.g. because you're testing functionality that
+did not have an equivalent before), tag the test with a scalatest tag
+corresponding to the version of the Daml package that introduced the
+functionality, e.g.,
+`org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmuelt_0_1_9`. This
+ensures the test will be excluded if we are running against earlier
+Daml versions.
 
 # Troubleshooting
 

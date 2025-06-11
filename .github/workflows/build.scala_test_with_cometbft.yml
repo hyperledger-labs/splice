@@ -18,6 +18,9 @@ on:
         type: string
         required: false
         default: ""
+      daml_base_version:
+        type: string
+        required: true
 
 jobs:
 
@@ -117,3 +120,4 @@ jobs:
           failure_notifications_invoker_sa: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_SA }}
           failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
+          daml_base_version: ${{ inputs.daml_base_version }}

@@ -10,7 +10,18 @@ on:
       daml_base_version:
         type: string
         required: false
-        default: "0.3.21"
+        default: ""
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'The commit SHA to use for the build'
+        required: false
+        default: ''
+        type: string
+      daml_base_version:
+        type: string
+        required: false
+        default: ""
 
 permissions:
   id-token: write # Required for GCP Workload Identity for failure notifications
