@@ -714,6 +714,57 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/allocations:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "allocateAmulet"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AllocateAmuletRequest"
+      responses:
+        "200":
+          description: The AmuletAllocation has been created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AllocateAmuletResponse"
+        "400":
+          description: |
+            Invalid request, check the error response for details.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "404":
+          description: |
+            The submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "409":
+          description:
+            A transfer with the same tracking id has been created.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A transfer with the same tracking id is currently being processed,
+            which may or may not succeed. Retry submitting the request with exponential
+            back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 components:
   schemas:
     UserStatusResponse:
@@ -1281,3 +1332,102 @@ components:
           type: boolean
         transfer_preapproval_description:
           type: boolean
+
+    AllocateAmuletRequest:
+      type: object
+      required:
+        - settlement
+        - transfer_leg_id
+        - transfer_leg
+      properties:
+        settlement:
+          type: object
+          required:
+            - executor
+            - settlement_ref
+            - allocate_before
+            - settle_before
+          properties:
+            executor:
+              type: string
+            settlement_ref:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                cid:
+                  type: string
+            allocate_before:
+              type: string
+              format: date-time
+            settle_before:
+              type: string
+              format: date-time
+            meta:
+              type: object
+              additionalProperties:
+                type: string
+        transfer_leg_id:
+          type: string
+        transfer_leg:
+          type: object
+          required:
+            - receiver
+            - amount
+          properties:
+            receiver:
+              type: string
+            amount:
+              type: string
+            meta:
+              type: object
+              additionalProperties:
+                type: string
+
+    AllocateAmuletResponse:
+      type: object
+      required:
+        - output
+        - sender_change_cids
+        - meta
+      properties:
+        output:
+          "$ref": "#/components/schemas/AllocationInstructionResultOutput"
+        sender_change_cids:
+          type: array
+          items:
+            type: string
+        meta:
+          type: object
+          additionalProperties:
+            type: string
+
+    AllocationInstructionResultOutput:
+      oneOf:
+        - "$ref": "#/components/schemas/AllocationInstructionResultPending"
+        - "$ref": "#/components/schemas/AllocationInstructionResultCompleted"
+        - "$ref": "#/components/schemas/AllocationInstructionResultFailed"
+
+    AllocationInstructionResultPending:
+      type: object
+      required:
+        - allocation_instruction_cid
+      properties:
+        allocation_instruction_cid:
+          type: string
+
+    AllocationInstructionResultCompleted:
+      type: object
+      required:
+        - allocation_cid
+      properties:
+        allocation_cid:
+          type: string
+
+    AllocationInstructionResultFailed:
+      type: object
+      properties:
+        dummy: # cannot define an empty object for some reason
+          type: object
