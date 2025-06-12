@@ -5,8 +5,8 @@
 
 .. _docker_compose_helm_chart:
 
-Docker Compose and Helm Chart Deployment
-========================================
+Alternative Docker Compose Deployment
+==================================
 
 This guide introduces a community-contributed Docker Compose solution for deploying Canton validator nodes and supporting infrastructure, following the ``x-docker`` standard used by Mario Delgado’s team for onboarding blockchains. 
 Note that while it was tested during a scheduled upgrade on DevNet, that required 
