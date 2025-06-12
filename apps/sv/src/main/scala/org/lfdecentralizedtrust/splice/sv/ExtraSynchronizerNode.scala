@@ -20,7 +20,7 @@ import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
 import java.time.Duration
 import scala.concurrent.ExecutionContextExecutor
 
-// TODO(#13301) Unify this with LocalSynchronizerNode
+// TODO(DACH-NY/canton-network-node#13301) Unify this with LocalSynchronizerNode
 final class ExtraSynchronizerNode(
     override val sequencerAdminConnection: SequencerAdminConnection,
     override val mediatorAdminConnection: MediatorAdminConnection,

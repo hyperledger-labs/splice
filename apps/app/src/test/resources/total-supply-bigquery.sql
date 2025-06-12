@@ -1,4 +1,4 @@
--- TODO (#18620) put this file somewhere that makes sense
+-- TODO (DACH-NY/canton-network-internal#362) put this file somewhere that makes sense
 DECLARE
   as_of_record_time timestamp;
 DECLARE

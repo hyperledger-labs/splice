@@ -56,7 +56,7 @@ object TrafficBalanceService {
       //
       // This is why we translate the NOT_FOUND into a None here and just ignore the traffic balance
       // check in this case.
-      // TODO(#6644): Revisit this once Canton initializes the traffic state on sequencer connection.
+      // TODO(DACH-NY/canton-network-node#6644): Revisit this once Canton initializes the traffic state on sequencer connection.
       participantAdminConnection
         .getParticipantTrafficState(synchronizerId: SynchronizerId)
         .transform {

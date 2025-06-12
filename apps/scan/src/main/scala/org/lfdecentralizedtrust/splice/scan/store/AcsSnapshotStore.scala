@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.scan.store
 
+import cats.data.NonEmptyVector
 import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.scan.store.AcsSnapshotStore.{
@@ -240,7 +241,8 @@ class AcsSnapshotStore(
           "queryAcsSnapshot.getCreatedEvents",
         )
     } yield {
-      val eventsInPage = applyLimit("queryAcsSnapshot", limit, events.map(_._2.toCreatedEvent))
+      val eventsInPage =
+        applyLimitOrFail("queryAcsSnapshot", limit, events.map(_._2.toCreatedEvent))
       val afterToken = if (eventsInPage.size == limit.limit) events.lastOption.map(_._1) else None
       QueryAcsSnapshotResult(
         migrationId = migrationId,
@@ -256,7 +258,7 @@ class AcsSnapshotStore(
       snapshot: CantonTimestamp,
       after: Option[Long],
       limit: Limit,
-      partyIds: Seq[PartyId],
+      partyIds: NonEmptyVector[PartyId],
   )(implicit tc: TraceContext): Future[QueryAcsSnapshotResult] = {
     this
       .queryAcsSnapshot(
@@ -264,10 +266,11 @@ class AcsSnapshotStore(
         snapshot,
         after,
         limit,
-        partyIds,
+        partyIds.toVector,
         AcsSnapshotStore.holdingsTemplates,
       )
       .map { result =>
+        val partyIdsSet = partyIds.toVector.toSet
         QueryAcsSnapshotResult(
           result.migrationId,
           result.snapshotRecordTime,
@@ -277,8 +280,10 @@ class AcsSnapshotStore(
                 .decodeHoldingContract(createdEvent.event)
                 .fold(
                   locked =>
-                    partyIds.contains(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner)),
-                  amulet => partyIds.contains(PartyId.tryFromProtoPrimitive(amulet.payload.owner)),
+                    partyIdsSet
+                      .contains(PartyId.tryFromProtoPrimitive(locked.payload.amulet.owner)),
+                  amulet =>
+                    partyIdsSet.contains(PartyId.tryFromProtoPrimitive(amulet.payload.owner)),
                 )
             },
           result.afterToken,
@@ -289,7 +294,7 @@ class AcsSnapshotStore(
   def getHoldingsSummary(
       migrationId: Long,
       recordTime: CantonTimestamp,
-      partyIds: Seq[PartyId],
+      partyIds: NonEmptyVector[PartyId],
       asOfRound: Long,
   )(implicit tc: TraceContext): Future[AcsSnapshotStore.HoldingsSummaryResult] = {
     this
@@ -297,7 +302,7 @@ class AcsSnapshotStore(
         migrationId,
         recordTime,
         None,
-        // assumption: the number of contracts is small enough that it will fit in memory
+        // if the limit is exceeded by the results from the DB, an exception will be thrown
         HardLimit.tryCreate(Limit.MaxPageSize),
         partyIds,
       )

@@ -28,7 +28,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataSnapshotGenerator(
     participantAdminConnection: ParticipantAdminConnection,
-    // TODO(#11099) Read everything from the participant connection once the genesis state API is available there.
+    // TODO(DACH-NY/canton-network-node#11099) Read everything from the participant connection once the genesis state API is available there.
     sequencerAdminConnection: Option[SequencerAdminConnection],
     dsoStore: SvDsoStore,
     acsExporter: AcsExporter,

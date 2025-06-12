@@ -29,7 +29,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.TimeUnit
 import scala.jdk.CollectionConverters.*
 
-//TODO(#16139): remove this utility
+//TODO(#925): remove this utility
 trait ConfigScheduleUtil extends TestCommon {
 
   /** Helper function to create AmuletConfig's in tests for amulet config changes. Uses the `currentSchedule` as a reference

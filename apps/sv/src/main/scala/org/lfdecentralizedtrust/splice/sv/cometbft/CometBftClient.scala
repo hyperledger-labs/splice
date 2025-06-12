@@ -126,7 +126,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
         Status.INTERNAL.withDescription(message)
       case CometBftHttpRpcClient.CometBftAbciAppError(message) =>
         // We use FAILED_PRECONDITION, as most problems will eventually go away; and iterated retries are visible in our logs
-        // TODO(#5897): raise different error codes once the ABCI app follows gRPC guidelines, currently it just always uses code 1
+        // TODO(DACH-NY/canton-network-node#5897): raise different error codes once the ABCI app follows gRPC guidelines, currently it just always uses code 1
         Status.FAILED_PRECONDITION.withDescription(message)
     }
   }

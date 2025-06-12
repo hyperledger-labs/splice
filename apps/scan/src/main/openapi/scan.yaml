@@ -267,10 +267,79 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
+  /v2/updates:
+    post:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateHistoryV2"
+      description: |
+        Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
+        Compared to `/v1/updates`, the `/v2/updates` removes the `offset` field in responses,
+        which was hardcoded to 1 in `/v1/updates` for compatibility, and is now removed.
+        `/v2/updates` sorts events lexicographically in `events_by_id` by `ID` for convenience, which should not be confused with the
+        order of events in the transaction, for this you should rely on the order of `root_event_ids` and `child_event_ids`.
+        Updates are ordered lexicographically by `(migration id, record time)`.
+        For a given migration id, each update has a unique record time.
+        The record time ranges of different migrations may overlap, i.e.,
+        it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
+        and there may be two updates with the same record time but different migration ids.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/UpdateHistoryRequestV2"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryResponseV2"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v2/updates/{update_id}:
+    get:
+      tags: [external, scan]
+      x-jvm-package: scan
+      operationId: "getUpdateByIdV2"
+      description: |
+        Returns the update with the given update_id.
+        Compared to `/v1/updates/{update_id}`, the `/v2/updates/{update_id}` removes the `offset` field in responses,
+        which was hardcoded to 1 in `/v1/updates/{update_id}` for compatibility, and is now removed.
+        `/v2/updates/{update_id}` sorts events lexicographically in `events_by_id` by `ID` for convenience, which should not be confused with the
+        order of events in the transaction, for this you should rely on the order of `root_event_ids` and `child_event_ids`.
+      parameters:
+        - name: "update_id"
+          in: "path"
+          required: true
+          schema:
+            type: string
+        - name: "daml_value_encoding"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/DamlValueEncoding"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateHistoryItemV2"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
   /v1/updates:
     post:
-      tags: [external, scan]
+      deprecated: true
+      tags: [deprecated]
       x-jvm-package: scan
       operationId: "getUpdateHistoryV1"
       description: |
@@ -283,6 +352,7 @@ paths:
         The record time ranges of different migrations may overlap, i.e.,
         it is not guaranteed that the maximum record time of one migration is smaller than the minimum record time of the next migration,
         and there may be two updates with the same record time but different migration ids.
+        The order of items in events_by_id is not defined.
       requestBody:
         required: true
         content:
@@ -303,13 +373,15 @@ paths:
 
   /v1/updates/{update_id}:
     get:
-      tags: [external, scan]
+      deprecated: true
+      tags: [ deprecated ]
       x-jvm-package: scan
       operationId: "getUpdateByIdV1"
       description: |
         Returns the update with the given update_id.
         Unlike /v0/updates/{update_id}, this endpoint returns responses that are consistent across different
         scan instances. Event ids returned by this endpoint are not comparable to event ids returned by /v0/updates.
+        The order of items in events_by_id is not defined.
       parameters:
         - name: "update_id"
           in: "path"
@@ -790,7 +862,7 @@ paths:
         "404":
           description: "No migration scheduled"
 
-  # TODO(#13386) Move to SV app
+  # TODO(DACH-NY/canton-network-internal#418) Move to SV app
   /v0/synchronizer-identities/{domain_id_prefix}:
     get:
       tags: [internal, scan]
@@ -812,7 +884,7 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
-  # TODO(#13386) Move to SV app
+  # TODO(DACH-NY/canton-network-internal#418) Move to SV app
   /v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}:
     get:
       tags: [internal, scan]
@@ -1387,7 +1459,7 @@ paths:
       x-jvm-package: scan
       operationId: "getUpdateHistory"
       description: |
-        **Deprecated**, use /v1/updates instead.
+        **Deprecated**, use /v2/updates instead.
         Returns the update history in ascending order, paged, from ledger begin or optionally starting after a record time.
       requestBody:
         required: true
@@ -1414,7 +1486,7 @@ paths:
       x-jvm-package: scan
       operationId: "getUpdateById"
       description: |
-        **Deprecated**, use /v1/updates/{update_id} instead.
+        **Deprecated**, use /v2/updates/{update_id} instead.
       parameters:
         - name: "update_id"
           in: "path"
@@ -2035,6 +2107,33 @@ components:
           format: int32
         daml_value_encoding:
           $ref: "#/components/schemas/DamlValueEncoding"
+    UpdateHistoryRequestV2:
+      type: object
+      required:
+        - page_size
+      properties:
+        after:
+          $ref: "#/components/schemas/UpdateHistoryRequestAfter"
+          description: |
+            The transactions returned will either have a higher migration id or
+            the same migration id and a record_time greater than the migration id and record time
+            specified.
+        page_size:
+          description: |
+            The maximum number of transactions returned for this request.
+          type: integer
+          format: int32
+        daml_value_encoding:
+          $ref: "#/components/schemas/DamlValueEncoding"
+    UpdateHistoryResponseV2:
+      type: object
+      required:
+        - transactions
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpdateHistoryItemV2"
     UpdateHistoryResponse:
       type: object
       required:
@@ -2044,6 +2143,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UpdateHistoryItem"
+    UpdateHistoryItemV2:
+      type: object
+      description: |
+        An individual item in the update history. May be a transaction or a contract reassignment.
+      oneOf:
+        - $ref: "#/components/schemas/UpdateHistoryTransactionV2"
+        - $ref: "#/components/schemas/UpdateHistoryReassignment"
     UpdateHistoryItem:
       type: object
       description: |
@@ -2225,6 +2331,66 @@ components:
             Values are nodes of the transaction tree.
             Within a transaction, IDs may be referenced by `root_event_ids` or
             `child_event_ids` in `ExercisedEvent` herein.
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/TreeEvent"
+    UpdateHistoryTransactionV2:
+      type: object
+      required:
+        - update_id
+        - migration_id
+        - workflow_id
+        - command_id
+        - record_time
+        - synchronizer_id
+        - effective_at
+        - root_event_ids
+        - events_by_id
+      properties:
+        update_id:
+          description: |
+            The id of the update. This is not comparable to other updates; it's
+            meant for correlating with server logs.
+          type: string
+        migration_id:
+          description: |
+            The migration id of the synchronizer.
+          type: integer
+          format: int64
+        workflow_id:
+          description: |
+            This transaction's Daml workflow ID; a workflow ID can be associated
+            with multiple transactions. If empty, no workflow ID was set.
+          type: string
+        record_time:
+          description: |
+            The time at which the transaction was sequenced, with microsecond
+            resolution, using ISO-8601 representation.
+          type: string
+        synchronizer_id:
+          description: |
+            The id of the synchronizer through which this transaction was sequenced.
+          type: string
+        effective_at:
+          description: |
+            Ledger effective time, using ISO-8601 representation. This is the time
+            returned by `getTime` for all Daml executed as part of this transaction,
+            both by the submitting participant and all confirming participants.
+          type: string
+        root_event_ids:
+          description: |
+            Roots of the transaction tree. These are guaranteed to occur as keys
+            of the `events_by_id` object.
+          type: array
+          items:
+            type: string
+        events_by_id:
+          x-scala-map-type: "scala.collection.immutable.SortedMap"
+          description: |
+            Changes to the ledger that were caused by this transaction, keyed by ID and sorted lexicographically by ID for display consistency.
+            Values are nodes of the transaction tree.
+            Within a transaction, IDs may be referenced by `root_event_ids` or
+            `child_event_ids` in `ExercisedEvent` herein, which are sorted in the order as they occurred in the transaction.
           type: object
           additionalProperties:
             $ref: "#/components/schemas/TreeEvent"
@@ -2453,6 +2619,7 @@ components:
           type: array
           items:
             type: string
+          minItems: 1
           description: |
             Filters by contracts in which these party_ids are the owners of the amulets.
 
@@ -2478,6 +2645,7 @@ components:
           type: array
           items:
             type: string
+          minItems: 1
           description: |
             The owners for which to compute the summary.
         as_of_round:

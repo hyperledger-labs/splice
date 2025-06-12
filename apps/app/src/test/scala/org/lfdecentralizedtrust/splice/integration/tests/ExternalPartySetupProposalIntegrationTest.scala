@@ -51,7 +51,7 @@ import java.util.UUID
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-// TODO(#14568) Merge this into ExternallySignedPartyOnboardingTest
+// TODO(DACH-NY/canton-network-node#14568) Merge this into ExternallySignedPartyOnboardingTest
 class ExternalPartySetupProposalIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -612,7 +612,7 @@ class ExternalPartySetupProposalIntegrationTest
     }
   }
 
-  // TODO(#15468): Simplify this test to not require a ledger submission
+  // TODO(DACH-NY/canton-network-node#15468): Simplify this test to not require a ledger submission
   "TransferPreapprovals get expired by SV automation" in { implicit env =>
     val onboarding = onboardExternalParty(aliceValidatorBackend)
     val externalParty = onboarding.party
