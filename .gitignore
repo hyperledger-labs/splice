@@ -71,3 +71,4 @@ apps/splitwell/src/test/resources/splitwell-bundle*.tar.gz
 **/SingletonCookie
 __pycache__/
 docs/src/deployment/observability/metrics_reference.rst
+.dccache
