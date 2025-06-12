@@ -1,21 +1,14 @@
 #!/usr/bin/env bash
 
-# Example invocation from Pulumi:
-# ./bigquery-cloudsql.sh \
-#   --private-network-project="${privateNetwork.project}" \
-#   --compute-region="${cloudsdkComputeRegion()}" \
-#   --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \
-#   --tables-to-replicate-length="${tablesToReplicate.length}" \
-#   --db-name="${dbName}" \
-#   --schema-name="${schemaName}" \
-#   --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}" \
-#   --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \
-#   --postgres-user-name="${postgres.user.name}" \
-#   --publication-name="${publicationName}" \
-#   --replication-slot-name="${replicationSlotName}" \
-#   --replicator-user-name="${replicatorUserName}" \
-#   --postgres-instance-name="${postgres.databaseInstance.name}" \
-#   --scan-app-database-name="${scanAppDatabaseName(postgres)}"
+set -euo pipefail
+
+SUBCOMMAND="$1"
+shift
+
+if [[ $SUBCOMMAND != create-pub-rep-slot && $SUBCOMMAND != delete-pub-rep-slot ]]; then
+  echo "Error: Invalid subcommand '$SUBCOMMAND'. Must be 'create-pub-rep-slot' or 'delete-pub-rep-slot'." >&2
+  exit 1
+fi
 
 # Parse named arguments
 PRIVATE_NETWORK_PROJECT=""
@@ -150,68 +143,90 @@ gsutil mb --pap enforced -p "$PRIVATE_NETWORK_PROJECT" \
 gsutil iam ch "serviceAccount:$SERVICE_ACCOUNT_EMAIL:roles/storage.objectAdmin" \
     "gs://$TMP_BUCKET"
 
-cat > "$TMP_SQL_FILE" <<EOT
-  DO \$\$
-  DECLARE
-    migration_complete BOOLEAN := FALSE;
-    max_attempts INT := 30; -- Try for 5 minutes (30 attempts * 10 seconds)
-    attempt INT := 0;
-  BEGIN
-    WHILE NOT migration_complete AND attempt < max_attempts LOOP
-      -- Check if all tables exist AND have the record_time column
-      -- this is added by V037__denormalize_update_history.sql
-      SELECT COUNT(*) = $TABLES_TO_REPLICATE_LENGTH INTO migration_complete
-        FROM information_schema.columns
-        WHERE table_catalog = '$DB_NAME'
-          AND table_schema = '$SCHEMA_NAME'
-          AND table_name IN ($TABLES_TO_REPLICATE_LIST)
-          AND column_name = 'record_time';
+case "$SUBCOMMAND" in
+  create-pub-rep-slot)
+    cat > "$TMP_SQL_FILE" <<EOT
+      DO \$\$
+      DECLARE
+        migration_complete BOOLEAN := FALSE;
+        max_attempts INT := 30; -- Try for 5 minutes (30 attempts * 10 seconds)
+        attempt INT := 0;
+      BEGIN
+        WHILE NOT migration_complete AND attempt < max_attempts LOOP
+          -- Check if all tables exist AND have the record_time column
+          -- this is added by V037__denormalize_update_history.sql
+          SELECT COUNT(*) = $TABLES_TO_REPLICATE_LENGTH INTO migration_complete
+            FROM information_schema.columns
+            WHERE table_catalog = '$DB_NAME'
+              AND table_schema = '$SCHEMA_NAME'
+              AND table_name IN ($TABLES_TO_REPLICATE_LIST)
+              AND column_name = 'record_time';
 
-      IF NOT migration_complete THEN
-        RAISE NOTICE 'Waiting for update_history tables (attempt %/%), sleeping 10s...', attempt + 1, max_attempts;
-        PERFORM pg_sleep(10);
-        attempt := attempt + 1;
-      END IF;
-    END LOOP;
+          IF NOT migration_complete THEN
+            RAISE NOTICE 'Waiting for update_history tables (attempt %/%), sleeping 10s...', attempt + 1, max_attempts;
+            PERFORM pg_sleep(10);
+            attempt := attempt + 1;
+          END IF;
+        END LOOP;
 
-    IF NOT migration_complete THEN
-      RAISE EXCEPTION 'Timed out waiting for update_history tables to be created';
-    END IF;
-  END \$\$;
-  SET search_path TO $SCHEMA_NAME;
-  ALTER USER $POSTGRES_USER_NAME WITH REPLICATION; -- needed to create the replication slot
-  DO \$\$
-  BEGIN
-    -- TODO (#19811) drop slot, pub if table list doesn't match
-    IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '$PUBLICATION_NAME') THEN
-      CREATE PUBLICATION $PUBLICATION_NAME
-        FOR TABLE $TABLES_TO_REPLICATE_JOINED;
-    END IF;
-  END \$\$;
-  COMMIT; -- otherwise fails with "cannot create logical replication slot
-          -- in transaction that has performed writes"
-  DO \$\$
-  BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '$REPLICATION_SLOT_NAME') THEN
-      PERFORM PG_CREATE_LOGICAL_REPLICATION_SLOT
-        ('$REPLICATION_SLOT_NAME', 'pgoutput');
-    END IF;
-  END \$\$;
-  COMMIT;
-  ALTER USER $REPLICATOR_USER_NAME WITH REPLICATION;
-  GRANT SELECT ON ALL TABLES
-    IN SCHEMA $SCHEMA_NAME TO $REPLICATOR_USER_NAME;
-  GRANT USAGE ON SCHEMA $SCHEMA_NAME TO $REPLICATOR_USER_NAME;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA $SCHEMA_NAME
-    GRANT SELECT ON TABLES TO $REPLICATOR_USER_NAME;
-  COMMIT;
+        IF NOT migration_complete THEN
+          RAISE EXCEPTION 'Timed out waiting for update_history tables to be created';
+        END IF;
+      END \$\$;
+      SET search_path TO $SCHEMA_NAME;
+      -- from https://cloud.google.com/datastream/docs/configure-cloudsql-psql
+      ALTER USER $POSTGRES_USER_NAME WITH REPLICATION; -- needed to create the replication slot
+      DO \$\$
+      BEGIN
+        -- TODO (#19811) drop slot, pub if table list doesn't match
+        IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '$PUBLICATION_NAME') THEN
+          CREATE PUBLICATION $PUBLICATION_NAME
+            FOR TABLE $TABLES_TO_REPLICATE_JOINED;
+        END IF;
+      END \$\$;
+      COMMIT; -- otherwise fails with "cannot create logical replication slot
+              -- in transaction that has performed writes"
+      DO \$\$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '$REPLICATION_SLOT_NAME') THEN
+          PERFORM PG_CREATE_LOGICAL_REPLICATION_SLOT
+            ('$REPLICATION_SLOT_NAME', 'pgoutput');
+        END IF;
+      END \$\$;
+      COMMIT;
+      ALTER USER $REPLICATOR_USER_NAME WITH REPLICATION;
+      GRANT SELECT ON ALL TABLES
+        IN SCHEMA $SCHEMA_NAME TO $REPLICATOR_USER_NAME;
+      GRANT USAGE ON SCHEMA $SCHEMA_NAME TO $REPLICATOR_USER_NAME;
+      ALTER DEFAULT PRIVILEGES IN SCHEMA $SCHEMA_NAME
+        GRANT SELECT ON TABLES TO $REPLICATOR_USER_NAME;
+      COMMIT;
 EOT
+    ;;
+  delete-pub-rep-slot)
+    cat > "$TMP_SQL_FILE" <<EOT
+      SET search_path TO $SCHEMA_NAME;
+      DO \$\$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '$REPLICATION_SLOT_NAME') THEN
+          PERFORM PG_DROP_REPLICATION_SLOT('$REPLICATION_SLOT_NAME');
+        END IF;
+      END \$\$;
+      DO \$\$
+      BEGIN
+        IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '$PUBLICATION_NAME') THEN
+          DROP PUBLICATION $PUBLICATION_NAME;
+        END IF;
+      END \$\$;
+EOT
+    ;;
+esac
 
 # upload SQL to temporary bucket
 gsutil cp "$TMP_SQL_FILE" "$GCS_URI"
 
 # then import into Cloud SQL
-gcloud sql import sql $POSTGRES_INSTANCE_NAME "$GCS_URI" \
+gcloud sql import sql "$POSTGRES_INSTANCE_NAME" "$GCS_URI" \
   --database="$SCAN_APP_DATABASE_NAME" \
   --user="$POSTGRES_USER_NAME" \
   --quiet
