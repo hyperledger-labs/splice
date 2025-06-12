@@ -314,9 +314,11 @@ final case class CantonParameters(
     enableAdditionalConsistencyChecks: Boolean = false,
     manualStart: Boolean = false,
     startupParallelism: Option[PositiveInt] = None,
-    nonStandardConfig: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    nonStandardConfig: Boolean = true,
     sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
-    alphaVersionSupport: Boolean = false,
+    // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
+    alphaVersionSupport: Boolean = true,
     betaVersionSupport: Boolean = false,
     portsFile: Option[String] = None,
     timeouts: TimeoutSettings = TimeoutSettings(),
@@ -1029,6 +1031,17 @@ object CantonConfig {
     lazy implicit val bftBlockOrdererPruningConfigReader
         : ConfigReader[BftBlockOrdererConfig.PruningConfig] =
       deriveReader[BftBlockOrdererConfig.PruningConfig]
+    lazy implicit val bftBlockOrdererLeaderSelectionPolicyHowLongToBlacklistConfigReader
+        : ConfigReader[BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowLongToBlacklist] =
+      deriveEnumerationReader[BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowLongToBlacklist]
+    lazy implicit val bftBlockOrdererLeaderSelectionPolicyHowManyCanWeBlacklistConfigReader
+        : ConfigReader[BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowManyCanWeBlacklist] =
+      deriveEnumerationReader[
+        BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowManyCanWeBlacklist
+      ]
+    lazy implicit val bftBlockOrdererLeaderSelectionPolicyConfigReader
+        : ConfigReader[BftBlockOrdererConfig.LeaderSelectionPolicyConfig] =
+      deriveEnumerationReader[BftBlockOrdererConfig.LeaderSelectionPolicyConfig]
     lazy implicit val bftBlockOrdererConfigReader: ConfigReader[BftBlockOrdererConfig] =
       deriveReader[BftBlockOrdererConfig]
     lazy implicit val sequencerConfigBftSequencerReader
@@ -1638,6 +1651,17 @@ object CantonConfig {
     lazy implicit val bftBlockOrdererPruningConfigWriter
         : ConfigWriter[BftBlockOrdererConfig.PruningConfig] =
       deriveWriter[BftBlockOrdererConfig.PruningConfig]
+    lazy implicit val bftBlockOrdererLeaderSelectionPolicyHowLongToBlacklistConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowLongToBlacklist] =
+      deriveEnumerationWriter[BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowLongToBlacklist]
+    lazy implicit val bftBlockOrdererLeaderSelectionPolicyHowManyCanWeBlacklistConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowManyCanWeBlacklist] =
+      deriveEnumerationWriter[
+        BftBlockOrdererConfig.LeaderSelectionPolicyConfig.HowManyCanWeBlacklist
+      ]
+    lazy implicit val bftBlockOrdererLeaderSelectionPolicyConfigWriter
+        : ConfigWriter[BftBlockOrdererConfig.LeaderSelectionPolicyConfig] =
+      deriveEnumerationWriter[BftBlockOrdererConfig.LeaderSelectionPolicyConfig]
     lazy implicit val bftBlockOrdererConfigWriter: ConfigWriter[BftBlockOrdererConfig] =
       deriveWriter[BftBlockOrdererConfig]
 
@@ -1982,7 +2006,7 @@ object CantonConfig {
         .foldLeft(c) { case (subConfig, (key, obj)) =>
           subConfig.withValue(key, goVal(key, obj))
         }
-    go(config.resolve()) // Resolve the config _before_ redacting confidential information
+    go(config.resolve()) // Resolve config _before_ redacting confidential fields
       .root()
       .get("canton")
       .render(CantonConfig.defaultConfigRenderer)

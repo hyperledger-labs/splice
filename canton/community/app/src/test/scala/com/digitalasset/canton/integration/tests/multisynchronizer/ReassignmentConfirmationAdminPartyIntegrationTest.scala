@@ -86,10 +86,23 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
         signatory = participant1.parties.enable(
           "signatory",
           synchronizeParticipants = Seq(participant2),
+          synchronizer = daName,
         )
+        participant1.parties.enable(
+          "signatory",
+          synchronizeParticipants = Seq(participant2),
+          synchronizer = acmeName,
+        )
+
         observer = participant2.parties.enable(
           "observer",
           synchronizeParticipants = Seq(participant1),
+          synchronizer = daName,
+        )
+        participant2.parties.enable(
+          "observer",
+          synchronizeParticipants = Seq(participant1),
+          synchronizer = acmeName,
         )
 
         programmableSequencers.put(
@@ -185,7 +198,7 @@ sealed trait ReassignmentConfirmationAdminPartyIntegrationTest
       participant2.ledger_api.state.acs
         .active_contracts_of_party(party = observer)
         .find(_.createdEvent.value.contractId == iou.id.contractId)
-        .map(_.synchronizerId) shouldBe Some(acmeId.toProtoPrimitive)
+        .map(_.synchronizerId) shouldBe Some(acmeId.logical.toProtoPrimitive)
     }
   }
 

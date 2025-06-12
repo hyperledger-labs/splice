@@ -74,7 +74,8 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                     .withDescription("Sequencer is not yet initialized")
                     .asRuntimeException()
                 )
-              case Some(sequencerSynchronizerId) if sequencerSynchronizerId != synchronizerId =>
+              case Some(sequencerSynchronizerId)
+                  if sequencerSynchronizerId.logical != synchronizerId =>
                 Future.failed(
                   Status.INTERNAL
                     .withDescription(

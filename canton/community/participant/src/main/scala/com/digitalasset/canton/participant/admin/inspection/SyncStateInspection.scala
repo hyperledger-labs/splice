@@ -13,7 +13,12 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, NonNegativeLong}
 import com.digitalasset.canton.crypto.SyncCryptoApiParticipantProvider
-import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond, Offset}
+import com.digitalasset.canton.data.{
+  BufferedAcsCommitment,
+  CantonTimestamp,
+  CantonTimestampSecond,
+  Offset,
+}
 import com.digitalasset.canton.ledger.participant.state.SynchronizerIndex
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -25,8 +30,8 @@ import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection.
 }
 import com.digitalasset.canton.participant.protocol.RequestJournal
 import com.digitalasset.canton.participant.pruning.SortedReconciliationIntervalsProviderFactory
+import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.ActiveContractStore.ActivenessChangeDetail
-import com.digitalasset.canton.participant.store.{SyncPersistentState, *}
 import com.digitalasset.canton.participant.sync.{
   ConnectedSynchronizersLookup,
   SyncPersistentStateManager,
@@ -77,6 +82,7 @@ import java.time.Instant
 import scala.collection.immutable.SortedMap
 import scala.concurrent.{ExecutionContext, Future}
 
+// TODO(#25483) Should this be physical?
 trait JournalGarbageCollectorControl {
   def disable(synchronizerId: SynchronizerId)(implicit traceContext: TraceContext): Future[Unit]
   def enable(synchronizerId: SynchronizerId)(implicit traceContext: TraceContext): Unit
@@ -524,7 +530,7 @@ final class SyncStateInspection(
     timeouts.inspection
       .awaitUS(s"$functionFullName from $start to $end on $synchronizerAlias")(
         getOrFail(getPersistentState(synchronizerAlias), synchronizerAlias).acsCommitmentStore
-          .searchComputedBetween(start, end, counterParticipant.toList)
+          .searchComputedBetween(start, end, counterParticipant.map(NonEmpty.mk(Seq, _)))
       )
       .asGrpcResponse
 
@@ -549,13 +555,13 @@ final class SyncStateInspection(
     timeouts.inspection
       .awaitUS(s"$functionFullName from $start to $end on $synchronizerAlias")(
         getOrFail(getPersistentState(synchronizerAlias), synchronizerAlias).acsCommitmentStore
-          .searchReceivedBetween(start, end, counterParticipant.toList)
+          .searchReceivedBetween(start, end, counterParticipant.map(NonEmpty.mk(Seq, _)))
       )
       .asGrpcResponse
 
   def crossSynchronizerSentCommitmentMessages(
       synchronizerPeriods: Seq[SynchronizerSearchCommitmentPeriod],
-      counterParticipants: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]],
       states: Seq[CommitmentPeriodState],
       verbose: Boolean,
   )(implicit traceContext: TraceContext): Either[String, Iterable[SentAcsCommitment]] =
@@ -571,18 +577,22 @@ final class SyncStateInspection(
 
             result = for {
               computed <- persistentState.acsCommitmentStore
-                .searchComputedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+                .searchComputedBetween(dp.fromExclusive, dp.toInclusive, counterParticipantsFilter)
               received <-
                 if (verbose)
                   persistentState.acsCommitmentStore
-                    .searchReceivedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+                    .searchReceivedBetween(
+                      dp.fromExclusive,
+                      dp.toInclusive,
+                      counterParticipantsFilter,
+                    )
                     .map(iter => iter.map(rec => rec.message))
                 else FutureUnlessShutdown.pure(Seq.empty)
               outstanding <- persistentState.acsCommitmentStore
                 .outstanding(
                   dp.fromExclusive,
                   dp.toInclusive,
-                  counterParticipants,
+                  counterParticipantsFilter,
                   includeMatchedPeriods = true,
                 )
                 .map { collection =>
@@ -622,7 +632,7 @@ final class SyncStateInspection(
 
   def crossSynchronizerReceivedCommitmentMessages(
       synchronizerPeriods: Seq[SynchronizerSearchCommitmentPeriod],
-      counterParticipants: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]],
       states: Seq[CommitmentPeriodState],
       verbose: Boolean,
   )(implicit traceContext: TraceContext): Either[String, Iterable[ReceivedAcsCommitment]] =
@@ -639,16 +649,20 @@ final class SyncStateInspection(
               computed <-
                 if (verbose)
                   persistentState.acsCommitmentStore
-                    .searchComputedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+                    .searchComputedBetween(
+                      dp.fromExclusive,
+                      dp.toInclusive,
+                      counterParticipantsFilter,
+                    )
                 else FutureUnlessShutdown.pure(Seq.empty)
               received <- persistentState.acsCommitmentStore
-                .searchReceivedBetween(dp.fromExclusive, dp.toInclusive, counterParticipants)
+                .searchReceivedBetween(dp.fromExclusive, dp.toInclusive, counterParticipantsFilter)
                 .map(iter => iter.map(rec => rec.message))
               outstanding <- persistentState.acsCommitmentStore
                 .outstanding(
                   dp.fromExclusive,
                   dp.toInclusive,
-                  counterParticipants,
+                  counterParticipantsFilter,
                   includeMatchedPeriods = true,
                 )
 
@@ -656,9 +670,8 @@ final class SyncStateInspection(
                 .peekThrough(dp.toInclusive) // peekThrough takes an upper bound parameter
                 .map(iter =>
                   iter.filter(cmt =>
-                    cmt.period.fromExclusive >= dp.fromExclusive && cmt.synchronizerId == dp.indexedSynchronizer.synchronizerId && (counterParticipants.isEmpty ||
-                      counterParticipants
-                        .contains(cmt.sender))
+                    cmt.period.fromExclusive >= dp.fromExclusive && cmt.synchronizerId == dp.indexedSynchronizer.synchronizerId && (counterParticipantsFilter
+                      .fold(true)(_.contains(cmt.sender)))
                   )
                 )
             } yield ReceivedAcsCommitment
@@ -697,14 +710,14 @@ final class SyncStateInspection(
     val persistentState = getPersistentState(synchronizerAlias)
     timeouts.inspection.awaitUS(s"$functionFullName from $start to $end on $synchronizerAlias")(
       getOrFail(persistentState, synchronizerAlias).acsCommitmentStore
-        .outstanding(start, end, counterParticipant.toList)
+        .outstanding(start, end, counterParticipant.map(NonEmpty.mk(Seq, _)))
     )
   }.asGrpcResponse
 
   def bufferedCommitments(
       synchronizerAlias: SynchronizerAlias,
       endAtOrBefore: CantonTimestamp,
-  )(implicit traceContext: TraceContext): Iterable[AcsCommitment] = {
+  )(implicit traceContext: TraceContext): Iterable[BufferedAcsCommitment] = {
     val persistentState = getPersistentState(synchronizerAlias)
     timeouts.inspection
       .awaitUS(s"$functionFullName to and including $endAtOrBefore on $synchronizerAlias")(
@@ -739,7 +752,7 @@ final class SyncStateInspection(
         (for {
           cleanTs <- OptionT(
             participantNodePersistentState.value.ledgerApiStore
-              .cleanSynchronizerIndex(state.indexedSynchronizer.synchronizerId)
+              .cleanSynchronizerIndex(state.synchronizerIdx.synchronizerId)
               .map(_.map(_.recordTime))
           )
           cleanTimeOfRequest <- OptionT(
@@ -754,7 +767,7 @@ final class SyncStateInspection(
     getPersistentStateE(synchronizerAlias)
       .map(state =>
         participantNodePersistentState.value.ledgerApiStore
-          .cleanSynchronizerIndex(state.indexedSynchronizer.synchronizerId)
+          .cleanSynchronizerIndex(state.synchronizerIdx.synchronizerId)
       )
 
   def lookupCleanSequencerCounter(synchronizerAlias: SynchronizerAlias)(implicit
@@ -763,7 +776,7 @@ final class SyncStateInspection(
     getPersistentStateE(synchronizerAlias)
       .map(state =>
         participantNodePersistentState.value.ledgerApiStore
-          .cleanSynchronizerIndex(state.indexedSynchronizer.synchronizerId)
+          .cleanSynchronizerIndex(state.synchronizerIdx.synchronizerId)
           .flatMap(
             _.flatMap(_.sequencerIndex)
               .traverse(sequencerIndex =>
@@ -831,18 +844,47 @@ final class SyncStateInspection(
       .fetchAllSlowCounterParticipantConfig()
 
   def getIntervalsBehindForParticipants(
-      synchronizers: Seq[SynchronizerId],
-      participants: Seq[ParticipantId],
+      synchronizersFilter: Option[NonEmpty[Seq[SynchronizerId]]],
+      participantsFilter: Option[NonEmpty[Seq[ParticipantId]]],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[CounterParticipantIntervalsBehind]] = {
-    val result = for {
-      (synchronizerId, syncPersistentState) <-
-        syncPersistentStateManager.getAll
-          .filter { case (synchronizer, _) =>
-            synchronizers.contains(synchronizer) || synchronizers.isEmpty
-          }
-    } yield for {
+    val filteredStates = synchronizersFilter match {
+      case Some(synchronizers) =>
+        syncPersistentStateManager.getAll.values.filter { state =>
+          synchronizers.contains(state.logicalSynchronizerId)
+        }
+
+      case None => syncPersistentStateManager.getAll.values
+    }
+
+    for {
+      allKnownParticipants <- findAllKnownParticipants(synchronizersFilter, participantsFilter).map(
+        _.view.mapValues(_.excl(participantId)).toMap
+      )
+
+      result <- MonadUtil.sequentialTraverse(filteredStates.toSeq)(
+        getIntervalsBehindForParticipants(allKnownParticipants, participantsFilter, _)
+      )
+    } yield result.flatten
+  }
+
+  /** @param filteredKnownParticipants
+    *   All known participants except the local one
+    * @param participantsFilter
+    *   Optional filter on the participants
+    * @return
+    */
+  private def getIntervalsBehindForParticipants(
+      filteredKnownParticipants: Map[SynchronizerId, Set[ParticipantId]],
+      participantsFilter: Option[NonEmpty[Seq[ParticipantId]]],
+      syncPersistentState: SyncPersistentState,
+  )(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Seq[CounterParticipantIntervalsBehind]] = {
+    val synchronizerId = syncPersistentState.logicalSynchronizerId
+
+    for {
       lastSent <- syncPersistentState.acsCommitmentStore.lastComputedAndSent(traceContext)
 
       lastSentFinal = lastSent.fold(CantonTimestamp.MinValue)(_.forgetRefinement)
@@ -850,7 +892,7 @@ final class SyncStateInspection(
         .outstanding(
           CantonTimestamp.MinValue,
           lastSentFinal,
-          participants,
+          participantsFilter,
           includeMatchedPeriods = true,
         )
 
@@ -859,8 +901,7 @@ final class SyncStateInspection(
         lastSentFinal,
       )
 
-      filteredAllParticipants <- findAllKnownParticipants(synchronizers, participants)
-      allParticipantIds = filteredAllParticipants.values.flatten.toSet
+      allParticipantIds = filteredKnownParticipants.values.flatten.toSet
 
       matchedFilteredByYoungest = outstanding
         .filter { case (_, _, state) => state == Matched }
@@ -896,7 +937,7 @@ final class SyncStateInspection(
     } yield {
       val newestMatchPerParticipant = matchedFilteredByYoungest
         .filter { case (_, participant, _) =>
-          participants.contains(participant) || participants.isEmpty
+          participantsFilter.fold(true)(_.contains(participant))
         }
         .map { case (period, participant, _) =>
           CounterParticipantIntervalsBehind(
@@ -930,7 +971,6 @@ final class SyncStateInspection(
         }
       newestMatchPerParticipant ++ participantsWithoutMatches
     }
-    FutureUnlessShutdown.sequence(result).map(_.flatten)
   }
 
   def addOrUpdateConfigsForSlowCounterParticipants(
@@ -950,7 +990,7 @@ final class SyncStateInspection(
         getPersistentState(synchronizerAlias)
           .toRight(s"Unknown synchronizer $synchronizerAlias")
       )
-      synchronizerId = state.indexedSynchronizer.synchronizerId
+      synchronizerId = state.physicalSynchronizerId
       unsequencedSubmissions <- EitherT.right(
         participantNodePersistentState.value.inFlightSubmissionStore
           .lookupUnsequencedUptoUnordered(synchronizerId, CantonTimestamp.now())
@@ -977,7 +1017,7 @@ final class SyncStateInspection(
           .awaitUS(functionFullName)(
             participantNodePersistentState.value.ledgerApiStore
               .onlyForTestingNumberOfAcceptedTransactionsFor(
-                synchronizerPersistentState.indexedSynchronizer.synchronizerId
+                synchronizerPersistentState.synchronizerIdx.synchronizerId
               )
           )
           .onShutdown(0)
@@ -1028,31 +1068,31 @@ final class SyncStateInspection(
       .map(_.synchronizerHandle.syncPersistentState.acsInspection)
 
   def findAllKnownParticipants(
-      synchronizerFilter: Seq[SynchronizerId] = Seq.empty,
-      participantFilter: Seq[ParticipantId] = Seq.empty,
+      synchronizerFilter: Option[NonEmpty[Seq[SynchronizerId]]],
+      participantFilter: Option[NonEmpty[Seq[ParticipantId]]],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[SynchronizerId, Set[ParticipantId]]] = {
-    val result = for {
-      (synchronizerId, _) <-
-        syncPersistentStateManager.getAll.filter { case (synchronizerId, _) =>
-          synchronizerFilter.contains(synchronizerId) || synchronizerFilter.isEmpty
-        }
-    } yield for {
-      _ <- FutureUnlessShutdown.unit
-      synchronizerTopoClient = syncCrypto.ips.tryForSynchronizer(synchronizerId)
-      ipsSnapshot <- synchronizerTopoClient.awaitSnapshot(
-        synchronizerTopoClient.approximateTimestamp
-      )
-      allMembers <- ipsSnapshot.allMembers()
-      allParticipants = allMembers
-        .filter(_.code == ParticipantId.Code)
-        .map(member => ParticipantId.apply(member.uid))
-        .excl(participantId)
-        .filter(participantFilter.contains(_) || participantFilter.isEmpty)
-    } yield (synchronizerId, allParticipants)
+    val filteredSynchronizerIds = syncPersistentStateManager.getAllLatest.keySet.toSeq
+      .filter { synchronizerId =>
+        synchronizerFilter.fold(true)(_.contains(synchronizerId))
+      }
 
-    FutureUnlessShutdown.sequence(result).map(_.toMap)
+    MonadUtil
+      .sequentialTraverse(filteredSynchronizerIds) { synchronizerId =>
+        val synchronizerTopoClient = syncCrypto.ips.tryForSynchronizer(synchronizerId)
+        val ipsSnapshot = synchronizerTopoClient.currentSnapshotApproximation
+
+        ipsSnapshot
+          .allMembers()
+          .map(
+            _.collect {
+              case id: ParticipantId if participantFilter.fold(true)(_.contains(id)) => id
+            }
+          )
+          .map(synchronizerId -> _)
+      }
+      .map(_.toMap)
   }
 
   def cleanSequencedEventStoreAboveCleanSynchronizerIndex(synchronizerAlias: SynchronizerAlias)(
@@ -1062,7 +1102,7 @@ final class SyncStateInspection(
       getPersistentState(synchronizerAlias).map { synchronizerState =>
         timeouts.inspection.await(functionFullName)(
           participantNodePersistentState.value.ledgerApiStore
-            .cleanSynchronizerIndex(synchronizerState.indexedSynchronizer.synchronizerId)
+            .cleanSynchronizerIndex(synchronizerState.synchronizerIdx.synchronizerId)
             .flatMap(
               _.flatMap(_.sequencerIndex)
                 .traverse(sequencerIndex =>

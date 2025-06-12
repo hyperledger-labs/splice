@@ -5,27 +5,24 @@ package com.digitalasset.canton.protocol.messages
 
 import cats.Functor
 import cats.data.EitherT
-import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.DecryptionError.InvariantViolation
 import com.digitalasset.canton.crypto.SyncCryptoError.SyncCryptoDecryptionError
+import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError
 import com.digitalasset.canton.crypto.store.CryptoPrivateStoreError.FailedToReadKey
-import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPublicStore}
 import com.digitalasset.canton.crypto.v30 as V30Crypto
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.messages.EncryptedView.checkEncryptionSpec
 import com.digitalasset.canton.protocol.messages.EncryptedViewMessageError.SyncCryptoDecryptError
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.{ParsingResult, parseRequiredNonEmpty}
 import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.*
@@ -143,52 +140,6 @@ object EncryptedView {
         .flatMap(deserialize)
         .map(CompressedView(_))
   }
-
-  def checkEncryptionSpec(
-      cryptoPublicStore: CryptoPublicStore,
-      keyId: Fingerprint,
-      encryptionAlgorithmSpec: EncryptionAlgorithmSpec,
-      allowedEncryptionSpecs: RequiredEncryptionSpecs,
-  )(implicit
-      executionContext: ExecutionContext,
-      traceContext: TraceContext,
-  ): EitherT[FutureUnlessShutdown, DecryptionError, Unit] =
-    for {
-      encryptionKey <- cryptoPublicStore
-        .encryptionKey(keyId)
-        .toRight(
-          DecryptionError.InvalidEncryptionKey(s"Encryption key $keyId not found")
-        )
-      _ <- (if (!allowedEncryptionSpecs.keys.contains(encryptionKey.keySpec))
-              Left(
-                DecryptionError.UnsupportedKeySpec(
-                  encryptionKey.keySpec,
-                  allowedEncryptionSpecs.keys,
-                )
-              )
-            else if (
-              !encryptionAlgorithmSpec.supportedEncryptionKeySpecs.contains(encryptionKey.keySpec)
-            )
-              Left(
-                DecryptionError.UnsupportedKeySpec(
-                  encryptionKey.keySpec,
-                  encryptionAlgorithmSpec.supportedEncryptionKeySpecs,
-                )
-              )
-            else Either.unit).toEitherT[FutureUnlessShutdown]
-
-      _ <- EitherT
-        .cond[FutureUnlessShutdown](
-          allowedEncryptionSpecs.algorithms.contains(encryptionAlgorithmSpec),
-          (),
-          DecryptionError.UnsupportedAlgorithmSpec(
-            encryptionAlgorithmSpec,
-            allowedEncryptionSpecs.algorithms,
-          ),
-        )
-        .leftWiden[DecryptionError]
-    } yield ()
-
 }
 
 /** An encrypted view message.
@@ -212,7 +163,7 @@ final case class EncryptedViewMessage[+VT <: ViewType](
     viewHash: ViewHash,
     sessionKeys: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]],
     encryptedView: EncryptedView[VT],
-    override val synchronizerId: SynchronizerId,
+    override val synchronizerId: PhysicalSynchronizerId,
     viewEncryptionScheme: SymmetricKeyScheme,
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -230,7 +181,7 @@ final case class EncryptedViewMessage[+VT <: ViewType](
       viewHash: ViewHash = this.viewHash,
       sessionKeyRandomness: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]] = this.sessionKeys,
       encryptedView: EncryptedView[A] = this.encryptedView,
-      synchronizerId: SynchronizerId = this.synchronizerId,
+      synchronizerId: PhysicalSynchronizerId = this.synchronizerId,
       viewEncryptionScheme: SymmetricKeyScheme = this.viewEncryptionScheme,
   ): EncryptedViewMessage[A] = new EncryptedViewMessage(
     submittingParticipantSignature,
@@ -247,7 +198,7 @@ final case class EncryptedViewMessage[+VT <: ViewType](
     submittingParticipantSignature = submittingParticipantSignature.map(_.toProtoV30),
     viewHash = viewHash.toProtoPrimitive,
     sessionKeyLookup = sessionKeys.map(EncryptedViewMessage.serializeSessionKeyEntry),
-    synchronizerId = synchronizerId.toProtoPrimitive,
+    physicalSynchronizerId = synchronizerId.toProtoPrimitive,
     viewType = viewType.toProtoEnum,
   )
 
@@ -277,7 +228,7 @@ final case class EncryptedViewMessage[+VT <: ViewType](
 object EncryptedViewMessage extends VersioningCompanion[EncryptedViewMessage[ViewType]] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.EncryptedViewMessage)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.EncryptedViewMessage)(
       supportedProtoVersion(_)(EncryptedViewMessage.fromProto),
       _.toProtoV30,
     )
@@ -288,7 +239,7 @@ object EncryptedViewMessage extends VersioningCompanion[EncryptedViewMessage[Vie
       viewHash: ViewHash,
       sessionKeys: NonEmpty[Seq[AsymmetricEncrypted[SecureRandomness]]],
       encryptedView: EncryptedView[VT],
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       viewEncryptionScheme: SymmetricKeyScheme,
       protocolVersion: ProtocolVersion,
   ): EncryptedViewMessage[VT] = EncryptedViewMessage(
@@ -342,20 +293,22 @@ object EncryptedViewMessage extends VersioningCompanion[EncryptedViewMessage[Vie
         "session key",
         sessionKeyMapP,
       )
-      synchronizerUid <- UniqueIdentifier.fromProtoPrimitive(synchronizerIdP, "synchronizer_id")
+      synchronizerId <- PhysicalSynchronizerId.fromProtoPrimitive(
+        synchronizerIdP,
+        "physical_synchronizer_id",
+      )
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield new EncryptedViewMessage(
       signature,
       viewHash,
       sessionKeyRandomnessNE,
       encryptedView,
-      SynchronizerId(synchronizerUid),
+      synchronizerId,
       viewEncryptionScheme,
     )(rpv)
   }
 
   def decryptRandomness[VT <: ViewType](
-      allowedEncryptionSpecs: RequiredEncryptionSpecs,
       snapshot: SynchronizerSnapshotSyncCryptoApi,
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
       encrypted: EncryptedViewMessage[VT],
@@ -397,19 +350,6 @@ object EncryptedViewMessage extends VersioningCompanion[EncryptedViewMessage[Vie
             ),
           )
         }
-      _ <- checkEncryptionSpec(
-        snapshot.crypto.cryptoPublicStore,
-        encryptedSessionKeyForParticipant.encryptedFor,
-        encryptedSessionKeyForParticipant.encryptionAlgorithmSpec,
-        allowedEncryptionSpecs,
-      )
-        .leftMap(err =>
-          EncryptedViewMessageError
-            .SyncCryptoDecryptError(
-              SyncCryptoDecryptionError(err)
-            )
-        )
-
       // we get the randomness for the session key from the message or by searching the cache. If this encrypted
       // randomness is in the cache this means that a previous view with the same recipients tree has been
       // received before.
@@ -488,7 +428,6 @@ object EncryptedViewMessage extends VersioningCompanion[EncryptedViewMessage[Vie
   }
 
   def decryptFor[VT <: ViewType](
-      staticSynchronizerParameters: StaticSynchronizerParameters,
       snapshot: SynchronizerSnapshotSyncCryptoApi,
       sessionKeyStore: ConfirmationRequestSessionKeyStore,
       encrypted: EncryptedViewMessage[VT],
@@ -499,35 +438,19 @@ object EncryptedViewMessage extends VersioningCompanion[EncryptedViewMessage[Vie
       ec: ExecutionContext,
       tc: TraceContext,
   ): EitherT[FutureUnlessShutdown, EncryptedViewMessageError, VT#View] =
-    // verify that the view symmetric encryption scheme is part of the required schemes
-    if (
-      !staticSynchronizerParameters.requiredSymmetricKeySchemes
-        .contains(encrypted.viewEncryptionScheme)
-    ) {
-      EitherT.leftT[FutureUnlessShutdown, VT#View](
-        EncryptedViewMessageError.SymmetricDecryptError(
-          InvariantViolation(
-            s"The view symmetric encryption scheme ${encrypted.viewEncryptionScheme} is not " +
-              s"part of the required schemes: ${staticSynchronizerParameters.requiredSymmetricKeySchemes}"
-          )
+    for {
+      viewRandomness <- optViewRandomness.fold(
+        decryptRandomness(
+          snapshot,
+          sessionKeyStore,
+          encrypted,
+          participantId,
         )
+      )(r => EitherT.pure(r))
+      decrypted <- decryptWithRandomness(snapshot, encrypted, viewRandomness)(
+        deserialize
       )
-    } else {
-      for {
-        viewRandomness <- optViewRandomness.fold(
-          decryptRandomness(
-            staticSynchronizerParameters.requiredEncryptionSpecs,
-            snapshot,
-            sessionKeyStore,
-            encrypted,
-            participantId,
-          )
-        )(r => EitherT.pure(r))
-        decrypted <- decryptWithRandomness(snapshot, encrypted, viewRandomness)(
-          deserialize
-        )
-      } yield decrypted
-    }
+    } yield decrypted
 
   implicit val encryptedViewMessageCast
       : ProtocolMessageContentCast[EncryptedViewMessage[ViewType]] =
@@ -563,8 +486,8 @@ object EncryptedViewMessageError {
   ) extends EncryptedViewMessageError
 
   final case class WrongSynchronizerIdInEncryptedViewMessage(
-      declaredSynchronizerId: SynchronizerId,
-      containedSynchronizerId: SynchronizerId,
+      declaredSynchronizerId: PhysicalSynchronizerId,
+      containedSynchronizerId: PhysicalSynchronizerId,
   ) extends EncryptedViewMessageError
 
   final case class WrongRandomnessLength(

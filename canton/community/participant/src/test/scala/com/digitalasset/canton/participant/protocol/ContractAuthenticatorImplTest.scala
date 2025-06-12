@@ -8,14 +8,15 @@ import com.digitalasset.canton.crypto.provider.symbolic.SymbolicPureCrypto
 import com.digitalasset.canton.crypto.{Salt, TestSalt}
 import com.digitalasset.canton.data.{CantonTimestamp, ViewPosition}
 import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.ExampleTransactionFactory.lfHash
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.util.LfTransactionBuilder.{defaultPackageName, defaultTemplateId}
 import com.digitalasset.canton.{BaseTest, LfPackageName, LfPartyId, protocol}
-import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.data.Ref.IdString
+import com.digitalasset.daml.lf.data.{Bytes, ImmArray}
 import com.digitalasset.daml.lf.transaction.Versioned
 import com.digitalasset.daml.lf.value.Value
 import org.scalatest.Assertion
@@ -60,7 +61,7 @@ class ContractAuthenticatorImplTest extends AnyWordSpec with BaseTest {
             "authenticate" in new WithContractAuthenticator(
               authContractIdVersion
             ) {
-              lazy override val contractInstance: LfContractInst =
+              lazy override val contractInstance: LfThinContractInst =
                 baseInstance.map(_.copy(arg = normalizedArg))
               contractAuthenticator.authenticateSerializable(contract) shouldBe Either.unit
 
@@ -82,10 +83,14 @@ class ContractAuthenticatorImplTest extends AnyWordSpec with BaseTest {
         }
 
         "using a generic contract id" should {
+
+          def genericContractId(discriminator: Int, suffix: Int): LfContractId =
+            LfContractId.V1(lfHash(discriminator), Bytes.assertFromString(f"$suffix%04x"))
+
           "correctly authenticate the contract" in new WithContractAuthenticator(
             authContractIdVersion
           ) {
-            val nonAuthenticatedContractId = ExampleTransactionFactory.suffixedId(1, 2)
+            val nonAuthenticatedContractId = genericContractId(1, 2)
             contractAuthenticator.authenticateSerializable(
               contract.copy(contractId = nonAuthenticatedContractId)
             ) shouldBe Left(
@@ -303,7 +308,8 @@ class WithContractAuthenticator(contractIdVersion: CantonContractIdVersion) exte
     unicumGenerator
   )
 
-  protected lazy val contractInstance: LfContractInst = ExampleTransactionFactory.contractInstance()
+  protected lazy val contractInstance: LfThinContractInst =
+    ExampleTransactionFactory.contractInstance()
   protected lazy val ledgerTime: CantonTimestamp = CantonTimestamp.MinValue
   protected lazy val alice: IdString.Party = LfPartyId.assertFromString("alice")
   protected lazy val signatories: Set[IdString.Party] =

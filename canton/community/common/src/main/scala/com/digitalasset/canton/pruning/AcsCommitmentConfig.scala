@@ -14,6 +14,7 @@ import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.version.*
 
+// TODO(#25483) Should that be physical?
 final case class ConfigForSynchronizerThresholds(
     synchronizerId: SynchronizerId,
     thresholdDistinguished: NonNegativeLong,
@@ -144,7 +145,7 @@ object CounterParticipantIntervalsBehind
 
   val supportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(
         partV30.CounterParticipantInfo
       )(fromProtoV30),

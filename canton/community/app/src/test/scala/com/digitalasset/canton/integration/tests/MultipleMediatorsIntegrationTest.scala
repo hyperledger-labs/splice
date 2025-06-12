@@ -33,6 +33,7 @@ import com.digitalasset.canton.integration.{
   IsolatedEnvironments,
   TestConsoleEnvironment,
 }
+import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.SynchronizerWithoutMediatorError
 import com.digitalasset.canton.sequencing.protocol.{
   ClosedEnvelope,
@@ -54,7 +55,7 @@ import org.scalatest.Assertion
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-trait MultipleMediatorsBaseTest { this: BaseTest with HasProgrammableSequencer =>
+trait MultipleMediatorsBaseTest { this: BaseTest & HasProgrammableSequencer =>
 
   protected def participantSeesMediators(
       ref: ParticipantReference,
@@ -127,17 +128,23 @@ trait MultipleMediatorsBaseTest { this: BaseTest with HasProgrammableSequencer =
         )
         .cause
 
+      val errorUnknownSender = SequencerErrors
+        .SenderUnknown(
+          s"(Eligible) Senders are unknown: MED::"
+        )
+        .cause
+
       loggerFactory.assertLoggedWarningsAndErrorsSeq(
         submit(),
-        logEntries => {
-          logEntries.size should be <= 3
-          logEntries.head.warningMessage should include(error) // warning
-          logEntries.last.errorMessage should include(error) // failure of console command
-          if (logEntries.sizeIs == 3) {
-            // failure of the submission when no tracking is used
-            logEntries(1).warningMessage should include(error)
-          } else succeed
-        },
+        LogEntry.assertLogSeq(
+          mustContainWithClue = Seq(
+            (_.warningMessage should include(error), "warning"), // warning
+            (_.errorMessage should include(error), "error"), // failure of console command
+          ),
+          mayContain = Seq(
+            _.warningMessage should include(errorUnknownSender)
+          ),
+        ),
       )
     }
 
@@ -277,7 +284,7 @@ class MultipleMediatorsIntegrationTest
         )
         val pingCount = 10
         Future
-          .traverse((1 to pingCount)) { i =>
+          .traverse(1 to pingCount) { i =>
             Future {
               participant1.health.ping(participant1, id = s"mediator-round-robin-ping-$i")
             }

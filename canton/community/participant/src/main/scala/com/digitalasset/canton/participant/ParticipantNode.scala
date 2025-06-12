@@ -13,10 +13,15 @@ import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.auth.CantonAdminToken
 import com.digitalasset.canton.common.sequencer.grpc.SequencerInfoLoader
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
-import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi, SyncCryptoApiParticipantProvider}
+import com.digitalasset.canton.crypto.{
+  Crypto,
+  CryptoPureApi,
+  SyncCryptoApiParticipantProvider,
+  SynchronizerCrypto,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.environment.*
@@ -55,6 +60,7 @@ import com.digitalasset.canton.participant.synchronizer.grpc.GrpcSynchronizerReg
 import com.digitalasset.canton.participant.topology.*
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.store.backend.ParameterStorageBackend
+import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.resource.*
 import com.digitalasset.canton.scheduler.{Schedulers, SchedulersImpl}
 import com.digitalasset.canton.sequencing.client.{RecordingConfig, ReplayConfig, SequencerClient}
@@ -291,16 +297,13 @@ class ParticipantNodeBootstrap(
 
     override protected def attempt()(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, String, Option[RunningNode[ParticipantNode]]] = {
-
-      val partyOps = new PartyOps(topologyManager, loggerFactory)
+    ): EitherT[FutureUnlessShutdown, String, Option[RunningNode[ParticipantNode]]] =
       createParticipantServices(
         participantId,
         crypto,
         adminServerRegistry,
         storage,
         engine,
-        partyOps,
         topologyManager,
         tryGetPackageDependencyResolver(),
       ).map { participantServices =>
@@ -327,7 +330,6 @@ class ParticipantNodeBootstrap(
         setInitialized(participantServices)
         Some(new RunningNode(bootstrapStageCallback, node))
       }
-    }
 
     private def createPackageOps(
         manager: SyncPersistentStateManager
@@ -360,7 +362,6 @@ class ParticipantNodeBootstrap(
         adminServerRegistry: CantonMutableHandlerRegistry,
         storage: Storage,
         engine: Engine,
-        partyOps: PartyOps,
         authorizedTopologyManager: AuthorizedTopologyManager,
         packageDependencyResolver: PackageDependencyResolver,
     )(implicit executionSequencerFactory: ExecutionSequencerFactory): EitherT[
@@ -390,24 +391,24 @@ class ParticipantNodeBootstrap(
       )
 
       for {
+        synchronizerAliasManager <- EitherT
+          .right[String](
+            SynchronizerAliasManager
+              .create(
+                registeredSynchronizersStore,
+                loggerFactory,
+              )
+          )
+
         synchronizerConnectionConfigStore <- EitherT
           .right(
             SynchronizerConnectionConfigStore.create(
               storage,
               ReleaseProtocolVersion.latest,
+              synchronizerAliasManager,
               timeouts,
               loggerFactory,
             )
-          )
-
-        synchronizerAliasManager <- EitherT
-          .right[String](
-            SynchronizerAliasManager
-              .create(
-                synchronizerConnectionConfigStore,
-                registeredSynchronizersStore,
-                loggerFactory,
-              )
           )
 
         persistentStateContainer = new LifeCycleContainer[ParticipantNodePersistentState](
@@ -437,7 +438,8 @@ class ParticipantNodeBootstrap(
           indexedStringStore,
           persistentState.map(_.acsCounterParticipantConfigStore).value,
           parameters,
-          crypto,
+          (staticSynchronizerParameters: StaticSynchronizerParameters) =>
+            SynchronizerCrypto(crypto, staticSynchronizerParameters),
           clock,
           tryGetPackageDependencyResolver(),
           persistentState.map(_.ledgerApiStore),
@@ -473,6 +475,7 @@ class ParticipantNodeBootstrap(
 
         inFlightSubmissionTracker = new InFlightSubmissionTracker(
           persistentState.map(_.inFlightSubmissionStore),
+          synchronizerConnectionConfigStore,
           commandDeduplicator,
           loggerFactory,
         )
@@ -637,12 +640,7 @@ class ParticipantNodeBootstrap(
           parameters.batchingConfig.maxPruningBatchSize,
           arguments.metrics.pruning,
           exitOnFatalFailures = arguments.parameterConfig.exitOnFatalFailures,
-          synchronizerId =>
-            synchronizerAliasManager
-              .aliasForSynchronizerId(synchronizerId)
-              .flatMap(synchronizerAlias =>
-                synchronizerConnectionConfigStore.get(synchronizerAlias).toOption.map(_.status)
-              ),
+          synchronizerConnectionConfigStore,
           parameters.processingTimeouts,
           futureSupervisor,
           loggerFactory,
@@ -688,7 +686,7 @@ class ParticipantNodeBootstrap(
           ephemeralState,
           syncPersistentStateManager,
           packageServiceContainer.asEval,
-          partyOps,
+          new PartyOps(syncPersistentStateManager.get(_).map(_.topologyManager), loggerFactory),
           topologyDispatcher,
           partyNotifier,
           syncCryptoSignerWithSessionKeys,
@@ -803,14 +801,7 @@ class ParticipantNodeBootstrap(
         adminServerRegistry
           .addServiceU(
             v30.PruningServiceGrpc.bindService(
-              new GrpcPruningService(
-                participantId,
-                sync,
-                pruningScheduler,
-                syncPersistentStateManager,
-                ips,
-                loggerFactory,
-              ),
+              new GrpcPruningService(participantId, sync, pruningScheduler, loggerFactory),
               executionContext,
             )
           )
@@ -981,7 +972,7 @@ class ParticipantNode(
 
   override def close(): Unit = () // closing is done in the bootstrap class
 
-  def readySynchronizers: Map[SynchronizerId, SubmissionReady] =
+  def readySynchronizers: Map[PhysicalSynchronizerId, SubmissionReady] =
     sync.readySynchronizers.values.toMap
 
   private def supportedProtocolVersions: Seq[ProtocolVersion] = {
@@ -993,7 +984,8 @@ class ParticipantNode(
   }
 
   override def status: ParticipantStatus = {
-    val ports = Map("ledger" -> config.ledgerApi.port, "admin" -> config.adminApi.port)
+    val ports = Map("ledger" -> config.ledgerApi.port, "admin" -> config.adminApi.port) ++
+      config.httpLedgerApi.flatMap(_.server.port).flatMap(Port.create(_).toOption).map("json" -> _)
     val synchronizers = readySynchronizers
     val topologyQueues = identityPusher.queueStatus
 

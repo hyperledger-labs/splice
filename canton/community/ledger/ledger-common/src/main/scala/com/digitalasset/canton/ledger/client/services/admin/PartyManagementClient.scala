@@ -89,6 +89,7 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
 
   def allocateParty(
       hint: Option[String],
+      synchronizerId: Option[String] = None,
       token: Option[String] = None,
   )(implicit traceContext: TraceContext): Future[PartyDetails] =
     LedgerClient
@@ -98,6 +99,8 @@ final class PartyManagementClient(service: PartyManagementServiceStub)(implicit
           partyIdHint = hint.getOrElse(""),
           localMetadata = None,
           identityProviderId = "",
+          synchronizerId = synchronizerId.getOrElse(""),
+          userId = "",
         )
       )
       .map(_.partyDetails.getOrElse(sys.error("No PartyDetails in response.")))

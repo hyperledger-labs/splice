@@ -14,12 +14,12 @@ import com.digitalasset.daml.lf.archive.{DamlLf, DarParser, Decode}
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref.{Identifier, PackageId, PackageName, PackageVersion, Party}
 import com.digitalasset.daml.lf.data.Time.Timestamp
-import com.digitalasset.daml.lf.data.{FrontStack, ImmArray, Ref, Time}
+import com.digitalasset.daml.lf.data.{Bytes, FrontStack, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.*
 import com.digitalasset.daml.lf.transaction.test.{NodeIdTransactionBuilder, TransactionBuilder}
 import com.digitalasset.daml.lf.value.Value as LfValue
-import com.digitalasset.daml.lf.value.Value.{ContractId, ContractInstance, ValueText}
+import com.digitalasset.daml.lf.value.Value.{ContractId, ThinContractInstance, ValueText}
 import org.apache.pekko.stream.scaladsl.Sink
 import org.scalatest.{AsyncTestSuite, OptionValues}
 
@@ -88,7 +88,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
   protected final val somePackageName = PackageName.assertFromString("pkg-name")
   protected final val somePackageVersion = PackageVersion.assertFromString("1.0")
   protected final val someTemplateIdFilter =
-    TemplateFilter(someTemplateId, includeCreatedEventBlob = false)
+    TemplateFilter(someTemplateId.toRef, includeCreatedEventBlob = false)
   protected final val someValueText = LfValue.ValueText("some text")
   protected final val someValueInt = LfValue.ValueInt64(1)
   protected final val someValueNumeric =
@@ -132,7 +132,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
     ),
   )
   protected final val someChoiceResult =
-    LfValue.ValueContractId(ContractId.V1(Hash.hashPrivateKey("#1")))
+    LfValue.ValueContractId(ContractId.V1(Hash.hashPrivateKey("#1"), Bytes.assertFromString("00")))
 
   protected final def someContractKey(party: Party, value: String): LfValue.ValueRecord =
     LfValue.ValueRecord(
@@ -143,11 +143,11 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
       ),
     )
 
-  private[this] val txVersion = LanguageVersion.StableVersions(LanguageVersion.Major.V2).min
+  private[this] val txVersion = LanguageVersion.Major.V2.maxStableVersion
   private[this] def newBuilder(): NodeIdTransactionBuilder = new NodeIdTransactionBuilder
 
   protected final val someContractInstance =
-    ContractInstance(
+    ThinContractInstance(
       packageName = somePackageName,
       template = someTemplateId,
       arg = someContractArgument,
@@ -156,7 +156,7 @@ private[dao] trait JdbcLedgerDaoSuite extends JdbcLedgerDaoBackend with OptionVa
 
   protected final val otherTemplateId = testIdentifier("Dummy")
   protected final val otherTemplateIdFilter =
-    TemplateFilter(otherTemplateId, includeCreatedEventBlob = false)
+    TemplateFilter(otherTemplateId.toRef, includeCreatedEventBlob = false)
   protected final val otherContractArgument = LfValue.ValueRecord(
     None,
     ImmArray(None -> LfValue.ValueParty(alice)),

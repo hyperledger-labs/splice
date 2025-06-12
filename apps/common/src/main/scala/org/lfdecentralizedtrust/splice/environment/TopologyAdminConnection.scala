@@ -144,7 +144,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       SynchronizerTimeCommands.FetchTime(
-        Some(synchronizerId),
+        Some(PhysicalSynchronizerId(synchronizerId, ProtocolVersion.v34)),
         freshnessBound =
           com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
         timeout = timeout,
@@ -248,7 +248,7 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[SequencerSynchronizerState]]] =
     runCmd(
-      TopologyAdminCommands.Read.SequencerSynchronizerState(
+      TopologyAdminCommands.Read.ListSequencerSynchronizerState(
         BaseQuery(
           store = store,
           proposals = proposals,
@@ -300,7 +300,7 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[MediatorSynchronizerState]]] = {
     runCmd(
-      TopologyAdminCommands.Read.MediatorSynchronizerState(
+      TopologyAdminCommands.Read.ListMediatorSynchronizerState(
         BaseQuery(
           store = store,
           proposals = proposals,
@@ -1131,7 +1131,7 @@ abstract class TopologyAdminConnection(
       timeQuery: TimeQuery,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[SynchronizerParametersState]]] = {
     runCmd(
-      TopologyAdminCommands.Read.SynchronizerParametersState(
+      TopologyAdminCommands.Read.ListSynchronizerParametersState(
         BaseQuery(
           storeId,
           proposals = proposals.proposals,

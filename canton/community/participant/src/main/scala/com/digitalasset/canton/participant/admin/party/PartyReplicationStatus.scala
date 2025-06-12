@@ -7,6 +7,7 @@ import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
 
 import scala.reflect.ClassTag
@@ -40,13 +41,12 @@ object PartyReplicationStatus {
     def toProto: v30.GetAddPartyStatusResponse.Status.Status
   }
 
-  final case class ProposalProcessed(params: ReplicationParams, serialO: Option[PositiveInt])
-      extends PartyReplicationStatus {
+  final case class ProposalProcessed(params: ReplicationParams) extends PartyReplicationStatus {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.ProposalProcessed
 
     override def toProto: v30.GetAddPartyStatusResponse.Status.Status =
       v30.GetAddPartyStatusResponse.Status.Status.ProposalProcessed(
-        v30.GetAddPartyStatusResponse.Status.ProposalProcessed(serialO.map(_.unwrap))
+        v30.GetAddPartyStatusResponse.Status.ProposalProcessed()
       )
   }
 
@@ -57,7 +57,8 @@ object PartyReplicationStatus {
         synchronizerId: SynchronizerId,
         sourceParticipantId: ParticipantId,
         targetParticipantId: ParticipantId,
-        serialO: Option[PositiveInt],
+        serial: PositiveInt,
+        participantPermission: ParticipantPermission,
     ): ProposalProcessed =
       ProposalProcessed(
         ReplicationParams(
@@ -66,21 +67,21 @@ object PartyReplicationStatus {
           synchronizerId,
           sourceParticipantId,
           targetParticipantId,
-        ),
-        serialO,
+          serial,
+          participantPermission,
+        )
       )
   }
   final case class AgreementAccepted(
       params: ReplicationParams,
       sequencerId: SequencerId,
-      serialO: Option[PositiveInt],
   ) extends PartyReplicationStatus {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.AgreementAccepted
 
     override def toProto: v30.GetAddPartyStatusResponse.Status.Status =
       v30.GetAddPartyStatusResponse.Status.Status.AgreementAccepted(
         v30.GetAddPartyStatusResponse.Status
-          .AgreementAccepted(sequencerId.uid.toProtoPrimitive, serialO.map(_.unwrap))
+          .AgreementAccepted(sequencerId.uid.toProtoPrimitive)
       )
   }
   object AgreementAccepted {
@@ -92,9 +93,10 @@ object PartyReplicationStatus {
           agreement.synchronizerId,
           agreement.sourceParticipantId,
           agreement.targetParticipantId,
+          agreement.serial,
+          agreement.participantPermission,
         ),
         agreement.sequencerId,
-        agreement.serialO,
       )
   }
   sealed trait AuthorizedPartyReplicationStatus extends PartyReplicationStatus {
@@ -111,7 +113,6 @@ object PartyReplicationStatus {
         v30.GetAddPartyStatusResponse.Status
           .TopologyAuthorized(
             authorizedParams.sequencerId.uid.toProtoPrimitive,
-            authorizedParams.serial.unwrap,
             Some(authorizedParams.effectiveAt.toProtoTimestamp),
           )
       )
@@ -121,7 +122,6 @@ object PartyReplicationStatus {
     def apply(
         agreement: ReplicationParams,
         sequencerId: SequencerId,
-        serial: PositiveInt,
         effectiveAt: CantonTimestamp,
     ): TopologyAuthorized =
       TopologyAuthorized(
@@ -131,8 +131,9 @@ object PartyReplicationStatus {
           agreement.synchronizerId,
           agreement.sourceParticipantId,
           agreement.targetParticipantId,
+          agreement.serial,
+          agreement.participantPermission,
           sequencerId,
-          serial,
           effectiveAt,
         )
       )
@@ -147,7 +148,6 @@ object PartyReplicationStatus {
         v30.GetAddPartyStatusResponse.Status
           .ConnectionEstablished(
             authorizedParams.sequencerId.uid.toProtoPrimitive,
-            authorizedParams.serial.unwrap,
             Some(authorizedParams.effectiveAt.toProtoTimestamp),
           )
       )
@@ -164,7 +164,6 @@ object PartyReplicationStatus {
         v30.GetAddPartyStatusResponse.Status
           .ReplicatingAcs(
             authorizedParams.sequencerId.uid.toProtoPrimitive,
-            authorizedParams.serial.unwrap,
             Some(authorizedParams.effectiveAt.toProtoTimestamp),
             numberOfContractsReplicated.unwrap,
           )
@@ -182,7 +181,6 @@ object PartyReplicationStatus {
         v30.GetAddPartyStatusResponse.Status
           .Completed(
             authorizedParams.sequencerId.uid.toProtoPrimitive,
-            authorizedParams.serial.unwrap,
             Some(authorizedParams.effectiveAt.toProtoTimestamp),
             numberOfContractsReplicated.unwrap,
           )
@@ -212,10 +210,11 @@ object PartyReplicationStatus {
       synchronizerId: SynchronizerId,
       sourceParticipantId: ParticipantId,
       targetParticipantId: ParticipantId,
+      serial: PositiveInt,
+      participantPermission: ParticipantPermission,
   ) {
     implicit def toAuthorized(
         sequencerId: SequencerId,
-        serial: PositiveInt,
         effectiveAt: CantonTimestamp,
     ): AuthorizedReplicationParams =
       AuthorizedReplicationParams(
@@ -224,8 +223,9 @@ object PartyReplicationStatus {
         synchronizerId,
         sourceParticipantId,
         targetParticipantId,
-        sequencerId,
         serial,
+        participantPermission,
+        sequencerId,
         effectiveAt,
       )
   }
@@ -236,8 +236,9 @@ object PartyReplicationStatus {
       synchronizerId: SynchronizerId,
       sourceParticipantId: ParticipantId,
       targetParticipantId: ParticipantId,
-      sequencerId: SequencerId,
       serial: PositiveInt,
+      participantPermission: ParticipantPermission,
+      sequencerId: SequencerId,
       effectiveAt: CantonTimestamp,
   ) {
     implicit def toBasic: ReplicationParams =
@@ -247,6 +248,8 @@ object PartyReplicationStatus {
         synchronizerId,
         sourceParticipantId,
         targetParticipantId,
+        serial,
+        participantPermission,
       )
   }
 }

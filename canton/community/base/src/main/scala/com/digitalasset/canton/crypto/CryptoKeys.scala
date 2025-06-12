@@ -5,6 +5,7 @@ package com.digitalasset.canton.crypto
 
 import cats.Order
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.CantonRequireTypes.{
   LengthLimitedStringWrapper,
@@ -148,7 +149,7 @@ object CryptoKeyPair extends HasVersionedMessageCompanion[CryptoKeyPair[PublicKe
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.CryptoKeyPair)(fromProtoCryptoKeyPairV30),
       _.toProtoCryptoKeyPairV30,
     )
@@ -222,9 +223,9 @@ trait PublicKey extends CryptoKeyPairKey {
 object PublicKey {
 
   /** Return the latest key from a sequence of keys */
-  def getLatestKey[A <: PublicKey](availableKeys: Seq[A]): Option[A] =
+  def getLatestKey[A <: PublicKey](availableKeys: NonEmpty[Seq[A]]): A =
     // use lastOption to retrieve latest key (newer keys are at the end) */
-    availableKeys.lastOption
+    availableKeys.last1
 
   def fromProtoPublicKeyV30(publicKeyP: v30.PublicKey): ParsingResult[PublicKey] =
     publicKeyP.key match {
@@ -279,7 +280,7 @@ object PublicKeyWithName extends HasVersionedMessageCompanion[PublicKeyWithName]
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.PublicKeyWithName)(fromProto30),
       _.toProtoV30,
     )

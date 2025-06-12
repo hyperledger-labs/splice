@@ -125,7 +125,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         testedProtocolVersion,
       )
       maxSequencingTimeOfAggregation = env.environment.clock.now.add(
-        Duration.ofMinutes(1)
+        Duration.ofMinutes(2)
       ) // cannot exceed the DynamicSynchronizerParameters.sequencerAggregateSubmissionTimeout (defaults to 5m)
       topologyTimestampTombstone = env.environment.clock.now
 
@@ -521,6 +521,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
           transportSecurity = false,
           None,
           SequencerAlias.Default,
+          None,
         )
 
       val conn = mediator1.sequencer_connection.get()

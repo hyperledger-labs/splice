@@ -71,7 +71,7 @@ object RepairContract {
           s"Unable to decode contract event payload: ${decodeError.errorMessage}"
         )
 
-      contractInstance = LfContractInst(
+      contractInstance = LfThinContractInst(
         fattyContract.packageName,
         fattyContract.templateId,
         transaction.Versioned(fattyContract.version, fattyContract.createArg),
@@ -99,7 +99,7 @@ object RepairContract {
 
       driverContractMetadata <-
         DriverContractMetadata
-          .fromTrustedByteString(fattyContract.cantonData.toByteString)
+          .fromLfBytes(fattyContract.cantonData.toByteArray)
           .leftMap(deserializationError =>
             s"Unable to deserialize driver contract metadata: ${deserializationError.message}"
           )

@@ -5,10 +5,10 @@ import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDa
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   DamlRecord,
+  Event,
   ExercisedEvent,
   Identifier,
-  TransactionTree,
-  TreeEvent,
+  Transaction,
   Unit as damlUnit,
   Value as damlValue,
 }
@@ -679,9 +679,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def withNodeId(
-      event: TreeEvent,
+      event: Event,
       nodeId: Int,
-  ): TreeEvent = event match {
+  ): Event = event match {
     case created: CreatedEvent =>
       new CreatedEvent(
         created.getWitnessParties,
@@ -719,7 +719,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
 
-  protected def withlastDescendedNodeid[E <: TreeEvent](event: E, lastDescendedNodeId: Int): E = {
+  protected def withlastDescendedNodeid[E <: Event](event: E, lastDescendedNodeId: Int): E = {
     event match {
       case exercised: ExercisedEvent =>
         new ExercisedEvent(
@@ -840,7 +840,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       createdEventObservers: Seq[PartyId] = Seq.empty,
   ) = mkTx(
     offset,
-    createRequests.map[TreeEvent](
+    createRequests.map[Event](
       toCreatedEvent(_, createdEventSignatories, packageName, createdEventObservers)
     ),
     synchronizerId,
@@ -970,7 +970,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         recordTime: Instant = defaultEffectiveAt,
         packageName: String = dummyPackageName,
         createdEventObservers: Seq[PartyId] = Seq.empty,
-    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
@@ -998,7 +998,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
         recordTime: Instant = defaultEffectiveAt,
-    )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
+    )(implicit stores: Seq[HasIngestionSink]): Future[Transaction] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
@@ -1023,7 +1023,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def archive[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
-    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx = mkTx(nextOffset(), Seq(toArchivedEvent(c)), domain, txEffectiveAt)
       store.testIngestionSink
         .ingestUpdate(
@@ -1036,8 +1036,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingest(
-        makeTx: Long => TransactionTree
-    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
+        makeTx: Long => Transaction
+    )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx = makeTx(nextOffset())
       store.testIngestionSink
         .ingestUpdate(
@@ -1050,8 +1050,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     }
 
     def ingestMulti(
-        makeTx: Long => TransactionTree
-    )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
+        makeTx: Long => Transaction
+    )(implicit stores: Seq[HasIngestionSink]): Future[Transaction] = {
       val tx = makeTx(nextOffset())
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
@@ -1128,7 +1128,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         offset: Long = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         recordTime: Instant = defaultEffectiveAt,
-    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[Transaction] = {
       val tx = mkTx(
         offset,
         Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),
@@ -1149,25 +1149,24 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkTx(
       offset: Long,
-      events: Seq[TreeEvent],
+      events: Seq[Event],
       synchronizerId: SynchronizerId,
       effectiveAt: Instant = defaultEffectiveAt,
       workflowId: String = "",
       commandId: String = "",
       recordTime: Instant = defaultEffectiveAt,
-  ): TransactionTree = {
+  ): Transaction = {
     val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i)
     }
-    val eventsById = eventsWithId.map(e => e.getNodeId -> e).toMap
-    new TransactionTree(
+    new Transaction(
       updateId,
       commandId,
       workflowId,
       effectiveAt,
+      eventsWithId.asJava,
       offset,
-      eventsById.asJava,
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       recordTime,
@@ -1177,10 +1176,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def mkExerciseTx(
       offset: Long,
       root: ExercisedEvent,
-      children: Seq[TreeEvent],
+      children: Seq[Event],
       synchronizerId: SynchronizerId,
       effectiveAt: Instant = defaultEffectiveAt,
-  ): TransactionTree = {
+  ): Transaction = {
     val updateId = nextUpdateId()
     val childrenWithId = children.zipWithIndex.map { case (e, i) =>
       withNodeId(e, i + 1) // account for root node id
@@ -1194,14 +1193,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         childrenWithId.map(_.getNodeId).maxOption.map(_.intValue()).getOrElse(0),
       )
     }
-    val eventsById = (rootWithId +: childrenWithId).map(e => e.getNodeId -> e).toMap
-    new TransactionTree(
+    val events = rootWithId +: childrenWithId
+    new Transaction(
       updateId,
       "",
       "",
       effectiveAt,
+      events.asJava,
       offset,
-      eventsById.asJava,
       synchronizerId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
       effectiveAt, // we equate record time and effectiveAt for simplicity
@@ -1226,7 +1225,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       choiceName: String,
       choiceArgument: damlValue,
       exerciseResult: damlValue,
-  ): TreeEvent =
+  ): Event =
     new ExercisedEvent(
       Seq.empty.asJava,
       0,
@@ -1349,7 +1348,7 @@ object StoreTest {
       }
     }
 
-    override def tryParse(tx: TransactionTree, domain: SynchronizerId)(implicit
+    override def tryParse(tx: Transaction, domain: SynchronizerId)(implicit
         tc: TraceContext
     ): Seq[TestTxLogEntry] = {
       Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(

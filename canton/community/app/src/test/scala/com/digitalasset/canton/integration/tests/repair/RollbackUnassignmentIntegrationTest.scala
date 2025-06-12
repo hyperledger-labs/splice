@@ -45,14 +45,18 @@ sealed trait RollbackUnassignmentIntegrationTest
           p.dars.upload(CantonExamplesPath)
         }
 
-        participant1.parties.enable(
-          aliceS,
-          synchronizeParticipants = Seq(participant2),
-        )
-        participant2.parties.enable(
-          bobS,
-          synchronizeParticipants = Seq(participant1),
-        )
+        Seq(daName, acmeName).foreach { alias =>
+          participant1.parties.enable(
+            aliceS,
+            synchronizeParticipants = Seq(participant2),
+            synchronizer = alias,
+          )
+          participant2.parties.enable(
+            bobS,
+            synchronizeParticipants = Seq(participant1),
+            synchronizer = alias,
+          )
+        }
       }
 
   "Can rollback an unassignment" in { implicit env =>
@@ -75,8 +79,9 @@ sealed trait RollbackUnassignmentIntegrationTest
       .unassignId
 
     participant2.ledger_api.updates
-      .flat(
+      .reassignments(
         partyIds = Set(bob),
+        filterTemplates = Seq.empty,
         completeAfter = 1,
         resultFilter = _.isUnassignment,
       )
@@ -99,8 +104,9 @@ sealed trait RollbackUnassignmentIntegrationTest
 
     contractEntry.map(_.reassignmentCounter).loneElement shouldBe 2 // increased by two
 
-    val updates = participant1.ledger_api.updates.flat(
+    val updates = participant1.ledger_api.updates.reassignments(
       partyIds = Set(alice),
+      filterTemplates = Seq.empty,
       completeAfter = 4,
       beginOffsetExclusive = ledgerEnd,
     )
@@ -123,8 +129,8 @@ sealed trait RollbackUnassignmentIntegrationTest
       case other => fail(s"Expected 2 unassigned events, but got: $other")
     }
 
-    assigned1.target shouldBe daId.toProtoPrimitive
-    assigned1.source shouldBe acmeId.toProtoPrimitive
+    assigned1.target shouldBe daId.logical.toProtoPrimitive
+    assigned1.source shouldBe acmeId.logical.toProtoPrimitive
     assigned1.target shouldBe assigned2.source
     unassigned1.target shouldBe unassigned2.source
     unassigned1.source shouldBe unassigned2.target

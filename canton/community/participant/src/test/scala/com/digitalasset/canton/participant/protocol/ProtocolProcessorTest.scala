@@ -79,7 +79,7 @@ import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.version.HasTestCloseContext
+import com.digitalasset.canton.version.{HasTestCloseContext, ProtocolVersion}
 import com.digitalasset.canton.{
   BaseTest,
   DefaultDamlValues,
@@ -126,7 +126,7 @@ class ProtocolProcessorTest
     UniqueIdentifier.tryFromProtoPrimitive("participant::other-participant")
   )
   private val party = PartyId(UniqueIdentifier.tryFromProtoPrimitive("party::participant"))
-  private val synchronizer = DefaultTestIdentities.synchronizerId
+  private val synchronizer = DefaultTestIdentities.physicalSynchronizerId
   private val topology: TestingTopology = TestingTopology.from(
     Set(synchronizer),
     Map(
@@ -199,7 +199,7 @@ class ProtocolProcessorTest
   when(trm.pretty).thenAnswer(Pretty.adHocPrettyInstance[ConfirmationResultMessage])
   when(trm.verdict).thenAnswer(Verdict.Approve(testedProtocolVersion))
   when(trm.rootHash).thenAnswer(rootHash)
-  when(trm.synchronizerId).thenAnswer(DefaultTestIdentities.synchronizerId)
+  when(trm.synchronizerId).thenAnswer(DefaultTestIdentities.physicalSynchronizerId)
 
   private val requestId = RequestId(CantonTimestamp.Epoch)
   private val requestSc = SequencerCounter(0)
@@ -375,7 +375,7 @@ class ProtocolProcessorTest
         ephemeralState.get(),
         crypto,
         sequencerClient,
-        synchronizerId = DefaultTestIdentities.synchronizerId,
+        synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
         testedProtocolVersion,
         loggerFactory,
         FutureSupervisor.Noop,
@@ -391,6 +391,15 @@ class ProtocolProcessorTest
         override protected def metricsContextForSubmissionParam(
             submissionParam: Int
         ): MetricsContext = MetricsContext.Empty
+
+        override protected def preSubmissionValidations(
+            params: Int,
+            cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+            protocolVersion: ProtocolVersion,
+        )(implicit
+            traceContext: TraceContext
+        ): EitherT[FutureUnlessShutdown, TestProcessingSteps.TestProcessingError, Unit] =
+          EitherT.pure(())
       }
 
     (sut, persistentState, ephemeralState.get(), participantNodeEphemeralState)
@@ -406,13 +415,13 @@ class ProtocolProcessorTest
     viewHash = viewHash,
     sessionKeys = sessionKeyMapTest,
     encryptedView = encryptedView,
-    synchronizerId = DefaultTestIdentities.synchronizerId,
+    synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
     SymmetricKeyScheme.Aes128Gcm,
     testedProtocolVersion,
   )
   private lazy val rootHashMessage = RootHashMessage(
     rootHash,
-    DefaultTestIdentities.synchronizerId,
+    DefaultTestIdentities.physicalSynchronizerId,
     testedProtocolVersion,
     TestViewType,
     testTopologyTimestamp,
@@ -673,7 +682,7 @@ class ProtocolProcessorTest
         viewHash = viewHash1,
         sessionKeys = sessionKeyMapTest,
         encryptedView = encryptedViewWrongRH,
-        synchronizerId = DefaultTestIdentities.synchronizerId,
+        synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
         SymmetricKeyScheme.Aes128Gcm,
         testedProtocolVersion,
       )
@@ -708,7 +717,7 @@ class ProtocolProcessorTest
         viewHash = viewHash,
         sessionKeys = sessionKeyMapTest,
         encryptedView = EncryptedView(TestViewType)(Encrypted.fromByteString(ByteString.EMPTY)),
-        synchronizerId = DefaultTestIdentities.synchronizerId,
+        synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
         viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
         protocolVersion = testedProtocolVersion,
       )

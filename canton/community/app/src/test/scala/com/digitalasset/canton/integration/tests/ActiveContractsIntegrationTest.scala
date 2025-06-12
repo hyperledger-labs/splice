@@ -115,9 +115,11 @@ class ActiveContractsIntegrationTest
           )
         } yield p.synchronizers.connect_local(d, alias = a)
 
-        party1a = participant1.parties.enable("party1")
-        party1b = participant1.parties.enable("party1b")
-        party2 = participant2.parties.enable("party2")
+        Seq(daName, acmeName, repairSynchronizerName).foreach { alias =>
+          party1a = participant1.parties.enable("party1", synchronizer = alias)
+          party1b = participant1.parties.enable("party1b", synchronizer = alias)
+          party2 = participant2.parties.enable("party2", synchronizer = alias)
+        }
 
         participants.all.dars.upload(BaseTest.CantonExamplesPath)
       }
@@ -145,7 +147,7 @@ class ActiveContractsIntegrationTest
     val (contract, createUpdate, _) =
       IouSyntax.createIouComplete(participant1, Some(synchronizerId))(signatory, observer)
 
-    val createdEvent = createUpdate.eventsById.values.head.getCreated
+    val createdEvent = createUpdate.events.head.getCreated
 
     ContractData(contract, createdEvent)
 
@@ -187,7 +189,7 @@ class ActiveContractsIntegrationTest
 
     val packageName = Ref.PackageName.assertFromString("CantonExamples")
 
-    val contractInst = LfContractInst(
+    val contractInst = LfThinContractInst(
       packageName = packageName,
       template = lfTemplate,
       arg = Versioned(protocol.DummyTransactionVersion, lfArguments),
@@ -249,7 +251,7 @@ class ActiveContractsIntegrationTest
     participant1.synchronizers.reconnect_all()
     val createdEvent = eventually() {
       val endOffset = participant1.ledger_api.state.end()
-      val updates = participant1.ledger_api.updates.flat(
+      val updates = participant1.ledger_api.updates.transactions(
         partyIds = Set(signatory),
         completeAfter = Int.MaxValue,
         beginOffsetExclusive = startOffset,
@@ -261,7 +263,7 @@ class ActiveContractsIntegrationTest
     ContractData(contract, createdEvent)
   }
 
-  private def submitAssignment(
+  private def submitAssignments(
       out: UnassignedWrapper,
       submitter: PartyId,
       participantOverride: Option[LocalParticipantReference],
@@ -483,7 +485,7 @@ class ActiveContractsIntegrationTest
       )
 
       // Submit the assignments
-      val (assignment1, _) = submitAssignment(unassignment1, observer, Some(participant2))
+      val (assignment1, _) = submitAssignments(unassignment1, observer, Some(participant2))
 
       checkACS(participant2, assignment1.reassignment.offset)(
         activationFromCreate = Seq((contract3.createdEvent, acmeId, ReassignmentCounter(0))),
@@ -491,7 +493,7 @@ class ActiveContractsIntegrationTest
         incompletesUnassigned = Seq(2),
       )
 
-      val (assignment2, _) = submitAssignment(unassignment2, observer, Some(participant2))
+      val (assignment2, _) = submitAssignments(unassignment2, observer, Some(participant2))
 
       // wait until participant2 is synchronized
       eventually() {
@@ -596,7 +598,7 @@ class ActiveContractsIntegrationTest
       unassignment1.events.loneElement.reassignmentCounter shouldBe 1
       getReassignmentCountersFromACS() shouldBe List(1)
 
-      val (assignment1, _) = submitAssignment(unassignment1, signatory, Some(participant1))
+      val (assignment1, _) = submitAssignments(unassignment1, signatory, Some(participant1))
       assignment1.events.loneElement.reassignmentCounter shouldBe 1
       getReassignmentCountersFromACS() shouldBe List(1)
 
@@ -610,7 +612,7 @@ class ActiveContractsIntegrationTest
       unassignment2.events.loneElement.reassignmentCounter shouldBe 2
       getReassignmentCountersFromACS() shouldBe List(2)
 
-      val (assignment2, _) = submitAssignment(unassignment2, signatory, Some(participant1))
+      val (assignment2, _) = submitAssignments(unassignment2, signatory, Some(participant1))
       assignment2.events.loneElement.reassignmentCounter shouldBe 2
       getReassignmentCountersFromACS() shouldBe List(2)
 
@@ -746,7 +748,7 @@ class ActiveContractsIntegrationTest
       checkACS(activeOn = None, incompleteReassignment = true, Seq()) // no filtering
       checkACS(activeOn = None, incompleteReassignment = false, Seq(otherTemplate))
 
-      val (in, _) = submitAssignment(out, party, Some(participant1))
+      val (in, _) = submitAssignments(out, party, Some(participant1))
 
       checkACS(activeOn = Some(in), incompleteReassignment = false, Seq(contractTemplate))
       checkACS(
@@ -808,7 +810,7 @@ class ActiveContractsIntegrationTest
       checkACS(activeOn = None, incompleteReassignment = true, otherParty)
       checkACS(activeOn = None, incompleteReassignment = false, otherParty)
 
-      val (in, _) = submitAssignment(out, party, Some(participant1))
+      val (in, _) = submitAssignments(out, party, Some(participant1))
 
       checkACS(activeOn = Some(in), incompleteReassignment = false, party)
       checkACS(activeOn = None, incompleteReassignment = false, otherParty)
@@ -846,8 +848,9 @@ class ActiveContractsIntegrationTest
       startFromExclusive: Long,
   ) = {
     val unassignedUniqueId = participant.ledger_api.updates
-      .flat(
-        Set(observer),
+      .reassignments(
+        partyIds = Set(observer),
+        filterTemplates = Seq.empty,
         beginOffsetExclusive = startFromExclusive,
         completeAfter = PositiveInt.one,
         resultFilter = _.isUnassignment,

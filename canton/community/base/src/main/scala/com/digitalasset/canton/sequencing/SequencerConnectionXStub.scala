@@ -10,7 +10,7 @@ import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth
 import com.digitalasset.canton.sequencing.protocol.HandshakeResponse
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -25,26 +25,36 @@ import scala.concurrent.ExecutionContextExecutor
 trait SequencerConnectionXStub {
   import SequencerConnectionXStub.*
 
-  def getApiName(retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry)(implicit
+  def getApiName(
+      retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy = CantonGrpcUtil.DefaultGrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, String]
+  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError.ConnectionError, String]
 
   def performHandshake(
       clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
       minimumProtocolVersion: Option[ProtocolVersion],
       retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy = CantonGrpcUtil.DefaultGrpcLogPolicy,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, HandshakeResponse]
 
   def getSynchronizerAndSequencerIds(
-      retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry
+      retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy = CantonGrpcUtil.DefaultGrpcLogPolicy,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, (SynchronizerId, SequencerId)]
+  ): EitherT[
+    FutureUnlessShutdown,
+    SequencerConnectionXStubError,
+    (PhysicalSynchronizerId, SequencerId),
+  ]
 
   def getStaticSynchronizerParameters(
-      retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry
+      retryPolicy: GrpcError => Boolean = CantonGrpcUtil.RetryPolicy.noRetry,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy = CantonGrpcUtil.DefaultGrpcLogPolicy,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, StaticSynchronizerParameters]

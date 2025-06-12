@@ -35,7 +35,12 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.IndexedSynchronizer
 import com.digitalasset.canton.store.db.{DbTest, PostgresTest}
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  UniqueIdentifier,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{
   BaseTest,
@@ -89,16 +94,16 @@ sealed trait SyncStateInspectionTest
   lazy val remoteId2NESet: NonEmpty[Set[ParticipantId]] = NonEmptyUtil.fromElement(remoteId2).toSet
 
   // values for synchronizer1
-  lazy val synchronizerId: SynchronizerId = SynchronizerId(
+  lazy val synchronizerId: PhysicalSynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::synchronizer")
-  )
+  ).toPhysical
   lazy val synchronizerIdAlias: SynchronizerAlias = SynchronizerAlias.tryCreate("synchronizer")
   lazy val indexedSynchronizer: IndexedSynchronizer =
     IndexedSynchronizer.tryCreate(synchronizerId, 1)
   // values for synchronizer2
-  lazy val synchronizerId2: SynchronizerId = SynchronizerId(
+  lazy val synchronizerId2: PhysicalSynchronizerId = SynchronizerId(
     UniqueIdentifier.tryFromProtoPrimitive("synchronizer::synchronizer2")
-  )
+  ).toPhysical
   lazy val synchronizerId2Alias: SynchronizerAlias = SynchronizerAlias.tryCreate("synchronizer2")
   lazy val indexedSynchronizer2: IndexedSynchronizer =
     IndexedSynchronizer.tryCreate(synchronizerId2, 2)
@@ -191,7 +196,7 @@ sealed trait SyncStateInspectionTest
     * ReceivedAcsCommitment is in state Outstanding.
     */
   def createDummyReceivedCommitment(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       remoteParticipant: ParticipantId,
       commitmentPeriod: CommitmentPeriod,
       hashingState: HashingState = new HashingState(),
@@ -291,13 +296,13 @@ sealed trait SyncStateInspectionTest
     val (syncStateInspection, _) = buildSyncState()
     val crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
     val crossSynchronizerComputed = syncStateInspection.crossSynchronizerSentCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
@@ -310,13 +315,13 @@ sealed trait SyncStateInspectionTest
     addSynchronizerToSyncState(stateManager, synchronizerId, synchronizerIdAlias)
     val crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
     val crossSynchronizerComputed = syncStateInspection.crossSynchronizerSentCommitmentMessages(
       Seq.empty,
-      Seq.empty,
+      None,
       Seq.empty,
       verbose = false,
     )
@@ -342,7 +347,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -372,7 +377,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -418,13 +423,13 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = true,
       )
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = true,
       )
@@ -458,7 +463,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -528,13 +533,13 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -635,13 +640,13 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSent = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod, synchronizerSearchPeriod2),
-        Seq(remoteId),
+        NonEmpty.from(Seq(remoteId)),
         Seq.empty,
         verbose = false,
       )
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod, synchronizerSearchPeriod2),
-        Seq(remoteId),
+        NonEmpty.from(Seq(remoteId)),
         Seq.empty,
         verbose = false,
       )
@@ -716,26 +721,26 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerSentMatched = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq(CommitmentPeriodState.Matched),
         verbose = false,
       )
       crossSynchronizerSentMismatched = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq(CommitmentPeriodState.Mismatched),
         verbose = false,
       )
       crossSynchronizerSentOutstanding = syncStateInspection
         .crossSynchronizerSentCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Outstanding),
           verbose = false,
         )
       crossSynchronizerAll = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq(
           CommitmentPeriodState.Matched,
           CommitmentPeriodState.Mismatched,
@@ -746,28 +751,28 @@ sealed trait SyncStateInspectionTest
       crossSynchronizerReceivedMatched = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Matched),
           verbose = false,
         )
       crossSynchronizerReceivedMismatched = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Mismatched),
           verbose = false,
         )
       crossSynchronizerReceivedOutstanding = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(CommitmentPeriodState.Outstanding),
           verbose = false,
         )
       crossSynchronizerReceivedAll = syncStateInspection
         .crossSynchronizerReceivedCommitmentMessages(
           Seq(synchronizerSearchPeriod),
-          Seq.empty,
+          None,
           Seq(
             CommitmentPeriodState.Matched,
             CommitmentPeriodState.Mismatched,
@@ -822,7 +827,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerSentCommitmentMessages(
         Seq(synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )
@@ -847,7 +852,7 @@ sealed trait SyncStateInspectionTest
 
       crossSynchronizerReceived = syncStateInspection.crossSynchronizerReceivedCommitmentMessages(
         Seq(synchronizerSearchPeriod, synchronizerSearchPeriod),
-        Seq.empty,
+        None,
         Seq.empty,
         verbose = false,
       )

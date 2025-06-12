@@ -2,6 +2,6 @@ sdk-version: 3.3.0-snapshot.20250502.13767.0.v2fc6c7e2
 name: experimental-tests
 source: .
 version: 3.1.0
-dependencies:
+dependencies: 
 - daml-prim
 - daml-stdlib

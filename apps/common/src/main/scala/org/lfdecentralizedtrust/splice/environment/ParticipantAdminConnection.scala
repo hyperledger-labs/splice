@@ -25,7 +25,12 @@ import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveD
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
-import com.digitalasset.canton.sequencing.SequencerConnectionValidation
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnectionValidation,
+  SequencerConnection,
+  SequencerConnections,
+}
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
@@ -90,7 +95,7 @@ class ParticipantAdminConnection(
     _.getSchedule(_),
   )
 
-  override protected type Status = ParticipantStatus
+  override type Status = ParticipantStatus
 
   override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
@@ -121,7 +126,7 @@ class ParticipantAdminConnection(
         throw Status.NOT_FOUND
           .withDescription(s"Domain with alias $synchronizerAlias is not connected")
           .asRuntimeException()
-      )(_.synchronizerId)
+      )(_.synchronizerId.logical)
     )
 
   /** Usually you want getSynchronizerId instead which is much faster if the domain is connected
@@ -133,7 +138,7 @@ class ParticipantAdminConnection(
   ): Future[SynchronizerId] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
-    )
+    ).map(_.logical)
 
   def reconnectAllDomains()(implicit
       traceContext: TraceContext
@@ -242,7 +247,12 @@ class ParticipantAdminConnection(
         "domain_registered",
         s"participant registered ${config.synchronizerAlias} with config $config",
         lookupSynchronizerConnectionConfig(config.synchronizerAlias).map {
-          case Some(existingConfig) if existingConfig == config => Right(())
+          // We don't set the sequencer id when connecting but Canton returns it so we ignore it in the comparison here.
+          case Some(existingConfig)
+              if ParticipantAdminConnection.dropSequencerId(
+                existingConfig
+              ) == ParticipantAdminConnection.dropSequencerId(config) =>
+            Right(())
           case Some(other) => Left(Some(other))
           case None => Left(None)
         },
@@ -339,7 +349,7 @@ class ParticipantAdminConnection(
       )
     } yield configuredDomains
       .collectFirst {
-        case (configuredDomain, _) if configuredDomain.synchronizerAlias == domain =>
+        case (configuredDomain, _, _) if configuredDomain.synchronizerAlias == domain =>
           configuredDomain
       }
 
@@ -359,6 +369,7 @@ class ParticipantAdminConnection(
   ): Future[Unit] =
     runCmd(
       ParticipantAdminCommands.SynchronizerConnectivity.ModifySynchronizerConnection(
+        None,
         config,
         SequencerConnectionValidation.ThresholdActive,
       )
@@ -791,7 +802,7 @@ class ParticipantAdminConnection(
 
 object ParticipantAdminConnection {
   import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-  import com.digitalasset.canton.admin.participant.v30.*
+  import com.digitalasset.canton.admin.participant.v30.{SynchronizerConnectionConfig as _, *}
   import com.digitalasset.canton.admin.participant.v30.PackageServiceGrpc.PackageServiceStub
   import io.grpc.ManagedChannel
 
@@ -855,5 +866,21 @@ object ParticipantAdminConnection {
       */
     @com.google.common.annotations.VisibleForTesting
     private[splice] val ForTesting = Const(ParticipantId("OnlyForTesting"))
+  }
+
+  def dropSequencerId(config: SynchronizerConnectionConfig): SynchronizerConnectionConfig =
+    config.copy(
+      sequencerConnections = dropSequencerId(config.sequencerConnections)
+    )
+
+  def dropSequencerId(connections: SequencerConnections): SequencerConnections = {
+    connections.connections.foldLeft(connections) { case (acc, c) =>
+      acc.modify(c.sequencerAlias, dropSequencerId)
+    }
+  }
+
+  def dropSequencerId(connection: SequencerConnection): SequencerConnection = connection match {
+    case grpc: GrpcSequencerConnection => grpc.copy(sequencerId = None)
+    case _ => connection
   }
 }

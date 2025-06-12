@@ -1257,7 +1257,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     (for {
       conn <- sequencerConnections.aliasToConnection.values
       endpoint <- conn match {
-        case GrpcSequencerConnection(endpoints, _, _, _) => endpoints
+        case GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints
       }
     } yield endpoint.toString).toSet
   }

@@ -73,7 +73,7 @@ class WalletMetricsTest
       )
       val synchronizerId =
         sv1Backend.participantClient.synchronizers.list_connected().loneElement.synchronizerId
-      metrics.attributes("synchronizer_id") shouldBe synchronizerId.toString
+      metrics.attributes("synchronizer_id") shouldBe synchronizerId.logical.toString
     }
   }
 

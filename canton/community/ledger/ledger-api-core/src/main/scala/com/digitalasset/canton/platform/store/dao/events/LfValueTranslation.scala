@@ -86,9 +86,7 @@ final class LfValueTranslation(
 ) extends LfValueSerialization
     with NamedLogging {
 
-  private val enricherO = engineO.map(engine =>
-    new Enricher(engine, requireContractIdSuffix = engine.config.requireSuffixedGlobalContractId)
-  )
+  private val enricherO = engineO.map(new Enricher(_))
 
   private[this] val packageLoader = new DeduplicatingPackageLoader()
 
@@ -256,8 +254,8 @@ final class LfValueTranslation(
           )
         )
       )
-      Ref.QualifiedChoiceName(interfaceId, choiceName) =
-        Ref.QualifiedChoiceName.assertFromString(rawExercisedEvent.exerciseChoice)
+      Ref.QualifiedChoiceId(interfaceId, choiceName) =
+        Ref.QualifiedChoiceId.assertFromString(rawExercisedEvent.exerciseChoice)
       // Convert Daml-LF values to ledger API values.
       // In verbose mode, this involves loading Daml-LF packages and filling in missing type information.
       choiceArgument <- toApiValue(

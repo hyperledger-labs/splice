@@ -9,7 +9,7 @@ import j.codegen as jcg
 import scala.jdk.CollectionConverters.*
 
 private[splice] object TransactionTreeExtensions {
-  implicit final class `TransactionTree AN extensions`(private val self: j.TransactionTree)
+  implicit final class `TransactionTree AN extensions`(private val self: j.Transaction)
       extends AnyVal {
     def findCreation[TCid <: jcg.ContractId[?], T <: jcg.DamlRecord[?]](
         tpl: Contract.Companion.Template[TCid, T],
@@ -20,7 +20,7 @@ private[splice] object TransactionTreeExtensions {
     }.flatten
 
     def findArchive[Marker](
-        descendantOf: j.TreeEvent,
+        descendantOf: j.Event,
         contractId: jcg.ContractId[Marker],
         archive: jcg.Choice[Marker, Archive, j.Unit],
     ): Option[j.ExercisedEvent] =
@@ -31,7 +31,7 @@ private[splice] object TransactionTreeExtensions {
       }
 
     def firstDescendantExercise[Marker, Res](
-        event: j.TreeEvent,
+        event: j.Event,
         tpl: jcg.ContractCompanion[?, ?, Marker],
         choice: jcg.Choice[Marker, ?, Res],
     ): Option[(j.ExercisedEvent, Res)] =
@@ -41,10 +41,10 @@ private[splice] object TransactionTreeExtensions {
         case _ => None
       })
 
-    def collectFirstDescendant[Z](of: j.TreeEvent)(p: j.TreeEvent PartialFunction Z): Option[Z] =
+    def collectFirstDescendant[Z](of: j.Event)(p: j.Event PartialFunction Z): Option[Z] =
       self.preorderDescendants(of) collectFirst p
 
-    def preorderDescendants(of: j.TreeEvent): Iterator[j.TreeEvent] = {
+    def preorderDescendants(of: j.Event): Iterator[j.Event] = {
       of match {
         case _: j.CreatedEvent => Iterator.empty
         case ex: j.ExercisedEvent =>
@@ -52,7 +52,7 @@ private[splice] object TransactionTreeExtensions {
           self.getChildNodeIds(ex).asScala.iterator flatMap { childId =>
             evs
               .get(childId)
-              .fold(Iterator.empty[j.TreeEvent])(child =>
+              .fold(Iterator.empty[j.Event])(child =>
                 Seq(child).iterator ++ self.preorderDescendants(child)
               )
           }

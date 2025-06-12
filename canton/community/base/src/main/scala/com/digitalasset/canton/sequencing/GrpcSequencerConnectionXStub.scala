@@ -11,7 +11,7 @@ import com.digitalasset.canton.connection.v30
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc.ApiInfoServiceStub
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.networking.grpc.GrpcError
+import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, GrpcError}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnect.GetSynchronizerParametersResponse.Parameters
 import com.digitalasset.canton.sequencer.api.v30.SequencerConnectServiceGrpc.SequencerConnectServiceStub
@@ -23,7 +23,7 @@ import com.digitalasset.canton.sequencer.api.v30.{
 import com.digitalasset.canton.sequencing.SequencerConnectionXStub.SequencerConnectionXStubError
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth
 import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeResponse}
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Channel
@@ -39,16 +39,20 @@ class GrpcSequencerConnectionXStub(
 )(implicit
     ec: ExecutionContextExecutor
 ) extends SequencerConnectionXStub {
-  override def getApiName(retryPolicy: GrpcError => Boolean)(implicit
+  override def getApiName(
+      retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, String] = for {
+  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError.ConnectionError, String] = for {
     apiName <- connection
       .sendRequest(
         requestDescription = "get API info",
         stubFactory = apiSvcFactory,
         retryPolicy = retryPolicy,
+        logPolicy = logPolicy,
       )(_.getApiInfo(v30.GetApiInfoRequest()).map(_.name))
-      .leftMap[SequencerConnectionXStubError](
+      .leftMap(
         SequencerConnectionXStubError.ConnectionError.apply
       )
   } yield apiName
@@ -57,6 +61,7 @@ class GrpcSequencerConnectionXStub(
       clientProtocolVersions: NonEmpty[Seq[ProtocolVersion]],
       minimumProtocolVersion: Option[ProtocolVersion],
       retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, HandshakeResponse] = {
@@ -67,6 +72,7 @@ class GrpcSequencerConnectionXStub(
           requestDescription = "perform handshake",
           stubFactory = sequencerConnectSvcFactory,
           retryPolicy = retryPolicy,
+          logPolicy = logPolicy,
         )(_.handshake(handshakeRequest.toProtoV30))
         .leftMap(SequencerConnectionXStubError.ConnectionError.apply)
       handshakeResponse <- EitherT
@@ -77,21 +83,29 @@ class GrpcSequencerConnectionXStub(
     } yield handshakeResponse
   }
 
-  override def getSynchronizerAndSequencerIds(retryPolicy: GrpcError => Boolean)(implicit
+  override def getSynchronizerAndSequencerIds(
+      retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, (SynchronizerId, SequencerId)] =
+  ): EitherT[
+    FutureUnlessShutdown,
+    SequencerConnectionXStubError,
+    (PhysicalSynchronizerId, SequencerId),
+  ] =
     for {
       synchronizerIdP <- connection
         .sendRequest(
           requestDescription = "get synchronizer ID",
           stubFactory = sequencerConnectSvcFactory,
           retryPolicy = retryPolicy,
+          logPolicy = logPolicy,
         )(_.getSynchronizerId(SequencerConnect.GetSynchronizerIdRequest()))
         .leftMap(SequencerConnectionXStubError.ConnectionError.apply)
 
-      synchronizerId <- EitherT.fromEither[FutureUnlessShutdown](
-        SynchronizerId
-          .fromProtoPrimitive(synchronizerIdP.synchronizerId, "synchronizer_id")
+      psid <- EitherT.fromEither[FutureUnlessShutdown](
+        PhysicalSynchronizerId
+          .fromProtoPrimitive(synchronizerIdP.physicalSynchronizerId, "physical_synchronizer_id")
           .leftMap(err => SequencerConnectionXStubError.DeserializationError(err.message))
       )
 
@@ -103,9 +117,12 @@ class GrpcSequencerConnectionXStub(
             SequencerConnectionXStubError.DeserializationError(err.message)
           )
       )
-    } yield (synchronizerId, sequencerId)
+    } yield (psid, sequencerId)
 
-  override def getStaticSynchronizerParameters(retryPolicy: GrpcError => Boolean)(implicit
+  override def getStaticSynchronizerParameters(
+      retryPolicy: GrpcError => Boolean,
+      logPolicy: CantonGrpcUtil.GrpcLogPolicy,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SequencerConnectionXStubError, StaticSynchronizerParameters] =
     for {
@@ -114,6 +131,7 @@ class GrpcSequencerConnectionXStub(
           requestDescription = "get static synchronizer parameters",
           stubFactory = sequencerConnectSvcFactory,
           retryPolicy = retryPolicy,
+          logPolicy = logPolicy,
         )(_.getSynchronizerParameters(SequencerConnect.GetSynchronizerParametersRequest()))
         .leftMap(SequencerConnectionXStubError.ConnectionError.apply)
 

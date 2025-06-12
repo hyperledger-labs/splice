@@ -21,6 +21,7 @@ import com.digitalasset.canton.networking.grpc.{
   CantonServerInterceptors,
 }
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TracingConfig
 import io.netty.handler.ssl.{ClientAuth, SslContext}
 import org.slf4j.LoggerFactory
@@ -110,6 +111,7 @@ trait ServerConfig extends Product with Serializable {
 
 object ServerConfig {
   val defaultMaxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(10 * 1024 * 1024)
+  val defaultMaxInboundMetadataSize: NonNegativeInt = NonNegativeInt.tryCreate(8 * 1024)
 }
 
 /** A variant of [[ServerConfig]] that by default listens to connections only on the loopback
@@ -276,7 +278,8 @@ final case class SequencerApiClientConfig(
   override def tlsConfig: Option[TlsClientConfig] = tls.map(_.toTlsClientConfig)
 
   def asSequencerConnection(
-      sequencerAlias: SequencerAlias = SequencerAlias.Default
+      sequencerAlias: SequencerAlias = SequencerAlias.Default,
+      sequencerId: Option[SequencerId] = None,
   ): GrpcSequencerConnection = {
     val endpoint = Endpoint(address, port)
     GrpcSequencerConnection(
@@ -284,6 +287,7 @@ final case class SequencerApiClientConfig(
       tls.exists(_.enabled),
       tls.flatMap(_.trustCollectionFile).map(_.pemBytes),
       sequencerAlias,
+      sequencerId = sequencerId,
     )
   }
 }

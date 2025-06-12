@@ -5,10 +5,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import com.daml.ledger.api.v2.transaction_filter.{
-  CumulativeFilter,
-  TransactionFilter as LapiTransactionFilter,
-}
+import com.daml.ledger.api.v2.transaction_filter.{EventFormat, CumulativeFilter}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
@@ -441,8 +438,8 @@ object MultiDomainAcsStore {
       includeCreatedEventBlob: Boolean = true,
   ) {
 
-    def toTransactionFilter: LapiTransactionFilter =
-      LapiTransactionFilter(
+    def toEventFormat: EventFormat =
+      EventFormat(
         filtersByParty = Map(
           primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
             Seq(

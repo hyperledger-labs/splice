@@ -29,10 +29,13 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.availability.OrderingBlock
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.bfttime.CanonicalCommitSet
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.CommitCertificate
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.{
   BlockMetadata,
   EpochInfo,
+}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.{
+  CommitCertificate,
+  OrderedBlock,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   Membership,
@@ -418,6 +421,48 @@ class StateTransferBehaviorTest
 
       callbackCell.get shouldBe
         Some(Genesis.GenesisEpochNumber -> aMembership.orderingTopology.nodes)
+    }
+  }
+
+  "receiving an unhandled message" should {
+    "enqueue it for later" in {
+      val (context, stateTransferBehavior) = createStateTransferBehavior()
+      implicit val ctx: ContextType = context
+
+      // PbftUnverifiedNetworkMessage
+      val underlyingMessage = mock[ConsensusSegment.ConsensusMessage.PbftNetworkMessage]
+      when(underlyingMessage.from).thenThrow(
+        new RuntimeException("should have used an actual sender")
+      )
+      val signedMessage = underlyingMessage.fakeSign
+      val pbftUnverifiedNetworkMessage =
+        Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage(
+          actualSender = otherId,
+          signedMessage,
+        )
+      stateTransferBehavior.receive(pbftUnverifiedNetworkMessage)
+
+      // PbftVerifiedNetworkMessage
+      val underlyingMessage2 = mock[ConsensusSegment.ConsensusMessage.PbftNetworkMessage]
+      when(underlyingMessage2.from).thenReturn(otherId)
+      val signedMessage2 = underlyingMessage2.fakeSign
+      val pbftVerifiedNetworkMessage =
+        Consensus.ConsensusMessage.PbftVerifiedNetworkMessage(signedMessage2)
+      stateTransferBehavior.receive(pbftVerifiedNetworkMessage)
+
+      // A different message
+      val anotherMessage =
+        Consensus.ConsensusMessage.BlockOrdered(
+          OrderedBlock(aCommitCert.blockMetadata, batchRefs = Seq.empty, CanonicalCommitSet.empty),
+          aCommitCert,
+        )
+      stateTransferBehavior.receive(anotherMessage)
+
+      @SuppressWarnings(Array("org.wartremover.warts.Serializable"))
+      val expectedMessages =
+        Seq(pbftUnverifiedNetworkMessage, pbftVerifiedNetworkMessage, anotherMessage)
+
+      stateTransferBehavior.postponedConsensusMessages.dump should contain theSameElementsInOrderAs expectedMessages
     }
   }
 

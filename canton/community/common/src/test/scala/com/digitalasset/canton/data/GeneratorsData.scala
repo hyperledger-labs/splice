@@ -3,8 +3,9 @@
 
 package com.digitalasset.canton.data
 
+import cats.syntax.functor.*
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.crypto.{GeneratorsCrypto, Salt, SigningKeyUsage, TestHash}
+import com.digitalasset.canton.crypto.{Salt, TestHash}
 import com.digitalasset.canton.data.ActionDescription.{
   CreateActionDescription,
   ExerciseActionDescription,
@@ -15,16 +16,10 @@ import com.digitalasset.canton.data.MerkleTree.VersionedMerkleTree
 import com.digitalasset.canton.data.ViewPosition.{MerklePathElement, MerkleSeqIndex}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.messages.{
-  ConfirmationResultMessage,
-  DeliveredUnassignmentResult,
-  SignedProtocolMessage,
-  Verdict,
-}
-import com.digitalasset.canton.sequencing.protocol.{Batch, MediatorGroupRecipient, SignedContent}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
-import com.digitalasset.canton.util.SeqUtil
+import com.digitalasset.canton.util.collection.SeqUtil
 import com.digitalasset.canton.version.{ProtocolVersion, RepresentativeProtocolVersion}
 import com.digitalasset.canton.{LfInterfaceId, LfPackageId, LfPartyId, LfVersioned}
 import com.digitalasset.daml.lf.value.Value.ValueInt64
@@ -67,7 +62,7 @@ final class GeneratorsData(
 
   implicit val commonMetadataArb: Arbitrary[CommonMetadata] = Arbitrary(
     for {
-      synchronizerId <- Arbitrary.arbitrary[SynchronizerId]
+      synchronizerId <- Arbitrary.arbitrary[PhysicalSynchronizerId]
 
       mediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
@@ -508,7 +503,7 @@ final class GeneratorsData(
   implicit val assignmentCommonDataArb: Arbitrary[AssignmentCommonData] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      targetSynchronizerId <- Arbitrary.arbitrary[Target[SynchronizerId]]
+      targetSynchronizerId <- Arbitrary.arbitrary[Target[PhysicalSynchronizerId]]
 
       targetMediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
@@ -537,7 +532,7 @@ final class GeneratorsData(
   implicit val unassignmentCommonData: Arbitrary[UnassignmentCommonData] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      sourceSynchronizerId <- Arbitrary.arbitrary[Source[SynchronizerId]]
+      sourceSynchronizerId <- Arbitrary.arbitrary[Source[PhysicalSynchronizerId]]
 
       sourceMediator <- Arbitrary.arbitrary[MediatorGroupRecipient]
 
@@ -563,75 +558,19 @@ final class GeneratorsData(
       )
   )
 
-  private def deliveryUnassignmentResultGen(
-      sourceProtocolVersion: Source[ProtocolVersion]
-  ): Gen[DeliveredUnassignmentResult] =
-    for {
-      sourceSynchronizerId <- Arbitrary.arbitrary[Source[SynchronizerId]]
-      requestId <- Arbitrary.arbitrary[RequestId]
-      rootHash <- Arbitrary.arbitrary[RootHash]
-      protocolVersion = sourceProtocolVersion.unwrap
-      verdict = Verdict.Approve(protocolVersion)
-
-      result = ConfirmationResultMessage.create(
-        sourceSynchronizerId.unwrap,
-        ViewType.UnassignmentViewType,
-        requestId,
-        rootHash,
-        verdict,
-        protocolVersion,
-      )
-
-      signedResult =
-        SignedProtocolMessage.from(
-          result,
-          protocolVersion,
-          GeneratorsCrypto.sign(
-            GeneratorsCrypto.testSigningKey.fingerprint,
-            "UnassignmentResult-mediator",
-            TestHash.testHashPurpose,
-            SigningKeyUsage.ProtocolOnly,
-          ),
-        )
-
-      recipients <- recipientsArb.arbitrary
-
-      batch = Batch.of(protocolVersion, signedResult -> recipients)
-      deliver <- deliverGen(sourceSynchronizerId.unwrap, batch, protocolVersion)
-
-      unassignmentTs <- Arbitrary.arbitrary[CantonTimestamp]
-    } yield DeliveredUnassignmentResult
-      .create(
-        SignedContent(
-          deliver,
-          sign(
-            GeneratorsCrypto.testSigningKey.fingerprint,
-            "UnassignmentResult-sequencer",
-            TestHash.testHashPurpose,
-            SigningKeyUsage.ProtocolOnly,
-          ),
-          Some(unassignmentTs),
-          protocolVersion,
-        )
-      )
-      .value
-
   implicit val assignmentViewArb: Arbitrary[AssignmentView] = Arbitrary(
     for {
       salt <- Arbitrary.arbitrary[Salt]
-      contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
-      unassignmentResultEvent <- deliveryUnassignmentResultGen(sourceProtocolVersion)
-      reassignmentCounter <- reassignmentCounterGen
-
+      contracts <- Arbitrary.arbitrary[ContractsReassignmentBatch]
+      reassignmentId <- Arbitrary.arbitrary[ReassignmentId]
       hashOps = TestHash // Not used for serialization
 
     } yield AssignmentView
       .create(hashOps)(
         salt,
-        contract,
-        unassignmentResultEvent,
+        reassignmentId,
+        contracts,
         targetProtocolVersion,
-        reassignmentCounter,
       )
       .value
   )
@@ -640,23 +579,22 @@ final class GeneratorsData(
     for {
       salt <- Arbitrary.arbitrary[Salt]
 
-      contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
+      contracts <- Arbitrary.arbitrary[ContractsReassignmentBatch]
 
-      targetSynchronizerId <- Arbitrary.arbitrary[Target[SynchronizerId]]
+      targetSynchronizerId <- Arbitrary
+        .arbitrary[Target[PhysicalSynchronizerId]]
+        .map(_.map(_.copy(protocolVersion = protocolVersion)))
       timeProof <- timeProofArb(protocolVersion).arbitrary
-      reassignmentCounter <- reassignmentCounterGen
 
       hashOps = TestHash // Not used for serialization
 
     } yield UnassignmentView
       .create(hashOps)(
         salt,
-        contract,
+        contracts,
         targetSynchronizerId,
         timeProof,
         sourceProtocolVersion,
-        targetProtocolVersion,
-        reassignmentCounter,
       )
   )
 

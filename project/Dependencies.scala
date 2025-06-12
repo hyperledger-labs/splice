@@ -6,7 +6,7 @@ import sbt.*
 object Dependencies {
   private final val CD = CantonDependencies
 
-  lazy val scala_version = "2.13.15"
+  lazy val scala_version = "2.13.16"
 
   lazy val scalatest_version = "3.2.11"
 

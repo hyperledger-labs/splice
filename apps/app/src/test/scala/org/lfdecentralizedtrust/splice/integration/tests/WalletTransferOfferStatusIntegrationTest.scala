@@ -1,8 +1,17 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
-import com.daml.ledger.api.v2.event.ExercisedEvent
-import com.daml.ledger.api.v2.transaction.{TransactionTree, TreeEvent}
+import com.daml.ledger.api.v2.event.{Event, ExercisedEvent}
+import com.daml.ledger.api.v2.transaction.Transaction
+import com.daml.ledger.api.v2.transaction_filter
+import com.daml.ledger.api.v2.transaction_filter.{
+  CumulativeFilter,
+  EventFormat,
+  Filters,
+  TransactionFormat as TransactionFormatProto,
+  UpdateFormat,
+}
+import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.CreatedEvent
 import org.lfdecentralizedtrust.splice.history.AmuletCreate
@@ -14,11 +23,12 @@ import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 import org.lfdecentralizedtrust.splice.wallet.automation.AcceptedTransferOfferTrigger
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
-import scala.jdk.CollectionConverters.CollectionHasAsScala
+import scala.jdk.CollectionConverters.*
 
 class WalletTransferOfferStatusIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -76,15 +86,42 @@ class WalletTransferOfferStatusIntegrationTest
 
     def getRootFromTxId(txId: String, parties: Set[PartyId])(implicit
         env: SpliceTests.SpliceTestConsoleEnvironment
-    ): (TransactionTree, TreeEvent) = {
-      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
-        .by_id(parties, txId)
-        .getOrElse(fail("Expected to see the transaction tree in the ledger."))
-      val root = txTree.eventsById
-        .getOrElse(
-          txTree.eventsById.keySet.minOption.getOrElse(fail("mustExist")),
-          fail("Must exist"),
-        )
+    ): (Transaction, Event) = {
+      val eventFormat = EventFormat(
+        filtersByParty = parties.toSeq
+          .map(party =>
+            party.toLf -> Filters(
+              Seq(
+                CumulativeFilter(
+                  IdentifierFilter.WildcardFilter(
+                    transaction_filter.WildcardFilter(includeCreatedEventBlob = false)
+                  )
+                )
+              )
+            )
+          )
+          .toMap,
+        filtersForAnyParty = None,
+        verbose = false,
+      )
+      val txTree = inside(
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
+          .update_by_id(
+            txId,
+            UpdateFormat(
+              includeTransactions = Some(
+                TransactionFormatProto(
+                  Some(eventFormat),
+                  transaction_filter.TransactionShape.TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                )
+              )
+            ),
+          )
+          .getOrElse(fail("Expected to see the transaction tree in the ledger."))
+      ) { case TransactionWrapper(tx) =>
+        tx
+      }
+      val root = txTree.events.headOption.value
       txTree -> root
     }
 
@@ -119,19 +156,20 @@ class WalletTransferOfferStatusIntegrationTest
                     )
                   ) =>
                 status should be(TxLogEntry.Http.TransferOfferStatus.Accepted)
-                val (tree, exercise: TreeEvent) = getRootFromTxId(
+                val (tree, exercise) = getRootFromTxId(
                   txId,
                   Set(aliceUserParty, bobUserParty),
                 )
                 exercise.getExercised.choice should be("TransferOffer_Accept")
-                val childNodeIds = data.TransactionTree
-                  .fromProto(TransactionTree.toJavaProto(tree))
+                val javaTx = data.Transaction
+                  .fromProto(Transaction.toJavaProto(tree))
+                val childNodeIds = javaTx
                   .getChildNodeIds(
                     data.ExercisedEvent.fromProto(ExercisedEvent.toJavaProto(exercise.getExercised))
                   )
                   .asScala
-                val acceptChildren = childNodeIds.map(
-                  tree.eventsById.getOrElse(_, fail("Must exist"))
+                val acceptChildren = childNodeIds.map(nodeId =>
+                  tree.events.find(e => e.getCreated.nodeId == nodeId).getOrElse(fail("Must exist"))
                 )
                 acceptChildren.map(_.getCreated.contractId) should contain(contractId)
             }
@@ -160,15 +198,15 @@ class WalletTransferOfferStatusIntegrationTest
                 Set(aliceUserParty, bobUserParty),
               )
               batchExercise.getExercised.choice should be("WalletAppInstall_ExecuteBatch")
-              tree.eventsById
+              tree.events
                 .find(
-                  _._2.getExercised.choice == "AcceptedTransferOffer_Complete"
+                  _.getExercised.choice == "AcceptedTransferOffer_Complete"
                 )
                 .valueOrFail("Did not find complete tx")
-              val amulets = tree.eventsById.view
-                .filter(_._2.getCreated.contractId.nonEmpty)
-                .mapValues(evt => CreatedEvent.fromProto(toJavaProto(evt.getCreated)))
-                .collect { case (_, AmuletCreate(amulet)) =>
+              val amulets = tree.events
+                .filter(_.getCreated.contractId.nonEmpty)
+                .map(evt => CreatedEvent.fromProto(toJavaProto(evt.getCreated)))
+                .collect { case AmuletCreate(amulet) =>
                   amulet
                 }
               amulets.exists { amulet =>

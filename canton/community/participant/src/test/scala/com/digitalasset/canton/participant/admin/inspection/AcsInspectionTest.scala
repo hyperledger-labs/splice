@@ -150,7 +150,7 @@ object AcsInspectionTest extends MockitoSugar with ArgumentMatchersSugar with Ba
       .create(
         LfVersioned(
           LfLanguageVersion.v2_dev,
-          LfValue.ContractInstance(
+          LfValue.ThinContractInstance(
             packageName = Ref.PackageName.assertFromString("pkg-name"),
             template = Ref.Identifier.assertFromString("pkg:Mod:Template"),
             arg = LfValue.ValueNil,
@@ -210,7 +210,7 @@ object AcsInspectionTest extends MockitoSugar with ArgumentMatchersSugar with Ba
 
     when(state.activeContractStore).thenAnswer(acs)
     when(state.requestJournalStore).thenAnswer(rjs)
-    when(state.indexedSynchronizer).thenAnswer(IndexedSynchronizer.tryCreate(FakeSynchronizerId, 1))
+    when(state.synchronizerIdx).thenAnswer(IndexedSynchronizer.tryCreate(FakeSynchronizerId, 1))
     when(state.acsInspection).thenAnswer(acsInspection)
 
     state

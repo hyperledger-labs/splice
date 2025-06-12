@@ -26,7 +26,7 @@ import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValid
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.*
+import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.collection.immutable

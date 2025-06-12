@@ -13,6 +13,7 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
+import com.digitalasset.canton.crypto.SigningKeyUsage.encodeUsageForHash
 import com.digitalasset.canton.crypto.SigningPublicKey.getDataForFingerprint
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPrivateStoreExtended}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -289,7 +290,7 @@ object Signature
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.Signature)(fromProtoV30),
       _.toProtoV30,
     )
@@ -368,6 +369,9 @@ final case class SignatureDelegationValidityPeriod(
       .catchOnly[IllegalArgumentException](fromInclusive + periodLength)
       .getOrElse(CantonTimestamp.MaxValue)
 
+  def covers(timestamp: CantonTimestamp): Boolean =
+    timestamp >= fromInclusive && timestamp < toExclusive
+
   override protected def pretty: Pretty[SignatureDelegationValidityPeriod] =
     prettyOfClass(
       param("fromInclusive", _.fromInclusive),
@@ -420,7 +424,7 @@ final case class SignatureDelegation private[crypto] (
   def delegatingKeyId: Fingerprint = signature.signedBy
 
   def isValidAt(timestamp: CantonTimestamp): Boolean =
-    timestamp >= validityPeriod.fromInclusive && timestamp < validityPeriod.toExclusive
+    validityPeriod.covers(timestamp)
 
   def toProtoV30: v30.SignatureDelegation =
     v30.SignatureDelegation(
@@ -438,7 +442,25 @@ final case class SignatureDelegation private[crypto] (
 
 object SignatureDelegation {
 
-  // TODO(#22362): https://github.com/DACH-NY/canton/pull/22185#discussion_r1846626744
+  /** Constructs a [[SignatureDelegation]] using a session key, validity period, and signature.
+    * These components are constructed in
+    * [[com.digitalasset.canton.crypto.signer.SyncCryptoSignerWithSessionKeys]] via the sign
+    * primitive.
+    *
+    * In summary, a new or existing session key (generated in software) is used to sign the original
+    * message contents. This key has a validity period, whose duration is configurable in Canton.
+    * The provided signature is generated with a long-term key and covers the session key
+    * fingerprint, the validity period, and the synchronizer ID, authorizing the session key to act
+    * on behalf of the long-term key during that period.
+    *
+    * @param sessionKey
+    *   The session key used to produce the signature.
+    * @param validityPeriod
+    *   The duration for which the session key is valid.
+    * @param signature
+    *   Signature authorizing the session key to act for a long-term key, over the hash of the
+    *   session key fingerprint, validity period, and synchronizer ID.
+    */
   def create(
       sessionKey: SigningPublicKey,
       validityPeriod: SignatureDelegationValidityPeriod,
@@ -471,13 +493,16 @@ object SignatureDelegation {
 
   def generateHash(
       synchronizerId: SynchronizerId,
-      id: Fingerprint,
+      sessionKey: SigningPublicKey,
       validityPeriod: SignatureDelegationValidityPeriod,
   ): Hash = {
     val hashBuilder =
       HashBuilderFromMessageDigest(HashAlgorithm.Sha256, HashPurpose.SessionKeyDelegation)
     hashBuilder
-      .add(id.unwrap)
+      .add(sessionKey.id.unwrap)
+      .add(sessionKey.keySpec.toProtoEnum.value)
+      .add(sessionKey.format.toProtoEnum.value)
+      .add(encodeUsageForHash(sessionKey.usage))
       .add(validityPeriod.getCryptographicEvidence)
       .add(synchronizerId.toProtoPrimitive)
       .finish()
@@ -684,6 +709,16 @@ object SigningKeyUsage {
           .find(sku => sku.dbType == dbTypeInt.toByte)
           .getOrElse(throw new DbDeserializationException(s"Unknown key usage id: $dbTypeInt"))
       )
+
+  /** Encodes a non-empty set of signing key usages into a ByteString for hashing. The usages are
+    * converted to their proto enum integer values and sorted to ensure determinism.
+    */
+  def encodeUsageForHash(usage: NonEmpty[Set[SigningKeyUsage]]): ByteString = {
+    val orderedUsages = usage.forgetNE.toSeq.map(_.toProtoEnum.value).sorted
+    DeterministicEncoding.encodeSeqWith(orderedUsages)(usageInt =>
+      DeterministicEncoding.encodeInt(usageInt)
+    )
+  }
 
   case object Namespace extends SigningKeyUsage {
     override val identifier: String = "namespace"
@@ -1258,7 +1293,7 @@ object SigningPublicKey
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.SigningPublicKey)(fromProtoV30),
       _.toProtoV30,
     )
@@ -1466,7 +1501,7 @@ final case class SigningPrivateKey private (
 object SigningPrivateKey extends HasVersionedMessageCompanion[SigningPrivateKey] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.SigningPrivateKey)(fromProtoV30),
       _.toProtoV30,
     )
@@ -1544,6 +1579,16 @@ object SigningError {
     override def pretty: Pretty[UnsupportedAlgorithmSpec] = prettyOfClass(
       param("algorithmSpec", _.algorithmSpec),
       param("supportedAlgorithmSpecs", _.supportedAlgorithmSpecs),
+    )
+  }
+
+  final case class UnsupportedKeyFormat(
+      keyFormat: CryptoKeyFormat,
+      supportedKeyFormats: Set[CryptoKeyFormat],
+  ) extends SigningError {
+    override def pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
+      param("keyFormat", _.keyFormat),
+      param("supportedKeyFormats", _.supportedKeyFormats),
     )
   }
 
@@ -1694,6 +1739,16 @@ object SignatureCheckError {
     )
   }
 
+  final case class UnsupportedHashAlgorithm(
+      hashAlgorithm: HashAlgorithm,
+      supportedHashAlgorithms: Set[HashAlgorithm],
+  ) extends SignatureCheckError {
+    override def pretty: Pretty[UnsupportedHashAlgorithm] = prettyOfClass(
+      param("hashAlgorithm", _.hashAlgorithm),
+      param("supportedHashAlgorithms", _.supportedHashAlgorithms),
+    )
+  }
+
   final case class InvalidKeyUsage(
       keyId: Fingerprint,
       keyUsage: Set[SigningKeyUsage],
@@ -1706,9 +1761,23 @@ object SignatureCheckError {
     )
   }
 
-  final case class InvalidSignatureFormat(message: String) extends SignatureCheckError {
-    override protected def pretty: Pretty[InvalidSignatureFormat] = prettyOfClass(
-      unnamedParam(_.message.unquoted)
+  final case class UnsupportedSignatureFormat(
+      signatureFormat: SignatureFormat,
+      supportedSignatureFormats: Set[SignatureFormat],
+  ) extends SignatureCheckError {
+    override def pretty: Pretty[UnsupportedSignatureFormat] = prettyOfClass(
+      param("signatureFormat", _.signatureFormat),
+      param("supportedSignatureFormats", _.supportedSignatureFormats),
+    )
+  }
+
+  final case class UnsupportedKeyFormat(
+      keyFormat: CryptoKeyFormat,
+      supportedKeyFormats: Set[CryptoKeyFormat],
+  ) extends SignatureCheckError {
+    override def pretty: Pretty[UnsupportedKeyFormat] = prettyOfClass(
+      param("keyFormat", _.keyFormat),
+      param("supportedKeyFormats", _.supportedKeyFormats),
     )
   }
 
@@ -1742,6 +1811,16 @@ object SignatureCheckError {
 
   final case class InvalidSignatureDelegation(message: String) extends SignatureCheckError {
     override protected def pretty: Pretty[InvalidSignatureDelegation] = prettyOfClass(
+      unnamedParam(_.message.unquoted)
+    )
+  }
+
+  /** Thrown when verifying a message request that does not support session signing keys, e.g., a
+    * non-protocol message.
+    */
+  final case class UnsupportedDelegationSignatureError(message: String)
+      extends SignatureCheckError {
+    override protected def pretty: Pretty[UnsupportedDelegationSignatureError] = prettyOfClass(
       unnamedParam(_.message.unquoted)
     )
   }

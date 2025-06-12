@@ -15,7 +15,6 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.{CantonTimestamp, ReassignmentSubmitterMetadata}
-import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.health.{
   AtomicHealthComponent,
   CloseableHealthComponent,
@@ -60,8 +59,11 @@ import com.digitalasset.canton.participant.synchronizer.{
   SynchronizerHandle,
   SynchronizerRegistryError,
 }
-import com.digitalasset.canton.participant.topology.ParticipantTopologyDispatcher
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
+import com.digitalasset.canton.participant.topology.{
+  ParticipantTopologyDispatcher,
+  SequencerConnectionSuccessorListener,
+}
 import com.digitalasset.canton.participant.traffic.ParticipantTrafficControlSubscriber
 import com.digitalasset.canton.participant.util.DAMLe.PackageResolver
 import com.digitalasset.canton.participant.util.{DAMLe, TimeOfChange}
@@ -86,17 +88,16 @@ import com.digitalasset.canton.topology.processing.{
   SequencedTime,
   TopologyTransactionProcessor,
 }
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{ErrorUtil, FutureUnlessShutdownUtil, MonadUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.engine.Engine
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 
 /** A connected synchronizer from the synchronization service.
   *
@@ -116,7 +117,6 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
   *   Synchronisation crypto utility combining IPS and Crypto operations for a single synchronizer.
   */
 class ConnectedSynchronizer(
-    val synchronizerId: SynchronizerId,
     val synchronizerHandle: SynchronizerHandle,
     participantId: ParticipantId,
     engine: Engine,
@@ -129,6 +129,7 @@ class ConnectedSynchronizer(
     identityPusher: ParticipantTopologyDispatcher,
     topologyProcessor: TopologyTransactionProcessor,
     missingKeysAlerter: MissingKeysAlerter,
+    sequencerConnectionListener: SequencerConnectionSuccessorListener,
     reassignmentCoordination: ReassignmentCoordination,
     commandProgressTracker: CommandProgressTracker,
     messageDispatcherFactory: MessageDispatcher.Factory[MessageDispatcher],
@@ -146,6 +147,8 @@ class ConnectedSynchronizer(
     with ReassignmentSubmissionHandle
     with CloseableHealthComponent
     with AtomicHealthComponent {
+
+  val synchronizerId: PhysicalSynchronizerId = synchronizerHandle.synchronizerId
 
   val topologyClient: SynchronizerTopologyClientWithInit = synchronizerHandle.topologyClient
 
@@ -170,7 +173,6 @@ class ConnectedSynchronizer(
     TransactionConfirmationRequestFactory(
       participantId,
       synchronizerId,
-      staticSynchronizerParameters.protocolVersion,
     )(
       synchronizerCrypto.crypto.pureCrypto,
       seedGenerator,
@@ -482,6 +484,7 @@ class ConnectedSynchronizer(
     for {
       // Prepare missing key alerter
       _ <- EitherT.right(missingKeysAlerter.init())
+      _ <- EitherT.right(sequencerConnectionListener.init())
 
       // Phase 0: Initialise topology client at current clean head
       _ <- EitherT.right(initializeClientAtCleanHead())
@@ -632,7 +635,7 @@ class ConnectedSynchronizer(
               ephemeral.timeTracker,
               tc =>
                 participantNodePersistentState.value.ledgerApiStore
-                  .cleanSynchronizerIndex(synchronizerId)(tc, ec)
+                  .cleanSynchronizerIndex(synchronizerId.logical)(tc, ec)
                   .map(_.flatMap(_.sequencerIndex).map(_.sequencerTimestamp)),
             )(initializationTraceContext)
           )
@@ -686,7 +689,7 @@ class ConnectedSynchronizer(
                   Target(synchronizerId),
                   Target(staticSynchronizerParameters),
                   reassignmentCoordination,
-                  data.contract.metadata.stakeholders,
+                  data.contracts.stakeholders.all,
                   data.unassignmentRequest.submitterMetadata,
                   participantId,
                   data.unassignmentRequest.targetTimeProof.timestamp,
@@ -706,7 +709,7 @@ class ConnectedSynchronizer(
         }
 
         pendingReassignments.lastOption.map(t =>
-          t.reassignmentId.unassignmentTs -> t.sourceSynchronizer
+          t.reassignmentId.unassignmentTs -> t.sourceSynchronizer.map(_.logical)
         )
       }
 
@@ -759,26 +762,12 @@ class ConnectedSynchronizer(
       name: String,
       onClosing: => ERROR,
   )(
-      f: => EitherT[Future, ERROR, FutureUnlessShutdown[RESULT]]
+      f: => EitherT[FutureUnlessShutdown, ERROR, FutureUnlessShutdown[RESULT]]
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, ERROR, FutureUnlessShutdown[RESULT]] = {
-    val resultPromise = Promise[Either[ERROR, FutureUnlessShutdown[RESULT]]]()
-    performUnlessClosingF[Unit](name) {
-      val result = f.value
-      // try to complete the Promise with result of f (performUnlessClosingF on a non-closed ConnectedSynchronizer)
-      resultPromise.completeWith(result)
-      result.flatMap {
-        case Right(fusResult) =>
-          fusResult.unwrap.map(_ => ()) // tracking the completion of the inner FUS
-        case Left(_) => Future.unit
-      }
-    }.tapOnShutdown(
-      // try to complete the Promise with the onClosing error (performUnlessClosingF on a closed ConnectedSynchronizer)
-      resultPromise.trySuccess(Left(onClosing)).discard
-    ).discard // only needed to track the inner FUS too
-    EitherT(resultPromise.future)
-  }
+  ): EitherT[Future, ERROR, FutureUnlessShutdown[RESULT]] =
+    performUnlessClosingEitherUSFAsync[ERROR, FutureUnlessShutdown[RESULT]](name)(f)(x => x)
+      .onShutdown(Left(onClosing))
 
   /** @return
     *   The outer future completes after the submission has been registered as in-flight. The inner
@@ -810,14 +799,12 @@ class ConnectedSynchronizer(
           disclosedContracts,
           topologySnapshot,
         )
-        .onShutdown(Left(SubmissionDuringShutdown.Rejection()))
     }
 
-  override def submitUnassignment(
+  override def submitUnassignments(
       submitterMetadata: ReassignmentSubmitterMetadata,
-      contractId: LfContractId,
-      targetSynchronizer: Target[SynchronizerId],
-      targetProtocolVersion: Target[ProtocolVersion],
+      contractIds: Seq[LfContractId],
+      targetSynchronizer: Target[PhysicalSynchronizerId],
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, ReassignmentProcessorError, FutureUnlessShutdown[
@@ -831,26 +818,27 @@ class ConnectedSynchronizer(
       SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down."),
     ) {
       logger.debug(
-        s"Submitting unassignment of `$contractId` from `$synchronizerId` to `$targetSynchronizer`"
+        s"Submitting unassignment of `$contractIds` from `$synchronizerId` to `$targetSynchronizer`"
       )
 
       if (!ready)
-        SynchronizerNotReady(synchronizerId, "Cannot submit unassignment before recovery").discard
-      unassignmentProcessor
-        .submit(
-          UnassignmentProcessingSteps
-            .SubmissionParam(
-              submitterMetadata,
-              contractId,
-              targetSynchronizer,
-              targetProtocolVersion,
-            ),
-          synchronizerCrypto.currentSnapshotApproximation.ipsSnapshot,
+        EitherT.leftT(
+          SynchronizerNotReady(synchronizerId, "Cannot submit unassignment before recovery")
         )
-        .onShutdown(Left(SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down")))
+      else
+        unassignmentProcessor
+          .submit(
+            UnassignmentProcessingSteps
+              .SubmissionParam(
+                submitterMetadata,
+                contractIds,
+                targetSynchronizer,
+              ),
+            synchronizerCrypto.currentSnapshotApproximation.ipsSnapshot,
+          )
     }
 
-  override def submitAssignment(
+  override def submitAssignments(
       submitterMetadata: ReassignmentSubmitterMetadata,
       reassignmentId: ReassignmentId,
   )(implicit
@@ -868,15 +856,16 @@ class ConnectedSynchronizer(
       logger.debug(s"Submitting assignment of `$reassignmentId` to `$synchronizerId`")
 
       if (!ready)
-        SynchronizerNotReady(synchronizerId, "Cannot submit unassignment before recovery").discard
-
-      assignmentProcessor
-        .submit(
-          AssignmentProcessingSteps
-            .SubmissionParam(submitterMetadata, reassignmentId),
-          synchronizerCrypto.currentSnapshotApproximation.ipsSnapshot,
+        EitherT.leftT(
+          SynchronizerNotReady(synchronizerId, "Cannot submit unassignment before recovery")
         )
-        .onShutdown(Left(SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down")))
+      else
+        assignmentProcessor
+          .submit(
+            AssignmentProcessingSteps
+              .SubmissionParam(submitterMetadata, reassignmentId),
+            synchronizerCrypto.currentSnapshotApproximation.ipsSnapshot,
+          )
     }
 
   def numberOfDirtyRequests(): Int = ephemeral.requestJournal.numberOfDirtyRequests
@@ -901,11 +890,6 @@ class ConnectedSynchronizer(
       SyncCloseable(
         "connected-synchronizer",
         LifeCycle.close(
-          // Close the synchronizer crypto client first to stop waiting for snapshots that may block the sequencer subscription
-          synchronizerCrypto,
-          // Close the sequencer client so that the processors won't receive or handle events when
-          // their shutdown is initiated.
-          sequencerClient,
           journalGarbageCollector,
           acsCommitmentProcessor,
           transactionProcessor,
@@ -973,7 +957,6 @@ object ConnectedSynchronizer {
   trait Factory[+T <: ConnectedSynchronizer] {
 
     def create(
-        synchronizerId: SynchronizerId,
         synchronizerHandle: SynchronizerHandle,
         participantId: ParticipantId,
         engine: Engine,
@@ -986,6 +969,7 @@ object ConnectedSynchronizer {
         identityPusher: ParticipantTopologyDispatcher,
         topologyProcessorFactory: TopologyTransactionProcessor.Factory,
         missingKeysAlerter: MissingKeysAlerter,
+        sequencerConnectionSuccessorListener: SequencerConnectionSuccessorListener,
         reassignmentCoordination: ReassignmentCoordination,
         commandProgressTracker: CommandProgressTracker,
         clock: Clock,
@@ -999,7 +983,6 @@ object ConnectedSynchronizer {
 
   object DefaultFactory extends Factory[ConnectedSynchronizer] {
     override def create(
-        synchronizerId: SynchronizerId,
         synchronizerHandle: SynchronizerHandle,
         participantId: ParticipantId,
         engine: Engine,
@@ -1012,6 +995,7 @@ object ConnectedSynchronizer {
         identityPusher: ParticipantTopologyDispatcher,
         topologyProcessorFactory: TopologyTransactionProcessor.Factory,
         missingKeysAlerter: MissingKeysAlerter,
+        sequencerConnectionSuccessorListener: SequencerConnectionSuccessorListener,
         reassignmentCoordination: ReassignmentCoordination,
         commandProgressTracker: CommandProgressTracker,
         clock: Clock,
@@ -1035,20 +1019,20 @@ object ConnectedSynchronizer {
         persistentState.requestJournalStore,
         tc =>
           ephemeralState.ledgerApiIndexer.ledgerApiStore.value
-            .cleanSynchronizerIndex(synchronizerId)(tc, ec),
+            .cleanSynchronizerIndex(synchronizerHandle.synchronizerId.logical)(tc, ec),
         sortedReconciliationIntervalsProvider,
         persistentState.acsCommitmentStore,
         persistentState.activeContractStore,
         persistentState.submissionTrackerStore,
         participantNodePersistentState.map(_.inFlightSubmissionStore),
-        synchronizerId,
+        synchronizerHandle.synchronizerId,
         parameters.journalGarbageCollectionDelay,
         parameters.processingTimeouts,
         loggerFactory,
       )
       for {
         acsCommitmentProcessor <- AcsCommitmentProcessor(
-          synchronizerId,
+          synchronizerHandle.synchronizerId,
           participantId,
           synchronizerHandle.sequencerClient,
           synchronizerCrypto,
@@ -1073,7 +1057,6 @@ object ConnectedSynchronizer {
           acsCommitmentProcessor.scheduleTopologyTick
         )
       } yield new ConnectedSynchronizer(
-        synchronizerId,
         synchronizerHandle,
         participantId,
         engine,
@@ -1086,6 +1069,7 @@ object ConnectedSynchronizer {
         identityPusher,
         topologyProcessor,
         missingKeysAlerter,
+        sequencerConnectionSuccessorListener,
         reassignmentCoordination,
         commandProgressTracker,
         ParallelMessageDispatcherFactory,

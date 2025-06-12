@@ -27,7 +27,12 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
   Observation,
   Submission,
 }
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId, TestingTopology}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+  TestingTopology,
+}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.{ReassignmentTag, SameReassignmentType, SingletonTraverse}
@@ -55,7 +60,7 @@ private[reassignment] object TestReassignmentCoordination {
     val recentTimeProofProvider = mock[RecentTimeProofProvider]
     when(
       recentTimeProofProvider.get(
-        any[Target[SynchronizerId]],
+        any[Target[PhysicalSynchronizerId]],
         any[Target[StaticSynchronizerParameters]],
       )(
         any[TraceContext]
@@ -95,24 +100,6 @@ private[reassignment] object TestReassignmentCoordination {
         defaultSyncCryptoApi(synchronizers.toSeq.map(_.unwrap), packages, loggerFactory),
       loggerFactory,
     ) {
-
-      override def awaitUnassignmentTimestamp(
-          sourceSynchronizer: Source[SynchronizerId],
-          staticSynchronizerParameters: Source[StaticSynchronizerParameters],
-          timestamp: CantonTimestamp,
-      )(implicit
-          traceContext: TraceContext
-      ): EitherT[FutureUnlessShutdown, UnknownSynchronizer, Unit] =
-        awaitTimestampOverride match {
-          case None =>
-            super.awaitUnassignmentTimestamp(
-              sourceSynchronizer,
-              staticSynchronizerParameters,
-              timestamp,
-            )
-          case Some(overridden) =>
-            EitherT.right(overridden.fold(FutureUnlessShutdown.unit)(FutureUnlessShutdown.outcomeF))
-        }
 
       override def awaitTimestamp[T[X] <: ReassignmentTag[X]: SameReassignmentType](
           synchronizerId: T[SynchronizerId],

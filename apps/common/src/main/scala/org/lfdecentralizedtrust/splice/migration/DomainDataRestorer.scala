@@ -18,6 +18,7 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.topology.SynchronizerId
 import com.google.protobuf.ByteString
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainDataRestorer(
@@ -29,6 +30,7 @@ class DomainDataRestorer(
 
   /** We assume the domain was not register prior to trying to restore the data.
     */
+  @nowarn("cat=unused&msg=synchronizerId")
   def connectDomainAndRestoreData(
       ledgerConnection: BaseLedgerConnection,
       userId: String,
@@ -52,7 +54,9 @@ class DomainDataRestorer(
         case None =>
           val domainConnectionConfig = SynchronizerConnectionConfig(
             synchronizerAlias,
-            synchronizerId = Some(synchronizerId),
+            synchronizerId = None,
+            // TODO(#19804) Consider whether we can add back the safeguard here.
+            // synchronizerId = Some(synchronizerId),
             sequencerConnections = sequencerConnections,
             manualConnect = true,
             initializeFromTrustedSynchronizer = true,

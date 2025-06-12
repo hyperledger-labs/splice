@@ -3,12 +3,13 @@
 
 package com.digitalasset.canton.participant.protocol.reassignment
 
+import cats.data.EitherT
 import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ProcessingTimeout, TestingConfigInternal}
-import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerSnapshotSyncCryptoApi}
 import com.digitalasset.canton.data.ViewType.UnassignmentViewType
-import com.digitalasset.canton.lifecycle.PromiseUnlessShutdownFactory
+import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, PromiseUnlessShutdownFactory}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.ReassignmentProcessorError
 import com.digitalasset.canton.participant.protocol.submission.{
@@ -19,14 +20,15 @@ import com.digitalasset.canton.participant.protocol.{ContractAuthenticator, Prot
 import com.digitalasset.canton.participant.sync.SyncEphemeralState
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.sequencing.client.SequencerClient
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.ExecutionContext
 
 class UnassignmentProcessor(
-    synchronizerId: Source[SynchronizerId],
+    synchronizerId: Source[PhysicalSynchronizerId],
     override val participantId: ParticipantId,
     staticSynchronizerParameters: Source[StaticSynchronizerParameters],
     reassignmentCoordination: ReassignmentCoordination,
@@ -75,4 +77,12 @@ class UnassignmentProcessor(
       "user-id" -> submissionParam.submitterMetadata.userId,
       "type" -> "unassignment",
     )
+
+  override protected def preSubmissionValidations(
+      params: UnassignmentProcessingSteps.SubmissionParam,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, Unit] = EitherT.pure(())
 }

@@ -70,10 +70,7 @@ abstract class TopologyTransactionAuthorizationValidatorTest(multiTransactionHas
   ) = {
     val validator =
       new TopologyTransactionAuthorizationValidator(
-        new SynchronizerCryptoPureApi(
-          defaultStaticSynchronizerParameters,
-          Factory.cryptoApi.crypto.pureCrypto,
-        ),
+        Factory.syncCryptoClient.crypto.pureCrypto,
         store,
         validationIsFinal = validationIsFinal,
         loggerFactory,
@@ -168,7 +165,7 @@ abstract class TopologyTransactionAuthorizationValidatorTest(multiTransactionHas
         }
       }
 
-      // TODO(#20714): Add test for invalid signature scheme usage in the transaction protocol (probably as part of the LedgerAuthorizationIntegrationTest).
+      // TODO(#25752): Add test for invalid signature scheme usage in the transaction protocol (probably as part of the LedgerAuthorizationIntegrationTest).
       "fail to add if the signing key has an unsupported scheme" in {
         val validator = mk()
         import Factory.*

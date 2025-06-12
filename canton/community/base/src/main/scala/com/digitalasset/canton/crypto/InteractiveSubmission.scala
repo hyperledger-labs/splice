@@ -19,7 +19,6 @@ import com.digitalasset.canton.protocol.hash.{
   TransactionMetadataHashBuilder,
 }
 import com.digitalasset.canton.protocol.{LfContractId, LfHash, SerializableContract}
-import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
@@ -57,7 +56,7 @@ object InteractiveSubmission {
         commandId: Ref.CommandId,
         transactionUUID: UUID,
         mediatorGroup: Int,
-        synchronizerId: SynchronizerId,
+        synchronizerId: SynchronizerId, // TODO(#25483) Should that be physical?
         timeBoundaries: LedgerTimeBoundaries,
         preparationTime: Time.Timestamp,
         disclosedContracts: Map[ContractId, FatContractInstance],
@@ -113,6 +112,7 @@ object InteractiveSubmission {
       commandId: Ref.CommandId,
       transactionUUID: UUID,
       mediatorGroup: Int,
+      // TODO(#25483) Should this be physical?
       synchronizerId: SynchronizerId,
       timeBoundaries: LedgerTimeBoundaries,
       preparationTime: Time.Timestamp,
@@ -195,8 +195,7 @@ object InteractiveSubmission {
   def verifySignatures(
       hash: Hash,
       signatures: Map[PartyId, Seq[Signature]],
-      cryptoPureApi: CryptoPureApi,
-      topologySnapshot: TopologySnapshot,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       actAs: Set[LfPartyId],
       logger: TracedLogger,
   )(implicit
@@ -232,8 +231,7 @@ object InteractiveSubmission {
       verifySignatures(
         hash,
         signaturesFromActAsParties,
-        cryptoPureApi,
-        topologySnapshot,
+        cryptoSnapshot,
         logger,
       )
     }
@@ -245,8 +243,7 @@ object InteractiveSubmission {
   private def verifySignatures(
       hash: Hash,
       signatures: Map[PartyId, Seq[Signature]],
-      cryptoPureApi: CryptoPureApi,
-      topologySnapshot: TopologySnapshot,
+      cryptoSnapshot: SynchronizerSnapshotSyncCryptoApi,
       logger: TracedLogger,
   )(implicit
       traceContext: TraceContext,
@@ -256,7 +253,7 @@ object InteractiveSubmission {
       .parTraverse_ { case (party, signatures) =>
         for {
           authInfo <- EitherT(
-            topologySnapshot
+            cryptoSnapshot.ipsSnapshot
               .partyAuthorization(party)
               .map(
                 _.toRight(s"Could not find party signing keys for $party.")
@@ -268,8 +265,7 @@ object InteractiveSubmission {
               .find(_.fingerprint == signature.signedBy)
               .toRight(s"Signing key ${signature.signedBy} is not a valid key for $party")
               .flatMap(key =>
-                // TODO(#23551) Add new usage for interactive submission
-                cryptoPureApi
+                cryptoSnapshot.pureCrypto
                   .verifySignature(hash.unwrap, key, signature, SigningKeyUsage.ProtocolOnly)
                   .map(_ => key.fingerprint)
                   .leftMap(_.toString)

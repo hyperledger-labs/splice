@@ -867,6 +867,7 @@ class IssConsensusModuleTest
                     startEpochCouldAlterOrderingTopology = None,
                     previousBftTime = None,
                     previousEpochTopologyQueryTimestamp = None,
+                    leaderSelectionPolicyState = None,
                   )
                 )
               )
@@ -947,7 +948,7 @@ class IssConsensusModuleTest
             .shouldCatchUpTo(eqTo(GenesisEpochNumber))(any[TraceContext])
           verify(retransmissionsManagerMock, never)
             .handleMessage(
-              any[CryptoProvider[ProgrammableUnitTestEnv]],
+              any[OrderingTopologyInfo[ProgrammableUnitTestEnv]],
               any[RetransmissionsMessage],
             )(any[ContextType], any[TraceContext])
           context.extractBecomes() should matchPattern {
