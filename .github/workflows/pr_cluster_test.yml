@@ -4,8 +4,8 @@ on:
     types: [created]
 permissions:
   contents: read
-  issues: write
-  pull-requests: read
+  issues: read
+  pull-requests: write # To comment back on the PR
   id-token: write
 
 jobs:
