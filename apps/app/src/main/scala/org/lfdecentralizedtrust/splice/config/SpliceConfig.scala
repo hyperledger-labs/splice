@@ -107,7 +107,7 @@ case class SpliceConfig(
 
   override def withDefaults(defaults: DefaultPorts, edition: CantonEdition): SpliceConfig = this
 
-  // TODO(#736): we want to remove all of the configurations options below:
+  // TODO(DACH-NY/canton-network-node#736): we want to remove all of the configurations options below:
   override val participants: Map[InstanceName, ParticipantNodeConfig] = Map.empty
   override val remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty
   override val mediators: Map[InstanceName, MediatorNodeConfig] = Map.empty
@@ -541,6 +541,10 @@ object SpliceConfig {
     implicit val partyIdConfigReader: ConfigReader[PartyId] = ConfigReader.fromString(str =>
       Codec.decode(Codec.Party)(str).left.map(err => CannotConvert(str, "PartyId", err))
     )
+    implicit val packageVersionConfigReader: ConfigReader[PackageVersion] =
+      ConfigReader.fromString(str =>
+        PackageVersion.fromString(str).left.map(err => CannotConvert(str, "PackageVersion", err))
+      )
     implicit val beneficiaryConfigReader: ConfigReader[BeneficiaryConfig] =
       deriveReader[BeneficiaryConfig]
     implicit val svParticipantClientConfigReader: ConfigReader[SvParticipantClientConfig] =
@@ -889,6 +893,8 @@ object SpliceConfig {
     implicit val periodicBackupDumpConfigWriter: ConfigWriter[PeriodicBackupDumpConfig] =
       deriveWriter[PeriodicBackupDumpConfig]
     implicit val partyIdConfigWriter: ConfigWriter[PartyId] =
+      implicitly[ConfigWriter[String]].contramap(_.toString)
+    implicit val packageVersionConfigWriter: ConfigWriter[PackageVersion] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val beneficiaryConfigWriter: ConfigWriter[BeneficiaryConfig] =
       deriveWriter[BeneficiaryConfig]

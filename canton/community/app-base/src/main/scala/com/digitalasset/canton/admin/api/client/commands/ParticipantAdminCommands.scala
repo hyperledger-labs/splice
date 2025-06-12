@@ -193,7 +193,7 @@ object ParticipantAdminCommands {
                 if (dar.description.isEmpty)
                   PathUtils.getFilenameWithoutExtension(Path.of(filename))
                 else dar.description
-              _ = logger.info(s"Sending upload doar for ${descriptionOrFilename}")(
+              _ = logger.info(s"Sending upload dar for ${descriptionOrFilename}")(
                 TraceContext.empty
               )
             } yield v30.UploadDarRequest.UploadDarData(

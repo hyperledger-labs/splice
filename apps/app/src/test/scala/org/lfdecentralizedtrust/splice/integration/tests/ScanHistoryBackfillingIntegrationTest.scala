@@ -377,6 +377,24 @@ class ScanHistoryBackfillingIntegrationTest
     }
 
     clue("Compare scan histories with each other using the v1 HTTP endpoint") {
+      // The v1 endpoint is deprecated, but we still have users using it
+      @nowarn("cat=deprecation")
+      val sv1HttpUpdates =
+        sv1ScanBackend.getUpdateHistoryV1(1000, None, encoding = CompactJson)
+
+      @nowarn("cat=deprecation")
+      val sv2HttpUpdates =
+        sv2ScanBackend.getUpdateHistoryV1(1000, None, encoding = CompactJson)
+
+      // Compare common prefix, as there might be concurrent activity
+      val commonLength = sv1HttpUpdates.length min sv2HttpUpdates.length
+      commonLength should be > 10
+      val sv1Items = sv1HttpUpdates.take(commonLength)
+      val sv2Items = sv2HttpUpdates.take(commonLength)
+      sv1Items should contain theSameElementsInOrderAs sv2Items
+    }
+
+    clue("Compare scan histories with each other using the v2 HTTP endpoint") {
       val sv1HttpUpdates =
         readUpdateHistoryFromScan(sv1ScanBackend)
       val sv2HttpUpdates =
@@ -477,7 +495,7 @@ class ScanHistoryBackfillingIntegrationTest
       val sv2Transactions =
         sv2ScanBackend.listTransactions(None, SortOrder.Asc, 1000).map(shortDebugDescription)
 
-      // TODO(#16798): switch to theSameElementsInOrderAs once the endpoint sorts by record time instead of row id.
+      // TODO(#666): switch to theSameElementsInOrderAs once the endpoint sorts by record time instead of row id.
       sv1Transactions should contain theSameElementsAs sv2Transactions
     }
 

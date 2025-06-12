@@ -25,7 +25,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.config.NetworkAppClientConfig
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions
-import org.lfdecentralizedtrust.splice.http.v0.definitions.GetDsoInfoResponse
+import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  GetDsoInfoResponse,
+  UpdateHistoryItem,
+  UpdateHistoryItemV2,
+}
 import org.lfdecentralizedtrust.splice.scan.{ScanApp, ScanAppBootstrap}
 import org.lfdecentralizedtrust.splice.scan.automation.ScanAutomationService
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
@@ -457,24 +461,39 @@ abstract class ScanAppReference(
       count: Int,
       after: Option[(Long, String)],
       lossless: Boolean,
-  ) = {
+  ): Seq[UpdateHistoryItem] = {
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetUpdateHistoryV0(count, after, lossless)
       )
     }
   }
+
+  @deprecated(message = "Use getUpdateHistory instead", since = "0.4.2")
+  def getUpdateHistoryV1(
+      count: Int,
+      after: Option[(Long, String)],
+      encoding: definitions.DamlValueEncoding,
+  ): Seq[UpdateHistoryItem] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetUpdateHistoryV1(count, after, encoding)
+      )
+    }
+  }
+
   def getUpdateHistory(
       count: Int,
       after: Option[(Long, String)],
       encoding: definitions.DamlValueEncoding,
-  ) = {
+  ): Seq[UpdateHistoryItemV2] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.GetUpdateHistory(count, after, encoding)
+        HttpScanAppClient.GetUpdateHistoryV2(count, after, encoding)
       )
     }
   }
+
   def getUpdate(updateId: String, encoding: definitions.DamlValueEncoding) = {
     consoleEnvironment.run {
       httpCommand(

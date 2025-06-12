@@ -52,7 +52,7 @@ class PublishLocalCometBftNodeConfigTrigger(
         store,
         store.key.svParty,
       )
-      // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
+      // TODO (DACH-NY/canton-network-node#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
       // create a task if the local config is different than the one we have published to the DSO
       // or if no domain bft is configured
       if !synchronizerNodeConfig
@@ -111,7 +111,7 @@ object PublishLocalCometBftNodeConfigTrigger {
       param("localSvNodeConfig", _.localSvNodeConfig),
     )
 
-    // TODO(#5889): unify or align with CometBftNode.getLocalNodeConfig and the functions backing `diffNetworkConfig`
+    // TODO(DACH-NY/canton-network-node#5889): unify or align with CometBftNode.getLocalNodeConfig and the functions backing `diffNetworkConfig`
     val damlSvNodeConfig: daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig =
       getNewSynchronizerNodeConfig(synchronizerNodeConfig, localSvNodeConfig)
   }

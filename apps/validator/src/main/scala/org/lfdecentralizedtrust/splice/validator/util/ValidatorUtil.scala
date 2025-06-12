@@ -239,7 +239,7 @@ private[validator] object ValidatorUtil {
         // Note: it's OK to skip off-boarding in this case, as on-boarding always creates an install contract first,
         // and off-boarding archives the install contract jointly with the validator right. Thus we can't end up in a
         // situation where there is a stray validator right.
-        // TODO(#12556): revisit the above statement in the context of removing the data races wrt validator user rights that do exist
+        // TODO(#772): revisit the above statement in the context of removing the data races wrt validator user rights that do exist
         logger
           .info(s"Skipping off-boarding of $endUserName, as no wallet install contract was found.")
         Future.unit

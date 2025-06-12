@@ -66,7 +66,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
             // Advance so we're within the renewalInterval + make sure that we have
             // an open round that we can use. We time the advances so that
             // automation doesn't trigger before payments can be made.
-            // TODO (#7609): consider replacing with stopping and starting triggers
+            // TODO (#996): consider replacing with stopping and starting triggers
             advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(1)))
             advanceTimeToRoundOpen
           },

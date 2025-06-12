@@ -4,6 +4,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardMetadataIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =

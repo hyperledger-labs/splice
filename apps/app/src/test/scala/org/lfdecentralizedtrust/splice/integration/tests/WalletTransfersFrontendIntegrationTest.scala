@@ -29,7 +29,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
-      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
   protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(
@@ -382,6 +382,7 @@ object BaseWalletTransfersFrontendIntegrationTest {
   )
 }
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class WalletTransferOffersFrontendIntegrationTest
     extends BaseWalletTransfersFrontendIntegrationTest {
   override protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(
@@ -408,6 +409,7 @@ class WalletTransferOffersFrontendIntegrationTest
   override protected def shouldDisableTokenStandardSwitch: Boolean = true
 }
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardWalletTransfersFrontendIntegrationTest
     extends BaseWalletTransfersFrontendIntegrationTest {
   override protected def createTransferOfferViaBackend(walletClient: WalletAppClientReference)(

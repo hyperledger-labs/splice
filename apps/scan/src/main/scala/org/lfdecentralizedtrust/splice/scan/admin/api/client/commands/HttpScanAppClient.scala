@@ -876,7 +876,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListDsoSequencersResponse.OK(response) =>
         response.domainSequencers.traverse { domain =>
-          // TODO (#9309): malicious scans can make these decoding fail
+          // TODO (DACH-NY/canton-network-internal#449): malicious scans can make these decoding fail
           Codec.decode(Codec.SynchronizerId)(domain.domainId).flatMap { synchronizerId =>
             domain.sequencers
               .traverse { s =>
@@ -947,7 +947,7 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.ListDsoScansResponse.OK(response) =>
         response.scans.traverse { domain =>
-          // TODO (#9309): malicious scans can make this decoding fail
+          // TODO (DACH-NY/canton-network-internal#449): malicious scans can make this decoding fail
           Codec.decode(Codec.SynchronizerId)(domain.domainId).map { synchronizerId =>
             // all SVs validate the Uri, so this should only fail to parse for malicious SVs.
             val (malformed, scanList) =
@@ -1258,7 +1258,41 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetUpdateHistory(
+  case class GetUpdateHistoryV2(
+      count: Int,
+      after: Option[(Long, String)],
+      damlValueEncoding: definitions.DamlValueEncoding,
+  ) extends InternalBaseCommand[http.GetUpdateHistoryV2Response, Seq[
+        definitions.UpdateHistoryItemV2
+      ]] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetUpdateHistoryV2Response] = {
+      client.getUpdateHistoryV2(
+        // the request is the same as for V1
+        definitions.UpdateHistoryRequestV2(
+          after = after.map { case (migrationId, recordTime) =>
+            definitions.UpdateHistoryRequestAfter(migrationId, recordTime)
+          },
+          pageSize = count,
+          damlValueEncoding = Some(damlValueEncoding),
+        ),
+        headers,
+      )
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetUpdateHistoryV2Response.OK(response) =>
+        Right(response.transactions)
+    }
+  }
+
+  @deprecated(message = "Use GetUpdateHistory instead", since = "0.4.2")
+  case class GetUpdateHistoryV1(
       count: Int,
       after: Option[(Long, String)],
       damlValueEncoding: definitions.DamlValueEncoding,

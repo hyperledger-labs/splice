@@ -187,7 +187,7 @@ export class Dso extends pulumi.ComponentResource {
 
     const useCantonBft =
       this.args.decentralizedSynchronizerUpgradeConfig.active.sequencer.enableBftSequencer;
-    // TODO(#19670): long-term CantonBFT deployments should be robust enough to onboard in parallel again?
+    // TODO(#893): long-term CantonBFT deployments should be robust enough to onboard in parallel again?
     const incrementalOnboarding = useCantonBft;
 
     // recursive install function to allow injecting dependencies on previous svs

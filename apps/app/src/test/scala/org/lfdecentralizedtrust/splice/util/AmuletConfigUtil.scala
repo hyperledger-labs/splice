@@ -1,7 +1,6 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
@@ -22,9 +21,9 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
   TestCommon,
 }
-import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultAmuletConfig
 
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 import java.util.UUID
 
 trait AmuletConfigUtil extends TestCommon {
@@ -37,27 +36,34 @@ trait AmuletConfigUtil extends TestCommon {
       tickDuration: NonNegativeFiniteDuration,
       maxNumInputs: Int = 100,
       holdingFee: BigDecimal = SpliceUtil.defaultHoldingFee.rate,
-      nextSynchronizerId: Option[SynchronizerId] = None,
+      createFee: BigDecimal = SpliceUtil.defaultCreateFee.fee,
   )(implicit
       env: SpliceTests.SpliceTestConsoleEnvironment
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
-    val activeSynchronizerId =
-      AmuletConfigSchedule(amuletRules)
-        .getConfigAsOf(env.environment.clock.now)
-        .decentralizedSynchronizer
-        .activeSynchronizer
-    val domainFeesConfig = defaultSynchronizerFeesConfig
-    defaultAmuletConfig(
-      tickDuration,
-      maxNumInputs,
-      SynchronizerId.tryFromString(activeSynchronizerId),
-      domainFeesConfig.extraTrafficPrice.value,
-      domainFeesConfig.minTopupAmount.value,
-      domainFeesConfig.baseRateBurstAmount.value,
-      domainFeesConfig.baseRateBurstWindow,
-      domainFeesConfig.readVsWriteScalingFactor.value,
-      holdingFee = holdingFee,
-      nextSynchronizerId = nextSynchronizerId,
+    val existingAmuletConfig = AmuletConfigSchedule(amuletRules)
+      .getConfigAsOf(env.environment.clock.now)
+    val existingTransferConfig = existingAmuletConfig.transferConfig
+    new splice.amuletconfig.AmuletConfig(
+      new splice.amuletconfig.TransferConfig(
+        new splice.fees.FixedFee(
+          createFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+        ),
+        new splice.fees.RatePerRound(
+          holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+        ),
+        existingTransferConfig.transferFee,
+        existingTransferConfig.lockHolderFee,
+        existingTransferConfig.extraFeaturedAppRewardAmount,
+        maxNumInputs,
+        existingTransferConfig.maxNumOutputs,
+        existingTransferConfig.maxNumLockHolders,
+      ),
+      existingAmuletConfig.issuanceCurve,
+      existingAmuletConfig.decentralizedSynchronizer,
+      new RelTime(TimeUnit.NANOSECONDS.toMicros(tickDuration.duration.toNanos)),
+      existingAmuletConfig.packageConfig,
+      existingAmuletConfig.transferPreapprovalFee,
+      existingAmuletConfig.featuredAppActivityMarkerAmount,
     )
   }
 

@@ -89,7 +89,7 @@ find_exceptions |
 
 ### Look for leaked secrets
 
-# TODO(#14876) Patch secrets in the log file
+# TODO(DACH-NY/canton-network-internal#481) Patch secrets in the log file
 sed -i 's/secret=test/secret=hidden/g' "$LOGFILE"
 
 find_secrets() {
