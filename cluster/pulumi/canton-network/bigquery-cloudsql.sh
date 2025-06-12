@@ -37,124 +37,77 @@ SCAN_APP_DATABASE_NAME=""
 declare -A PROVIDED_ARGS
 
 while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --private-network-project=*)
-      if [ -n "${PROVIDED_ARGS[private-network-project]}" ]; then
-        echo "Error: --private-network-project specified more than once" >&2
-        exit 1
-      fi
-      PRIVATE_NETWORK_PROJECT="${1#*=}"
-      PROVIDED_ARGS[private-network-project]=1
+  # Verify argument follows --name=value format
+  if [[ ! "$1" =~ ^--[a-zA-Z0-9_-]+=.* ]]; then
+    echo "Error: Invalid argument format: $1" >&2
+    echo "Expected format: --name=value" >&2
+    exit 1
+  fi
+
+  # Extract parameter name and value
+  param_name="${1#--}"
+  param_name="${param_name%%=*}"
+  param_value="${1#*=}"
+
+  # Check for duplicate parameters
+  if [ -n "${PROVIDED_ARGS[$param_name]}" ]; then
+    echo "Error: --$param_name specified more than once" >&2
+    exit 1
+  fi
+
+  # Set appropriate variable based on parameter name
+  case "$param_name" in
+    private-network-project)
+      PRIVATE_NETWORK_PROJECT="$param_value"
       ;;
-    --compute-region=*)
-      if [ -n "${PROVIDED_ARGS[compute-region]}" ]; then
-        echo "Error: --compute-region specified more than once" >&2
-        exit 1
-      fi
-      COMPUTE_REGION="${1#*=}"
-      PROVIDED_ARGS[compute-region]=1
+    compute-region)
+      COMPUTE_REGION="$param_value"
       ;;
-    --service-account-email=*)
-      if [ -n "${PROVIDED_ARGS[service-account-email]}" ]; then
-        echo "Error: --service-account-email specified more than once" >&2
-        exit 1
-      fi
-      SERVICE_ACCOUNT_EMAIL="${1#*=}"
-      PROVIDED_ARGS[service-account-email]=1
+    service-account-email)
+      SERVICE_ACCOUNT_EMAIL="$param_value"
       ;;
-    --tables-to-replicate-length=*)
-      if [ -n "${PROVIDED_ARGS[tables-to-replicate-length]}" ]; then
-        echo "Error: --tables-to-replicate-length specified more than once" >&2
-        exit 1
-      fi
-      TABLES_TO_REPLICATE_LENGTH="${1#*=}"
-      PROVIDED_ARGS[tables-to-replicate-length]=1
+    tables-to-replicate-length)
+      TABLES_TO_REPLICATE_LENGTH="$param_value"
       ;;
-    --db-name=*)
-      if [ -n "${PROVIDED_ARGS[db-name]}" ]; then
-        echo "Error: --db-name specified more than once" >&2
-        exit 1
-      fi
-      DB_NAME="${1#*=}"
-      PROVIDED_ARGS[db-name]=1
+    db-name)
+      DB_NAME="$param_value"
       ;;
-    --schema-name=*)
-      if [ -n "${PROVIDED_ARGS[schema-name]}" ]; then
-        echo "Error: --schema-name specified more than once" >&2
-        exit 1
-      fi
-      SCHEMA_NAME="${1#*=}"
-      PROVIDED_ARGS[schema-name]=1
+    schema-name)
+      SCHEMA_NAME="$param_value"
       ;;
-    --tables-to-replicate-list=*)
-      if [ -n "${PROVIDED_ARGS[tables-to-replicate-list]}" ]; then
-        echo "Error: --tables-to-replicate-list specified more than once" >&2
-        exit 1
-      fi
-      TABLES_TO_REPLICATE_LIST="${1#*=}"
-      PROVIDED_ARGS[tables-to-replicate-list]=1
+    tables-to-replicate-list)
+      TABLES_TO_REPLICATE_LIST="$param_value"
       ;;
-    --tables-to-replicate-joined=*)
-      if [ -n "${PROVIDED_ARGS[tables-to-replicate-joined]}" ]; then
-        echo "Error: --tables-to-replicate-joined specified more than once" >&2
-        exit 1
-      fi
-      TABLES_TO_REPLICATE_JOINED="${1#*=}"
-      PROVIDED_ARGS[tables-to-replicate-joined]=1
+    tables-to-replicate-joined)
+      TABLES_TO_REPLICATE_JOINED="$param_value"
       ;;
-    --postgres-user-name=*)
-      if [ -n "${PROVIDED_ARGS[postgres-user-name]}" ]; then
-        echo "Error: --postgres-user-name specified more than once" >&2
-        exit 1
-      fi
-      POSTGRES_USER_NAME="${1#*=}"
-      PROVIDED_ARGS[postgres-user-name]=1
+    postgres-user-name)
+      POSTGRES_USER_NAME="$param_value"
       ;;
-    --publication-name=*)
-      if [ -n "${PROVIDED_ARGS[publication-name]}" ]; then
-        echo "Error: --publication-name specified more than once" >&2
-        exit 1
-      fi
-      PUBLICATION_NAME="${1#*=}"
-      PROVIDED_ARGS[publication-name]=1
+    publication-name)
+      PUBLICATION_NAME="$param_value"
       ;;
-    --replication-slot-name=*)
-      if [ -n "${PROVIDED_ARGS[replication-slot-name]}" ]; then
-        echo "Error: --replication-slot-name specified more than once" >&2
-        exit 1
-      fi
-      REPLICATION_SLOT_NAME="${1#*=}"
-      PROVIDED_ARGS[replication-slot-name]=1
+    replication-slot-name)
+      REPLICATION_SLOT_NAME="$param_value"
       ;;
-    --replicator-user-name=*)
-      if [ -n "${PROVIDED_ARGS[replicator-user-name]}" ]; then
-        echo "Error: --replicator-user-name specified more than once" >&2
-        exit 1
-      fi
-      REPLICATOR_USER_NAME="${1#*=}"
-      PROVIDED_ARGS[replicator-user-name]=1
+    replicator-user-name)
+      REPLICATOR_USER_NAME="$param_value"
       ;;
-    --postgres-instance-name=*)
-      if [ -n "${PROVIDED_ARGS[postgres-instance-name]}" ]; then
-        echo "Error: --postgres-instance-name specified more than once" >&2
-        exit 1
-      fi
-      POSTGRES_INSTANCE_NAME="${1#*=}"
-      PROVIDED_ARGS[postgres-instance-name]=1
+    postgres-instance-name)
+      POSTGRES_INSTANCE_NAME="$param_value"
       ;;
-    --scan-app-database-name=*)
-      if [ -n "${PROVIDED_ARGS[scan-app-database-name]}" ]; then
-        echo "Error: --scan-app-database-name specified more than once" >&2
-        exit 1
-      fi
-      SCAN_APP_DATABASE_NAME="${1#*=}"
-      PROVIDED_ARGS[scan-app-database-name]=1
+    scan-app-database-name)
+      SCAN_APP_DATABASE_NAME="$param_value"
       ;;
     *)
-      echo "Unknown parameter: $1" >&2
+      echo "Unknown parameter: --$param_name" >&2
       exit 1
       ;;
   esac
+
+  # Mark parameter as provided
+  PROVIDED_ARGS[$param_name]=1
+
   shift
 done
 
