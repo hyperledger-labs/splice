@@ -12,6 +12,7 @@ import scala.jdk.OptionConverters.*
 class RunbookSvSequencerInfoPreflightIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
   override lazy val resetRequiredTopologyState: Boolean = false
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.svPreflightTopology(

@@ -35,6 +35,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     with WithAuth0Support {
 
   override lazy val resetRequiredTopologyState: Boolean = false
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   protected val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
 

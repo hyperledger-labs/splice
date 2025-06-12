@@ -11,6 +11,7 @@ abstract class ValidatorNonDevNetPreflightIntegrationTestBase
     with WalletFrontendTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   protected val validatorName: String
 
