@@ -25,4 +25,4 @@ runs:
       uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: /tmp/classes
-        key: classes-${{ inputs.cache_version }} branch:${{ github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}
+        key: classes-${{ inputs.cache_version }} branch:${{ github.head_ref }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'project/Dependencies.scala', 'project/CantonDependencies.scala', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt', 'daml/dars.lock', 'openapi-cache-key.txt') }} rev:${{ github.sha }}
