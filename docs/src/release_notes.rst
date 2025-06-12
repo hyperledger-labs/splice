@@ -24,6 +24,10 @@ Upcoming
   - Fix a bug where the ``/v0/holdings/summary`` endpoint would return incomplete results when the requested parties had more than 1000 holdings.
     Additionally, that endpoint and ``/v0/holdings/state`` will now fail if an empty list of parties is provided.
 
+- Mediator
+
+  - Fix an issue where the mediator sometimes got stuck after initialization and required a restart to recover.
+
 0.4.1
 -----
 
