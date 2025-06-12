@@ -29,6 +29,9 @@ def filter_versions(k, vs, base):
     return [v for v in vs if v not in base_versions]
 
 
+# Given a splice version, output the latest Daml package versions from base-version to package-config-file
+# and output a list of scalatest tag exclusions to tags-file that exclude all tests for package versions
+# that are in HEAD but not in base-version.
 def main():
     if len(sys.argv) != 4:
         print(

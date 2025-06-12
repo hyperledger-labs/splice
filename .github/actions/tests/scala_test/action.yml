@@ -84,6 +84,7 @@ inputs:
     description: "Slack channel for failure notifications (for failure notifications)"
     required: true
   daml_base_version:
+    description: "Splice version from which the initial-package-config should be chosen"
     type: string
     required: true
 
