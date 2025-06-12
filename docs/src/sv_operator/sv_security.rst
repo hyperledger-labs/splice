@@ -43,22 +43,9 @@ Our recommended approach for switching to use KMS for SV participant keys is to:
 Configuring a fresh SV to use an external KMS
 ---------------------------------------------
 
-.. include:: ../common/kms_config_general.rst
-
-Whatever KMS provider you choose, please note:
-
-* In addition to configuration changes to the ``splice-participant`` Helm chart,
-  you will also need to change the way in which your CometBFT governance key is managed compared to the default setup.
-  See :ref:`sv-kms-cometbft-key` below for details.
-* Values in the ``kms`` section of the participant Helm chart are implicitly mapped to the Canton participant ``crypto.kms`` config.
-  This implies that all configuration keys supported by Canton are supported, not only the ones shown in the examples above.
-  Key names in camelCase are automatically converted to kebab-case.
-* For setting extra environment variables and mounting files to configure authentication to the KMS,
-  you can use the ``.additionalEnvVars``, ``.extraVolumeMounts``, and ``.extraVolumes`` fields of the Splice participant Helm chart
-  (see the examples).
-* Make sure that your KMS configuration is always included in the values files you pass to ``helm install participant ...`` or ``helm upgrade participant ...``.
-* You need to deploy a **fresh** participant in order for KMS to be used correctly,
-  which implies that you will need to setup the remaining SV components afresh as well (see :ref:`above <sv-kms-migrating>`).
+In addition to :ref:`configuration changes to the participant Helm chart <sv-kms-participant>` itself,
+you will also need to
+:ref:`change the way in which your CometBFT governance key is managed <sv-kms-cometbft-key>` compared to the default setup.
 
 .. _sv-kms-cometbft-key:
 
@@ -125,12 +112,27 @@ To instruct the SV app to use the externally managed CometBFT governance key ins
 set the ``cometBFT.externalGovernanceKey`` value in the ``splice-sv-node`` Helm chart to ``true``.
 (You can comment out the respective line in ``splice-node/examples/sv-helm/sv-values.yaml``.)
 
-Configuring participant for using Google Cloud KMS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. _sv-kms-participant:
+
+Configuring participant to use an external KMS
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Beyond the :ref:`changes to the SV app deployment <sv-kms-cometbft-key>` described above,
+the setup of an SV participant to use an external KMS is identical to the
+:ref:`setup of a validator participant with KMS <validator-kms>`.
+It involves configuration changes to the ``splice-participant`` Helm chart that depend on the KMS provider you choose.
+
+.. include:: ../common/kms_config_general.rst
+
+Also recall that you need to deploy a **fresh** participant in order for KMS to be used correctly,
+which implies that you will need to set up the remaining SV components afresh as well (see :ref:`above <sv-kms-migrating>`).
+
+Google Cloud KMS
+================
 
 .. include:: ../common/kms_config_gcp.rst
 
-Configuring participant for using Amazon Web Services KMS
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Amazon Web Services KMS
+=======================
 
 .. include:: ../common/kms_config_aws.rst

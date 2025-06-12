@@ -9,3 +9,13 @@ We provide minimal Helm configuration examples for Google Cloud (GCP) KMS and Am
 .. warning::
 
    The GCP and AWS KMS drivers are available only for licensed users of Canton Enterprise.
+
+Whatever KMS provider you choose, please note:
+
+* Values in the ``kms`` section of the participant Helm chart are implicitly mapped to the Canton participant ``crypto.kms`` config.
+  This implies that all configuration keys supported by Canton are supported, not only the ones shown in the examples above.
+  Key names in camelCase are automatically converted to kebab-case.
+* For setting extra environment variables and mounting files to configure authentication to the KMS,
+  you can use the ``.additionalEnvVars``, ``.extraVolumeMounts``, and ``.extraVolumes`` fields of the Splice participant Helm chart
+  (see the examples).
+* Make sure that your KMS configuration is always included in the values files you pass to ``helm install participant ...`` or ``helm upgrade participant ...``.

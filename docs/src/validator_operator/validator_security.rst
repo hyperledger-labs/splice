@@ -36,20 +36,12 @@ Our recommended approach for switching to use KMS is to:
 Configuring a fresh validator to use an external KMS
 ----------------------------------------------------
 
+Only configuration changes to the ``splice-participant`` Helm chart are required to deploy a KMS-enabled validator.
+
 .. include:: ../common/kms_config_general.rst
 
-Whatever KMS provider you choose, please note:
-
-* Values in the ``kms`` section of the participant Helm chart are implicitly mapped to the Canton participant ``crypto.kms`` config.
-  This implies that all configuration keys supported by Canton are supported, not only the ones shown in the examples above.
-  Key names in camelCase are automatically converted to kebab-case.
-* For setting extra environment variables and mounting files to configure authentication to the KMS,
-  you can use the ``.additionalEnvVars``, ``.extraVolumeMounts``, and ``.extraVolumes`` fields of the Splice participant Helm chart
-  (see the examples).
-* Make sure that your KMS configuration is always included in the values files you pass to ``helm install participant ...`` or ``helm upgrade participant ...``.
-* Only configuration changes to ``splice-participant`` are required to deploy a KMS-enabled validator.
-* You need to deploy a **fresh** participant in order for KMS to be used correctly,
-  which implies that you will need to setup the remaining validator components afresh as well (see :ref:`above <validator-kms-migrating>`).
+Also recall that you need to deploy a **fresh** participant in order for KMS to be used correctly,
+which implies that you will need to setup the remaining validator components afresh as well (see :ref:`above <validator-kms-migrating>`).
 
 Google Cloud KMS
 ^^^^^^^^^^^^^^^^
