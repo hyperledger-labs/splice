@@ -13,8 +13,9 @@ import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-fronte
 import BftAnsField from './BftAnsField';
 import AmountInput from './AmountInput';
 import { Add, Remove } from '@mui/icons-material';
-import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 import dayjs from 'dayjs';
+import { getUTCWithOffset } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 const CreateAllocation: React.FC = () => {
   const { createAllocation } = useWalletClient();
@@ -25,7 +26,10 @@ const CreateAllocation: React.FC = () => {
     mutationFn: async () => {
       return validated && (await createAllocation(validated));
     },
-    onSuccess: () => setError(null),
+    onSuccess: () => {
+      setError(null);
+      setAllocation(emptyForm());
+    },
     onError: error => {
       console.error('Failed to submit allocation', error);
       setError(error);
@@ -45,7 +49,9 @@ const CreateAllocation: React.FC = () => {
             ) : null}
             <Typography variant="h6">Transfer Leg ID</Typography>
             <TextField
+              id="create-allocation-transfer-leg-id"
               value={allocation.transfer_leg_id}
+              error={!allocation.transfer_leg_id}
               onChange={event =>
                 setAllocation({ ...allocation, transfer_leg_id: event.target.value })
               }
@@ -54,7 +60,9 @@ const CreateAllocation: React.FC = () => {
             <Stack direction="row" alignItems="center" spacing={2}>
               <Typography variant="h6">ID</Typography>
               <TextField
+                id="create-allocation-settlement-ref-id"
                 value={allocation.settlement.settlement_ref?.id || ''}
+                error={!allocation.settlement.settlement_ref?.id}
                 onChange={event =>
                   setAllocation({
                     ...allocation,
@@ -70,6 +78,7 @@ const CreateAllocation: React.FC = () => {
               />
               <Typography variant="h6">Contract ID (optional)</Typography>
               <TextField
+                id="create-allocation-settlement-ref-cid"
                 value={allocation.settlement.settlement_ref?.cid || ''}
                 onChange={event =>
                   setAllocation({
@@ -90,7 +99,7 @@ const CreateAllocation: React.FC = () => {
               name="Receiver"
               label="Receiver"
               aria-label="Receiver"
-              id="create-offer-receiver"
+              id="create-allocation-transfer-leg-receiver"
               onPartyChanged={party =>
                 setAllocation({
                   ...allocation,
@@ -103,7 +112,7 @@ const CreateAllocation: React.FC = () => {
               name="Executor"
               label="Executor"
               aria-label="Executor"
-              id="create-offer-receiver"
+              id="create-allocation-settlement-executor"
               onPartyChanged={party =>
                 setAllocation({
                   ...allocation,
@@ -121,29 +130,56 @@ const CreateAllocation: React.FC = () => {
               }
             />
             <Typography variant="h6">Settle before</Typography>
-            <DateTimePicker
+            <DesktopDateTimePicker
+              label={`Enter time in local timezone (${getUTCWithOffset()})`}
               value={dayjs(allocation.settlement.settle_before)}
-              onChange={value =>
-                value &&
-                setAllocation({
-                  ...allocation,
-                  settlement: { ...allocation.settlement, settle_before: value.toDate() },
-                })
-              }
+              format="YYYY-MM-DD HH:mm"
+              minDate={dayjs()}
+              readOnly={false}
+              onChange={newValue => {
+                if (newValue) {
+                  const date = newValue.toDate();
+                  date.setSeconds(0, 0);
+                  setAllocation({
+                    ...allocation,
+                    settlement: { ...allocation.settlement, settle_before: date },
+                  });
+                }
+              }}
+              slotProps={{
+                textField: {
+                  id: 'create-allocation-settlement-settle-before',
+                },
+              }}
+              closeOnSelect
             />
             <Typography variant="h6">Allocate before</Typography>
-            <DateTimePicker
+            <DesktopDateTimePicker
+              label={`Enter time in local timezone (${getUTCWithOffset()})`}
               value={dayjs(allocation.settlement.allocate_before)}
-              onChange={value =>
-                value &&
-                setAllocation({
-                  ...allocation,
-                  settlement: { ...allocation.settlement, allocate_before: value.toDate() },
-                })
-              }
+              format="YYYY-MM-DD HH:mm"
+              minDate={dayjs()}
+              readOnly={false}
+              onChange={newValue => {
+                if (newValue) {
+                  const date = newValue.toDate();
+                  date.setSeconds(0, 0);
+                  setAllocation({
+                    ...allocation,
+                    settlement: { ...allocation.settlement, allocate_before: date },
+                  });
+                }
+              }}
+              slotProps={{
+                textField: {
+                  id: 'create-allocation-settlement-allocate-before',
+                },
+              }}
+              closeOnSelect
             />
             <Typography variant="h6">Settlement meta</Typography>
             <MetaEditor
+              idPrefix="settlement"
               meta={allocation.settlement.meta || {}}
               setMeta={meta =>
                 setAllocation({
@@ -154,6 +190,7 @@ const CreateAllocation: React.FC = () => {
             />
             <Typography variant="h6">Transfer leg meta</Typography>
             <MetaEditor
+              idPrefix="transfer-leg"
               meta={allocation.transfer_leg.meta || {}}
               setMeta={meta =>
                 setAllocation({
@@ -175,6 +212,7 @@ const CreateAllocation: React.FC = () => {
               ]}
             >
               <Button
+                id="create-allocation-submit-button"
                 variant="pill"
                 fullWidth
                 size="large"
@@ -211,7 +249,7 @@ function emptyForm(): PartialAllocateAmuletRequest {
     },
     transfer_leg_id: '',
     transfer_leg: {
-      amount: '',
+      amount: '1',
       receiver: '',
       meta: {},
     },
@@ -253,7 +291,11 @@ function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletReq
 export default CreateAllocation;
 
 type Meta = { [key: string]: string };
-const MetaEditor: React.FC<{ meta: Meta; setMeta: (meta: Meta) => void }> = ({ meta, setMeta }) => {
+const MetaEditor: React.FC<{ meta: Meta; setMeta: (meta: Meta) => void; idPrefix: string }> = ({
+  meta,
+  setMeta,
+  idPrefix,
+}) => {
   const keys = Object.keys(meta);
   // will always have at least keys(meta).length
   const [nEntries, setNEntries] = useState(keys.length);
@@ -280,11 +322,13 @@ const MetaEditor: React.FC<{ meta: Meta; setMeta: (meta: Meta) => void }> = ({ m
         return (
           <Stack direction="row" key={idx}>
             <TextField
+              id={`${idPrefix}-meta-key-${idx}`}
               placeholder="key"
               value={key}
               onChange={event => updateKey(event.target.value)}
             />
             <TextField
+              id={`${idPrefix}-meta-value-${idx}`}
               placeholder="value"
               value={value}
               onChange={event => updateValue(event.target.value)}
@@ -293,7 +337,11 @@ const MetaEditor: React.FC<{ meta: Meta; setMeta: (meta: Meta) => void }> = ({ m
           </Stack>
         );
       })}
-      <Button startIcon={<Add />} onClick={() => setNEntries(nEntries + 1)}>
+      <Button
+        id={`${idPrefix}-add-meta`}
+        startIcon={<Add />}
+        onClick={() => setNEntries(nEntries + 1)}
+      >
         Add Entry
       </Button>
     </Stack>

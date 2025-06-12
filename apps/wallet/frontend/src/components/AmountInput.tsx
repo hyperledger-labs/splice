@@ -28,7 +28,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({ setCcAmountText, ccAmo
       <Box display="flex">
         <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
           <OutlinedInput
-            id="create-offer-amulet-amount"
+            id="amulet-amount"
             type="text"
             value={ccAmountText}
             onChange={event => setCcAmountText(event.target.value)}
@@ -48,7 +48,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({ setCcAmountText, ccAmo
         <FormControl>
           <OutlinedInput
             disabled
-            id="create-offer-usd-amount"
+            id="usd-amount"
             value={usd ?? '...'}
             endAdornment={<InputAdornment position="end">USD</InputAdornment>}
             aria-describedby="outlined-amount-usd-helper-text"
