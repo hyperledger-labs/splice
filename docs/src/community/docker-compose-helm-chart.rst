@@ -23,25 +23,5 @@ Key Features of This Solution
 - Automated installation and update scripts for setup and maintenance.
 - Support for custom overrides (``custom.yml``) and environment variables, enabling advanced configuration without modifying the base files.
 - Integration guidance for Traefik (proxy) and Prometheus (monitoring) via ``central-proxy-docker`` and ``:ext-network.yml``.
-- Experimental Helm chart for Kubernetes environments (in progress).
-- Disaster recovery features (in progress).
-
-:ref:`Official Docker Compose <compose_validator>` vs. This Solution
---------------------------------------------------------------------
-
-+-------------------+--------------------------+--------------------------------------------------+
-| Aspect            | Official Docker Compose  | This Solution                                    |
-+===================+==========================+==================================================+
-| Customization     | Limited (env, flags)     | Extensive (custom.yml, ext-network, etc.)        |
-+-------------------+--------------------------+--------------------------------------------------+
-| Integration       | Minimal, no proxy/       | Traefik, Prometheus, Helm/K8s                    |
-|                   | monitoring               |                                                  |
-+-------------------+--------------------------+--------------------------------------------------+
-| Upgrade Support   | Manual                   | Automated migration layer                        |
-+-------------------+--------------------------+--------------------------------------------------+
-| Security          | Insecure by default,     | Designed for integration, user responsibility    |
-|                   | can be hardened          |                                                  |
-+-------------------+--------------------------+--------------------------------------------------+
-| Automation        | Some scripts, mostly     | Automated install, update, launch                |
-|                   | manual                   |                                                  |
-+-------------------+--------------------------+--------------------------------------------------+
+- Experimental Helm chart for Kubernetes environments (in progress as of June 2025).
+- Disaster recovery features (in progress as of June 2025).
