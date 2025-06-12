@@ -121,6 +121,7 @@ const CreateAllocation: React.FC = () => {
               }
             />
             <AmountInput
+              idPrefix="create-allocation"
               ccAmountText={allocation.transfer_leg.amount || ''}
               setCcAmountText={ccAmountText =>
                 setAllocation({

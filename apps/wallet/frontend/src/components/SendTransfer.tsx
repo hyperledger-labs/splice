@@ -180,7 +180,11 @@ const SendTransfer: React.FC = () => {
             </Stack>
           </Stack>
 
-          <AmountInput ccAmountText={ccAmountText} setCcAmountText={setCCAmountText} />
+          <AmountInput
+            idPrefix="create-offer"
+            ccAmountText={ccAmountText}
+            setCcAmountText={setCCAmountText}
+          />
           {!(preapprovalResult.data && useTransferPreapproval) && (
             <Stack direction="column" mb={4} spacing={1}>
               <Typography variant="h6">Expiration</Typography>

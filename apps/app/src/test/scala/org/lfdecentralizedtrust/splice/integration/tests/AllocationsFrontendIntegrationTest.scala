@@ -101,9 +101,9 @@ class AllocationsFrontendIntegrationTest
           validatorPartyId.toProtoPrimitive,
           validatorPartyId.toProtoPrimitive,
         )
-        click on "amulet-amount"
-        numberField("amulet-amount").value = ""
-        numberField("amulet-amount").underlying.sendKeys(
+        click on "create-allocation-amulet-amount"
+        numberField("create-allocation-amulet-amount").value = ""
+        numberField("create-allocation-amulet-amount").underlying.sendKeys(
           create.transferLeg.amount.toString
         )
 

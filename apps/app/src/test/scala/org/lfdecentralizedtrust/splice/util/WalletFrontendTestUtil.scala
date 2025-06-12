@@ -241,9 +241,9 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       receiver.toProtoPrimitive,
     )
 
-    click on "amulet-amount"
-    numberField("amulet-amount").value = ""
-    numberField("amulet-amount").underlying.sendKeys(transferAmount.toString())
+    click on "create-offer-amulet-amount"
+    numberField("create-offer-amulet-amount").value = ""
+    numberField("create-offer-amulet-amount").underlying.sendKeys(transferAmount.toString())
 
     click on "create-offer-expiration-days"
     singleSel("create-offer-expiration-days").value = expiryDays.toString
