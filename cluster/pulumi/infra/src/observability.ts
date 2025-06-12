@@ -12,7 +12,6 @@ import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
   ENABLE_COMETBFT_PRUNING,
   GCP_PROJECT,
@@ -41,6 +40,7 @@ import {
 import { infraConfig, monitoringConfig } from './config';
 import { createGrafanaDashboards } from './grafana-dashboards';
 import { istioVersion } from './istio';
+import {dsoSize} from "splice-pulumi-common-sv";
 
 function istioVirtualService(
   ns: k8s.core.v1.Namespace,
@@ -278,8 +278,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             retentionSize: infraConfig.prometheus.retentionSize,
             resources: {
               requests: {
-                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '24Gi' : '6Gi') : '4Gi',
-                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '4' : '2') : '1',
+                memory: `${2 + (dsoSize - 1) * 0.5}Gi` ,
+                cpu: 0.5 + (dsoSize - 1) * 0.2,
               },
             },
             logFormat: 'json',
