@@ -1436,7 +1436,7 @@ class UpdateHistory(
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
       )
     }
-    val events: Seq[Event] = createEvents ++ exerciseEvents
+    val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
 
     UpdateHistoryResponse(
       update = TransactionTreeUpdate(
