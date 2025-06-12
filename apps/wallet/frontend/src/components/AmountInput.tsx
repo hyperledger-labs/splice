@@ -7,10 +7,15 @@ import { Box, FormControl, InputAdornment, OutlinedInput, Stack, Typography } fr
 import { useWalletConfig } from '../utils/config';
 
 interface AmountInputProps {
+  idPrefix: string;
   ccAmountText: string;
   setCcAmountText: (amount: string) => void;
 }
-export const AmountInput: React.FC<AmountInputProps> = ({ setCcAmountText, ccAmountText }) => {
+export const AmountInput: React.FC<AmountInputProps> = ({
+  idPrefix,
+  setCcAmountText,
+  ccAmountText,
+}) => {
   const config = useWalletConfig();
   const amuletPriceQuery = useAmuletPrice();
   const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
@@ -28,7 +33,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({ setCcAmountText, ccAmo
       <Box display="flex">
         <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
           <OutlinedInput
-            id="amulet-amount"
+            id={`${idPrefix}-amulet-amount`}
             type="text"
             value={ccAmountText}
             onChange={event => setCcAmountText(event.target.value)}
@@ -48,7 +53,7 @@ export const AmountInput: React.FC<AmountInputProps> = ({ setCcAmountText, ccAmo
         <FormControl>
           <OutlinedInput
             disabled
-            id="usd-amount"
+            id={`${idPrefix}-usd-amount`}
             value={usd ?? '...'}
             endAdornment={<InputAdornment position="end">USD</InputAdornment>}
             aria-describedby="outlined-amount-usd-helper-text"
