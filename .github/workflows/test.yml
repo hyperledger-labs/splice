@@ -3,7 +3,6 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
-  issues: write
   pull-requests: write
 
 jobs:
@@ -18,5 +17,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: "A test comment"
+              body: "Another test comment (with only PR permissions)"
             });
