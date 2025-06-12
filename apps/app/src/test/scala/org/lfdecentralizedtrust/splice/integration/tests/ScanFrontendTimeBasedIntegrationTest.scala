@@ -552,14 +552,14 @@ class ScanFrontendTimeBasedIntegrationTest
               getLedgerTime.toInstant.plusSeconds(
                 defaultTickDuration.minusSeconds(1).duration.toSeconds
               ),
-              SpliceUtil.defaultAmuletConfig(
+              mkUpdatedAmuletConfig(
+                amuletRules.contract,
                 NonNegativeFiniteDuration.tryFromDuration(
                   scala.concurrent.duration.Duration.fromNanos(
                     amuletRules.payload.configSchedule.initialValue.tickDuration.microseconds * 1000
                   )
                 ),
                 newMaxNumInputs,
-                decentralizedSynchronizerId,
               ),
             )
           )

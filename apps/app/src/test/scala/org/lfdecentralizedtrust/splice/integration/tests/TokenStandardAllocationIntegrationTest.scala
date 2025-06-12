@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationr
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardAllocationIntegrationTest
     extends IntegrationTest
     with HasExecutionContext

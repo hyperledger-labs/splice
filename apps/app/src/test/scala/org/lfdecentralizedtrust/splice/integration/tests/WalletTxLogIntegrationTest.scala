@@ -49,8 +49,6 @@ class WalletTxLogIntegrationTest
     with ExternallySignedPartyTestUtil
     with TriggerTestUtil {
 
-  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
-
   private val amuletPrice = BigDecimal(0.75).setScale(10)
 
   override lazy val sanityChecksIgnoredRootCreates = Seq(

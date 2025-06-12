@@ -13,6 +13,7 @@ import scala.sys.process.{Process, ProcessLogger}
 import scala.util.Using
 
 // This is an integration test because it requires a live canton & scan to function
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardCliIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with TokenStandardTest

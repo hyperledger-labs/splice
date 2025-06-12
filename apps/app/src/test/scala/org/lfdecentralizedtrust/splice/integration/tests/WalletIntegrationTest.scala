@@ -21,7 +21,6 @@ import org.lfdecentralizedtrust.splice.validator.automation.AcceptTransferPreapp
 import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWalletAppClient.CreateTransferPreapprovalResponse
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
-  // PartyAndAmount,
   TransferTxLogEntry,
   TxLogEntry,
 }
@@ -561,7 +560,7 @@ class WalletIntegrationTest
       }
     }
 
-    "TransferPreapprovals can be created, looked up, cancelled and amulet can be sent through them" in {
+    "TransferPreapprovals can be created, looked up, cancelled and amulet can be sent through them" taggedAs (org.lfdecentralizedtrust.splice.util.Tags.SpliceAmulet_0_1_9) in {
       implicit env =>
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         aliceValidatorWalletClient.tap(10.0)
