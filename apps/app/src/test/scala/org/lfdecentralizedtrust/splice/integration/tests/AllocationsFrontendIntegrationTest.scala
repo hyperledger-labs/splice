@@ -58,8 +58,7 @@ class AllocationsFrontendIntegrationTest
         requestedAt,
         settleAndAllocateBefore,
         settleAndAllocateBefore,
-//        new Metadata(java.util.Map.of("k1", "v1", "k2", "v2")),
-        new Metadata(java.util.Map.of()),
+        new Metadata(java.util.Map.of("k1", "v1", "k2", "v2")),
       ),
       "some_transfer_leg_id",
       new TransferLeg(
@@ -67,8 +66,7 @@ class AllocationsFrontendIntegrationTest
         validatorPartyId.toProtoPrimitive,
         BigDecimal(12).bigDecimal.setScale(10),
         new InstrumentId(dsoParty.toProtoPrimitive, "Amulet"),
-        new Metadata(java.util.Map.of()),
-//        new Metadata(java.util.Map.of("k3", "v3")),
+        new Metadata(java.util.Map.of("k3", "v3")),
       ),
     )
     // use the data here to create, but ignore the requestedAt field
@@ -120,6 +118,9 @@ class AllocationsFrontendIntegrationTest
           create.settlement.allocateBefore,
         )
 
+        setMeta(create.settlement.meta, "settlement")
+        setMeta(create.transferLeg.meta, "transfer-leg")
+
         click on "create-allocation-submit-button"
       },
     )(
@@ -145,6 +146,16 @@ class AllocationsFrontendIntegrationTest
         specification should be(wantedAllocation(specification.settlement.requestedAt))
       },
     )
+  }
+
+  private def setMeta(meta: Metadata, idPrefix: String)(implicit webDriver: WebDriverType) = {
+    import scala.jdk.CollectionConverters.*
+
+    meta.values.asScala.zipWithIndex.foreach { case ((key, value), index) =>
+      click on s"$idPrefix-add-meta"
+      textField(s"$idPrefix-meta-key-$index").underlying.sendKeys(key)
+      textField(s"$idPrefix-meta-value-$index").underlying.sendKeys(value)
+    }
   }
 
   "A wallet UI" should {
