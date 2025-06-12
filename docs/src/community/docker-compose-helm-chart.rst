@@ -12,7 +12,7 @@ This guide introduces a community-contributed Docker Compose solution for deploy
 It was tested during a scheduled upgrade on DevNet using ``canton-docker``. 
 Downtime was handled by updating the ``.env`` file with the migration ID, renaming the databases (with a planned change to use standardized names like ``participant_${MIGRATION_ID}`` and ``validator_${MIGRATION_ID}``), and including ``validator-migration.yaml`` as part of the migration setup.
 The solution emphasizes extensibility, operational flexibility, and integration with broader infrastructure. 
-For a simpler, more minimal setup, refer to :ref:`Docker Compose-Based Deployment of a Validator Node <compose_validator>`.
+For the officially supported docker-compose deployment, refer to :ref:`Docker Compose-Based Deployment of a Validator Node <compose_validator>`.
 
 Thanks to Mario Delgado for sharing this solution in a community discussion. 
 For more details and future updates, see the `CryptoManufaktur-io/canton-docker <https://github.com/CryptoManufaktur-io/canton-docker>`_ repository.
