@@ -93,6 +93,15 @@ html_theme_options = {
     # 'analytics_id': 'UA-64532708-4'
 }
 
+# Adding "Edit Source" links
+# See https://docs.readthedocs.com/platform/latest/guides/edit-source-links-sphinx.html
+html_context = {
+    "display_github": True,
+    "github_user": "hyperledger-labs",
+    "github_repo": "splice",
+    "github_version": "main",
+    "conf_py_path": "/docs/src/",
+}
 
 html_js_files = ["script.js"]
 
