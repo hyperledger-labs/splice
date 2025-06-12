@@ -11,7 +11,8 @@ import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
-  CLUSTER_NAME, clusterProdLike,
+  CLUSTER_NAME,
+  clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
   ENABLE_COMETBFT_PRUNING,
   GCP_PROJECT,
