@@ -18,6 +18,7 @@ Supervalidators
    sv_backup.rst
    sv_pruning.rst
    sv_restore.rst
+   sv_security.rst
    sv_operations.rst
    sv_scratchnet.rst
 
