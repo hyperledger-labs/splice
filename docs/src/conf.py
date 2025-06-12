@@ -25,6 +25,21 @@ from datetime import date
 import re
 
 
+# make_id from docutils removes leading digits from IDs, which makes it impossible to have permanent links to numbered
+# headings. We prefix IDs which start with a digit with "id-" before passing it to make_id to make permanent links work.
+#
+# See https://docutils.sourceforge.io/docs/ref/rst/directives.html#identifier-normalization
+def setup(app):
+    import docutils.nodes
+    make_id_orig = docutils.nodes.make_id
+
+    def make_id(string):
+        prefixed_string = "id-" + string if string and string[0].isdigit() else string
+        return make_id_orig(prefixed_string)
+
+    docutils.nodes.make_id = make_id
+
+
 # -- Project information -----------------------------------------------------
 
 project = "Splice"
