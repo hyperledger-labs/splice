@@ -2701,8 +2701,8 @@
             "remoteWriteDashboards": true,
             "resources": {
               "requests": {
-                "cpu": 0.5,
-                "memory": "2Gi"
+                "cpu": "2",
+                "memory": "8Gi"
               }
             },
             "retention": "1y",
