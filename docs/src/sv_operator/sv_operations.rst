@@ -17,7 +17,7 @@ as well as general information useful to SV node operators.
 Security Notice
 ---------------
 
-.. include:: ../common/sv_extra_dars_warning.rst
+.. include:: ../common/sv_extra_dars_notice.rst
 
 For more information on hardening your SV node, see :ref:`sv-security`.
 

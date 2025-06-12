@@ -12,7 +12,7 @@ Security Hardening
 Third-party Daml apps
 +++++++++++++++++++++
 
-.. include:: ../common/sv_extra_dars_warning.rst
+.. include:: ../common/sv_extra_dars_notice.rst
 
 .. _sv-kms:
 
