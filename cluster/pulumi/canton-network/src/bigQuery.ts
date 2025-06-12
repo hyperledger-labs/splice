@@ -5,7 +5,12 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
-import {InstalledHelmChart, installPostgresPasswordSecret, MOCK_SPLICE_ROOT, SPLICE_ROOT} from 'splice-pulumi-common';
+import {
+  InstalledHelmChart,
+  installPostgresPasswordSecret,
+  MOCK_SPLICE_ROOT,
+  SPLICE_ROOT,
+} from 'splice-pulumi-common';
 import { config } from 'splice-pulumi-common/src/config';
 import {
   Postgres,
@@ -357,7 +362,7 @@ function createPublicationAndReplicationSlots(
       --replication-slot-name="${replicationSlotName}" \
       --replicator-user-name="${replicatorUserName}" \
       --postgres-instance-name="${postgres.databaseInstance.name}" \
-      --scan-app-database-name="${scanAppDatabaseName(postgres)}"`
+      --scan-app-database-name="${scanAppDatabaseName(postgres)}"`;
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
     {
