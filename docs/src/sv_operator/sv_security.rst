@@ -33,12 +33,15 @@ Migrating an existing SV to use an external KMS for participant keys
 
 .. include:: ../common/kms_migration_context.rst
 
-Our recommended approach for switching to use KMS for SV participant keys is to:
+One approach for switching to use KMS for SV participant keys while minimizing the risk of losing rewards is to:
 
-1. Coordinate with the other SV operators to offboard your current SV.
-2. Set up a fresh SV from scratch with the desired KMS configuration. (Rest of this guide.)
-3. Transfer all relevant assets from the existing non-KMS SV to a validator or the new KMS-enabled SV.
-4. Retire the non-KMS SV.
+1. Set up a fresh SV from scratch with the desired KMS configuration. (Rest of this guide.)
+   Coordinate with the other SV operators to onboard it with weight 0.
+2. Coordinate with the other SV operators to move your SV weight to the new SV,
+   setting the weight of the older SV to 0.
+3. Transfer all relevant assets from the older SV to a validator or the new KMS-enabled SV.
+4. Coordinate with the other SV operators to offboard the older SV.
+5. Retire the older SV.
 
 Configuring a fresh SV to use an external KMS
 ---------------------------------------------
