@@ -388,7 +388,10 @@ corresponding to the version of the Daml package that introduced the
 functionality, e.g.,
 `org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9`. This
 ensures the test will be excluded if we are running against earlier
-Daml versions.
+Daml versions. When we run the integration tests against older Daml
+versions, we pass scalatest tag exclusions belonging to newer Daml
+package versions as well as
+`org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck`.
 
 # Troubleshooting
 
