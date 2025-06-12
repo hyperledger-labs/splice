@@ -9,9 +9,9 @@ Docker Compose and Helm Chart Deployment
 ========================================
 
 This guide introduces a community-contributed Docker Compose solution for deploying Canton validator nodes and supporting infrastructure, following the ``x-docker`` standard used by Mario Delgado’s team for onboarding blockchains. 
-The solution emphasizes extensibility, operational flexibility, and integration with broader infrastructure. 
 It was tested during a scheduled upgrade on DevNet using ``canton-docker``. 
 Downtime was handled by updating the ``.env`` file with the migration ID, renaming the databases (with a planned change to use standardized names like ``participant_${MIGRATION_ID}`` and ``validator_${MIGRATION_ID}``), and including ``validator-migration.yaml`` as part of the migration setup.
+The solution emphasizes extensibility, operational flexibility, and integration with broader infrastructure. 
 For a simpler, more minimal setup, refer to :ref:`Docker Compose-Based Deployment of a Validator Node <compose_validator>`.
 
 Thanks to Mario Delgado for sharing this solution in a community discussion. 
