@@ -22,7 +22,7 @@ Using an external KMS for managing participant keys
 .. include:: ../common/kms_participants_context.rst
 
 In the following, we describe how to configure an SV so that its participant keys are managed by an external KMS.
-This guide build assumes that you are following :ref:`sv-helm` for deploying your SV.
+This guide assumes that you are following :ref:`sv-helm` for deploying your SV.
 
 Official support for the KMS-based operation of sequencers and mediators that are part of an SV deployment is planned for a future release.
 
