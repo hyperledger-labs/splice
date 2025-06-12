@@ -49,6 +49,7 @@ class AllocationsFrontendIntegrationTest
     val settleAndAllocateBefore = LocalDateTime
       .now()
       .plusSeconds(3600)
+      // FE only supports minute precision, so we truncate
       .truncatedTo(ChronoUnit.MINUTES)
       .toInstant(ZoneOffset.UTC)
     def wantedAllocation(requestedAt: Instant) = new AllocationSpecification(
