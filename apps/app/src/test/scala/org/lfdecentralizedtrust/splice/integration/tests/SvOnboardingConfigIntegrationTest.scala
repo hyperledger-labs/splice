@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.util.SvTestUtil
 
 /** Integration test that onboards an SV then starts a clone without the onboarding config.
   */
+@org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class SvOnboardingConfigIntegrationTest extends IntegrationTest with SvTestUtil {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =

@@ -71,7 +71,6 @@ services:
       - CANTON_PARTICIPANT_ADMIN_USER_NAME=administrator
       - AUTH_TARGET_AUDIENCE=${LEDGER_API_AUTH_AUDIENCE}
       - ADDITIONAL_CONFIG_DISABLE_AUTH=canton.participants.participant.ledger-api.auth-services=[]
-      - ADDITIONAL_CONFIG_ALLOW_INSECURE=canton.participants.participant.http-ledger-api.allow-insecure-tokens=true
     depends_on:
       postgres-splice-sv:
         condition: service_healthy

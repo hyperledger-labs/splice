@@ -15,6 +15,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
@@ -225,7 +226,16 @@ class SplitwellApp(
     )
   }
 
-  override lazy val requiredPackageIds = Set(DarResources.splitwell.bootstrap.packageId)
+  override lazy val requiredPackageIds = Set(
+    DarResources.splitwell.all
+      .find(_.metadata.version == config.requiredDarVersion)
+      .getOrElse(
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"No splitwell DAR with version ${config.requiredDarVersion} found")
+          .asRuntimeException
+      )
+      .packageId
+  )
 
   protected[this] override def automationServices(st: SplitwellApp.State) =
     Seq(st.automation)

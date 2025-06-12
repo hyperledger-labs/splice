@@ -40,11 +40,12 @@ import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.config.{AuthTokenSourceConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResources,
   RetryProvider,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
@@ -571,6 +572,9 @@ object SpliceTests extends LazyLogging {
           Http().shutdownAllConnectionPools().map(_ => Done)
       }
     }
+
+    protected def splitwellDarPath =
+      s"daml/dars/splitwell-${InitialPackageVersions.initialPackageVersion(DarResources.splitwell)}.dar"
   }
 
   object BracketSynchronous {

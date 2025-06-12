@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
-import org.lfdecentralizedtrust.splice.util.SpliceUtil.{defaultAmuletConfig, defaultDsoRulesConfig}
+import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultDsoRulesConfig
 import org.lfdecentralizedtrust.splice.util.*
 import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
@@ -29,6 +29,7 @@ import scala.jdk.CollectionConverters.*
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
+    with AmuletConfigUtil
     with SvTestUtil
     with SvFrontendTestUtil
     with FrontendLoginUtil
@@ -941,20 +942,15 @@ class SvFrontendIntegrationTest
               holdingFee: String = "0.001",
               expiresSoon: Boolean,
           ): Unit = {
-            val activeSynchronizerId =
-              AmuletConfigSchedule(sv1Backend.getDsoInfo().amuletRules)
-                .getConfigAsOf(env.environment.clock.now)
-                .decentralizedSynchronizer
-                .activeSynchronizer
-            val baseConfig = defaultAmuletConfig(
+            val baseConfig = mkUpdatedAmuletConfig(
+              sv1Backend.getDsoInfo().amuletRules.contract,
               defaultTickDuration,
               1000,
-              SynchronizerId.tryFromString(activeSynchronizerId),
             )
-            val newConfig = defaultAmuletConfig(
+            val newConfig = mkUpdatedAmuletConfig(
+              sv1Backend.getDsoInfo().amuletRules.contract,
               defaultTickDuration,
               1000,
-              SynchronizerId.tryFromString(activeSynchronizerId),
               holdingFee = BigDecimal(holdingFee),
               createFee = BigDecimal(createFee),
             )

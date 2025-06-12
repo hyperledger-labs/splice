@@ -35,6 +35,7 @@ import org.slf4j.event.Level
 
 import scala.math.Ordering.Implicits.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class SvTimeBasedRewardCouponIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil

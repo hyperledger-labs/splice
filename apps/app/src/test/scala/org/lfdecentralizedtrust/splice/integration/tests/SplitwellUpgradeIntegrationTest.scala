@@ -22,15 +22,13 @@ class SplitwellUpgradeIntegrationTest
     with SplitwellTestUtil
     with WalletTestUtil {
 
-  private val darPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => ConfigTransforms.useSplitwellUpgradeDomain()(config))
       .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+        aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
       // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()

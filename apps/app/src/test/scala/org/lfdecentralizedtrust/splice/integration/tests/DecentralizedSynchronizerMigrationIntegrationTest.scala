@@ -116,8 +116,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)

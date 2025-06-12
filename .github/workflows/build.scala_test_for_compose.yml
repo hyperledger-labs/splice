@@ -25,6 +25,11 @@ on:
         type: string
         required: false
         default: ""
+      daml_base_version:
+        description: "Splice version from which the initial-package-config should be chosen"
+        type: string
+        required: true
+
 
 jobs:
 
@@ -99,3 +104,4 @@ jobs:
           failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
           with_canton: ${{ inputs.with_canton }}
+          daml_base_version: ${{ inputs.daml_base_version }}
