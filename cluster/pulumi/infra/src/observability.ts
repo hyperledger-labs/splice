@@ -275,8 +275,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
             retentionSize: infraConfig.prometheus.retentionSize,
             resources: {
               requests: {
-                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '24Gi' : '6Gi') : '4Gi',
-                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '4' : '2') : '1',
+                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '8Gi' : '3Gi') : '2Gi',
+                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '2' : '1') : '0.5',
               },
             },
             logFormat: 'json',
