@@ -392,6 +392,9 @@ Daml versions. When we run the integration tests against older Daml
 versions, we pass scalatest tag exclusions belonging to newer Daml
 package versions as well as
 `org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck`.
+This is accomplished by writing out a `scala_test_tags` file which
+contains a list of additional arguments passed to scalatest which is
+then picked up when running the tests.
 
 # Troubleshooting
 
