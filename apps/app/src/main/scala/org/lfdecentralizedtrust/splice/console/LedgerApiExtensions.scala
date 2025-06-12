@@ -87,7 +87,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                   // We often have duplicates when merging choice contexts from multiple off-ledger APIs.
                   // Cull them here to avoid sending them twice; and because the Ledger API server
                   // currently errors out on them.
-                  // TODO(#18566): remove the note wrt the error once that's no longer the case
+                  // TODO(#560): remove the note wrt the error once that's no longer the case
                   .distinctBy(_.getContractId)
                   .map(DisclosedContract.fromJavaProto),
                 synchronizerId = synchronizerId,
@@ -187,7 +187,7 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
                 // We often have duplicates when merging choice contexts from multiple off-ledger APIs.
                 // Cull them here to avoid sending them twice; and because the Ledger API server
                 // currently errors out on them.
-                // TODO(#18566): remove the note wrt the error once that's no longer the case
+                // TODO(#560): remove the note wrt the error once that's no longer the case
                 .distinctBy(_.getContractId)
                 .map(DisclosedContract.fromJavaProto),
               synchronizerId = synchronizerId,

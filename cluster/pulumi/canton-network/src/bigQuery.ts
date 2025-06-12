@@ -168,7 +168,7 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
     friendlyName: `${scanBigQuery.dataset} Dataset`,
     location: cloudsdkComputeRegion(),
     deleteContentsOnDestroy: true,
-    // TODO (#19806) reduce time travel window from 7-day default to 2 days if
+    // TODO (DACH-NY/canton-network-internal#343) reduce time travel window from 7-day default to 2 days if
     // it makes a cost difference
     labels: {
       cluster: CLUSTER_BASENAME,
@@ -176,11 +176,11 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
-/* TODO (#19812) remove this comment when enabled on all relevant clusters
+/* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
 If you see an error like this
   gcp:datastream:ConnectionProfile (sv-4-scan-bq-cxn):
     error: 1 error occurred:
-    	* Error creating ConnectionProfile: googleapi: Error 403: Datastream API has not been used in project da-cn-scratchnet before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/datastream.googleapis.com/overview?project=da-cn-scratchnet then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+      * Error creating ConnectionProfile: googleapi: Error 403: Datastream API has not been used in project da-cn-scratchnet before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/datastream.googleapis.com/overview?project=da-cn-scratchnet then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
 
 or the same for
 
@@ -225,7 +225,7 @@ function installPostgresConnectionProfile(
 ): gcp.datastream.ConnectionProfile {
   const profileName = `${postgres.namespace.logicalName}-scan-update-history-cxn`;
 
-  // TODO (#19810) may have to await scan migration or pub/rep slots command
+  // TODO (#454) may have to await scan migration or pub/rep slots command
   return new gcp.datastream.ConnectionProfile(
     profileName,
     {
@@ -292,7 +292,7 @@ function installDatastreamToNatVmFirewallRule(
   });
 }
 
-// TODO (#19807) if we disable default egress rule, we need another firewall
+// TODO (DACH-NY/canton-network-internal#342) if we disable default egress rule, we need another firewall
 // rule for Nat VM -> Postgres
 
 function installReplicatorPassword(postgres: CloudPostgres): PostgresPassword {
@@ -311,8 +311,9 @@ function createPostgresReplicatorUser(
   postgres: CloudPostgres,
   password: PostgresPassword
 ): gcp.sql.User {
+  const name = `${postgres.namespace.logicalName}-user-${replicatorUserName}`;
   return new gcp.sql.User(
-    `${postgres.namespace.logicalName}-user-${replicatorUserName}`,
+    name,
     {
       instance: postgres.databaseInstance.name,
       name: replicatorUserName,
@@ -321,31 +322,16 @@ function createPostgresReplicatorUser(
     {
       parent: postgres,
       deletedWith: postgres.databaseInstance,
+      retainOnDelete: true,
       protect: protectCloudSql,
       dependsOn: [postgres.databaseInstance, password.secret],
     }
   );
 }
 
-/*
-For the SQL below to apply, the user/operator applying the pulumi
-needs the 'Cloud SQL Editor' IAM role in the relevant GCP project
- */
-
-function createPublicationAndReplicationSlots(
-  postgres: CloudPostgres,
-  replicatorUser: gcp.sql.User,
-  scan: InstalledHelmChart
-) {
-  const dbName = scanAppDatabaseName(postgres);
-  const schemaName = dbName;
-  return new command.local.Command(
-    `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
-    {
-      // TODO (#19809) refactor to invoke external shell script
-      // ----
-      // from https://cloud.google.com/datastream/docs/configure-cloudsql-psql
-      create: pulumi.interpolate`
+function databaseCommandBracket(postgres: CloudPostgres) {
+  return {
+    header: pulumi.interpolate`
         set -e
         TMP_BUCKET="da-cn-tmp-sql-$(date +%s)-$RANDOM"
         TMP_SQL_FILE="$(mktemp tmp_pub_rep_slots_XXXXXXXXXX.sql --tmpdir)"
@@ -360,6 +346,48 @@ function createPublicationAndReplicationSlots(
             "gs://$TMP_BUCKET"
 
         cat > "$TMP_SQL_FILE" <<'EOT'
+  `,
+    footer: pulumi.interpolate`
+EOT
+
+        # upload SQL to temporary bucket
+        gsutil cp "$TMP_SQL_FILE" "$GCS_URI"
+
+        # then import into Cloud SQL
+        gcloud sql import sql ${postgres.databaseInstance.name} "$GCS_URI" \
+          --database="${scanAppDatabaseName(postgres)}" \
+          --user="${postgres.user.name}" \
+          --quiet
+
+        # cleanup: remove the file from GCS, delete the bucket, remove the local file
+        gsutil rm "$GCS_URI"
+        gsutil rb "gs://$TMP_BUCKET"
+        rm "$TMP_SQL_FILE"
+  `,
+  };
+}
+
+/*
+For the SQL below to apply, the user/operator applying the pulumi
+needs the 'Cloud SQL Editor' IAM role in the relevant GCP project
+ */
+
+function createPublicationAndReplicationSlots(
+  postgres: CloudPostgres,
+  replicatorUser: gcp.sql.User,
+  scan: InstalledHelmChart
+) {
+  const dbName = scanAppDatabaseName(postgres);
+  const schemaName = dbName;
+  const { header, footer } = databaseCommandBracket(postgres);
+  return new command.local.Command(
+    `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
+    {
+      // TODO (#455) refactor to invoke external shell script
+      // ----
+      // from https://cloud.google.com/datastream/docs/configure-cloudsql-psql
+      create: pulumi.interpolate`
+        ${header}
           DO $$
           DECLARE
             migration_complete BOOLEAN := FALSE;
@@ -391,7 +419,7 @@ function createPublicationAndReplicationSlots(
           ALTER USER ${postgres.user.name} WITH REPLICATION; -- needed to create the replication slot
           DO $$
           BEGIN
-            -- TODO (#19811) drop slot, pub if table list doesn't match
+            -- TODO (#453) drop slot, pub if table list doesn't match
             IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '${publicationName}') THEN
               CREATE PUBLICATION ${publicationName}
                 FOR TABLE ${tablesToReplicate.join(', ')};
@@ -414,21 +442,23 @@ function createPublicationAndReplicationSlots(
           ALTER DEFAULT PRIVILEGES IN SCHEMA ${schemaName}
             GRANT SELECT ON TABLES TO ${replicatorUserName};
           COMMIT;
-EOT
-
-        # upload SQL to temporary bucket
-        gsutil cp "$TMP_SQL_FILE" "$GCS_URI"
-
-        # then import into Cloud SQL
-        gcloud sql import sql ${postgres.databaseInstance.name} "$GCS_URI" \
-          --database="${scanAppDatabaseName(postgres)}" \
-          --user="${postgres.user.name}" \
-          --quiet
-
-        # cleanup: remove the file from GCS, delete the bucket, remove the local file
-        gsutil rm "$GCS_URI"
-        gsutil rb "gs://$TMP_BUCKET"
-        rm "$TMP_SQL_FILE"
+        ${footer}
+      `,
+      delete: pulumi.interpolate`
+        ${header}
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM pg_replication_slots WHERE slot_name = '${replicationSlotName}') THEN
+            PERFORM PG_DROP_REPLICATION_SLOT('${replicationSlotName}');
+          END IF;
+        END $$;
+        DO $$
+        BEGIN
+          IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '${publicationName}') THEN
+            DROP PUBLICATION ${publicationName};
+          END IF;
+        END $$;
+        ${footer}
       `,
     },
     {

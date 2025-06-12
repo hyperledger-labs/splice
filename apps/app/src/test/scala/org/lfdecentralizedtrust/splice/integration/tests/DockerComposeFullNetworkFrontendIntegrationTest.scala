@@ -13,6 +13,9 @@ class DockerComposeFullNetworkFrontendIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.empty(this.getClass.getSimpleName)
 
+  // This does nothing as the wallet clients will not actually be connected to the compose setup
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+
   override lazy val resetRequiredTopologyState = false
 
   val partyHint = "local-composeValidator-1"

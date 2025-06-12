@@ -18,6 +18,7 @@ import com.digitalasset.canton.integration.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
 import com.digitalasset.canton.topology.{ForceFlag, ForceFlags}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, SpliceConfig}
@@ -26,12 +27,14 @@ import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
 }
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResources,
   SpliceConsoleEnvironment,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
 }
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.config.SvCantonIdentifierConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.CommonAppInstanceReferences
 import org.lfdecentralizedtrust.splice.validator.config.ValidatorCantonIdentifierConfig
 import org.scalatest.matchers.should.Matchers
@@ -103,6 +106,51 @@ case class EnvironmentDefinition(
         }
       })
     })
+
+  def withInitialPackageVersions: EnvironmentDefinition =
+    addConfigTransforms(
+      (_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(
+            initialPackageConfig = InitialPackageConfig(
+              amuletVersion = InitialPackageVersions.initialPackageVersion(DarResources.amulet),
+              amuletNameServiceVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.amuletNameService),
+              dsoGovernanceVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.dsoGovernance),
+              validatorLifecycleVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.validatorLifecycle),
+              walletVersion = InitialPackageVersions.initialPackageVersion(DarResources.wallet),
+              walletPaymentsVersion =
+                InitialPackageVersions.initialPackageVersion(DarResources.walletPayments),
+            )
+          )
+        )(config),
+      (_, config) =>
+        ConfigTransforms.updateAllValidatorAppConfigs_(c =>
+          c.copy(
+            appInstances = c.appInstances.transform {
+              case ("splitwell", instance) =>
+                instance.copy(dars =
+                  Seq(
+                    java.nio.file.Paths.get(
+                      s"daml/dars/splitwell-${InitialPackageVersions.initialPackageVersion(DarResources.splitwell)}.dar"
+                    )
+                  )
+                )
+              case (_, instance) => instance
+            }
+          )
+        )(config),
+      (_, config) =>
+        ConfigTransforms.updateAllSplitwellAppConfigs_(c =>
+          c.copy(
+            requiredDarVersion = PackageVersion.assertFromString(
+              InitialPackageVersions.initialPackageVersion(DarResources.splitwell)
+            )
+          )
+        )(config),
+    )
 
   def withInitializedNodes(): EnvironmentDefinition =
     copy(setup = implicit env => {
@@ -391,6 +439,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+      .withInitialPackageVersions
   }
 
   def simpleTopology4Svs(testName: String): EnvironmentDefinition = {
@@ -398,6 +447,7 @@ object EnvironmentDefinition extends CommonAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
+      .withInitialPackageVersions
   }
 
   def simpleTopology1SvWithSimTime(testName: String): EnvironmentDefinition =

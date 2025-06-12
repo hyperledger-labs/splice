@@ -92,7 +92,7 @@ const ElectionRequests: React.FC = () => {
     return <Loading />;
   }
 
-  // TODO (#4966): add a popup to ask confirmation
+  // TODO (DACH-NY/canton-network-node#4966): add a popup to ask confirmation
   return (
     <Stack mt={4} spacing={4} direction="column" justifyContent="center">
       <Typography mt={4} variant="h4">

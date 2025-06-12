@@ -17,15 +17,9 @@ as well as general information useful to SV node operators.
 Security Notice
 ---------------
 
-.. warning::
+.. include:: ../common/sv_extra_dars_notice.rst
 
-  As an SV operator, you are most welcome to review, install, and use third-party Daml apps provided you
-  **install third-party Daml apps on a validator node separate from your SV node**.
-
-  Installing additional Daml apps on an SV node is not supported and may compromise its secure
-  operations. In particular, please refrain from manually uploading additional ``.dar`` files
-  to your SV node or manually connecting it to third-party synchronizers.
-
+For more information on hardening your SV node, see :ref:`sv-security`.
 
 .. _generate_onboarding_secret:
 
@@ -83,7 +77,7 @@ Participant identities
   - Quorums for administering the domain topology on behalf of the DSO party (>⅔ of onboarded SVs once activated)
   - Quorums for confirmation-based DSO Daml workflows (>⅔ of onboarded SVs; on DevNet instead usually >½)
 
-  .. TODO(#7746): remove "once activated"
+  .. TODO(DACH-NY/canton-network-node#7746): remove "once activated"
 
 - In general, participant identities *can't* be reused on the same global synchronizer,
   i.e., without the network being reset/redeployed.

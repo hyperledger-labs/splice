@@ -20,7 +20,7 @@ class DsoElectionTimeBasedIntegrationTest
 
   private val dummyDsoSynchronizerId = SynchronizerId.tryFromString("domain1::domain")
 
-  // TODO(#7649): once flow is fixed add test to check that SVs can elect a new delegate (currently locked contract issue)
+  // TODO(DACH-NY/canton-network-node#7649): once flow is fixed add test to check that SVs can elect a new delegate (currently locked contract issue)
   "SVs can elect a new delegate and if a delegate gets offboarded a new delegate is chosen while current ElectionRequests are archived" in {
     implicit env =>
       clue("Initialize DSO with 4 SVs") {
@@ -143,7 +143,7 @@ class DsoElectionTimeBasedIntegrationTest
       }
   }
 
-  // TODO(#7649): enable test back if automatic delegate election is re-enabled in new flow
+  // TODO(DACH-NY/canton-network-node#7649): enable test back if automatic delegate election is re-enabled in new flow
   "detect an inactive delegate" ignore { implicit env =>
     val dsoRulesBeforeElection = clue("Initialize DSO with 4 SVs") {
       startAllSync(
@@ -204,7 +204,7 @@ class DsoElectionTimeBasedIntegrationTest
             advanceTime(tickDurationWithBuffer)
           },
           entries => {
-            // TODO(#6856) Consider reverting this to a `forExactly`
+            // TODO(DACH-NY/canton-network-internal#495) Consider reverting this to a `forExactly`
             forAtLeast(3, entries) { line =>
               line.message should include(
                 "Starting check for delegate inactivity"

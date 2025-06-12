@@ -27,7 +27,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * ``PositiveFiniteDuration` config reader and writer made public
 * `ProofOfOwnership` made public
 ## Misc
-* Added support for interface filters in ledger api ACS commands. TODO (#17403): This should be upstreamed.
+* Added support for interface filters in ledger api ACS commands. TODO (#638): This should be upstreamed.
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`
 * Removed a trailing comma in many places because the CC Scala compiler doesn't like it (e.g. `.authorize(op, domain, mediator, side, key.some, )` -> `.authorize(op, domain, mediator, side, key.some)`)

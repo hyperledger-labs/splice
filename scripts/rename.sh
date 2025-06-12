@@ -713,7 +713,7 @@ function subcmd_cn_splice {
     "$GSR_ARGS"
 
   simple_rename '(?x)CN_(?=
-      APP_(?! # TODO (#14617) pulumi deployment conf
+      APP_(?! # TODO (DACH-NY/canton-network-node#14617) pulumi deployment conf
               SPLITWELL_PROVIDER_WALLET_USER_NAME
           )
     | ARTIFACTS_REPOSITORY
@@ -723,14 +723,14 @@ function subcmd_cn_splice {
     # TODO (#14617 pulumi conf) | PULUMI_LOAD_ENV_CONFIG_FILE
   )///SPLICE_'
   simple_rename '\bCN(?=Postgres|CustomResourceOptions)///Splice'
-  # TODO (#14137) transform lowercase
+  # TODO (DACH-NY/canton-network-node#14137) transform lowercase
   simple_rename '(?<=\binstall)CN(?=(?:Runbook)?HelmChart)///Splice'
   simple_rename '\bcnR(?=eplaceEqualDeep\b)///r'
   # AUTH0_CN_MANAGEMENT_API_CLIENT_ID
   # AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
   simple_rename '(?x)(\b|`)cn-(?=
       app-
-    # TODO (#14618) node pool names | (?:apps|infra)-pool
+    # TODO (DACH-NY/canton-network-node#14618) node pool names | (?:apps|infra)-pool
     | cluster-ingress-(?:full|sv)
     | directory
     | istio-fwd
@@ -1182,7 +1182,7 @@ function subcmd_no_illegal_daml_references() {
     local illegal_patterns=(
       svc SVC Svc   # to avoid conflict with PerSvContracts
       '(?<![a-z])cc(?!(ept|essor|g[.]github))'
-      'global(?!(ly))' # TODO (#17137): revisit
+      'global(?!(ly))' # TODO (DACH-NY/canton-network-node#17137): revisit
       CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       # Allow only Dso as in DsoRules in comments

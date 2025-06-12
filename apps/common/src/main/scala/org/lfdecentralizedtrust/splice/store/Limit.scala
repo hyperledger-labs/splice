@@ -14,7 +14,7 @@ sealed trait Limit {
 
 object Limit {
 
-  // TODO (#12610): make configurable
+  // TODO (#767): make configurable
   val MaxPageSize: Int = 1000
   val DefaultLimit: Limit = HardLimit.tryCreate(MaxPageSize)
 
@@ -83,6 +83,28 @@ trait LimitHelpers { _: NamedLogging =>
             limit.toLong,
           )
           result.take(limit)
+        } else {
+          result
+        }
+    }
+  }
+
+  protected final def applyLimitOrFail[CC[_], C](
+      name: String,
+      limit: Limit,
+      result: C & scala.collection.IterableOps[?, CC, C],
+  ): C = {
+    limit match {
+      case PageLimit(limit) =>
+        result.take(limit.intValue())
+      case HardLimit(limit) =>
+        val resultSize = result.size
+        if (resultSize > limit) {
+          throw io.grpc.Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Size of the result exceeded the limit in $name. Result size: ${resultSize.toLong}. Limit: ${limit.toLong}"
+            )
+            .asRuntimeException()
         } else {
           result
         }

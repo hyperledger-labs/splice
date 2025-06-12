@@ -13,6 +13,7 @@ final class NonDsoNonDevNetPreflightIntegrationTest
     with DataExportTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   // For now treating this as a non-SV app since it is really run directly as the DSO
   // rather than as SV-1. It just happens to be in SV-1's namespace.

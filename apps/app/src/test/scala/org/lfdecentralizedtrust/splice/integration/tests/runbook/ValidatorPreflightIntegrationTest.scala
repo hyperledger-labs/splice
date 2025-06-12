@@ -35,6 +35,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     with WithAuth0Support {
 
   override lazy val resetRequiredTopologyState: Boolean = false
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   protected val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
 
@@ -488,7 +489,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         () => find(id("onboard-button")) should not be empty,
       )
 
-      // TODO(#12457): This is a workaround to bypass slowness of wallet user onboarding
+      // TODO(DACH-NY/canton-network-internal#485): This is a workaround to bypass slowness of wallet user onboarding
       actAndCheck(timeUntilSuccess = 2.minute)(
         "Onboard wallet user", {
           click on "onboard-button"
@@ -525,7 +526,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
 
   override protected val validatorWalletUser = sys.env("SPLICE_OAUTH_TEST_VALIDATOR_WALLET_USER")
 
-  // TODO(#8300): remove this check once canton handles sequencer connections more gracefully
+  // TODO(#979): remove this check once canton handles sequencer connections more gracefully
   override def checkValidatorIsConnectedToSvRunbook() = "Validator is connected to SV runbook" in {
     implicit env =>
       val sv = sv_client("sv")

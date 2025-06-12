@@ -278,8 +278,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
             retentionSize: infraConfig.prometheus.retentionSize,
             resources: {
               requests: {
-                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '24Gi' : '6Gi') : '4Gi',
-                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '4' : '2') : '1',
+                memory: clusterProdLike ? (!clusterIsResetPeriodically ? '8Gi' : '3Gi') : '2Gi',
+                cpu: clusterProdLike ? (!clusterIsResetPeriodically ? '2' : '1') : '0.5',
               },
             },
             logFormat: 'json',
@@ -559,7 +559,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
       '/api/v1/write'
     );
   }
-  // TODO(#18897): Consider removing this also from non-MainNet clusters
+  // TODO(DACH-NY/canton-network-internal#360): Consider removing this also from non-MainNet clusters
   const grafanaPublicVirtualService = isMainNet
     ? undefined
     : istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');

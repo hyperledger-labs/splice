@@ -11,7 +11,7 @@ export const oidcAuthToProviderProps = (config: AuthConfig): AuthProviderProps =
 
     // We include the `openid` scope to comply with the OIDC spec, which requires this scope to be present:
     // see https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest.
-    // TODO(#16509): we don't do that for tokens that access the Ledger API server as the Ledger API server does not like the multiple audiences returned by Auth0 when also requesting the openid scope.
+    // TODO(DACH-NY/canton-network-node#16509): we don't do that for tokens that access the Ledger API server as the Ledger API server does not like the multiple audiences returned by Auth0 when also requesting the openid scope.
     const openid_scope = token_scope !== 'daml_ledger_api' ? 'openid' : null;
 
     // We include the `offline_access` scope to tell auth0 we want refresh tokens when we first authenticate.

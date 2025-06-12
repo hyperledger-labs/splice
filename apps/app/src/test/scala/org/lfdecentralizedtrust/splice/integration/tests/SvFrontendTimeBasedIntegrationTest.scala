@@ -53,7 +53,7 @@ class SvFrontendTimeBasedIntegrationTest
   }
 
   "SV UIs" should {
-    // TODO(#7649): enable test back if automatic delegate election is re-enabled in new flow
+    // TODO(DACH-NY/canton-network-node#7649): enable test back if automatic delegate election is re-enabled in new flow
     "see election results reflected in the UI" ignore { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(

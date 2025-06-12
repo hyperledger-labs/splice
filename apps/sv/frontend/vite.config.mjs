@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'build',
-      // TODO(#7672): reduce/remove this limit
+      // TODO(#854): reduce/remove this limit
       chunkSizeWarningLimit: 4800,
       commonjsOptions: {
         transformMixedEsModules: true,

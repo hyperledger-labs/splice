@@ -98,7 +98,7 @@ canton.validator-apps.validator_backend_$index = {
                 type = "self-signed"
                 user = $user
                 secret = "test"
-                # TODO(#2052) use actual audience of the target participant
+                # TODO(DACH-NY/canton-network-internal#502) use actual audience of the target participant
                 audience = \${SPLICE_APP_VALIDATOR_LEDGER_API_AUTH_AUDIENCE}
             }
         }

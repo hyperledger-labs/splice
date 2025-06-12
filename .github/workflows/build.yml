@@ -7,6 +7,23 @@ on:
         required: false
         default: ''
         type: string
+      daml_base_version:
+        description: "Splice version from which the initial-package-config should be chosen"
+        type: string
+        required: false
+        default: ""
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'The commit SHA to use for the build'
+        required: false
+        default: ''
+        type: string
+      daml_base_version:
+        description: "Splice version from which the initial-package-config should be chosen"
+        type: string
+        required: false
+        default: ""
 
 permissions:
   id-token: write # Required for GCP Workload Identity for failure notifications
@@ -66,6 +83,7 @@ jobs:
       parallelism: 4
       test_name: simtime
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_resource_intensive:
@@ -77,6 +95,7 @@ jobs:
       parallelism: 2
       test_name: resource-intensive
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_record_time_tolerance:
@@ -88,6 +107,7 @@ jobs:
       parallelism: 1
       test_name: record-time-tolerance
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_disaster_recovery:
@@ -99,6 +119,7 @@ jobs:
       parallelism: 1
       test_name: disaster-recovery
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_with_cometbft:
@@ -109,6 +130,7 @@ jobs:
       parallelism: 1
       test_name: cometbft
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_with_bft:
@@ -120,6 +142,7 @@ jobs:
       parallelism: 1
       test_name: canton bft
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
 
@@ -129,11 +152,12 @@ jobs:
       runs_on: self-hosted-k8s-large
       test_names_file: 'test-full-class-names.log'
       start_canton_options: -w
-      # TODO(#10912) Investigate why things got slower
+      # TODO(DACH-NY/canton-network-node#10912) Investigate why things got slower
       parallelism: 10
       test_name: wall-clock-time
       with_gcp_creds: true
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_wall_clock_time_bft:
@@ -147,6 +171,7 @@ jobs:
       with_gcp_creds: true
       pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
       run_if_commit_tag: 'bft'
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_frontend_wall_clock_time:
@@ -159,6 +184,7 @@ jobs:
       test_name: frontend-wall-clock-time
       is_frontend_test: true
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_frontend_simtime:
@@ -171,6 +197,7 @@ jobs:
       test_name: frontend-simtime
       is_frontend_test: true
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_docker_compose:
@@ -182,6 +209,7 @@ jobs:
       parallelism: 2
       test_name: docker-compose
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_local_net:
@@ -193,6 +221,7 @@ jobs:
       test_name: docker-compose
       with_canton: false
       start_canton_options: ""
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   scala_test_app_upgrade:
@@ -207,6 +236,7 @@ jobs:
       skip_if_regex: "\\[breaking\\]"
       skip_if_files_changed: "nix/canton-sources.json"
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   ui_tests:
@@ -237,6 +267,7 @@ jobs:
       test_name: without-canton
       with_gcp_creds: true
       commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
   final_result:

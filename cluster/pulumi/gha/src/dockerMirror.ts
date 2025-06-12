@@ -16,7 +16,7 @@ export function installDockerRegistryMirror(): k8s.helm.v3.Release {
     {
       name: 'docker-registry-mirror',
       chart: 'docker-registry',
-      version: '2.2.3',
+      version: '2.3.0',
       namespace: namespace.metadata.name,
       repositoryOpts: {
         repo: 'https://helm.twun.io',

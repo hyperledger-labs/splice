@@ -13,6 +13,7 @@ import scala.sys.process.{Process, ProcessLogger}
 import scala.util.Using
 
 // This is an integration test because it requires a live canton & scan to function
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardCliIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with TokenStandardTest
@@ -122,7 +123,7 @@ class TokenStandardCliIntegrationTest
             "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
           )
           val exitCode = Process(args, cwd).!(logProcessor)
-          // TODO (#18610): check that recordtime and updateid are present
+          // TODO (#908): check that recordtime and updateid are present
           inside(readLines) { case _ :+ last =>
             last should be("{}")
           }

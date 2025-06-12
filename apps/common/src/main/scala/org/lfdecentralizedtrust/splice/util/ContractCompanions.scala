@@ -27,7 +27,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.{
 
 import scala.jdk.CollectionConverters.*
 
-// TODO (#17282): Replace with usage of com.digitalasset.transcode
+// TODO (#916): Replace with usage of com.digitalasset.transcode
 object ContractCompanions {
   type C = Contract.Companion.Template[_ <: ContractId[?], _ <: DamlRecord[?]]
   type I = Contract.Companion.Interface[_ <: ContractId[?], _ <: JavaGenContract[_ <: ContractId[

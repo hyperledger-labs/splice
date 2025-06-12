@@ -82,7 +82,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
             monitorTaskAsFollower(task)
           }
         } else {
-          // TODO(#6856) Could this be busy-looping as well, if we are a polling trigger?
+          // TODO(DACH-NY/canton-network-internal#495) Could this be busy-looping as well, if we are a polling trigger?
           Future.successful(
             TaskSuccess(
               s"Skipping because current epoch ${dsoRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
@@ -244,7 +244,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
                 )
               )
             } else if (isLeaderInactive) {
-              // TODO(#6856) Resolve the busy loop in a more elegant way.
+              // TODO(DACH-NY/canton-network-internal#495) Resolve the busy loop in a more elegant way.
               if (enableAutomaticDsoDelegateElection) {
                 voteForNewDsoDelegate(dsoRules, monitoredLeader)
               } else {

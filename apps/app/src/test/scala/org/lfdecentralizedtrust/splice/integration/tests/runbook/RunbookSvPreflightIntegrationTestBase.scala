@@ -25,6 +25,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     with SvTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.svPreflightTopology(
