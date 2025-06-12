@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# TODO: every variable reference like ${...} below is a TypeScript expression
+# that will be passed into this script as a named argument.  The names of the arguments
+# should be hyphenated-like-this, and the new shell variables should be ALL_CAPS_WITH_UNDERSCORES.
+# 1. Add to the top of this file a parser that reads named arguments and sets shell variables.
+#    If any arguments are missing, or specified more than once, fail with an error.
+# 2. Replace all ${...} with the corresponding shell variable.
+# 3. Include a comment at top of file that is an invocation of the script from Pulumi,
+#    passing the original expressions below for each newly-introduced named argument.
+
 set -e
 
 TMP_BUCKET="da-cn-tmpsql-$(date +%s)-$RANDOM-b"
