@@ -333,7 +333,7 @@ function databaseCommandBracket(postgres: CloudPostgres) {
   return {
     header: pulumi.interpolate`
         set -e
-        TMP_BUCKET="da-cn-tmp-sql-$(date +%s)-$RANDOM"
+        TMP_BUCKET="da-cn-tmpsql-$(date +%s)-$RANDOM-b"
         TMP_SQL_FILE="$(mktemp tmp_pub_rep_slots_XXXXXXXXXX.sql --tmpdir)"
         GCS_URI="gs://$TMP_BUCKET/$(basename "$TMP_SQL_FILE")"
 
