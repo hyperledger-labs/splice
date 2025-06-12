@@ -86,7 +86,7 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
             if (dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_11.metadata.version) {
               majorityRejected || majorityAccepted
             } else {
-              // TODO(#16139): get rid of this case
+              // TODO(#925): get rid of this case
               votes.size >= dsoRules.payload.svs.size()
             }
         }

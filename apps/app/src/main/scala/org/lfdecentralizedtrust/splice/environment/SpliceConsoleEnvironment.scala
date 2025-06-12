@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.wallet.config.WalletAppClientConfig
 class SpliceConsoleEnvironment(
     override val environment: SpliceEnvironment,
     val consoleOutput: ConsoleOutput = StandardConsoleOutput,
-) extends ConsoleEnvironment // TODO(#736): Generalize this.
+) extends ConsoleEnvironment // TODO(DACH-NY/canton-network-node#736): Generalize this.
     {
 
   override type Config = SpliceConfig

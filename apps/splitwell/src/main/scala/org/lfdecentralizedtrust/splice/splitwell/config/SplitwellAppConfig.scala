@@ -12,7 +12,9 @@ import org.lfdecentralizedtrust.splice.config.{
   HttpClientConfig,
   NetworkAppClientConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.config.*
 
 case class SplitwellSynchronizerConfig(
@@ -36,11 +38,12 @@ case class SplitwellAppBackendConfig(
     participantClient: ParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     domains: SplitwellSynchronizerConfig,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
-) extends SpliceBackendConfig // TODO(#736): fork or generalize this trait.
+    requiredDarVersion: PackageVersion = DarResources.splitwell.bootstrap.metadata.version,
+) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwell"
 

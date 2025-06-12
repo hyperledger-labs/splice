@@ -136,7 +136,7 @@ object SvUtil {
       Map(
         synchronizerId.toProtoPrimitive -> new SynchronizerConfig(
           dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
-          "TODO(#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
+          "TODO(DACH-NY/canton-network-node#4900): share CometBFT genesis.json of sv1 via DsoRules config.",
           // TODO(M3-47): also share the Canton SynchronizerId of the decentralized domain here
           Optional.of(defaultAcsCommitmentReconciliationInterval.duration.toSeconds),
         )

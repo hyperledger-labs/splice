@@ -862,7 +862,7 @@ paths:
         "404":
           description: "No migration scheduled"
 
-  # TODO(#13386) Move to SV app
+  # TODO(DACH-NY/canton-network-internal#418) Move to SV app
   /v0/synchronizer-identities/{domain_id_prefix}:
     get:
       tags: [internal, scan]
@@ -884,7 +884,7 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
-  # TODO(#13386) Move to SV app
+  # TODO(DACH-NY/canton-network-internal#418) Move to SV app
   /v0/synchronizer-bootstrapping-transactions/{domain_id_prefix}:
     get:
       tags: [internal, scan]

@@ -65,7 +65,7 @@ class SynchronizerNodeReconciler(
         .toJava
       rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
-      // TODO(#4901): do not use default, but reconcile all configured domains
+      // TODO(DACH-NY/canton-network-node#4901): do not use default, but reconcile all configured domains
       synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala
         .get(synchronizerId.toProtoPrimitive)
       sequencerConfig = synchronizerNodeConfig.flatMap(_.sequencer.toScala)

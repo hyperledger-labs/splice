@@ -106,7 +106,7 @@ class CometBftHttpRpcClient(
     })
   }
 
-  // TODO(#5428) add retries for failures
+  // TODO(DACH-NY/canton-network-node#5428) add retries for failures
   private def callCometBftJsonHttp[T: Decoder](
       method: String,
       params: Map[String, Json],

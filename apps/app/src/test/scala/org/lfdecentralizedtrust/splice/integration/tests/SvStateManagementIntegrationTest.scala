@@ -43,10 +43,10 @@ import java.util.Optional
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
-//TODO(#16139): adapt this test to work only with SetConfig
+//TODO(#925): adapt this test to work only with SetConfig
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
 
-  // TODO(#16139): change tests to work with current version
+  // TODO(#925): change tests to work with current version
   private val initialPackageConfig = InitialPackageConfig(
     amuletVersion = "0.1.7",
     amuletNameServiceVersion = "0.1.7",
@@ -55,7 +55,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     walletVersion = "0.1.7",
     walletPaymentsVersion = "0.1.7",
   )
-  // TODO(#16139): when using the latest version, this can be removed
+  // TODO(#925): when using the latest version, this can be removed
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: EnvironmentDefinition =

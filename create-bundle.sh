@@ -19,7 +19,7 @@ function adjust_shellscript_binary() {
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
   # shellcheck disable=SC2043
-  for file in "bin/splice-node" # TODO(#161): Canton supports windows. Do we want that too? "bin/splice-node.bat"
+  for file in "bin/splice-node" # TODO(DACH-NY/canton-network-node#161): Canton supports windows. Do we want that too? "bin/splice-node.bat"
   do
       cat "$RELEASE_DIR"/$file |
         sed -e "s/REPLACE_VERSION/${REPLACE_VERSION}/" |
@@ -27,7 +27,7 @@ function adjust_shellscript_binary() {
         sed -e "s/REPLACE_JVM_OPTS/${REPLACE_JVM_OPTS}/" |
         sed -e "s/REPLACE_MAIN_CLASS/${REPLACE_MAIN_CLASS}/" |
         sed -e "s/REPLACE_JAR/${REPLACE_JAR}/" > "$RELEASE_DIR/tmp.txt"
-        # TODO(#161): Look into this Mac Icon
+        # TODO(DACH-NY/canton-network-node#161): Look into this Mac Icon
 #        sed -e "s/REPLACE_MAC_ICON_FILE/${REPLACE_MAC_ICON_FILE}/"
       mv "$RELEASE_DIR"/tmp.txt "$RELEASE_DIR"/$file
       chmod 755 "$RELEASE_DIR/$file"

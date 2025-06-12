@@ -1275,7 +1275,7 @@ abstract class TopologyAdminConnection(
         member.filterString,
       )
     ).map(
-      // TODO(#14815) Canton currently compares member IDs by string prefix instead of strict equality of
+      // TODO(#720) Canton currently compares member IDs by string prefix instead of strict equality of
       // member IDs in ListSynchronizerTrustCertificate, so we apply another filter for equality of the member ID
       _.filter(r => r.item.participantId.member.filterString == member.filterString)
         .map(r =>

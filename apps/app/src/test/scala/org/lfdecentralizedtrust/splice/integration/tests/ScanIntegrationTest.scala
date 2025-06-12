@@ -531,7 +531,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       }
   }
 
-  // TODO (#13038) reenable
+  // TODO (DACH-NY/canton-network-node#13038) reenable
   "list collected app and validator and SV rewards" ignore { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
@@ -587,7 +587,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         _ => {
           bobValidatorWalletClient
             .listAppRewardCoupons() should have size 1
-          // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+          // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
 
           //          bobValidatorWalletClient.listValidatorRewardCoupons() should
           //            have size (if (bobToppedUp) 2 else 1)
@@ -613,7 +613,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         }
       }
     }
-    // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+    // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
     // replace _ with validatorRewardAmount
     val (appRewardAmount, _) =
       getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, featured = false)
@@ -622,7 +622,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       eventually() {
         bobValidatorWalletClient
           .listAppRewardCoupons() should have size 0
-        // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+        // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
         //        bobValidatorWalletClient
         //          .listValidatorRewardCoupons() should have size 0
 
@@ -638,7 +638,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
         val inputAppRewardAmount = inputAppRewardAmounts.loneElement
         inputAppRewardAmount shouldBe appRewardAmount
-        // TODO(#13038) Add asserts back for listValidatorRewardCoupons
+        // TODO(DACH-NY/canton-network-node#13038) Add asserts back for listValidatorRewardCoupons
 
         //        val inputValidatorAmounts = bobTransfers
         //          .flatMap(_.sender.inputValidatorRewardAmount)

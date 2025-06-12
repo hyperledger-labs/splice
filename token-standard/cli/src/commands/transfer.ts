@@ -29,7 +29,7 @@ interface TransferCommandOptions {
   // paths to keys
   publicKey: string;
   privateKey: string;
-  instrumentAdmin: string; // TODO (#18611): replace with registry call
+  instrumentAdmin: string; // TODO (#907): replace with registry call
   instrumentId: string;
   transferFactoryRegistryUrl: string;
   userId: string;
@@ -154,7 +154,7 @@ export async function transfer(
     deduplicationPeriod,
   });
 
-  // TODO (#18610): this is currently '{}'. It should include record_time and update_id, which require usage of completions API
+  // TODO (#908): this is currently '{}'. It should include record_time and update_id, which require usage of completions API
   console.log(JSON.stringify(result, null, 2));
 }
 

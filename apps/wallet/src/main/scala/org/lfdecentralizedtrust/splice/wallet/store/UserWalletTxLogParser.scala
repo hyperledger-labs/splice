@@ -274,7 +274,7 @@ class UserWalletTxLogParser(
 
           // ------------------------------------------------------------------
           // Transfer Offers
-          // TODO (#7153): these are not used for the Transaction History, and would benefit from being split off
+          // TODO (#837): these are not used for the Transaction History, and would benefit from being split off
           // ------------------------------------------------------------------
 
           case WalletAppInstall_CreateTransferOffer(ex) =>

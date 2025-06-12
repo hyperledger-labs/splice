@@ -382,7 +382,7 @@ class DisasterRecoveryIntegrationTest
 
         // Note: the dumps contain data from the sequencers, need to get
         // the dumps before shutting down canton nodes.
-        // TODO(#11099): Once taking the migration dump does not need sequencers to be running, move this further down.
+        // TODO(DACH-NY/canton-network-node#11099): Once taking the migration dump does not need sequencers to be running, move this further down.
         withClueAndLog("Getting and writing disaster recovery dumps") {
           getAndWriteDumps(identities, timestampBeforeDisaster)
         }

@@ -15,8 +15,6 @@ class WalletAppRewardsTimeBasedIntegrationTest
     with SplitwellTestUtil
     with TriggerTestUtil {
 
-  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-current.dar"
-
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
@@ -30,10 +28,10 @@ class WalletAppRewardsTimeBasedIntegrationTest
           _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
         )(config)
       )
-      // TODO (#10859) remove and fix test failures
+      // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
-  // TODO (#10859) remove and fix test failures
+  // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
   "A wallet" should {

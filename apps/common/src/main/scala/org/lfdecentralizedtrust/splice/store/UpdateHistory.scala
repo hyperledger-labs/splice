@@ -104,7 +104,7 @@ class UpdateHistory(
         includeCreatedEventBlob = false,
       )
 
-      // TODO(#12780): This can be removed eventually
+      // TODO(#948): This can be removed eventually
       def issue12777Workaround()(implicit tc: TraceContext): Future[Unit] = {
         val action = for {
           oldHistoryIdOpt <- sql"""
@@ -1400,7 +1400,7 @@ class UpdateHistory(
   ): UpdateHistoryResponse = {
 
     val createEvents = createRows.map(_.toCreatedEvent.event)
-    // TODO(#17370) - remove this conversion as it's costly
+    // TODO(#640) - remove this conversion as it's costly
     val nodesWithChildren = exerciseRows
       .map(exercise =>
         EventId.nodeIdFromEventId(exercise.eventId) -> exercise.childEventIds

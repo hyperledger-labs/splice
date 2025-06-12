@@ -525,7 +525,7 @@ object DamlPlugin extends AutoPlugin {
         s"Codegen asked to generate code from nonexistent file: $darFile"
       )
 
-    // TODO(#13274) Switch back to upstream java codegen once it supports upgrading.
+    // TODO(DACH-NY/canton-network-node#13274) Switch back to upstream java codegen once it supports upgrading.
     val codegenJarPath =
       ensureArtifactAvailable(
         url =

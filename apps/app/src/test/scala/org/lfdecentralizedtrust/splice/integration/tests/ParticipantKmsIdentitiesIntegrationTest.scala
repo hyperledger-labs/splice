@@ -128,7 +128,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
         // better.files.File(aliceParticipantDumpFile).write(dumpFromValidator.toJson.spaces2)
 
         // uncomment all of this to write out new dumps for KmsMigrationDumpImportIntegrationTest
-        // TODO(#16277): Add KmsMigrationDumpImportIntegrationTest and/or remove this
+        // TODO(DACH-NY/canton-network-node#16277): Add KmsMigrationDumpImportIntegrationTest and/or remove this
         // import io.circe.syntax.EncoderOps
         // val someTimestamp = java.time.Instant.now()
         // // sv1

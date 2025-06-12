@@ -109,7 +109,7 @@ export function getKnownInterfaceView(
   }
 }
 
-// TODO (#18500): handle allocations in such a way that any callers have to handle them too
+// TODO (#563): handle allocations in such a way that any callers have to handle them too
 /**
  * Use this when `createdEvent` is guaranteed to have an interface view because the ledger api filters
  * include it, and thus is guaranteed to be returned by the API.

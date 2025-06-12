@@ -62,7 +62,7 @@ class HttpExternalWalletHandler(
               )
             case QueryResult(dedupOffset, None) =>
               val sender = userWalletStore.key.endUserParty
-              // TODO(#8300) revisit if we want to retry here.
+              // TODO(#979) revisit if we want to retry here.
               retryProvider.retryForClientCalls(
                 "createTransferOffer",
                 "createTransferOffer",
@@ -211,7 +211,7 @@ class HttpExternalWalletHandler(
               )
             case QueryResult(dedupOffset, None) =>
               val buyer = userWalletStore.key.endUserParty
-              // TODO(#8300) revisit if we want to retry here.
+              // TODO(#979) revisit if we want to retry here.
               retryProvider
                 .retryForClientCalls(
                   "createBuyTrafficRequest",
@@ -292,7 +292,7 @@ object HttpExternalWalletHandler {
     override def determineExceptionErrorKind(exception: Throwable, logger: TracedLogger)(implicit
         tc: TraceContext
     ): ErrorKind = exception match {
-      // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
+      // TODO(#979) global domain can be disconnected and reconnected after config of sequencer connections changed
       case ex: io.grpc.StatusRuntimeException
           if (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION && ex.getStatus.getDescription
             .contains("The domain id was not found")) =>

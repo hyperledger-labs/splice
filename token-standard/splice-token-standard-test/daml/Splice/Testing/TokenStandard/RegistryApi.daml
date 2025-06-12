@@ -22,7 +22,7 @@ import Daml.Script
 --
 -- The function names match the names of the handlers defined in the OpenAPI specification.
 class RegistryApi app where
-  -- TODO (#17541): add functions for simulating all OpenAPI endpoints as part of testing the unhappy paths
+  -- TODO (DACH-NY/canton-network-node#17541): add functions for simulating all OpenAPI endpoints as part of testing the unhappy paths
 
   getTransferFactory
     : app -> TransferFactory_Transfer

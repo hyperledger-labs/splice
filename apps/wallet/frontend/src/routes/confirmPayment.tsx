@@ -273,7 +273,7 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   const converted = convertCurrency(total.totalAmount, total.totalCurrency, amuletPrice);
   const ccAmount = total.totalCurrency === 'AmuletUnit' ? total.totalAmount : converted.amount;
 
-  const totalAmulet = ccAmount; // TODO (#3492): compute actual fee
+  const totalAmulet = ccAmount; // TODO (#878): compute actual fee
   const totalUSDUnit = totalAmulet.times(amuletPrice);
 
   return (

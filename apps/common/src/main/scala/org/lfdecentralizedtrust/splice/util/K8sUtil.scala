@@ -89,7 +89,7 @@ object K8sUtil {
     def getPreflightToken(clientId: String)(implicit logger: Logger): Option[AuthToken] = {
       readSecretField(preflightTokenSecretName, clientId) match {
         case Some(secretData) =>
-          // TODO (#8039): remove try catch, logging and fallback to None (let it crash, which shouldn't happen)
+          // TODO (#852): remove try catch, logging and fallback to None (let it crash, which shouldn't happen)
           try {
             val token =
               circeDecode[Auth0PreflightTokenData](secretData).fold(throw _, identity).toAuthToken

@@ -54,7 +54,7 @@ object TopupUtil {
   )(implicit tc: TraceContext, ec: ExecutionContext, mat: Materializer) = {
     scanConnection.getAmuletRulesWithState().flatMap { amuletRules =>
       // Since we auto-tap CC for traffic purchases on DevNet, we always have sufficient funds
-      // TODO(#8046): Considering removing this once we remove auto-tapping in DevNet
+      // TODO(#851): Considering removing this once we remove auto-tapping in DevNet
       if (amuletRules.payload.isDevNet) Future.successful(true)
       else
         for {

@@ -49,7 +49,7 @@ case class SharedSpliceAppParameters(
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
-    // TODO(#736): likely remove all of the following:
+    // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,
     override val enablePreviewFeatures: Boolean,

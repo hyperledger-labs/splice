@@ -1018,7 +1018,7 @@ object BuildCommon {
           "daml/AdminWorkflows/daml.yaml",
           "daml/PartyReplication/daml.yaml",
         ),
-        // TODO(#16168) Before creating the first stable release with backwards compatibility guarantees,
+        // TODO(DACH-NY/canton-network-node#16168) Before creating the first stable release with backwards compatibility guarantees,
         //  make "AdminWorkflows.dar" stable again
         damlFixedDars := Seq(),
         // commented out from Canton OS repo as settings don't apply to us (yet)
@@ -1652,7 +1652,7 @@ object BuildCommon {
         FileFunction.cached(cacheDir, FileInfo.hash) { _ =>
           runWorkspaceCommand(workingDir, "build", workspace, log)
 
-          // TODO(#7667) - we have to run the type check here because it depends on other things to be built first (e.g. common-frontend, openapi-ts-client, etc). Ideally we run this as part of our static checks instead (npmLint)
+          // TODO(#985) - we have to run the type check here because it depends on other things to be built first (e.g. common-frontend, openapi-ts-client, etc). Ideally we run this as part of our static checks instead (npmLint)
           runWorkspaceCommand(workingDir, "type:check", workspace, log)
           val buildFiles = (baseDir / "build" ** "*").get.toSet
           buildFiles

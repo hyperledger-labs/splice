@@ -150,7 +150,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     topupConfig,
   } = validatorConfig;
 
-  // TODO(#14679): Remove the override once ciperiodic has been bumped to 0.2.0
+  // TODO(DACH-NY/canton-network-node#14679): Remove the override once ciperiodic has been bumped to 0.2.0
   const postgresPvcSizeOverride = config.optionalEnv('VALIDATOR_RUNBOOK_POSTGRES_PVC_SIZE');
   const supportsValidatorRunbookReset = config.envFlag('SUPPORTS_VALIDATOR_RUNBOOK_RESET', false);
   const postgresValues: ChartValues = _.merge(

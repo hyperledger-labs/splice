@@ -65,7 +65,7 @@ class SubscriptionReadyForPaymentTrigger(
           val msg =
             show"Failed making subscription payment due to Daml exception\n${failedOperation.toValue}"
           // We're throwing this as INTERNAL to avoid that the polling trigger retries this task in a tight loop.
-          // TODO(#2034): INTERNAL is not the right option for a ITR_InsufficientFunds error. There we should actually try to create a marker on-ledger to reach out to the user for a decision on whether to continue trying to pay this subscription or not.
+          // TODO(DACH-NY/canton-network-node#2034): INTERNAL is not the right option for a ITR_InsufficientFunds error. There we should actually try to create a marker on-ledger to reach out to the user for a decision on whether to continue trying to pay this subscription or not.
           throw Status.INTERNAL.withDescription(msg).asRuntimeException()
 
         case unknown =>

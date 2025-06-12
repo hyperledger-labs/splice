@@ -43,7 +43,7 @@ class SvIdentitiesDumpIntegrationTest extends IntegrationTestWithSharedEnvironme
               .fromHttp(io.circe.parser.decode[http.SynchronizerNodeIdentities](jsonString).value)
               .value
             // The authorized store snapshots are not always byte-for-byte equal
-            // TODO(#11611): Figure out why and if we can improve the checking here
+            // TODO(#794): Figure out why and if we can improve the checking here
             scrubAuthorizedStoreSnapshots(ids) shouldBe scrubAuthorizedStoreSnapshots(
               parsed
             ) withClue s"Identities dump for sv ${backend.name} is consistent with identities fetched through the endpoint"

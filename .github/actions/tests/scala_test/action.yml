@@ -83,6 +83,10 @@ inputs:
   failure_notifications_slack_channel:
     description: "Slack channel for failure notifications (for failure notifications)"
     required: true
+  daml_base_version:
+    description: "Splice version from which the initial-package-config should be chosen"
+    type: string
+    required: true
 
 runs:
   using: "composite"
@@ -133,6 +137,28 @@ runs:
       with:
         cache_version: 4
 
+    - name: Set Daml package versions
+      uses: ./.github/actions/nix/run_bash_command_in_nix
+      with:
+        cmd: |
+          if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
+            echo "Running with initial package config from ${{ inputs.daml_base_version }}"
+            ./scripts/initial-package-config.py ${{ inputs.daml_base_version }} initial_package_config scala_test_tags
+            echo "Initial package config" $(cat initial_package_config)
+            echo "ScalaTest tags: $(cat scala_test_tags)"
+          else
+            echo "daml_base_version is not set, using the latest versions"
+          fi
+
+    - name: Export Daml package versions output
+      id: daml_package_versions
+      shell: bash
+      run: |
+        # We can't export from within run_bash_command_in_nix so we do it here.
+        if [[ "${{ inputs.daml_base_version }}" != "" ]]; then
+          echo "initial_package_versions='$(cat initial_package_config)'" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Prepare list of tests to run for sbt
       uses: ./.github/actions/nix/run_bash_command_in_nix
       with:
@@ -147,7 +173,16 @@ runs:
     - name: Set RUN_SPLITTED_TESTS_CMD
       id: list_tests
       shell: bash
-      run: echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests)\"" >> "$GITHUB_OUTPUT"
+      run: |
+        tags=""
+        if [ -f scala_test_tags ]
+        then
+          tags="$(cat scala_test_tags)"
+          echo "Using scalatest tags: $tags"
+        else
+          echo "No scala test tags configured"
+        fi
+        echo "RUN_SPLITTED_TESTS_CMD=\"testOnly $(cat /tmp/tests) -- $tags\"" >> "$GITHUB_OUTPUT"
 
     # webpack uses inotify to watch for changes, and we need to increase the limit
     - name: increase inotify limit
@@ -191,7 +226,7 @@ runs:
     - name: Run tests
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
-        extra_env_vars: POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres
+        extra_env_vars: "POSTGRES_DB=postgres POSTGRES_HOST=localhost POSTGRES_USER=postgres POSTGRES_PASSWORD=postgres INITIAL_PACKAGE_VERSIONS=${{ steps.daml_package_versions.outputs.initial_package_versions }}"
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
         cmd: ${{ steps.list_tests.outputs.RUN_SPLITTED_TESTS_CMD }}

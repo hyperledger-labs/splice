@@ -21,7 +21,7 @@ case class SpliceStatus(
     ports: Map[String, Port],
     active: Boolean,
 ) extends NodeStatus.Status {
-  // TODO(#3859) Set this to something useful.
+  // TODO(DACH-NY/canton-network-node#3859) Set this to something useful.
   override def components: Seq[ComponentStatus] = Seq.empty
 
   private[environment] def portsString(ports: Map[String, Port]): String =

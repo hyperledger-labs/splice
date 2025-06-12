@@ -29,7 +29,7 @@ export const podKillSchedule = (
         namespace: chaosMeshNs.metadata.name,
       },
       spec: {
-        // TODO(#10689) Reduce this back to 5min once Canton sequencers stop being so slow
+        // TODO(DACH-NY/canton-network-node#10689) Reduce this back to 5min once Canton sequencers stop being so slow
         schedule: '@every 60m',
         historyLimit: 2,
         concurrencyPolicy: 'Forbid',

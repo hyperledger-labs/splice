@@ -559,7 +559,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
       '/api/v1/write'
     );
   }
-  // TODO(#18897): Consider removing this also from non-MainNet clusters
+  // TODO(DACH-NY/canton-network-internal#360): Consider removing this also from non-MainNet clusters
   const grafanaPublicVirtualService = isMainNet
     ? undefined
     : istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');

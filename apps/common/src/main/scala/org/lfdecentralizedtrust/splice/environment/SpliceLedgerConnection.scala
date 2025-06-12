@@ -1150,7 +1150,7 @@ class SpliceLedgerConnection(
                completionOffsetCallback(offset).map(_ => ())
              )
            } else {
-             // TODO(#14568) Once we ingest data for external parties, block on the offset in all cases
+             // TODO(DACH-NY/canton-network-node#14568) Once we ingest data for external parties, block on the offset in all cases
              FutureUnlessShutdown.unit
            }).map(_ => completion.updateId)
         }

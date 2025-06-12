@@ -49,7 +49,7 @@ class AggregatingScanConnection(
       dsoRulesWithSvNodeStates <- dsoStore.getDsoRulesWithSvNodeStates()
     } yield {
       val svNodes = dsoRulesWithSvNodeStates.svNodeStates.values
-      // TODO(#13301) We should use the internal URL for the SV’s own scan to avoid a loopback requirement
+      // TODO(DACH-NY/canton-network-node#13301) We should use the internal URL for the SV’s own scan to avoid a loopback requirement
       (if (includeSelf)
          svNodes
        else svNodes.filterNot(_.payload.sv == dsoStore.key.svParty.filterString))

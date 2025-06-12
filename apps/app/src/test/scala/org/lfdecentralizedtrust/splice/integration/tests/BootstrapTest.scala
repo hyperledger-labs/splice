@@ -9,6 +9,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.Integration
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class BootstrapTest extends IntegrationTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =

@@ -24,14 +24,14 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 dayjs.extend(utc);
 
-// TODO(#16139): Retire this file
+// TODO(#925): Retire this file
 const AddFutureAmuletConfigSchedule: React.FC<{
   chooseAction: (action: ActionFromForm) => void;
 }> = ({ chooseAction }) => {
   const dsoInfosQuery = useDsoInfos();
 
   const [date, setDate] = useState<Dayjs | null>(dayjs());
-  // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
+  // TODO (#967): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue>>();
 
   useEffect(() => {

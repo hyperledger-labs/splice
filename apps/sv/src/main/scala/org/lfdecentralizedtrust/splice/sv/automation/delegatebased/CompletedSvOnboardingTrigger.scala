@@ -20,7 +20,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import CompletedSvOnboardingTrigger.*
 
-//TODO(#3756) reconsider this trigger
+//TODO(DACH-NY/canton-network-node#3756) reconsider this trigger
 class CompletedSvOnboardingTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,

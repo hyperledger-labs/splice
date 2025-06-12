@@ -64,9 +64,9 @@ Glossary
 
     Canton Coin
 
-      * currency issued by super validator collective
+      * utility token minted by Validators, Application Providers and Super Validators as rewards for activity completed on the Global Synchronizer
       * used for :term:`synchronizer fees`
-      * coins accrue holding fees that pay for the coin's usage of DSO storage space
+      * coins accrue holding fees that pay for the coin's usage of Super Validator storage space
       * all CC transactions are public
       * supports locked coins that can be unlocked by lock holder
       * support transfers single sender, multi-receiver transfers

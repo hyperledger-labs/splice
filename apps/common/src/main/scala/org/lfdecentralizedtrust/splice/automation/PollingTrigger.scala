@@ -66,7 +66,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             "performWorkIfNotPaused may not be called concurrently",
           )
           runningTaskFinishedVar = Some(Promise())
-          // TODO(#8526) refactor for better latency reporting
+          // TODO(#842) refactor for better latency reporting
           val latencyTimer = metrics.latency.startAsync()
           metrics.iterations.mark()
           waitForReadyToWork()

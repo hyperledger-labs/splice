@@ -84,22 +84,22 @@ resource.labels.namespace_name=~"sv|validator1|multi-validator|splitwell"
 -(resource.labels.container_name="istio-proxy" AND severity<ERROR)
 -resource.labels.container_name="postgres"
 -(resource.labels.container_name=~"postgres" AND resource.labels.namespace_name="multi-validator")
--- TODO(#14570): Remove this once we have improved our sv onboarding logic
+-- TODO(DACH-NY/canton-network-internal#412): Remove this once we have improved our sv onboarding logic
 -(resource.labels.container_name="sv-app" AND jsonPayload.stack_trace=~"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node")
--- TODO(#15716): Don't just ignore this - investigate!
+-- TODO(#695): Don't just ignore this - investigate!
 -(resource.labels.container_name="splitwell-app" AND jsonPayload.message=~"Waiting for domain Domain 'global' to be connected has not completed after")
--- TODO(#17636): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher
+-- TODO(#911): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher
 -(jsonPayload.message=~"signalWhenIngested.* has not completed after .* milliseconds")
 ${conditionalString(
   isDevNet,
-  "-- TODO(#17637): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3\n" +
+  "-- TODO(DACH-NY/canton-network-internal#475): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3\n" +
     '-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")\n' +
-    '-- TODO(#8300): Can happen due to random disconnects/reconnects but also in other contexts\n' +
+    '-- TODO(#979): Can happen due to random disconnects/reconnects but also in other contexts\n' +
     '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")'
 )}
 ${conditionalString(
   !isMainNet,
-  '-- TODO(#17025): Stop ignoring these again once we have topology-aware package selection\n' +
+  '-- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection\n' +
     '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))\n' +
     '-(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")'
 )}
@@ -117,7 +117,7 @@ ${conditionalString(
 )}
 ${conditionalString(
   !isMainNet && !isDevNet,
-  `-- TODO(#19192): suppressed faulty validator warnings until timestamp
+  `-- TODO(DACH-NY/canton-network-node#19192): suppressed faulty validator warnings until timestamp
 -(resource.labels.container_name="participant"
   AND resource.labels.namespace_name="sv-1"
   AND jsonPayload.message=~"ACS_COMMITMENT_MISMATCH"

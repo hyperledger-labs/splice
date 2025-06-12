@@ -126,7 +126,7 @@ class HttpValidatorAdminHandler(
   ] = {
     implicit val TracedUser(_, tracedContext) = tuser
     withSpan(s"$workflowId.listUsers") { _ => _ =>
-      // TODO(#12550): move away from tracking onboarded users via on-ledger contracts, and create only one WalletAppInstall per user-party
+      // TODO(DACH-NY/canton-network-node#12550): move away from tracking onboarded users via on-ledger contracts, and create only one WalletAppInstall per user-party
       store.listUsers().map(us => definitions.ListUsersResponse(us.toVector))
     }
   }
@@ -174,7 +174,7 @@ class HttpValidatorAdminHandler(
           .getDomainDataSnapshot(
             Instant.parse(timestamp),
             synchronizerId,
-            // TODO(#9731): get migration id from scan instead of configuring here
+            // TODO(DACH-NY/canton-network-node#9731): get migration id from scan instead of configuring here
             migrationId getOrElse (config.domainMigrationId + 1),
             force.getOrElse(false),
           )

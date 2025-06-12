@@ -1,4 +1,4 @@
--- TODO (#18620) put this file somewhere that makes sense
+-- TODO (DACH-NY/canton-network-internal#362) put this file somewhere that makes sense
 
 -- in this example:
 -- experiment_dataset is the name of the BigQuery dataset

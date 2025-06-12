@@ -28,7 +28,7 @@ case class TreasuryConfig(
       * This is used to set the deadline for grpc calls to the participant.
       * If the call takes longer than this, it will be cancelled and retried.
       * This is only intended for testing purposes.
-      * TODO(#11501) block and unblock submissions on domain reconnect
+      * TODO(DACH-NY/canton-network-node#11501) block and unblock submissions on domain reconnect
       */
     grpcDeadline: Option[NonNegativeFiniteDuration] = None,
 )

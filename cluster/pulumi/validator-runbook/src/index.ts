@@ -14,7 +14,7 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.saveAuth0Cache();
 }
 
-// TODO(#8008): Reduce duplication from sv-runbook stack
+// TODO(DACH-NY/canton-network-node#8008): Reduce duplication from sv-runbook stack
 async function main() {
   const auth0ClusterCfg = infraStack.requireOutput('auth0') as pulumi.Output<Auth0ClusterConfig>;
   if (!auth0ClusterCfg.validatorRunbook) {

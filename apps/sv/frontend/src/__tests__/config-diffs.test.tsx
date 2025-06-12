@@ -87,7 +87,7 @@ describe('SV can see AmuletRules config diffs', () => {
 
     await goToGovernanceTabAndClickOnAction('Executed', deprecatedAction, user);
 
-    //TODO(#14813): when an action is executed, the AmuletConfigSchedule is updated and actualized to now, therefore the diff is empty for the first change
+    //TODO(#934): when an action is executed, the AmuletConfigSchedule is updated and actualized to now, therefore the diff is empty for the first change
     await screen.findByTestId('stringify-display');
 
     // current comparison against vote result

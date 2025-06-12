@@ -86,7 +86,7 @@ export class CometBftNodeConfigs {
   }
 
   private istioExternalPort(nodeIndex: number) {
-    // TODO(#10482) Revisit port scheme
+    // TODO(DACH-NY/canton-network-node#10482) Revisit port scheme
     return nodeIndex >= 10
       ? Number(`26${this._domainMigrationId}${nodeIndex}`)
       : Number(`26${this._domainMigrationId}${nodeIndex}6`);

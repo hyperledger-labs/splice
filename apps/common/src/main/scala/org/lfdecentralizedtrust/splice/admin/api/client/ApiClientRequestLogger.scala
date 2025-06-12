@@ -67,7 +67,7 @@ class ApiClientRequestLogger(
       }
     } else {
       val tidInfo =
-        // TODO(#9754): consider flushing out empty and missing trace contexts, as they typically indicate missed opportunities to simplify debugging
+        // TODO(#969): consider flushing out empty and missing trace contexts, as they typically indicate missed opportunities to simplify debugging
         if (optCallerContext.isEmpty) "no caller tid".unquoted
         else if (callerTraceContext == requestTraceContext) "empty caller tid".unquoted
         else requestTraceContext.showTraceId

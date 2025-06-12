@@ -21,6 +21,7 @@ import monocle.macros.syntax.lens.*
 
 import java.nio.file.{Path, Paths}
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class ParticipantPlaintextIdentitiesIntegrationTest extends IntegrationTest with StandaloneCanton {
 
   val svNodePath: File = testResourcesPath / "local-sv-node"

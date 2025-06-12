@@ -13,7 +13,7 @@ import org.lfdecentralizedtrust.splice.util.WalletTestUtil
 
 import scala.jdk.CollectionConverters.*
 
-//TODO(#16139): remove this test
+//TODO(#925): remove this test
 class SvTimeBasedPruneAmuletConfigScheduleIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil

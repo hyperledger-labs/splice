@@ -90,7 +90,7 @@ export function getDsoConfigToCompareWith(
   dsoAction: { tag: 'SRARC_SetConfig'; value: DsoRules_SetConfig },
   dsoInfosQuery: UseQueryResult<DsoInfo>
 ): [string, DsoRulesConfig | undefined] {
-  // TODO(#15180): Implement effectivity on all actions
+  // TODO(DACH-NY/canton-network-node#15180): Implement effectivity on all actions
   // we need to subtract 1 second because the effectiveAt differs slightly from the completedAt in DsoRules-based actions
   const latestConfig =
     effectiveAt && tableType
@@ -127,7 +127,7 @@ export function getAmuletConfigToCompareWith(
   amuetAction: { tag: 'CRARC_SetConfig'; value: AmuletRules_SetConfig },
   dsoInfosQuery: UseQueryResult<DsoInfo>
 ): [string, AmuletConfig<USD>] | undefined {
-  // TODO(#15180): Implement effectivity on all actions
+  // TODO(DACH-NY/canton-network-node#15180): Implement effectivity on all actions
   // we need to subtract 1 second because the effectiveAt differs slightly from the completedAt in DsoRules-based actions
   const latestConfig =
     effectiveAt && tableType

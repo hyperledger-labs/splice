@@ -118,7 +118,7 @@ class SvOffboardingIntegrationTest
               BigDecimal(0.0).bigDecimal,
               Instant.now().plus(5, ChronoUnit.MINUTES),
               0L,
-              java.util.Optional.of("transfer-command-description"),
+              java.util.Optional.empty(),
             )
             .commands
             .asScala

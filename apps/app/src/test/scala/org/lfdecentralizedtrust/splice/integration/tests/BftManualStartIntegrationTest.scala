@@ -31,7 +31,7 @@ class BftManualStartIntegrationTest extends IntegrationTest {
     "start with the bft sequencers" in { implicit env =>
       sv1Backend.startSync()
       sv1ScanBackend.startSync()
-      // TODO(#19670) if possible, don't require parallel start of sv app and scan
+      // TODO(#893) if possible, don't require parallel start of sv app and scan
       startAllSync(sv2Backend, sv2ScanBackend)
       startAllSync(sv3Backend, sv3ScanBackend)
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend)) { sv =>

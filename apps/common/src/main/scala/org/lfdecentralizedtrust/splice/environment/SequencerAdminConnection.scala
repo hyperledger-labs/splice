@@ -98,7 +98,7 @@ class SequencerAdminConnection(
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
       SequencerAdminCommands.InitializeFromGenesisState(
-        // TODO(#10953) Stop doing that.
+        // TODO(DACH-NY/canton-network-node#10953) Stop doing that.
         topologySnapshot.toByteString(domainParameters.protocolVersion),
         domainParameters,
       )
