@@ -56,7 +56,7 @@ This is not required for PRs from forks, which are automatically opted-in for CI
 
 ### Running static tests only in CI
 
-For changes e.g. changes in Pulumi deployment configurations, deployment scripts, etc., that would not affect
+For changes e.g. in Pulumi deployment configurations, deployment scripts, etc., that would not affect
 integration tests, one can opt-in to running static tests only.
 To run only static tests (and skip e.g. integration tests) on your PR, either include the text `[static]`
 in your last commit message, or add a "static" GitHub label to the PR.
