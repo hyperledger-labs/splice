@@ -16,8 +16,7 @@ on:
         required: true
       commit_sha:
         type: string
-        required: false
-        default: ""
+        required: true
       daml_base_version:
         description: "Splice version from which the initial-package-config should be chosen"
         type: string
