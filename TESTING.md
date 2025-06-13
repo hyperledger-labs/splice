@@ -65,7 +65,7 @@ in your last commit message, or add a "static" GitHub label to the PR.
 
 In certain cases, it may be valid to allow a PR to be merged without going through CI.
 While `[skip ci]` is supported, it does not allow the PR to be merged. To skip testing but
-stil allow the PR to be merged, please include the text `[force]` in your last commit message.
+still allow the PR to be merged, please include the text `[force]` in your last commit message.
 
 ### Requesting Cluster Tests
 
