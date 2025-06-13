@@ -106,15 +106,15 @@ services:
       - ${LOCALNET_DIR}/conf/canton/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/canton/sv:/app/sv/${SV_PROFILE}
     ports:
-      - "${TEST_PORT-4$PARTICIPANT_LEDGER_API_PORT:}4${PARTICIPANT_LEDGER_API_PORT}"
-      - "${TEST_PORT-4$PARTICIPANT_ADMIN_API_PORT:}4${PARTICIPANT_ADMIN_API_PORT}"
-      - "${TEST_PORT-4$PARTICIPANT_JSON_API_PORT:}4${PARTICIPANT_JSON_API_PORT}"
-      - "${TEST_PORT-3$PARTICIPANT_LEDGER_API_PORT:}3${PARTICIPANT_LEDGER_API_PORT}"
-      - "${TEST_PORT-3$PARTICIPANT_ADMIN_API_PORT:}3${PARTICIPANT_ADMIN_API_PORT}"
-      - "${TEST_PORT-3$PARTICIPANT_JSON_API_PORT:}3${PARTICIPANT_JSON_API_PORT}"
-      - "${TEST_PORT-2$PARTICIPANT_LEDGER_API_PORT:}2${PARTICIPANT_LEDGER_API_PORT}"
-      - "${TEST_PORT-2$PARTICIPANT_ADMIN_API_PORT:}2${PARTICIPANT_ADMIN_API_PORT}"
-      - "${TEST_PORT-2$PARTICIPANT_JSON_API_PORT:}2${PARTICIPANT_JSON_API_PORT}"
+      - "${TEST_PORT-4$PARTICIPANT_LEDGER_API_PORT_SUFFIX:}4${PARTICIPANT_LEDGER_API_PORT_SUFFIX}"
+      - "${TEST_PORT-4$PARTICIPANT_ADMIN_API_PORT_SUFFIX:}4${PARTICIPANT_ADMIN_API_PORT_SUFFIX}"
+      - "${TEST_PORT-4$PARTICIPANT_JSON_API_PORT_SUFFIX:}4${PARTICIPANT_JSON_API_PORT_SUFFIX}"
+      - "${TEST_PORT-3$PARTICIPANT_LEDGER_API_PORT_SUFFIX:}3${PARTICIPANT_LEDGER_API_PORT_SUFFIX}"
+      - "${TEST_PORT-3$PARTICIPANT_ADMIN_API_PORT_SUFFIX:}3${PARTICIPANT_ADMIN_API_PORT_SUFFIX}"
+      - "${TEST_PORT-3$PARTICIPANT_JSON_API_PORT_SUFFIX:}3${PARTICIPANT_JSON_API_PORT_SUFFIX}"
+      - "${TEST_PORT-2$PARTICIPANT_LEDGER_API_PORT_SUFFIX:}2${PARTICIPANT_LEDGER_API_PORT_SUFFIX}"
+      - "${TEST_PORT-2$PARTICIPANT_ADMIN_API_PORT_SUFFIX:}2${PARTICIPANT_ADMIN_API_PORT_SUFFIX}"
+      - "${TEST_PORT-2$PARTICIPANT_JSON_API_PORT_SUFFIX:}2${PARTICIPANT_JSON_API_PORT_SUFFIX}"
     healthcheck:
       test: ["CMD", "bash", "/app/health-check.sh"]
       interval: 20s
@@ -158,9 +158,9 @@ services:
       retries: 1000
       start_period: 30s
     ports:
-      - "${TEST_PORT-4$VALIDATOR_ADMIN_API_PORT:}4${VALIDATOR_ADMIN_API_PORT}"
-      - "${TEST_PORT-3$VALIDATOR_ADMIN_API_PORT:}3${VALIDATOR_ADMIN_API_PORT}"
-      - "${TEST_PORT-2$VALIDATOR_ADMIN_API_PORT:}2${VALIDATOR_ADMIN_API_PORT}"
+      - "${TEST_PORT-4$VALIDATOR_ADMIN_API_PORT_SUFFIX:}4${VALIDATOR_ADMIN_API_PORT_SUFFIX}"
+      - "${TEST_PORT-3$VALIDATOR_ADMIN_API_PORT_SUFFIX:}3${VALIDATOR_ADMIN_API_PORT_SUFFIX}"
+      - "${TEST_PORT-2$VALIDATOR_ADMIN_API_PORT_SUFFIX:}2${VALIDATOR_ADMIN_API_PORT_SUFFIX}"
     depends_on:
       canton:
         condition: service_healthy
@@ -176,7 +176,6 @@ services:
       args:
         BASE_IMAGE: ${IMAGE_REPO}canton:${IMAGE_TAG}
     env_file:
-      - ${LOCALNET_ENV_DIR}/${ENV}.env
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
       - *app-user-auth-env
@@ -219,6 +218,17 @@ services:
     profiles:
       - app-user
 
+  ans-web-ui-app-user:
+    image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
+    container_name: ans-web-ui-app-user
+    env_file:
+      - ${LOCALNET_ENV_DIR}/common.env
+      - *app-user-auth-env
+    environment:
+      - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost:${APP_USER_UI_PORT}
+    profiles:
+      - app-user
+
   ###############################################################################################################
   ### Application Provider
   ###############################################################################################################
@@ -228,6 +238,17 @@ services:
     env_file:
       - ${LOCALNET_ENV_DIR}/common.env
       - *app-provider-auth-env
+    profiles:
+      - app-provider
+
+  ans-web-ui-app-provider:
+    image: "${IMAGE_REPO}ans-web-ui:${IMAGE_TAG}"
+    container_name: ans-web-ui-app-provider
+    env_file:
+      - ${LOCALNET_ENV_DIR}/common.env
+      - *app-provider-auth-env
+    environment:
+      - SPLICE_APP_WALLET_REDIRECT=http://wallet.localhost:${APP_PROVIDER_UI_PORT}
     profiles:
       - app-provider
 
