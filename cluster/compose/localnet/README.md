@@ -34,17 +34,34 @@ Resource constraints for containers can be configured via:
 - The default database port is **DB_PORT=5432**.
 
 Other ports follow a specific pattern based on the validator:
-- `4${PORT}`: Super Validator (sv) port
-- `3${PORT}`: App Provider port
-- `2${PORT}`: App User port
+- `4${PORT_SUFFIX}`: Super Validator (sv) port
+- `3${PORT_SUFFIX}`: App Provider port
+- `2${PORT_SUFFIX}`: App User port
 
-These patterns apply to the following ports:
-- **PARTICIPANT_LEDGER_API_PORT**: 5001
-- **PARTICIPANT_ADMIN_API_PORT**: 5002
-- **PARTICIPANT_JSON_API_PORT**: 7575
-- **VALIDATOR_ADMIN_API_PORT**: 5003
-- **CANTON_HTTP_HEALTHCHECK_PORT**: 7000
-- **CANTON_GRPC_HEALTHCHECK_PORT**: 5061
+These patterns apply to the following ports suffixes:
+- **PARTICIPANT_LEDGER_API_PORT_SUFFIX**: 901
+- **PARTICIPANT_ADMIN_API_PORT_SUFFIX**: 902
+- **PARTICIPANT_JSON_API_PORT_SUFFIX**: 975
+- **VALIDATOR_ADMIN_API_PORT_SUFFIX**: 903
+- **CANTON_HTTP_HEALTHCHECK_PORT_SUFFIX**: 900
+- **CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX**: 961
+
+## Exposed Ports
+
+The following section details the ports used by various services. The default database port is **DB_PORT=5432**.
+
+Other ports are generated using specific patterns based on the validator:
+- For the Super Validator (sv), the port is specified as `4${PORT_SUFFIX}`.
+- For the App Provider, the port is specified as `3${PORT_SUFFIX}`.
+- For the App User, the port is specified as `2${PORT_SUFFIX}`.
+
+The corresponding port suffixes are defined as follows:
+- **PARTICIPANT_LEDGER_API_PORT_SUFFIX**: 901
+- **PARTICIPANT_ADMIN_API_PORT_SUFFIX**: 902
+- **PARTICIPANT_JSON_API_PORT_SUFFIX**: 975
+- **VALIDATOR_ADMIN_API_PORT_SUFFIX**: 903
+- **CANTON_HTTP_HEALTHCHECK_PORT_SUFFIX**: 900
+- **CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX**: 961
 
 
 UI Ports are defined as follows:
@@ -57,6 +74,14 @@ UI Ports are defined as follows:
 Localnet uses a single PostgreSQL database for all components. Database configurations are sourced from `LOCALNET_ENV_DIR/postgres.env`.
 
 ## Application UIs
+
+- **App User ANS UI**
+    - **URL**: [http://ans.localhost:2000](http://ans.localhost:2000)
+    - **Description**: Interface for registering names.
+
+- **App Provider ANS UI**
+    - **URL**: [http://ans.localhost:3000](http://ans.localhost:3000)
+    - **Description**: Interface for registering names.
 
 - **App User Wallet UI**
     - **URL**: [http://wallet.localhost:2000](http://wallet.localhost:2000)
@@ -95,7 +120,7 @@ app-provider.adminToken
 ```
 
 For proper functionality, Swagger UI relies on a localhost nginx proxy for `canton.localhost` configured for each participant. For example, the `JSON Ledger API HTTP Endpoints` for the app-provider
-can be accessed at the nginx proxy URL `http://canton.localhost:${APP_PROVIDER_UI_PORT}` via Swagger UI, which corresponds to accessing `localhost:3${PARTICIPANT_JSON_API_PORT}` directly.
+can be accessed at the nginx proxy URL `http://canton.localhost:${APP_PROVIDER_UI_PORT}` via Swagger UI, which corresponds to accessing `localhost:3${PARTICIPANT_JSON_API_PORT_SUFFIX}` directly.
 The nginx proxy only adds additional headers to resolve CORS issues within Swagger UI.
 
 
