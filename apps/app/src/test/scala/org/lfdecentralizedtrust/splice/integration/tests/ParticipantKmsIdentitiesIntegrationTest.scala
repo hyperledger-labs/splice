@@ -1,15 +1,16 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
-import com.digitalasset.canton.topology.ParticipantId
-import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
+// import com.digitalasset.canton.crypto.{EncryptionPublicKey, SigningPublicKey}
+// import com.digitalasset.canton.topology.ParticipantId
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+// import org.lfdecentralizedtrust.splice.config.{ConfigTransforms, ParticipantBootstrapDumpConfig}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
-  updateAllSvAppConfigs,
+//   updateAllSvAppConfigs,
   updateAllValidatorConfigs,
 }
-import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
-import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
-import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
+// import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
+// import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump
+// import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.StandaloneCanton
@@ -31,42 +32,42 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
       .addConfigTransforms(
         (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
         (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-        // comment this to generate a fresh dump with fresh keys
         (_, conf) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidator") {
               c.copy(
-                domains = c.domains.copy(extra = Seq.empty),
-                participantBootstrappingDump = Some(
-                  ParticipantBootstrapDumpConfig
-                    .File(
-                      aliceParticipantDumpFile,
-                      Some(participantIdPrefix),
-                    )
-                ),
+                domains = c.domains.copy(extra = Seq.empty)
+                // comment this to generate a fresh dump with fresh keys
+                // participantBootstrappingDump = Some(
+                //   ParticipantBootstrapDumpConfig
+                //     .File(
+                //       aliceParticipantDumpFile,
+                //       Some(participantIdPrefix),
+                //     )
+                // ),
               )
             } else {
               c
             }
           }(conf),
-        // comment this to generate a fresh dump with fresh keys
-        (_, conf) => {
-          updateAllSvAppConfigs { case (name, c) =>
-            if (name == "sv2") {
-              c.copy(
-                participantBootstrappingDump = Some(
-                  ParticipantBootstrapDumpConfig
-                    .File(
-                      sv2ParticipantDumpFile,
-                      Some(s"sv2"),
-                    )
-                )
-              )
-            } else {
-              c
-            }
-          }(conf)
-        },
+        // // comment this to generate a fresh dump with fresh keys
+        // (_, conf) => {
+        //   updateAllSvAppConfigs { case (name, c) =>
+        //     if (name == "sv2") {
+        //       c.copy(
+        //         participantBootstrappingDump = Some(
+        //           ParticipantBootstrapDumpConfig
+        //             .File(
+        //               sv2ParticipantDumpFile,
+        //               Some(s"sv2"),
+        //             )
+        //         )
+        //       )
+        //     } else {
+        //       c
+        //     }
+        //   }(conf)
+        // },
         // default transforms that look relevant
         (_, config) => ConfigTransforms.makeAllTimeoutsBounded(config),
         (_, config) => ConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(config),
@@ -104,28 +105,28 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
       )() {
         startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-        val predefinedDump = NodeIdentitiesDump
-          .fromJsonFile(
-            aliceParticipantDumpFile,
-            ParticipantId.tryFromProtoPrimitive,
-          )
-          .value
+        // val predefinedDump = NodeIdentitiesDump
+        //   .fromJsonFile(
+        //     aliceParticipantDumpFile,
+        //     ParticipantId.tryFromProtoPrimitive,
+        //   )
+        //   .value
 
         clue("start validator with predefined dump") {
           aliceValidatorBackend.startSync()
         }
 
-        dumpMatchesParticipantState(
-          predefinedDump,
-          aliceValidatorBackend.participantClientWithAdminToken,
-          Some(participantIdPrefix),
-        )
+        // dumpMatchesParticipantState(
+        //   predefinedDump,
+        //   aliceValidatorBackend.participantClientWithAdminToken,
+        //   Some(participantIdPrefix),
+        // )
 
         val dumpFromValidator = aliceValidatorBackend.dumpParticipantIdentities()
-        dumpFromValidator.keys.toSet shouldBe predefinedDump.keys.toSet
+        // dumpFromValidator.keys.toSet shouldBe predefinedDump.keys.toSet
 
         // uncomment this to write out a new dump for this test
-        // better.files.File(aliceParticipantDumpFile).write(dumpFromValidator.toJson.spaces2)
+        better.files.File(aliceParticipantDumpFile).write(dumpFromValidator.toJson.spaces2)
 
         // uncomment all of this to write out new dumps for KmsMigrationDumpImportIntegrationTest
         // TODO(DACH-NY/canton-network-node#16277): Add KmsMigrationDumpImportIntegrationTest and/or remove this
@@ -174,58 +175,58 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
       ) {
         startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
-        val predefinedDump = NodeIdentitiesDump
-          .fromJsonFile(
-            sv2ParticipantDumpFile,
-            ParticipantId.tryFromProtoPrimitive,
-          )
-          .value
+        // val predefinedDump = NodeIdentitiesDump
+        //   .fromJsonFile(
+        //     sv2ParticipantDumpFile,
+        //     ParticipantId.tryFromProtoPrimitive,
+        //   )
+        //   .value
 
         clue("start sv2 with predefined dump") {
           startAllSync(sv2Backend, sv2ScanBackend, sv2ValidatorBackend)
         }
 
-        dumpMatchesParticipantState(predefinedDump, sv2Backend.participantClientWithAdminToken)
+        // dumpMatchesParticipantState(predefinedDump, sv2Backend.participantClientWithAdminToken)
 
         val dumpFromSvValidator = sv2ValidatorBackend.dumpParticipantIdentities()
-        dumpFromSvValidator.keys.toSet shouldBe predefinedDump.keys.toSet
+        // dumpFromSvValidator.keys.toSet shouldBe predefinedDump.keys.toSet
 
         // uncomment this to write out a new dump for this test
-        // better.files.File(sv2ParticipantDumpFile).write(dumpFromSvValidator.toJson.spaces2)
+        better.files.File(sv2ParticipantDumpFile).write(dumpFromSvValidator.toJson.spaces2)
       }
   }
 
-  private def dumpMatchesParticipantState(
-      dump: NodeIdentitiesDump,
-      participant: ParticipantClientReference,
-      prefixOverwrite: Option[String] = None,
-  ) = {
-    clue("Participant ID is the same") {
-      participant.id shouldBe ParticipantId(
-        dump.id.uid.tryChangeId(
-          prefixOverwrite.getOrElse(dump.id.uid.toProtoPrimitive.split("::")(0))
-        )
-      )
-    }
-    clue("keys are correctly registered") {
-      val keys = participant.keys.secret.list()
-      keys should have size dump.keys.size.toLong
+  // private def dumpMatchesParticipantState(
+  //     dump: NodeIdentitiesDump,
+  //     participant: ParticipantClientReference,
+  //     prefixOverwrite: Option[String] = None,
+  // ) = {
+  //   clue("Participant ID is the same") {
+  //     participant.id shouldBe ParticipantId(
+  //       dump.id.uid.tryChangeId(
+  //         prefixOverwrite.getOrElse(dump.id.uid.toProtoPrimitive.split("::")(0))
+  //       )
+  //     )
+  //   }
+  //   clue("keys are correctly registered") {
+  //     val keys = participant.keys.secret.list()
+  //     keys should have size dump.keys.size.toLong
 
-      def checkKmsKeyId(keyName: String) = {
-        val key = keys.find(_.name.exists(_.unwrap == keyName)).value
-        inside(dump.keys.find(_.name.value == key.name.value.unwrap).value) {
-          case NodeKey.KmsKeyId(keyType, keyId, _) =>
-            key.kmsKeyId.value.unwrap shouldBe keyId
-            key.publicKey match {
-              case _: SigningPublicKey => keyType shouldBe NodeKey.KeyType.Signing
-              case _: EncryptionPublicKey => keyType shouldBe NodeKey.KeyType.Encryption
-              case _ => fail("Unexpected key type")
-            }
-        }
-      }
-      checkKmsKeyId("namespace")
-      checkKmsKeyId("signing")
-      checkKmsKeyId("encryption")
-    }
-  }
+  //     def checkKmsKeyId(keyName: String) = {
+  //       val key = keys.find(_.name.exists(_.unwrap == keyName)).value
+  //       inside(dump.keys.find(_.name.value == key.name.value.unwrap).value) {
+  //         case NodeKey.KmsKeyId(keyType, keyId, _) =>
+  //           key.kmsKeyId.value.unwrap shouldBe keyId
+  //           key.publicKey match {
+  //             case _: SigningPublicKey => keyType shouldBe NodeKey.KeyType.Signing
+  //             case _: EncryptionPublicKey => keyType shouldBe NodeKey.KeyType.Encryption
+  //             case _ => fail("Unexpected key type")
+  //           }
+  //       }
+  //     }
+  //     checkKmsKeyId("namespace")
+  //     checkKmsKeyId("signing")
+  //     checkKmsKeyId("encryption")
+  //   }
+  // }
 }
