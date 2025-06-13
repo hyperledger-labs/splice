@@ -99,7 +99,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
           "KMS_TYPE" -> "gcp",
           "KMS_LOCATION_ID" -> "us-central1",
           "KMS_PROJECT_ID" -> "da-cn-splice",
-          "KMS_KEY_RING_ID" -> "kms-ci",
+          "KMS_KEY_RING_ID" -> "integration-tests",
         ),
       )() {
         startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
@@ -170,7 +170,7 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
         "KMS_TYPE" -> "gcp",
         "KMS_LOCATION_ID" -> "us-central1",
         "KMS_PROJECT_ID" -> "da-cn-splice",
-        "KMS_KEY_RING_ID" -> "kms-ci",
+        "KMS_KEY_RING_ID" -> "integration-tests",
       ) {
         startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
