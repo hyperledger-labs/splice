@@ -47,6 +47,7 @@ function check_patterns_locally() {
     'SpliceTests\.scala.*getMeterProvider\.get."cn_tests"' # test metrics
     '^[^:]+package-lock\.json:.*"integrity"' # appears in hashes
     'Preflight.*Test.*\.scala:.*s"https://cns' # hostnames in preflights
+    'Test.*\.scala:.*da-cn-splice' # GCP project we use for KMS keys used in integration tests
     'cluster/images/splice-test-temp-runner-hook/index.js' # gha-runner-hook copied over
     'apps/app/src/test/resources/dumps/.*-identity-dump.json' # encoded snapshots can randomly contain 'cn'
     'token-standard/CHANGELOG.md'
