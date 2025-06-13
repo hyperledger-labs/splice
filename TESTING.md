@@ -48,19 +48,24 @@ Splice code is tested in the following ways:
 
 ### Opting-in to CI
 
-At the moment, CI is by default being cancelled on commits, unless explicitly opted in. (CI jobs will report
-the error `Build was canceled`.) To enable CI for your commit, please include the text `[ci]` in your commit
-message.
+For PRs using branches in this repo (as opposed to PRs from forks), CI is by default being cancelled on commits,
+unless explicitly opted in. (CI jobs will report the error `Build was canceled`.)
+To enable CI for your commit, please include the text `[ci]` in your commit message.
+
+This is not required for PRs from forks, which are automatically opted-in for CI (but require a Contributor's approval to run).
+
+### Running static tests only in CI
+
+For changes e.g. changes in Pulumi deployment configurations, deployment scripts, etc., that would not affect
+integration tests, one can opt-in to running static tests only.
+To run only static tests (and skip e.g. integration tests) on your PR, either include the text `[static]`
+in your last commit message, or add a "static" GitHub label to the PR.
 
 ### Opting-out of CI
 
 In certain cases, it may be valid to allow a PR to be merged without going through CI.
 While `[skip ci]` is supported, it does not allow the PR to be merged. To skip testing but
-stil allow the PR to be merged, please include the text `[force]` in your commit message.
-
-Alternatively, to run only static tests (and skip e.g. integration tests) on your PR,
-include the text `[static]` in your commit message. This is recommended for, e.g. changes in
-Pulumi deployment configurations, deployment scripts, etc.
+stil allow the PR to be merged, please include the text `[force]` in your last commit message.
 
 ### Requesting Cluster Tests
 
