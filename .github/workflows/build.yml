@@ -35,7 +35,9 @@ jobs:
 
   cancel_if_not_opt_in:
     runs-on: self-hosted-docker-tiny
-    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+    # Note that we don't auto-cancel on merged commits (e.g. in a post-merge workflow), and on
+    # pull_request_target events (which indicate that we are running from a fork).
+    if: github.event_name == 'pull_request'
     name: Cancel if not opted in
     permissions:
       actions: write
