@@ -1730,12 +1730,12 @@ class UpdateHistory(
         //     select max(migration_id)
         //     from #$table
         //     where history_id = $historyId and migration_id < $migrationId
-        // but uses a recursive CTE to implement an index skip scan.
+        // but uses a recursive CTE to avoid a backwards-index-scan which attempts to read most of the table.
         sql"""
           WITH RECURSIVE t AS (
-             (SELECT migration_id FROM #$table where history_id = 1 and migration_id < $migrationId ORDER BY migration_id LIMIT 1)
+             (SELECT migration_id FROM #$table where history_id = $historyId and migration_id < $migrationId ORDER BY migration_id LIMIT 1)
              UNION ALL
-             SELECT (SELECT migration_id FROM #$table WHERE history_id = 1 and migration_id < $migrationId and migration_id > t.migration_id ORDER BY migration_id LIMIT 1)
+             SELECT (SELECT migration_id FROM #$table WHERE history_id = $historyId and migration_id < $migrationId and migration_id > t.migration_id ORDER BY migration_id LIMIT 1)
              FROM t
              WHERE t.migration_id IS NOT NULL
              )
