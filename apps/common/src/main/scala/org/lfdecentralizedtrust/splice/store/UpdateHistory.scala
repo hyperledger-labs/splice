@@ -1726,10 +1726,20 @@ class UpdateHistory(
   ): Future[Option[Long]] = {
     def previousId(table: String) = {
       storage.query(
+        // The following is equivalent to:
+        //     select max(migration_id)
+        //     from #$table
+        //     where history_id = $historyId and migration_id < $migrationId
+        // but uses a recursive CTE to implement an index skip scan.
         sql"""
-             select max(migration_id)
-             from #$table
-             where history_id = $historyId and migration_id < $migrationId
+          WITH RECURSIVE t AS (
+             (SELECT migration_id FROM #$table where history_id = 1 and migration_id < $migrationId ORDER BY migration_id LIMIT 1)
+             UNION ALL
+             SELECT (SELECT migration_id FROM #$table WHERE history_id = 1 and migration_id < $migrationId and migration_id > t.migration_id ORDER BY migration_id LIMIT 1)
+             FROM t
+             WHERE t.migration_id IS NOT NULL
+             )
+          SELECT MAX(migration_id) FROM t WHERE migration_id IS NOT NULL;
            """.as[Option[Long]].head,
         s"getPreviousMigrationId.$table",
       )
