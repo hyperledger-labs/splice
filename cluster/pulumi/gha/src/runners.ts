@@ -466,7 +466,7 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:0.3.21`;
+  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:0.4.1`;
 
   const repo = ghaConfig.githubRepo;
 
