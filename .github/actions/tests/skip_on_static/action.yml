@@ -11,19 +11,24 @@ runs:
   using: "composite"
   steps:
     - name: Check if static only
+      id: check
       shell: bash
       run: |
         last_commit_msg=$(git log -1 --pretty=%B)
         pr_labels='${{ toJSON(github.event.pull_request.labels) }}'
-        static_label=$(echo "$pr_labels" | jq -r '.[] | select(.name == "static") | .name' | grep -c 'static')
+        static_label=$(echo "$pr_labels" | jq -r '.[] | select(.name == "static") | .name' | grep -c 'static' || true)
         echo "Last commit message: $last_commit_msg"
         if [[ "${{ github.event_name }}" == "pull_request"* ]]; then
-          if [[ "$last_commit_msg" == *"[static]"* ]] || [[ "$static_label" -gt 0 ]] ; then
-          echo "Only static tests should be running"
-          echo "Last commit message is: $last_commit_msg"
-          echo "Static label count: $static_label (all labels: $pr_labels)"
-          echo "skip=true" >> "$GITHUB_OUTPUT"
+          if [[ "$last_commit_msg" == *"[static]"* ]] || [[ "$static_label" -gt 0 ]]; then
+            echo "Only static tests should be running"
+            echo "Last commit message is: $last_commit_msg"
+            echo "Static label count: $static_label (all labels: $pr_labels)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Not static-test-only"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
         else
-          echo "Not static-test-only"
+          echo "Not a pull_request or pull_request_target event, not checking for static-test-only flag"
           echo "skip=false" >> "$GITHUB_OUTPUT"
         fi
