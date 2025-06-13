@@ -173,7 +173,7 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
     friendlyName: `${scanBigQuery.dataset} Dataset`,
     location: cloudsdkComputeRegion(),
     deleteContentsOnDestroy: true,
-    // TODO (#19806) reduce time travel window from 7-day default to 2 days if
+    // TODO (DACH-NY/canton-network-internal#343) reduce time travel window from 7-day default to 2 days if
     // it makes a cost difference
     labels: {
       cluster: CLUSTER_BASENAME,
@@ -181,11 +181,11 @@ function installBigqueryDataset(scanBigQuery: ScanBigQueryConfig): gcp.bigquery.
   });
 }
 
-/* TODO (#19812) remove this comment when enabled on all relevant clusters
+/* TODO (DACH-NY/canton-network-internal#341) remove this comment when enabled on all relevant clusters
 If you see an error like this
   gcp:datastream:ConnectionProfile (sv-4-scan-bq-cxn):
     error: 1 error occurred:
-    	* Error creating ConnectionProfile: googleapi: Error 403: Datastream API has not been used in project da-cn-scratchnet before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/datastream.googleapis.com/overview?project=da-cn-scratchnet then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+      * Error creating ConnectionProfile: googleapi: Error 403: Datastream API has not been used in project da-cn-scratchnet before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/datastream.googleapis.com/overview?project=da-cn-scratchnet then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
 
 or the same for
 
@@ -230,7 +230,7 @@ function installPostgresConnectionProfile(
 ): gcp.datastream.ConnectionProfile {
   const profileName = `${postgres.namespace.logicalName}-scan-update-history-cxn`;
 
-  // TODO (#19810) may have to await scan migration or pub/rep slots command
+  // TODO (#454) may have to await scan migration or pub/rep slots command
   return new gcp.datastream.ConnectionProfile(
     profileName,
     {
@@ -297,7 +297,7 @@ function installDatastreamToNatVmFirewallRule(
   });
 }
 
-// TODO (#19807) if we disable default egress rule, we need another firewall
+// TODO (DACH-NY/canton-network-internal#342) if we disable default egress rule, we need another firewall
 // rule for Nat VM -> Postgres
 
 function installReplicatorPassword(postgres: CloudPostgres): PostgresPassword {
