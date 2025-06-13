@@ -8,11 +8,13 @@ Community-Contributed Documentation
 
 .. warning::
 
-   This section contains community-contributed documentation that
-   hasn't been vetted or tested by the splice
-   maintainers so it may be incorrect or outdated.
+   This section features solutions shared by community members. 
+   While they haven’t been formally tested by the Splice maintainers, 
+   users are encouraged to verify the information independently. 
+   Contributions to enhance accuracy and completeness are always welcome.
 
 .. toctree::
 
    oidc-config-okta-keycloak.rst
+   docker-compose-helm-chart.rst
    
