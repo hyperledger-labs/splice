@@ -67,6 +67,9 @@ spec:
         - containerPort: 5213
           name: sw-api
           protocol: TCP
+        - containerPort: 10013
+          name: metrics-api
+          protocol: TCP
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
