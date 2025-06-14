@@ -5,8 +5,8 @@ persistence:
   databaseName: participant_MIGRATION_ID
   schema: participant
 auth:
-  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
-  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # replace OIDC_AUTHORITY_URL & OIDC_AUTHORITY_JWKS_SUB_URL with your provider's OIDC base URL and JWKS sub-URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS_SUB_URL
   # replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with the audience of your choice.
   targetAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
 enableHealthProbes: true
