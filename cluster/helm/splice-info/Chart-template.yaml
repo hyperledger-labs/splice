@@ -1,0 +1,6 @@
+apiVersion: v2
+name: splice-info
+version: VERSION_NUMBER
+appVersion: VERSION_NUMBER
+
+description: "A simple web server that serves JSON files with deployment and runtime information."
