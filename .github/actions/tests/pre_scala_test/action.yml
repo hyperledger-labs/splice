@@ -32,16 +32,15 @@ runs:
   using: "composite"
   steps:
     - name: Check if static only
+      uses: ./.github/actions/tests/skip_on_static
+      id: check
+
+    - name: Skip if static only
+      if: steps.check.outputs.skip == 'true'
       shell: bash
       run: |
-        last_commit_msg=$(git log -1 --pretty=%B)
-        echo "Last commit message: $last_commit_msg"
-        if [[ "${{ github.event_name }}" == "pull_request"* ]] && [[ "$last_commit_msg" == *"[static]"* ]]; then
-          echo "Only static tests should be running, skipping this job"
-          echo "skip=true" >> "$GITHUB_ENV"
-        else
-          echo "Not static-test-only, continuing"
-        fi
+        echo "Only static tests should be running, skipping this job"
+        echo "skip=true" >> "$GITHUB_ENV"
 
     - name: Check if skip regex matches
       if: ${{ inputs.skip_if_regex != '' }}
