@@ -86,6 +86,13 @@ class ScanAutomationService(
       triggerContext,
     )
   )
+  registerTrigger(
+    new DeleteCorruptAcsSnapshotTrigger(
+      snapshotStore,
+      store.updateHistory,
+      triggerContext,
+    )
+  )
   if (config.txLogBackfillEnabled) {
     registerTrigger(
       new TxLogBackfillingTrigger(

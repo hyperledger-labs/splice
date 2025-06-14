@@ -90,6 +90,9 @@ class ScanHistoryBackfillingTrigger(
     if (!store.updateHistory.isReady) {
       logger.debug("UpdateHistory is not yet ready")
       Future.successful(Seq.empty)
+    } else if (!store.updateHistory.corruptAcsSnapshotsDeleted) {
+      logger.debug("There may be corrupt ACS snapshots that need to be deleted")
+      Future.successful(Seq.empty)
     } else {
       store.updateHistory.getBackfillingState().map {
         case BackfillingState.Complete =>
