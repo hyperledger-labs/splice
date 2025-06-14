@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.wallet.treasury
 
-import com.daml.ledger.javaapi.data.codegen.Exercised
+import com.daml.ledger.javaapi.data.codegen.{Exercised, Update}
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRight
@@ -42,6 +42,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   SpliceLedgerConnection,
 }
 import SpliceLedgerConnection.CommandId
+import com.daml.ledger.api.v2.CommandsOuterClass
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.transferpreapproval.TransferPreapprovalProposal
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupConfig
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
@@ -83,11 +84,14 @@ import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationinstructionv1,
+  allocationv1,
   holdingv1,
   metadatav1,
   transferinstructionv1,
 }
 
+import java.time.Instant
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
@@ -135,12 +139,16 @@ class TreasuryService(
             } else 1L
           case _: EnqueuedTokenStandardTransferOperation =>
             BatchWithOneOperation
+          case _: EnqueuedAmuletAllocationOperation =>
+            BatchWithOneOperation
         },
         {
           case amuletOp: EnqueuedAmuletOperation =>
             AmuletOperationBatch(amuletOp)
           case tsOp: EnqueuedTokenStandardTransferOperation =>
             TokenStandardOperationBatch(tsOp)
+          case allOp: EnqueuedAmuletAllocationOperation =>
+            AmuletAllocationOperationBatch(allOp)
         },
       ) {
         case (batch: AmuletOperationBatch, operation: EnqueuedAmuletOperation) =>
@@ -159,6 +167,8 @@ class TreasuryService(
         case amuletBatch: AmuletOperationBatch => filterAndExecuteBatch(amuletBatch)
         case TokenStandardOperationBatch(operation) =>
           executeTokenStandardTransferOperation(operation)
+        case AmuletAllocationOperationBatch(operation) =>
+          executeAmuletAllocationOperation(operation)
       }
       .toMat(
         Sink.onComplete(result0 => {
@@ -239,6 +249,15 @@ class TreasuryService(
         dedup,
       )
     )
+  }
+
+  def enqueueAmuletAllocationOperation(
+      specification: allocationv1.AllocationSpecification,
+      requestedAt: Instant,
+      dedup: Option[AmuletOperationDedupConfig],
+  )(implicit tc: TraceContext): Future[allocationinstructionv1.AllocationInstructionResult] = {
+    val p = Promise[allocationinstructionv1.AllocationInstructionResult]()
+    enqueue(EnqueuedAmuletAllocationOperation(specification, requestedAt, p, tc, dedup))
   }
 
   private def enqueue(
@@ -503,68 +522,109 @@ class TreasuryService(
       operation: EnqueuedTokenStandardTransferOperation
   ): Future[Done] = {
     TraceContext.withNewTraceContext(implicit tc => {
-      val now = clock.now.toInstant
-      logger.debug(s"Executing token standard operation $operation")
-      val sender = userStore.key.endUserParty
-      val dso = userStore.key.dsoParty.toProtoPrimitive
-      (for {
-        amulets <- userStore.multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
-        lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
-          amuletCodegen.LockedAmulet.COMPANION
-        )
-        expiredLockedAmulets = lockedAmulets.filter(_.payload.lock.expiresAt.isBefore(now))
-        holdings = amulets ++ expiredLockedAmulets
-        choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
-          dso,
-          new transferinstructionv1.Transfer(
-            sender.toProtoPrimitive,
-            operation.receiverPartyId.toProtoPrimitive,
-            operation.amount.bigDecimal,
-            new holdingv1.InstrumentId(dso, "Amulet"),
-            now,
-            operation.expiresAt.toInstant,
-            holdings
-              .map(holding => new holdingv1.Holding.ContractId(holding.contractId.contractId))
-              .asJava,
-            new metadatav1.Metadata(
-              java.util.Map.of(TokenStandardMetadata.reasonMetaKey, operation.description)
+      withSpan("executeTokenStandardTransferOperation") { implicit tc => _ =>
+        val now = clock.now.toInstant
+        logger.debug(s"Executing token standard operation $operation")
+        val sender = userStore.key.endUserParty
+        val dso = userStore.key.dsoParty.toProtoPrimitive
+        exerciseTokenStandardChoice(operation) { holdings =>
+          val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
+            dso,
+            new transferinstructionv1.Transfer(
+              sender.toProtoPrimitive,
+              operation.receiverPartyId.toProtoPrimitive,
+              operation.amount.bigDecimal,
+              new holdingv1.InstrumentId(dso, "Amulet"),
+              now,
+              operation.expiresAt.toInstant,
+              holdings,
+              new metadatav1.Metadata(
+                java.util.Map.of(TokenStandardMetadata.reasonMetaKey, operation.description)
+              ),
             ),
-          ),
-          new metadatav1.ExtraArgs(
-            new metadatav1.ChoiceContext(java.util.Map.of()),
-            new metadatav1.Metadata(java.util.Map.of()),
-          ),
-        )
-        (factoryChoiceWithDisclosures, _) <- scanConnection.getTransferFactory(choiceArgs)
-        synchronizerId <- scanConnection.getAmuletRulesDomain()(tc)
-        baseSubmission = connection
-          .submit(
-            Seq(userStore.key.endUserParty),
-            Seq(userStore.key.endUserParty),
-            factoryChoiceWithDisclosures.factoryId
-              .exerciseTransferFactory_Transfer(factoryChoiceWithDisclosures.args),
-            CommandPriority.Low,
-            treasuryConfig.grpcDeadline,
+            emptyExtraArgs,
           )
-          .withSynchronizerId(
-            synchronizerId,
-            DisclosedContracts.fromProto(factoryChoiceWithDisclosures.disclosedContracts),
-          )
-        (offset, result) <- operation.dedup match {
-          case None => baseSubmission.noDedup.yieldResultAndOffset()
-          case Some(dedup) =>
-            baseSubmission.withDedup(dedup.commandId, dedup.config).yieldResultAndOffset()
+          scanConnection.getTransferFactory(choiceArgs).map { case (transferFactory, _) =>
+            transferFactory.factoryId
+              .exerciseTransferFactory_Transfer(
+                transferFactory.args
+              ) -> transferFactory.disclosedContracts
+          }
         }
-        _ <- userStore.signalWhenIngestedOrShutdown(offset)
-      } yield {
-        operation.outcomePromise.success(result.exerciseResult)
-        Done
-      }).recover { case ex =>
-        logger.info(s"Token standard operation failed.", ex)
-        operation.outcomePromise.failure(ex)
-        Done
       }
     })
+  }
+
+  private def executeAmuletAllocationOperation(operation: EnqueuedAmuletAllocationOperation) = {
+    TraceContext.withNewTraceContext(implicit tc => {
+      withSpan("executeAmuletAllocationOperation") { implicit tc => _ =>
+        logger.debug(s"Executing Amulet Allocation operation $operation")
+        exerciseTokenStandardChoice(operation) { holdings =>
+          val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
+            userStore.key.dsoParty.toProtoPrimitive,
+            operation.specification,
+            operation.requestedAt,
+            holdings,
+            emptyExtraArgs,
+          )
+          scanConnection.getAllocationFactory(choiceArgs).map { allocationFactory =>
+            allocationFactory.factoryId.exerciseAllocationFactory_Allocate(
+              allocationFactory.args
+            ) -> allocationFactory.disclosedContracts
+          }
+        }
+      }
+    })
+  }
+
+  private def exerciseTokenStandardChoice(operation: EnqueuedOperation)(
+      exerciseFromHoldings: java.util.List[holdingv1.Holding.ContractId] => Future[
+        (Update[Exercised[operation.Result]], Seq[CommandsOuterClass.DisclosedContract])
+      ]
+  )(implicit tc: TraceContext) = {
+    val now = clock.now.toInstant
+    (for {
+      holdings <- getHoldings(now)
+      (exercise, disclosedContracts) <- exerciseFromHoldings(holdings)
+      synchronizerId <- scanConnection.getAmuletRulesDomain()(tc)
+      baseSubmission = connection
+        .submit(
+          Seq(userStore.key.endUserParty),
+          Seq(userStore.key.endUserParty),
+          exercise,
+          CommandPriority.Low,
+          treasuryConfig.grpcDeadline,
+        )
+        .withSynchronizerId(
+          synchronizerId,
+          DisclosedContracts.fromProto(disclosedContracts),
+        )
+      (offset, result) <- operation.dedup match {
+        case None => baseSubmission.noDedup.yieldResultAndOffset()
+        case Some(dedup) =>
+          baseSubmission.withDedup(dedup.commandId, dedup.config).yieldResultAndOffset()
+      }
+      _ <- userStore.signalWhenIngestedOrShutdown(offset)
+    } yield {
+      operation.outcomePromise.success(result.exerciseResult)
+      Done
+    }).recover { case ex =>
+      logger.info(s"Token standard operation failed.", ex)
+      operation.outcomePromise.failure(ex)
+      Done
+    }
+  }
+
+  private def getHoldings(now: Instant)(implicit tc: TraceContext) = {
+    for {
+      amulets <- userStore.multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
+      lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
+        amuletCodegen.LockedAmulet.COMPANION
+      )
+      expiredLockedAmulets = lockedAmulets.filter(_.payload.lock.expiresAt.isBefore(now))
+    } yield (amulets ++ expiredLockedAmulets)
+      .map(holding => new holdingv1.Holding.ContractId(holding.contractId.contractId))
+      .asJava
   }
 
   private def waitForAmuletBatchIngestion(
@@ -1074,9 +1134,19 @@ object TreasuryService {
     )
   }
 
+  // Only one item per batch supported
+  private case class AmuletAllocationOperationBatch(operation: EnqueuedAmuletAllocationOperation)
+      extends OperationBatch
+      with PrettyPrinting {
+    override def pretty: Pretty[AmuletAllocationOperationBatch.this.type] = prettyOfClass(
+      param("operation", _.operation)
+    )
+  }
+
   private sealed trait EnqueuedOperation extends PrettyPrinting {
     type Result
     val outcomePromise: Promise[Result]
+    val dedup: Option[AmuletOperationDedupConfig]
   }
 
   private case class EnqueuedTokenStandardTransferOperation(
@@ -1098,6 +1168,22 @@ object TreasuryService {
         param("amount", _.amount),
         param("expiresAt", _.expiresAt),
         param("dedup", _.dedup),
+      )
+  }
+
+  private case class EnqueuedAmuletAllocationOperation(
+      specification: allocationv1.AllocationSpecification,
+      requestedAt: Instant,
+      outcomePromise: Promise[allocationinstructionv1.AllocationInstructionResult],
+      submittedFrom: TraceContext,
+      dedup: Option[AmuletOperationDedupConfig],
+  ) extends EnqueuedOperation {
+    override type Result = allocationinstructionv1.AllocationInstructionResult
+
+    override def pretty: Pretty[EnqueuedAmuletAllocationOperation.this.type] =
+      prettyNode(
+        "AmuletAllocationOperation",
+        param("specification", _.specification),
       )
   }
 
@@ -1140,4 +1226,9 @@ object TreasuryService {
     override def pretty: Pretty[AmuletOperationDedupConfig.this.type] =
       prettyNode("DedupConfig", param("commandId", _.commandId), param("config", _.config))
   }
+
+  val emptyExtraArgs = new metadatav1.ExtraArgs(
+    new metadatav1.ChoiceContext(java.util.Map.of()),
+    new metadatav1.Metadata(java.util.Map.of()),
+  )
 }

@@ -41,9 +41,15 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationv1,
+  transferinstructionv1,
+}
 
+import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 object HttpWalletAppClient {
 
@@ -1176,6 +1182,50 @@ object HttpWalletAppClient {
         String,
         definitions.TransferInstructionResultResponse,
       ]] = { case http.WithdrawTokenStandardTransferResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
+    final case class AllocateAmulet(spec: allocationv1.AllocationSpecification)
+        extends InternalBaseCommand[
+          http.AllocateAmuletResponse,
+          definitions.AllocateAmuletResponse,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.AllocateAmuletResponse] =
+        client.allocateAmulet(
+          definitions.AllocateAmuletRequest(
+            definitions.AllocateAmuletRequest.Settlement(
+              spec.settlement.executor,
+              definitions.AllocateAmuletRequest.Settlement.SettlementRef(
+                spec.settlement.settlementRef.id,
+                spec.settlement.settlementRef.cid.map(_.contractId).toScala,
+              ),
+              spec.settlement.allocateBefore.atOffset(ZoneOffset.UTC),
+              spec.settlement.settleBefore.atOffset(ZoneOffset.UTC),
+              Some(spec.settlement.meta.values.asScala.toMap),
+            ),
+            spec.transferLegId,
+            definitions.AllocateAmuletRequest.TransferLeg(
+              spec.transferLeg.receiver,
+              spec.transferLeg.amount.toString,
+              Some(spec.transferLeg.meta.values.asScala.toMap),
+            ),
+          ),
+          headers = headers,
+        )
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.AllocateAmuletResponse, Either[
+        String,
+        definitions.AllocateAmuletResponse,
+      ]] = { case http.AllocateAmuletResponse.OK(value) =>
         Right(value)
       }
     }
