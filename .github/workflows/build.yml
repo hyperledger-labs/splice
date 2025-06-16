@@ -35,7 +35,9 @@ jobs:
 
   cancel_if_not_opt_in:
     runs-on: self-hosted-docker-tiny
-    if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+    # Note that we don't auto-cancel on merged commits (e.g. in a post-merge workflow), and on
+    # pull_request_target events (which indicate that we are running from a fork).
+    if: github.event_name == 'pull_request'
     name: Cancel if not opted in
     permissions:
       actions: write
@@ -43,13 +45,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          # Checkout the PR head commit to get the commit message first
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Check if static only
+        uses: ./.github/actions/tests/skip_on_static
+        id: static_only
       - name: Cancel if not opted in
         shell: bash
         run: |
-          git fetch origin ${{ github.event.pull_request.head.sha }}
-          last_commit_msg=$(git log -1 --pretty=%B ${{ github.event.pull_request.head.sha }})
+          last_commit_msg=$(git log -1 --pretty=%B)
           echo "Last commit message: $last_commit_msg"
-          if [[ $last_commit_msg != *"[ci]"* ]] && [[ "$last_commit_msg" != *"[static]"* ]] ; then
+          if [[ $last_commit_msg != *"[ci]"* ]] && [[ "${{ steps.static_only.outputs.skip }}" == "false" ]] ; then
             echo "Cancelling the entire workflow because the current commit does not opt in for CI."
             curl -fsSL -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/cancel"
           else
@@ -275,7 +282,6 @@ jobs:
   final_result:
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
     needs:
-    - cancel_if_not_opt_in
     - static_tests
     - deployment_test
     - daml_test
@@ -301,6 +307,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check if static only
+        uses: ./.github/actions/tests/skip_on_static
+        id: static_only
       - name: Handle [force] and [static] labels
         shell: bash
         run: |
@@ -310,12 +319,12 @@ jobs:
           if [[ $last_commit_msg == *"[force]"* ]]; then
             echo "Skipping the check for job success because the current commit opts in for a forced run."
             echo "FORCE=true" >> "$GITHUB_ENV"
-          elif [[ "$last_commit_msg" == *"[static]"* ]]; then
+          elif [[ "${{ steps.static_only.outputs.skip }}" == "true" ]]; then
             echo "Only static tests are required"
             # shellcheck disable=SC2129
             echo "FORCE=false" >> "$GITHUB_ENV"
             echo "JOBS<<EOF" >> "$GITHUB_ENV"
-            echo '${{ toJSON(needs) }}' | jq '{"cancel_if_not_opt_in", "docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
+            echo '${{ toJSON(needs) }}' | jq '{"docs", "static_tests", "deployment_test"}' >> "$GITHUB_ENV"
             echo "EOF" >> "$GITHUB_ENV"
           else
             echo "Checking if all jobs succeeded."

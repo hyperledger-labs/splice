@@ -11,6 +11,7 @@ import {
 import BigNumber from 'bignumber.js';
 import React, { useContext, useMemo } from 'react';
 import {
+  AllocateAmuletRequest,
   createConfiguration,
   ListTransactionsRequest,
   Middleware,
@@ -95,6 +96,8 @@ export interface WalletClient {
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   rejectTokenStandardTransfer: (transferContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
+
+  createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
 
   getAppPaymentRequest: (contractId: string) => Promise<ContractWithState<AppPaymentRequest>>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
@@ -312,6 +315,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             Contract.decodeOpenAPI(c, AcceptedTransferOffer)
           ),
         };
+      },
+      createAllocation: async allocateAmuletRequest => {
+        await walletClient.allocateAmulet(allocateAmuletRequest);
       },
       getAppPaymentRequest: async contractId => {
         const response = await walletClient.getAppPaymentRequest(contractId);
