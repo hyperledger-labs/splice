@@ -27,6 +27,7 @@ export const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
           navLinks={[
             { name: 'Transactions', path: 'transactions' },
             { name: 'Transfer', path: 'transfer' },
+            { name: 'Allocations', path: 'allocations' },
             { name: 'Subscriptions', path: 'subscriptions' },
             { name: 'FAQs', path: 'faqs' },
           ]}

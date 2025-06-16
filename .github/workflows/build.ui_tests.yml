@@ -4,8 +4,7 @@ on:
     inputs:
       commit_sha:
         type: string
-        required: false
-        default: ""
+        required: true
 
 jobs:
   ui_tests:
@@ -21,18 +20,9 @@ jobs:
           # Checkout the PR head commit to get the commit message first
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Skip on [static]
+      - name: Check if static only
+        uses: ./.github/actions/tests/skip_on_static
         id: skip
-        shell: bash
-        run: |
-          last_commit_msg=$(git log -1 --pretty=%B)
-          echo "Last commit message: $last_commit_msg"
-          if [[ "${{ github.event_name }}" == "pull_request" ]] || [[ "${{ github.event_name }}" == "pull_request_target" ]]; then
-            if [[ "$last_commit_msg" == *"[static]"* ]];  then
-              echo "Skipping UI tests because of [static] label"
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-            fi
-          fi
 
       - name: Check out repository code
         uses: actions/checkout@v4

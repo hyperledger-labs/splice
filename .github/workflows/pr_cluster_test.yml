@@ -5,7 +5,7 @@ on:
 permissions:
   contents: read
   issues: read
-  pull-requests: read
+  pull-requests: write # To comment back on the PR
   id-token: write
 
 jobs:
@@ -40,9 +40,22 @@ jobs:
       - trigger_cluster_test_basic
       - get_head
     steps:
-      - run: |
+      - name: parse the result
+        id: parse
+        run: |
           number=$(echo '${{ needs.trigger_cluster_test_basic.outputs.result }}' | jq -r '.number')
           echo "Deploy scratchnet pipeline triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Comment on the PR
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script : |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: "Deploy cluster test triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please contact a Contributor to approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${{ steps.parse.outputs.number }}"
+            });
 
 
   trigger_cluster_test_hdm:
@@ -60,6 +73,19 @@ jobs:
       - trigger_cluster_test_hdm
       - get_head
     steps:
-      - run: |
+      - name: parse the result
+        id: parse
+        run: |
           number=$(echo '${{ needs.trigger_cluster_test_hdm.outputs.result }}' | jq -r '.number')
           echo "Deploy scratchnet HDM pipeline triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${number}"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+      - name: Comment on the PR
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script : |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: "Deploy HDM pipeline triggered for [Commit ${{ needs.get_head.outputs.sha }} in ${{ needs.get_head.outputs.repo }}](https://github.com/${{ github.repository }}/pull/${{ github.event.issue.number }}/files/${{ needs.get_head.outputs.sha }}), please contact a Contributor to approve it in CircleCI: https://app.circleci.com/pipelines/github/DACH-NY/canton-network-internal/${{ steps.parse.outputs.number }}"
+            });
