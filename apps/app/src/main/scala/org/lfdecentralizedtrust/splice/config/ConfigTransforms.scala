@@ -139,6 +139,15 @@ object ConfigTransforms {
     updateAllAutomationConfigs(setPollingIntervalInternal)(config)
   }
 
+  def reduceTriggerParallelism(parallelism: Int): ConfigTransform = { config =>
+    def setParallelism(config: AutomationConfig): AutomationConfig =
+      config
+        .focus(_.parallelism)
+        .replace(parallelism)
+
+    updateAllAutomationConfigs(setParallelism)(config)
+  }
+
   def updateAutomationConfig(
       app: ConfigurableApp
   )(transform: AutomationConfigTransform): ConfigTransform = {

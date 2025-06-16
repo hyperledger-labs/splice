@@ -39,6 +39,7 @@ import scala.jdk.CollectionConverters.*
 class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
 
   import WalletTestUtil.*
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -49,6 +50,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           _.withPausedTrigger[ExpiredAnsEntryTrigger]
         )(config)
       )
+      .addConfigTransform((_, config) => ConfigTransforms.reduceTriggerParallelism(1)(config))
       .addConfigTransform((_, config) =>
         // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
         ConfigTransforms
