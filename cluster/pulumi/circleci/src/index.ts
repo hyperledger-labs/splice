@@ -78,7 +78,7 @@ const persistentVolumeClaim = new k8s.core.v1.PersistentVolumeClaim(cachePvc, {
 new k8s.helm.v3.Release('container-agent', {
   name: 'container-agent',
   chart: 'container-agent',
-  version: '101.1.1',
+  version: '101.1.3',
   namespace: circleCiNamespace.metadata.name,
   repositoryOpts: {
     repo: 'https://packagecloud.io/circleci/container-agent/helm',

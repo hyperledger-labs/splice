@@ -28,7 +28,7 @@ class WalletPaymentFrontendIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withAmuletPrice(amuletPrice)
-      // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
+      // TODO(#979) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
   "A wallet payments UI" should {
@@ -558,7 +558,7 @@ class WalletPaymentFrontendIntegrationTest
       expectedProvider
     )
 
-    // TODO (#3492): test with fee
+    // TODO (#878): test with fee
     element.childElement(className("payment-total-amulet")).text should matchTextMixedWithNumbers(
       raw"([0-9.,]+) $amuletNameAcronym".r,
       Seq(expectedTotalCC),

@@ -106,7 +106,7 @@ function findAmuletRulesScheduleItemToCompareAgainst(
   if (isExecutedOrRejected) {
     if (!latestAddAction) {
       if (!latestUpdateAction) {
-        //TODO(#14813): Store a copy of the initial DsoRules and AmuletRules to diff against initial configs
+        //TODO(#934): Store a copy of the initial DsoRules and AmuletRules to diff against initial configs
         return ['initial', defaultConfig];
       } else {
         return parseAmuletRulesAction(latestUpdateAction);
@@ -253,7 +253,7 @@ export const ActionView: React.FC<{
           </>
         );
       }
-      // TODO(#15151): implement diffs for UpdateSvRewardWeight
+      // TODO(#712): implement diffs for UpdateSvRewardWeight
       case 'SRARC_UpdateSvRewardWeight': {
         return (
           <>
@@ -481,7 +481,7 @@ const AddFutureConfigValueTable: React.FC<{
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        // TODO(#904): Fix inflight requests diffs or completely remove them
         children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
@@ -501,7 +501,7 @@ const AddFutureConfigValueTable: React.FC<{
         }}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          // TODO(#904): Fix inflight requests diffs or completely remove them
           foldedAccordions: [],
         }}
       />
@@ -554,7 +554,7 @@ const RemoveFutureConfigValueTable: React.FC<{
       )
     : undefined;
 
-  // TODO(#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
+  // TODO(DACH-NY/canton-network-node#15154): Implement config diffs of CRARC_RemoveFutureAmuletConfigSchedule action
   return (
     <>
       {amuletConfigToCompareWith && (
@@ -684,7 +684,7 @@ const UpdateFutureConfigValueTable: React.FC<{
                 },
               ]
             : [],
-          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          // TODO(#904): Fix inflight requests diffs or completely remove them
           foldedAccordions: [],
         }}
       />
@@ -785,7 +785,7 @@ const SetAmuletConfigValueTable: React.FC<{
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        // TODO(#904): Fix inflight requests diffs or completely remove them
         children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
@@ -797,7 +797,7 @@ const SetAmuletConfigValueTable: React.FC<{
         actionName={amuletAction.tag}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          // TODO(#904): Fix inflight requests diffs or completely remove them
           foldedAccordions: [],
         }}
       />
@@ -897,7 +897,7 @@ const SetDsoConfigValueTable: React.FC<{
   const confirmationDialogPropsWithDiffs = confirmationDialogProps
     ? {
         ...confirmationDialogProps,
-        // TODO(#18846): Fix inflight requests diffs or completely remove them
+        // TODO(#904): Fix inflight requests diffs or completely remove them
         children: <AccordionList unfoldedAccordions={unfoldedAccordions} foldedAccordions={[]} />,
       }
     : undefined;
@@ -909,7 +909,7 @@ const SetDsoConfigValueTable: React.FC<{
         actionName={dsoAction.tag}
         accordionList={{
           unfoldedAccordions: unfoldedAccordions,
-          // TODO(#18846): Fix inflight requests diffs or completely remove them
+          // TODO(#904): Fix inflight requests diffs or completely remove them
           foldedAccordions: [],
         }}
       />

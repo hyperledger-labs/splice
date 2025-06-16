@@ -15,7 +15,7 @@ to gain access to test infrastructure for:
 Note that a **copy of the source code is required**, as at the time of writing
 Daml Script code cannot be shared across SDK's in compiled form.
 
-.. TODO(#18169): remove this limitation, and the note about this limitation
+.. TODO(#594): remove this limitation, and the note about this limitation
 
 See the module docs below for an overview of the functionality provided by this package.
 

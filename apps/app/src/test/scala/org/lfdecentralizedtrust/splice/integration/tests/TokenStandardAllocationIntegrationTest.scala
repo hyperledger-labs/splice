@@ -38,6 +38,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationr
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardAllocationIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -89,7 +90,7 @@ class TokenStandardAllocationIntegrationTest
       bob: PartyId,
   ): tradingapp.OTCTradeProposal = {
     val aliceLeg = mkTransferLeg(dso, alice, bob, aliceTransferAmount)
-    // TODO(#18559): swap against a token from the token reference implementation
+    // TODO(#561): swap against a token from the token reference implementation
     val bobLeg = mkTransferLeg(dso, bob, alice, bobTransferAmount)
     new tradingapp.OTCTradeProposal(
       venue.toProtoPrimitive,
@@ -443,7 +444,7 @@ class TokenStandardAllocationIntegrationTest
   }
 
   private def setupAllocatedOtcTrade()(implicit env: SpliceTestConsoleEnvironment) = {
-    // TODO(#18561): use external parties for all of them
+    // TODO(DACH-NY/canton-network-node#18561): use external parties for all of them
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
     // Allocate venue on separate participant node, we still go through the validator API instead of parties.enable

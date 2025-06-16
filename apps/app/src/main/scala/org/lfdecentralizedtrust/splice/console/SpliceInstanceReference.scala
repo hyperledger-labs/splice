@@ -64,7 +64,7 @@ trait AppReference extends InstanceReference {
 
   override type Status = SpliceStatus
 
-  // TODO(#736): remove/cleanup all the uninteresting console commands copied from Canton.
+  // TODO(DACH-NY/canton-network-node#736): remove/cleanup all the uninteresting console commands copied from Canton.
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   // Doesn't make sense for splice
@@ -102,7 +102,7 @@ trait HttpAppReference extends AppReference with HttpCommandRunner {
 
   def basePath: String
 
-  // TODO (#4606): Refactor so that these two methods don't need to be implemented
+  // TODO (DACH-NY/canton-network-node#4606): Refactor so that these two methods don't need to be implemented
   override def keys: KeyAdministrationGroup = noGrpcError()
 
   override def adminCommand[Result](
@@ -245,7 +245,7 @@ class ParticipantClientReference(
     override val config: RemoteParticipantConfig,
 ) extends RemoteParticipantReference(consoleEnvironment, name) {
 
-  // TODO(#5141) Consider removing this once Canton no longer explodes
+  // TODO(DACH-NY/canton-network-node#5141) Consider removing this once Canton no longer explodes
   // when uploading the same DAR twice.
   def upload_dar_unless_exists(
       path: String

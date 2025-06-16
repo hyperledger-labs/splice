@@ -40,11 +40,12 @@ import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.config.{AuthTokenSourceConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResources,
   RetryProvider,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
@@ -418,7 +419,7 @@ object SpliceTests extends LazyLogging {
       value should beWithin(range._1, range._2)
 
     // Upper bound for fees in any of the above transfers
-    // TODO(#10898): Figure out something better for upper bounds of fees
+    // TODO(#806): Figure out something better for upper bounds of fees
     val smallAmount: BigDecimal = BigDecimal(1.0)
     def beWithin(lower: BigDecimal, upper: BigDecimal): Matcher[BigDecimal] =
       be >= lower and be <= upper
@@ -571,6 +572,9 @@ object SpliceTests extends LazyLogging {
           Http().shutdownAllConnectionPools().map(_ => Done)
       }
     }
+
+    protected def splitwellDarPath =
+      s"daml/dars/splitwell-${InitialPackageVersions.initialPackageVersion(DarResources.splitwell)}.dar"
   }
 
   object BracketSynchronous {

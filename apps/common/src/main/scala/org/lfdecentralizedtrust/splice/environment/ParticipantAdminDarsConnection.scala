@@ -236,7 +236,7 @@ trait ParticipantAdminDarsConnection {
           logger.warn(
             s"Vetted state contains multiple entries on domain $domain for $participantId: $other. Will use the last entry"
           )
-          // TODO(#18175) - remove once canton can handle this and fixed the issue
+          // TODO(DACH-NY/canton-network-node#18175) - remove once canton can handle this and fixed the issue
           other.maxBy(_.base.serial)
       }
     }

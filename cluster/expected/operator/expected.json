@@ -602,12 +602,12 @@
         "maxHistory": 10,
         "resources": {
           "limits": {
-            "cpu": 2,
-            "memory": "4G"
-          },
-          "requests": {
             "cpu": 1,
             "memory": "2G"
+          },
+          "requests": {
+            "cpu": 0.2,
+            "memory": "1G"
           }
         },
         "serviceMonitor": {

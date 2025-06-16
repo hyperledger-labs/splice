@@ -241,7 +241,7 @@ class DbUserWalletStore(
   )(implicit
       lc: TraceContext
   ): Future[Seq[store.TxLogEntry.TransactionHistoryTxLogEntry]] = {
-    // TODO (#11200): don't use the event id for pagination, use the entry number
+    // TODO (#960): don't use the event id for pagination, use the entry number
     waitUntilAcsIngested {
       for {
         rows <- storage

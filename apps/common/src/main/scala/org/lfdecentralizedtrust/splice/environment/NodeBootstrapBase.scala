@@ -33,7 +33,9 @@ object NodeBootstrap {
 /** Modelled after CantonNodeBootstrap
   */
 trait NodeBootstrap[+N <: CantonNode]
-    extends CantonNodeBootstrap[N] // TODO(#736): remove the dependency on this trait.
+    extends CantonNodeBootstrap[
+      N
+    ] // TODO(DACH-NY/canton-network-node#736): remove the dependency on this trait.
     {
 
   def name: InstanceName
@@ -49,7 +51,7 @@ trait NodeBootstrap[+N <: CantonNode]
 
   def getNode: Option[N]
 
-  // TODO(#736): following methods are only here because of the CantonNodeBootstrap trait
+  // TODO(DACH-NY/canton-network-node#736): following methods are only here because of the CantonNodeBootstrap trait
   def crypto: Option[Crypto] = ???
 
 }
@@ -143,7 +145,7 @@ abstract class NodeBootstrapBase[
   def getNode: Option[T] = ref.get()
   def isInitialized: Boolean = ref.get().isDefined
 
-  // TODO(#736): obviously we don't need this. however, removing this likely requires a Canton upstream change.
+  // TODO(DACH-NY/canton-network-node#736): obviously we don't need this. however, removing this likely requires a Canton upstream change.
   // This absolutely must be a "def", because it is used during class initialization.
   protected def connectionPoolForParticipant: Boolean = false
 

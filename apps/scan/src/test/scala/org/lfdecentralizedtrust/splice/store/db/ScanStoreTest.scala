@@ -1989,7 +1989,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     // the validator faucet amount is already included in the `inputValidatorRewardAmount`,
     // We'll set this here once we add support for showing faucet coupon rewards separately
     // from the usage-based validator rewards.
-    // TODO(#9824): track faucet coupon inputs separately
+    // TODO(#968): track faucet coupon inputs separately
     java.util.Optional.empty(),
   )
 
@@ -2049,7 +2049,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       mkTransferSummary(
         inputAppRewardAmount,
         inputValidatorRewardAmount,
-        // TODO (#9173): also test for sv rewards once the scan store supports them
+        // TODO (DACH-NY/canton-network-node#9173): also test for sv rewards once the scan store supports them
         0.0,
         inputAmuletAmount,
         balanceChanges,

@@ -82,6 +82,7 @@ in pkgs.mkShell {
     python3Packages.regex
     python3Packages.requests
     python3Packages.requests_toolbelt
+    python3Packages.semver
     python3Packages.sphinx_rtd_theme
     python3Packages.sphinx-copybutton
     python3Packages.sphinxcontrib-openapi

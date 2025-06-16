@@ -51,8 +51,8 @@ class ScanTimeBasedIntegrationTest
   }
 
   "return correct amulet configs" in { implicit env =>
-    // TODO(#2930) test also with changing amulet prices.
-    // TODO(#2930) Currently we are not guaranteed that the first three rounds are correctly
+    // TODO(DACH-NY/canton-network-node#2930) test also with changing amulet prices.
+    // TODO(DACH-NY/canton-network-node#2930) Currently we are not guaranteed that the first three rounds are correctly
     // captured in the tx log, so for now we first advance a round, and query only on that
     // round and beyond. Once that is fixed, we should make sure that querying for round 0 is reliable as well.
 
@@ -224,7 +224,7 @@ class ScanTimeBasedIntegrationTest
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
 
-        // TODO(#10941): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
+        // TODO(#805): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
         val appRewardsBobR3 = BigDecimal(4.2000000000)
         val appRewardsAliceR3 = BigDecimal(3.8400000000)
         val validatorRewardsBobR3 = BigDecimal(1.4000000000)
@@ -286,7 +286,7 @@ class ScanTimeBasedIntegrationTest
           compareLeaderboard(
             sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
             Seq(
-              // TODO(#10941): consider de-hard-coding the expected values here
+              // TODO(#805): consider de-hard-coding the expected values here
               (bobValidatorWalletClient, BigDecimal(8.4060000000)),
               (aliceValidatorWalletClient, BigDecimal(7.6860000000)),
             ),
@@ -296,7 +296,7 @@ class ScanTimeBasedIntegrationTest
           compareLeaderboard(
             sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
             Seq(
-              // TODO(#10941): consider de-hard-coding the expected values here
+              // TODO(#805): consider de-hard-coding the expected values here
               (bobValidatorWalletClient, BigDecimal(2.8020000000)),
               (aliceValidatorWalletClient, BigDecimal(2.5620000000)),
             ),

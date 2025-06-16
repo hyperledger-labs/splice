@@ -50,7 +50,7 @@ class LocalSequencerConnectionsTrigger(
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
       rulesAndState <- store.getDsoRulesWithSvNodeState(svParty)
-      // TODO(#4906): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
+      // TODO(#998): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
       synchronizerId <- participantAdminConnection.getSynchronizerId(decentralizedSynchronizerAlias)
       domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
         synchronizerId,

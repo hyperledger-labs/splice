@@ -26,7 +26,7 @@ export const ValidatorLeaderboardTable: React.FC = () => {
     case 'success': {
       const topValidators = topValidatorsQuery.data.validatorsAndRewards.map(validator => ({
         name: validator.provider,
-        // TODO(#5280) - add transfer totals to API response
+        // TODO(DACH-NY/canton-network-node#5280) - add transfer totals to API response
         totalRewards: BigNumber(validator.rewards),
       }));
 

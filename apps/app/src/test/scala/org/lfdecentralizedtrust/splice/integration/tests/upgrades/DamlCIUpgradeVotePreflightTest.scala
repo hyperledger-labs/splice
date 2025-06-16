@@ -28,6 +28,8 @@ class DamlCIUpgradeVotePreflightTest
 
   override lazy val resetRequiredTopologyState: Boolean = false
 
+  override protected def runTokenStandardCliSanityCheck: Boolean = false
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
@@ -50,6 +52,8 @@ class DamlCIUpgradeVotePreflightTest
           click on "navlink-votes"
           val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
           dropDownAction.selectByValue("CRARC_SetConfig")
+
+          click on "action-change-dialog-proceed"
 
           // 20m to be effective so as to give enough time to upgrade the SV and Validator runbooks.
           // The expiration doesn't matter so as long as it's enough for SVs to vote, but it needs to be less than the effective date.

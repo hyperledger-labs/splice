@@ -38,7 +38,7 @@ sealed abstract class DisclosedContracts {
 
   /** Overwrite the domain id with the domain id of the disclosed contracts as those cannot be reassigned.
     */
-  // TODO(#13713) Remove this once our domain selection logic works properly with soft domain migrations
+  // TODO(DACH-NY/canton-network-node#13713) Remove this once our domain selection logic works properly with soft domain migrations
   private[splice] def overwriteDomain(target: SynchronizerId): SynchronizerId
 
   /** Throw if any contracts with known state are not assigned to `synchronizerId`.
@@ -48,7 +48,7 @@ sealed abstract class DisclosedContracts {
     this match {
       case Empty | NE(_, `synchronizerId`) => this
       case NE(contracts, otherSynchronizerId) =>
-        // TODO (#8135) invalidate contracts
+        // TODO (#980) invalidate contracts
         retryableError(
           s"disclosed contracts are not on expected domain $synchronizerId, but on $otherSynchronizerId: $contracts"
         )
@@ -144,7 +144,7 @@ object DisclosedContracts {
       }
       if (inOtherStates.isEmpty)
         NE(contracts ++ other.map(_.contract.toDisclosedContract), assignedDomain)
-      else // TODO (#8135) invalidate contracts and other
+      else // TODO (#980) invalidate contracts and other
         retryableError(
           show"contracts must match the domain of other disclosed contracts, $assignedDomain, to be disclosed: $other"
         )
