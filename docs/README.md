@@ -23,3 +23,9 @@ or other changes that are not picked up by `sphinx-autobuild`.
 ### Changes
 
 When making a change, rebuild the documentation using `sbt docs/bundle`.
+
+## Install requirements
+
+```bash
+./install-docs-requirements.sh
+```
