@@ -337,11 +337,25 @@ function databaseCommandBracket(postgres: CloudPostgres) {
         TMP_SQL_FILE="$(mktemp tmp_pub_rep_slots_XXXXXXXXXX.sql --tmpdir)"
         GCS_URI="gs://$TMP_BUCKET/$(basename "$TMP_SQL_FILE")"
 
+        if [ -s "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+          echo "Using $GOOGLE_APPLICATION_CREDENTIALS for authentication"
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+        elif [ -n "$GOOGLE_CREDENTIALS" ]; then
+          echo "Using GOOGLE_CREDENTIALS for authentication"
+          echo "$GOOGLE_CREDENTIALS" | gcloud auth activate-service-account --key-file=-
+        else
+          echo 'No GCP credentials found, using default'
+        fi
+        echo 'Current gcloud login:'
+        gcloud auth list --format=config
+
         # create temporary bucket
+        echo "Creating temporary bucket $TMP_BUCKET"
         gsutil mb --pap enforced -p "${privateNetwork.project}" \
             -l "${cloudsdkComputeRegion()}" "gs://$TMP_BUCKET"
 
         # grant DB service account access to the bucket
+        echo "Granting CloudSQL DB access to $TMP_BUCKET"
         gsutil iam ch "serviceAccount:${postgres.databaseInstance.serviceAccountEmailAddress}:roles/storage.objectAdmin" \
             "gs://$TMP_BUCKET"
 
@@ -350,16 +364,16 @@ function databaseCommandBracket(postgres: CloudPostgres) {
     footer: pulumi.interpolate`
 EOT
 
-        # upload SQL to temporary bucket
+        echo 'Uploading SQL to temporary bucket'
         gsutil cp "$TMP_SQL_FILE" "$GCS_URI"
 
-        # then import into Cloud SQL
+        echo 'Importing into CloudSQL'
         gcloud sql import sql ${postgres.databaseInstance.name} "$GCS_URI" \
           --database="${scanAppDatabaseName(postgres)}" \
           --user="${postgres.user.name}" \
           --quiet
 
-        # cleanup: remove the file from GCS, delete the bucket, remove the local file
+        echo 'Cleaning up temporary GCS object and bucket'
         gsutil rm "$GCS_URI"
         gsutil rb "gs://$TMP_BUCKET"
         rm "$TMP_SQL_FILE"
