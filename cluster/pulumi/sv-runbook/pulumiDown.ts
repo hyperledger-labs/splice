@@ -13,7 +13,7 @@ async function runRunbookDown() {
   operations.push(downOperation(svRunbookStack, abortController));
   const cantonStacks = runSvCantonForSvs(
     ['sv'],
-    'up',
+    'down',
     stack => {
       return downStack(stack, abortController);
     },
