@@ -106,54 +106,54 @@ with open(SPLICE_ROOT + "/daml.yaml") as f:
     obj = yaml.safe_load(f)
     daml_sdk_version = obj["sdk-version"]
 
-with open(os.path.join(os.getenv("CANTON"), "SUBDIR")) as f:
-    canton_subdir = f.readline()
+# with open(os.path.join(os.getenv("CANTON"), "SUBDIR")) as f:
+#     canton_subdir = f.readline()
 
-version = os.getenv("VERSION")
-if not version:
-    print("Environment variable VERSION must be set")
-    sys.exit(1)
-chart_version = version
+# version = os.getenv("VERSION")
+# if not version:
+#     print("Environment variable VERSION must be set")
+#     sys.exit(1)
+# chart_version = version
 
-if re.match(r"^[0-9]+.[0-9]+.[0-9]+$", version):
-    # For releases, we download artifacts from GitHub Releases
-    download_url = f"https://github.com/digital-asset/decentralized-canton-sync/releases/download/v{version}"
-    helm_repo_prefix = os.getenv("OCI_RELEASE_HELM_REGISTRY")
-    docker_repo_prefix = os.getenv("RELEASE_DOCKER_REGISTRY")
-else:
-    # For snapshots, we download artifacts through the gcs proxy on the cluster
-    download_url = "/cn-release-bundles"
-    helm_repo_prefix = os.getenv("OCI_DEV_HELM_REGISTRY")
-    docker_repo_prefix = os.getenv("DEV_DOCKER_REGISTRY")
+# if re.match(r"^[0-9]+.[0-9]+.[0-9]+$", version):
+#     # For releases, we download artifacts from GitHub Releases
+#     download_url = f"https://github.com/digital-asset/decentralized-canton-sync/releases/download/v{version}"
+#     helm_repo_prefix = os.getenv("OCI_RELEASE_HELM_REGISTRY")
+#     docker_repo_prefix = os.getenv("RELEASE_DOCKER_REGISTRY")
+# else:
+#     # For snapshots, we download artifacts through the gcs proxy on the cluster
+#     download_url = "/cn-release-bundles"
+#     helm_repo_prefix = os.getenv("OCI_DEV_HELM_REGISTRY")
+#     docker_repo_prefix = os.getenv("DEV_DOCKER_REGISTRY")
 
 # Sphinx does not allow something like ``|version|``
 # so instead we define a replacement that includes the formatting.
-rst_prolog = f"""
-.. role:: raw-html(raw)
-   :format: html
+# rst_prolog = f"""
+# .. role:: raw-html(raw)
+#    :format: html
 
-.. |splice_cluster| replace:: :raw-html:`<span class="splice-cluster">unknown_cluster</span>`
+# .. |splice_cluster| replace:: :raw-html:`<span class="splice-cluster">unknown_cluster</span>`
 
-.. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.digitalasset.com`
-.. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
-.. |generic_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
-.. |gsf_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
-.. |generic_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
-.. |gsf_sequencer_url| replace:: :raw-html:`https://sequencer-MIGRATION_ID.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+# .. |da_hostname| replace:: :raw-html:`<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.digitalasset.com`
+# .. |gsf_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+# .. |generic_sv_url| replace:: :raw-html:`https://sv.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
+# .. |gsf_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
+# .. |generic_scan_url| replace:: :raw-html:`https://scan.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.YOUR_SV_SPONSOR`
+# .. |gsf_sequencer_url| replace:: :raw-html:`https://sequencer-MIGRATION_ID.sv-1.<span class="splice-url-prefix">unknown_cluster.</span>global.canton.network.sync.global`
 
-.. |version_literal| replace:: ``{version}``
-.. |chart_version_literal| replace:: ``{chart_version}``
-.. |canton_version| replace:: {canton_version}
-.. |canton_subdir| replace:: {canton_subdir}
-.. |daml_sdk_tooling_version| replace:: {daml_sdk_tooling_version}
-.. |daml_sdk_version| replace:: {daml_sdk_version}
+# .. |version_literal| replace:: ``{version}``
+# .. |chart_version_literal| replace:: ``{chart_version}``
+# .. |canton_version| replace:: {canton_version}
+# .. |canton_subdir| replace:: {canton_subdir}
+# .. |daml_sdk_tooling_version| replace:: {daml_sdk_tooling_version}
+# .. |daml_sdk_version| replace:: {daml_sdk_version}
 
-.. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
-.. |image_tag_set| replace:: ``export IMAGE_TAG={version}``
+# .. |chart_version_set| replace:: ``export CHART_VERSION={chart_version}``
+# .. |image_tag_set| replace:: ``export IMAGE_TAG={version}``
 
-.. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_splice-node.tar.gz">Download Bundle</a>`
-.. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
+# .. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_splice-node.tar.gz">Download Bundle</a>`
+# .. |openapi_download_link| replace:: :raw-html:`<a class="reference external" href="{download_url}/{version}_openapi.tar.gz">Download OpenAPI specs</a>`
 
-.. |helm_repo_prefix| replace:: {helm_repo_prefix}
-.. |docker_repo_prefix| replace:: {docker_repo_prefix}
-"""
+# .. |helm_repo_prefix| replace:: {helm_repo_prefix}
+# .. |docker_repo_prefix| replace:: {docker_repo_prefix}
+# """

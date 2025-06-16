@@ -1,3 +1,6 @@
 pyyaml
 sphinx
 sphinx_rtd_theme
+sphinx-copybutton
+sphinx_reredirects
+sphinxcontrib-openapi
