@@ -133,17 +133,16 @@ const CreateAllocation: React.FC = () => {
             <Typography variant="h6">Settle before</Typography>
             <DesktopDateTimePicker
               label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={dayjs(allocation.settlement.settle_before)}
+              value={dayjs((allocation.settlement.settle_before || 0) / 1000)}
               format="YYYY-MM-DD HH:mm"
               minDate={dayjs()}
               readOnly={false}
               onChange={newValue => {
                 if (newValue) {
-                  const date = newValue.toDate();
-                  date.setSeconds(0, 0);
+                  const micros = newValue.second(0).unix() * 1000 * 1000;
                   setAllocation({
                     ...allocation,
-                    settlement: { ...allocation.settlement, settle_before: date },
+                    settlement: { ...allocation.settlement, settle_before: micros },
                   });
                 }
               }}
@@ -157,17 +156,16 @@ const CreateAllocation: React.FC = () => {
             <Typography variant="h6">Allocate before</Typography>
             <DesktopDateTimePicker
               label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={dayjs(allocation.settlement.allocate_before)}
+              value={dayjs((allocation.settlement.allocate_before || 0) / 1000)}
               format="YYYY-MM-DD HH:mm"
               minDate={dayjs()}
               readOnly={false}
               onChange={newValue => {
                 if (newValue) {
-                  const date = newValue.toDate();
-                  date.setSeconds(0, 0);
+                  const micros = newValue.second(0).unix() * 1000 * 1000;
                   setAllocation({
                     ...allocation,
-                    settlement: { ...allocation.settlement, allocate_before: date },
+                    settlement: { ...allocation.settlement, allocate_before: micros },
                   });
                 }
               }}
@@ -236,13 +234,13 @@ interface PartialAllocateAmuletRequest {
 }
 
 function emptyForm(): PartialAllocateAmuletRequest {
-  const now = new Date();
+  const nowMicros = dayjs().unix() * 1000 * 1000;
   return {
     settlement: {
       executor: '',
       meta: {},
-      allocate_before: now,
-      settle_before: now,
+      allocate_before: nowMicros,
+      settle_before: nowMicros,
       settlement_ref: {
         id: '',
         cid: undefined,

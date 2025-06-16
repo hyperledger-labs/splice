@@ -1360,11 +1360,11 @@ components:
                 cid:
                   type: string
             allocate_before:
-              type: string
-              format: date-time
+              type: integer
+              format: int64
             settle_before:
-              type: string
-              format: date-time
+              type: integer
+              format: int64
             meta:
               type: object
               additionalProperties:

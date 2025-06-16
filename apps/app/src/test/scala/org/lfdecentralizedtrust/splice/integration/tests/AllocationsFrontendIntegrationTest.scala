@@ -46,19 +46,21 @@ class AllocationsFrontendIntegrationTest
   ) = {
     val validatorPartyId = aliceValidatorBackend.getValidatorPartyId()
     val receiver = validatorPartyId
-    val settleAndAllocateBefore = LocalDateTime
+    val now = LocalDateTime
       .now()
-      .plusSeconds(3600)
       // FE only supports minute precision, so we truncate
       .truncatedTo(ChronoUnit.MINUTES)
       .toInstant(ZoneOffset.UTC)
+    val allocateBefore = now.plusSeconds(3600)
+    val settleBefore = now.plusSeconds(3600 * 2)
+
     def wantedAllocation(requestedAt: Instant) = new AllocationSpecification(
       new SettlementInfo(
         validatorPartyId.toProtoPrimitive,
         new SettlementReference("some_reference", Optional.empty),
         requestedAt,
-        settleAndAllocateBefore,
-        settleAndAllocateBefore,
+        allocateBefore,
+        settleBefore,
         new Metadata(java.util.Map.of("k1", "v1", "k2", "v2")),
       ),
       "some_transfer_leg_id",

@@ -46,7 +46,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   transferinstructionv1,
 }
 
-import java.time.ZoneOffset
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -1206,8 +1205,8 @@ object HttpWalletAppClient {
                 spec.settlement.settlementRef.id,
                 spec.settlement.settlementRef.cid.map(_.contractId).toScala,
               ),
-              spec.settlement.allocateBefore.atOffset(ZoneOffset.UTC),
-              spec.settlement.settleBefore.atOffset(ZoneOffset.UTC),
+              Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.allocateBefore)),
+              Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.settleBefore)),
               Some(spec.settlement.meta.values.asScala.toMap),
             ),
             spec.transferLegId,

@@ -4,6 +4,7 @@ import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
@@ -22,8 +23,6 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.util.*
 
-import java.time.temporal.ChronoUnit
-import java.time.{Instant, LocalDateTime, ZoneOffset}
 import java.util.Optional
 
 class AmuletAllocationsIntegrationTest
@@ -42,20 +41,16 @@ class AmuletAllocationsIntegrationTest
   ) = {
     val validatorPartyId = aliceValidatorBackend.getValidatorPartyId()
     val receiver = validatorPartyId
-    val now = LocalDateTime
-      .now()
-      .plusSeconds(3600)
-      // daml precision
-      .truncatedTo(ChronoUnit.MICROS)
-      .toInstant(ZoneOffset.UTC)
-    val settleAndAllocateBefore = now.plusSeconds(3600)
-    def wantedAllocation(requestedAt: Instant) = new AllocationSpecification(
+    val now = CantonTimestamp.now()
+    val allocateBefore = now.plusSeconds(3600)
+    val settleBefore = now.plusSeconds(3600 * 2)
+    def wantedAllocation(requestedAt: CantonTimestamp) = new AllocationSpecification(
       new SettlementInfo(
         validatorPartyId.toProtoPrimitive,
         new SettlementReference("some_reference", Optional.empty),
-        requestedAt,
-        settleAndAllocateBefore,
-        settleAndAllocateBefore,
+        requestedAt.toInstant,
+        allocateBefore.toInstant,
+        settleBefore.toInstant,
         new Metadata(java.util.Map.of("k1", "v1", "k2", "v2")),
       ),
       "some_transfer_leg_id",
@@ -96,7 +91,9 @@ class AmuletAllocationsIntegrationTest
           .payload
           .allocation
 
-        specification should be(wantedAllocation(specification.settlement.requestedAt))
+        specification should be(
+          wantedAllocation(CantonTimestamp.assertFromInstant(specification.settlement.requestedAt))
+        )
       },
     )
   }
