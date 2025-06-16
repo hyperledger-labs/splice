@@ -1301,13 +1301,19 @@ object SpliceLedgerConnection {
     // NOTE: avoid changing this computation, as otherwise some commands might not get properly deduplicated
     // on an app upgrade.
     def commandIdForSubmission: String = {
+      def discriminatorString: Seq[String] = discriminator.toList match {
+        case Nil => Seq("")
+        case head :: Nil =>
+          Seq(head) // keep old behavior for upgrades, when discriminator was a single string
+        case list => list.flatMap(str => Seq(str.length.toString, str))
+      }
       val str = parties
         .map(_.toProtoPrimitive)
         .prepended(
           parties.length.toString
         ) // prepend length to avoid suffixes interfering with party mapping, e.g., otherwise we have
         // CommandId("myMethod", Seq(alice), "bob").commandIdForSubmission == CommandId("myMethod", Seq(alice,bob), "").commandIdForSubmission
-        .appendedAll(discriminator.flatMap(str => Seq(str.length.toString, str)))
+        .appendedAll(discriminatorString)
         .mkString("/")
       // Digest is not thread safe, create a new one each time.
       val hashFun = MessageDigest.getInstance("SHA-256")
