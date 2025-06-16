@@ -3,7 +3,13 @@
 # Script to install requirements for building Sphinx docs locally
 
 set -e
-
+# Check for Xcode Command Line Tools
+if ! xcode-select -p &>/dev/null; then
+    echo "Xcode Command Line Tools not found. Installing..."
+    xcode-select --install
+    echo "Check for the install xcode dialog box. Please complete the Xcode Command Line Tools installation, then re-run this script."
+    exit 1
+fi
 # Check for Python 3 and pip
 if ! command -v python3 &>/dev/null; then
     echo "Python 3 is required. Please install it first."
