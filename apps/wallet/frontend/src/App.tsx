@@ -11,6 +11,7 @@ import {
 import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   createBrowserRouter,
@@ -36,6 +37,8 @@ import Subscriptions from './routes/subscriptions';
 import Transactions from './routes/transactions';
 import Transfer from './routes/transfer';
 import { useConfigPollInterval, useWalletConfig } from './utils/config';
+import Allocations from './routes/allocations';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 const App: React.FC = () => {
   const config = useWalletConfig();
@@ -59,20 +62,22 @@ const App: React.FC = () => {
     });
 
     return (
-      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
-        <QueryClientProvider client={queryClient}>
-          <ReactQueryDevtools initialIsOpen={false} />
-          <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
-            <ValidatorClientProvider url={config.services.validator.url}>
-              <WalletClientProvider url={config.services.validator.url}>
-                <ValidatorScanProxyClientProvider validatorUrl={config.services.validator.url}>
-                  <CurrentUserProvider>{children}</CurrentUserProvider>
-                </ValidatorScanProxyClientProvider>
-              </WalletClientProvider>
-            </ValidatorClientProvider>
-          </UserProvider>
-        </QueryClientProvider>
-      </AuthProvider>
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+          <QueryClientProvider client={queryClient}>
+            <ReactQueryDevtools initialIsOpen={false} />
+            <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
+              <ValidatorClientProvider url={config.services.validator.url}>
+                <WalletClientProvider url={config.services.validator.url}>
+                  <ValidatorScanProxyClientProvider validatorUrl={config.services.validator.url}>
+                    <CurrentUserProvider>{children}</CurrentUserProvider>
+                  </ValidatorScanProxyClientProvider>
+                </WalletClientProvider>
+              </ValidatorClientProvider>
+            </UserProvider>
+          </QueryClientProvider>
+        </AuthProvider>
+      </LocalizationProvider>
     );
   };
   const router = createBrowserRouter(
@@ -89,6 +94,7 @@ const App: React.FC = () => {
           <Route index element={<Transactions />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="transfer" element={<Transfer />} />
+          <Route path="allocations" element={<Allocations />} />
           <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="faqs" element={<Faqs />} />
         </Route>
