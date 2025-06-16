@@ -203,9 +203,19 @@ class AnsSubscriptionInitialPaymentTrigger(
       ansContextCId,
     )
     // look up the confirmation for this payment created by this SV no matter if it is a acceptance or rejection
-    queryResult <- dsoStore.lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
-      svParty,
-      paymentCid,
+    ansEntryByNameQueryResult <- dsoStore.lookupAnsEntryByNameWithOffset(
+      entryName,
+      context.clock.now,
+    )
+    ansInitialPaymentConfirmationQueryResult <- dsoStore
+      .lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
+        svParty,
+        paymentCid,
+      )
+    // take the minimum offset
+    minOffset = Math.min(
+      ansInitialPaymentConfirmationQueryResult.offset,
+      ansEntryByNameQueryResult.offset,
     )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ConfirmAction(
@@ -213,8 +223,8 @@ class AnsSubscriptionInitialPaymentTrigger(
         action,
       )
     )
-    taskOutcome <- queryResult match {
-      case QueryResult(offset, None) =>
+    taskOutcome <- ansInitialPaymentConfirmationQueryResult match {
+      case QueryResult(_, None) =>
         connection
           .submit(
             actAs = Seq(svParty),
@@ -225,9 +235,9 @@ class AnsSubscriptionInitialPaymentTrigger(
             commandId = SpliceLedgerConnection.CommandId(
               "org.lfdecentralizedtrust.splice.sv.createAnsCollectInitialEntryPaymentConfirmation",
               Seq(svParty, dsoParty),
-              paymentCid.contractId,
+              entryName,
             ),
-            deduplicationOffset = offset,
+            deduplicationOffset = minOffset,
           )
           .yieldUnit()
           .map { _ =>
