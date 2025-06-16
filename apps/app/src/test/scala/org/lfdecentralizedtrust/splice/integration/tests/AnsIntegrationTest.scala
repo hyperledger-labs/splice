@@ -39,7 +39,6 @@ import scala.jdk.CollectionConverters.*
 class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
 
   import WalletTestUtil.*
-  override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
