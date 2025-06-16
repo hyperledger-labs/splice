@@ -608,9 +608,9 @@ abstract class TopologyAdminConnection(
       includeMappings = Set(
         mapping.code
       ),
-    ).flatMap(existing =>
-      existing
-        .find(_.mapping == mapping)
+    ).flatMap(sameCodeTopologyMappings =>
+      sameCodeTopologyMappings
+        .find(_.mapping.uniqueKey == mapping.uniqueKey)
         .flatMap(_.selectMapping[M])
         .fold({
           logger.info(
@@ -622,11 +622,19 @@ abstract class TopologyAdminConnection(
             PositiveInt.one,
             isProposal = false,
           )
-        }) { existingTx =>
-          logger.info(
-            s"Existing mapping found for ${mapping.code}: $mapping, returning existing transaction with serial ${existingTx.serial}"
-          )
-          existingTx.transaction.pure[Future]
+        }) { existingTxWithSameUniqueCode =>
+          if (existingTxWithSameUniqueCode == mapping) {
+            logger.info(
+              s"Existing mapping found for ${mapping.code}: $mapping, returning existing transaction with serial ${existingTxWithSameUniqueCode.serial}"
+            )
+            existingTxWithSameUniqueCode.transaction.pure[Future]
+          } else {
+            throw Status.ALREADY_EXISTS
+              .withDescription(
+                s"Mapping with unique key ${mapping.uniqueKey} already exists with a different mapping: $existingTxWithSameUniqueCode"
+              )
+              .asRuntimeException()
+          }
         }
     )
   }
