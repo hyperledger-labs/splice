@@ -192,7 +192,7 @@ case "$SUBCOMMAND" in
       ALTER USER $POSTGRES_USER_NAME WITH REPLICATION; -- needed to create the replication slot
       DO \$\$
       BEGIN
-        -- TODO (#19811) drop slot, pub if table list doesn't match
+        -- TODO (#453) drop slot, pub if table list doesn't match
         IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = '$PUBLICATION_NAME') THEN
           CREATE PUBLICATION $PUBLICATION_NAME
             FOR TABLE $TABLES_TO_REPLICATE_JOINED;
