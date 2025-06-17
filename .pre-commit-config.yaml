@@ -86,4 +86,5 @@ repos:
      hooks:
      - id: rstcheck
        name: Check sphinx format
+       args: [--report-level, WARNING]
        additional_dependencies: ['rstcheck[sphinx]']

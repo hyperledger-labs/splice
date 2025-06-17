@@ -33,6 +33,7 @@ template DsoBootstrap with
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState
     isDevNet : Bool
+    initialRound : Optional Int
   where
     signatory dso
     observer sv1Party
@@ -55,6 +56,7 @@ template DsoBootstrap with
         exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
           round0Duration
           amuletPrice
+          initialRound
         -- create the DSO rules with the SV1 as the sole sv
         let sv1SvInfo = SvInfo with
               name = sv1Name
