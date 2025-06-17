@@ -24,6 +24,7 @@ import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingCon
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.{LfCommand, LfCreateCommand, LfKeyResolver, LfPartyId}
 import com.digitalasset.daml.lf.VersionRange
 import com.digitalasset.daml.lf.data.Ref.{PackageId, PackageName}
@@ -55,7 +56,8 @@ object DAMLe {
       enableStackTraces: Boolean,
       profileDir: Option[Path] = None,
       iterationsBetweenInterruptions: Long =
-        10000, // 10000 is the default value in the engine configuration
+        10000, // 10000 is the default value in the engine configuration,
+      paranoidMode: Boolean,
   ): Engine =
     new Engine(
       EngineConfig(
@@ -70,6 +72,7 @@ object DAMLe {
         requireSuffixedGlobalContractId = true,
         contractKeyUniqueness = ContractKeyUniquenessMode.Off,
         iterationsBetweenInterruptions = iterationsBetweenInterruptions,
+        paranoid = paranoidMode,
       )
     )
 
@@ -163,12 +166,12 @@ class DAMLe(
     engineForEnrichment,
     packageId =>
       implicit traceContext => {
-        resolvePackage(packageId)(traceContext).transformWithHandledAborted {
-          case Success(pkg) => FutureUnlessShutdown.pure(pkg)
-          case Failure(ex) =>
-            logger.error(s"Package resolution failed for [$packageId]", ex)
-            FutureUnlessShutdown.failed(ex)
-        }
+        resolvePackage(packageId)(traceContext)
+          .thereafter {
+            case Failure(ex) =>
+              logger.error(s"Package resolution failed for [$packageId]", ex)
+            case _ => ()
+          }
       },
   )
 
@@ -361,9 +364,11 @@ class DAMLe(
             .value
         case ResultNeedContract(acoid, resume) =>
           contracts
-            .lookupLfInstance(acoid)
+            .lookupFatContract(acoid)
             .value
-            .flatMap(optInst => handleResultInternal(contracts, resume(optInst)))
+            .flatMap { fatInstanceOpt =>
+              handleResultInternal(contracts, resume(fatInstanceOpt))
+            }
         case ResultError(err) => FutureUnlessShutdown.pure(Left(EngineError(err)))
         case ResultInterruption(continue, _) =>
           // Run the interruption loop asynchronously to avoid blocking the calling thread.

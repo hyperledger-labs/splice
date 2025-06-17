@@ -4,7 +4,7 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.authentication
 
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{
   AsyncOrSyncCloseable,
@@ -22,7 +22,7 @@ import com.digitalasset.canton.sequencing.authentication.{
 }
 import com.digitalasset.canton.sequencing.client.transports.GrpcSequencerClientAuth.ChannelTokenFetcher
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.authentication.ServerAuthenticatingServerFilter.ServerAuthenticatingSimpleForwardingServerCall
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.ForwardingServerCall.SimpleForwardingServerCall
@@ -33,9 +33,9 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 private[bftordering] class ServerAuthenticatingServerFilter(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     member: Member,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     supportedProtocolVersions: Seq[ProtocolVersion],
     config: AuthenticationTokenManagerConfig,
     override val timeouts: ProcessingTimeout,
@@ -101,7 +101,7 @@ object ServerAuthenticatingServerFilter {
       call: ServerCall[ReqT, RespT],
       tokenProvider: AuthenticationTokenProvider,
       authenticationServiceChannel: GrpcManagedChannel,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       member: Member,
       timeouts: ProcessingTimeout,
       override val loggerFactory: NamedLoggerFactory,

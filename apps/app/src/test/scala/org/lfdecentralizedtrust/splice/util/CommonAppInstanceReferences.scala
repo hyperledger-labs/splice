@@ -22,9 +22,11 @@ import com.digitalasset.canton.SynchronizerAlias
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonAppInstanceReferences {
   def decentralizedSynchronizerId(implicit env: SpliceTestConsoleEnvironment): SynchronizerId =
-    sv1Backend.participantClientWithAdminToken.synchronizers.id_of(
-      sv1Backend.config.domains.global.alias
-    )
+    sv1Backend.participantClientWithAdminToken.synchronizers
+      .id_of(
+        sv1Backend.config.domains.global.alias
+      )
+      .logical
   def decentralizedSynchronizerAlias(implicit
       env: SpliceTestConsoleEnvironment
   ): SynchronizerAlias =

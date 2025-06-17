@@ -243,4 +243,14 @@ object TopologyTransactionRejection {
     override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
       TopologyManagerError.MemberCannotRejoinSynchronizer.Reject(members)
   }
+
+  final case class OngoingSynchronizerUpgrade(synchronizerId: PhysicalSynchronizerId)
+      extends TopologyTransactionRejection {
+    override def asString: String =
+      s"The topology state of synchronizer $synchronizerId is frozen due to an ongoing synchronizer migration and no more topology changes are allowed."
+
+    override def toTopologyManagerError(implicit elc: ErrorLoggingContext): TopologyManagerError =
+      TopologyManagerError.OngoingSynchronizerUpgrade.Reject(synchronizerId)
+  }
+
 }

@@ -15,7 +15,7 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{EnvironmentDefinition, TestConsoleEnvironment}
 import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.{SynchronizerAlias, protocol}
 
 /** Bootstraps synchronizers given topology descriptions and stores information in
@@ -119,7 +119,9 @@ object NetworkTopologyDescription {
 /** A data container to hold useful information for initialized synchronizers
   */
 final case class InitializedSynchronizer(
-    synchronizerId: SynchronizerId,
+    physicalSynchronizerId: PhysicalSynchronizerId,
     staticSynchronizerParameters: protocol.StaticSynchronizerParameters,
     synchronizerOwners: Set[InstanceReference],
-)
+) {
+  def synchronizerId: SynchronizerId = physicalSynchronizerId.logical
+}

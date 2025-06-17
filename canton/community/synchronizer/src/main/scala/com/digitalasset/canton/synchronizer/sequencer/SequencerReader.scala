@@ -42,7 +42,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.ReadState
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.synchronizer.sequencer.store.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
@@ -116,12 +116,12 @@ object SequencerReaderConfig {
 
 class SequencerReader(
     config: SequencerReaderConfig,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     store: SequencerStore,
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
     eventSignaller: EventSignaller,
     topologyClientMember: Member,
-    protocolVersion: ProtocolVersion,
+    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -132,7 +132,7 @@ class SequencerReader(
   def readV2(member: Member, requestedTimestampInclusive: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, CreateSubscriptionError, Sequencer.SequencedEventSource] =
-    performUnlessClosingEitherUSF(functionFullName)(for {
+    synchronizeWithClosing(functionFullName)(for {
       registeredTopologyClientMember <- EitherT
         .fromOptionF(
           store.lookupMember(topologyClientMember),
@@ -202,16 +202,14 @@ class SequencerReader(
             )
           )
       )
-      previousEventTimestamp <- EitherT.right(
-        readFromTimestampInclusive
-          .flatTraverse { timestamp =>
-            store.previousEventTimestamp(
-              registeredMember.memberId,
-              timestampExclusive =
-                timestamp, // this is correct as we query for latest timestamp before `timestampInclusive`
-            )
-          }
-      )
+
+      previousEventTimestamp <- EitherT.right(readFromTimestampInclusive.flatTraverse { timestamp =>
+        store.previousEventTimestamp(
+          registeredMember.memberId,
+          timestampExclusive =
+            timestamp, // this is correct as we query for latest timestamp before `timestampInclusive`
+        )
+      })
       _ = logger.debug(
         s"New subscription for $member will start with previous event timestamp = $previousEventTimestamp " +
           s"and latest topology client timestamp = $latestTopologyClientRecipientTimestamp"
@@ -341,7 +339,7 @@ class SequencerReader(
         _ = logger.debug(
           s"Signing event with sequencing timestamp ${event.timestamp} for $member"
         )
-        signed <- performUnlessClosingUSF("sign-event")(
+        signed <- synchronizeWithClosing("sign-event")(
           signEvent(event, signingSnapshot).value
         )
       } yield signed

@@ -73,10 +73,15 @@ class SyncCryptoApiParticipantProvider(
   private val synchronizerCryptoClientCache: TrieMap[SynchronizerId, SynchronizerCryptoClient] =
     TrieMap.empty
 
-  // The cache should be invalidated whenever a change is detected in the associated topology client
-  // in ips.synchronizers.
-  def invalidateCacheForSynchronizer(synchronizerId: SynchronizerId): Unit =
+  def remove(synchronizerId: SynchronizerId): Unit = {
     synchronizerCryptoClientCache.remove(synchronizerId).discard
+    ips.remove(synchronizerId).discard
+  }
+
+  def removeAndClose(synchronizerId: SynchronizerId): Unit = {
+    synchronizerCryptoClientCache.remove(synchronizerId).foreach(_.close())
+    ips.remove(synchronizerId).foreach(_.close())
+  }
 
   private def createSynchronizerCryptoClient(
       synchronizerId: SynchronizerId,
@@ -88,8 +93,7 @@ class SyncCryptoApiParticipantProvider(
       synchronizerId,
       synchronizerTopologyClient,
       staticSynchronizerParameters,
-      crypto,
-      new SynchronizerCryptoPureApi(staticSynchronizerParameters, pureCrypto),
+      SynchronizerCrypto(crypto, staticSynchronizerParameters),
       sessionSigningKeysConfig,
       verificationParallelismLimit,
       timeouts,
@@ -97,11 +101,11 @@ class SyncCryptoApiParticipantProvider(
       loggerFactory.append("synchronizerId", synchronizerId.toString),
     )
 
-  private def createOrUpdateCache(
+  private def getOrUpdate(
       synchronizerId: SynchronizerId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
       synchronizerTopologyClient: SynchronizerTopologyClient,
-  ) =
+  ): SynchronizerCryptoClient =
     synchronizerCryptoClientCache.getOrElseUpdate(
       synchronizerId,
       createSynchronizerCryptoClient(
@@ -115,7 +119,7 @@ class SyncCryptoApiParticipantProvider(
       synchronizerId: SynchronizerId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
   ): SynchronizerCryptoClient =
-    createOrUpdateCache(
+    getOrUpdate(
       synchronizerId,
       staticSynchronizerParameters,
       ips.tryForSynchronizer(synchronizerId),
@@ -125,8 +129,8 @@ class SyncCryptoApiParticipantProvider(
       synchronizerId: SynchronizerId,
       staticSynchronizerParameters: StaticSynchronizerParameters,
   ): Option[SynchronizerCryptoClient] =
-    ips.forSynchronizer(synchronizerId).map { domainTopologyClient =>
-      createOrUpdateCache(synchronizerId, staticSynchronizerParameters, domainTopologyClient)
+    ips.forSynchronizer(synchronizerId).map { topologyClient =>
+      getOrUpdate(synchronizerId, staticSynchronizerParameters, topologyClient)
     }
 
 }
@@ -307,12 +311,11 @@ object SyncCryptoClient {
   */
 class SynchronizerCryptoClient private (
     val member: Member,
-    val synchronizerId: SynchronizerId,
+    val physicalSynchronizerId: PhysicalSynchronizerId,
     val ips: SynchronizerTopologyClient,
-    val crypto: Crypto,
+    val crypto: SynchronizerCrypto,
     val syncCryptoSigner: SyncCryptoSigner,
     val syncCryptoVerifier: SyncCryptoVerifier,
-    val staticSynchronizerParameters: StaticSynchronizerParameters,
     override val timeouts: ProcessingTimeout,
     override protected val futureSupervisor: FutureSupervisor,
     override val loggerFactory: NamedLoggerFactory,
@@ -322,8 +325,9 @@ class SynchronizerCryptoClient private (
     with NamedLogging
     with FlagCloseable {
 
-  override val pureCrypto: SynchronizerCryptoPureApi =
-    new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto)
+  val synchronizerId: SynchronizerId = physicalSynchronizerId.logical
+
+  override val pureCrypto: SynchronizerCryptoPureApi = crypto.pureCrypto
 
   override def snapshot(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
@@ -348,7 +352,6 @@ class SynchronizerCryptoClient private (
   def create(snapshot: TopologySnapshot): SynchronizerSnapshotSyncCryptoApi =
     new SynchronizerSnapshotSyncCryptoApi(
       synchronizerId,
-      staticSynchronizerParameters,
       snapshot,
       crypto,
       syncCryptoSigner,
@@ -403,8 +406,7 @@ object SynchronizerCryptoClient {
       synchronizerId: SynchronizerId,
       ips: SynchronizerTopologyClient,
       staticSynchronizerParameters: StaticSynchronizerParameters,
-      crypto: Crypto,
-      pureCrypto: SynchronizerCryptoPureApi,
+      synchronizerCrypto: SynchronizerCrypto,
       verificationParallelismLimit: PositiveInt,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
@@ -414,24 +416,22 @@ object SynchronizerCryptoClient {
   ): SynchronizerCryptoClient = {
     val syncCryptoSignerWithLongTermKeys = SyncCryptoSigner.createWithLongTermKeys(
       member,
-      crypto.privateCrypto,
-      crypto.cryptoPrivateStore,
+      synchronizerCrypto,
       loggerFactory,
     )
     new SynchronizerCryptoClient(
       member,
-      synchronizerId,
+      PhysicalSynchronizerId(synchronizerId, staticSynchronizerParameters),
       ips,
-      crypto,
+      synchronizerCrypto,
       syncCryptoSignerWithLongTermKeys,
       SyncCryptoVerifier.create(
         synchronizerId,
         staticSynchronizerParameters,
-        pureCrypto,
+        synchronizerCrypto.pureCrypto,
         verificationParallelismLimit,
         loggerFactory,
       ),
-      staticSynchronizerParameters,
       timeouts,
       futureSupervisor,
       loggerFactory.append("synchronizerId", synchronizerId.toString),
@@ -446,8 +446,7 @@ object SynchronizerCryptoClient {
       synchronizerId: SynchronizerId,
       ips: SynchronizerTopologyClient,
       staticSynchronizerParameters: StaticSynchronizerParameters,
-      crypto: Crypto,
-      pureCrypto: SynchronizerCryptoPureApi,
+      synchronizerCrypto: SynchronizerCrypto,
       sessionSigningKeysConfig: SessionSigningKeysConfig,
       verificationParallelismLimit: PositiveInt,
       timeouts: ProcessingTimeout,
@@ -460,25 +459,25 @@ object SynchronizerCryptoClient {
       synchronizerId,
       staticSynchronizerParameters,
       member,
-      crypto.privateCrypto,
-      crypto.cryptoPrivateStore,
+      synchronizerCrypto,
       sessionSigningKeysConfig,
+      futureSupervisor,
+      timeouts,
       loggerFactory,
     )
     new SynchronizerCryptoClient(
       member,
-      synchronizerId,
+      PhysicalSynchronizerId(synchronizerId, staticSynchronizerParameters),
       ips,
-      crypto,
+      synchronizerCrypto,
       syncCryptoSignerWithSessionKeys,
       SyncCryptoVerifier.create(
         synchronizerId,
         staticSynchronizerParameters,
-        pureCrypto,
+        synchronizerCrypto.pureCrypto,
         verificationParallelismLimit,
         loggerFactory,
       ),
-      staticSynchronizerParameters,
       timeouts,
       futureSupervisor,
       loggerFactory,
@@ -490,9 +489,8 @@ object SynchronizerCryptoClient {
 /** crypto operations for a (synchronizer,timestamp) */
 class SynchronizerSnapshotSyncCryptoApi(
     val synchronizerId: SynchronizerId,
-    staticSynchronizerParameters: StaticSynchronizerParameters,
     override val ipsSnapshot: TopologySnapshot,
-    val crypto: Crypto,
+    val crypto: SynchronizerCrypto,
     val syncCryptoSigner: SyncCryptoSigner,
     val syncCryptoVerifier: SyncCryptoVerifier,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -500,8 +498,7 @@ class SynchronizerSnapshotSyncCryptoApi(
     extends SyncCryptoApi
     with NamedLogging {
 
-  override val pureCrypto: CryptoPureApi =
-    new SynchronizerCryptoPureApi(staticSynchronizerParameters, crypto.pureCrypto)
+  override val pureCrypto: SynchronizerCryptoPureApi = crypto.pureCrypto
 
   override def sign(
       hash: Hash,
@@ -578,34 +575,6 @@ class SynchronizerSnapshotSyncCryptoApi(
         hash,
         sequencerGroup.active,
         sequencerGroup.threshold,
-        sequencerGroup.toString,
-        signatures,
-        usage,
-      )
-    } yield ()
-
-  override def unsafePartialVerifySequencerSignatures(
-      hash: Hash,
-      signatures: NonEmpty[Seq[Signature]],
-      usage: NonEmpty[Set[SigningKeyUsage]],
-  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, SignatureCheckError, Unit] =
-    for {
-      sequencerGroup <- EitherT(
-        ipsSnapshot
-          .sequencerGroup()
-          .map(
-            _.toRight(
-              SignatureCheckError.MemberGroupDoesNotExist(
-                "Sequencer group not found"
-              )
-            )
-          )
-      )
-      _ <- syncCryptoVerifier.verifyGroupSignatures(
-        ipsSnapshot,
-        hash,
-        sequencerGroup.active,
-        threshold = PositiveInt.one,
         sequencerGroup.toString,
         signatures,
         usage,

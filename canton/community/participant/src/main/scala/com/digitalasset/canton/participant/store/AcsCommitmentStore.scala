@@ -5,7 +5,7 @@ package com.digitalasset.canton.participant.store
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
+import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.protocol.messages.{
@@ -202,7 +202,7 @@ trait AcsCommitmentLookup {
   def outstanding(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipants: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
       includeMatchedPeriods: Boolean = false,
   )(implicit
       traceContext: TraceContext
@@ -214,7 +214,7 @@ trait AcsCommitmentLookup {
   def searchComputedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipants: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
@@ -227,7 +227,7 @@ trait AcsCommitmentLookup {
   def searchReceivedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipants: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[SignedProtocolMessage[AcsCommitment]]]
@@ -303,7 +303,7 @@ trait CommitmentQueue {
     */
   def peekThrough(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[List[AcsCommitment]]
+  ): FutureUnlessShutdown[List[BufferedAcsCommitment]]
 
   /** Returns an unordered list of commitments whose period ends at or after the given timestamp.
     *
@@ -311,7 +311,7 @@ trait CommitmentQueue {
     */
   def peekThroughAtOrAfter(timestamp: CantonTimestamp)(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[AcsCommitment]]
+  ): FutureUnlessShutdown[Seq[BufferedAcsCommitment]]
 
   /** Returns, if exists, a list containing all commitments originating from the given participant
     * that overlap the given period. Does not delete them from the queue.
@@ -336,7 +336,7 @@ trait CommitmentQueue {
       counterParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[AcsCommitment]]
+  ): FutureUnlessShutdown[Seq[BufferedAcsCommitment]]
 
   /** Deletes all commitments whose period ends at or before the given timestamp. */
   def deleteThrough(timestamp: CantonTimestamp)(implicit

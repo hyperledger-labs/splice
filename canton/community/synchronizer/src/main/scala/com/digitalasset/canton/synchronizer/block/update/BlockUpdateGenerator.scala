@@ -21,12 +21,15 @@ import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
   SignedOrderingRequestOps,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.InvalidLedgerEvent
+import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError.{
+  InvalidLedgerEvent,
+  SequencedBeforeLowerBound,
+}
 import com.digitalasset.canton.synchronizer.sequencer.store.SequencerMemberValidator
 import com.digitalasset.canton.synchronizer.sequencer.traffic.SequencerRateLimitManager
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.*
+import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.collection.immutable
@@ -95,6 +98,7 @@ class BlockUpdateGeneratorImpl(
     sequencerId: SequencerId,
     rateLimitManager: SequencerRateLimitManager,
     orderingTimeFixMode: OrderingTimeFixMode,
+    minimumSequencingTime: CantonTimestamp,
     metrics: SequencerMetrics,
     protected val loggerFactory: NamedLoggerFactory,
     memberValidator: SequencerMemberValidator,
@@ -135,8 +139,15 @@ class BlockUpdateGeneratorImpl(
         case Left(error) =>
           InvalidLedgerEvent.Error(block.blockHeight, error).discard
           None
-        case Right(value) =>
-          Some(Traced(value))
+        case Right(event) =>
+          if (event.timestamp < minimumSequencingTime) {
+            SequencedBeforeLowerBound
+              .Error(event.timestamp, minimumSequencingTime, event.toString)
+              .log()
+            None
+          } else {
+            Some(Traced(event))
+          }
       }
     }
 

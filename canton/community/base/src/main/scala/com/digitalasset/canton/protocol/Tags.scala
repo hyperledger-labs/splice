@@ -188,6 +188,7 @@ object RequestId {
   * unassignment request.
   */
 final case class ReassignmentId(
+    // TODO(#25483) This should be physical
     sourceSynchronizer: Source[SynchronizerId],
     unassignmentTs: CantonTimestamp,
 ) extends PrettyPrinting {
@@ -195,12 +196,6 @@ final case class ReassignmentId(
     v30.ReassignmentId(
       sourceSynchronizerId = sourceSynchronizer.unwrap.toProtoPrimitive,
       timestamp = unassignmentTs.toProtoPrimitive,
-    )
-
-  def toAdminProto: com.digitalasset.canton.admin.participant.v30.ReassignmentId =
-    com.digitalasset.canton.admin.participant.v30.ReassignmentId(
-      sourceSynchronizerId = sourceSynchronizer.unwrap.toProtoPrimitive,
-      timestamp = Some(unassignmentTs.toProtoTimestamp),
     )
 
   override protected def pretty: Pretty[ReassignmentId] = prettyOfClass(

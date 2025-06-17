@@ -189,5 +189,4 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         templateId.getEntityName,
       )
   }
-
 }

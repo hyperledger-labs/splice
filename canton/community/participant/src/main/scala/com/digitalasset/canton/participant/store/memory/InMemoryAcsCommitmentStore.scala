@@ -5,7 +5,7 @@ package com.digitalasset.canton.participant.store.memory
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
+import com.digitalasset.canton.data.{BufferedAcsCommitment, CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -27,7 +27,7 @@ import com.digitalasset.canton.store.memory.InMemoryPrunableByTime
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.IterableUtil.Ops
+import com.digitalasset.canton.util.collection.IterableUtil.Ops
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.annotation.tailrec
@@ -209,7 +209,7 @@ class InMemoryAcsCommitmentStore(
   override def outstanding(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Seq[ParticipantId],
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
       includeMatchedPeriods: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -217,8 +217,7 @@ class InMemoryAcsCommitmentStore(
     FutureUnlessShutdown.pure(
       _outstanding.get
         .filter { case (period, participant, state, _) =>
-          (counterParticipant.isEmpty ||
-            counterParticipant.contains(participant)) &&
+          counterParticipantsFilter.fold(true)(_.contains(participant)) &&
           period.fromExclusive < end &&
           period.toInclusive >= start &&
           (includeMatchedPeriods || state != CommitmentPeriodState.Matched)
@@ -229,15 +228,15 @@ class InMemoryAcsCommitmentStore(
   override def searchComputedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[
     Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.HashedCommitmentType)]
   ] = {
-    val filteredByCounterParty =
-      if (counterParticipant.isEmpty) computed
-      else computed.filter(c => counterParticipant.contains(c._1))
+    val filteredByCounterParty = counterParticipantsFilter.fold(computed)(participants =>
+      computed.filter { case (counterParticipant, _) => participants.contains(counterParticipant) }
+    )
 
     FutureUnlessShutdown.pure(
       filteredByCounterParty.flatMap { case (p, m) =>
@@ -256,13 +255,17 @@ class InMemoryAcsCommitmentStore(
   override def searchReceivedBetween(
       start: CantonTimestamp,
       end: CantonTimestamp,
-      counterParticipant: Seq[ParticipantId] = Seq.empty,
+      counterParticipantsFilter: Option[NonEmpty[Seq[ParticipantId]]] = None,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Iterable[SignedProtocolMessage[AcsCommitment]]] = {
-    val filteredByCounterParty = (if (counterParticipant.isEmpty) received
-                                  else
-                                    received.filter(c => counterParticipant.contains(c._1))).values
+    val filteredByCounterParty = counterParticipantsFilter
+      .fold(received)(participants =>
+        received.filter { case (counterParticipant, _) =>
+          participants.contains(counterParticipant)
+        }
+      )
+      .values
 
     FutureUnlessShutdown.pure(
       filteredByCounterParty.flatMap(msgs =>
@@ -383,10 +386,12 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
 
   /* Access must be synchronized, since PriorityQueue doesn't support concurrent
     modifications. */
-  private val queue: mutable.PriorityQueue[AcsCommitment] =
+  private val queue: mutable.PriorityQueue[BufferedAcsCommitment] =
     // Queues dequeue in max-first, so make the lowest timestamp the maximum
     mutable.PriorityQueue.empty(
-      Ordering.by[AcsCommitment, CantonTimestampSecond](cmt => cmt.period.toInclusive).reverse
+      Ordering
+        .by[BufferedAcsCommitment, CantonTimestampSecond](cmt => cmt.period.toInclusive)
+        .reverse
     )
 
   private object lock
@@ -399,7 +404,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
   override def enqueue(
       commitment: AcsCommitment
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = sync {
-    queue.enqueue(commitment)
+    queue.enqueue(commitment.toQueuedAcsCommitment)
   }
 
   /** Returns all commitments whose period ends at or before the given timestamp.
@@ -408,7 +413,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
     */
   override def peekThrough(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[AcsCommitment]] = sync {
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[List[BufferedAcsCommitment]] = sync {
     queue.takeWhile(_.period.toInclusive <= timestamp).toList
   }
 
@@ -418,7 +423,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
     */
   override def peekThroughAtOrAfter(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[AcsCommitment]] =
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[BufferedAcsCommitment]] =
     sync {
       queue.filter(_.period.toInclusive >= timestamp).toSeq
     }
@@ -428,7 +433,7 @@ class InMemoryCommitmentQueue(implicit val ec: ExecutionContext) extends Commitm
       counterParticipant: ParticipantId,
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Seq[AcsCommitment]] =
+  ): FutureUnlessShutdown[Seq[BufferedAcsCommitment]] =
     sync {
       queue
         .filter(_.period.overlaps(period))

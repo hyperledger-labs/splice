@@ -64,7 +64,7 @@ object PackageServiceTest {
   def readCantonExamplesBytes(): Array[Byte] =
     Files.readAllBytes(Paths.get(BaseTest.CantonExamplesPath))
 
-  private val AdminWorkflowsPath = getResourcePath("dar/AdminWorkflows.dar")
+  private val AdminWorkflowsPath = getResourcePath("AdminWorkflows.dar")
   def loadAdminWorkflowsDar(): archive.Dar[Archive] =
     loadDar(AdminWorkflowsPath)
 
@@ -99,7 +99,12 @@ class PackageServiceTest
     val packageDependencyResolver =
       new PackageDependencyResolver(packageStore, processingTimeouts, loggerFactory)
     private val engine =
-      DAMLe.newEngine(enableLfDev = false, enableLfBeta = false, enableStackTraces = false)
+      DAMLe.newEngine(
+        enableLfDev = false,
+        enableLfBeta = false,
+        enableStackTraces = false,
+        paranoidMode = true,
+      )
 
     val sut: PackageService = PackageService
       .createAndInitialize(

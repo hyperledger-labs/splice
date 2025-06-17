@@ -20,10 +20,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.admin.v30.*
-import com.digitalasset.canton.topology.admin.v30.AuthorizeRequest.Type.{
-  Proposal,
-  TransactionHashBytes,
-}
+import com.digitalasset.canton.topology.admin.v30.AuthorizeRequest.Type.{Proposal, TransactionHash}
 import com.digitalasset.canton.topology.admin.v30.IdentityInitializationServiceGrpc.IdentityInitializationServiceStub
 import com.digitalasset.canton.topology.admin.v30.TopologyAggregationServiceGrpc.TopologyAggregationServiceStub
 import com.digitalasset.canton.topology.admin.v30.TopologyManagerReadServiceGrpc.TopologyManagerReadServiceStub
@@ -341,7 +338,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class SynchronizerParametersState(
+    final case class ListSynchronizerParametersState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -373,7 +370,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class MediatorSynchronizerState(
+    final case class ListMediatorSynchronizerState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -405,7 +402,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class SequencerSynchronizerState(
+    final case class ListSequencerSynchronizerState(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -437,7 +434,7 @@ object TopologyAdminCommands {
           .leftMap(_.toString)
     }
 
-    final case class PurgeTopologyTransaction(
+    final case class ListPurgeTopologyTransaction(
         query: BaseQuery,
         filterSynchronizerId: String,
     ) extends BaseCommand[
@@ -466,6 +463,70 @@ object TopologyAdminCommands {
       ): Either[String, Seq[ListPurgeTopologyTransactionResult]] =
         response.results
           .traverse(ListPurgeTopologyTransactionResult.fromProtoV30)
+          .leftMap(_.toString)
+    }
+
+    final case class ListSynchronizerUpgradeAnnouncement(
+        query: BaseQuery,
+        filterSynchronizerId: String,
+    ) extends BaseCommand[
+          v30.ListSynchronizerUpgradeAnnouncementRequest,
+          v30.ListSynchronizerUpgradeAnnouncementResponse,
+          Seq[ListSynchronizerUpgradeAnnouncementResult],
+        ] {
+
+      override protected def createRequest()
+          : Either[String, v30.ListSynchronizerUpgradeAnnouncementRequest] =
+        Right(
+          new ListSynchronizerUpgradeAnnouncementRequest(
+            baseQuery = Some(query.toProtoV1),
+            filterSynchronizerId = filterSynchronizerId,
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.ListSynchronizerUpgradeAnnouncementRequest,
+      ): Future[v30.ListSynchronizerUpgradeAnnouncementResponse] =
+        service.listSynchronizerUpgradeAnnouncement(request)
+
+      override protected def handleResponse(
+          response: v30.ListSynchronizerUpgradeAnnouncementResponse
+      ): Either[String, Seq[ListSynchronizerUpgradeAnnouncementResult]] =
+        response.results
+          .traverse(ListSynchronizerUpgradeAnnouncementResult.fromProtoV30)
+          .leftMap(_.toString)
+    }
+
+    final case class ListSequencerConnectionSuccessor(
+        query: BaseQuery,
+        filterSequencerId: String,
+    ) extends BaseCommand[
+          v30.ListSequencerConnectionSuccessorRequest,
+          v30.ListSequencerConnectionSuccessorResponse,
+          Seq[ListSequencerConnectionSuccessorResult],
+        ] {
+
+      override protected def createRequest()
+          : Either[String, v30.ListSequencerConnectionSuccessorRequest] =
+        Right(
+          new ListSequencerConnectionSuccessorRequest(
+            baseQuery = Some(query.toProtoV1),
+            filterSequencerId = filterSequencerId,
+          )
+        )
+
+      override protected def submitRequest(
+          service: TopologyManagerReadServiceStub,
+          request: v30.ListSequencerConnectionSuccessorRequest,
+      ): Future[v30.ListSequencerConnectionSuccessorResponse] =
+        service.listSequencerConnectionSuccessor(request)
+
+      override protected def handleResponse(
+          response: v30.ListSequencerConnectionSuccessorResponse
+      ): Either[String, Seq[ListSequencerConnectionSuccessorResult]] =
+        response.results
+          .traverse(ListSequencerConnectionSuccessorResult.fromProtoV30)
           .leftMap(_.toString)
     }
 
@@ -915,7 +976,7 @@ object TopologyAdminCommands {
     }
 
     final case class Authorize[M <: TopologyMapping: ClassTag](
-        transactionHash: ByteString,
+        transactionHash: String,
         mustFullyAuthorize: Boolean,
         signedBy: Seq[Fingerprint],
         store: TopologyStoreId,
@@ -928,7 +989,7 @@ object TopologyAdminCommands {
 
       override protected def createRequest(): Either[String, AuthorizeRequest] = Right(
         AuthorizeRequest(
-          TransactionHashBytes(transactionHash),
+          TransactionHash(transactionHash),
           mustFullyAuthorize = mustFullyAuthorize,
           forceChanges = Seq.empty,
           signedBy = signedBy.map(_.toProtoPrimitive),

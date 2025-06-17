@@ -39,6 +39,7 @@ import com.digitalasset.canton.data.{CantonTimestamp, CantonTimestampSecond}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.admin.ResourceLimits
 import com.digitalasset.canton.participant.admin.data.ContractIdImportMode
+import com.digitalasset.canton.participant.admin.party.PartyParticipantPermission
 import com.digitalasset.canton.participant.admin.traffic.TrafficStateAdmin
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
   ReceivedCmtState,
@@ -51,7 +52,14 @@ import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.sequencing.protocol.TrafficState
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.PositiveSeconds
-import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
+import com.digitalasset.canton.topology.{
+  ConfiguredPhysicalSynchronizerId,
+  ParticipantId,
+  PartyId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{BinaryFileUtil, GrpcStreamingUtils, OptionUtil, PathUtils}
 import com.digitalasset.canton.version.ProtocolVersion
@@ -481,8 +489,9 @@ object ParticipantAdminCommands {
     final case class AddPartyAsync(
         party: PartyId,
         synchronizerId: SynchronizerId,
-        sourceParticipant: Option[ParticipantId],
-        serial: Option[PositiveInt],
+        sourceParticipant: ParticipantId,
+        serial: PositiveInt,
+        participantPermission: ParticipantPermission,
     ) extends GrpcAdminCommand[
           v30.AddPartyAsyncRequest,
           v30.AddPartyAsyncResponse,
@@ -498,8 +507,10 @@ object ParticipantAdminCommands {
           v30.AddPartyAsyncRequest(
             partyId = party.toProtoPrimitive,
             synchronizerId = synchronizerId.toProtoPrimitive,
-            sourceParticipantUid = sourceParticipant.fold("")(_.uid.toProtoPrimitive),
-            serial = serial.fold(0)(_.value),
+            sourceParticipantUid = sourceParticipant.uid.toProtoPrimitive,
+            topologySerial = serial.value,
+            participantPermission =
+              PartyParticipantPermission.toProtoPrimitive(participantPermission),
           )
         )
 
@@ -930,7 +941,7 @@ object ParticipantAdminCommands {
     }
 
     final case class IgnoreEvents(
-        synchronizerId: SynchronizerId,
+        physicalSynchronizerId: PhysicalSynchronizerId,
         fromInclusive: SequencerCounter,
         toInclusive: SequencerCounter,
         force: Boolean,
@@ -953,7 +964,7 @@ object ParticipantAdminCommands {
       override protected def createRequest(): Either[String, v30.IgnoreEventsRequest] =
         Right(
           v30.IgnoreEventsRequest(
-            synchronizerId = synchronizerId.toProtoPrimitive,
+            physicalSynchronizerId = physicalSynchronizerId.toProtoPrimitive,
             fromInclusive = fromInclusive.toProtoPrimitive,
             toInclusive = toInclusive.toProtoPrimitive,
             force = force,
@@ -967,7 +978,7 @@ object ParticipantAdminCommands {
     }
 
     final case class UnignoreEvents(
-        synchronizerId: SynchronizerId,
+        physicalSynchronizerId: PhysicalSynchronizerId,
         fromInclusive: SequencerCounter,
         toInclusive: SequencerCounter,
         force: Boolean,
@@ -990,7 +1001,7 @@ object ParticipantAdminCommands {
       override protected def createRequest(): Either[String, v30.UnignoreEventsRequest] =
         Right(
           v30.UnignoreEventsRequest(
-            synchronizerId = synchronizerId.toProtoPrimitive,
+            physicalSynchronizerId = physicalSynchronizerId.toProtoPrimitive,
             fromInclusive = fromInclusive.toProtoPrimitive,
             toInclusive = toInclusive.toProtoPrimitive,
             force = force,
@@ -1139,8 +1150,13 @@ object ParticipantAdminCommands {
 
     }
 
+    // TODO(#25483) Check usage and see whether automatic resolution is fine
     final case class GetSynchronizerId(synchronizerAlias: SynchronizerAlias)
-        extends Base[v30.GetSynchronizerIdRequest, v30.GetSynchronizerIdResponse, SynchronizerId] {
+        extends Base[
+          v30.GetSynchronizerIdRequest,
+          v30.GetSynchronizerIdResponse,
+          PhysicalSynchronizerId,
+        ] {
 
       override protected def createRequest(): Either[String, v30.GetSynchronizerIdRequest] =
         Right(v30.GetSynchronizerIdRequest(synchronizerAlias.toProtoPrimitive))
@@ -1153,9 +1169,9 @@ object ParticipantAdminCommands {
 
       override protected def handleResponse(
           response: v30.GetSynchronizerIdResponse
-      ): Either[String, SynchronizerId] =
-        SynchronizerId
-          .fromProtoPrimitive(response.synchronizerId, "synchronizer_id")
+      ): Either[String, PhysicalSynchronizerId] =
+        PhysicalSynchronizerId
+          .fromProtoPrimitive(response.physicalSynchronizerId, "synchronizer_id")
           .leftMap(_.toString)
     }
 
@@ -1233,7 +1249,7 @@ object ParticipantAdminCommands {
           v30.ListRegisteredSynchronizersRequest,
           v30.ListRegisteredSynchronizersResponse,
           Seq[
-            (SynchronizerConnectionConfig, Boolean)
+            (SynchronizerConnectionConfig, ConfiguredPhysicalSynchronizerId, Boolean)
           ],
         ] {
 
@@ -1251,15 +1267,26 @@ object ParticipantAdminCommands {
 
       override protected def handleResponse(
           response: v30.ListRegisteredSynchronizersResponse
-      ): Either[String, Seq[(SynchronizerConnectionConfig, Boolean)]] = {
+      ): Either[String, Seq[
+        (SynchronizerConnectionConfig, ConfiguredPhysicalSynchronizerId, Boolean)
+      ]] = {
 
         def mapRes(
             result: v30.ListRegisteredSynchronizersResponse.Result
-        ): Either[String, (SynchronizerConnectionConfig, Boolean)] =
+        ): Either[
+          String,
+          (SynchronizerConnectionConfig, ConfiguredPhysicalSynchronizerId, Boolean),
+        ] =
           for {
             configP <- result.config.toRight("Server has sent empty config")
             config <- SynchronizerConnectionConfig.fromProtoV30(configP).leftMap(_.toString)
-          } yield (config, result.connected)
+            psid <- result.physicalSynchronizerId
+              .traverse(
+                PhysicalSynchronizerId.fromProtoPrimitive(_, "physical_synchronizer_id")
+              )
+              .map(ConfiguredPhysicalSynchronizerId(_))
+              .leftMap(_.toString)
+          } yield (config, psid, result.connected)
 
         response.results.traverse(mapRes)
       }
@@ -1330,6 +1357,7 @@ object ParticipantAdminCommands {
     }
 
     final case class ModifySynchronizerConnection(
+        synchronizerId: Option[PhysicalSynchronizerId],
         config: SynchronizerConnectionConfig,
         sequencerConnectionValidation: SequencerConnectionValidation,
     ) extends Base[v30.ModifySynchronizerRequest, v30.ModifySynchronizerResponse, Unit] {
@@ -1339,6 +1367,7 @@ object ParticipantAdminCommands {
           v30.ModifySynchronizerRequest(
             newConfig = Some(config.toProtoV30),
             sequencerConnectionValidation = sequencerConnectionValidation.toProtoV30,
+            physicalSynchronizerId = synchronizerId.map(_.toProtoPrimitive),
           )
         )
 
@@ -1452,7 +1481,7 @@ object ParticipantAdminCommands {
     final case class OpenCommitment(
         observer: StreamObserver[v30.OpenCommitmentResponse],
         commitment: AcsCommitment.HashedCommitmentType,
-        synchronizerId: SynchronizerId,
+        physicalSynchronizerId: PhysicalSynchronizerId,
         computedForCounterParticipant: ParticipantId,
         toInclusive: CantonTimestamp,
     ) extends Base[
@@ -1463,7 +1492,7 @@ object ParticipantAdminCommands {
       override protected def createRequest() = Right(
         v30.OpenCommitmentRequest(
           AcsCommitment.hashedCommitmentTypeToProto(commitment),
-          synchronizerId.toProtoPrimitive,
+          physicalSynchronizerId.toProtoPrimitive,
           computedForCounterParticipant.toProtoPrimitive,
           Some(toInclusive.toProtoTimestamp),
         )

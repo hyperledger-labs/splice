@@ -13,7 +13,7 @@ import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
-import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, Transaction, User}
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -94,7 +94,7 @@ class BaseLedgerConnection(
     client.latestPrunedOffset()
 
   def activeContracts(
-      filter: com.daml.ledger.api.v2.transaction_filter.TransactionFilter,
+      eventFormat: com.daml.ledger.api.v2.transaction_filter.EventFormat,
       offset: Long,
   )(implicit tc: TraceContext): Future[
     (
@@ -106,7 +106,7 @@ class BaseLedgerConnection(
     val activeContractsRequest = client.activeContracts(
       lapi.state_service.GetActiveContractsRequest(
         activeAtOffset = offset,
-        filter = Some(filter),
+        eventFormat = Some(eventFormat),
       )
     )
     for {
@@ -139,7 +139,7 @@ class BaseLedgerConnection(
         Seq[IncompleteReassignmentEvent.Unassign],
         Seq[IncompleteReassignmentEvent.Assign],
     )
-  ] = activeContracts(filter.toTransactionFilter, offset)
+  ] = activeContracts(filter.toEventFormat, offset)
 
   def getConnectedDomains(party: PartyId)(implicit
       tc: TraceContext
@@ -1328,7 +1328,7 @@ object SpliceLedgerConnection {
 
   def decodeExerciseResult[T](
       update: Update[T],
-      transaction: TransactionTree,
+      transaction: Transaction,
   ): T = {
     val rootEventIds = transaction.getRootNodeIds.asScala.toSeq
     if (rootEventIds.size == 1) {

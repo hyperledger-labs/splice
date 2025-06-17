@@ -155,6 +155,7 @@ final class CachingSynchronizerTopologyClient(
   }
 
   override def synchronizerId: SynchronizerId = delegate.synchronizerId
+  override def physicalSynchronizerId: PhysicalSynchronizerId = delegate.physicalSynchronizerId
 
   override def snapshotAvailable(timestamp: CantonTimestamp): Boolean =
     delegate.snapshotAvailable(timestamp)
@@ -238,7 +239,7 @@ object CachingSynchronizerTopologyClient {
 
   def create(
       clock: Clock,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       store: TopologyStore[TopologyStoreId.SynchronizerStore],
       packageDependenciesResolver: PackageDependencyResolverUS,
       cachingConfigs: CachingConfigs,
@@ -399,6 +400,15 @@ private class ForwardingTopologySnapshotClient(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[PartyKeyTopologySnapshotClient.PartyAuthorizationInfo]] =
     parent.partyAuthorization(party)
+
+  override def isSynchronizerUpgradeOngoing()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PhysicalSynchronizerId]] = parent.isSynchronizerUpgradeOngoing()
+
+  override def sequencerConnectionSuccessors()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[SequencerId, SequencerConnectionSuccessor]] =
+    parent.sequencerConnectionSuccessors()
 }
 
 class CachingTopologySnapshot(
@@ -516,6 +526,9 @@ class CachingTopologySnapshot(
     cache = cachingConfigs.partyCache.buildScaffeine(),
     loader = implicit traceContext => party => parent.partyAuthorization(party),
   )(logger, "partyAuthorizationsCache")
+
+  private val topologyFrozenCache =
+    new AtomicReference[Option[FutureUnlessShutdown[Option[PhysicalSynchronizerId]]]](None)
 
   override def allKeys(owner: Member)(implicit
       traceContext: TraceContext
@@ -669,4 +682,14 @@ class CachingTopologySnapshot(
         fetchAll(_).map(_.toSeq)
       )
       .map(_.toMap)
+
+  override def isSynchronizerUpgradeOngoing()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Option[PhysicalSynchronizerId]] =
+    getAndCache(topologyFrozenCache, parent.isSynchronizerUpgradeOngoing())
+
+  override def sequencerConnectionSuccessors()(implicit
+      traceContext: TraceContext
+  ): FutureUnlessShutdown[Map[SequencerId, SequencerConnectionSuccessor]] =
+    parent.sequencerConnectionSuccessors()
 }

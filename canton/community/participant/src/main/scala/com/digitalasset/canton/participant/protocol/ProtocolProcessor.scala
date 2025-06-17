@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.data.{EitherT, NonEmptyChain}
+import cats.data.{EitherT, Nested, NonEmptyChain}
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
@@ -56,7 +56,11 @@ import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{AsyncResult, HandlerResult}
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{ParticipantId, SubmissionTopologyHelper, SynchronizerId}
+import com.digitalasset.canton.topology.{
+  ParticipantId,
+  PhysicalSynchronizerId,
+  SubmissionTopologyHelper,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
@@ -102,7 +106,7 @@ abstract class ProtocolProcessor[
     ephemeral: SyncEphemeralState,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClientSend,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
     futureSupervisor: FutureSupervisor,
@@ -626,7 +630,7 @@ abstract class ProtocolProcessor[
       val rootHash = batch.rootHashMessage.rootHash
       val freshOwnTimelyTxF = ephemeral.submissionTracker.register(rootHash, requestId)
 
-      val processedET = performUnlessClosingEitherUSF(
+      val processedET = synchronizeWithClosing(
         s"ProtocolProcess.processRequest(rc=$rc, sc=$sc, traceId=${traceContext.traceId})"
       ) {
         // registering the request has to be done synchronously
@@ -696,7 +700,7 @@ abstract class ProtocolProcessor[
         )
       } else FutureUnlessShutdown.unit
 
-    performUnlessClosingEitherUSF(
+    synchronizeWithClosing(
       s"$functionFullName(rc=$rc, sc=$sc, traceId=${traceContext.traceId})"
     ) {
       val preliminaryChecksET = for {
@@ -710,7 +714,8 @@ abstract class ProtocolProcessor[
               _.leftMap(_ =>
                 steps.embedRequestError(
                   UnableToGetDynamicSynchronizerParameters(
-                    snapshot.synchronizerId,
+                    // TODO(#25467) synchronizerId in the snapshot should be physical
+                    PhysicalSynchronizerId(snapshot.synchronizerId, protocolVersion),
                     snapshot.ipsSnapshot.timestamp,
                   )
                 )
@@ -1242,7 +1247,7 @@ abstract class ProtocolProcessor[
     val content = event.event.content
     val ts = content.timestamp
 
-    val processedET = performUnlessClosingEitherUSFAsync(
+    val processedET = synchronizeWithClosing(
       s"ProtocolProcess.processResult(sc=$counter, traceId=${traceContext.traceId}"
     ) {
       val resultEnvelopes =
@@ -1260,8 +1265,8 @@ abstract class ProtocolProcessor[
         show"Got result for ${steps.requestKind.unquoted} request at $requestId: $resultEnvelopes"
       )
 
-      processResultInternal1(event, result, requestId, ts, counter)
-    }(_.value)
+      Nested(processResultInternal1(event, result, requestId, ts, counter))
+    }.value
 
     handlerResultForConfirmationResult(ts, processedET)
   }
@@ -1444,7 +1449,7 @@ abstract class ProtocolProcessor[
     //  A dishonest sequencer or mediator could break this assumption.
 
     // Some more synchronization is done in the Phase37Synchronizer.
-    val res = performUnlessClosingEitherUSF(
+    val res = synchronizeWithClosing(
       s"$functionFullName(sc=$sc, traceId=${traceContext.traceId})"
     )(
       EitherT(
@@ -1883,7 +1888,7 @@ object ProtocolProcessor {
   }
 
   final case class UnableToGetDynamicSynchronizerParameters(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       ts: CantonTimestamp,
   ) extends RequestProcessingError
       with ResultProcessingError {

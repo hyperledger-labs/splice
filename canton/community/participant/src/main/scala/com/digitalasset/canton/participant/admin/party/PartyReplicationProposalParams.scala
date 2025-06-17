@@ -9,6 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.participant.admin.workflows.java.canton.internal as M
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
@@ -25,7 +26,8 @@ final case class PartyReplicationProposalParams private (
     synchronizerId: SynchronizerId,
     targetParticipantId: ParticipantId,
     sequencerIds: NonEmpty[List[SequencerId]],
-    serial: Option[PositiveInt],
+    serial: PositiveInt,
+    participantPermission: ParticipantPermission,
 )
 
 object PartyReplicationProposalParams {
@@ -62,12 +64,13 @@ object PartyReplicationProposalParams {
           .fromProtoPrimitive(synchronizer, "synchronizer")
           // The following error is impossible to trigger as the ledger-api does not emit invalid synchronizer ids
           .leftMap(err => s"Invalid synchronizerId $err")
-      serialIntO <- Either.cond(
+      serialInt <- Either.cond(
         c.topologySerial.toInt.toLong == c.topologySerial,
-        Option.when(c.topologySerial.toInt != 0)(c.topologySerial.toInt),
+        c.topologySerial.toInt,
         s"Non-integer serial ${c.topologySerial}",
       )
-      serial <- serialIntO.traverse(PositiveInt.create).leftMap(_.message)
+      serial <- PositiveInt.create(serialInt).leftMap(_.message)
+      participantPermission = PartyParticipantPermission.fromDaml(c.participantPermission)
     } yield PartyReplicationProposalParams(
       requestId,
       partyId,
@@ -75,5 +78,6 @@ object PartyReplicationProposalParams {
       targetParticipantId,
       sequencerIdsNE,
       serial,
+      participantPermission,
     )
 }

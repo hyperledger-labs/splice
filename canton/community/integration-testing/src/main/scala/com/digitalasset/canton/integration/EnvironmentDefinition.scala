@@ -103,7 +103,7 @@ final case class EnvironmentDefinition(
   def updateTestingConfig(
       update: TestingConfigInternal => TestingConfigInternal
   ): EnvironmentDefinition =
-    copy(testingConfig = testingConfig.focus().modify(update))
+    copy(testingConfig = update(testingConfig))
 
   private def setStaticSynchronizerParameters(
       map: Map[String, StaticSynchronizerParameters]
@@ -863,6 +863,18 @@ object EnvironmentDefinition extends LazyLogging {
   )
     .withNetworkBootstrap { implicit env =>
       NetworkBootstrapper(S2M1_S2M1)
+    }
+
+  /**   - 3 participants '''not''' connected to any synchronizer
+    *   - 3 synchronizers with 1 sequencer and 1 mediator each
+    */
+  lazy val P3_S1M1_S1M1_S1M1: EnvironmentDefinition = buildBaseEnvironmentDefinition(
+    numParticipants = 3,
+    numSequencers = 3,
+    numMediators = 3,
+  )
+    .withNetworkBootstrap { implicit env =>
+      NetworkBootstrapper(S1M1_S1M1_S1M1)
     }
 
   def fromResource(path: String): EnvironmentDefinition =

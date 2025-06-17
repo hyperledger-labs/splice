@@ -29,13 +29,11 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   EpochLength,
   EpochNumber,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.SignedMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.ordering.iss.EpochInfo
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.topology.{
   Membership,
   OrderingTopologyInfo,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.ConsensusSegment.ConsensusMessage.PbftNetworkMessage
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.dependencies.ConsensusModuleDependencies
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Availability,
@@ -244,12 +242,14 @@ final class StateTransferBehavior[E <: Env[E]](
       // We drop retransmission messages, as they will likely be stale once state transfer is finished.
       case _: Consensus.RetransmissionsMessage =>
 
-      case Consensus.ConsensusMessage.PbftUnverifiedNetworkMessage(_, underlyingMessage) =>
-        enqueuePbftNetworkMessage(message, underlyingMessage)
+      case Consensus.ConsensusMessage
+            .PbftUnverifiedNetworkMessage(actualSender, _) =>
+        // Use the actual sender to prevent the node from filling up other nodes' quotas in the queue.
+        enqueuePbftNetworkMessage(message, actualSender)
 
       case Consensus.ConsensusMessage.PbftVerifiedNetworkMessage(underlyingMessage) =>
         // likely a late response from the crypto provider
-        enqueuePbftNetworkMessage(message, underlyingMessage)
+        enqueuePbftNetworkMessage(message, underlyingMessage.from)
 
       case _ =>
         postponedConsensusMessages.enqueue(BftNodeId.Empty, message) match {
@@ -268,6 +268,8 @@ final class StateTransferBehavior[E <: Env[E]](
               s"Successfully postponed a message without an originating node (`$messageType`, " +
                 s"likely a late internal message)"
             )
+          case FairBoundedQueue.EnqueueResult.Duplicate(_) =>
+            abort("Deduplication is disabled")
         }
     }
   }
@@ -370,6 +372,7 @@ final class StateTransferBehavior[E <: Env[E]](
       context.flatMapFuture(
         epochStore.completeEpoch(currentEpochNumber),
         PureFun.Const(epochStore.startEpoch(newEpochInfo)),
+        orderingStage = Some("state-transfer-store-epochs"),
       )
     ) {
       case Failure(exception) => Consensus.ConsensusMessage.AsyncException(exception)
@@ -383,18 +386,17 @@ final class StateTransferBehavior[E <: Env[E]](
 
   private def enqueuePbftNetworkMessage(
       message: Consensus.Message[E],
-      underlyingNetworkMessage: SignedMessage[PbftNetworkMessage],
-  )(implicit traceContext: TraceContext): Unit =
-    postponedConsensusMessages.enqueue(
-      underlyingNetworkMessage.message.from,
-      message,
-    ) match {
+      from: BftNodeId,
+  )(implicit context: E#ActorContextT[Consensus.Message[E]], traceContext: TraceContext): Unit =
+    postponedConsensusMessages.enqueue(from, message) match {
       case EnqueueResult.PerNodeQuotaExceeded(nodeId) =>
         logger.info(s"Node `$nodeId` exceeded its postponed message queue quota")
       case EnqueueResult.TotalCapacityExceeded =>
         logger.info("Postponed message queue total capacity has been exceeded")
       case EnqueueResult.Success =>
         logger.trace("Successfully postponed a message")
+      case FairBoundedQueue.EnqueueResult.Duplicate(_) =>
+        abort("Deduplication is disabled")
     }
 
   private def cleanUpPostponedMessageQueue(): Unit = {

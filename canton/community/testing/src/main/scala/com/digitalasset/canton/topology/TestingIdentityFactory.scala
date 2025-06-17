@@ -28,6 +28,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSynchronizerParameters,
+  StaticSynchronizerParameters,
   SynchronizerParameters,
   TestSynchronizerParameters,
 }
@@ -43,14 +44,12 @@ import com.digitalasset.canton.topology.store.{
   ValidatedTopologyTransaction,
 }
 import com.digitalasset.canton.topology.transaction.*
-import com.digitalasset.canton.topology.transaction.DelegationRestriction.{
-  CanSignAllButNamespaceDelegations,
-  CanSignAllMappings,
-}
+import com.digitalasset.canton.topology.transaction.DelegationRestriction.CanSignAllButNamespaceDelegations
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Remove
 import com.digitalasset.canton.topology.transaction.TopologyTransaction.TxHash
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
-import com.digitalasset.canton.util.{ErrorUtil, MapsUtil}
+import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.{BaseTest, FutureHelpers, LfPackageId, LfPartyId}
 import com.google.common.annotations.VisibleForTesting
 
@@ -121,10 +120,19 @@ final case class TestingTopology(
     synchronizerParameters: List[
       SynchronizerParameters.WithValidity[DynamicSynchronizerParameters]
     ] = defaultSynchronizerParams,
+    staticSynchronizerParameters: StaticSynchronizerParameters =
+      defaultStaticSynchronizerParameters,
     freshKeys: AtomicBoolean = new AtomicBoolean(false),
     sessionSigningKeysConfig: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
 ) {
   def mediators: Seq[MediatorId] = mediatorGroups.toSeq.flatMap(_.all)
+
+  /** Overwrites the `staticSynchronizerParameters` field.
+    */
+  def withStaticSynchronizerParams(
+      staticSynchronizerParameters: StaticSynchronizerParameters
+  ): TestingTopology =
+    this.copy(staticSynchronizerParameters = staticSynchronizerParameters)
 
   /** Define for which synchronizers the topology should apply.
     *
@@ -251,6 +259,7 @@ final case class TestingTopology(
       crypto,
       loggerFactory,
       synchronizerParameters,
+      staticSynchronizerParameters,
       sessionSigningKeysConfig,
     )
 }
@@ -312,11 +321,13 @@ object TestingTopology {
 
 class TestingIdentityFactory(
     topology: TestingTopology,
-    crypto: Crypto,
+    val crypto: Crypto,
     override protected val loggerFactory: NamedLoggerFactory,
     dynamicSynchronizerParameters: List[
       SynchronizerParameters.WithValidity[DynamicSynchronizerParameters]
     ],
+    staticSynchronizerParameters: StaticSynchronizerParameters =
+      defaultStaticSynchronizerParameters,
     sessionSigningKeysConfig: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
 ) extends NamedLogging
     with FutureHelpers {
@@ -351,14 +362,14 @@ class TestingIdentityFactory(
     forOwner(owner, availableUpToInclusive, currentSnapshotApproximationTimestamp)
       .tryForSynchronizer(
         synchronizerId,
-        defaultStaticSynchronizerParameters,
+        staticSynchronizerParameters,
       )
 
   private def ips(
       upToInclusive: CantonTimestamp,
       currentSnapshotApproximationTimestamp: CantonTimestamp,
   ): IdentityProvidingServiceClient = {
-    val ips = new IdentityProvidingServiceClient()
+    val ips = new IdentityProvidingServiceClient(loggerFactory)
     synchronizers.foreach(dId =>
       ips.add(new SynchronizerTopologyClient() with HasFutureSupervision with NamedLogging {
 
@@ -382,6 +393,9 @@ class TestingIdentityFactory(
         ): FutureUnlessShutdown[Boolean] = ???
 
         override def synchronizerId: SynchronizerId = dId
+
+        override def physicalSynchronizerId: PhysicalSynchronizerId =
+          PhysicalSynchronizerId(synchronizerId, BaseTest.testedProtocolVersion)
 
         override def trySnapshot(timestamp: CantonTimestamp)(implicit
             traceContext: TraceContext
@@ -448,7 +462,7 @@ class TestingIdentityFactory(
             traceContext: TraceContext
         ): FutureUnlessShutdown[Option[(SequencedTime, EffectiveTime)]] =
           FutureUnlessShutdown.pure(None)
-      })
+      })(TraceContext.empty)
     )
     ips
   }
@@ -764,7 +778,8 @@ class TestingOwnerWithKeys(
     multiHash: Boolean = false,
 ) extends NoTracing {
 
-  val cryptoApi = TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(keyOwner)
+  val crypto = TestingIdentityFactory(loggerFactory).crypto
+  val syncCryptoClient = TestingIdentityFactory(loggerFactory).forOwnerAndSynchronizer(keyOwner)
 
   object SigningKeys {
 
@@ -797,13 +812,6 @@ class TestingOwnerWithKeys(
     val uid2 = UniqueIdentifier.tryCreate("second", uid.namespace)
     val ts = CantonTimestamp.Epoch
     val ts1 = ts.plusSeconds(1)
-    val ns1k1 = mkAdd(
-      NamespaceDelegation.tryCreate(
-        Namespace(namespaceKey.fingerprint),
-        namespaceKey,
-        CanSignAllMappings,
-      )
-    )
     val ns1k2 = mkAdd(
       NamespaceDelegation.tryCreate(
         Namespace(namespaceKey.fingerprint),
@@ -819,36 +827,17 @@ class TestingOwnerWithKeys(
       OwnerToKeyMapping(mediatorId, NonEmpty(Seq, key3)),
       NonEmpty(Set, namespaceKey, key3),
     )
-    val dtc1m =
-      SynchronizerTrustCertificate(
-        participant1,
-        synchronizerId,
-      )
 
     private val defaultSynchronizerParameters = TestSynchronizerParameters.defaultDynamic
 
     val dpc1 = mkAdd(
       SynchronizerParametersState(
-        SynchronizerId(uid),
+        synchronizerId,
         defaultSynchronizerParameters
           .tryUpdate(confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfSeconds(1)),
       ),
       namespaceKey,
     )
-    val dpc1Updated = mkAdd(
-      SynchronizerParametersState(
-        SynchronizerId(uid),
-        defaultSynchronizerParameters
-          .tryUpdate(
-            confirmationResponseTimeout = NonNegativeFiniteDuration.tryOfSeconds(2),
-            topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(100),
-          ),
-      ),
-      namespaceKey,
-    )
-
-    val dpc2 =
-      mkAdd(SynchronizerParametersState(SynchronizerId(uid2), defaultSynchronizerParameters), key2)
 
     val p1_nsk2 = mkAdd(
       NamespaceDelegation.tryCreate(
@@ -924,7 +913,10 @@ class TestingOwnerWithKeys(
         // In practice the other hash should be an actual transaction hash
         // But it actually doesn't matter what the other hash is as long as the transaction hash is included
         // in the hash set
-        (NonEmpty.mk(Set, trans.hash, TxHash(TestHash.digest("test_hash"))), cryptoApi.pureCrypto)
+        (
+          NonEmpty.mk(Set, trans.hash, TxHash(TestHash.digest("test_hash"))),
+          syncCryptoClient.pureCrypto,
+        )
       )
     } else {
       None
@@ -936,7 +928,7 @@ class TestingOwnerWithKeys(
             trans,
             signingKeys.map(_.fingerprint),
             isProposal,
-            cryptoApi.crypto.privateCrypto,
+            syncCryptoClient.crypto.privateCrypto,
             BaseTest.testedProtocolVersion,
             multiHash = hash,
           )
@@ -1032,11 +1024,11 @@ class TestingOwnerWithKeys(
     Await
       .result(
         keySpecO.fold(
-          cryptoApi.crypto
+          syncCryptoClient.crypto
             .generateSigningKey(usage = usage, name = Some(KeyName.tryCreate(name)))
             .value
         )(keySpec =>
-          cryptoApi.crypto
+          syncCryptoClient.crypto
             .generateSigningKey(
               keySpec = keySpec,
               usage = usage,
@@ -1049,10 +1041,10 @@ class TestingOwnerWithKeys(
       .onShutdown(sys.error("aborted due to shutdown"))
       .getOrElse(sys.error("key should be there"))
 
-  def genEncKey(name: String): EncryptionPublicKey =
+  private def genEncKey(name: String): EncryptionPublicKey =
     Await
       .result(
-        cryptoApi.crypto
+        syncCryptoClient.crypto
           .generateEncryptionKey(name = Some(KeyName.tryCreate(name)))
           .value,
         30.seconds,

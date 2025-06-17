@@ -1425,6 +1425,35 @@ class ProtocolConverters(schemaProcessors: SchemaProcessors)(implicit
       }
   }
 
+  object AllocatePartyRequest
+      extends ProtocolConverter[
+        lapi.admin.party_management_service.AllocatePartyRequest,
+        js.AllocatePartyRequest,
+      ] {
+    def fromJson(
+        obj: js.AllocatePartyRequest
+    ): Future[lapi.admin.party_management_service.AllocatePartyRequest] =
+      Future {
+        lapi.admin.party_management_service.AllocatePartyRequest(
+          partyIdHint = obj.partyIdHint,
+          localMetadata = obj.localMetadata,
+          identityProviderId = obj.identityProviderId,
+          synchronizerId = obj.synchronizerId,
+          userId = obj.userId,
+        )
+      }
+    def toJson(
+        obj: lapi.admin.party_management_service.AllocatePartyRequest
+    ): Future[js.AllocatePartyRequest] = Future.successful(
+      js.AllocatePartyRequest(
+        partyIdHint = obj.partyIdHint,
+        localMetadata = obj.localMetadata,
+        identityProviderId = obj.identityProviderId,
+        synchronizerId = obj.synchronizerId,
+        userId = obj.userId,
+      )
+    )
+  }
 }
 
 object IdentifierConverter extends ProtocolConverter[lapi.value.Identifier, String] {

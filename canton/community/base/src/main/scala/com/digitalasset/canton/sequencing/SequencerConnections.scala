@@ -131,7 +131,9 @@ object SequencerConnections
     extends HasVersionedMessageCompanion[SequencerConnections]
     with HasVersionedMessageCompanionDbHelpers[SequencerConnections] {
 
-  def single(connection: SequencerConnection): SequencerConnections =
+  def single(
+      connection: SequencerConnection
+  ): SequencerConnections =
     new SequencerConnections(
       aliasToConnection = NonEmpty(Map, connection.sequencerAlias -> connection),
       sequencerTrustThreshold = PositiveInt.one,
@@ -218,7 +220,7 @@ object SequencerConnections
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(v30.SequencerConnections)(fromProtoV30),
       _.toProtoV30,
     )

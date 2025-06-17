@@ -256,8 +256,8 @@ final class LfValueTranslation(
           )
         )
       )
-      Ref.QualifiedChoiceName(interfaceId, choiceName) =
-        Ref.QualifiedChoiceName.assertFromString(rawExercisedEvent.exerciseChoice)
+      Ref.QualifiedChoiceId(interfaceId, choiceName) =
+        Ref.QualifiedChoiceId.assertFromString(rawExercisedEvent.exerciseChoice)
       // Convert Daml-LF values to ledger API values.
       // In verbose mode, this involves loading Daml-LF packages and filling in missing type information.
       choiceArgument <- toApiValue(
@@ -371,7 +371,7 @@ final class LfValueTranslation(
           keyOpt = globalKey.map(GlobalKeyWithMaintainers(_, maintainers)),
           version = createArgument.version,
         ),
-        createTime = rawCreatedEvent.ledgerEffectiveTime,
+        createTime = CreationTime.CreatedAt(rawCreatedEvent.ledgerEffectiveTime),
         cantonData = Bytes.fromByteArray(rawCreatedEvent.driverMetadata),
       )
 

@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.topology.transaction
 
+import cats.Monad
 import cats.data.EitherT
 import cats.instances.order.*
 import cats.syntax.either.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.KeyPurpose
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -196,10 +198,47 @@ class ValidatingTopologyMappingChecks(
     for {
       _ <- checkFirstIsNotRemove
       _ <- checkRemoveDoesNotChangeMapping
+      _ <- checkNoOngoingSynchronizerUpgrade(effective, toValidate, pendingChangesLookup)
       _ <- checkOpt.getOrElse(EitherTUtil.unitUS)
     } yield ()
 
   }
+
+  private val mappingsAllowedDuringSynchronizerUpgrade =
+    Set[Code](Code.SynchronizerUpgradeAnnouncement, Code.SequencerConnectionSuccessor)
+
+  /** Check that the topology state is not frozen if this store is a synchronizer store. All other
+    * stores are not subject to freezing the topology state.
+    */
+  private def checkNoOngoingSynchronizerUpgrade(
+      effective: EffectiveTime,
+      toValidate: GenericSignedTopologyTransaction,
+      pendingChangesLookup: PendingChangesLookup,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, TopologyTransactionRejection, Unit] =
+    Monad[EitherT[FutureUnlessShutdown, TopologyTransactionRejection, *]].whenA(
+      store.storeId.isSynchronizerStore
+    )(for {
+      results <- loadFromStore(
+        effective,
+        Set(Code.SynchronizerUpgradeAnnouncement),
+        pendingChangesLookup,
+      )
+      announcements = NonEmpty.from(
+        results.flatMap(_.selectMapping[SynchronizerUpgradeAnnouncement].toList)
+      )
+      _ <- announcements match {
+        case None => EitherTUtil.unitUS[TopologyTransactionRejection]
+        case Some(announcement) =>
+          EitherTUtil.condUnitET[FutureUnlessShutdown](
+            mappingsAllowedDuringSynchronizerUpgrade.contains(toValidate.mapping.code),
+            TopologyTransactionRejection.OngoingSynchronizerUpgrade(
+              announcement.head1.mapping.synchronizerId
+            ): TopologyTransactionRejection,
+          )
+      }
+    } yield {})
 
   private def loadHistoryFromStore(
       effectiveTime: EffectiveTime,

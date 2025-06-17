@@ -43,12 +43,13 @@ import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, MapsUtil}
+import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.collection.MapsUtil
 import com.digitalasset.canton.version.{HashingSchemeVersion, ProtocolVersion}
 import com.digitalasset.canton.{LfCreateCommand, LfKeyResolver, LfPartyId, LfValue, checked}
 import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.data.Ref.{CommandId, Identifier, PackageId, PackageName}
-import com.digitalasset.daml.lf.transaction.FatContractInstance
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance}
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
@@ -477,7 +478,7 @@ object ModelConformanceChecker {
             createNodeEnricher(storedContract.toLf)(traceContext).map { enrichedNode =>
               cid -> FatContractInstance.fromCreateNode(
                 enrichedNode,
-                storedContract.ledgerCreateTime.toLf,
+                CreationTime.CreatedAt(storedContract.ledgerCreateTime.toLf),
                 saltFromSerializedContract(storedContract),
               )
             }

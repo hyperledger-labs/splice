@@ -370,7 +370,7 @@ class JoiningNodeInitializer(
             config.scan,
           )
           // Finally, fully onboard the sequencer and mediator
-          _ <-
+          physicalSynchronizerId <-
             localSynchronizerNode.onboardLocalSequencerIfRequired(
               svConnection.map(_._2)
             )
@@ -378,7 +378,7 @@ class JoiningNodeInitializer(
           _ = if (!skipTrafficReconciliationTriggers)
             dsoAutomationService.registerTrafficReconciliationTriggers()
           _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
-            decentralizedSynchronizer
+            physicalSynchronizerId
           )
           _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
           _ <- waitForSvToObtainUnlimitedTraffic(localSynchronizerNode, decentralizedSynchronizer)
@@ -472,7 +472,7 @@ class JoiningNodeInitializer(
                 show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
-          case Some(HostingParticipant(_, permission)) =>
+          case Some(HostingParticipant(_, permission, _)) =>
             if (permission == ParticipantPermission.Submission)
               dsoPartyHosting
             else

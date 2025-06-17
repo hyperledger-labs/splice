@@ -222,7 +222,7 @@ class SyncCryptoVerifier(
           validKeys,
           SignatureDelegation.generateHash(
             synchronizerId,
-            signatureDelegation.sessionKey.id,
+            signatureDelegation.sessionKey,
             signatureDelegation.validityPeriod,
           ),
           signatureDelegation.signature,
@@ -265,6 +265,13 @@ class SyncCryptoVerifier(
     val cachedSignatureDelegationO =
       sessionKeysVerificationCache.getIfPresent(sessionKey.fingerprint).map { case (sD, _) => sD }
     for {
+      _ <- EitherT.cond[FutureUnlessShutdown](
+        usage == SigningKeyUsage.ProtocolOnly,
+        (),
+        SignatureCheckError.UnsupportedDelegationSignatureError(
+          s"Session signing keys are not supposed to be used for non-protocol messages. Requested usage: $usage"
+        ),
+      )
       // get the current long-term valid keys
       validKeys <- validKeysO.fold(
         getValidKeys(topologySnapshot, signers, usage)

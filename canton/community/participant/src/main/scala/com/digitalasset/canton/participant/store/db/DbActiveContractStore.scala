@@ -41,6 +41,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.util.collection.IterableUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import slick.jdbc.*
 
@@ -152,14 +153,7 @@ class DbActiveContractStore(
       )
       _ <-
         if (enableAdditionalConsistencyChecks) {
-          performUnlessClosingCheckedUST(
-            "additional-consistency-check",
-            Checked.result[AcsError, AcsWarning, Unit](
-              logger.debug(
-                "Could not perform additional consistency check because node is shutting down"
-              )
-            ),
-          ) {
+          synchronizeWithClosing("additional-consistency-check") {
             activeContractsData.asSeq.parTraverse_ { tc =>
               checkActivationsDeactivationConsistency(
                 tc.contractId,
@@ -188,14 +182,9 @@ class DbActiveContractStore(
       )
       _ <-
         if (enableAdditionalConsistencyChecks) {
-          performUnlessClosingCheckedUST(
-            "additional-consistency-check",
-            Checked.result[AcsError, AcsWarning, Unit](
-              logger.debug(
-                "Could not perform additional consistency check because node is shutting down"
-              )
-            ),
-          )(contracts.parTraverse_(checkActivationsDeactivationConsistency tupled))
+          synchronizeWithClosing("additional-consistency-check")(
+            contracts.parTraverse_(checkActivationsDeactivationConsistency tupled)
+          )
         } else checkedTUnit
     } yield ()
   }
@@ -522,7 +511,7 @@ class DbActiveContractStore(
             // use of the partial index "active_contracts_pruning_idx" appears to be splitting the select and delete
             // into separate statements. See #11292.
             for {
-              acsEntriesToPrune <- performUnlessClosingUSF("Fetch ACS entries batch")(
+              acsEntriesToPrune <- synchronizeWithClosing("Fetch ACS entries batch")(
                 storage.query(
                   (sql"""
                   with deactivation_time(contract_id, ts, repair_counter, row_num) as (
@@ -544,7 +533,7 @@ class DbActiveContractStore(
                 )
               )
               totalEntriesPruned <-
-                performUnlessClosingUSF("Delete ACS entries batch")(
+                synchronizeWithClosing("Delete ACS entries batch")(
                   if (acsEntriesToPrune.isEmpty) FutureUnlessShutdown.pure(0)
                   else {
                     val deleteStatement =
@@ -566,7 +555,7 @@ class DbActiveContractStore(
                 )
             } yield totalEntriesPruned
           case _: DbStorage.Profile.H2 =>
-            performUnlessClosingUSF("ACS.doPrune")(
+            synchronizeWithClosing("ACS.doPrune")(
               storage.queryAndUpdate(
                 sqlu"""
             with deactivation_time(contract_id, ts, repair_counter, row_num) as (

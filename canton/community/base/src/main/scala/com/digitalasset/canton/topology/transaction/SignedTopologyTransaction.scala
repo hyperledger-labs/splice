@@ -213,7 +213,7 @@ object SignedTopologyTransaction
     SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping]
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.SignedTopologyTransaction
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -345,11 +345,18 @@ object SignedTopologyTransaction
     )
   }
 
+  /** @param crypto
+    *   We use a [[com.digitalasset.canton.crypto.BaseCrypto]] because this method serves both the
+    *   synchronizer outbox dispatcher that requires a
+    *   [[com.digitalasset.canton.crypto.SynchronizerCrypto]] and the GRPC topology manager read
+    *   service that uses a [[com.digitalasset.canton.crypto.Crypto]]. This method is only used to
+    *   produce signatures; and it does not verify signatures from untrusted sources.
+    */
   def asVersion[Op <: TopologyChangeOp, M <: TopologyMapping](
       signedTx: SignedTopologyTransaction[Op, M],
       protocolVersion: ProtocolVersion,
   )(
-      crypto: Crypto
+      crypto: BaseCrypto
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -469,7 +476,7 @@ object SignedTopologyTransactions
       ProtocolVersionValidation,
     ] {
   override val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(
       v30.SignedTopologyTransactions
     )(
       supportedProtoVersion(_)(fromProtoV30),

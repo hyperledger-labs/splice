@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250516.13778.0.v4f93f23f"
+  val version: String = "3.4.0-snapshot.20250613.13901.0.v8b39a4d0"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -19,7 +19,7 @@ object CantonDependencies {
     if (sys.props("os.name").contains("Mac")) "osx"
     else sys.props("os.name").toLowerCase
 
-  lazy val scala_version = "2.13.15"
+  lazy val scala_version = "2.13.16"
   lazy val scala_version_short = "2.13"
 
   lazy val anorm = "org.playframework.anorm" %% "anorm" % "2.7.0"
@@ -33,7 +33,7 @@ object CantonDependencies {
   lazy val logback_version = "1.4.5"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
-  lazy val ammonite_version = "3.0.0"
+  lazy val ammonite_version = "3.0.1"
   lazy val pprint_version = "0.7.1"
   // if you update the slick version, please also update our forked code in common/slick.util.*
   lazy val slick_version = "3.5.2"

@@ -11,7 +11,7 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.util.ReassignmentTag.Target
 import com.digitalasset.canton.version.{
   ProtoVersion,
@@ -46,7 +46,7 @@ final case class AssignmentMediatorMessage(
 
   protected[this] val commonData: AssignmentCommonData = tree.commonData.tryUnwrap
 
-  override def synchronizerId: SynchronizerId = commonData.targetSynchronizerId.unwrap
+  override def synchronizerId: PhysicalSynchronizerId = commonData.targetSynchronizerId.unwrap
 
   override def mediator: MediatorGroupRecipient = commonData.targetMediatorGroup
 
@@ -78,7 +78,7 @@ object AssignmentMediatorMessage
     ] {
 
   val versioningTable: VersioningTable = VersioningTable(
-    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v33)(v30.AssignmentMediatorMessage)(
+    ProtoVersion(30) -> VersionedProtoCodec(ProtocolVersion.v34)(v30.AssignmentMediatorMessage)(
       supportedProtoVersion(_)((context, proto) => fromProtoV30(context)(proto)),
       _.toProtoV30,
     )

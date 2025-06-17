@@ -8,8 +8,8 @@ import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Versioned}
-import com.digitalasset.daml.lf.value.Value.{ContractId, ContractInstance}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
+import com.digitalasset.daml.lf.value.Value.{ContractId, ThinContractInstance}
 
 trait ContractAuthenticator {
 
@@ -62,14 +62,18 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
     for {
       metadata <- ContractMetadata.create(contract.signatories, contract.stakeholders, gk)
       driverMetadata <- DriverContractMetadata
-        .fromTrustedByteString(contract.cantonData.toByteString)
+        .fromLfBytes(contract.cantonData.toByteArray)
         .leftMap(_.toString)
-      createTime <- CantonTimestamp.fromInstant(contract.createdAt.toInstant)
+      createTime <- contract.createdAt match {
+        case CreationTime.CreatedAt(time) => Right(CantonTimestamp(time))
+        case CreationTime.Now =>
+          Left(s"Cannot determine creation time for contract ${contract.contractId}.")
+      }
       contractInstance <- SerializableRawContractInstance
         .create(
           Versioned(
             contract.version,
-            ContractInstance(
+            ThinContractInstance(
               contract.packageName,
               contract.templateId,
               contract.createArg,
@@ -115,7 +119,10 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
       metadata: ContractMetadata,
       rawContractInstance: SerializableRawContractInstance,
   ): Either[String, Unit] = {
-    val ContractId.V1(_, cantonContractSuffix) = contractId
+    val ContractId.V1(_, cantonContractSuffix) = contractId match {
+      case cid: LfContractId.V1 => cid
+      case _ => sys.error("ContractId V2 are not supported")
+    }
     val optContractIdVersion = CantonContractIdVersion.fromContractSuffix(cantonContractSuffix)
     optContractIdVersion match {
       case Right(contractIdVersion) =>

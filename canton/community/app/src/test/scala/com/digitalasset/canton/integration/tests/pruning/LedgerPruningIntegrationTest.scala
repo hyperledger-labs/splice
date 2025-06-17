@@ -19,7 +19,7 @@ import com.digitalasset.canton.integration.plugins.{
 }
 import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors.OffsetOutOfRange
 import com.digitalasset.canton.participant.admin.grpc.PruningServiceError.UnsafeToPrune
-import com.digitalasset.canton.protocol.LfContractInst
+import com.digitalasset.canton.protocol.LfThinContractInst
 import com.digitalasset.canton.sequencing.protocol.{Recipients, SubmissionRequest}
 import com.digitalasset.canton.synchronizer.sequencer.{
   HasProgrammableSequencer,
@@ -27,7 +27,7 @@ import com.digitalasset.canton.synchronizer.sequencer.{
   SendDecision,
 }
 import com.digitalasset.canton.time.{NonNegativeFiniteDuration, SimClock}
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{SynchronizerAlias, config}
 import org.scalatest.Assertions.fail
@@ -106,8 +106,8 @@ abstract class LedgerPruningIntegrationTest
 
   def acsContracts(p: LocalParticipantReference, templateIdO: Option[String] = None)(implicit
       env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
-  ): Seq[LfContractInst] = {
-    val all: Seq[LfContractInst] =
+  ): Seq[LfThinContractInst] = {
+    val all: Seq[LfThinContractInst] =
       p.testing.pcs_search(env.daName, activeSet = true).map(_._2.contractInstance)
     templateIdO match {
       case Some(templateId) =>
@@ -214,10 +214,10 @@ abstract class LedgerPruningIntegrationTest
 
     def requestJournalSize(
         p: LocalParticipantReference,
-        synchronizerAlias: SynchronizerAlias,
+        psid: PhysicalSynchronizerId,
         end: Option[CantonTimestamp],
     ): Int = {
-      val size = p.testing.state_inspection.requestJournalSize(synchronizerAlias, end = end).value
+      val size = p.testing.state_inspection.requestJournalSize(psid, end = end).value
       size.failOnShutdown
     }
 
@@ -271,13 +271,13 @@ abstract class LedgerPruningIntegrationTest
         // The only contracts pruned from the pcs should be those of the first bong.
         pcsCount(participant) shouldBe expectedPcsCount
 
-        val msgs = participant.testing.sequencer_messages(daName)
+        val msgs = participant.testing.sequencer_messages(daId)
         msgs should not be empty
         forAll(msgs) { msg =>
           msg.timestamp should be >= lastSeenTxTsBeforePruning
         }
 
-        requestJournalSize(participant, daName, end = Some(lastSeenTxTsBeforePruning)) shouldBe 0
+        requestJournalSize(participant, daId, end = Some(lastSeenTxTsBeforePruning)) shouldBe 0
       }
     }
 
@@ -286,11 +286,15 @@ abstract class LedgerPruningIntegrationTest
     val p1Id = participant1.id.adminParty
     val p2Id = participant2.id.adminParty
 
+    // wait until all unrelated active contracts are archived
+    eventually() {
+      acsCount(participant1) shouldBe 0
+      acsCount(participant2) shouldBe 0
+    }
+
     val p1UnrelatedPingContracts = pcsCount(participant1)
-    val p1UnrelatedActivePingContracts = acsCount(participant1)
 
     val p2UnrelatedPingContracts = pcsCount(participant2)
-    val p2UnrelatedActivePingContracts = acsCount(participant2)
 
     // Perform a level 2 bong to produce a lot of archived contracts and events to be pruned.
     // Produces 14 contracts.
@@ -302,7 +306,7 @@ abstract class LedgerPruningIntegrationTest
 
     pcsCount(participant1) shouldBe 14 + p1UnrelatedPingContracts
     // No new ping contracts should remain active
-    acsCount(participant1) shouldBe p1UnrelatedActivePingContracts
+    acsCount(participant1) shouldBe 0
 
     // Creates two more contracts (that stay active)
     createCycleContract(
@@ -408,7 +412,7 @@ abstract class LedgerPruningIntegrationTest
       p1LedgerEnd,
       p1PruningOffset,
       lastSeenTxTsBeforePruning,
-      16 + p1UnrelatedActivePingContracts,
+      16,
       2,
     )
     pruneAndCheck(
@@ -416,7 +420,7 @@ abstract class LedgerPruningIntegrationTest
       p2LedgerEnd,
       p2PruningOffset,
       lastSeenTxTsBeforePruning,
-      16 + p2UnrelatedActivePingContracts,
+      16,
       2,
     )
 
@@ -486,7 +490,7 @@ abstract class LedgerPruningIntegrationTest
           new Amount(3.50.toBigDecimal, "CHF"),
           List().asJava,
         ).create.commands.asScala.toSeq
-      participant1.ledger_api.javaapi.commands.submit_flat(
+      participant1.ledger_api.javaapi.commands.submit(
         Seq(participant1.id.adminParty),
         cmd,
         Some(daId),

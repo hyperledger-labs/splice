@@ -37,6 +37,7 @@ object ConsoleEnvironmentBinding {
        |import com.digitalasset.canton.participant.admin.workflows.java.canton.internal.ping.Ping
        |$consoleMacrosImport
        |import ${classOf[com.digitalasset.canton.console.BootstrapScriptException].getName}
+       |import ${classOf[com.digitalasset.canton.SynchronizerAlias].getName}
        |import com.digitalasset.canton.config.RequireTypes._
        |import com.digitalasset.canton.participant.admin.ResourceLimits
        |import ch.qos.logback.classic.Level
@@ -81,6 +82,7 @@ object ConsoleEnvironmentBinding {
          |import com.digitalasset.canton.sequencing.SequencerConnection
          |import com.digitalasset.canton.sequencing.SequencerConnections
          |import com.digitalasset.canton.sequencing.SequencerConnectionValidation._
+         |import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
          |import com.digitalasset.canton.sequencing.GrpcSequencerConnection
          |""".stripMargin
 

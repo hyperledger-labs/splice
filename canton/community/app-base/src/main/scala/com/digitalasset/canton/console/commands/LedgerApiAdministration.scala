@@ -28,11 +28,13 @@ import com.daml.ledger.api.v2.state_service.{
   GetConnectedSynchronizersResponse,
 }
 import com.daml.ledger.api.v2.topology_transaction.TopologyTransaction as TopoplogyTransactionProto
-import com.daml.ledger.api.v2.transaction.{
-  Transaction as ApiTransaction,
-  TransactionTree as TransactionTreeProto,
-}
+import com.daml.ledger.api.v2.transaction.Transaction as ApiTransaction
+import com.daml.ledger.api.v2.transaction_filter
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
+import com.daml.ledger.api.v2.transaction_filter.TransactionShape.{
+  TRANSACTION_SHAPE_ACS_DELTA,
+  TRANSACTION_SHAPE_LEDGER_EFFECTS,
+}
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
   EventFormat,
@@ -40,22 +42,20 @@ import com.daml.ledger.api.v2.transaction_filter.{
   ParticipantAuthorizationTopologyFormat,
   TemplateFilter,
   TopologyFormat,
-  TransactionFilter as TransactionFilterProto,
+  TransactionFormat as TransactionFormatProto,
+  TransactionShape,
   UpdateFormat,
 }
 import com.daml.ledger.javaapi as javab
 import com.daml.ledger.javaapi.data.{
-  GetUpdateTreesResponse,
   GetUpdatesResponse,
   Reassignment,
   TopologyTransaction,
   Transaction,
-  TransactionFilter,
-  TransactionTree,
+  TransactionFormat,
 }
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.metrics.api.MetricsContext
-import com.daml.scalautil.Statement.discard
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.*
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.{
@@ -81,7 +81,6 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.Signature
 import com.digitalasset.canton.data.{CantonTimestamp, DeduplicationPeriod}
-import com.digitalasset.canton.ledger.api.util.TransactionTreeOps.TransactionTreeOps
 import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId, JwksUrl}
 import com.digitalasset.canton.ledger.client.services.admin.IdentityProviderConfigClient
 import com.digitalasset.canton.logging.NamedLogging
@@ -101,8 +100,8 @@ import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 import scala.util.chaining.scalaUtilChainingOps
-import scala.util.{Failure, Success, Try}
 
 trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper {
   thisAdministration: LedgerApiCommandRunner & NamedLogging & FeatureFlagFilter =>
@@ -148,116 +147,21 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     @Help.Group("Updates")
     object updates extends Helpful {
 
-      @Help.Summary("Get update trees", FeatureFlag.Testing)
+      @Help.Summary("Get updates", FeatureFlag.Testing)
       @Help.Description(
-        """This function connects to the update tree stream for the given parties and collects update trees
-          |until either `completeAfter` update trees have been received or `timeout` has elapsed.
-          |The returned update trees can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
-          |If the beginOffset is zero then the participant begin is taken as beginning offset.
-          |If the endOffset is None then a continuous stream is returned."""
-      )
-      def trees(
-          partyIds: Set[PartyId],
-          completeAfter: PositiveInt,
-          beginOffsetExclusive: Long = 0L,
-          endOffsetInclusive: Option[Long] = None,
-          verbose: Boolean = true,
-          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
-          resultFilter: UpdateTreeWrapper => Boolean = _ => true,
-      ): Seq[UpdateTreeWrapper] =
-        trees_with_tx_filter(
-          filter = TransactionFilterProto(partyIds.map(_.toLf -> Filters(Nil)).toMap, None),
-          completeAfter = completeAfter,
-          beginOffsetExclusive = beginOffsetExclusive,
-          endOffsetInclusive = endOffsetInclusive,
-          verbose = verbose,
-          timeout = timeout,
-          resultFilter = resultFilter,
-        )
-
-      @Help.Summary("Get update trees", FeatureFlag.Testing)
-      @Help.Description(
-        """This function connects to the update tree stream for the transaction filter and collects update trees
-          |until either `completeAfter` update trees have been received or `timeout` has elapsed.
-          |The returned update trees can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
-          |NOTE: As opposed to the flat transaction streams, the transaction filter provided for transaction trees DO NOT
-          | filter the events in the tree, but decide instead the event payloads projection rules.
-          | (e.g. whether to include in the CreatedEvent the created event blob).
-          |If the beginOffset is zero then the participant begin is taken as beginning offset.
-          |If the endOffset is None then a continuous stream is returned."""
-      )
-      def trees_with_tx_filter(
-          filter: TransactionFilterProto,
-          completeAfter: PositiveInt,
-          beginOffsetExclusive: Long = 0L,
-          endOffsetInclusive: Option[Long] = None,
-          verbose: Boolean = true,
-          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
-          resultFilter: UpdateTreeWrapper => Boolean = _ => true,
-      ): Seq[UpdateTreeWrapper] = check(FeatureFlag.Testing)({
-        val observer = new RecordingStreamObserver[UpdateTreeWrapper](completeAfter, resultFilter)
-        mkResult(
-          subscribe_trees(observer, filter, beginOffsetExclusive, endOffsetInclusive, verbose),
-          "getUpdateTrees",
-          observer,
-          timeout,
-        )
-      })
-
-      @Help.Summary("Subscribe to the update tree stream", FeatureFlag.Testing)
-      @Help.Description(
-        """This function connects to the update tree stream and passes update trees to `observer` until
-          |the stream is completed.
-          |Only update trees for parties in `filter.filterByParty.keys` will be returned.
-          |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all trees for `myParty: PartyId`.
+        """This function connects to the update stream for the given parties and collects updates
+          |until either `completeAfter` updates have been received or `timeout` has elapsed.
           |The returned updates can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
           |If the endOffset is None then a continuous stream is returned."""
       )
-      def subscribe_trees(
-          observer: StreamObserver[UpdateTreeWrapper],
-          filter: TransactionFilterProto,
-          beginOffsetExclusive: Long = 0L,
-          endOffsetInclusive: Option[Long] = None,
-          verbose: Boolean = true,
-      ): AutoCloseable =
-        check(FeatureFlag.Testing)(
-          consoleEnvironment.run {
-            ledgerApiCommand(
-              LedgerApiCommands.UpdateService.SubscribeTrees(
-                observer,
-                beginOffsetExclusive,
-                endOffsetInclusive,
-                filter,
-                verbose,
-              )
-            )
-          }
-        )
-
-      @Help.Summary("Get flat updates", FeatureFlag.Testing)
-      @Help.Description(
-        """This function connects to the flat update stream for the given parties and collects updates
-          |until either `completeAfter` flat updates have been received or `timeout` has elapsed.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
-          |including create event blobs for explicit disclosure, consider using `flat_with_tx_filter`.
-          |If the beginOffset is zero then the participant begin is taken as beginning offset.
-          |If the endOffset is None then a continuous stream is returned."""
-      )
-      def flat(
-          partyIds: Set[PartyId],
+      def updates(
+          updateFormat: UpdateFormat,
           completeAfter: PositiveInt,
           beginOffsetExclusive: Long = 0L,
           endOffsetInclusive: Option[Long] = None,
-          verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
           synchronizerFilter: Option[SynchronizerId] = None,
@@ -273,13 +177,78 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         val observer =
           new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilterWithSynchronizer)
 
-        val filter = TransactionFilterProto(partyIds.map(_.toLf -> Filters(Nil)).toMap, None)
         mkResult(
-          subscribe_flat(observer, filter, beginOffsetExclusive, endOffsetInclusive, verbose),
+          subscribe_updates(
+            observer,
+            updateFormat,
+            beginOffsetExclusive,
+            endOffsetInclusive,
+          ),
           "getUpdates",
           observer,
           timeout,
         )
+      })
+
+      @Help.Summary("Get transactions", FeatureFlag.Testing)
+      @Help.Description(
+        """This function connects to the update stream for the given parties and collects updates
+          |until either `completeAfter` transactions have been received or `timeout` has elapsed.
+          |The returned updates can be filtered to be between the given offsets (default: no filtering).
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
+          |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
+          |including create event blobs for explicit disclosure, consider using `tx_with_tx_format`.
+          |If the beginOffset is zero then the participant begin is taken as beginning offset.
+          |If the endOffset is None then a continuous stream is returned."""
+      )
+      def transactions(
+          partyIds: Set[PartyId],
+          completeAfter: PositiveInt,
+          beginOffsetExclusive: Long = 0L,
+          endOffsetInclusive: Option[Long] = None,
+          verbose: Boolean = true,
+          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+          resultFilter: UpdateWrapper => Boolean = _ => true,
+          synchronizerFilter: Option[SynchronizerId] = None,
+          transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+      ): Seq[TransactionWrapper] = check(FeatureFlag.Testing)({
+
+        val resultFilterWithSynchronizer = synchronizerFilter match {
+          case Some(synchronizerId) =>
+            (update: UpdateWrapper) =>
+              resultFilter(update) && update.synchronizerId == synchronizerId.toProtoPrimitive
+          case None => resultFilter
+        }
+
+        val observer =
+          new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilterWithSynchronizer)
+
+        val transactionFormat = TransactionFormatProto(
+          eventFormat = Some(
+            EventFormat(
+              filtersByParty = partyIds.map(_.toLf -> Filters(Nil)).toMap,
+              filtersForAnyParty = None,
+              verbose = verbose,
+            )
+          ),
+          transactionShape = transactionShape,
+        )
+
+        mkResult(
+          subscribe_updates(
+            observer,
+            UpdateFormat(
+              includeTransactions = Some(transactionFormat),
+              includeReassignments = None,
+              includeTopologyEvents = None,
+            ),
+            beginOffsetExclusive,
+            endOffsetInclusive,
+          ),
+          "getUpdates",
+          observer,
+          timeout,
+        ).collect { case tx: TransactionWrapper => tx }
       })
 
       @Help.Summary("Get reassignments", FeatureFlag.Testing)
@@ -301,6 +270,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           completeAfter: PositiveInt,
           beginOffsetExclusive: Long = 0L,
           endOffsetInclusive: Option[Long] = None,
+          verbose: Boolean = false,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
           synchronizerFilter: Option[SynchronizerId] = None,
@@ -338,7 +308,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 EventFormat(
                   filtersByParty = Map.empty,
                   filtersForAnyParty = Some(filters),
-                  verbose = false,
+                  verbose = verbose,
                 )
               )
             else
@@ -346,7 +316,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 EventFormat(
                   filtersByParty = partyIds.map(_.toLf -> filters).toMap,
                   filtersForAnyParty = None,
-                  verbose = false,
+                  verbose = verbose,
                 )
               ),
           includeTransactions = None,
@@ -429,65 +399,42 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         ).collect { case wrapper: TopologyTransactionWrapper => wrapper }
       })
 
-      @Help.Summary("Get flat updates", FeatureFlag.Testing)
+      @Help.Summary("Get updates", FeatureFlag.Testing)
       @Help.Description(
-        """This function connects to the flat update stream for the given transaction filter and collects updates
+        """This function connects to the update stream for the given transaction format and collects updates
           |until either `completeAfter` transactions have been received or `timeout` has elapsed.
           |The returned transactions can be filtered to be between the given offsets (default: no filtering).
           |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
           |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
-          |`flat` instead.
+          |`transactions` instead.
           |If the beginOffset is zero then the participant begin is taken as beginning offset.
           |If the endOffset is None then a continuous stream is returned."""
       )
-      def flat_with_tx_filter(
-          filter: TransactionFilterProto,
+      def transactions_with_tx_format(
+          transactionFormat: TransactionFormatProto,
           completeAfter: PositiveInt,
           beginOffsetExclusive: Long = 0L,
           endOffsetInclusive: Option[Long] = None,
-          verbose: Boolean = true,
           timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
           resultFilter: UpdateWrapper => Boolean = _ => true,
       ): Seq[UpdateWrapper] = check(FeatureFlag.Testing)({
         val observer = new RecordingStreamObserver[UpdateWrapper](completeAfter, resultFilter)
         mkResult(
-          subscribe_flat(observer, filter, beginOffsetExclusive, endOffsetInclusive, verbose),
+          subscribe_updates(
+            observer,
+            UpdateFormat(
+              includeTransactions = Some(transactionFormat),
+              includeReassignments = None,
+              includeTopologyEvents = None,
+            ),
+            beginOffsetExclusive,
+            endOffsetInclusive,
+          ),
           "getUpdates",
           observer,
           timeout,
         )
       })
-
-      @Help.Summary("Subscribe to the flat update stream", FeatureFlag.Testing)
-      @Help.Description("""This function connects to the flat update stream and passes updates to `observer` until
-          |the stream is completed.
-          |Only updates for parties in `filter.filterByParty.keys` will be returned.
-          |Use `filter = TransactionFilter(Map(myParty.toLf -> Filters()))` to return all updates for `myParty: PartyId`.
-          |The returned updates can be filtered to be between the given offsets (default: no filtering).
-          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-          |this command fails with a `NOT_FOUND` error.
-          |If the beginOffset is zero then the participant begin is taken as beginning offset.
-          |If the endOffset is None then a continuous stream is returned.""")
-      def subscribe_flat(
-          observer: StreamObserver[UpdateWrapper],
-          filter: TransactionFilterProto,
-          beginOffsetExclusive: Long = 0L,
-          endOffsetInclusive: Option[Long] = None,
-          verbose: Boolean = true,
-      ): AutoCloseable =
-        check(FeatureFlag.Testing)(
-          consoleEnvironment.run {
-            ledgerApiCommand(
-              LedgerApiCommands.UpdateService.SubscribeFlat(
-                observer,
-                beginOffsetExclusive,
-                endOffsetInclusive,
-                filter,
-                verbose,
-              )
-            )
-          }
-        )
 
       @Help.Summary("Subscribe to the update stream", FeatureFlag.Testing)
       @Help.Description("""This function connects to the update stream and passes updates to `observer` until the stream
@@ -521,10 +468,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
 
       @Help.Summary("Starts measuring throughput at the update service", FeatureFlag.Testing)
       @Help.Description(
-        """This function will subscribe on behalf of `parties` to the update tree stream and
+        """This function will subscribe on behalf of `parties` to the update stream and
           |notify various metrics:
           |The metric `<name>.<metricSuffix>` counts the number of update trees emitted.
-          |The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of events emitted as part of update trees.
+          |The metric `<name>.<metricSuffix>-tx-node-count` tracks the number of events emitted as part of update.
           |The metric `<name>.<metricSuffix>-tx-size` tracks the number of bytes emitted as part of update trees.
           |
           |To stop measuring, you need to close the returned `AutoCloseable`.
@@ -533,11 +480,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       def start_measuring(
           parties: Set[PartyId],
           metricName: String,
-          onUpdate: UpdateTreeWrapper => Unit = _ => (),
+          onUpdate: UpdateWrapper => Unit = _ => (),
       )(implicit consoleEnvironment: ConsoleEnvironment): AutoCloseable =
         check(FeatureFlag.Testing) {
 
-          val observer: StreamObserver[UpdateTreeWrapper] = new StreamObserver[UpdateTreeWrapper] {
+          val observer: StreamObserver[UpdateWrapper] = new StreamObserver[UpdateWrapper] {
 
             implicit val metricsContext: MetricsContext =
               MetricsContext("measurement" -> metricName)
@@ -546,17 +493,25 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               .forParticipant(name)
               .consoleThroughput
 
-            override def onNext(tree: UpdateTreeWrapper): Unit = {
-              val (s, serializedSize) = tree match {
-                case TransactionTreeWrapper(transactionTree) =>
-                  transactionTree.rootNodeIds().size.toLong -> transactionTree.serializedSize
+            override def onNext(tx: UpdateWrapper): Unit = {
+              val (s, serializedSize) = tx match {
+                case TransactionWrapper(transaction) =>
+                  Transaction
+                    .fromProto(ApiTransaction.toJavaProto(transaction))
+                    .getRootNodeIds
+                    .size
+                    .toLong -> transaction.serializedSize
                 case reassignmentWrapper: ReassignmentWrapper =>
                   1L -> reassignmentWrapper.reassignment.serializedSize
+                case topologyTransaction: TopologyTransactionWrapper =>
+                  throw new RuntimeException(
+                    s"Unexpectedly received a topology transaction: $topologyTransaction."
+                  )
               }
               consoleMetrics.metric.mark(s)
               consoleMetrics.nodeCount.update(s)
               consoleMetrics.transactionSize.update(serializedSize)
-              onUpdate(tree)
+              onUpdate(tx)
             }
 
             override def onError(t: Throwable): Unit = t match {
@@ -581,44 +536,29 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               logger.info(s"Stop measuring throughput (metric: $metricName).")
           }
 
-          val filterParty = TransactionFilterProto(parties.map(_.toLf -> Filters(Nil)).toMap, None)
-
-          logger.info(s"Start measuring throughput (metric: $metricName).")
-          subscribe_trees(
-            observer,
-            filterParty,
-            state.end(),
+          val eventFormat = EventFormat(
+            filtersByParty = parties.map(_.toLf -> Filters(Nil)).toMap,
+            filtersForAnyParty = None,
             verbose = false,
           )
+          val updateFormat = UpdateFormat(
+            includeTransactions = Some(
+              TransactionFormatProto(
+                eventFormat = Some(eventFormat),
+                transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+              )
+            ),
+            includeReassignments = Some(eventFormat),
+            includeTopologyEvents = None,
+          )
+
+          logger.info(s"Start measuring throughput (metric: $metricName).")
+          subscribe_updates(
+            observer = observer,
+            updateFormat = updateFormat,
+            beginOffsetExclusive = state.end(),
+          )
         }
-
-      @Help.Summary("Get a (tree) transaction by its ID", FeatureFlag.Testing)
-      @Help.Description(
-        """Get a transaction tree from the update stream by its ID. Returns None if the transaction is not (yet)
-          |known at the participant or if the transaction has been pruned via `pruning.prune`."""
-      )
-      def by_id(parties: Set[PartyId], id: String): Option[TransactionTreeProto] =
-        check(FeatureFlag.Testing)(consoleEnvironment.run {
-          ledgerApiCommand(
-            LedgerApiCommands.UpdateService.GetTransactionById(parties.map(_.toLf), id)(
-              consoleEnvironment.environment.executionContext
-            )
-          )
-        })
-
-      @Help.Summary("Get a transaction tree by its offset", FeatureFlag.Testing)
-      @Help.Description(
-        """Get a transaction tree from the update stream by its offset. Returns None if the transaction is not (yet)
-          |known at the participant or if the transaction has been pruned via `pruning.prune`."""
-      )
-      def by_offset(parties: Set[PartyId], offset: Long): Option[TransactionTreeProto] =
-        check(FeatureFlag.Testing)(consoleEnvironment.run {
-          ledgerApiCommand(
-            LedgerApiCommands.UpdateService.GetTransactionByOffset(parties.map(_.toLf), offset)(
-              consoleEnvironment.environment.executionContext
-            )
-          )
-        })
 
       @Help.Summary("Get an update by its ID", FeatureFlag.Testing)
       @Help.Description(
@@ -778,10 +718,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
     object commands extends Helpful {
 
       @Help.Summary(
-        "Submit command and wait for the resulting transaction, returning the transaction tree or failing otherwise"
+        "Submit command and wait for the resulting transaction, returning the transaction or failing otherwise"
       )
       @Help.Description(
-        """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit and returns it.
+        """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit, and returns the "flattened" transaction.
           | If the timeout is set, it also waits for the transaction to appear at all other configured
           | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
           | the timeout only specifies how long to wait at the other participants.
@@ -805,56 +745,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           disclosedContracts: Seq[DisclosedContract] = Seq.empty,
           userId: String = userId,
           userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
-      ): TransactionTreeProto = {
-        val tx = consoleEnvironment.run {
-          ledgerApiCommand(
-            LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
-              actAs.map(_.toLf),
-              readAs.map(_.toLf),
-              commands,
-              workflowId,
-              commandId,
-              deduplicationPeriod,
-              submissionId,
-              minLedgerTimeAbs,
-              disclosedContracts,
-              synchronizerId,
-              userId,
-              userPackageSelectionPreference,
-            )
-          )
-        }
-        optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
-      }
-
-      @Help.Summary(
-        "Submit command and wait for the resulting transaction, returning the flattened transaction or failing otherwise"
-      )
-      @Help.Description(
-        """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit, and returns the "flattened" transaction.
-          | If the timeout is set, it also waits for the transaction to appear at all other configured
-          | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
-          | the timeout only specifies how long to wait at the other participants.
-          | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
-          | the allotted time.
-          | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
-          | participants are connected/disconnected, the command may currently result in spurious timeouts or may
-          | return before the transaction appears at all the involved participants."""
-      )
-      def submit_flat(
-          actAs: Seq[PartyId],
-          commands: Seq[Command],
-          synchronizerId: Option[SynchronizerId] = None,
-          workflowId: String = "",
-          commandId: String = "",
-          optTimeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
-          deduplicationPeriod: Option[DeduplicationPeriod] = None,
-          submissionId: String = "",
-          minLedgerTimeAbs: Option[Instant] = None,
-          readAs: Seq[PartyId] = Seq.empty,
-          disclosedContracts: Seq[DisclosedContract] = Seq.empty,
-          userId: String = userId,
-          userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+          transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
       ): ApiTransaction = {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -871,6 +762,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               synchronizerId,
               userId,
               userPackageSelectionPreference,
+              transactionShape,
             )
           )
         }
@@ -952,10 +844,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
       @Help.Description(
         """Submits an assignment command on behalf of `submitter` party, waits for the resulting assignment to commit, and returns the reassignment.
-          | If waitForParticipants is set, it also waits for the reassignment(s) to appear at all other configured
+          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
           | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
           | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-          | Timout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the specified participants.
+          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
           | The unassignId should be the one returned by the corresponding submit_unassign command."""
       )
       def submit_assign(
@@ -966,31 +858,60 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           workflowId: String = "",
           userId: String = userId,
           submissionId: String = UUID.randomUUID().toString,
-          eventFormat: Option[EventFormat] = eventFormatAllParties,
-          waitForParticipants: Map[ParticipantReference, PartyId] = Map.empty,
-          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+          timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
       ): AssignedWrapper =
-        submitReassignments(submitter, waitForParticipants, timeout)(commandId =>
-          consoleEnvironment.run(
-            ledgerApiCommand(
-              LedgerApiCommands.CommandService.SubmitAndWaitAssign(
-                submitter = submitter.toLf,
-                unassignId = unassignId,
-                source = source,
-                target = target,
-                workflowId = workflowId,
-                userId = userId,
-                commandId = commandId,
-                submissionId = submissionId,
-                eventFormat = eventFormat,
-              )
+        submit_assign_with_format(
+          submitter = submitter,
+          unassignId = unassignId,
+          source = source,
+          target = target,
+          workflowId = workflowId,
+          userId = userId,
+          submissionId = submissionId,
+          eventFormat = eventFormatAllParties,
+          timeout = timeout,
+        ).assignedWrapper
+
+      @Help.Summary(
+        "Submit assign command and wait for the resulting reassignment, returning the reassignment or failing otherwise",
+        FeatureFlag.Testing,
+      )
+      @Help.Description(
+        """Submits an assignment command on behalf of `submitter` party, waits for the resulting assignment to commit, and returns the reassignment.
+          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
+          | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
+          | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
+          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
+          | The unassignId should be the one returned by the corresponding submit_unassign command."""
+      )
+      def submit_assign_with_format(
+          submitter: PartyId,
+          unassignId: String,
+          source: SynchronizerId,
+          target: SynchronizerId,
+          workflowId: String = "",
+          userId: String = userId,
+          submissionId: String = UUID.randomUUID().toString,
+          eventFormat: Option[EventFormat],
+          timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
+      ): EmptyOrAssignedWrapper = {
+        val result = consoleEnvironment.run(
+          ledgerApiCommand(
+            LedgerApiCommands.CommandService.SubmitAndWaitAssign(
+              submitter = submitter.toLf,
+              unassignId = unassignId,
+              source = source,
+              target = target,
+              workflowId = workflowId,
+              userId = userId,
+              commandId = UUID.randomUUID().toString,
+              submissionId = submissionId,
+              eventFormat = eventFormat,
             )
           )
-        ) match {
-          case assigned: AssignedWrapper => assigned
-          case invalid =>
-            throw new IllegalStateException(s"AssignedWrapper expected, but got: $invalid")
-        }
+        )
+        optionallyAwait(result, result.updateId, target.toProtoPrimitive, timeout)
+      }
 
       @Help.Summary(
         "Submit unassign command and wait for the resulting reassignment, returning the reassignment or failing otherwise",
@@ -998,10 +919,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
       @Help.Description(
         """Submits an unassignment command on behalf of `submitter` party, waits for the resulting unassignment to commit, and returns the reassignment.
-          | If waitForParticipants is set, it also waits for the reassignment(s) to appear at all other configured
+          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
           | participants who were involved in the unassignment. The call blocks until the unassignment commits or fails.
           | Fails if the unassignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-          | Timout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the specified participants."""
+          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants."""
       )
       def submit_unassign(
           submitter: PartyId,
@@ -1011,31 +932,59 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           workflowId: String = "",
           userId: String = userId,
           submissionId: String = UUID.randomUUID().toString,
-          eventFormat: Option[EventFormat] = eventFormatAllParties,
-          waitForParticipants: Map[ParticipantReference, PartyId] = Map.empty,
-          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+          timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
       ): UnassignedWrapper =
-        submitReassignments(submitter, waitForParticipants, timeout)(commandId =>
-          consoleEnvironment.run(
-            ledgerApiCommand(
-              LedgerApiCommands.CommandService.SubmitAndWaitUnassign(
-                submitter = submitter.toLf,
-                contractIds = contractIds,
-                source = source,
-                target = target,
-                workflowId = workflowId,
-                userId = userId,
-                commandId = commandId,
-                submissionId = submissionId,
-                eventFormat = eventFormat,
-              )
+        submit_unassign_with_format(
+          submitter = submitter,
+          contractIds = contractIds,
+          source = source,
+          target = target,
+          workflowId = workflowId,
+          userId = userId,
+          submissionId = submissionId,
+          eventFormat = eventFormatAllParties,
+          timeout = timeout,
+        ).unassignedWrapper
+
+      @Help.Summary(
+        "Submit unassign command and wait for the resulting reassignment, returning the reassignment or failing otherwise",
+        FeatureFlag.Testing,
+      )
+      @Help.Description(
+        """Submits an unassignment command on behalf of `submitter` party, waits for the resulting unassignment to commit, and returns the reassignment.
+          | If timeout is set, it also waits for the reassignment(s) to appear at all other configured
+          | participants who were involved in the unassignment. The call blocks until the unassignment commits or fails.
+          | Fails if the unassignment doesn't commit, or if it doesn't become visible to the involved participants in time.
+          | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants."""
+      )
+      def submit_unassign_with_format(
+          submitter: PartyId,
+          contractIds: Seq[LfContractId],
+          source: SynchronizerId,
+          target: SynchronizerId,
+          workflowId: String = "",
+          userId: String = userId,
+          submissionId: String = UUID.randomUUID().toString,
+          eventFormat: Option[EventFormat],
+          timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
+      ): EmptyOrUnassignedWrapper = {
+        val result = consoleEnvironment.run(
+          ledgerApiCommand(
+            LedgerApiCommands.CommandService.SubmitAndWaitUnassign(
+              submitter = submitter.toLf,
+              contractIds = contractIds,
+              source = source,
+              target = target,
+              workflowId = workflowId,
+              userId = userId,
+              commandId = UUID.randomUUID().toString,
+              submissionId = submissionId,
+              eventFormat = eventFormat,
             )
           )
-        ) match {
-          case unassigned: UnassignedWrapper => unassigned
-          case invalid =>
-            throw new IllegalStateException(s"UnassignedWrapper expected, but got: $invalid")
-        }
+        )
+        optionallyAwait(result, result.updateId, source.toProtoPrimitive, timeout)
+      }
 
       @Help.Summary(
         "Combines `submit_unassign` and `submit_assign` in a single macro",
@@ -1052,9 +1001,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           workflowId: String = "",
           userId: String = userId,
           submissionId: String = UUID.randomUUID().toString,
-          eventFormat: Option[EventFormat] = eventFormatAllParties,
-          waitForParticipants: Map[ParticipantReference, PartyId] = Map.empty,
-          timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+          timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
       ): (UnassignedWrapper, AssignedWrapper) = {
         val unassigned = submit_unassign(
           submitter,
@@ -1064,8 +1011,6 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           workflowId,
           userId,
           submissionId,
-          eventFormat,
-          waitForParticipants,
           timeout,
         )
         val assigned = submit_assign(
@@ -1076,41 +1021,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           workflowId,
           userId,
           submissionId,
-          eventFormat,
-          waitForParticipants,
           timeout,
         )
         (unassigned, assigned)
-      }
-
-      private def submitReassignments(
-          submitter: PartyId,
-          waitForParticipants: Map[ParticipantReference, PartyId],
-          timeout: config.NonNegativeDuration,
-      )(submit: String => ReassignmentWrapper): ReassignmentWrapper = {
-        val commandId = UUID.randomUUID().toString
-        val ledgerEndBefore = state.end()
-        val participants = waitForParticipants.view.map { case (participant, partyId) =>
-          participant -> (partyId, participant.ledger_api.state.end())
-        }.toMap
-        val reassignment = submit(commandId)
-        val reassignmentUpdateId = reassignment.updateId
-        participants.foreach { case (participant, (queryingParty, from)) =>
-          discard(waitForUpdateId(participant, from, queryingParty, reassignmentUpdateId, timeout))
-        }
-        discard(
-          waitForUpdateId(
-            thisAdministration,
-            ledgerEndBefore,
-            submitter,
-            reassignmentUpdateId,
-            timeout,
-          ) match {
-            case result: ReassignmentWrapper => result
-            case _ => throw new IllegalStateException("ReassignmentWrapper expected")
-          }
-        )
-        reassignment
       }
 
       @Help.Summary("Submit assign command asynchronously", FeatureFlag.Testing)
@@ -1238,7 +1151,6 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
-            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -1301,6 +1213,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             |- limit: limit (default set via canton.parameter.console)
             |- verbose: whether the resulting events should contain detailed type information
             |- filterTemplate: list of templates ids to filter for, empty sequence acts as a wildcard
+            |- filterTemplate: list of interface ids to filter for, empty sequence acts as a wildcard
             |- activeAtOffsetO: the offset at which the snapshot of the active contracts will be computed, it
             |  must be no greater than the current ledger end offset and must be greater than or equal to the
             |  last pruning offset. If no offset is specified then the current participant end will be used.
@@ -1531,12 +1444,17 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         """Allocates a new party on the ledger.
           party: a hint for generating the party identifier
           annotations: key-value pairs associated with this party and stored locally on this Ledger API server
-          identityProviderId: identity provider id"""
+          identityProviderId: identity provider id
+          synchronizerId: The synchronizer on which the party should be allocated.
+                          The participant must be connected to the synchronizer.
+                          The parameter may be omitted if the participant is connected to only one synchronizer."""
       )
       def allocate(
           party: String,
           annotations: Map[String, String] = Map.empty,
           identityProviderId: String = "",
+          synchronizerId: String = "",
+          userId: String = "",
       ): PartyDetails = {
         val proto = check(FeatureFlag.Testing)(consoleEnvironment.run {
           ledgerApiCommand(
@@ -1544,6 +1462,8 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               partyIdHint = party,
               annotations = annotations,
               identityProviderId = identityProviderId,
+              synchronizerId = synchronizerId,
+              userId = userId,
             )
           )
         })
@@ -2060,6 +1980,13 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
               )
+            ).flatMap(_ =>
+              ledgerApiCommand(
+                LedgerApiCommands.Users.Rights.List(
+                  id = id,
+                  identityProviderId = identityProviderId,
+                )
+              )
             )
           })
 
@@ -2092,6 +2019,13 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 identityProviderAdmin = identityProviderAdmin,
                 identityProviderId = identityProviderId,
                 readAsAnyParty = readAsAnyParty,
+              )
+            ).flatMap(_ =>
+              ledgerApiCommand(
+                LedgerApiCommands.Users.Rights.List(
+                  id = id,
+                  identityProviderId = identityProviderId,
+                )
               )
             )
           })
@@ -2205,12 +2139,13 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       @Help.Summary("Submit commands (Java bindings)", FeatureFlag.Testing)
       @Help.Group("Command Submission (Java bindings)")
       object commands extends Helpful {
+
         @Help.Summary(
-          "Submit java codegen commands and wait for the resulting transaction, returning the transaction tree or failing otherwise",
+          "Submit java codegen command and wait for the resulting transaction, returning the transaction or failing otherwise",
           FeatureFlag.Testing,
         )
         @Help.Description(
-          """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit and returns it.
+          """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit, and returns the "flattened" transaction.
             | If the timeout is set, it also waits for the transaction to appear at all other configured
             | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
             | the timeout only specifies how long to wait at the other participants.
@@ -2234,61 +2169,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             disclosedContracts: Seq[javab.data.DisclosedContract] = Seq.empty,
             userId: String = userId,
             userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
-        ): TransactionTree = check(FeatureFlag.Testing) {
-          val tx = consoleEnvironment.run {
-            ledgerApiCommand(
-              LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
-                actAs.map(_.toLf),
-                readAs.map(_.toLf),
-                commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
-                workflowId,
-                commandId,
-                deduplicationPeriod,
-                submissionId,
-                minLedgerTimeAbs,
-                disclosedContracts.map(c => DisclosedContract.fromJavaProto(c.toProto)),
-                synchronizerId,
-                userId,
-                userPackageSelectionPreference,
-              )
-            )
-          }
-          javab.data.TransactionTree.fromProto(
-            TransactionTreeProto.toJavaProto(
-              optionallyAwait(tx, tx.updateId, tx.synchronizerId, optTimeout)
-            )
-          )
-        }
-
-        @Help.Summary(
-          "Submit java codegen command and wait for the resulting transaction, returning the flattened transaction or failing otherwise",
-          FeatureFlag.Testing,
-        )
-        @Help.Description(
-          """Submits a command on behalf of the `actAs` parties, waits for the resulting transaction to commit, and returns the "flattened" transaction.
-            | If the timeout is set, it also waits for the transaction to appear at all other configured
-            | participants who were involved in the transaction. The call blocks until the transaction commits or fails;
-            | the timeout only specifies how long to wait at the other participants.
-            | Fails if the transaction doesn't commit, or if it doesn't become visible to the involved participants in
-            | the allotted time.
-            | Note that if the optTimeout is set and the involved parties are concurrently enabled/disabled or their
-            | participants are connected/disconnected, the command may currently result in spurious timeouts or may
-            | return before the transaction appears at all the involved participants."""
-        )
-        def submit_flat(
-            actAs: Seq[PartyId],
-            commands: Seq[javab.data.Command],
-            synchronizerId: Option[SynchronizerId] = None,
-            workflowId: String = "",
-            commandId: String = "",
-            optTimeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
-            deduplicationPeriod: Option[DeduplicationPeriod] = None,
-            submissionId: String = "",
-            minLedgerTimeAbs: Option[Instant] = None,
-            readAs: Seq[PartyId] = Seq.empty,
-            disclosedContracts: Seq[javab.data.DisclosedContract] = Seq.empty,
-            userId: String = userId,
-            userPackageSelectionPreference: Seq[LfPackageId] = Seq.empty,
+            transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
         ): Transaction = check(FeatureFlag.Testing) {
           val tx = consoleEnvironment.run {
             ledgerApiCommand(
@@ -2305,6 +2186,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                 synchronizerId,
                 userId,
                 userPackageSelectionPreference,
+                transactionShape,
               )
             )
           }
@@ -2353,10 +2235,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         )
         @Help.Description(
           """Submits an unassignment command on behalf of `submitter` party, waits for the resulting unassignment to commit, and returns the reassignment.
-            | If waitForParticipants is set, it also waits for the reassignment(s) to appear at all other configured
+            | If timeout is set, it also waits for the reassignment(s) to appear at all other
             | participants who were involved in the unassignment. The call blocks until the unassignment commits or fails.
             | Fails if the unassignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-            | Timout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the specified participants."""
+            | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants."""
         )
         def submit_unassign(
             submitter: PartyId,
@@ -2366,9 +2248,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             workflowId: String = "",
             userId: String = userId,
             submissionId: String = UUID.randomUUID().toString,
-            eventFormat: Option[EventFormat] = eventFormatAllParties,
-            waitForParticipants: Map[ParticipantReference, PartyId] = Map.empty,
-            timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+            timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
         ): Reassignment =
           ledger_api.commands
             .submit_unassign(
@@ -2379,10 +2259,9 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               workflowId,
               userId,
               submissionId,
-              eventFormat,
-              waitForParticipants,
               timeout,
             )
+            .unassignedWrapper
             .reassignment
             .pipe(ReassignmentProto.toJavaProto)
             .pipe(Reassignment.fromProto)
@@ -2393,10 +2272,10 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         )
         @Help.Description(
           """Submits a assignment command on behalf of `submitter` party, waits for the resulting assignment to commit, and returns the reassignment.
-            | If waitForParticipants is set, it also waits for the reassignment(s) to appear at all other configured
+            | If timeout is set, it also waits for the reassignment(s) to appear at all other
             | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
             | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
-            | Timout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the specified participants.
+            | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
             | The unassignId should be the one returned by the corresponding submit_unassign command."""
         )
         def submit_assign(
@@ -2407,9 +2286,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             workflowId: String = "",
             userId: String = userId,
             submissionId: String = UUID.randomUUID().toString,
-            eventFormat: Option[EventFormat] = eventFormatAllParties,
-            waitForParticipants: Map[ParticipantReference, PartyId] = Map.empty,
-            timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+            timeout: Option[config.NonNegativeDuration] = Some(timeouts.ledgerCommand),
         ): Reassignment =
           ledger_api.commands
             .submit_assign(
@@ -2420,8 +2297,6 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               workflowId,
               userId,
               submissionId,
-              eventFormat,
-              waitForParticipants,
               timeout,
             )
             .reassignment
@@ -2434,84 +2309,36 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       object updates extends Helpful {
 
         @Help.Summary(
-          "Get update trees in the format expected by the Java bindings",
+          "Get updates in the format expected by the Java bindings",
           FeatureFlag.Testing,
         )
         @Help.Description(
-          """This function connects to the update tree stream for the given parties and collects update trees
-            |until either `completeAfter` update trees have been received or `timeout` has elapsed.
-            |The returned update trees can be filtered to be between the given offsets (default: no filtering).
+          """This function connects to the update stream for the given parties and collects updates
+            |until either `completeAfter` updates have been received or `timeout` has elapsed.
+            |The returned updates can be filtered to be between the given offsets (default: no filtering).
             |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
             |this command fails with a `NOT_FOUND` error.
             |If the beginOffset is zero then the participant begin is taken as beginning offset.
             |If the endOffset is None then a continuous stream is returned."""
         )
-        def trees(
-            partyIds: Set[PartyId],
+        def updates(
+            updateFormat: UpdateFormat,
             completeAfter: PositiveInt,
             beginOffsetExclusive: Long = 0L,
             endOffsetInclusive: Option[Long] = None,
-            verbose: Boolean = true,
-            timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
-            resultFilter: UpdateTreeWrapper => Boolean = _ => true,
-        ): Seq[GetUpdateTreesResponse] = check(FeatureFlag.Testing)(
-          ledger_api.updates
-            .trees(
-              partyIds,
-              completeAfter,
-              beginOffsetExclusive,
-              endOffsetInclusive,
-              verbose,
-              timeout,
-              resultFilter,
-            )
-            .map {
-              case tx: TransactionTreeWrapper =>
-                tx.transactionTree
-                  .pipe(TransactionTreeProto.toJavaProto)
-                  .pipe(javab.data.TransactionTree.fromProto)
-                  .pipe(new GetUpdateTreesResponse(_))
-
-              case reassignment: ReassignmentWrapper =>
-                reassignment.reassignment
-                  .pipe(ReassignmentProto.toJavaProto)
-                  .pipe(Reassignment.fromProto)
-                  .pipe(new GetUpdateTreesResponse(_))
-            }
-        )
-
-        @Help.Summary(
-          "Get flat updates in the format expected by the Java bindings",
-          FeatureFlag.Testing,
-        )
-        @Help.Description(
-          """This function connects to the flat update stream for the given parties and collects updates
-            |until either `completeAfter` flat updates have been received or `timeout` has elapsed.
-            |The returned updates can be filtered to be between the given offsets (default: no filtering).
-            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-            |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
-            |including create event blobs for explicit disclosure, consider using `flat_with_tx_filter`.
-            |If the beginOffset is zero then the participant begin is taken as beginning offset.
-            |If the endOffset is None then a continuous stream is returned."""
-        )
-        def flat(
-            partyIds: Set[PartyId],
-            completeAfter: PositiveInt,
-            beginOffsetExclusive: Long = 0L,
-            endOffsetInclusive: Option[Long] = None,
-            verbose: Boolean = true,
             timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
             resultFilter: UpdateWrapper => Boolean = _ => true,
-        ): Seq[GetUpdatesResponse] = check(FeatureFlag.Testing)(
+            synchronizerFilter: Option[SynchronizerId] = None,
+        ): Seq[GetUpdatesResponse] = check(FeatureFlag.Testing)({
           ledger_api.updates
-            .flat(
-              partyIds,
+            .updates(
+              updateFormat,
               completeAfter,
               beginOffsetExclusive,
               endOffsetInclusive,
-              verbose,
               timeout,
               resultFilter,
+              synchronizerFilter,
             )
             .map {
               case tx: TransactionWrapper =>
@@ -2532,38 +2359,83 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
                   .pipe(TopologyTransaction.fromProto)
                   .pipe(new GetUpdatesResponse(_))
             }
-        )
+
+        })
 
         @Help.Summary(
-          "Get flat updates in the format expected by the Java bindings",
+          "Get transactions in the format expected by the Java bindings",
           FeatureFlag.Testing,
         )
         @Help.Description(
-          """This function connects to the flat update stream for the given transaction filter and collects updates
+          """This function connects to the update stream for the given parties and collects updates
             |until either `completeAfter` transactions have been received or `timeout` has elapsed.
-            |The returned transactions can be filtered to be between the given offsets (default: no filtering).
+            |The returned updates can be filtered to be between the given offsets (default: no filtering).
             |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
-            |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
-            |`flat` instead.
+            |this command fails with a `NOT_FOUND` error. If you need to specify filtering conditions for template IDs and
+            |including create event blobs for explicit disclosure, consider using `tx_with_tx_format`.
             |If the beginOffset is zero then the participant begin is taken as beginning offset.
             |If the endOffset is None then a continuous stream is returned."""
         )
-        def flat_with_tx_filter(
-            filter: TransactionFilter,
+        def transactions(
+            partyIds: Set[PartyId],
             completeAfter: PositiveInt,
             beginOffsetExclusive: Long = 0L,
             endOffsetInclusive: Option[Long] = None,
             verbose: Boolean = true,
             timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
             resultFilter: UpdateWrapper => Boolean = _ => true,
-        ): Seq[GetUpdatesResponse] = check(FeatureFlag.Testing)(
+            synchronizerFilter: Option[SynchronizerId] = None,
+            transactionShape: TransactionShape = TRANSACTION_SHAPE_ACS_DELTA,
+        ): Seq[GetUpdatesResponse] = check(FeatureFlag.Testing)({
+
           ledger_api.updates
-            .flat_with_tx_filter(
-              TransactionFilterProto.fromJavaProto(filter.toProto),
+            .transactions(
+              partyIds,
               completeAfter,
               beginOffsetExclusive,
               endOffsetInclusive,
               verbose,
+              timeout,
+              resultFilter,
+              synchronizerFilter,
+              transactionShape,
+            )
+            .map {
+              _.transaction
+                .pipe(ApiTransaction.toJavaProto)
+                .pipe(javab.data.Transaction.fromProto)
+                .pipe(new GetUpdatesResponse(_))
+            }
+        })
+
+        @Help.Summary(
+          "Get transactions in the format expected by the Java bindings",
+          FeatureFlag.Testing,
+        )
+        @Help.Description(
+          """This function connects to the update stream for the given transaction format and collects updates
+            |until either `completeAfter` transactions have been received or `timeout` has elapsed.
+            |The returned transactions can be filtered to be between the given offsets (default: no filtering).
+            |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
+            |this command fails with a `NOT_FOUND` error. If you only need to filter by a set of parties, consider using
+            |`flat` or `trees` instead.
+            |If the beginOffset is zero then the participant begin is taken as beginning offset.
+            |If the endOffset is None then a continuous stream is returned."""
+        )
+        def transactions_with_tx_format(
+            transactionFormat: TransactionFormat,
+            completeAfter: PositiveInt,
+            beginOffsetExclusive: Long = 0L,
+            endOffsetInclusive: Option[Long] = None,
+            timeout: config.NonNegativeDuration = timeouts.ledgerCommand,
+            resultFilter: UpdateWrapper => Boolean = _ => true,
+        ): Seq[GetUpdatesResponse] = check(FeatureFlag.Testing)(
+          ledger_api.updates
+            .transactions_with_tx_format(
+              TransactionFormatProto.fromJavaProto(transactionFormat.toProto),
+              completeAfter,
+              beginOffsetExclusive,
+              endOffsetInclusive,
               timeout,
               resultFilter,
             )
@@ -2694,40 +2566,6 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       }
 
     }
-
-    private def waitForUpdateId(
-        administration: BaseLedgerApiAdministration,
-        from: Long,
-        queryPartyId: PartyId,
-        updateId: String,
-        timeout: config.NonNegativeDuration,
-    ): UpdateWrapper = {
-      def logPrefix: String =
-        s"As waiting for update-id:$updateId at participant:$administration with querying party:$queryPartyId starting from $from: "
-      Try(
-        administration.ledger_api.updates
-          .flat(
-            partyIds = Set(queryPartyId),
-            beginOffsetExclusive = from,
-            completeAfter = PositiveInt.one,
-            resultFilter = {
-              case reassignmentW: ReassignmentWrapper =>
-                reassignmentW.reassignment.updateId == updateId
-              case TransactionWrapper(transaction) => transaction.updateId == updateId
-              case tt: TopologyTransactionWrapper =>
-                tt.topologyTransaction.updateId == updateId
-            },
-            timeout = timeout,
-          )
-      ) match {
-        case Success(values) if values.sizeIs == 1 => values(0)
-        case Success(values) =>
-          throw new IllegalStateException(
-            s"$logPrefix Exactely one update expected, but received #${values.size}"
-          )
-        case Failure(t) => throw new IllegalStateException(s"$logPrefix an exception occurred.", t)
-      }
-    }
   }
 
   /** @return
@@ -2750,8 +2588,34 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
 
   import com.digitalasset.canton.util.ShowUtil.*
 
-  private def awaitTransaction(
-      transactionId: String,
+  private def wildcardUpdateFormatForParties(parties: Set[PartyId]): UpdateFormat = {
+    val eventFormat = EventFormat(
+      filtersByParty = parties.toSeq
+        .map(party =>
+          party.toLf -> Filters(
+            Seq(
+              CumulativeFilter(
+                IdentifierFilter.WildcardFilter(
+                  transaction_filter.WildcardFilter(includeCreatedEventBlob = false)
+                )
+              )
+            )
+          )
+        )
+        .toMap,
+      filtersForAnyParty = None,
+      verbose = false,
+    )
+    UpdateFormat(
+      includeTransactions =
+        Some(TransactionFormatProto(Some(eventFormat), TRANSACTION_SHAPE_LEDGER_EFFECTS)),
+      includeReassignments = Some(eventFormat),
+      includeTopologyEvents = None,
+    )
+  }
+
+  private def awaitUpdate(
+      updateId: String,
       at: Map[ParticipantReference, PartyId],
       timeout: config.NonNegativeDuration,
   ): Unit = {
@@ -2760,7 +2624,9 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
         (
           participant,
           party,
-          participant.ledger_api.updates.by_id(Set(party), transactionId).isDefined,
+          participant.ledger_api.updates
+            .update_by_id(updateId, wildcardUpdateFormatForParties(Set(party)))
+            .isDefined,
         )
       }
     ConsoleMacros.utils.retry_until_true(timeout)(
@@ -2768,14 +2634,14 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
         val res = scan().map { case (participant, party, res) =>
           s"${party.toString}@${participant.toString}: ${if (res) "observed" else "not observed"}"
         }
-        s"Failed to observe transaction on all nodes: ${res.mkString(", ")}"
+        s"Failed to observe update on all nodes: ${res.mkString(", ")}"
       },
     )
 
   }
 
   private[console] def involvedParticipants(
-      transactionId: String,
+      updateId: String,
       txSynchronizerId: String,
   ): Map[ParticipantReference, PartyId] = {
     val txSynchronizer = SynchronizerId.tryFromString(txSynchronizerId)
@@ -2790,24 +2656,37 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
         .toSet
 
     val synchronizerParties = synchronizerPartiesAndParticipants.map(_.party)
-    // WARNING! this logic will become highly problematic if we introduce witness blinding based on topology events
     // Read the transaction under the authority of all parties on the synchronizer, in order to get the witness_parties
     // to be all the actual witnesses of the transaction. There's no other convenient way to get the full witnesses,
     // as the Exercise events don't contain the informees of the Exercise action.
-    val tree = ledger_api.updates
-      .by_id(synchronizerParties, transactionId)
+    val update = ledger_api.updates
+      .update_by_id(updateId, wildcardUpdateFormatForParties(synchronizerParties))
       .getOrElse(
         throw new IllegalStateException(
-          s"Can't find transaction by ID: $transactionId. Queried parties: $synchronizerParties"
+          s"Can't find update by ID: $updateId. Queried parties: $synchronizerParties"
         )
       )
-    val witnesses = tree.eventsById.values
-      .flatMap { ev =>
-        ev.kind.created.fold(Seq.empty[String])(ev => ev.witnessParties) ++
-          ev.kind.exercised.fold(Seq.empty[String])(ev => ev.witnessParties)
-      }
-      .map(PartyId.tryFromProtoPrimitive)
-      .toSet
+    val witnesses = (update match {
+      case TransactionWrapper(tx) =>
+        tx.events.flatMap { ev =>
+          ev.event.created.fold(Seq.empty[String])(ev => ev.witnessParties) ++
+            ev.event.exercised.fold(Seq.empty[String])(ev => ev.witnessParties)
+        }
+
+      case AssignedWrapper(_, assignedEvents) =>
+        assignedEvents
+          .flatMap(_.createdEvent)
+          .flatMap(_.witnessParties)
+
+      case UnassignedWrapper(_, unassignedEvents) =>
+        unassignedEvents
+          .flatMap(_.witnessParties)
+
+      case TopologyTransactionWrapper(_) =>
+        throw new IllegalStateException(
+          s"Invalid: update by ID: $updateId belongs to a topology transaction"
+        )
+    }).map(PartyId.tryFromProtoPrimitive).toSet
 
     // A participant identity equality check that doesn't blow up if the participant isn't running
     def identityIs(pRef: ParticipantReference, id: ParticipantId): Boolean = pRef match {
@@ -2837,18 +2716,18 @@ trait LedgerApiAdministration extends BaseLedgerApiAdministration {
     }
   }
 
-  def optionallyAwait[Tx](
-      tx: Tx,
-      txId: String,
+  def optionallyAwait[T](
+      update: T,
+      updateId: String,
       txSynchronizerId: String,
       optTimeout: Option[config.NonNegativeDuration],
-  ): Tx =
+  ): T =
     optTimeout match {
-      case None => tx
+      case None => update
       case Some(timeout) =>
-        val involved = involvedParticipants(txId, txSynchronizerId)
-        logger.debug(show"Awaiting transaction ${txId.unquoted} at ${involved.keys.mkShow()}")
-        awaitTransaction(txId, involved, timeout)
-        tx
+        val involved = involvedParticipants(updateId, txSynchronizerId)
+        logger.debug(show"Awaiting update ${updateId.unquoted} at ${involved.keys.mkShow()}")
+        awaitUpdate(updateId, involved, timeout)
+        update
     }
 }

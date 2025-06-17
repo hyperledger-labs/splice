@@ -4,7 +4,10 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection
 
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection.FairBoundedQueue.EnqueueResult
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.collection.FairBoundedQueue.{
+  DeduplicationStrategy,
+  EnqueueResult,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.util.collection.BoundedQueue.DropStrategy
 import org.scalatest.wordspec.AnyWordSpec
@@ -27,11 +30,12 @@ class FairBoundedQueueTest extends AnyWordSpec with BaseTest {
     }
 
     "enqueue messages one by one, drop messages according to strategies, and dump" in {
-      Table[Int, Int, DropStrategy, Seq[Enqueue], Seq[ItemType]](
+      Table[Int, Int, DropStrategy, DeduplicationStrategy, Seq[Enqueue], Seq[ItemType]](
         (
           "max queue size",
           "per node quota",
           "drop strategy",
+          "deduplication strategy",
           "items to enqueue and results",
           "final dump",
         ),
@@ -39,6 +43,7 @@ class FairBoundedQueueTest extends AnyWordSpec with BaseTest {
           /*max queue size = */ 5,
           /*per-node quota = */ 2,
           DropStrategy.DropOldest,
+          DeduplicationStrategy.Noop,
           Seq(
             Enqueue(node1, 1, EnqueueResult.Success),
             Enqueue(node2, 2, EnqueueResult.Success),
@@ -51,18 +56,20 @@ class FairBoundedQueueTest extends AnyWordSpec with BaseTest {
           /*max queue size = */ 3,
           /*per-node quota = */ 2,
           DropStrategy.DropOldest,
+          DeduplicationStrategy.Noop,
           Seq(
             Enqueue(node1, 1, EnqueueResult.Success),
             Enqueue(node2, 2, EnqueueResult.Success),
             Enqueue(node1, 3, EnqueueResult.Success),
             Enqueue(node3, 4, EnqueueResult.TotalCapacityExceeded),
           ),
-          Seq(2, 3, 4),
+          Seq(1, 2, 3),
         ),
         (
           /*max queue size = */ 5,
           /*per-node quota = */ 2,
           DropStrategy.DropNewest,
+          DeduplicationStrategy.Noop,
           Seq(
             Enqueue(node1, 1, EnqueueResult.Success),
             Enqueue(node2, 2, EnqueueResult.Success),
@@ -77,6 +84,7 @@ class FairBoundedQueueTest extends AnyWordSpec with BaseTest {
           /*max queue size = */ 3,
           /*per-node quota = */ 2,
           DropStrategy.DropNewest,
+          DeduplicationStrategy.Noop,
           Seq(
             Enqueue(node1, 1, EnqueueResult.Success),
             Enqueue(node2, 2, EnqueueResult.Success),
@@ -89,6 +97,7 @@ class FairBoundedQueueTest extends AnyWordSpec with BaseTest {
           /*max queue size = */ 4,
           /*per-node quota = */ 1,
           DropStrategy.DropOldest,
+          DeduplicationStrategy.Noop,
           Seq(
             Enqueue(node1, 1, EnqueueResult.Success),
             Enqueue(node2, 2, EnqueueResult.Success),
@@ -97,12 +106,63 @@ class FairBoundedQueueTest extends AnyWordSpec with BaseTest {
           ),
           Seq(3, 4),
         ),
-      ).forEvery { (maxQueueSize, perNodeQuota, dropStrategy, itemsToEnqueue, finalDump) =>
-        val queue = new FairBoundedQueue[ItemType](maxQueueSize, perNodeQuota, dropStrategy)
-        itemsToEnqueue.foreach(itemsToEnqueue =>
-          queue.enqueue(itemsToEnqueue.nodeId, itemsToEnqueue.item) shouldBe itemsToEnqueue.result
-        )
-        queue.dump shouldBe finalDump
+        (
+          /*max queue size = */ 3,
+          /*per-node quota = */ 2,
+          DropStrategy.DropOldest,
+          DeduplicationStrategy.Noop,
+          Seq(
+            Enqueue(node1, 1, EnqueueResult.Success),
+            Enqueue(node2, 2, EnqueueResult.Success),
+            Enqueue(node1, 3, EnqueueResult.Success),
+            Enqueue(node2, 4, EnqueueResult.TotalCapacityExceeded),
+            Enqueue(node1, 5, EnqueueResult.PerNodeQuotaExceeded(node1)),
+            Enqueue(node2, 6, EnqueueResult.TotalCapacityExceeded),
+            Enqueue(node2, 7, EnqueueResult.TotalCapacityExceeded),
+          ),
+          Seq(3, 5, 7),
+        ),
+        (
+          /*max queue size = */ 2,
+          /*per-node quota = */ 2,
+          DropStrategy.DropOldest,
+          DeduplicationStrategy.Noop,
+          Seq(
+            Enqueue(node1, 1, EnqueueResult.Success),
+            Enqueue(node1, 1, EnqueueResult.Success),
+          ),
+          Seq(1, 1),
+        ),
+        (
+          /*max queue size = */ 2,
+          /*per-node quota = */ 2,
+          DropStrategy.DropOldest,
+          DeduplicationStrategy.PerNode,
+          Seq(
+            Enqueue(node1, 1, EnqueueResult.Success),
+            Enqueue(node1, 1, EnqueueResult.Duplicate(node1)),
+          ),
+          Seq(1),
+        ),
+      ).forEvery {
+        (
+            maxQueueSize,
+            perNodeQuota,
+            dropStrategy,
+            deduplicationStrategy,
+            itemsToEnqueue,
+            finalDump,
+        ) =>
+          val queue = new FairBoundedQueue[ItemType](
+            maxQueueSize,
+            perNodeQuota,
+            dropStrategy,
+            deduplicationStrategy,
+          )
+          itemsToEnqueue.foreach(itemsToEnqueue =>
+            queue.enqueue(itemsToEnqueue.nodeId, itemsToEnqueue.item) shouldBe itemsToEnqueue.result
+          )
+          queue.dump shouldBe finalDump
       }
     }
 

@@ -19,7 +19,7 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{InProcessGrpcName, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.connection.GrpcApiInfoService
 import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.data.Offset
@@ -50,8 +50,12 @@ import com.digitalasset.canton.platform.apiserver.ratelimiting.{
   RateLimitingInterceptor,
   ThreadpoolCheck,
 }
-import com.digitalasset.canton.platform.apiserver.services.admin.ApiUserManagementService
-import com.digitalasset.canton.platform.apiserver.{ApiServiceOwner, LedgerFeatures}
+import com.digitalasset.canton.platform.apiserver.services.admin.Utils
+import com.digitalasset.canton.platform.apiserver.{
+  ApiServiceOwner,
+  InProcessGrpcName,
+  LedgerFeatures,
+}
 import com.digitalasset.canton.platform.config.{
   IdentityProviderManagementConfig,
   IndexServiceConfig,
@@ -127,7 +131,7 @@ class StartableStoppableLedgerApiServer(
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] =
     execQueue.execute(
-      performUnlessClosingF(functionFullName) {
+      synchronizeWithClosingF(functionFullName) {
         ledgerApiResource.get match {
           case Some(_) =>
             logger.info(
@@ -316,7 +320,7 @@ class StartableStoppableLedgerApiServer(
       interactiveSubmissionEnricher = new InteractiveSubmissionEnricher(
         new Engine(config.engine.config.copy(requireSuffixedGlobalContractId = false)),
         packageResolver = packageId =>
-          traceContext =>
+          implicit traceContext =>
             FutureUnlessShutdown.outcomeF(
               packageLoader.loadPackage(
                 packageId = packageId,
@@ -347,6 +351,7 @@ class StartableStoppableLedgerApiServer(
         tls = config.serverConfig.tls,
         address = Some(config.serverConfig.address),
         maxInboundMessageSize = config.serverConfig.maxInboundMessageSize.unwrap,
+        maxInboundMetadataSize = config.serverConfig.maxInboundMetadataSize.unwrap,
         port = config.serverConfig.port,
         seeding = config.cantonParameterConfig.ledgerApiServerParameters.contractIdSeeding,
         syncService = timedSyncService,
@@ -441,7 +446,7 @@ class StartableStoppableLedgerApiServer(
           )
           Future.successful(())
         case other =>
-          ApiUserManagementService.handleResult("creating extra admin user")(other).map(_ => ())
+          Utils.handleResult("creating extra admin user")(other).map(_ => ())
       }
   }
 

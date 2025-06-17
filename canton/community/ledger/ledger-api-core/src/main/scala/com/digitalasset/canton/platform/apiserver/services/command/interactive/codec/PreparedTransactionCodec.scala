@@ -61,5 +61,9 @@ object PreparedTransactionCodec {
     /** Converts a ParsingResult[A] to a Result[A]
       */
     def toResult: Result[A] = parsingResult.leftMap(_.message).toResult
+    def toFutureWithLoggedFailures(description: String, logger: TracedLogger)(implicit
+        errorLoggingContext: ErrorLoggingContext,
+        traceContext: TraceContext,
+    ): Future[A] = toResult.toFutureWithLoggedFailures(description, logger)
   }
 }

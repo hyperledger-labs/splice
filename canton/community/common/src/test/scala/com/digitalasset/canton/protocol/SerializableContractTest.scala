@@ -15,7 +15,7 @@ import com.digitalasset.canton.{
   LfVersioned,
 }
 import com.digitalasset.daml.lf.data.{Bytes, Ref}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Node}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Node}
 import com.digitalasset.daml.lf.value.Value
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -27,43 +27,52 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
   private val templateId = ExampleTransactionFactory.templateId
 
   "SerializableContractInstance" should {
-    "deserialize correctly" in {
-      val someContractSalt = TestSalt.generateSalt(0)
-      val contractId = ExampleTransactionFactory.suffixedId(0, 0)
 
-      val metadata = ContractMetadata.tryCreate(
-        signatories = Set(alice),
-        stakeholders = Set(alice, bob),
-        maybeKeyWithMaintainersVersioned = Some(
-          ExampleTransactionFactory.globalKeyWithMaintainers(
-            LfGlobalKey
-              .build(templateId, Value.ValueUnit, LfPackageName.assertFromString("package-name"))
-              .value,
-            Set(alice),
+    forEvery(Seq(AuthenticatedContractIdVersionV10, AuthenticatedContractIdVersionV11)) {
+      contractIdVersion =>
+        s"deserialize $contractIdVersion correctly" in {
+          val someContractSalt = TestSalt.generateSalt(0)
+
+          val contractId = ExampleTransactionFactory.suffixedId(0, 0, contractIdVersion)
+
+          val metadata = ContractMetadata.tryCreate(
+            signatories = Set(alice),
+            stakeholders = Set(alice, bob),
+            maybeKeyWithMaintainersVersioned = Some(
+              ExampleTransactionFactory.globalKeyWithMaintainers(
+                LfGlobalKey
+                  .build(
+                    templateId,
+                    Value.ValueUnit,
+                    LfPackageName.assertFromString("package-name"),
+                  )
+                  .value,
+                Set(alice),
+              )
+            ),
           )
-        ),
-      )
 
-      val sci = ExampleTransactionFactory.asSerializable(
-        contractId,
-        ExampleTransactionFactory.contractInstance(Seq(contractId)),
-        metadata,
-        CantonTimestamp.now(),
-        someContractSalt,
-      )
-      SerializableContract.fromProtoVersioned(
-        sci.toProtoVersioned(testedProtocolVersion)
-      ) shouldEqual Right(sci)
+          val sci = ExampleTransactionFactory.asSerializable(
+            contractId,
+            ExampleTransactionFactory.contractInstance(Seq(contractId)),
+            metadata,
+            CantonTimestamp.now(),
+            someContractSalt,
+          )
+          SerializableContract.fromProtoVersioned(
+            sci.toProtoVersioned(testedProtocolVersion)
+          ) shouldEqual Right(sci)
+        }
     }
   }
 
-  "SerializableContract.fromDisclosedContract" when {
+  "SerializableContract.fromFatContract" when {
     val transactionVersion = LfLanguageVersion.v2_dev
 
     val createdAt = LfTimestamp.Epoch
     val contractSalt = TestSalt.generateSalt(0)
     val driverMetadata =
-      Bytes.fromByteArray(DriverContractMetadata(contractSalt).toByteArray(testedProtocolVersion))
+      DriverContractMetadata(contractSalt).toLfBytes(AuthenticatedContractIdVersionV11)
 
     val contractIdDiscriminator = ExampleTransactionFactory.lfHash(0)
     val contractIdSuffix =
@@ -88,12 +97,16 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
     )
 
     val disclosedContract =
-      FatContractInstance.fromCreateNode(createNode, createdAt, driverMetadata)
+      FatContractInstance.fromCreateNode(
+        createNode,
+        CreationTime.CreatedAt(createdAt),
+        driverMetadata,
+      )
 
     "provided a valid disclosed contract" should {
       "succeed" in {
         val actual = SerializableContract
-          .fromDisclosedContract(disclosedContract)
+          .fromFatContract(disclosedContract)
           .value
 
         actual shouldBe SerializableContract(
@@ -102,7 +115,7 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
             .create(
               LfVersioned(
                 transactionVersion,
-                LfValue.ContractInstance(
+                LfValue.ThinContractInstance(
                   packageName = pkgName,
                   template = templateId,
                   arg = LfValue.ValueInt64(123L),
@@ -120,10 +133,10 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
     "provided a disclosed contract with unknown contract id format" should {
       "fail" in {
         SerializableContract
-          .fromDisclosedContract(
+          .fromFatContract(
             FatContractInstance.fromCreateNode(
               createNode.mapCid(_ => invalidFormatContractId),
-              createdAt,
+              CreationTime.CreatedAt(createdAt),
               driverMetadata,
             )
           )
@@ -135,8 +148,12 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
     "provided a disclosed contract with missing driver contract metadata" should {
       "fail" in {
         SerializableContract
-          .fromDisclosedContract(
-            FatContractInstance.fromCreateNode(createNode, createdAt, cantonData = Bytes.Empty)
+          .fromFatContract(
+            FatContractInstance.fromCreateNode(
+              createNode,
+              CreationTime.CreatedAt(createdAt),
+              cantonData = Bytes.Empty,
+            )
           )
           .left
           .value shouldBe "Missing driver contract metadata in provided disclosed contract"

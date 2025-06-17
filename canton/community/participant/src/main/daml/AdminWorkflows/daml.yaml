@@ -3,7 +3,7 @@ build-options:
 - --target=2.1
 name: AdminWorkflows
 source: AdminWorkflows.daml
-version: 3.3.0
+version: 3.4.0
 dependencies: 
 - daml-prim
 - daml-stdlib

@@ -14,7 +14,7 @@ import com.digitalasset.canton.common.sequencer.{
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ProcessingTimeout, TopologyConfig}
-import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.crypto.SynchronizerCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.*
@@ -49,7 +49,7 @@ import scala.util.chaining.*
 
 class StoreBasedSynchronizerOutbox(
     synchronizerAlias: SynchronizerAlias,
-    val synchronizerId: SynchronizerId,
+    val synchronizerId: PhysicalSynchronizerId,
     val memberId: Member,
     val protocolVersion: ProtocolVersion,
     val handle: RegisterTopologyTransactionHandle,
@@ -58,7 +58,7 @@ class StoreBasedSynchronizerOutbox(
     val targetStore: TopologyStore[TopologyStoreId.SynchronizerStore],
     override protected val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
-    override protected val crypto: Crypto,
+    override protected val crypto: SynchronizerCrypto,
     broadcastBatchSize: PositiveInt,
     maybeObserverCloseable: Option[AutoCloseable] = None,
     override protected val futureSupervisor: FutureSupervisor,
@@ -173,7 +173,7 @@ class StoreBasedSynchronizerOutbox(
   final def startup()(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] = {
-    val loadWatermarksF = performUnlessClosingUSF(functionFullName)(for {
+    val loadWatermarksF = synchronizeWithClosing(functionFullName)(for {
       // find the current target watermark
       watermarkTsO <- targetStore.currentDispatchingWatermark
       watermarkTs = watermarkTsO.getOrElse(CantonTimestamp.MinValue)
@@ -238,7 +238,7 @@ class StoreBasedSynchronizerOutbox(
       if (initialize)
         initialized.set(true)
       if (cur.hasPending) {
-        val pendingAndApplicableF = performUnlessClosingUSF(functionFullName)(for {
+        val pendingAndApplicableF = synchronizeWithClosing(functionFullName)(for {
           // find pending transactions
           pending <- findPendingTransactions(cur)
           // filter out applicable
@@ -251,7 +251,7 @@ class StoreBasedSynchronizerOutbox(
           (pending, applicable) = pendingAndApplicable
           _ = lastDispatched.set(applicable.lastOption)
           // Try to convert if necessary the topology transactions for the required protocol version of the synchronizer
-          convertedTxs <- performUnlessClosingEitherUSF(functionFullName) {
+          convertedTxs <- synchronizeWithClosing(functionFullName) {
             convertTransactions(applicable)
           }
           // dispatch to synchronizer
@@ -316,7 +316,7 @@ class StoreBasedSynchronizerOutbox(
         )
       }.discard
       logger.debug(s"Updating dispatching watermark to $newWatermark")
-      performUnlessClosingUSF(functionFullName)(
+      synchronizeWithClosing(functionFullName)(
         targetStore.updateDispatchingWatermark(newWatermark)
       )
     } else {
@@ -410,11 +410,11 @@ class SynchronizerOutboxDynamicObserver(val loggerFactory: NamedLoggerFactory)
 }
 
 class SynchronizerOutboxFactory(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
     synchronizerTopologyManager: SynchronizerTopologyManager,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
@@ -425,7 +425,7 @@ class SynchronizerOutboxFactory(
   private val synchronizerObserverRef = new SingleUseCell[SynchronizerOutboxDynamicObserver]
 
   def create(
-      protocolVersion: ProtocolVersion,
+      protocolVersion: ProtocolVersion, // // TODO(#25482) Reduce duplication in parameters
       targetTopologyClient: SynchronizerTopologyClientWithInit,
       sequencerClient: SequencerClient,
       timeTracker: SynchronizerTimeTracker,
@@ -531,11 +531,11 @@ class SynchronizerOutboxFactory(
 }
 
 class SynchronizerOutboxFactorySingleCreate(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     memberId: Member,
     authorizedTopologyManager: AuthorizedTopologyManager,
     synchronizerTopologyManager: SynchronizerTopologyManager,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     topologyConfig: TopologyConfig,
     override val timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,

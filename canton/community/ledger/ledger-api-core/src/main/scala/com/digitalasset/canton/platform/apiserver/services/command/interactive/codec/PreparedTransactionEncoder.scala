@@ -29,7 +29,13 @@ import com.digitalasset.daml.lf
 import com.digitalasset.daml.lf.crypto
 import com.digitalasset.daml.lf.data.ImmArray
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{GlobalKey, Node, NodeId, TransactionVersion}
+import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
+  GlobalKey,
+  Node,
+  NodeId,
+  TransactionVersion,
+}
 import com.digitalasset.daml.lf.value.Value
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -287,7 +293,7 @@ final class PreparedTransactionEncoder(
             }
         },
       )
-      .withFieldComputed(_.createdAt, _.enrichedContract.createdAt.transformInto[Long])
+      .withFieldComputed(_.createdAt, fci => CreationTime.encode(fci.enrichedContract.createdAt))
       .withFieldComputedPartial(_.eventBlob, _.toCreateEventBlob.leftMap(_.errorMessage).toResult)
       .buildTransformer
 

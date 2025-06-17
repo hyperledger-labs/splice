@@ -14,7 +14,7 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfTimestamp, admin, crypto, protocol}
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, Versioned}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
 import com.digitalasset.daml.lf.value.ValueCoder
 import com.google.protobuf.ByteString
 import com.google.protobuf.timestamp.Timestamp
@@ -51,7 +51,7 @@ case class SerializableContract(
     extends HasVersionedWrapper[SerializableContract]
     with PrettyPrinting {
 
-  def contractInstance: LfContractInst = rawContractInstance.contractInstance
+  def contractInstance: LfThinContractInst = rawContractInstance.contractInstance
 
   override protected def companionObj: HasVersionedMessageCompanionCommon[SerializableContract] =
     SerializableContract
@@ -99,6 +99,16 @@ case class SerializableContract(
     version = rawContractInstance.contractInstance.version,
   )
 
+  // Will succeed providing the contract has been authenticated
+  def tryFatContractInstance: FatContractInstance =
+    FatContractInstance.fromCreateNode(
+      toLf,
+      CreationTime.CreatedAt(ledgerCreateTime.toLf),
+      DriverContractMetadata(contractSalt).toLfBytes(
+        CantonContractIdVersion.tryCantonContractIdVersion(contractId)
+      ),
+    )
+
 }
 
 object SerializableContract
@@ -106,7 +116,7 @@ object SerializableContract
     with HasVersionedMessageCompanionDbHelpers[SerializableContract] {
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(30) -> ProtoCodec(
-      ProtocolVersion.v33,
+      ProtocolVersion.v34,
       supportedProtoVersion(protocol.v30.SerializableContract)(fromProtoV30),
       _.toProtoV30,
     )
@@ -129,7 +139,7 @@ object SerializableContract
 
   def apply(
       contractId: LfContractId,
-      contractInstance: LfContractInst,
+      contractInstance: LfThinContractInst,
       metadata: ContractMetadata,
       ledgerTime: CantonTimestamp,
       contractSalt: Salt,
@@ -140,13 +150,15 @@ object SerializableContract
         SerializableContract(contractId, _, metadata, LedgerCreateTime(ledgerTime), contractSalt)
       )
 
-  def fromDisclosedContract(
+  def fromFatContract(
       fat: FatContractInstance
   ): Either[String, SerializableContract] = {
-    val ledgerTime = CantonTimestamp(fat.createdAt)
     val driverContractMetadataBytes = fat.cantonData.toByteArray
-
     for {
+      ledgerTime <- fat.createdAt match {
+        case CreationTime.Now => Left("Invalid createdAt timestamp")
+        case CreationTime.CreatedAt(ts) => Right(CantonTimestamp(ts))
+      }
       _disclosedContractIdVersion <- CantonContractIdVersion
         .extractCantonContractIdVersion(fat.contractId)
         .leftMap(err => s"Invalid disclosed contract id: ${err.toString}")
@@ -157,11 +169,11 @@ object SerializableContract
           )
         else
           DriverContractMetadata
-            .fromTrustedByteArray(driverContractMetadataBytes)
+            .fromLfBytes(driverContractMetadataBytes)
             .leftMap(err => s"Failed parsing disclosed contract driver contract metadata: $err")
             .map(_.salt)
       }
-      contractInstance = Versioned(fat.version, fat.toCreateNode.coinst)
+      contractInstance = fat.toCreateNode.versionedCoinst
       cantonContractMetadata <- ContractMetadata.create(
         signatories = fat.signatories,
         stakeholders = fat.stakeholders,
@@ -253,4 +265,5 @@ object SerializableContract
       LedgerCreateTime(ledgerCreateTime),
       contractSalt,
     )
+
 }
