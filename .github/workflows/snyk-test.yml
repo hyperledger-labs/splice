@@ -3,7 +3,8 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
-  node_snyk_test:
+  snyk_test:
+    name: Snyk Test
     runs-on: self-hosted-docker-tiny
     steps:
       - name: Check out repository code
