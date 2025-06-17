@@ -231,7 +231,7 @@ class AnsSubscriptionInitialPaymentTrigger(
               Seq(svParty, dsoParty),
               entryName,
             ),
-            // we can safely assume that `ansEntryNameOffset` is before the ansInitialPaymentConfirmation offset
+            // we can safely assume that `ansEntryNameOffset` is smaller than the offset from the ansInitialPaymentConfirmation
             deduplicationOffset = ansEntryNameOffset,
           )
           .yieldUnit()
