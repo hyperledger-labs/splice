@@ -348,7 +348,7 @@ function createPublicationAndReplicationSlots(
   const schemaName = dbName;
   const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
   const path = `${root}/cluster/pulumi/canton-network/bigquery-cloudsql.sh`;
-  const scriptArgs = pulumi.interpolate`
+  const scriptArgs = pulumi.interpolate`\
       --private-network-project="${privateNetwork.project}" \
       --compute-region="${cloudsdkComputeRegion()}" \
       --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \

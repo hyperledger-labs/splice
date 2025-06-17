@@ -10,7 +10,22 @@ if [[ $SUBCOMMAND != create-pub-rep-slot && $SUBCOMMAND != delete-pub-rep-slot ]
   exit 1
 fi
 
-# Parse named arguments
+REQUIRED_ARGS=(
+  "private-network-project"
+  "compute-region"
+  "service-account-email"
+  "tables-to-replicate-length"
+  "db-name"
+  "schema-name"
+  "tables-to-replicate-list"
+  "tables-to-replicate-joined"
+  "postgres-user-name"
+  "publication-name"
+  "replication-slot-name"
+  "replicator-user-name"
+  "postgres-instance-name"
+  "scan-app-database-name"
+)
 PRIVATE_NETWORK_PROJECT=""
 COMPUTE_REGION=""
 SERVICE_ACCOUNT_EMAIL=""
@@ -27,7 +42,7 @@ POSTGRES_INSTANCE_NAME=""
 SCAN_APP_DATABASE_NAME=""
 
 # Track which arguments have been provided
-declare -A PROVIDED_ARGS
+declare -a PROVIDED_ARGS
 
 while [ "$#" -gt 0 ]; do
   # Verify argument follows --name=value format
@@ -105,34 +120,17 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Check that all required arguments were provided
-REQUIRED_ARGS=(
-  "private-network-project"
-  "compute-region"
-  "service-account-email"
-  "tables-to-replicate-length"
-  "db-name"
-  "schema-name"
-  "tables-to-replicate-list"
-  "tables-to-replicate-joined"
-  "postgres-user-name"
-  "publication-name"
-  "replication-slot-name"
-  "replicator-user-name"
-  "postgres-instance-name"
-  "scan-app-database-name"
-)
-
 for arg in "${REQUIRED_ARGS[@]}"; do
-  if [ -z "${PROVIDED_ARGS[$arg]}" ]; then
+  if [[ -z "${PROVIDED_ARGS[$arg]:-}" ]]; then
     echo "Error: Required argument --$arg not provided" >&2
     exit 1
   fi
 done
 
-if [ -s "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+if [[ -s "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
   echo "Using $GOOGLE_APPLICATION_CREDENTIALS for authentication"
   gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
-elif [ -n "$GOOGLE_CREDENTIALS" ]; then
+elif [[ -n "${GOOGLE_CREDENTIALS:-}" ]]; then
   echo "Using GOOGLE_CREDENTIALS for authentication"
   echo "$GOOGLE_CREDENTIALS" | gcloud auth activate-service-account --key-file=-
 else
