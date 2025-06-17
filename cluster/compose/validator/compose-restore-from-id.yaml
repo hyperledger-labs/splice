@@ -12,4 +12,4 @@ services:
           ADDITIONAL_CONFIG_MIGRATE_VALIDATOR_PARTY=
             canton.validator-apps.validator_backend.migrate-validator-party.scan.admin-api.url = "${SCAN_ADDRESS}"
     volumes:
-      - ${VALIDATOR_PARTICIPANT_IDENTITIES_DUMP}:/participant-bootstrapping-dump
+      - ${VALIDATOR_PARTICIPANT_IDENTITIES_DUMP}:/participant-bootstrapping-dump/identities.json

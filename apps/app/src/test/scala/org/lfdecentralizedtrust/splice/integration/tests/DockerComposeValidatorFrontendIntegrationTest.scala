@@ -191,7 +191,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       "recovering from identities dump",
       Seq(
         "-i",
-        backupsDir.toAbsolutePath.toString,
+        identities.toAbsolutePath.toString,
         "-P",
         "da-composeValidator-13",
       ),
