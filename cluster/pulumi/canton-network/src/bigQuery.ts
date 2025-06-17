@@ -366,8 +366,8 @@ function createPublicationAndReplicationSlots(
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
     {
-      create: pulumi.interpolate`"${path}" create-pub-rep-slot ${scriptArgs}`,
-      delete: pulumi.interpolate`"${path}" delete-pub-rep-slot ${scriptArgs}`,
+      create: pulumi.interpolate`'${path}' create-pub-rep-slot ${scriptArgs}`,
+      delete: pulumi.interpolate`'${path}' delete-pub-rep-slot ${scriptArgs}`,
     },
     {
       deletedWith: postgres.databaseInstance,
