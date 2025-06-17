@@ -20,7 +20,7 @@ object AuthConfig {
   case class Rs256(
       audience: String,
       jwksUrl: URL,
-      connectionTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(5),
+      connectionTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(10),
       readTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(10),
   ) extends AuthConfig
 
