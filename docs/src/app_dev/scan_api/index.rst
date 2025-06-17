@@ -5,9 +5,25 @@
 
 .. _app_dev_scan_api:
 
-Scan API
-========
-The Scan App is part of a :term:`CN Supervalidator` (SV) node.
+Scan APIs
+=========
+
+The Scan APIs consist of the following APIs:
+
+* :ref:`scan_bulk_data_api`: A comprehensive API that provides access to the exact and full history of updates and ACS snapshots as recorded on the SV participant node.
+* :ref:`scan_global_synchronizer_connectivity_api`
+* :ref:`scan_global_synchronizer_operations_api`
+* :ref:`scan_cc_reference_data_api`
+* :ref:`scan_current_state_api`
+* :ref:`scan_aggregates_api`
+
+Please see the :ref:`scan_openapi` for the full API reference;
+and see :ref:`app_dev_openapi_conventions` to learn about the API stability annotations and
+the contract payload encoding used.
+
+.. rubric:: Scan App Overview
+
+The Scan App serving the Scan APIs is part of a :term:`CN Supervalidator` (SV) node.
 The Scan App is shown in the context of an SV node in the following diagram:
 
 .. image:: images/sv_scan_app_topology.png
@@ -30,17 +46,6 @@ You can directly connect to a Scan API hosted by a single SV, or you can read fr
 
 The validator node contains a :ref:`validator-api-scan-proxy` that
 provides :term:`BFT` reads to Scan APIs hosted by Super Validators.
-
-The Scan API is grouped in the following categories:
-
-* :ref:`scan_bulk_data_api`: A comprehensive API that provides access to the exact and full history of updates and ACS snapshots as recorded on the SV participant node.
-* :ref:`scan_global_synchronizer_connectivity_api`
-* :ref:`scan_global_synchronizer_operations_api`
-* :ref:`scan_cc_reference_data_api`
-* :ref:`scan_current_state_api`
-* :ref:`scan_aggregates_api`
-
-Please see the :ref:`scan_openapi` for the full API reference.
 
 .. toctree::
    :hidden:
