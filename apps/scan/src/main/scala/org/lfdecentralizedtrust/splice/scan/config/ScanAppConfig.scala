@@ -46,6 +46,7 @@ case class ScanAppBackendConfig(
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
+    svNodeStateCacheTtl: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {

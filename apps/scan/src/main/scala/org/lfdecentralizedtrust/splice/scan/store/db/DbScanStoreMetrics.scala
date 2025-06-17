@@ -36,7 +36,8 @@ class DbScanStoreMetrics(metricsFactory: LabeledMetricsFactory) extends AutoClos
       -1L,
     )(MetricsContext.Empty)
 
-  val cache = new CacheMetrics(prefix :+ "cache", metricsFactory)
+  val totalAmuletBalanceCache = new CacheMetrics(prefix :+ "total-amulet-balance-cache", metricsFactory)
+  val svNodeStateCache = new CacheMetrics(prefix :+ "sv-node-state-cache", metricsFactory)
 
   val history = new HistoryMetrics(metricsFactory)(MetricsContext.Empty)
 

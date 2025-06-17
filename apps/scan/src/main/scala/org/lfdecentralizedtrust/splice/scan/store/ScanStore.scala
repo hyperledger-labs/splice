@@ -36,6 +36,7 @@ import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
   TemplateJsonDecoder,
 }
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -97,26 +98,29 @@ trait ScanStore
       )
     )
 
+  protected def listCachedSvNodeStates()(implicit
+      tc: TraceContext
+  ): Future[Seq[splice.dso.svstate.SvNodeState]]
+
   /** Returns all items extracted by `f` from the DsoRules ensuring that they're sorted by synchronizerId,
     * so that the order is deterministic.
     */
-  def listFromSvNodeStates[T](
+  def listFromCachedSvNodeStates[T](
       f: splice.dso.svstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
-      dsoRules <- getDsoRulesWithState()
-      nodeStates <- Future.traverse(dsoRules.payload.svs.asScala.keys) { svPartyId =>
-        getSvNodeState(PartyId.tryFromProtoPrimitive(svPartyId))
-      }
+      nodeStates <- listCachedSvNodeStates()
     } yield {
-      val items = nodeStates.toVector.flatMap(nodeState => f(nodeState.contract.payload))
+      val items = nodeStates.toVector.flatMap(nodeState => f(nodeState))
       val itemsByDomain = items.groupBy(_._1).view.mapValues(_.map(_._2))
       itemsByDomain.toVector.sortBy(_._1)
     }
   }
 
-  def listDsoScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
-    listFromSvNodeStates { nodeState =>
+  def listCachedDsoScans()(implicit
+      tc: TraceContext
+  ): Future[Vector[(String, Vector[ScanInfo])]] = {
+    listFromCachedSvNodeStates { nodeState =>
       for {
         (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
         scan <- domainConfig.scan.toScala
@@ -314,6 +318,7 @@ object ScanStore {
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
+      svNodeStateCacheTtl: NonNegativeFiniteDuration,
       metrics: DbScanStoreMetrics,
   )(implicit
       ec: ExecutionContext,
@@ -331,6 +336,7 @@ object ScanStore {
           createScanAggregatesReader,
           domainMigrationInfo,
           participantId,
+          svNodeStateCacheTtl,
           metrics,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
