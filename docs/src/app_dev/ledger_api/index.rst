@@ -8,5 +8,12 @@
 Ledger API
 ==========
 
-Current documentation for the Ledger API can be found `here <https://docs.digitalasset.com/build/3.3/reference/app-dev/ledger-api/>`_.
+As can be seen from the :ref:`validator-network-diagram`, the Ledger API is
+served by the Canton Participant node running as part of in a Validator Node.
+
+.. todo:: include the diagram here
+
+Use the documentation maintained by Digital Asset to learn how to use the Ledger API:
+https://docs.digitalasset.com/build/3.3/explanations/ledger-api.
+
 
