@@ -206,24 +206,19 @@ class AnsSubscriptionInitialPaymentTrigger(
       ansRules.contractId,
       ansContextCId,
     )
-    ansInitialPaymentConfirmationQueryResult <- dsoStore
-      .lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
+    ansInitialPaymentConfirmationByAnsName <- dsoStore
+      .listInitialPaymentConfirmationByAnsName(
         svParty,
-        paymentCid,
+        entryName,
       )
-    // take the minimum offset
-    minOffset = Math.min(
-      ansInitialPaymentConfirmationQueryResult.offset,
-      ansEntryNameOffset,
-    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ConfirmAction(
         svParty.toProtoPrimitive,
         action,
       )
     )
-    taskOutcome <- ansInitialPaymentConfirmationQueryResult match {
-      case QueryResult(_, None) =>
+    taskOutcome <- ansInitialPaymentConfirmationByAnsName match {
+      case Seq.empty =>
         connection
           .submit(
             actAs = Seq(svParty),
@@ -236,7 +231,8 @@ class AnsSubscriptionInitialPaymentTrigger(
               Seq(svParty, dsoParty),
               entryName,
             ),
-            deduplicationOffset = minOffset,
+            // we can safely assume that `ansEntryNameOffset` is before the ansInitialPaymentConfirmation offset
+            deduplicationOffset = ansEntryNameOffset,
           )
           .yieldUnit()
           .map { _ =>
@@ -244,7 +240,7 @@ class AnsSubscriptionInitialPaymentTrigger(
               s"confirmed to create ans entry $entryName by collecting payment $paymentCid"
             )
           }
-      case QueryResult(_, Some(_)) =>
+      case Seq(_) =>
         TaskSuccess(
           s"skipping as confirmation (either acceptance or rejection) from $svParty is already created for this payment $paymentCid"
         ).pure[Future]
