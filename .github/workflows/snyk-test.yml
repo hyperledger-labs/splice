@@ -32,4 +32,4 @@ jobs:
         with:
           cmd: |
             snyk auth ${{ secrets.SNYK_TOKEN }}
-            snyk test --all-projects --exclude=build.sbt --exclude=canton/community/*
+            snyk test --all-projects --exclude=build.sbt --exclude=canton/community
