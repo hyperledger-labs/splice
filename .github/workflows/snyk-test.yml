@@ -8,21 +8,17 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@4a528b5c534bb771b6e3772656a8e0e9dc902f8b
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      - name: Setup
+        id: setup
+        uses: ./.github/actions/tests/common_test_setup
         with:
-          args: --all-projects --exclude=build.sbt
-
-  python_snyk_test:
-    runs-on: self-hosted-docker-tiny
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+          test_name: snyk
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          with_sbt: false
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/python@4a528b5c534bb771b6e3772656a8e0e9dc902f8b
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
-          args: --all-projects --exclude=build.sbt
+          cmd: |
+            snyk auth ${{ secrets.SNYK_TOKEN }}
+            snyk test --all-projects --exclude=build.sbt
