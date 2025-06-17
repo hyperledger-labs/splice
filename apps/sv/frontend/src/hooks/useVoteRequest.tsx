@@ -9,11 +9,17 @@ import { ContractId } from '@daml/types';
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
 export const useVoteRequest = (
-  contractId: ContractId<VoteRequest>
+  contractId: ContractId<VoteRequest>,
+  retry: boolean = true
 ): UseQueryResult<Contract<VoteRequest>> => {
   const { lookupDsoRulesVoteRequest } = useSvAdminClient();
   return useQuery({
     queryKey: ['listDsoRulesVoteRequests', contractId],
-    queryFn: async () => (await lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
+    queryFn: async () =>
+      Contract.decodeOpenAPI(
+        (await lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
+        VoteRequest
+      ), // || null,
+    retry,
   });
 };

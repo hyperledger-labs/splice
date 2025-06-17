@@ -15,18 +15,14 @@ import {
   ActionRequiringConfirmation,
   Vote,
   VoteRequest,
-  VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
-import {
-  VoteListingData,
-  VoteListingStatus,
-  VotesListingSection,
-} from '../components/governance/VotesListingSection';
+import { VoteListingData, VotesListingSection } from '../components/governance/VotesListingSection';
+import { actionTagToTitle, getVoteResultStatus } from '../utils/governance';
 
 export type YourVoteStatus = 'accepted' | 'rejected' | 'no-vote';
 
-type SupportedActionTag =
+export type SupportedActionTag =
   | 'CRARC_AddFutureAmuletConfigSchedule'
   | 'CRARC_SetConfig'
   | 'SRARC_GrantFeaturedAppRight'
@@ -69,37 +65,7 @@ const QUERY_LIMIT = 50;
 
 export const Governance: React.FC = () => {
   const svConfig = useSvConfig();
-
   const amuletName = svConfig.spliceInstanceNames.amuletName;
-  const actionTagToTitle = useMemo(
-    (): Record<SupportedActionTag, string> => ({
-      CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
-      CRARC_SetConfig: `Set ${amuletName} Rules Configuration`,
-      SRARC_GrantFeaturedAppRight: 'Feature Application',
-      SRARC_OffboardSv: 'Offboard Member',
-      SRARC_RevokeFeaturedAppRight: 'Unfeature Application',
-      SRARC_SetConfig: 'Set Dso Rules Configuration',
-      SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
-    }),
-    [amuletName]
-  );
-
-  const getVoteResultStatus = (outcome: VoteRequestOutcome): VoteListingStatus => {
-    switch (outcome.tag) {
-      case 'VRO_Accepted': {
-        const effectiveAt = dayjs(outcome.value.effectiveAt);
-        const now = dayjs();
-        if (dayjs(effectiveAt).isBefore(now)) return 'Implemented';
-        else return 'Accepted';
-      }
-      case 'VRO_Expired':
-        return 'Expired';
-      case 'VRO_Rejected':
-        return 'Rejected';
-      default:
-        return 'Unknown';
-    }
-  };
 
   const [tabValue, setTabValue] = useState('voting');
 
@@ -157,7 +123,9 @@ export const Governance: React.FC = () => {
     .filter(v => !alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
     .map(vr => {
       return {
-        actionName: actionTagToTitle[getAction(vr.payload.action) as SupportedActionTag],
+        contractId: vr.payload.trackingCid || vr.contractId,
+        actionName:
+          actionTagToTitle(amuletName)[getAction(vr.payload.action) as SupportedActionTag],
         votingCloses: dayjs(vr.payload.voteBefore).format(dateTimeFormatISO),
         createdAt: dayjs(vr.createdAt).format(dateTimeFormatISO),
         requester: vr.payload.requester,
@@ -175,7 +143,8 @@ export const Governance: React.FC = () => {
       const votes = v.payload.votes.entriesArray().map(e => e[1]);
 
       return {
-        actionName: actionTagToTitle[getAction(v.payload.action) as SupportedActionTag],
+        contractId: v.payload.trackingCid || v.contractId,
+        actionName: actionTagToTitle(amuletName)[getAction(v.payload.action) as SupportedActionTag],
         votingCloses: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect: effectiveAt,
         yourVote: computeYourVote(votes, svPartyId),
@@ -200,7 +169,9 @@ export const Governance: React.FC = () => {
       const votes = vr.request.votes.entriesArray().map(e => e[1]);
 
       return {
-        actionName: actionTagToTitle[getAction(vr.request.action) as SupportedActionTag],
+        contractId: vr.request.trackingCid,
+        actionName:
+          actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
         votingCloses: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect:
           (vr.outcome.tag === 'VRO_Accepted' &&

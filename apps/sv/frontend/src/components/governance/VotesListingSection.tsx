@@ -17,6 +17,9 @@ import ArrowForward from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { YourVoteStatus } from '../../routes/governance';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ContractId } from '@daml/types';
+import { useNavigate } from 'react-router-dom';
 
 interface VotesListingSectionProps {
   sectionTitle: string;
@@ -36,6 +39,7 @@ export type VoteListingStatus =
   | 'Unknown';
 
 export interface VoteListingData {
+  contractId: ContractId<VoteRequest>;
   actionName: string;
   votingCloses: string;
   voteTakesEffect: string;
@@ -83,6 +87,7 @@ export const VotesListingSection: React.FC<VotesListingSectionProps> = props => 
                 <VoteRow
                   key={index}
                   actionName={vote.actionName}
+                  contractId={vote.contractId}
                   uniqueId={uniqueId}
                   votingCloses={vote.votingCloses}
                   voteTakesEffect={vote.voteTakesEffect}
@@ -106,6 +111,7 @@ export const VotesListingSection: React.FC<VotesListingSectionProps> = props => 
 interface VoteRowProps {
   acceptanceThreshold: bigint;
   actionName: string;
+  contractId: ContractId<VoteRequest>;
   status: VoteListingStatus;
   uniqueId: string;
   voteStats: Record<YourVoteStatus, number>;
@@ -121,6 +127,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   const {
     acceptanceThreshold,
     actionName,
+    contractId,
     status,
     uniqueId,
     voteStats,
@@ -131,6 +138,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     showStatus,
     showVoteStats,
   } = props;
+  const navigate = useNavigate();
 
   return (
     <TableRow data-testid={`${uniqueId}-row`}>
@@ -175,7 +183,11 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       </TableCell>
 
       <TableCell align="right" data-testid={`${uniqueId}-row-view-details`}>
-        <Button endIcon={<ArrowForward fontSize="small" />} size="small">
+        <Button
+          endIcon={<ArrowForward fontSize="small" />}
+          size="small"
+          onClick={() => navigate(`/governance-beta/vote-requests/${contractId}`)}
+        >
           View Details
         </Button>
       </TableCell>
