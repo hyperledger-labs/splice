@@ -1285,11 +1285,14 @@ object SpliceLedgerConnection {
     * @param parties       : list of parties whose method calls should be considered distinct,
     *                      e.g., "Seq(directoryProvider)"
     * @param discriminator : additional discriminator for method calls,
-    *                      e.g., "digitalasset.splice" in case of deduplicating directory entry requests relating to directory name "digitalasset.splice". Beware of naive concatenation
+    *                      e.g., Seq("digitalasset.splice") in case of deduplicating directory entry requests relating to directory name "digitalasset.splice". Beware of naive concatenation
     *                      strings for discriminators. Always ensure that the encoding is injective.
     */
-  case class CommandId(methodName: String, parties: Seq[PartyId], discriminator: String = "")
-      extends PrettyPrinting {
+  case class CommandId(
+      methodName: String,
+      parties: Seq[PartyId],
+      discriminator: Seq[String] = Seq.empty,
+  ) extends PrettyPrinting {
     require(!methodName.contains('_'))
 
     override def pretty: Pretty[this.type] =
@@ -1298,19 +1301,29 @@ object SpliceLedgerConnection {
     // NOTE: avoid changing this computation, as otherwise some commands might not get properly deduplicated
     // on an app upgrade.
     def commandIdForSubmission: String = {
+      def discriminatorString: Seq[String] = discriminator.toList match {
+        case Nil => Seq("")
+        case head :: Nil =>
+          Seq(head) // keep old behavior for upgrades, when discriminator was a single string
+        case list => list.flatMap(str => Seq(str.length.toString, str))
+      }
       val str = parties
         .map(_.toProtoPrimitive)
         .prepended(
           parties.length.toString
         ) // prepend length to avoid suffixes interfering with party mapping, e.g., otherwise we have
         // CommandId("myMethod", Seq(alice), "bob").commandIdForSubmission == CommandId("myMethod", Seq(alice,bob), "").commandIdForSubmission
-        .appended(discriminator)
+        .appendedAll(discriminatorString)
         .mkString("/")
       // Digest is not thread safe, create a new one each time.
       val hashFun = MessageDigest.getInstance("SHA-256")
       val hash = hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
       s"${methodName}_$hash"
     }
+  }
+  object CommandId {
+    def apply(methodName: String, parties: Seq[PartyId], discriminator: String): CommandId =
+      CommandId(methodName, parties, Seq(discriminator))
   }
 
   def decodeExerciseResult[T](

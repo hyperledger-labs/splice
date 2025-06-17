@@ -110,20 +110,23 @@ class AnsSubscriptionInitialPaymentTrigger(
                     }
                     // if there are existing accepted confirmation of other payment and with the same ans entry name, we will reject this payment.
                     if (otherPaymentAcceptedConfirmations.isEmpty)
-                      dsoStore.lookupAnsEntryByName(entryName, context.clock.now).flatMap {
-                        case None =>
-                          // confirm to collect the payment and create the entry
-                          confirmCollectPayment(
-                            ansContext.contract.contractId,
-                            payment.contractId,
-                            entryName,
-                            transferContext,
-                          )
-                        case Some(entry) =>
-                          confirmToReject(
-                            s"entry already exists and owned by ${entry.payload.user}."
-                          )
-                      }
+                      dsoStore
+                        .lookupAnsEntryByNameWithOffset(entryName, context.clock.now)
+                        .flatMap {
+                          case QueryResult(offset, None) =>
+                            // confirm to collect the payment and create the entry
+                            confirmCollectPayment(
+                              ansContext.contract.contractId,
+                              payment.contractId,
+                              entryName,
+                              transferContext,
+                              offset,
+                            )
+                          case QueryResult(_, Some(entry)) =>
+                            confirmToReject(
+                              s"entry already exists and owned by ${entry.payload.user}."
+                            )
+                        }
                     else {
                       confirmToReject(
                         s"other initial payment collection has been confirmed for the same ans name ($entryName) with confirmation ${otherPaymentAcceptedConfirmations
@@ -193,6 +196,7 @@ class AnsSubscriptionInitialPaymentTrigger(
       paymentCid: SubscriptionInitialPayment.ContractId,
       entryName: String,
       transferContext: AppTransferContext,
+      ansEntryNameOffset: Long,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
@@ -202,19 +206,19 @@ class AnsSubscriptionInitialPaymentTrigger(
       ansRules.contractId,
       ansContextCId,
     )
-    // look up the confirmation for this payment created by this SV no matter if it is a acceptance or rejection
-    queryResult <- dsoStore.lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
-      svParty,
-      paymentCid,
-    )
+    ansInitialPaymentConfirmationByAnsName <- dsoStore
+      .listInitialPaymentConfirmationByAnsName(
+        svParty,
+        entryName,
+      )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ConfirmAction(
         svParty.toProtoPrimitive,
         action,
       )
     )
-    taskOutcome <- queryResult match {
-      case QueryResult(offset, None) =>
+    taskOutcome <- ansInitialPaymentConfirmationByAnsName match {
+      case Seq() =>
         connection
           .submit(
             actAs = Seq(svParty),
@@ -225,9 +229,10 @@ class AnsSubscriptionInitialPaymentTrigger(
             commandId = SpliceLedgerConnection.CommandId(
               "org.lfdecentralizedtrust.splice.sv.createAnsCollectInitialEntryPaymentConfirmation",
               Seq(svParty, dsoParty),
-              paymentCid.contractId,
+              entryName,
             ),
-            deduplicationOffset = offset,
+            // we can safely assume that `ansEntryNameOffset` is smaller than the offset from the ansInitialPaymentConfirmation
+            deduplicationOffset = ansEntryNameOffset,
           )
           .yieldUnit()
           .map { _ =>
@@ -235,7 +240,7 @@ class AnsSubscriptionInitialPaymentTrigger(
               s"confirmed to create ans entry $entryName by collecting payment $paymentCid"
             )
           }
-      case QueryResult(_, Some(_)) =>
+      case _ =>
         TaskSuccess(
           s"skipping as confirmation (either acceptance or rejection) from $svParty is already created for this payment $paymentCid"
         ).pure[Future]
