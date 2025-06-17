@@ -14,6 +14,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
+  Navigate,
   Route,
   RouterProvider,
   createBrowserRouter,
@@ -36,6 +37,7 @@ import ValidatorOnboarding from './routes/validatorOnboarding';
 import Voting from './routes/voting';
 import { useConfigPollInterval, useSvConfig } from './utils';
 import { Governance } from './routes/governance';
+import { VoteRequestDetails } from './routes/voteRequestDetails';
 
 const Providers: React.FC<React.PropsWithChildren> = ({ children }) => {
   const config = useSvConfig();
@@ -89,7 +91,15 @@ const App: React.FC = () => {
           <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
           <Route path="amulet-price" element={<AmuletPrice />} />
           <Route path="votes" element={<Voting />} />
-          <Route path="governance-beta" element={<Governance />} />
+          <Route
+            path="governance-beta"
+            element={<Navigate to="/governance-beta/vote-requests" replace />} //TODO: Change to /proposals
+          />
+          <Route path="governance-beta/vote-requests" element={<Governance />} />
+          <Route
+            path="governance-beta/vote-requests/:contractId"
+            element={<VoteRequestDetails />}
+          />
           <Route path="delegate" element={<Delegate />} />
         </Route>
       </Route>

@@ -6,10 +6,13 @@ import {
   VoteListingData,
   VotesListingSection,
 } from '../../components/governance/VotesListingSection';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ContractId } from '@daml/types';
 
 const inflightVoteRequests: VoteListingData[] = [
   {
     actionName: 'Feature Application',
+    contractId: '2abcde123456' as ContractId<VoteRequest>,
     votingCloses: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'no-vote',
@@ -19,6 +22,7 @@ const inflightVoteRequests: VoteListingData[] = [
   },
   {
     actionName: 'Set DSO Rules Configuration',
+    contractId: 'bcde123456' as ContractId<VoteRequest>,
     votingCloses: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'accepted',
@@ -31,6 +35,7 @@ const inflightVoteRequests: VoteListingData[] = [
 const voteHistory: VoteListingData[] = [
   {
     actionName: 'Feature Application',
+    contractId: '2abcde123456' as ContractId<VoteRequest>,
     votingCloses: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'no-vote',
@@ -40,6 +45,7 @@ const voteHistory: VoteListingData[] = [
   },
   {
     actionName: 'Set DSO Rules Configuration',
+    contractId: '2bcde123456' as ContractId<VoteRequest>,
     votingCloses: '2025-09-25 11:00',
     voteTakesEffect: '2025-09-26 11:00',
     yourVote: 'accepted',
