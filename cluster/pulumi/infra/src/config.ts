@@ -3,13 +3,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
-import {
-  config,
-  loadJsonFromFile,
-  PRIVATE_CONFIGS_PATH,
-  clusterDirectory,
-} from 'splice-pulumi-common';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
+import { config, loadJsonFromFile, externalIpRangesFile } from 'splice-pulumi-common';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
@@ -82,17 +76,8 @@ function extractIpRanges(x: IpRangesDict): string[] {
 }
 
 export function loadIPRanges(): pulumi.Output<string[]> {
-  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !PRIVATE_CONFIGS_PATH) {
-    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
-  }
-
-  const externalIpRanges = spliceConfig.pulumiProjectConfig.isExternalCluster
-    ? extractIpRanges(
-        loadJsonFromFile(
-          `${PRIVATE_CONFIGS_PATH}/configs/${clusterDirectory}/allowed-ip-ranges.json`
-        )
-      )
-    : [];
+  const file = externalIpRangesFile();
+  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file)) : [];
 
   const internalWhitelistedIps = getSecretVersionOutput({
     secret: 'pulumi-internal-whitelists',

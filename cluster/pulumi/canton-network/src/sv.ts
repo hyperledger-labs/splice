@@ -65,6 +65,7 @@ import {
 } from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
+import { installInfo } from './info';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -241,6 +242,14 @@ export async function installSvNode(
       },
     },
     config
+  );
+
+  installInfo(
+    xns,
+    `info.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+    'cluster-ingress/cn-http-gateway',
+    decentralizedSynchronizerUpgradeConfig,
+    `http://scan-app.${config.nodeName}:5012`
   );
 
   const svApp = installSvApp(

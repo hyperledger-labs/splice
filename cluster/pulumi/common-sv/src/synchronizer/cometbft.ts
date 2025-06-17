@@ -34,6 +34,10 @@ export type Cometbft = {
   release: InstalledHelmChart;
 };
 
+export function getChainIdSuffix(): string {
+  return config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0';
+}
+
 // TODO(#679) -- retrieve exact chain id directly from an env var / external config
 const getChainId = (migrationId: number): string => {
   if (`${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet) {
@@ -133,7 +137,7 @@ export function installCometBftNode(
     genesis: {
       // for TestNet-like deployments on scratchnet, set the chainId to 'test'
       chainId: getChainId(migrationId),
-      chainIdSuffix: config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0',
+      chainIdSuffix: getChainIdSuffix(),
     },
     metrics: {
       enable: true,
