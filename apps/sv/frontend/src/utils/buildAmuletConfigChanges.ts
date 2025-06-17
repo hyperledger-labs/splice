@@ -3,12 +3,37 @@
 import { ConfigChange } from '../components/governance/VoteRequestDetailsContent';
 import { Optional } from '@daml/types';
 import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
+import { Tuple2 } from '@daml.js/daml-prim-DA-Types-1.0.0/lib/DA/Types';
+
+function buildTransferSteps(
+  before: Tuple2<string, string>[] | undefined,
+  after: Tuple2<string, string>[] | undefined
+) {
+  return (
+    before
+      ?.map((b, idx) => {
+        const a = after?.[idx];
+        return [
+          {
+            fieldName: `Transfer Fee Step ${idx}`,
+            currentValue: b._1,
+            newValue: a?._1,
+          },
+          {
+            fieldName: `Transfer Fee Step ${idx}`,
+            currentValue: b._2,
+            newValue: a?._2,
+          },
+        ] as ConfigChange[];
+      })
+      .flat() || []
+  );
+}
 
 export function buildAmuletConfigChanges(
   before: Optional<AmuletConfig<'USD'>>,
   after: Optional<AmuletConfig<'USD'>>
 ): ConfigChange[] {
-  console.log('yaya steps', before?.transferConfig.transferFee?.steps);
   const changes = [
     {
       fieldName: 'Tick Duration (microseconds)',
@@ -55,11 +80,17 @@ export function buildAmuletConfigChanges(
       currentValue: before?.packageConfig.walletPayments || '',
       newValue: after?.packageConfig.walletPayments || '',
     },
+
+    ...buildTransferSteps(
+      before?.transferConfig.transferFee?.steps,
+      after?.transferConfig.transferFee?.steps
+    ),
     // {
     //   fieldName: '',
     //   currentValue: before?.transferConfig.transferFee?.steps,
     //   newValue: '',
     // }
   ] as ConfigChange[];
-  return changes;
+
+  return changes.filter(c => c.currentValue !== c.newValue);
 }
