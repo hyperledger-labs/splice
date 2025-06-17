@@ -110,20 +110,23 @@ class AnsSubscriptionInitialPaymentTrigger(
                     }
                     // if there are existing accepted confirmation of other payment and with the same ans entry name, we will reject this payment.
                     if (otherPaymentAcceptedConfirmations.isEmpty)
-                      dsoStore.lookupAnsEntryByName(entryName, context.clock.now).flatMap {
-                        case None =>
-                          // confirm to collect the payment and create the entry
-                          confirmCollectPayment(
-                            ansContext.contract.contractId,
-                            payment.contractId,
-                            entryName,
-                            transferContext,
-                          )
-                        case Some(entry) =>
-                          confirmToReject(
-                            s"entry already exists and owned by ${entry.payload.user}."
-                          )
-                      }
+                      dsoStore
+                        .lookupAnsEntryByNameWithOffset(entryName, context.clock.now)
+                        .flatMap {
+                          case QueryResult(offset, None) =>
+                            // confirm to collect the payment and create the entry
+                            confirmCollectPayment(
+                              ansContext.contract.contractId,
+                              payment.contractId,
+                              entryName,
+                              transferContext,
+                              offset,
+                            )
+                          case QueryResult(_, Some(entry)) =>
+                            confirmToReject(
+                              s"entry already exists and owned by ${entry.payload.user}."
+                            )
+                        }
                     else {
                       confirmToReject(
                         s"other initial payment collection has been confirmed for the same ans name ($entryName) with confirmation ${otherPaymentAcceptedConfirmations
@@ -193,6 +196,7 @@ class AnsSubscriptionInitialPaymentTrigger(
       paymentCid: SubscriptionInitialPayment.ContractId,
       entryName: String,
       transferContext: AppTransferContext,
+      ansEntryNameOffset: Long,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
@@ -202,11 +206,6 @@ class AnsSubscriptionInitialPaymentTrigger(
       ansRules.contractId,
       ansContextCId,
     )
-    // look up the confirmation for this payment created by this SV no matter if it is a acceptance or rejection
-    ansEntryByNameQueryResult <- dsoStore.lookupAnsEntryByNameWithOffset(
-      entryName,
-      context.clock.now,
-    )
     ansInitialPaymentConfirmationQueryResult <- dsoStore
       .lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
         svParty,
@@ -215,7 +214,7 @@ class AnsSubscriptionInitialPaymentTrigger(
     // take the minimum offset
     minOffset = Math.min(
       ansInitialPaymentConfirmationQueryResult.offset,
-      ansEntryByNameQueryResult.offset,
+      ansEntryNameOffset,
     )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ConfirmAction(
