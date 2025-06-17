@@ -5,7 +5,7 @@ on:
 jobs:
   snyk_test:
     name: Snyk Test
-    runs-on: self-hosted-docker-tiny
+    runs-on: self-hosted-docker-medium
     steps:
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
