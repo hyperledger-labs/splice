@@ -132,24 +132,7 @@ class BftScanConnection(
           retryProvider.timeouts,
           "refresh_scan_list",
         )({ tc =>
-          // This retry makes sure any partial or complete failures are immediately retried with a backoff.
-          FutureUnlessShutdown.outcomeF(
-            retryProvider.retry(
-              RetryFor.LongRunningAutomation,
-              "refresh_scan_list",
-              "refresh_scan_list",
-              bft.refresh(this)(tc).flatMap { connections =>
-                if (connections.failed > 0)
-                  Future.failed(
-                    io.grpc.Status.UNAVAILABLE
-                      .withDescription("Deliberately enforcing a retry on failed scans.")
-                      .asRuntimeException()
-                  )
-                else Future.unit
-              },
-              logger,
-            )(implicitly, TraceContext.empty, implicitly)
-          )
+          FutureUnlessShutdown.outcomeF(bft.refresh(this)(tc))
         })
       )
   }
