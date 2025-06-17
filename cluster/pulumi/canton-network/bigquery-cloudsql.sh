@@ -42,7 +42,7 @@ POSTGRES_INSTANCE_NAME=""
 SCAN_APP_DATABASE_NAME=""
 
 # Track which arguments have been provided
-declare -a PROVIDED_ARGS
+declare -A PROVIDED_ARGS
 
 while [ "$#" -gt 0 ]; do
   # Verify argument follows --name=value format
@@ -114,7 +114,7 @@ while [ "$#" -gt 0 ]; do
   esac
 
   # Mark parameter as provided
-  PROVIDED_ARGS[$param_name]=1
+  PROVIDED_ARGS["$param_name"]=1
 
   shift
 done
