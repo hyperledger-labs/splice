@@ -12,7 +12,6 @@ import {
   TableRow,
   Button,
   Alert,
-  Link,
 } from '@mui/material';
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
@@ -20,7 +19,6 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { YourVoteStatus } from '../../routes/governance';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { useNavigate } from 'react-router-dom';
 import { Link as RouterLink } from 'react-router-dom';
 
 interface VotesListingSectionProps {
@@ -140,7 +138,6 @@ const VoteRow: React.FC<VoteRowProps> = props => {
     showStatus,
     showVoteStats,
   } = props;
-  const navigate = useNavigate();
 
   return (
     <TableRow data-testid={`${uniqueId}-row`}>
