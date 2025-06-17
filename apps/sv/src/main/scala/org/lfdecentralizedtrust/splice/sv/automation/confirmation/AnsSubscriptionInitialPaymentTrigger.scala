@@ -218,7 +218,7 @@ class AnsSubscriptionInitialPaymentTrigger(
       )
     )
     taskOutcome <- ansInitialPaymentConfirmationByAnsName match {
-      case Seq.empty =>
+      case Seq() =>
         connection
           .submit(
             actAs = Seq(svParty),
@@ -240,7 +240,7 @@ class AnsSubscriptionInitialPaymentTrigger(
               s"confirmed to create ans entry $entryName by collecting payment $paymentCid"
             )
           }
-      case Seq(_) =>
+      case _ =>
         TaskSuccess(
           s"skipping as confirmation (either acceptance or rejection) from $svParty is already created for this payment $paymentCid"
         ).pure[Future]
