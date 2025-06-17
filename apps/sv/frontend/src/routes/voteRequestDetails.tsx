@@ -43,11 +43,7 @@ const buildProposal = (action: ActionRequiringConfirmation) => {
       case 'SRARC_UpdateSvRewardWeight':
         return {
           svToUpdate: dsoAction.value.svParty,
-          weightChange: {
-            fieldName: 'Weight',
-            currentValue: dsoAction.value.newRewardWeight || '0000', //TODO: Weight change has no old value. Change this to just show new value
-            newValue: dsoAction.value.newRewardWeight || '0000',
-          },
+          weightChange: dsoAction.value.newRewardWeight,
         } as UpdateSvRewardWeightProposal;
       case 'SRARC_GrantFeaturedAppRight':
         return {
@@ -106,7 +102,6 @@ export const VoteRequestDetails: React.FC = () => {
   const dsoInfosQuery = useDsoInfos();
 
   const ggg = useVoteRequestResultByCid(contractId as ContractId<VoteRequest>);
-  console.log('ggg', ggg);
 
   if (dsoInfosQuery.isPending) {
     return <Loading />;
