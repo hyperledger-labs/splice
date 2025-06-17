@@ -107,6 +107,8 @@ While doing so, please note the following:
     :start-after: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_START
     :end-before: PARTICIPANT_BOOTSTRAP_MIGRATE_TO_NEW_PARTICIPANT_END
 
+.. _validator_disaster_recovery-docker-compose-deployment:
+
 Docker-Compose Deployment
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 

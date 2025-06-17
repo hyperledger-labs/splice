@@ -32,6 +32,14 @@ Upcoming
 
   - Fix an issue where the mediator sometimes got stuck after initialization and required a restart to recover.
 
+- Validator
+
+  - docker-compose, breaking: Restoration from identities dump requires to
+    specify path to `identities.json` and not directory containing it. This is
+    consistent with the :ref:`documented
+    <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
+    `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
+
 0.4.1
 -----
 
