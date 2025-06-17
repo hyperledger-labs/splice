@@ -132,7 +132,31 @@ class BftScanConnection(
           retryProvider.timeouts,
           "refresh_scan_list",
         )({ tc =>
-          FutureUnlessShutdown.outcomeF(bft.refresh(this)(tc))
+          // This retry makes sure any partial or complete failures are immediately retried with a backoff.
+          FutureUnlessShutdown.outcomeF(
+            retryProvider.retry(
+              RetryFor.LongRunningAutomation,
+              "refresh_scan_list",
+              "refresh_scan_list",
+              bft.refresh(this)(tc).flatMap { connections =>
+                val failed = connections.failed
+                val total = connections.totalNumber
+                val f = connections.f
+                if (connections.failed > connections.f)
+                  Future.failed(
+                    io.grpc.Status.UNAVAILABLE
+                      .withDescription(
+                        s"Deliberately enforcing a retry because there are $failed/$total faulty scans, " +
+                          s"which is more than the maximum tolerated: $f. " +
+                          s"BFT requests will fail until enough are available."
+                      )
+                      .asRuntimeException()
+                  )
+                else Future.unit
+              },
+              logger,
+            )(implicitly, TraceContext.empty, implicitly)
+          )
         })
       )
   }
