@@ -1,6 +1,7 @@
 org.lfdecentralizedtrust.splice.auth.AuthTokenManagerTest
 org.lfdecentralizedtrust.splice.auth.SignatureVerifierTest
 org.lfdecentralizedtrust.splice.config.ThresholdsTest
+org.lfdecentralizedtrust.splice.environment.CommandIdDedupTest
 org.lfdecentralizedtrust.splice.environment.TopologyAwarePackageVersionSupportTest
 org.lfdecentralizedtrust.splice.http.UrlValidatorTest
 org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnectionTest

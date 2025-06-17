@@ -108,7 +108,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     val latestMigrationId: Gauge[Long] =
       metricsFactory.gauge(
         MetricInfo(
-          name = importUpdatesBackfillingPrefix :+ "latest-record-time",
+          name = importUpdatesBackfillingPrefix :+ "latest-migration-id",
           summary = "The migration id of the latest backfilled import update",
           Traffic,
         ),

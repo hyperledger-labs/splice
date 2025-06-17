@@ -22,7 +22,7 @@
 
 # Setting up Your Development Environment
 
-1. Clone the repository using `git clone git@github.com:DACH-NY/canton-network-node.git`.
+1. Clone this repo.
 1. Install [direnv](https://direnv.net/#basic-installation).
 1. Install Nix by running: `bash <(curl -sSfL https://nixos.org/nix/install)`
 1. Enable support for nix flakes and the nix command by adding to the
