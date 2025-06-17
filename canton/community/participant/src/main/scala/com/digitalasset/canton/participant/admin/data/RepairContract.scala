@@ -12,7 +12,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.{LfVersioned, ReassignmentCounter}
 import com.digitalasset.daml.lf.transaction
-import com.digitalasset.daml.lf.transaction.TransactionCoder
+import com.digitalasset.daml.lf.transaction.{CreationTime, TransactionCoder}
 import com.google.protobuf.ByteString
 
 import java.io.ByteArrayInputStream
@@ -71,7 +71,7 @@ object RepairContract {
           s"Unable to decode contract event payload: ${decodeError.errorMessage}"
         )
 
-      contractInstance = LfContractInst(
+      contractInstance = LfThinContractInst(
         fattyContract.packageName,
         fattyContract.templateId,
         transaction.Versioned(fattyContract.version, fattyContract.createArg),
@@ -95,11 +95,14 @@ object RepairContract {
         maybeKeyWithMaintainersVersioned,
       )
 
-      ledgerCreateTime = LedgerCreateTime(CantonTimestamp(fattyContract.createdAt))
+      ledgerCreateTime <- fattyContract.createdAt match {
+        case CreationTime.CreatedAt(time) => Right(LedgerCreateTime(CantonTimestamp(time)))
+        case CreationTime.Now => Left("Unable to determine create time.")
+      }
 
       driverContractMetadata <-
         DriverContractMetadata
-          .fromTrustedByteString(fattyContract.cantonData.toByteString)
+          .fromLfBytes(fattyContract.cantonData.toByteArray)
           .leftMap(deserializationError =>
             s"Unable to deserialize driver contract metadata: ${deserializationError.message}"
           )

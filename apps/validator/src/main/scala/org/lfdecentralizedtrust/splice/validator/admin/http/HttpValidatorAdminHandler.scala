@@ -208,6 +208,7 @@ class HttpValidatorAdminHandler(
                     transportSecurity,
                     _,
                     sequencerAlias,
+                    _,
                   ) =>
                 definitions.SequencerAliasToConnections(
                   sequencerAlias.toProtoPrimitive,

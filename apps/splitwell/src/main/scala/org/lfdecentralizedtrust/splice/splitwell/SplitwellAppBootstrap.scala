@@ -62,21 +62,17 @@ class SplitwellAppBootstrap(
     ) {
   override def initialize(adminRoutes: AdminRoutes): EitherT[Future, String, Unit] =
     startInstanceUnlessClosing {
-      EitherT.fromEither(
-        Right(
-          new SplitwellApp(
-            name,
-            config,
-            splitwellAppParameters,
-            storage,
-            clock,
-            loggerFactory,
-            tracerProvider,
-            futureSupervisor,
-            metrics,
-            adminRoutes,
-          )
-        )
+      new SplitwellApp(
+        name,
+        config,
+        splitwellAppParameters,
+        storage,
+        clock,
+        loggerFactory,
+        tracerProvider,
+        futureSupervisor,
+        metrics,
+        adminRoutes,
       )
     }
 

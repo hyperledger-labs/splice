@@ -16,7 +16,7 @@ import com.digitalasset.canton.protocol.messages.{ConfirmationResponse, Confirma
 import com.digitalasset.canton.protocol.{LocalRejectError, RequestId, RootHash}
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.protocol.{MediatorGroupRecipient, Recipients}
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -26,9 +26,9 @@ class BadRootHashMessagesRequestProcessor(
     ephemeral: SyncEphemeralState,
     crypto: SynchronizerCryptoClient,
     sequencerClient: SequencerClient,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     participantId: ParticipantId,
-    protocolVersion: ProtocolVersion,
+    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -48,7 +48,7 @@ class BadRootHashMessagesRequestProcessor(
       mediator: MediatorGroupRecipient,
       reject: LocalRejectError,
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    performUnlessClosingUSF(functionFullName) {
+    synchronizeWithClosing(functionFullName) {
       for {
         snapshot <- crypto.awaitSnapshot(timestamp)
         requestId = RequestId(timestamp)

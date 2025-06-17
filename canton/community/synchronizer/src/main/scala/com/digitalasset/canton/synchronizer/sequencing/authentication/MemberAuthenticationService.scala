@@ -50,7 +50,7 @@ import scala.concurrent.ExecutionContext
   *   for this member should be terminated.
   */
 class MemberAuthenticationService(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     cryptoApi: SynchronizerCryptoClient,
     store: MemberAuthenticationStore,
     clock: Clock,
@@ -169,7 +169,7 @@ class MemberAuthenticationService(
     * should be informed that this address now hosts a different synchronizer.
     */
   def validateToken(
-      intendedSynchronizerId: SynchronizerId,
+      intendedSynchronizerId: PhysicalSynchronizerId,
       member: Member,
       token: AuthenticationToken,
   ): Either[AuthenticationError, StoredAuthenticationToken] =
@@ -203,7 +203,7 @@ class MemberAuthenticationService(
   private def scheduleExpirations(
       timestamp: CantonTimestamp
   )(implicit traceContext: TraceContext): Unit = {
-    def run(): Unit = performUnlessClosing(functionFullName) {
+    def run(): Unit = synchronizeWithClosingSync(functionFullName) {
       val now = clock.now
       logger.debug(s"Expiring nonces and tokens up to $now")
       store.expireNoncesAndTokens(now)
@@ -233,7 +233,7 @@ class MemberAuthenticationService(
 
   private def correctSynchronizer(
       member: Member,
-      intendedSynchronizerId: SynchronizerId,
+      intendedSynchronizerId: PhysicalSynchronizerId,
   ): Either[AuthenticationError, Unit] =
     Either.cond(
       intendedSynchronizerId == synchronizerId,
@@ -300,7 +300,7 @@ object MemberAuthenticationService {
 }
 
 class MemberAuthenticationServiceImpl(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     cryptoApi: SynchronizerCryptoClient,
     store: MemberAuthenticationStore,
     clock: Clock,
@@ -334,7 +334,7 @@ class MemberAuthenticationServiceImpl(
       sc: SequencerCounter,
       transactions: Seq[GenericSignedTopologyTransaction],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    performUnlessClosingUSF(functionFullName) {
+    synchronizeWithClosing(functionFullName) {
       FutureUnlessShutdown.sequence(transactions.map(_.transaction).map {
         case TopologyTransaction(
               TopologyChangeOp.Remove,
@@ -384,7 +384,7 @@ trait MemberAuthenticationServiceFactory {
 object MemberAuthenticationServiceFactory {
 
   def apply(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       clock: Clock,
       nonceExpirationInterval: Duration,
       maxTokenExpirationInterval: Duration,

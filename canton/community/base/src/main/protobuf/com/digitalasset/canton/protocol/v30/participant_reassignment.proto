@@ -21,10 +21,10 @@ message ReassignmentId {
 // Messages sent by a participant as part of the reassignment protocol
 
 message UnassignmentCommonData {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
-  string source_synchronizer_id = 2;
+  string source_physical_synchronizer_id = 2;
 
   Stakeholders stakeholders = 3;
   repeated string reassigning_participant_uids = 4;
@@ -35,7 +35,7 @@ message UnassignmentCommonData {
 }
 
 message ReassignmentViewTree {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   bytes common_data = 1;
   BlindableNode participant_data = 2;
@@ -49,17 +49,17 @@ message AssignmentMediatorMessage {
 }
 
 message UnassignmentMediatorMessage {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   ReassignmentViewTree tree = 1;
   com.digitalasset.canton.crypto.v30.Signature submitting_participant_signature = 2;
 }
 
 message AssignmentCommonData {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
-  string target_synchronizer_id = 2;
+  string target_physical_synchronizer_id = 2;
 
   Stakeholders stakeholders = 3; // stakeholders of the contract
 
@@ -70,7 +70,7 @@ message AssignmentCommonData {
 }
 
 message ReassignmentSubmitterMetadata {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   string submitter = 1;
   string submitting_participant_uid = 2;
@@ -81,22 +81,23 @@ message ReassignmentSubmitterMetadata {
 }
 
 message UnassignmentView {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
-  string target_synchronizer_id = 3;
-  com.digitalasset.canton.time.v30.TimeProof target_time_proof = 4;
-  int32 target_protocol_version = 5;
-  int64 reassignment_counter = 6;
-  com.digitalasset.canton.protocol.v30.SerializableContract contract = 7;
+  string target_physical_synchronizer_id = 2;
+  com.digitalasset.canton.time.v30.TimeProof target_time_proof = 3;
+  repeated ActiveContract contracts = 4;
 }
 
 message AssignmentView {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   com.digitalasset.canton.crypto.v30.Salt salt = 1;
-  v30.SerializableContract contract = 2;
-  // Serialized SignedContent[SequencedEvent]
-  bytes unassignment_result_event = 3;
-  int64 reassignment_counter = 4;
+  repeated ActiveContract contracts = 2;
+  ReassignmentId reassignment_id = 3;
+}
+
+message ActiveContract {
+  v30.SerializableContract contract = 1;
+  int64 reassignment_counter = 2;
 }

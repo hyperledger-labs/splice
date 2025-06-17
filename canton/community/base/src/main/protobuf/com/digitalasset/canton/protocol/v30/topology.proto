@@ -57,6 +57,8 @@ message Enums {
     reserved 16; // was TrafficControlState
     TOPOLOGY_MAPPING_CODE_SEQUENCING_DYNAMIC_PARAMETERS_STATE = 17;
     TOPOLOGY_MAPPING_CODE_PARTY_TO_KEY_MAPPING = 18;
+    TOPOLOGY_MAPPING_CODE_SYNCHRONIZER_MIGRATION_ANNOUNCEMENT = 19;
+    TOPOLOGY_MAPPING_CODE_SEQUENCER_CONNECTION_SUCCESSOR = 20;
   }
 }
 
@@ -87,6 +89,7 @@ message NamespaceDelegation {
     CanSignSpecificMappings can_sign_specific_mapings = 6;
   }
 
+  // [start-docs-entry: namespace delegation restrictions]
   // the key can sign all currently known mappings and all mappings that will be added in future releases
   message CanSignAllMappings {}
   // the key can sign all currently known mappings and all mappings that will be added in future releases, except for
@@ -96,6 +99,7 @@ message NamespaceDelegation {
   message CanSignSpecificMappings {
     repeated Enums.TopologyMappingCode mappings = 1;
   }
+  // [end-docs-entry: namespace delegation restrictions]
 }
 // [end NamespaceDelegation definition]
 
@@ -134,6 +138,7 @@ message OwnerToKeyMapping {
   reserved 3; // was synchronizer = 3;
 }
 
+// [doc-entry-start: PartyToKeyMapping]
 // mapping a party to a key
 // authorization: whoever controls the party uid
 // UNIQUE(party)
@@ -147,6 +152,7 @@ message PartyToKeyMapping {
 
   reserved 2; // was synchronizer_id = 2
 }
+// [doc-entry-end: PartyToKeyMapping]
 
 // the trust certificate issued by the participant confirming that the participant
 // wishes to be present on the given synchronizer
@@ -200,12 +206,12 @@ message VettedPackages {
   message VettedPackage {
     // the hash of the vetted package
     string package_id = 1;
-    // optional earliest ledger effective time (exclusive) as of which the package is considered valid.
+    // optional earliest ledger effective time (inclusive) as of which the package is considered valid.
     // must be less than or equal to valid_until if both are present.
-    google.protobuf.Timestamp valid_from = 2;
-    // optional latest ledger effective time (inclusive) until which the package is considered valid.
+    google.protobuf.Timestamp valid_from_inclusive = 2;
+    // optional latest ledger effective time (exclusive) until which the package is considered valid.
     // must be greater than or equal to valid_from if both are present.
-    google.protobuf.Timestamp valid_until = 3;
+    google.protobuf.Timestamp valid_until_exclusive = 3;
   }
   // the participant vetting the packages
   string participant_uid = 1;
@@ -234,12 +240,17 @@ message VettedPackages {
 // UNIQUE(party)
 message PartyToParticipant {
   message HostingParticipant {
+    message Onboarding {}
+
     // the target participant that the party should be mapped to
     string participant_uid = 1;
 
     // permission of the participant for this particular party (the actual
     // will be min of ParticipantSynchronizerPermission.ParticipantPermission and this setting)
     Enums.ParticipantPermission permission = 2;
+
+    // optional, present iff the party is being onboarded to the participant
+    Onboarding onboarding = 3;
   }
 
   // the party that is to be represented by the participants
@@ -334,6 +345,45 @@ message PurgeTopologyTransaction {
   repeated TopologyMapping mappings = 2;
 }
 
+// indicates the beginning of a synchronizer upgrade and effectuates a topology freeze,
+// after which only synchronizer upgrade specific topology mappings are accepted.
+// removing this mapping unfreezes the topology state again.
+// authorization: whoever controls the physical synchronizer
+// UNIQUE(physical_synchronizer_id)
+message SynchronizerUpgradeAnnouncement {
+  // the physical synchronizer id
+  // TODO(#25576) revisit the usage of physical synchronizer ids to refer to the "current synchronizer"
+  string physical_synchronizer_id = 1;
+  // the physical synchronizer id of the successor synchronizer
+  string successor_physical_synchronizer_id = 2;
+}
+
+// a sequencer can announce its connections on the successor synchronizer
+// authorization: the owner of the sequencer's namespace
+// UNIQUE(sequencer_id)
+message SequencerConnectionSuccessor {
+  // the sequencer id
+  string sequencer_id = 1;
+  // to physical synchronizer id
+  // TODO(#25576) revisit the usage of physical synchronizer ids to refer to the "current synchronizer"
+  string physical_synchronizer_id = 2;
+  // the connection details with which members can connect to the sequencer on the successor synchronizer
+  SequencerConnection connection = 3;
+
+  message SequencerConnection {
+    oneof connection_type {
+      Grpc grpc = 1;
+    }
+
+    message Grpc {
+      // connection information to sequencer (http[s]://<host>:<port>")
+      // all endpoints must agree on using HTTPS or HTTP
+      repeated string endpoints = 1;
+      optional bytes custom_trust_certificates = 2;
+    }
+  }
+}
+
 // [docs-entry-start: topology mapping]
 message TopologyMapping {
   oneof mapping {
@@ -356,6 +406,9 @@ message TopologyMapping {
     DynamicSequencingParametersState sequencing_dynamic_parameters_state = 15;
 
     PartyToKeyMapping party_to_key_mapping = 16;
+
+    SynchronizerUpgradeAnnouncement synchronizer_upgrade_announcement = 17;
+    SequencerConnectionSuccessor sequencer_connection_successor = 18;
   }
   reserved 2; // was identifier_delegation
   reserved 10; // was authority_of
@@ -363,7 +416,7 @@ message TopologyMapping {
 // [docs-entry-end: topology mapping]
 
 message TopologyTransaction {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   Enums.TopologyChangeOp operation = 1;
 
@@ -389,7 +442,7 @@ message MultiTransactionSignatures {
 }
 
 message SignedTopologyTransaction {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   // serialized topology transaction (protobuf bytestring)
   bytes transaction = 1;
@@ -412,7 +465,7 @@ message SignedTopologyTransaction {
 }
 
 message SignedTopologyTransactions {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
   // serialized signed topology transaction (protobuf bytestring)
   repeated bytes signed_transaction = 1;
@@ -425,8 +478,8 @@ message SignedTopologyTransactions {
  * including the member the submitted the broadcast.
  */
 message TopologyTransactionsBroadcast {
-  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.StableProtoVersion";
+  option (scalapb.message).companion_extends = "com.digitalasset.canton.version.AlphaProtoVersion";
 
-  string synchronizer_id = 1;
+  string physical_synchronizer_id = 1;
   SignedTopologyTransactions signed_transactions = 2;
 }

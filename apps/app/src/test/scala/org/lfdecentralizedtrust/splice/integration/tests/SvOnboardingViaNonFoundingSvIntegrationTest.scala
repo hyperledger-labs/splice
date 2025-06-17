@@ -131,7 +131,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .connections
               .toIndexedSeq
               .loneElement match {
-              case GrpcSequencerConnection(endpoints, _, _, _) =>
+              case GrpcSequencerConnection(endpoints, _, _, _, _) =>
                 endpoints.toIndexedSeq.loneElement shouldBe LocalSynchronizerNode.toEndpoint(
                   sv2Backend.config.localSynchronizerNode.value.sequencer.internalApi
                 )

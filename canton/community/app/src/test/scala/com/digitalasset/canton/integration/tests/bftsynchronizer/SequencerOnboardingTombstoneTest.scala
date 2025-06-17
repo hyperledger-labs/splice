@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.integration.tests.bftsynchronizer
 
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{ComponentHealthState, ComponentStatus}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.DbConfig
@@ -65,15 +64,7 @@ trait SequencerOnboardingTombstoneTest
       import env.*
 
       clue("participant1 connects to sequencer1") {
-        participant1.synchronizers.connect_local_bft(
-          NonEmpty
-            .mk(
-              Seq,
-              SequencerAlias.tryCreate("seq1x") -> sequencer1,
-            )
-            .toMap,
-          alias = daName,
-        )
+        participant1.synchronizers.connect_local_bft(Seq(sequencer1), synchronizerAlias = daName)
       }
 
       participant1.health.ping(participant1.id)
@@ -108,8 +99,8 @@ trait SequencerOnboardingTombstoneTest
     onboardNewSequencer(
       // synchronizerId,
       initializedSynchronizers(daName).synchronizerId,
-      newSequencer = sequencer2,
-      existingSequencer = sequencer1,
+      newSequencerReference = sequencer2,
+      existingSequencerReference = sequencer1,
       synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
     )
 
@@ -129,7 +120,9 @@ trait SequencerOnboardingTombstoneTest
       // fetch synchronizer time to ensure participant1's sequencer client is caught up
       // to just before the long-running transaction held up by mediator1 being down before
       // disconnecting from sequencer1.
-      participant1.testing.fetch_synchronizer_time(initializedSynchronizers(daName).synchronizerId)
+      participant1.testing.fetch_synchronizer_time(
+        initializedSynchronizers(daName).physicalSynchronizerId
+      )
       participant1.synchronizers.disconnect_all()
 
       // Start the mediator so the long-running transaction's accept or reject can be sequenced.

@@ -5,6 +5,7 @@ package com.digitalasset.canton
 
 import cats.Functor
 import cats.data.{EitherT, OptionT}
+import cats.syntax.functor.*
 import cats.syntax.parallel.*
 import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.opentelemetry.OpenTelemetryMetricsFactory
@@ -17,6 +18,7 @@ import com.digitalasset.canton.metrics.OpenTelemetryOnDemandMetricsReader
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
 import com.digitalasset.canton.telemetry.ConfiguredOpenTelemetry
 import com.digitalasset.canton.time.WallClock
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
@@ -47,6 +49,7 @@ import org.typelevel.discipline.Laws
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
+import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
 trait ScalaFuturesWithPatience extends ScalaFutures {
@@ -436,11 +439,22 @@ trait BaseTest
   lazy val PerformanceTestPath: String = BaseTest.PerformanceTestPath
   lazy val DamlTestFilesPath: String = BaseTest.DamlTestFilesPath
   lazy val DamlTestLfDevFilesPath: String = BaseTest.DamlTestLfDevFilesPath
+
+  implicit class RichSynchronizerId(val id: SynchronizerId) {
+    def toPhysical: PhysicalSynchronizerId = PhysicalSynchronizerId(id, testedProtocolVersion)
+  }
+
+  implicit def toSynchronizerId(id: PhysicalSynchronizerId): SynchronizerId = id.logical
+  implicit def toSynchronizerIdF[F[X]: Functor](id: F[PhysicalSynchronizerId]): F[SynchronizerId] =
+    id.map(_.logical)
 }
 
 object BaseTest {
-
   val DefaultEventuallyTimeUntilSuccess: FiniteDuration = 20.seconds
+
+  implicit class RichSynchronizerIdO(val id: SynchronizerId) {
+    def toPhysical: PhysicalSynchronizerId = PhysicalSynchronizerId(id, testedProtocolVersion)
+  }
 
   /** Keeps evaluating `testCode` until it fails or a timeout occurs.
     * @return
@@ -549,14 +563,14 @@ object BaseTest {
   )
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
-  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.3.0.dar")
-  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.3.0.dar")
-  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.3.0.dar")
-  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.3.0.dar")
+  lazy val CantonTestsPath: String = getResourcePath("CantonTests-3.4.0.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev-3.4.0.dar")
+  lazy val CantonLfDev: String = getResourcePath("CantonLfDev-3.4.0.dar")
+  lazy val CantonLfV21: String = getResourcePath("CantonLfV21-3.4.0.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")
-  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.3.0.dar")
-  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.3.0.dar")
-  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.3.0.dar")
+  lazy val DamlScript3TestFilesPath: String = getResourcePath("DamlScript3TestFiles-3.4.0.dar")
+  lazy val DamlTestFilesPath: String = getResourcePath("DamlTestFiles-3.4.0.dar")
+  lazy val DamlTestLfDevFilesPath: String = getResourcePath("DamlTestLfDevFiles-3.4.0.dar")
 
   def getResourcePath(name: String): String =
     Option(getClass.getClassLoader.getResource(name))

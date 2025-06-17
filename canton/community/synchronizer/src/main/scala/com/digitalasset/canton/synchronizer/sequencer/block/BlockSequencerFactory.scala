@@ -8,6 +8,7 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.SynchronizerCryptoClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, LifeCycle, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -34,7 +35,7 @@ import com.digitalasset.canton.synchronizer.sequencing.traffic.{
   TrafficPurchasedManager,
 }
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.common.annotations.VisibleForTesting
@@ -96,7 +97,7 @@ abstract class BlockSequencerFactory(
 
   protected def createBlockSequencer(
       name: String,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       cryptoApi: SynchronizerCryptoClient,
       stateManager: BlockSequencerStateManager,
       store: SequencerBlockStore,
@@ -109,6 +110,7 @@ abstract class BlockSequencerFactory(
       protocolVersion: ProtocolVersion,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
+      minimumSequencingTime: CantonTimestamp,
       initialBlockHeight: Option[Long],
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
@@ -174,13 +176,14 @@ abstract class BlockSequencerFactory(
     )
 
   override final def create(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       sequencerId: SequencerId,
       clock: Clock,
       driverClock: Clock,
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
+      minimumSequencingTime: CantonTimestamp,
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot] = None,
       authenticationServices: Option[AuthenticationServices] = None,
@@ -261,6 +264,7 @@ abstract class BlockSequencerFactory(
         protocolVersion,
         rateLimitManager,
         orderingTimeFixMode,
+        minimumSequencingTime,
         initialBlockHeight,
         sequencerSnapshot,
         authenticationServices,

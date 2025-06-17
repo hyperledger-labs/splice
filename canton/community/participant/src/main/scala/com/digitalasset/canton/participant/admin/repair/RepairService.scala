@@ -43,14 +43,13 @@ import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.protocol.{LfChoiceName, *}
 import com.digitalasset.canton.store.SequencedEventStore
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.PekkoUtil.FutureQueue
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.AllExceptionRetryPolicy
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.CantonOnly
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray}
 import com.google.common.annotations.VisibleForTesting
@@ -89,7 +88,6 @@ final class RepairService(
     ledgerApiIndexer: Eval[LedgerApiIndexer],
     aliasManager: SynchronizerAliasManager,
     parameters: ParticipantNodeParameters,
-    threadsAvailableForWriting: PositiveInt,
     val synchronizerLookup: SynchronizerLookup,
     @VisibleForTesting
     private[canton] val executionQueue: SimpleExecutionQueue,
@@ -108,7 +106,7 @@ final class RepairService(
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
   private def synchronizerNotConnected(
-      synchronizerId: SynchronizerId
+      synchronizerId: PhysicalSynchronizerId
   ): EitherT[FutureUnlessShutdown, String, Unit] =
     EitherT.cond(
       !synchronizerLookup.isConnected(synchronizerId),
@@ -237,15 +235,23 @@ final class RepairService(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, RepairRequest.SynchronizerData] =
     for {
+      psid <- EitherT.fromEither[FutureUnlessShutdown](
+        synchronizerLookup
+          .latestKnownPSId(synchronizerId)
+          .toRight(s"Unable to resolve $synchronizerId to a physical synchronizer id")
+      )
+
+      _ = logger.debug(s"Using $psid as $synchronizerId")
+
       persistentState <- EitherT.fromEither[FutureUnlessShutdown](
-        lookUpSynchronizerPersistence(synchronizerId, s"synchronizer $synchronizerAlias")
+        lookUpSynchronizerPersistence(psid)
       )
       synchronizerIndex <- EitherT
         .right(
           ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(synchronizerId)
         )
       topologyFactory <- synchronizerLookup
-        .topologyFactoryFor(synchronizerId)
+        .topologyFactoryFor(psid)
         .toRight(s"No topology factory for synchronizer $synchronizerAlias")
         .toEitherT[FutureUnlessShutdown]
 
@@ -274,8 +280,8 @@ final class RepairService(
     *   alias of synchronizer to add contracts to. The synchronizer needs to be configured, but
     *   disconnected to prevent race conditions.
     * @param contracts
-    *   contracts to add. Relevant pieces of each contract: create-arguments (LfContractInst),
-    *   template-id (LfContractInst), contractId, ledgerCreateTime, salt (to be added to
+    *   contracts to add. Relevant pieces of each contract: create-arguments (LfThinContractInst),
+    *   template-id (LfThinContractInst), contractId, ledgerCreateTime, salt (to be added to
     *   SerializableContract), and witnesses, SerializableContract.metadata is only validated, but
     *   otherwise ignored as stakeholder and signatories can be recomputed from contracts.
     * @param ignoreAlreadyAdded
@@ -310,6 +316,7 @@ final class RepairService(
                 .synchronizerIdForAlias(synchronizerAlias)
                 .toRight(s"Could not find $synchronizerAlias")
             )
+
             synchronizer <- readSynchronizerData(synchronizerId, synchronizerAlias)
 
             contractStates <- EitherT.right[String](
@@ -524,7 +531,6 @@ final class RepairService(
       sourceSynchronizer: Source[SynchronizerId],
       targetSynchronizer: Target[SynchronizerId],
       skipInactive: Boolean,
-      batchSize: PositiveInt,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
     val contractsCount = PositiveInt.tryCreate(contracts.size)
     for {
@@ -558,19 +564,13 @@ final class RepairService(
           loggerFactory,
         )
         (for {
-          changeAssignationData <- EitherT.fromEither[FutureUnlessShutdown](
+          changeAssignationData <- EitherT.rightT[FutureUnlessShutdown, String](
             ChangeAssignation.Data.from(contracts.forgetNE, changeAssignation)
           )
-
           // Note the following purposely fails if any contract fails which results in not all contracts being processed.
-          _ <- MonadUtil
-            .batchedSequentialTraverse(
-              parallelism = threadsAvailableForWriting * PositiveInt.two,
-              batchSize,
-            )(
-              changeAssignationData
-            )(changeAssignation.changeAssignation(_, skipInactive).map(_ => Seq[Unit]()))
-            .map(_ => ())
+          _ <- changeAssignation
+            .changeAssignation(changeAssignationData, skipInactive)
+            .map(_ => Seq[Unit]())
 
         } yield ()).mapK(FutureUnlessShutdown.failOnShutdownToAbortExceptionK("changeAssignation"))
       }
@@ -578,7 +578,7 @@ final class RepairService(
   }
 
   def ignoreEvents(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       fromInclusive: SequencerCounter,
       toInclusive: SequencerCounter,
       force: Boolean,
@@ -626,6 +626,7 @@ final class RepairService(
           contractStore.value,
           loggerFactory,
         )
+
         unassignmentData = ChangeAssignation.Data.from(reassignmentData, changeAssignation)
         _ <- changeAssignation.completeUnassigned(unassignmentData)
 
@@ -638,23 +639,23 @@ final class RepairService(
           contractStore.value,
           loggerFactory,
         )
-        contractIdData <- EitherT.fromEither[FutureUnlessShutdown](
+        contractIdsData <- EitherT.fromEither[FutureUnlessShutdown](
           ChangeAssignation.Data
-            .from(
-              reassignmentData.contract.contractId,
+            .from[Seq[(LfContractId, Option[ReassignmentCounter])]](
+              reassignmentData.contracts.contractIds.map(_ -> None).toSeq,
               changeAssignationBack,
             )
             .incrementRepairCounter
         )
         _ <- changeAssignationBack.changeAssignation(
-          Seq(contractIdData.map((_, None))),
+          contractIdsData,
           skipInactive = false,
         )
       } yield ()).mapK(FutureUnlessShutdown.failOnShutdownToAbortExceptionK("rollbackUnassignment"))
     }
 
   private def performIfRangeSuitableForIgnoreOperations[T](
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       from: SequencerCounter,
       force: Boolean,
   )(
@@ -662,14 +663,14 @@ final class RepairService(
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, T] =
     for {
       persistentState <- EitherT.fromEither[FutureUnlessShutdown](
-        lookUpSynchronizerPersistence(synchronizerId, synchronizerId.show)
+        lookUpSynchronizerPersistence(synchronizerId)
       )
       _ <- EitherT.right(
         ledgerApiIndexer.value
-          .ensureNoProcessingForSynchronizer(synchronizerId)
+          .ensureNoProcessingForSynchronizer(synchronizerId.logical)
       )
       synchronizerIndex <- EitherT.right(
-        ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(synchronizerId)
+        ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(synchronizerId.logical)
       )
       startingPoints <- EitherT.right(
         SyncEphemeralStateFactory.startingPoints(
@@ -688,7 +689,7 @@ final class RepairService(
     } yield res
 
   def unignoreEvents(
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       fromInclusive: SequencerCounter,
       toInclusive: SequencerCounter,
       force: Boolean,
@@ -991,11 +992,10 @@ final class RepairService(
       contractsAdded: Seq[ContractToAdd],
       workflowIdProvider: () => Option[LfWorkflowId],
   )(implicit traceContext: TraceContext): RepairUpdate = {
-    val contractMetadata = contractsAdded.view
-      .map(c =>
-        c.contract.contractId -> c.driverMetadata(repair.synchronizer.parameters.protocolVersion)
-      )
-      .toMap
+    val contractMetadata = contractsAdded.view.map { c =>
+      val cId = c.contract.contractId
+      cId -> c.driverMetadata(CantonContractIdVersion.tryCantonContractIdVersion(cId))
+    }.toMap
     val nodeIds = LazyList.from(0).map(LfNodeId)
     val txNodes = nodeIds.zip(contractsAdded.map(_.contract.toLf)).toMap
     Update.RepairTransactionAccepted(
@@ -1190,20 +1190,19 @@ final class RepairService(
 
   // Looks up synchronizer persistence erroring if synchronizer is based on in-memory persistence for which repair is not supported.
   private def lookUpSynchronizerPersistence(
-      synchronizerId: SynchronizerId,
-      synchronizerDescription: String,
+      synchronizerId: PhysicalSynchronizerId
   )(implicit
       traceContext: TraceContext
   ): Either[String, SyncPersistentState] =
     for {
       dp <- synchronizerLookup
         .persistentStateFor(synchronizerId)
-        .toRight(log(s"Could not find $synchronizerDescription"))
+        .toRight(log(s"Could not find persistent state for $synchronizerId"))
       _ <- Either.cond(
         !dp.isMemory,
         (),
         log(
-          s"$synchronizerDescription is in memory which is not supported by repair. Use db persistence."
+          s"$synchronizerId is in memory which is not supported by repair. Use db persistence."
         ),
       )
     } yield dp
@@ -1267,18 +1266,34 @@ object RepairService {
   ) {
     def cid: LfContractId = contract.contractId
 
-    def driverMetadata(protocolVersion: ProtocolVersion): Bytes =
-      DriverContractMetadata(contract.contractSalt).toLfBytes(protocolVersion)
+    def driverMetadata(contractIdVersion: CantonContractIdVersion): Bytes =
+      DriverContractMetadata(contract.contractSalt).toLfBytes(contractIdVersion)
+
   }
 
   trait SynchronizerLookup {
-    def isConnected(synchronizerId: SynchronizerId): Boolean
+
+    /** Check whether the participant is currently connected to the given physical synchronizer.
+      */
+    def isConnected(synchronizerId: PhysicalSynchronizerId): Boolean
 
     def isConnectedToAnySynchronizer: Boolean
 
-    def persistentStateFor(synchronizerId: SynchronizerId): Option[SyncPersistentState]
+    /** Return the persistent state of the give physical synchronizer.
+      */
+    def persistentStateFor(synchronizerId: PhysicalSynchronizerId): Option[SyncPersistentState]
 
-    def topologyFactoryFor(synchronizerId: SynchronizerId)(implicit
+    /** Return the latest [[com.digitalasset.canton.topology.PhysicalSynchronizerId]] known for the
+      * given [[com.digitalasset.canton.topology.SynchronizerId]].
+      *
+      * Use cases are:
+      *   - submission of a transaction (phase 1)
+      *   - repair service
+      *   - inspection services
+      */
+    def latestKnownPSId(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId]
+
+    def topologyFactoryFor(synchronizerId: PhysicalSynchronizerId)(implicit
         traceContext: TraceContext
     ): Option[TopologyComponentFactory]
   }

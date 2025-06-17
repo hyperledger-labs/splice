@@ -13,7 +13,7 @@ import com.digitalasset.canton.console.{
   LocalParticipantReference,
   SequencerReference,
 }
-import com.digitalasset.canton.data.{CantonTimestamp, Offset}
+import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.MediatorError.InvalidMessage
 import com.digitalasset.canton.examples.java as M
@@ -44,7 +44,7 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{KnownPhysicalSynchronizerId, PartyId}
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import com.digitalasset.canton.{BaseTest, SynchronizerAlias}
 import monocle.macros.syntax.lens.*
@@ -136,11 +136,29 @@ final class ParticipantMigrateSynchronizerIntegrationTest
     val alice = participant1.parties.enable(
       "Alice",
       synchronizeParticipants = Seq(participant2),
+      synchronizer = daName,
     )
     val bob = participant2.parties.enable(
       "Bob",
       synchronizeParticipants = Seq(participant1),
+      synchronizer = daName,
     )
+
+    // temporarily connect to synchronizer 2 and allocate parties there
+    participant1.synchronizers.connect_local(sequencer2, alias = acmeName)
+    participant2.synchronizers.connect_local(sequencer2, alias = acmeName)
+    participant1.parties.enable(
+      "Alice",
+      synchronizeParticipants = Seq(participant2),
+      synchronizer = acmeName,
+    )
+    participant2.parties.enable(
+      "Bob",
+      synchronizeParticipants = Seq(participant1),
+      synchronizer = acmeName,
+    )
+    participant1.synchronizers.disconnect(acmeName)
+    participant2.synchronizers.disconnect(acmeName)
 
     IouSyntax.createIou(participant1)(alice, bob)
 
@@ -214,7 +232,7 @@ final class ParticipantMigrateSynchronizerIntegrationTest
     assertThrowsAndLogsCommandFailures(
       participant1.repair.migrate_synchronizer(
         source = daName,
-        target = config.copy(synchronizerId = Some(daId)),
+        target = config.copy(synchronizerId = daId),
       ),
       _.shouldBeCantonErrorCode(SynchronizerMigrationError.InvalidArgument),
     )
@@ -254,17 +272,24 @@ final class ParticipantMigrateSynchronizerIntegrationTest
             sequencer1.stop()
             mediator1.stop()
 
-            val config = getSynchronizerConfig(acmeName, sequencer2)
+            val newSynchronizerConfig = getSynchronizerConfig(acmeName, sequencer2)
 
             val reassignmentCounterBefore = participant1.ledger_api.state.acs
               .active_contracts_of_party(alice)
               .map(_.reassignmentCounter)
             reassignmentCounterBefore should not be empty
 
-            Seq(participant1, participant2).foreach { p =>
-              // need to force the synchronizer migration because of in-flight transactions
-              p.repair.migrate_synchronizer(source = daName, target = config, force = true)
+            val oldSynchronizer = daName
+            // need to force the synchronizer migration because of in-flight transactions
+            // user-manual-entry-begin: MigrateSynchronizerForRecovery
+            participants.all.foreach { participant =>
+              participant.repair.migrate_synchronizer(
+                source = oldSynchronizer,
+                target = newSynchronizerConfig,
+                force = true,
+              )
             }
+            // user-manual-entry-end: MigrateSynchronizerForRecovery
 
             val logAssertions: Seq[(LogEntryOptionality, LogEntry => Assertion)] =
               // suppress potential ACS commitment warnings during migration
@@ -275,7 +300,9 @@ final class ParticipantMigrateSynchronizerIntegrationTest
                 Seq(participant1, participant2).foreach(_.synchronizers.reconnect(acmeName))
 
                 val expectedAssignationAfter =
-                  reassignmentCounterBefore.map(counter => (acmeId.toProtoPrimitive, counter + 1))
+                  reassignmentCounterBefore.map(counter =>
+                    (acmeId.logical.toProtoPrimitive, counter + 1)
+                  )
                 val assignationAfter = participant1.ledger_api.state.acs
                   .active_contracts_of_party(alice)
                   .map(c => (c.synchronizerId, c.reassignmentCounter))
@@ -305,7 +332,7 @@ final class ParticipantMigrateSynchronizerIntegrationTest
 
           clue("transferring") {
             participant2.ledger_api.javaapi.commands
-              .submit_flat(
+              .submit(
                 Seq(bob),
                 coid.id.exerciseTransfer(alice.toProtoPrimitive).commands.asScala.toSeq,
               )
@@ -351,9 +378,21 @@ final class ParticipantMigrateSynchronizerIntegrationTest
         .valueOrFail("failed to grab node")
         .sync
         .synchronizerConnectionConfigStore
-    store.setStatus(daName, SynchronizerConnectionConfigStore.Vacating).value.futureValueUS.value
     store
-      .setStatus(acmeName, SynchronizerConnectionConfigStore.MigratingTo)
+      .setStatus(
+        daName,
+        KnownPhysicalSynchronizerId(daId),
+        SynchronizerConnectionConfigStore.Vacating,
+      )
+      .value
+      .futureValueUS
+      .value
+    store
+      .setStatus(
+        acmeName,
+        KnownPhysicalSynchronizerId(acmeId),
+        SynchronizerConnectionConfigStore.MigratingTo,
+      )
       .value
       .futureValueUS
       .value
@@ -415,7 +454,7 @@ final class ParticipantMigrateSynchronizerIntegrationTest
         val inspection = p.testing.state_inspection
 
         val sequencerClientEvents =
-          inspection.findMessages(daName, from = None, to = None, limit = Some(10))
+          inspection.findMessages(daId, from = None, to = None, limit = Some(10))
         sequencerClientEvents shouldBe empty
 
         val acs = valueOrFail(inspection.findAcs(daName))("ACS").futureValueUS
@@ -433,21 +472,10 @@ final class ParticipantMigrateSynchronizerIntegrationTest
 
         activeContracts shouldBe empty
 
-        inspection.requestJournalSize(daName) shouldBe Some(UnlessShutdown.Outcome(0))
+        inspection.requestJournalSize(daId) shouldBe Some(UnlessShutdown.Outcome(0))
 
-        // ACS commitments should be purged
-        def check[A](
-            f: (
-                SynchronizerAlias,
-                CantonTimestamp,
-                CantonTimestamp,
-                Option[ParticipantId],
-            ) => Iterable[A]
-        ) = f(daName, CantonTimestamp.Epoch, CantonTimestamp.MaxValue, None) shouldBe empty
-        check(inspection.findReceivedCommitments)
-        check(inspection.findComputedCommitments)
-        check(inspection.outstandingCommitments)
-        inspection.bufferedCommitments(daName, CantonTimestamp.MaxValue) shouldBe empty
+        // Note that ACS commitments are not purged by PruningProcessor.purgeSynchronizer for audit reasons.
+        // Hence not checking for the AcsCommitmentStore to be empty after purge.
       }
     }
 
@@ -532,10 +560,22 @@ final class ParticipantMigrateSynchronizerCrashRecoveryIntegrationTest
     val alice = participant1.parties.enable(
       "Alice",
       synchronizeParticipants = Seq(participant2),
+      synchronizer = daName,
+    )
+    participant1.parties.enable(
+      "Alice",
+      synchronizeParticipants = Seq(participant2),
+      synchronizer = acmeName,
     )
     val bob = participant2.parties.enable(
       "Bob",
       synchronizeParticipants = Seq(participant1),
+      synchronizer = daName,
+    )
+    participant2.parties.enable(
+      "Bob",
+      synchronizeParticipants = Seq(participant1),
+      synchronizer = acmeName,
     )
 
     val iousCommands = Seq(100.0, 101.0).flatMap { amount =>
@@ -625,9 +665,23 @@ final class ParticipantMigrateSynchronizerCrashRecoveryIntegrationTest
         .valueOrFail("failed to grab node")
         .sync
         .synchronizerConnectionConfigStore
-    store.setStatus(daName, SynchronizerConnectionConfigStore.Vacating).value.futureValueUS.value
+
     store
-      .setStatus(acmeName, SynchronizerConnectionConfigStore.MigratingTo)
+      .setStatus(
+        daName,
+        KnownPhysicalSynchronizerId(daId),
+        SynchronizerConnectionConfigStore.Vacating,
+      )
+      .value
+      .futureValueUS
+      .value
+
+    store
+      .setStatus(
+        acmeName,
+        KnownPhysicalSynchronizerId(acmeId),
+        SynchronizerConnectionConfigStore.MigratingTo,
+      )
       .value
       .futureValueUS
       .value
@@ -637,7 +691,7 @@ final class ParticipantMigrateSynchronizerCrashRecoveryIntegrationTest
 
 }
 
-trait ParticipantMigrateSynchronizerIntegrationTestHelpers { self: BaseTest =>
+sealed trait ParticipantMigrateSynchronizerIntegrationTestHelpers { self: BaseTest =>
   protected def grabParty(participant: LocalParticipantReference, name: String): PartyId =
     participant.parties
       .hosted(filterParty = name)

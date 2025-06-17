@@ -11,7 +11,7 @@ import com.digitalasset.canton.config.{
   DefaultProcessingTimeouts,
   ProcessingTimeout,
 }
-import com.digitalasset.canton.crypto.{SynchronizerCryptoClient, SynchronizerCryptoPureApi}
+import com.digitalasset.canton.crypto.SynchronizerCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.TracedLogger
@@ -90,11 +90,11 @@ class BlockSequencerTest
     private val actorSystem = ActorSystem()
     implicit val materializer: Materializer = Materializer(actorSystem)
 
-    private val synchronizerId = topologyTransactionFactory.synchronizerId1
+    private val synchronizerId = topologyTransactionFactory.synchronizerId1.toPhysical
     private val sequencer1 = topologyTransactionFactory.sequencer1
     private val topologyStore =
       new InMemoryTopologyStore(
-        SynchronizerStore(synchronizerId),
+        SynchronizerStore(synchronizerId.logical),
         testedProtocolVersion,
         loggerFactory,
         timeouts,
@@ -132,14 +132,10 @@ class BlockSequencerTest
     )
     private val cryptoApi = SynchronizerCryptoClient.create(
       member = sequencer1,
-      synchronizerId,
+      synchronizerId.logical,
       topologyClient,
       defaultStaticSynchronizerParameters,
-      topologyTransactionFactory.cryptoApi.crypto,
-      new SynchronizerCryptoPureApi(
-        defaultStaticSynchronizerParameters,
-        topologyTransactionFactory.cryptoApi.crypto.pureCrypto,
-      ),
+      topologyTransactionFactory.syncCryptoClient.crypto,
       BatchingConfig().parallelism,
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
@@ -186,6 +182,7 @@ class BlockSequencerTest
         protocolVersion = testedProtocolVersion,
         blockRateLimitManager = defaultRateLimiter,
         orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
+        minimumSequencingTime = CantonTimestamp.MinValue,
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(

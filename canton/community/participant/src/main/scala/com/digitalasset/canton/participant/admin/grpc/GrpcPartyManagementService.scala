@@ -20,11 +20,13 @@ import com.digitalasset.canton.participant.admin.data.ActiveContract as ActiveCo
 import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow.PartyReplicationArguments
 import com.digitalasset.canton.participant.admin.party.{
   PartyManagementServiceError,
+  PartyParticipantPermission,
   PartyReplicationAdminWorkflow,
 }
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.{EitherTUtil, GrpcStreamingUtils, OptionUtil, ResourceUtil}
@@ -76,19 +78,33 @@ class GrpcPartyManagementService(
   ): Either[String, PartyReplicationArguments] =
     for {
       partyId <- convert(request.partyId, "party_id", PartyId(_))
-      sourceParticipantIdO <- Option
-        .when(request.sourceParticipantUid.nonEmpty)(request.sourceParticipantUid)
-        .traverse(convert(_, "source_participant_uid", ParticipantId(_)))
+      sourceParticipantId <- convert(
+        request.sourceParticipantUid,
+        "source_participant_uid",
+        ParticipantId(_),
+      )
       synchronizerId <- convert(
         request.synchronizerId,
         "synchronizer_id",
         SynchronizerId(_),
       )
-      serialO <- Option
-        .when(request.serial != 0)(request.serial)
-        .traverse(ProtoConverter.parsePositiveInt("serial", _).leftMap(_.message))
-
-    } yield PartyReplicationArguments(partyId, synchronizerId, sourceParticipantIdO, serialO)
+      serial <- ProtoConverter
+        .parsePositiveInt("topology_serial", request.topologySerial)
+        .leftMap(_.message)
+      participantPermission <- ProtoConverter
+        .parseEnum[ParticipantPermission, v30.ParticipantPermission](
+          PartyParticipantPermission.fromProtoV30,
+          "participant_permission",
+          request.participantPermission,
+        )
+        .leftMap(_.message)
+    } yield PartyReplicationArguments(
+      partyId,
+      synchronizerId,
+      sourceParticipantId,
+      serial,
+      participantPermission,
+    )
 
   private def convert[T](
       rawId: String,
@@ -123,6 +139,9 @@ class GrpcPartyManagementService(
         synchronizerId = status.params.synchronizerId.toProtoPrimitive,
         sourceParticipantUid = status.params.sourceParticipantId.uid.toProtoPrimitive,
         targetParticipantUid = status.params.targetParticipantId.uid.toProtoPrimitive,
+        topologySerial = status.params.serial.unwrap,
+        participantPermission =
+          PartyParticipantPermission.toProtoPrimitive(status.params.participantPermission),
         status = Some(statusP),
       )
     })
@@ -160,7 +179,7 @@ class GrpcPartyManagementService(
       request: v30.ExportAcsRequest,
       out: OutputStream,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val allSynchronizerIds = sync.syncPersistentStateManager.getAll.keySet
+    val allLogicalSynchronizerIds = sync.syncPersistentStateManager.getAllLatest.keySet
 
     val ledgerEnd = sync.participantNodePersistentState.value.ledgerApiStore.ledgerEndCache
       .apply()
@@ -172,7 +191,7 @@ class GrpcPartyManagementService(
         PartyManagementServiceError.InternalError.Error("No ledger end found"),
       )
       validRequest <- EitherT.fromEither[FutureUnlessShutdown](
-        validateExportAcsAtOffsetRequest(request, ledgerEnd, allSynchronizerIds)
+        validateExportAcsAtOffsetRequest(request, ledgerEnd, allLogicalSynchronizerIds)
       )
       snapshotResult <- createAcsSnapshot(validRequest, out)
     } yield snapshotResult
@@ -335,7 +354,7 @@ class GrpcPartyManagementService(
         topologyTxEffectiveTime,
       )
 
-    val allSynchronizerIds = sync.syncPersistentStateManager.getAll.keySet
+    val allSynchronizerIds = sync.syncPersistentStateManager.allKnownLSIds
 
     for {
       parsedRequest <- EitherT.fromEither[FutureUnlessShutdown](

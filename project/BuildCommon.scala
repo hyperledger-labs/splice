@@ -327,7 +327,7 @@ object BuildCommon {
         `canton-pekko-fork`,
         `canton-magnolify-addon`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-logging`,
+        `canton-util-observability`,
         // Canton depends on the Daml code via a git submodule and the two
         // projects below. We instead depend on the artifacts released
         // from the Daml repo listed in libraryDependencies below.
@@ -395,7 +395,7 @@ object BuildCommon {
       .dependsOn(
         `canton-util-internal`,
         `canton-wartremover-extension` % "compile->compile;test->test",
-        `canton-util-logging`,
+        `canton-util-observability`,
       )
       .settings(
         sharedCantonSettings,
@@ -487,10 +487,10 @@ object BuildCommon {
       )
   }
 
-  lazy val `canton-util-logging` = {
+  lazy val `canton-util-observability` = {
     import CantonDependencies._
     sbt.Project
-      .apply("canton-util-logging", file("canton/community/util-logging"))
+      .apply("canton-util-observability", file("canton/community/util-observability"))
       .dependsOn(
         `canton-base-errors` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
@@ -677,7 +677,7 @@ object BuildCommon {
           scalaVersion,
           sbtVersion,
           BuildInfoKey("damlLibrariesVersion" -> CantonDependencies.daml_libraries_version),
-          BuildInfoKey("stableProtocolVersions" -> List("33")),
+          BuildInfoKey("stableProtocolVersions" -> List()),
           BuildInfoKey("betaProtocolVersions" -> List()),
         ),
         buildInfoPackage := "com.digitalasset.canton.buildinfo",
@@ -1172,7 +1172,7 @@ object BuildCommon {
         `canton-daml-errors` % "compile->compile;test->test",
         `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
-        `canton-util-logging`,
+        `canton-util-observability`,
         `canton-ledger-api`,
       )
       .settings(

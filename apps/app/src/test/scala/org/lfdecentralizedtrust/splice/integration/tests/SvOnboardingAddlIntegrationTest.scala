@@ -202,12 +202,12 @@ class SvOnboardingAddlIntegrationTest
 
         val localSequencerUrl = inside(sequencerConnections) {
           case Seq(
-                GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)
+                GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _, _)
               ) =>
             defaultSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
           case Seq(
-                GrpcSequencerConnection(_, _, _, _),
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _),
+                GrpcSequencerConnection(_, _, _, _, _),
+                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _),
               ) =>
             localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
         }

@@ -46,7 +46,7 @@ import com.digitalasset.canton.platform.apiserver.services.{
 }
 import com.digitalasset.canton.platform.config.InteractiveSubmissionServiceConfig
 import com.digitalasset.canton.protocol.hash.HashTracer
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.TryUtil
@@ -128,13 +128,13 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
         show"Submitted commands for prepare are: ${if (cmds.length > 1) "\n  " else ""}${cmds
             .map {
               case ApiCommand.Create(templateRef, _) =>
-                s"create ${templateRef.qName}"
+                s"create ${templateRef.qualifiedName}"
               case ApiCommand.Exercise(templateRef, _, choiceId, _) =>
-                s"exercise @${templateRef.qName} $choiceId"
+                s"exercise @${templateRef.qualifiedName} $choiceId"
               case ApiCommand.ExerciseByKey(templateRef, _, choiceId, _) =>
-                s"exerciseByKey @${templateRef.qName} $choiceId"
+                s"exerciseByKey @${templateRef.qualifiedName} $choiceId"
               case ApiCommand.CreateAndExercise(templateRef, _, choiceId, _) =>
-                s"createAndExercise ${templateRef.qName} ... $choiceId ..."
+                s"createAndExercise ${templateRef.qualifiedName} ... $choiceId ..."
             }
             .map(_.singleQuoted)
             .toSeq
@@ -307,7 +307,7 @@ private[apiserver] final class InteractiveSubmissionServiceImpl private[services
       vettingValidAt: Option[CantonTimestamp],
   )(implicit
       loggingContext: LoggingContextWithTrace
-  ): FutureUnlessShutdown[Option[(PackageReference, SynchronizerId)]] =
+  ): FutureUnlessShutdown[Option[(PackageReference, PhysicalSynchronizerId)]] =
     packagePreferenceService.getPreferredPackageVersion(
       parties = parties,
       packageName = packageName,

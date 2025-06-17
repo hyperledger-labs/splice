@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
   * released it when done. [[HasSynchronizeWithReaders.synchronizeWithReaders]] attempts to acquire
   * all permits and logs progress if slow.
   */
-trait HasSynchronizeWithReaders extends HasRunOnClosing {
+trait HasSynchronizeWithReaders extends HasSynchronizeWithClosing {
 
   import HasSynchronizeWithReaders.*
 
@@ -42,8 +42,8 @@ trait HasSynchronizeWithReaders extends HasRunOnClosing {
     )(TraceContext.empty)
   }
 
-  /** Semaphore for all the [[HasSynchronizeWithClosing.synchronizeWithClosing]] calls. Each such
-    * call obtains a permit for the time the computation is running. Upon closing,
+  /** Semaphore for all the [[HasSynchronizeWithClosing.synchronizeWithClosingSync]] calls. Each
+    * such call obtains a permit for the time the computation is running. Upon closing,
     * [[synchronizeWithReaders]] grabs all permits and thereby prevents further calls from
     * succeeding.
     */
@@ -78,23 +78,26 @@ trait HasSynchronizeWithReaders extends HasRunOnClosing {
     // Abort early if we are closing.
     // This prevents new readers from registering themselves so that eventually all permits become available
     // to grab in one go
-    if (isClosing) AbortedDueToShutdown
-    else if (readerSemaphore.tryAcquire()) {
-      val locationO = Option.when(keepTrackOfReaderCallStack)(new ReaderCallStack)
-      val handle = new ReaderHandle(reader, locationO)
-      readerUnderapproximation.put(handle, ()).discard
-      Outcome(handle)
-    } else if (isClosing) {
-      // We check again for closing because the closing may have been initiated concurrently since the previous check
-      AbortedDueToShutdown
-    } else {
-      logger.error(
-        s"All ${Int.MaxValue} reader locks for $nameInternal have been taken. Is there a memory/task leak somewhere?"
-      )
-      logger.debug(s"Currently registered readers: ${readerUnderapproximation.keys.mkString(",")}")
-      throw new IllegalStateException(
-        s"All ${Int.MaxValue} reader locks for '$nameInternal' have been taken."
-      )
+    unlessClosing {
+      if (readerSemaphore.tryAcquire()) {
+        val locationO = Option.when(keepTrackOfReaderCallStack)(new ReaderCallStack)
+        val handle = new ReaderHandle(reader, locationO)
+        readerUnderapproximation.put(handle, ()).discard
+        Outcome(handle)
+      } else if (isClosing) {
+        // We check again for closing because the closing may have been initiated concurrently since the previous check
+        AbortedDueToShutdown
+      } else {
+        logger.error(
+          s"All ${Int.MaxValue} reader locks for $nameInternal have been taken. Is there a memory/task leak somewhere?"
+        )
+        logger.debug(
+          s"Currently registered readers: ${readerUnderapproximation.keys.mkString(",")}"
+        )
+        throw new IllegalStateException(
+          s"All ${Int.MaxValue} reader locks for '$nameInternal' have been taken."
+        )
+      }
     }
 
   /** TODO(#16601) Make this method private once PerformUnlessClosing doesn't need it any more
@@ -142,7 +145,7 @@ trait HasSynchronizeWithReaders extends HasRunOnClosing {
     poll(initialReaderPollingPatience)
   }
 
-  private def dumpRunning()(implicit traceContext: TraceContext): Unit =
+  private[this] def dumpRunning()(implicit traceContext: TraceContext): Unit =
     readerUnderapproximation.keys.foreach { handle =>
       // Only dump those for which we have recorded a stack trace
       handle.location.foreach { loc =>

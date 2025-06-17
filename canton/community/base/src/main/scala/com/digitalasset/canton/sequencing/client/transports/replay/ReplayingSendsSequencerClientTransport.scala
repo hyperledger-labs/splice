@@ -109,7 +109,7 @@ object ReplayingSendsSequencerClientTransport {
 
     override def toString: String = {
       val durationSecsText = sendDuration.map(_.getSeconds).map(secs => s"${secs}s").getOrElse("?")
-      s"Sent $total send requests in $durationSecsText ($successful successful, $overloaded overloaded, $errors errors)"
+      s"Sent $total send requests in $durationSecsText ($successful successful, $overloaded overloaded, $errors problems)"
     }
   }
 
@@ -145,7 +145,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
   private val firstSend = new AtomicReference[Option[CantonTimestamp]](None)
   private val lastSend = new AtomicReference[Option[CantonTimestamp]](None)
 
-  private val submissionRequests: List[SubmissionRequest] = withNewTraceContext {
+  private lazy val submissionRequests: List[SubmissionRequest] = withNewTraceContext {
     implicit traceContext =>
       logger.debug("Loading recorded submission requests")
       ErrorUtil.withThrowableLogging {
@@ -304,7 +304,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     private val idleP = Promise[EventsReceivedReport]()
 
     private def scheduleCheck(): Unit =
-      performUnlessClosing(functionFullName) {
+      synchronizeWithClosingSync(functionFullName) {
         val nextCheckDuration =
           idlenessDuration.toJava.minus(durationFromLastEventToNow(stateRef.get()))
         val _ = materializer.scheduleOnce(nextCheckDuration.toScala, () => checkIfIdle())

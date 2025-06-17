@@ -211,21 +211,22 @@ create table sequencer_client_pending_sends (
 );
 
 create table par_synchronizer_connection_configs(
-    synchronizer_alias varchar not null primary key,
+    synchronizer_alias varchar not null,
+    physical_synchronizer_id varchar, -- can be null (id is unknown before the handshake)
+
+    -- We would like to have unique (synchronizer_alias, synchronizer_id). However, for postgres < 15, there is no
+    -- way to force two nulls to be considered distinct. We use generated columns to mimic that behavior.
+    empty_if_null_physical_synchronizer_id varchar generated always as (case when physical_synchronizer_id is null then '' else physical_synchronizer_id end) not null,
+    unique (synchronizer_alias, empty_if_null_physical_synchronizer_id),
+
     config binary large object, -- the protobuf-serialized versioned synchronizer connection config
     status char(1) default 'A' not null
 );
 
 -- used to register all synchronizers that a participant connects to
-create table par_synchronizers(
-    -- to keep track of the order synchronizers were registered
-    order_number serial not null primary key,
-    -- synchronizer human readable alias
-    alias varchar not null unique,
-    -- synchronizer id
-    synchronizer_id varchar not null unique,
-    status char(1) default 'A' not null,
-    constraint par_synchronizers_unique unique (alias, synchronizer_id)
+create table par_registered_synchronizers(
+    physical_synchronizer_id varchar not null primary key,
+    synchronizer_alias varchar not null
 );
 
 create table par_reassignments (
@@ -234,17 +235,13 @@ create table par_reassignments (
     source_synchronizer_idx integer not null,
 
     -- reassignment data
-    contract binary large object not null,
+    contracts binary large object array not null,
 
     -- UTC timestamp in microseconds relative to EPOCH
     unassignment_timestamp bigint not null,
     unassignment_request binary large object,
     unassignment_global_offset bigint,
     assignment_global_offset bigint,
-
-    -- UTC timestamp in microseconds relative to EPOCH
-    unassignment_decision_time bigint not null,
-    unassignment_result binary large object,
 
     -- defined if reassignment was completed
     -- UTC timestamp in microseconds relative to EPOCH
@@ -358,7 +355,7 @@ create index idx_par_commitment_queue_by_time on par_commitment_queue (synchroni
 
 -- the (current) synchronizer parameters for the given synchronizer
 create table par_static_synchronizer_parameters (
-    synchronizer_id varchar primary key,
+    physical_synchronizer_id varchar primary key,
     -- serialized form
     params binary large object not null
 );
@@ -391,7 +388,7 @@ create table mediator_deduplication_store (
     request_time bigint not null,
     expire_after bigint not null
 );
-create index idx_mediator_deduplication_store_expire_after on mediator_deduplication_store(expire_after, mediator_id);
+create index idx_mediator_deduplication_store_expire_after on mediator_deduplication_store(mediator_id, expire_after);
 
 create type pruning_phase as enum ('started', 'completed');
 
@@ -433,7 +430,8 @@ create table mediator_synchronizer_configuration (
   lock char(1) not null default 'X' primary key check (lock = 'X'),
   synchronizer_id varchar not null,
   static_synchronizer_parameters binary large object not null,
-  sequencer_connection binary large object not null
+  sequencer_connection binary large object not null,
+  is_topology_initialized bool not null default false
 );
 
 -- the last recorded head clean sequencer counter for each synchronizer
@@ -475,20 +473,6 @@ create table sequencer_watermarks (
     sequencer_online bool not null
 );
 
--- readers periodically write checkpoints that maps the calculated timer to a timestamp/event-id.
--- when a new subscription is requested from a counter the sequencer can use these checkpoints to find the closest
--- timestamp below the given counter to start the subscription from.
-create table sequencer_counter_checkpoints (
-   member integer not null,
-   counter bigint not null,
-   ts bigint not null,
-   latest_sequencer_event_ts bigint,
-   primary key (member, counter, ts)
-);
-
--- This index helps fetching the latest checkpoint for a member
-create index idx_sequencer_counter_checkpoints_by_member_ts on sequencer_counter_checkpoints(member, ts);
-
 -- record the latest acknowledgement sent by a sequencer client of a member for the latest event they have successfully
 -- processed and will not re-read.
 create table sequencer_acknowledgements (
@@ -496,12 +480,13 @@ create table sequencer_acknowledgements (
     ts bigint not null
 );
 
--- inclusive lower bound of when events can be read
+-- exclusive lower bound of when events can be read
 -- if empty it means all events from epoch can be read
 -- is updated when sequencer is pruned meaning that earlier events can no longer be read (and likely no longer exist)
 create table sequencer_lower_bound (
     single_row_lock char(1) not null default 'X' primary key check(single_row_lock = 'X'),
-    ts bigint not null
+    ts bigint not null,
+    latest_topology_client_timestamp bigint
 );
 
 -- h2 events table (differs from postgres in the recipients array definition)
@@ -542,7 +527,7 @@ create table par_in_flight_submission (
 
     submission_id varchar null,
 
-    submission_synchronizer_id varchar not null,
+    submission_physical_synchronizer_id varchar not null,
     message_id varchar not null,
 
     -- Sequencer timestamp after which this submission will not be sequenced any more, in microsecond precision relative to EPOCH
@@ -560,9 +545,9 @@ create table par_in_flight_submission (
     trace_context binary large object not null
 );
 create index idx_par_in_flight_submission_root_hash on par_in_flight_submission (root_hash_hex);
-create index idx_par_in_flight_submission_timeout on par_in_flight_submission (submission_synchronizer_id, sequencing_timeout);
-create index idx_par_in_flight_submission_sequencing on par_in_flight_submission (submission_synchronizer_id, sequencing_time);
-create index idx_par_in_flight_submission_message_id on par_in_flight_submission (submission_synchronizer_id, message_id);
+create index idx_par_in_flight_submission_timeout on par_in_flight_submission (submission_physical_synchronizer_id, sequencing_timeout);
+create index idx_par_in_flight_submission_sequencing on par_in_flight_submission (submission_physical_synchronizer_id, sequencing_time);
+create index idx_par_in_flight_submission_message_id on par_in_flight_submission (submission_physical_synchronizer_id, message_id);
 
 create table par_settings(
   client integer primary key, -- dummy field to enforce at most one row
@@ -774,9 +759,6 @@ create table seq_traffic_control_consumed_journal (
        primary key (member, sequencing_timestamp)
 );
 
--- This index helps joining traffic receipts without a member reference
-create index on seq_traffic_control_consumed_journal(sequencing_timestamp);
-
 --   BFT Ordering Tables
 
 -- Stores metadata for epochs
@@ -876,6 +858,12 @@ create table ord_output_lower_bound (
     single_row_lock char(1) not null default 'X' primary key check(single_row_lock = 'X'),
     epoch_number bigint not null,
     block_number bigint not null
+);
+
+create table ord_leader_selection_state (
+    epoch_number bigint not null,
+    state binary large object not null,
+    primary key (epoch_number)
 );
 
 -- Stores P2P endpoints from the configuration or admin command

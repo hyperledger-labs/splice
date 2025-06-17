@@ -17,7 +17,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
   UniformCantonConfigValidation,
 }
-import com.digitalasset.canton.crypto.{Crypto, Fingerprint, Nonce}
+import com.digitalasset.canton.crypto.{Fingerprint, Nonce, SynchronizerCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
@@ -33,7 +33,7 @@ import com.digitalasset.canton.sequencer.api.v30.SequencerAuthentication.{
 import com.digitalasset.canton.sequencer.api.v30.SequencerAuthenticationServiceGrpc.SequencerAuthenticationServiceStub
 import com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenWithExpiry
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.topology.{Member, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.ErrorKind.{FatalErrorKind, TransientErrorKind}
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy, Pause}
@@ -53,6 +53,7 @@ final case class AuthenticationTokenManagerConfig(
     retries: NonNegativeInt = AuthenticationTokenManagerConfig.defaultRetries,
     pauseRetries: NonNegativeFiniteDuration = AuthenticationTokenManagerConfig.defaultPauseRetries,
 ) extends UniformCantonConfigValidation
+
 object AuthenticationTokenManagerConfig {
   implicit val authenticationTokenManagerConfigCantonConfigValidator
       : CantonConfigValidator[AuthenticationTokenManagerConfig] = {
@@ -68,9 +69,9 @@ object AuthenticationTokenManagerConfig {
 /** Fetch an authentication token from the sequencer by using the sequencer authentication service
   */
 class AuthenticationTokenProvider(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     member: Member,
-    crypto: Crypto,
+    crypto: SynchronizerCrypto,
     supportedProtocolVersions: Seq[ProtocolVersion],
     config: AuthenticationTokenManagerConfig,
     override protected val timeouts: ProcessingTimeout,
@@ -85,7 +86,7 @@ class AuthenticationTokenProvider(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Status, AuthenticationTokenWithExpiry] = {
     def generateTokenET: FutureUnlessShutdown[Either[Status, AuthenticationTokenWithExpiry]] =
-      performUnlessClosingUSF(functionFullName) {
+      synchronizeWithClosing(functionFullName) {
         (for {
           challenge <- getChallenge(authenticationClient)
           nonce <- Nonce

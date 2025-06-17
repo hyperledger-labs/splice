@@ -31,6 +31,7 @@ import com.digitalasset.canton.participant.ledger.api.client.{
 }
 import com.digitalasset.canton.participant.sync.CantonSyncService
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.common.annotations.VisibleForTesting
@@ -64,17 +65,18 @@ class PartyReplicationAdminWorkflow(
       synchronizerId: SynchronizerId,
       sourceParticipantId: ParticipantId,
       sequencerCandidates: NonEmpty[Seq[SequencerId]],
-      serial: Option[PositiveInt],
+      serial: PositiveInt,
+      participantPermission: ParticipantPermission,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, String, Unit] = {
     val partyReplicationIdS = partyReplicationId.toHexString
-    val serialOrZero: Int = serial.map(_.value).getOrElse(0)
     val proposal = new M.partyreplication.PartyReplicationProposal(
       partyReplicationIdS,
       partyId.toProtoPrimitive,
       sourceParticipantId.adminParty.toProtoPrimitive,
       participantId.adminParty.toProtoPrimitive,
       sequencerCandidates.forgetNE.map(_.uid.toProtoPrimitive).asJava,
-      serialOrZero,
+      serial.unwrap,
+      PartyParticipantPermission.toDaml(participantPermission),
     )
     EitherT(
       retrySubmitter
@@ -154,7 +156,7 @@ class PartyReplicationAdminWorkflow(
             s"proposal-accept-${contract.data.partyReplicationId}",
           ),
       )
-      val commandResultF = performUnlessClosingF(s"submit $commandId")(
+      val commandResultF = synchronizeWithClosingF(s"submit $commandId")(
         retrySubmitter.submitCommands(
           Commands(
             workflowId = "",
@@ -304,9 +306,11 @@ class PartyReplicationAdminWorkflow(
 object PartyReplicationAdminWorkflow {
   final case class PartyReplicationArguments(
       partyId: PartyId,
+      // TODO(#25483) This should be physical
       synchronizerId: SynchronizerId,
-      sourceParticipantIdO: Option[ParticipantId],
-      serialO: Option[PositiveInt],
+      sourceParticipantId: ParticipantId,
+      serial: PositiveInt,
+      participantPermission: ParticipantPermission,
   )
   private def userId = "PartyReplicationAdminWorkflow"
 

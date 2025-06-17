@@ -164,7 +164,10 @@ trait SequencerConnectServiceIntegrationTest
 
       val grpcSequencerConnectClient = getSequencerConnectClient()
 
-      grpcSequencerConnectClient.getSynchronizerId(daName.unwrap).futureValueUS.value shouldBe daId
+      grpcSequencerConnectClient
+        .getSynchronizerId(daName.unwrap)
+        .futureValueUS
+        .value shouldBe daId
     }
 
     "respond to is active requests" in { implicit env =>
@@ -202,6 +205,7 @@ trait GrpcSequencerConnectServiceIntegrationTest extends SequencerConnectService
         transportSecurity = false,
         customTrustCertificates = None,
         SequencerAlias.Default,
+        None,
       )
 
     new GrpcSequencerConnectClient(

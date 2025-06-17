@@ -125,7 +125,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
         testedProtocolVersion,
       )
       maxSequencingTimeOfAggregation = env.environment.clock.now.add(
-        Duration.ofMinutes(1)
+        Duration.ofMinutes(2)
       ) // cannot exceed the DynamicSynchronizerParameters.sequencerAggregateSubmissionTimeout (defaults to 5m)
       topologyTimestampTombstone = env.environment.clock.now
 
@@ -224,14 +224,12 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
       sequencer1.health.initialized() shouldBe true
       sequencer2.health.initialized() shouldBe false
 
-      // user-manual-entry-begin: DynamicallyOnboardSequencer
       onboardNewSequencer(
         synchronizerId = daId,
-        newSequencer = sequencer2,
-        existingSequencer = sequencer1,
+        newSequencerReference = sequencer2,
+        existingSequencerReference = sequencer1,
         synchronizerOwners = initializedSynchronizers(daName).synchronizerOwners,
       )
-      // user-manual-entry-end: DynamicallyOnboardSequencer
 
       sequencer2.health.initialized() shouldBe true
 
@@ -521,6 +519,7 @@ abstract class DynamicOnboardingIntegrationTest(val name: String)
           transportSecurity = false,
           None,
           SequencerAlias.Default,
+          None,
         )
 
       val conn = mediator1.sequencer_connection.get()

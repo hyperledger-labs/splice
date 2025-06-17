@@ -40,10 +40,11 @@ import com.digitalasset.canton.synchronizer.sequencer.store.{
 import com.digitalasset.canton.synchronizer.sequencer.traffic.TimestampSelector.TimestampSelector
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitError,
+  SequencerRateLimitManager,
   SequencerTrafficStatus,
 }
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration, SynchronizerTimeTracker}
-import com.digitalasset.canton.topology.{Member, SequencerId, SynchronizerId}
+import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.FutureUtil.doNotAwait
@@ -68,8 +69,9 @@ object DatabaseSequencer {
       timeouts: ProcessingTimeout,
       storage: Storage,
       sequencerStore: SequencerStore,
+      minimumSequencingTime: CantonTimestamp,
       clock: Clock,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       topologyClientMember: Member,
       protocolVersion: ProtocolVersion,
       cryptoApi: SynchronizerCryptoClient,
@@ -112,6 +114,8 @@ object DatabaseSequencer {
       metrics,
       loggerFactory,
       blockSequencerMode = false,
+      minimumSequencingTime = minimumSequencingTime,
+      rateLimitManagerO = None,
     )
   }
 }
@@ -130,13 +134,15 @@ class DatabaseSequencer(
     exclusiveStorage: Option[Storage],
     health: Option[SequencerHealthConfig],
     clock: Clock,
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     topologyClientMember: Member,
-    protocolVersion: ProtocolVersion,
+    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     cryptoApi: SynchronizerCryptoClient,
     metrics: SequencerMetrics,
     loggerFactory: NamedLoggerFactory,
     blockSequencerMode: Boolean,
+    minimumSequencingTime: CantonTimestamp,
+    rateLimitManagerO: Option[SequencerRateLimitManager],
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
     extends BaseSequencer(
       loggerFactory,
@@ -159,11 +165,13 @@ class DatabaseSequencer(
     timeouts,
     storage,
     sequencerStore,
+    rateLimitManagerO,
     clock,
     eventSignaller,
     protocolVersion,
     loggerFactory,
     blockSequencerMode,
+    minimumSequencingTime,
     metrics,
   )
 
@@ -222,7 +230,7 @@ class DatabaseSequencer(
 
     def markOffline(): Unit = withNewTraceContext { implicit traceContext =>
       doNotAwait(
-        performUnlessClosingUSF(functionFullName)(markOfflineF().thereafter { _ =>
+        synchronizeWithClosing(functionFullName)(markOfflineF().thereafter { _ =>
           // schedule next marking sequencers as offline regardless of outcome
           schedule()
         }).onShutdown {

@@ -17,7 +17,6 @@ import com.digitalasset.canton.admin.api.client.data.{
   DynamicSynchronizerParameters as ConsoleDynamicSynchronizerParameters,
   TopologyQueueStatus,
 }
-import com.digitalasset.canton.config
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{ConsoleCommandTimeout, NonNegativeDuration}
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
@@ -61,10 +60,12 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.{ProtocolVersion, ProtocolVersionValidation}
+import com.digitalasset.canton.{config, networking}
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
 import io.grpc.{Context, Status}
 
+import java.net.URI
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -422,7 +423,7 @@ class TopologyAdministrationGroup(
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Write.Authorize(
-            txHash.hash.getCryptographicEvidence,
+            txHash.hash.toHexString,
             mustFullyAuthorize = mustBeFullyAuthorized,
             signedBy = signedBy,
             store = store,
@@ -625,7 +626,7 @@ class TopologyAdministrationGroup(
           protocolVersion: Option[String] = None,
       ): Seq[ListPurgeTopologyTransactionResult] = consoleEnvironment.run {
         adminCommand(
-          TopologyAdminCommands.Read.PurgeTopologyTransaction(
+          TopologyAdminCommands.Read.ListPurgeTopologyTransaction(
             BaseQuery(
               store,
               proposals,
@@ -647,10 +648,12 @@ class TopologyAdministrationGroup(
 
     @Help.Summary(
       """Creates and returns proposals of topology transactions to bootstrap a synchronizer, specifically
-        |SynchronizerParametersState, SequencerSynchronizerState, and MediatorSynchronizerState.""".stripMargin
+        |SynchronizerParametersState, SequencerSynchronizerState, and MediatorSynchronizerState.
+        |
+        |protocolVersion: protocol version of the synchronizer""".stripMargin
     )
     def generate_genesis_topology(
-        synchronizerId: SynchronizerId,
+        synchronizerId: PhysicalSynchronizerId,
         synchronizerOwners: Seq[Member],
         sequencers: Seq[SequencerId],
         mediators: Seq[MediatorId],
@@ -670,14 +673,16 @@ class TopologyAdministrationGroup(
 
       // create and sign the initial synchronizer parameters
       val synchronizerParameterState =
-        latest[SynchronizerParametersState](SynchronizerParametersState.uniqueKey(synchronizerId))
+        latest[SynchronizerParametersState](
+          SynchronizerParametersState.uniqueKey(synchronizerId.logical)
+        )
           .getOrElse(
             instance.topology.synchronizer_parameters.propose(
-              synchronizerId,
+              synchronizerId.logical,
               ConsoleDynamicSynchronizerParameters
                 .initialValues(
                   consoleEnvironment.environment.clock,
-                  ProtocolVersion.latest,
+                  synchronizerId.protocolVersion,
                 ),
               signedBy = None,
               store = Some(store),
@@ -687,11 +692,11 @@ class TopologyAdministrationGroup(
 
       val mediatorState =
         latest[MediatorSynchronizerState](
-          MediatorSynchronizerState.uniqueKey(synchronizerId, NonNegativeInt.zero)
+          MediatorSynchronizerState.uniqueKey(synchronizerId.logical, NonNegativeInt.zero)
         )
           .getOrElse(
             instance.topology.mediators.propose(
-              synchronizerId,
+              synchronizerId.logical,
               threshold = PositiveInt.one,
               group = NonNegativeInt.zero,
               active = mediators,
@@ -701,10 +706,12 @@ class TopologyAdministrationGroup(
           )
 
       val sequencerState =
-        latest[SequencerSynchronizerState](SequencerSynchronizerState.uniqueKey(synchronizerId))
+        latest[SequencerSynchronizerState](
+          SequencerSynchronizerState.uniqueKey(synchronizerId.logical)
+        )
           .getOrElse(
             instance.topology.sequencers.propose(
-              synchronizerId,
+              synchronizerId.logical,
               threshold = PositiveInt.one,
               active = sequencers,
               signedBy = None,
@@ -718,10 +725,13 @@ class TopologyAdministrationGroup(
     @Help.Summary(
       """Creates and returns proposals of topology transactions to bootstrap a synchronizer, specifically
         |SynchronizerParametersState, SequencerSynchronizerState, and MediatorSynchronizerState,
-        |and stores the result in a file which can be loaded using `node.topology.transactions.load_multiple_from_file`""".stripMargin
+        |and stores the result in a file which can be loaded using `node.topology.transactions.load_multiple_from_file`
+        |
+        |protocolVersion: protocol version of the synchronizer
+        |""".stripMargin
     )
     def download_genesis_topology(
-        synchronizerId: SynchronizerId,
+        synchronizerId: PhysicalSynchronizerId,
         synchronizerOwners: Seq[Member],
         sequencers: Seq[SequencerId],
         mediators: Seq[MediatorId],
@@ -738,7 +748,9 @@ class TopologyAdministrationGroup(
           store,
         )
 
-      SignedTopologyTransactions(transactions, ProtocolVersion.latest).writeToFile(outputFile)
+      SignedTopologyTransactions(transactions, synchronizerId.protocolVersion).writeToFile(
+        outputFile
+      )
     }
   }
 
@@ -1450,6 +1462,10 @@ class TopologyAdministrationGroup(
             participant's permissions.
       removes: The unique identifiers of the participants that should no longer host the party.
       signedBy: Refers to the optional fingerprint of the authorizing key which in turn refers to a specific, locally existing certificate.
+      serial: The expected serial this topology transaction should have. Serials must be contiguous and start at 1.
+              This transaction will be rejected if another fully authorized transaction with the same serial already
+              exists, or if there is a gap between this serial and the most recently used serial.
+              If None, the serial will be automatically selected by the node.
       synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
       mustFullyAuthorize: When set to true, the proposal's previously received signatures and the signature of this node must be
                           sufficient to fully authorize the topology transaction. If this is not the case, the request fails.
@@ -1461,22 +1477,26 @@ class TopologyAdministrationGroup(
                               storing it locally first. This also means it will _not_ be synchronized to other synchronizers
                               automatically.
       force: must be set when disabling a party with active contracts
+      requiresPartyToBeOnboarded: When set to true, indicate that the added participants need to first onboard the party
+                                  independently from this call before the added participants fully host the party.
       """)
     def propose_delta(
         party: PartyId,
         adds: Seq[(ParticipantId, ParticipantPermission)] = Nil,
         removes: Seq[ParticipantId] = Nil,
         signedBy: Option[Fingerprint] = None,
+        serial: Option[PositiveInt] = None,
         synchronize: Option[config.NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         mustFullyAuthorize: Boolean = false,
         store: TopologyStoreId = TopologyStoreId.Authorized,
         forceFlags: ForceFlags = ForceFlags.none,
+        requiresPartyToBeOnboarded: Boolean = false,
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant] = {
 
       val currentO = findCurrent(party, store)
-      val (existingPermissions, newSerial, threshold) = currentO match {
+      val (existingPermissions, nextSerial, threshold) = currentO match {
         case Some(current) if current.context.operation == TopologyChangeOp.Remove =>
           (
             // if the existing mapping was REMOVEd, we start from scratch
@@ -1497,6 +1517,7 @@ class TopologyAdministrationGroup(
             PositiveInt.one,
           )
       }
+      val newSerial = if (serial.nonEmpty) serial else nextSerial
 
       val newPermissions = new PartyToParticipantComputations(loggerFactory)
         .computeNewPermissions(
@@ -1519,6 +1540,8 @@ class TopologyAdministrationGroup(
           mustFullyAuthorize = mustFullyAuthorize,
           store = store,
           forceFlags = forceFlags,
+          participantsRequiringPartyToBeOnboarded =
+            if (requiresPartyToBeOnboarded) adds.map(_._1) else Nil,
         )
       } else {
         // we would remove the last participant, therefore we issue a REMOVE
@@ -1544,6 +1567,8 @@ class TopologyAdministrationGroup(
       party: The unique identifier of the party whose set of participant permissions to modify.
       newParticipants: The unique identifier of the participants to host the party. Each participant entry specifies
                        the participant's permissions (submission, confirmation, observation).
+      participantsRequiringPartyToBeOnboarded: The participants that need to onboard the party independently from this
+                                               call before the participants fully host the party.
       threshold: The threshold is `1` for regular parties and larger than `1` for "consortium parties". The threshold
                  indicates how many participant confirmations are needed in order to confirm a Daml transaction on
                  behalf the party.
@@ -1579,12 +1604,19 @@ class TopologyAdministrationGroup(
         mustFullyAuthorize: Boolean = false,
         store: TopologyStoreId = TopologyStoreId.Authorized,
         forceFlags: ForceFlags = ForceFlags.none,
+        participantsRequiringPartyToBeOnboarded: Seq[ParticipantId] = Nil,
     ): SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant] = {
       val command = TopologyAdminCommands.Write.Propose(
         mapping = PartyToParticipant.create(
           partyId = party,
           threshold = threshold,
-          participants = newParticipants.map((HostingParticipant.apply _) tupled),
+          participants = newParticipants.map { case (pid, permission) =>
+            HostingParticipant(
+              pid,
+              permission,
+              onboarding = participantsRequiringPartyToBeOnboarded.contains(pid),
+            )
+          },
         ),
         signedBy = signedBy,
         serial = serial,
@@ -2343,7 +2375,7 @@ class TopologyAdministrationGroup(
       consoleEnvironment
         .run {
           adminCommand(
-            TopologyAdminCommands.Read.MediatorSynchronizerState(
+            TopologyAdminCommands.Read.ListMediatorSynchronizerState(
               BaseQuery(
                 synchronizerId,
                 proposals,
@@ -2550,7 +2582,7 @@ class TopologyAdministrationGroup(
         protocolVersion: Option[String] = None,
     ): Seq[ListSequencerSynchronizerStateResult] = consoleEnvironment.run {
       adminCommand(
-        TopologyAdminCommands.Read.SequencerSynchronizerState(
+        TopologyAdminCommands.Read.ListSequencerSynchronizerState(
           BaseQuery(
             store,
             proposals,
@@ -2630,7 +2662,7 @@ class TopologyAdministrationGroup(
         protocolVersion: Option[String] = None,
     ): Seq[ListSynchronizerParametersStateResult] = consoleEnvironment.run {
       adminCommand(
-        TopologyAdminCommands.Read.SynchronizerParametersState(
+        TopologyAdminCommands.Read.ListSynchronizerParametersState(
           BaseQuery(
             store,
             proposals,
@@ -2957,6 +2989,235 @@ class TopologyAdministrationGroup(
         force = ForceFlags(ForceFlag.PreparationTimeRecordTimeToleranceIncrease),
       )
     }
+  }
+
+  object synchronizer_upgrade extends Helpful {
+
+    @Help.Summary("Inspect synchronizer migration announcements")
+    @Help.Group("Synchronizer Migration Announcement")
+    object announcement extends Helpful {
+      def list(
+          store: Option[TopologyStoreId] = None,
+          proposals: Boolean = false,
+          timeQuery: TimeQuery = TimeQuery.HeadState,
+          operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
+          filterSynchronizer: String = "",
+          filterSigningKey: String = "",
+      ): Seq[ListSynchronizerUpgradeAnnouncementResult] = consoleEnvironment.run {
+        adminCommand(
+          TopologyAdminCommands.Read.ListSynchronizerUpgradeAnnouncement(
+            BaseQuery(
+              store,
+              proposals,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              None,
+            ),
+            filterSynchronizer,
+          )
+        )
+      }
+
+      @Help.Summary("Propose the announcement of a synchronizer migration")
+      @Help.Description(
+        """
+         physicalSynchronizerId: the physical synchronizer id of the synchronizer on which the synchronizer migration will be announced
+         successorPhysicalSynchronizerId: the id of the physical synchronizer that succeeds the current physical synchronizer
+
+         store: - "Authorized": the topology transaction will be stored in the node's authorized store and automatically
+                                propagated to connected synchronizers, if applicable.
+                - "<synchronizer id>": the topology transaction will be directly submitted to the specified synchronizer without
+                                 storing it locally first. This also means it will _not_ be synchronized to other synchronizers
+                                 automatically.
+         mustFullyAuthorize: when set to true, the proposal's previously received signatures and the signature of this node must be
+                             sufficient to fully authorize the topology transaction. if this is not the case, the request fails.
+                             when set to false, the proposal retains the proposal status until enough signatures are accumulated to
+                             satisfy the mapping's authorization requirements.
+         signedBy: the fingerprint of the key to be used to sign this proposal
+         serial: the expected serial this topology transaction should have. Serials must be contiguous and start at 1.
+                 This transaction will be rejected if another fully authorized transaction with the same serial already
+                 exists, or if there is a gap between this serial and the most recently used serial.
+                 If None, the serial will be automatically selected by the node.
+         synchronize: Synchronization timeout to wait until the proposal has been observed on the synchronizer."""
+      )
+      def propose(
+          physicalSynchronizerId: PhysicalSynchronizerId,
+          successorPhysicalSynchronizerId: PhysicalSynchronizerId,
+          store: Option[TopologyStoreId] = None,
+          mustFullyAuthorize: Boolean = false,
+          signedBy: Option[Fingerprint] = None,
+          serial: Option[PositiveInt] = None,
+          synchronize: Option[config.NonNegativeDuration] = Some(
+            consoleEnvironment.commandTimeouts.unbounded
+          ),
+      ): SignedTopologyTransaction[TopologyChangeOp, SynchronizerUpgradeAnnouncement] =
+        consoleEnvironment.run {
+          adminCommand(
+            TopologyAdminCommands.Write.Propose(
+              mapping = SynchronizerUpgradeAnnouncement(
+                physicalSynchronizerId,
+                successorPhysicalSynchronizerId,
+              ),
+              signedBy = signedBy.toList,
+              serial = serial,
+              change = TopologyChangeOp.Replace,
+              mustFullyAuthorize = mustFullyAuthorize,
+              forceChanges = ForceFlags.none,
+              // TODO(#25467): use physical synchronizer id to uniquely identify the target store
+              store = store.getOrElse(TopologyStoreId.Synchronizer(physicalSynchronizerId.logical)),
+              waitToBecomeEffective = synchronize,
+            )
+          )
+        }
+      @Help.Summary("Propose the revocation of a synchronizer migration announcement")
+      @Help.Description(
+        """
+         physicalSynchronizerId: the physical synchronizer id of the synchronizer on which the synchronizer migration announcement will be revoked
+         successorPhysicalSynchronizerId: the id of the physical synchronizer that was supposed to succeed the current physical synchronizer
+
+         store: - "Authorized": the topology transaction will be stored in the node's authorized store and automatically
+                                propagated to connected synchronizers, if applicable.
+                - "<synchronizer id>": the topology transaction will be directly submitted to the specified synchronizer without
+                                 storing it locally first. This also means it will _not_ be synchronized to other synchronizers
+                                 automatically.
+         mustFullyAuthorize: when set to true, the proposal's previously received signatures and the signature of this node must be
+                             sufficient to fully authorize the topology transaction. if this is not the case, the request fails.
+                             when set to false, the proposal retains the proposal status until enough signatures are accumulated to
+                             satisfy the mapping's authorization requirements.
+         signedBy: the fingerprint of the key to be used to sign this proposal
+         serial: the expected serial this topology transaction should have. Serials must be contiguous and start at 1.
+                 This transaction will be rejected if another fully authorized transaction with the same serial already
+                 exists, or if there is a gap between this serial and the most recently used serial.
+                 If None, the serial will be automatically selected by the node.
+         synchronize: Synchronization timeout to wait until the proposal has been observed on the synchronizer."""
+      )
+      def revoke(
+          physicalSynchronizerId: PhysicalSynchronizerId,
+          successorPhysicalSynchronizerId: PhysicalSynchronizerId,
+          store: Option[TopologyStoreId] = None,
+          mustFullyAuthorize: Boolean = false,
+          signedBy: Option[Fingerprint] = None,
+          serial: Option[PositiveInt] = None,
+          synchronize: Option[config.NonNegativeDuration] = Some(
+            consoleEnvironment.commandTimeouts.unbounded
+          ),
+      ): SignedTopologyTransaction[TopologyChangeOp, SynchronizerUpgradeAnnouncement] =
+        consoleEnvironment.run {
+          adminCommand(
+            TopologyAdminCommands.Write.Propose(
+              mapping = SynchronizerUpgradeAnnouncement(
+                physicalSynchronizerId,
+                successorPhysicalSynchronizerId,
+              ),
+              signedBy = signedBy.toList,
+              serial = serial,
+              change = TopologyChangeOp.Remove,
+              mustFullyAuthorize = mustFullyAuthorize,
+              forceChanges = ForceFlags.none,
+              // TODO(#25467): use physical synchronizer id to uniquely identify the target store
+              store = store.getOrElse(TopologyStoreId.Synchronizer(physicalSynchronizerId.logical)),
+              waitToBecomeEffective = synchronize,
+            )
+          )
+        }
+    }
+
+    object sequencer_successors extends Helpful {
+      @Help.Summary("Propose the connection details of a sequencer on the successor synchronizer")
+      @Help.Description(
+        """
+         sequencerId: the id of the sequencer that will be reachable by the provided endpoints
+         endpoints: a list of URIs of the endpoints with which the sequencer is reachable on the successor synchronizer
+         synchronizerId: the logical synchronizer id
+         customTrustCertificates: a trust certificate in case the sequencer's TLS certificate is not signed via certificates trusted
+                                  by the OS's default trusted certificates
+
+         store: - "Authorized": the topology transaction will be stored in the node's authorized store and automatically
+                                propagated to connected synchronizers, if applicable.
+                - "<synchronizer id>": the topology transaction will be directly submitted to the specified synchronizer without
+                                 storing it locally first. This also means it will _not_ be synchronized to other synchronizers
+                                 automatically.
+         mustFullyAuthorize: when set to true, the proposal's previously received signatures and the signature of this node must be
+                             sufficient to fully authorize the topology transaction. if this is not the case, the request fails.
+                             when set to false, the proposal retains the proposal status until enough signatures are accumulated to
+                             satisfy the mapping's authorization requirements.
+         signedBy: the fingerprint of the key to be used to sign this proposal
+         serial: the expected serial this topology transaction should have. Serials must be contiguous and start at 1.
+                 This transaction will be rejected if another fully authorized transaction with the same serial already
+                 exists, or if there is a gap between this serial and the most recently used serial.
+                 If None, the serial will be automatically selected by the node.
+         operation: whether to replace or remove the currently valid mapping
+         synchronize: Synchronization timeout to wait until the proposal has been observed on the synchronizer."""
+      )
+      def propose_successor(
+          sequencerId: SequencerId,
+          endpoints: NonEmpty[Seq[URI]],
+          synchronizerId: PhysicalSynchronizerId,
+          customTrustCertificates: Option[ByteString] = None,
+          store: Option[TopologyStoreId] = None,
+          mustFullyAuthorize: Boolean = false,
+          signedBy: Option[Fingerprint] = None,
+          serial: Option[PositiveInt] = None,
+          operation: TopologyChangeOp = TopologyChangeOp.Replace,
+          synchronize: Option[config.NonNegativeDuration] = Some(
+            consoleEnvironment.commandTimeouts.unbounded
+          ),
+      ): SignedTopologyTransaction[TopologyChangeOp, SequencerConnectionSuccessor] =
+        consoleEnvironment.run {
+
+          adminCommand(
+            TopologyAdminCommands.Write.Propose(
+              mapping = networking.Endpoint
+                .fromUris(endpoints)
+                .map { case (validatedEndpoints, useTls) =>
+                  SequencerConnectionSuccessor(
+                    sequencerId,
+                    synchronizerId,
+                    GrpcConnection(
+                      validatedEndpoints,
+                      useTls,
+                      customTrustCertificates,
+                    ),
+                  )
+                },
+              signedBy = signedBy.toList,
+              serial = serial,
+              change = operation,
+              mustFullyAuthorize = mustFullyAuthorize,
+              forceChanges = ForceFlags.none,
+              // TODO(#25467): use physical synchronizer id to uniquely identify the target store
+              store = store.getOrElse(TopologyStoreId.Synchronizer(synchronizerId.logical)),
+              waitToBecomeEffective = synchronize,
+            )
+          )
+        }
+
+      def list(
+          store: Option[TopologyStoreId] = None,
+          proposals: Boolean = false,
+          timeQuery: TimeQuery = TimeQuery.HeadState,
+          operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
+          filterSequencerId: String = "",
+          filterSigningKey: String = "",
+      ): Seq[ListSequencerConnectionSuccessorResult] = consoleEnvironment.run {
+        adminCommand(
+          TopologyAdminCommands.Read.ListSequencerConnectionSuccessor(
+            BaseQuery(
+              store,
+              proposals,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              None,
+            ),
+            filterSequencerId,
+          )
+        )
+      }
+
+    }
+
   }
 
   @Help.Summary("Inspect topology stores")

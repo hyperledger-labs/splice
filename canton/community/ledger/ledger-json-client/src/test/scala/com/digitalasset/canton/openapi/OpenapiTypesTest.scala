@@ -146,12 +146,6 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
     object GrpcMappings1 {
       val value: Seq[Mapping[_, _]] = Seq(
         Mapping[
-          v2.admin.party_management_service.AllocatePartyRequest,
-          openapi.AllocatePartyRequest,
-        ](
-          openapi.AllocatePartyRequest.fromJson
-        ),
-        Mapping[
           v2.admin.party_management_service.AllocatePartyResponse,
           openapi.AllocatePartyResponse,
         ](
@@ -732,6 +726,12 @@ class OpenapiTypesTest extends AnyWordSpec with Matchers {
           ),
           Mapping[json.JsGetActiveContractsResponse, openapi.JsGetActiveContractsResponse](
             openapi.JsGetActiveContractsResponse.fromJson
+          ),
+          Mapping[
+            json.js.AllocatePartyRequest,
+            openapi.AllocatePartyRequest,
+          ](
+            openapi.AllocatePartyRequest.fromJson
           ),
           Mapping[json.JsContractEntry.JsActiveContract, openapi.JsActiveContract](
             openapi.JsActiveContract.fromJson

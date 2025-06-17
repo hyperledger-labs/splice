@@ -1257,7 +1257,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     (for {
       conn <- sequencerConnections.aliasToConnection.values
       endpoint <- conn match {
-        case GrpcSequencerConnection(endpoints, _, _, _) => endpoints
+        case GrpcSequencerConnection(endpoints, _, _, _, _) => endpoints
       }
     } yield endpoint.toString).toSet
   }
@@ -1379,7 +1379,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       participant: ParticipantClientReference,
       someExistingParty: PartyId,
       createNewParties: Boolean,
-  ) = {
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     // for test isolation
     val suffix = (new scala.util.Random).nextInt().toHexString.toLowerCase
 
@@ -1392,7 +1392,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           // more than just users state, but allocating fresh parties makes it easier to create interesting users
           Seq(someExistingParty) ++ {
             for (i <- 0 to 2)
-              yield participant.ledger_api.parties.allocate(s"fake-party-${i}-${suffix}").party
+              yield participant.ledger_api.parties
+                .allocate(
+                  s"fake-party-${i}-${suffix}",
+                  synchronizerId = decentralizedSynchronizerId.toProtoPrimitive,
+                )
+                .party
           }
         }
       } else {

@@ -19,6 +19,7 @@ import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
   FatContractInstance,
   GlobalKey,
   Node,
@@ -185,13 +186,17 @@ object InteractiveSubmissionGenerators {
   private val globalKeyMappingGen: Gen[Map[GlobalKey, Option[Value.ContractId]]] =
     Gen.mapOf(globalKeyMappingEntryGen)
 
-  private val inputContractsGen: Gen[FatContractInstance] = for {
+  private def inputContractsGen(overrideCid: Value.ContractId): Gen[FatContractInstance] = for {
     create <- ValueGenerators
       .malformedCreateNodeGenWithVersion(LanguageVersion.v2_1)
       .map(normalizeNodeForV1)
     createdAt <- Arbitrary.arbitrary[Time.Timestamp]
     driverMetadata <- Arbitrary.arbitrary[Array[Byte]].map(Bytes.fromByteArray)
-  } yield FatContractInstance.fromCreateNode(create, createdAt, driverMetadata)
+  } yield FatContractInstance.fromCreateNode(
+    create.copy(coid = overrideCid),
+    CreationTime.CreatedAt(createdAt),
+    driverMetadata,
+  )
 
   private val preparedTransactionDataGen: Gen[PrepareTransactionData] = for {
     submitterInfo <- submitterInfoGen
@@ -199,7 +204,9 @@ object InteractiveSubmissionGenerators {
     transaction <- versionedTransactionGenerator.map(SubmittedTransaction(_))
     transactionMeta <- transactionMetaGen(transaction)
     globalKeyMapping <- globalKeyMappingGen
-    inputContracts <- Gen.listOfN(1, inputContractsGen).map(ImmArray.from)
+    coids <- Gen.listOf(ValueGenerators.coidGen)
+    inputContracts = coids.flatMap(inputContractsGen(_).sample)
+    enrichedInputContracts = coids.flatMap(inputContractsGen(_).sample)
     mediatorGroup <- Arbitrary.arbitrary[PositiveInt]
     transactionUUID <- Gen.uuid
   } yield PrepareTransactionData(
@@ -207,7 +214,12 @@ object InteractiveSubmissionGenerators {
     transactionMeta,
     transaction,
     globalKeyMapping,
-    inputContracts.map(fci => fci.contractId -> ExternalInputContract(fci, fci)).toSeq.toMap,
+    inputContracts
+      .zip(enrichedInputContracts)
+      .map { case (originalFci, enrichedFci) =>
+        originalFci.contractId -> ExternalInputContract(originalFci, enrichedFci)
+      }
+      .toMap,
     synchronizerId,
     mediatorGroup.value,
     transactionUUID,

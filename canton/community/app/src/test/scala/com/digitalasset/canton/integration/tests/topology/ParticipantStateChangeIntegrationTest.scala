@@ -8,7 +8,6 @@ import com.daml.test.evidence.scalatest.ScalaTestSupport.Implicits.*
 import com.daml.test.evidence.tag.FuncTest
 import com.daml.test.evidence.tag.Security.SecurityTest.Property
 import com.daml.test.evidence.tag.Security.{Attack, SecurityTest, SecurityTestSuite}
-import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.console.{CommandFailure, LocalInstanceReference}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -210,13 +209,13 @@ trait ParticipantStateChangeIntegrationTest
     import env.*
 
     // try to start participant3 with an invalid synchronizer id
-    val conConfig = SynchronizerConnectionConfig.grpc(
-      SequencerAlias.Default,
+    val conConfig = SynchronizerConnectionConfig.tryGrpcSingleConnection(
       daName,
       s"http://localhost:${sequencer1.config.publicApi.port}",
       manualConnect = true,
-      synchronizerId =
-        Some(SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("notcorrect::fingerprint"))),
+      synchronizerId = Some(
+        SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("notcorrect::fingerprint")).toPhysical
+      ),
     )
 
     // fail because synchronizer id is wrong
@@ -227,7 +226,7 @@ trait ParticipantStateChangeIntegrationTest
       ),
     )
 
-    val synchronizerId = sequencer1.synchronizer_id
+    val synchronizerId = sequencer1.physical_synchronizer_id
     participant3.synchronizers.connect_by_config(
       conConfig.copy(synchronizerId = Some(synchronizerId))
     )
@@ -269,7 +268,7 @@ trait ParticipantStateChangeIntegrationTest
     // everything works before we test
     assertPingSucceeds(participant1, participant2)
     def submit() =
-      participant1.ledger_api.javaapi.commands.submit_flat(
+      participant1.ledger_api.javaapi.commands.submit(
         Seq(alice),
         Seq(
           IouSyntax
@@ -293,7 +292,7 @@ trait ParticipantStateChangeIntegrationTest
     )
 
     // p2 can not exercise a choice as p1 can not confirm
-    def call() = participant2.ledger_api.javaapi.commands.submit_flat(
+    def call() = participant2.ledger_api.javaapi.commands.submit(
       Seq(bob),
       Seq(cid.id.exerciseCall().commands().loneElement),
     )

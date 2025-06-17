@@ -18,8 +18,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.ExecutionContext
 
 /** Defines the default methods for protocol signing that use a topology snapshot for key lookup.
-  * This approach uses the signing APIs registered in Canton's
-  * [[com.digitalasset.canton.crypto.Crypto]] object at node startup.
+  * This approach uses the signing APIs registered in Canton at node startup.
   */
 class SyncCryptoSignerWithLongTermKeys(
     member: Member,
@@ -40,8 +39,9 @@ class SyncCryptoSignerWithLongTermKeys(
       existingKeys <- signingKeys.toList
         .parFilterA(pk => cryptoPrivateStore.existsSigningKey(pk.fingerprint))
         .leftMap[SyncCryptoError](SyncCryptoError.StoreError.apply)
-      kk <- PublicKey
-        .getLatestKey(existingKeys)
+      kk <- NonEmpty
+        .from(existingKeys)
+        .map(PublicKey.getLatestKey)
         .toRight[SyncCryptoError](
           SyncCryptoError
             .KeyNotAvailable(

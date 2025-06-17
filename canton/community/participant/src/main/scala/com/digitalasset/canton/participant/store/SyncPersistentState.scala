@@ -5,7 +5,7 @@ package com.digitalasset.canton.participant.store
 
 import cats.Eval
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi}
+import com.digitalasset.canton.crypto.{CryptoPureApi, SynchronizerCrypto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageDependencyResolver
@@ -20,6 +20,8 @@ import com.digitalasset.canton.topology.store.TopologyStore
 import com.digitalasset.canton.topology.store.TopologyStoreId.SynchronizerStore
 import com.digitalasset.canton.topology.{
   ParticipantId,
+  PhysicalSynchronizerId,
+  SynchronizerId,
   SynchronizerOutboxQueue,
   SynchronizerTopologyManager,
 }
@@ -35,7 +37,8 @@ trait SyncPersistentState extends NamedLogging with AutoCloseable {
 
   /** The crypto operations used on the synchronizer */
   def pureCryptoApi: CryptoPureApi
-  def indexedSynchronizer: IndexedSynchronizer
+  def physicalSynchronizerIdx: IndexedPhysicalSynchronizer
+  def synchronizerIdx: IndexedSynchronizer
   def staticSynchronizerParameters: StaticSynchronizerParameters
   def enableAdditionalConsistencyChecks: Boolean
   def reassignmentStore: ReassignmentStore
@@ -52,17 +55,22 @@ trait SyncPersistentState extends NamedLogging with AutoCloseable {
   def topologyManager: SynchronizerTopologyManager
   def synchronizerOutboxQueue: SynchronizerOutboxQueue
   def acsInspection: AcsInspection
+
+  lazy val physicalSynchronizerId: PhysicalSynchronizerId =
+    PhysicalSynchronizerId(synchronizerIdx.synchronizerId, staticSynchronizerParameters)
+
+  lazy val logicalSynchronizerId: SynchronizerId = synchronizerIdx.synchronizerId
 }
 
 object SyncPersistentState {
-
   def create(
       participantId: ParticipantId,
       storage: Storage,
+      physicalSynchronizerIdx: IndexedPhysicalSynchronizer,
       synchronizerIdx: IndexedSynchronizer,
       staticSynchronizerParameters: StaticSynchronizerParameters,
       clock: Clock,
-      crypto: Crypto,
+      crypto: SynchronizerCrypto,
       parameters: ParticipantNodeParameters,
       indexedStringStore: IndexedStringStore,
       acsCounterParticipantConfigStore: AcsCounterParticipantConfigStore,
@@ -73,13 +81,14 @@ object SyncPersistentState {
       futureSupervisor: FutureSupervisor,
   )(implicit ec: ExecutionContext): SyncPersistentState = {
     val synchronizerLoggerFactory =
-      loggerFactory.append("synchronizerId", synchronizerIdx.synchronizerId.toString)
+      loggerFactory.append("synchronizerId", physicalSynchronizerIdx.synchronizerId.toString)
     storage match {
       case _: MemoryStorage =>
         new InMemorySyncPersistentState(
           participantId,
           clock,
           crypto,
+          physicalSynchronizerIdx,
           synchronizerIdx,
           staticSynchronizerParameters,
           parameters.enableAdditionalConsistencyChecks,
@@ -96,6 +105,7 @@ object SyncPersistentState {
       case db: DbStorage =>
         new DbSyncPersistentState(
           participantId,
+          physicalSynchronizerIdx,
           synchronizerIdx,
           staticSynchronizerParameters,
           clock,

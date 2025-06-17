@@ -41,7 +41,7 @@ class SynchronizersFilterTest
         filter.split(correctTopology, correctPackages).futureValueUS
 
       unusableSynchronizers shouldBe empty
-      usableSynchronizers shouldBe List(DefaultTestIdentities.synchronizerId)
+      usableSynchronizers shouldBe List(DefaultTestIdentities.physicalSynchronizerId)
     }
 
     "reject synchronizers when informees don't have an active participant" in {
@@ -53,7 +53,7 @@ class SynchronizersFilterTest
 
       unusableSynchronizers shouldBe List(
         UsableSynchronizers.MissingActiveParticipant(
-          DefaultTestIdentities.synchronizerId,
+          DefaultTestIdentities.physicalSynchronizerId,
           Set(partyNotConnected),
         )
       )
@@ -68,7 +68,7 @@ class SynchronizersFilterTest
         val packageNotValid = defaultPackageId
         val packagesWithModifedValidityPeriod = correctPackages.map(vp =>
           if (vp.packageId == packageNotValid)
-            vp.copy(validFrom = validFrom, validUntil = validUntil)
+            vp.copy(validFromInclusive = validFrom, validUntilExclusive = validUntil)
           else vp
         )
         val (unusableSynchronizers, usableSynchronizers) =
@@ -79,7 +79,7 @@ class SynchronizersFilterTest
 
         unusableSynchronizers shouldBe List(
           UsableSynchronizers.UnknownPackage(
-            DefaultTestIdentities.synchronizerId,
+            DefaultTestIdentities.physicalSynchronizerId,
             List(
               unknownPackageFor(submitterParticipantId, packageNotValid),
               unknownPackageFor(observerParticipantId, packageNotValid),
@@ -102,7 +102,7 @@ class SynchronizersFilterTest
 
       unusableSynchronizers shouldBe List(
         UsableSynchronizers.UnknownPackage(
-          DefaultTestIdentities.synchronizerId,
+          DefaultTestIdentities.physicalSynchronizerId,
           List(
             unknownPackageFor(submitterParticipantId, missingPackage),
             unknownPackageFor(observerParticipantId, missingPackage),
@@ -111,11 +111,12 @@ class SynchronizersFilterTest
       )
     }
 
-    "reject synchronizers when the minimum protocol version is not satisfied " in {
+    // TODO(#15561) Re-enable this test when we have a stable protocol version
+    "reject synchronizers when the minimum protocol version is not satisfied " ignore {
       import SimpleTopology.*
 
       // LanguageVersion.VDev needs pv=dev so we use pv=6
-      val currentSynchronizerPV = ProtocolVersion.v33
+      val currentSynchronizerPV = ProtocolVersion.v34
       val filter =
         SynchronizersFilterForTx(
           Transactions.Create.tx(LfLanguageVersion.v2_dev),
@@ -132,8 +133,7 @@ class SynchronizersFilterTest
         .value
       unusableSynchronizers shouldBe List(
         UsableSynchronizers.UnsupportedMinimumProtocolVersion(
-          synchronizerId = DefaultTestIdentities.synchronizerId,
-          currentPV = currentSynchronizerPV,
+          synchronizerId = DefaultTestIdentities.physicalSynchronizerId,
           requiredPV = requiredPV,
           lfVersion = LfLanguageVersion.v2_dev,
         )
@@ -155,7 +155,7 @@ class SynchronizersFilterTest
         filter.split(correctTopology, correctPackages).futureValueUS
 
       unusableSynchronizers shouldBe empty
-      usableSynchronizers shouldBe List(DefaultTestIdentities.synchronizerId)
+      usableSynchronizers shouldBe List(DefaultTestIdentities.physicalSynchronizerId)
     }
 
     "reject synchronizers when packages are missing" in {
@@ -183,7 +183,7 @@ class SynchronizersFilterTest
         usableSynchronizers shouldBe empty
         unusableSynchronizers shouldBe List(
           UsableSynchronizers.UnknownPackage(
-            DefaultTestIdentities.synchronizerId,
+            DefaultTestIdentities.physicalSynchronizerId,
             unknownPackageFor(submitterParticipantId) ++ unknownPackageFor(observerParticipantId),
           )
         )
@@ -206,12 +206,12 @@ private[submission] object SynchronizersFilterTest {
         ec: ExecutionContext,
         tc: TraceContext,
     ): FutureUnlessShutdown[
-      (List[UsableSynchronizers.SynchronizerNotUsedReason], List[SynchronizerId])
+      (List[UsableSynchronizers.SynchronizerNotUsedReason], List[PhysicalSynchronizerId])
     ] = {
       val synchronizers = List(
         (
-          DefaultTestIdentities.synchronizerId,
-          synchronizerProtocolVersion,
+          DefaultTestIdentities.physicalSynchronizerId
+            .copy(protocolVersion = synchronizerProtocolVersion),
           SimpleTopology.defaultTestingIdentityFactory(topology, packages),
         )
       )

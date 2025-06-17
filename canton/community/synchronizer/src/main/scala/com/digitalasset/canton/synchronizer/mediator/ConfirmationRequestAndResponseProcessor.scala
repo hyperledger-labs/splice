@@ -45,13 +45,13 @@ import scala.concurrent.{ExecutionContext, Future}
   * participants.
   */
 private[mediator] class ConfirmationRequestAndResponseProcessor(
-    synchronizerId: SynchronizerId,
+    synchronizerId: PhysicalSynchronizerId,
     private val mediatorId: MediatorId,
     verdictSender: VerdictSender,
     crypto: SynchronizerCryptoClient,
     timeTracker: SynchronizerTimeTracker,
     val mediatorState: MediatorState,
-    protocolVersion: ProtocolVersion,
+    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     protected val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, tracer: Tracer)
@@ -660,7 +660,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
             snapshot
               .isHostedByAtLeastOneParticipantF(
                 declaredConfirmingParties.toSet,
-                (_, attr) => attr.permission.canConfirm,
+                (_, attr) => attr.canConfirm,
               )
           )
 
@@ -822,7 +822,7 @@ private[mediator] class ConfirmationRequestAndResponseProcessor(
       tc: TraceContext
   ): Future[Unit] = {
     FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
-      performUnlessClosingUSF("send-result-if-done")(f),
+      synchronizeWithClosing("send-result-if-done")(f),
       s"send-result-if-done failed for request $requestId",
       level = Level.WARN,
     )

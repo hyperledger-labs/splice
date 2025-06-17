@@ -67,7 +67,7 @@ trait ParticipantAdminDarsConnection {
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
       _ <- domains.traverse { domainId =>
-        vetDars(domainId, Seq(darResource), None)
+        vetDars(domainId.logical, Seq(darResource), None)
       }
     } yield ()
 
@@ -151,7 +151,7 @@ trait ParticipantAdminDarsConnection {
           packages.find(_.packageId == packageId) match {
             case Some(existingVettingState) =>
               if (
-                existingVettingState.validFrom
+                existingVettingState.validFromInclusive
                   .exists(existingValidFrom =>
                     existingValidFrom.isAfter(CantonTimestamp.now()) &&
                       packageValidFrom.forall(_ isBefore existingValidFrom)

@@ -210,7 +210,7 @@ class SvApp(
           svSynchronizerConfig.parameters
             .toStaticSynchronizerParameters(
               CryptoConfig(provider = CryptoProvider.Jce),
-              ProtocolVersion.v33,
+              ProtocolVersion.v34,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")

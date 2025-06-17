@@ -3,29 +3,49 @@
 
 package com.digitalasset.canton.participant.sync
 
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.participant.store.AcsInspection
+import com.digitalasset.canton.topology.{PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.util.SingleUseCell
 
 import scala.collection.concurrent.TrieMap
 
 /** Read-only interface to the current map of which synchronizers we're connected to. */
 trait ConnectedSynchronizersLookup {
+  // TODO(#25483) Check all usages of that one
   def get(synchronizerId: SynchronizerId): Option[ConnectedSynchronizer]
 
-  def isConnected(synchronizerId: SynchronizerId): Boolean = get(synchronizerId).nonEmpty
+  def get(synchronizerId: PhysicalSynchronizerId): Option[ConnectedSynchronizer]
 
-  def snapshot: collection.Map[SynchronizerId, ConnectedSynchronizer]
+  def getAcsInspection(synchronizerId: SynchronizerId): Option[AcsInspection]
+
+  def isConnected(synchronizerId: PhysicalSynchronizerId): Boolean = get(synchronizerId).nonEmpty
+  def isConnected(synchronizerId: SynchronizerId): Boolean
+
+  def snapshot: collection.Map[PhysicalSynchronizerId, ConnectedSynchronizer]
 }
 
-object ConnectedSynchronizersLookup {
+private[sync] object ConnectedSynchronizersLookup {
   def create(
-      connected: TrieMap[SynchronizerId, ConnectedSynchronizer]
+      connected: TrieMap[PhysicalSynchronizerId, ConnectedSynchronizer]
   ): ConnectedSynchronizersLookup =
     new ConnectedSynchronizersLookup {
       override def get(synchronizerId: SynchronizerId): Option[ConnectedSynchronizer] =
+        connected.values
+          .filter(_.synchronizerId.logical == synchronizerId)
+          .maxByOption(_.synchronizerId)
+
+      override def getAcsInspection(synchronizerId: SynchronizerId): Option[AcsInspection] =
+        connected.values
+          .find(_.synchronizerId.logical == synchronizerId)
+          .map(_.persistent.acsInspection)
+
+      override def get(synchronizerId: PhysicalSynchronizerId): Option[ConnectedSynchronizer] =
         connected.get(synchronizerId)
 
-      override def snapshot: collection.Map[SynchronizerId, ConnectedSynchronizer] =
+      override def isConnected(synchronizerId: SynchronizerId): Boolean =
+        connected.values.exists(_.synchronizerId.logical == synchronizerId)
+
+      override def snapshot: collection.Map[PhysicalSynchronizerId, ConnectedSynchronizer] =
         connected.readOnlySnapshot()
     }
 }
@@ -48,6 +68,15 @@ class ConnectedSynchronizersLookupContainer extends ConnectedSynchronizersLookup
   override def get(synchronizerId: SynchronizerId): Option[ConnectedSynchronizer] =
     tryGetDelegate.get(synchronizerId)
 
-  override def snapshot: collection.Map[SynchronizerId, ConnectedSynchronizer] =
+  override def get(synchronizerId: PhysicalSynchronizerId): Option[ConnectedSynchronizer] =
+    tryGetDelegate.get(synchronizerId)
+
+  override def getAcsInspection(synchronizerId: SynchronizerId): Option[AcsInspection] =
+    tryGetDelegate.getAcsInspection(synchronizerId)
+
+  override def isConnected(synchronizerId: SynchronizerId): Boolean =
+    tryGetDelegate.isConnected(synchronizerId)
+
+  override def snapshot: collection.Map[PhysicalSynchronizerId, ConnectedSynchronizer] =
     tryGetDelegate.snapshot
 }

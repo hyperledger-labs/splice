@@ -30,14 +30,19 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.EnrichedTransactionData.ExternalInputContract
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.codec.PreparedTransactionCodec.*
 import com.digitalasset.canton.protocol.{LfNode, LfNodeId}
-import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf
-import com.digitalasset.daml.lf.data.Ref.TypeConName
+import com.digitalasset.daml.lf.data.Ref.TypeConId
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.{FatContractInstance, NodeId, TransactionCoder}
+import com.digitalasset.daml.lf.transaction.{
+  CreationTime,
+  FatContractInstance,
+  NodeId,
+  TransactionCoder,
+}
 import com.digitalasset.daml.lf.value.Value
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
@@ -49,9 +54,7 @@ import io.scalaland.chimney.partial.Result
 import io.scalaland.chimney.syntax.*
 import io.scalaland.chimney.{PartialTransformer, Transformer}
 
-import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 /** Class to decode a PreparedTransaction to an LF Transaction and its metadata. Uses chimney to
   * define Transformers and PartialTransformer for all conversions.
@@ -124,9 +127,6 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
         contractId <- lf.value.Value.ContractId.fromBytes(bytes).toResult
       } yield contractId
     }
-  private implicit val uuidTransformer: PartialTransformer[String, UUID] =
-    PartialTransformer(src => Try(UUID.fromString(src)).toEither.leftMap(_.getMessage).toResult)
-
   private implicit val hashTransformer: PartialTransformer[ByteString, lf.crypto.Hash] =
     PartialTransformer { src =>
       lf.crypto.Hash.fromBytes(Bytes.fromByteString(src)).toResult
@@ -159,9 +159,6 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
   private implicit val partyTransformer: PartialTransformer[String, lf.data.Ref.Party] =
     PartialTransformer(src => lf.data.Ref.Party.fromString(src).toResult)
 
-  private implicit val mediatorGroupIndexDecoder: PartialTransformer[Int, MediatorGroupIndex] =
-    PartialTransformer(src => MediatorGroupIndex.create(src).leftMap(_.message).toResult)
-
   private implicit val nodeIdTransformer: PartialTransformer[String, lf.transaction.NodeId] =
     PartialTransformer { src =>
       src.toIntOption
@@ -179,7 +176,7 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
     // GlobalKey default constructor is private, so create a constructor function from the companion builder
     // and pass that to chimney so it can construct the instance
     def globalKeyConstructor(
-        templateId: TypeConName,
+        templateId: TypeConId,
         key: Value,
         packageName: Ref.PackageName,
     ): Result[lf.transaction.GlobalKey] =
@@ -359,12 +356,12 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
           .toResult
         enrichedContract = FatContractInstance.fromCreateNode(
           createNode,
-          createTime,
+          CreationTime.CreatedAt(createTime),
           originalContract.cantonData,
         )
       } yield ExternalInputContract(
-        enrichedFci = enrichedContract,
-        originalFci = originalContract,
+        originalContract = originalContract,
+        enrichedContract = enrichedContract,
       )
     }
 
@@ -413,12 +410,12 @@ final class PreparedTransactionDecoder(override val loggerFactory: NamedLoggerFa
     for {
       metadataProto <- requireField(executeRequest.preparedTransaction.metadata, "metadata")
       submitterInfoProto <- requireField(metadataProto.submitterInfo, "submitter_info")
-      transactionUUID <- metadataProto.transactionUuid
-        .transformIntoPartial[UUID]
+      transactionUUID <- ProtoConverter.UuidConverter
+        .fromProtoPrimitive(metadataProto.transactionUuid)
         .toFutureWithLoggedFailures("Failed to deserialize transaction UUID", logger)
       externallySignedSubmission <- for {
-        mediatorGroup <- metadataProto.mediatorGroup
-          .transformIntoPartial[MediatorGroupIndex]
+        mediatorGroup <- ProtoConverter
+          .parseNonNegativeInt("mediator_group", metadataProto.mediatorGroup)
           .toFutureWithLoggedFailures("Failed to deserialize mediator group", logger)
       } yield ExternallySignedSubmission(
         executeRequest.serializationVersion,
