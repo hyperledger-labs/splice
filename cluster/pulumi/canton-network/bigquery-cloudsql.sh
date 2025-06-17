@@ -129,12 +129,6 @@ for arg in "${REQUIRED_ARGS[@]}"; do
   fi
 done
 
-set -e
-
-TMP_BUCKET="da-cn-tmpsql-$(date +%s)-$RANDOM-b"
-TMP_SQL_FILE="$(mktemp tmp_pub_rep_slots_XXXXXXXXXX.sql --tmpdir)"
-GCS_URI="gs://$TMP_BUCKET/$(basename "$TMP_SQL_FILE")"
-
 if [ -s "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
   echo "Using $GOOGLE_APPLICATION_CREDENTIALS for authentication"
   gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
@@ -146,6 +140,20 @@ else
 fi
 echo 'Current gcloud login:'
 gcloud auth list --format=config
+
+TMP_BUCKET="da-cn-tmpsql-$(date +%s)-$RANDOM-b"
+TMP_SQL_FILE="$(mktemp tmp_pub_rep_slots_XXXXXXXXXX.sql --tmpdir)"
+GCS_URI="gs://$TMP_BUCKET/$(basename "$TMP_SQL_FILE")"
+
+# don't bother setting up cleanup until we are logged in and start creating
+# things to clean up
+cleanup() {
+  echo 'Cleaning up temporary GCS object and bucket'
+  gsutil rm "$GCS_URI" || true
+  gsutil rb "gs://$TMP_BUCKET" || true
+  rm "$TMP_SQL_FILE" || true
+}
+trap cleanup EXIT
 
 # create temporary bucket
 echo "Creating temporary bucket $TMP_BUCKET"
@@ -244,8 +252,3 @@ gcloud sql import sql "$POSTGRES_INSTANCE_NAME" "$GCS_URI" \
   --database="$SCAN_APP_DATABASE_NAME" \
   --user="$POSTGRES_USER_NAME" \
   --quiet
-
-echo 'Cleaning up temporary GCS object and bucket'
-gsutil rm "$GCS_URI"
-gsutil rb "gs://$TMP_BUCKET"
-rm "$TMP_SQL_FILE"
