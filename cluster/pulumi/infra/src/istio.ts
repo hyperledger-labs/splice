@@ -319,7 +319,7 @@ function configureGatewayService(
           },
         },
         autoscaling: {
-          maxReplicas: 10,
+          maxReplicas: 15,
         },
         podDisruptionBudget: {
           maxUnavailable: 1,

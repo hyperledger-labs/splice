@@ -24,7 +24,11 @@ services:
     mem_limit: 512mb
   wallet-web-ui-app-provider:
     mem_limit: 256mb
+  ans-web-ui-app-provider:
+    mem_limit: 256mb
   wallet-web-ui-app-user:
+    mem_limit: 256mb
+  ans-web-ui-app-user:
     mem_limit: 256mb
   wallet-web-ui-sv:
     mem_limit: 256mb
