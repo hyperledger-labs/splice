@@ -13,7 +13,7 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --exclude=build.sbt
+          args: --all-projects --exclude=build.sbt
 
   python_snyk_test:
     runs-on: self-hosted-docker-tiny
@@ -25,4 +25,4 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          args: --exclude=build.sbt
+          args: --all-projects --exclude=build.sbt
