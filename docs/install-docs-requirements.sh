@@ -10,21 +10,41 @@ if ! xcode-select -p &>/dev/null; then
     echo "Check for the install xcode dialog box. Please complete the Xcode Command Line Tools installation, then re-run this script."
     exit 1
 fi
-# Check for Python 3 and pip
-if ! command -v python3 &>/dev/null; then
-    echo "Python 3 is required. Please install it first."
-    exit 1
+
+# Check for Homebrew and install if missing
+if ! command -v brew &>/dev/null; then
+    echo "Homebrew not found. Installing Homebrew..."
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    # Add Homebrew to PATH for current session
+    if [[ -d "/opt/homebrew/bin" ]]; then
+        export PATH="/opt/homebrew/bin:$PATH"
+    elif [[ -d "/usr/local/bin" ]]; then
+        export PATH="/usr/local/bin:$PATH"
+    fi
 fi
 
-if ! command -v pip3 &>/dev/null; then
-    echo "pip3 is required. Please install it first."
-    exit 1
+# Check for pyenv and install if missing
+if ! command -v pyenv &>/dev/null; then
+    echo "pyenv not found. Installing with Homebrew..."
+    if ! command -v brew &>/dev/null; then
+        echo "Homebrew is required to install pyenv. Please install Homebrew first."
+        exit 1
+    fi
+    brew install pyenv
 fi
 
-# Create virtual environment if not exists
+# Ensure desired Python version is installed via pyenv
+PYTHON_VERSION="3.11.9"
+if ! pyenv versions --bare | grep -qx "$PYTHON_VERSION"; then
+    echo "Installing Python $PYTHON_VERSION with pyenv..."
+    pyenv install "$PYTHON_VERSION"
+fi
+
+# Create virtual environment using pyenv if not exists
 if [ ! -d "venv" ]; then
-    python3 -m venv venv
-    echo "Created virtual environment in ./venv"
+    pyenv shell "$PYTHON_VERSION"
+    python -m venv venv-splice-docs
+    echo "Created virtual environment in ./venv using pyenv Python $PYTHON_VERSION"
 fi
 
 # Activate virtual environment
@@ -37,18 +57,6 @@ pip install --upgrade pip
 echo "Installing build requirements..."
 if [ -f "requirements.txt" ]; then
     pip install -r requirements.txt
-fi
-
-# Check for Homebrew and install if missing
-if ! command -v brew &>/dev/null; then
-    echo "Homebrew not found. Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Add Homebrew to PATH for current session
-    if [[ -d "/opt/homebrew/bin" ]]; then
-        export PATH="/opt/homebrew/bin:$PATH"
-    elif [[ -d "/usr/local/bin" ]]; then
-        export PATH="/usr/local/bin:$PATH"
-    fi
 fi
 
 # Check for direnv and install if missing
@@ -64,4 +72,4 @@ fi
 export SPLICE_ROOT="${PWD}"
 
 echo "Sphinx documentation build requirements installed."
-echo "To activate the virtual environment, run: source venv/bin/activate"
+# echo "To activate the virtual environment, run: source venv/bin/activate"

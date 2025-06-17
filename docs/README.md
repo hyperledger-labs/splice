@@ -24,8 +24,18 @@ or other changes that are not picked up by `sphinx-autobuild`.
 
 When making a change, rebuild the documentation using `sbt docs/bundle`.
 
-## Install requirements
+## Simplified build
+
+For non developers who would rather not [setup a full developer environmnet](../DEVELOPMENT.md), you can preview a version of the doc by:
+
+- Installing the requirements for the doc only: 
 
 ```bash
 ./install-docs-requirements.sh
+```
+
+- Building the docs locally:
+
+```bash
+make livehtml
 ```
