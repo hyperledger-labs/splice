@@ -16,10 +16,20 @@ jobs:
           test_name: snyk
           artifactory_user: ${{ vars.ARTIFACTORY_USER }}
           artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
-          with_sbt: false
+      - name: run sbt npmInstall
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          cmd: "npmInstall"
+      - name: run npm-install for Pulumi
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            make cluster/pulumi/build
       - name: Run Snyk to check for vulnerabilities
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
           cmd: |
             snyk auth ${{ secrets.SNYK_TOKEN }}
-            snyk test --all-projects --exclude=build.sbt
+            snyk test --all-projects --exclude=build.sbt --exclude=canton/community/*
