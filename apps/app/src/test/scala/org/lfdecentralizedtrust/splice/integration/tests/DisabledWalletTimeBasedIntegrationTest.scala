@@ -14,6 +14,8 @@ import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
 import com.digitalasset.canton.logging.SuppressionRule.LevelAndAbove
 import org.slf4j.event.Level
 
+import scala.concurrent.duration.DurationInt
+
 class DisabledWalletTimeBasedIntegrationTest
     extends IntegrationTest
     with WalletTestUtil
@@ -72,7 +74,7 @@ class DisabledWalletTimeBasedIntegrationTest
           )
         ) - smallAmount
 
-      eventually() {
+      eventually(30.seconds) {
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(SvRewardCoupon.COMPANION)(
             dsoParty,
@@ -85,12 +87,15 @@ class DisabledWalletTimeBasedIntegrationTest
         advanceRoundsByOneTick
         currentRound += 1
 
-        val unclaimed = sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedReward.COMPANION)(
-            dsoParty,
-            reward => BigDecimal(reward.data.amount) >= expectedMinAmount,
-          )
-        unclaimed should not be empty
+        silentClue(
+          s"Check that there is at least one unclaimed reward larger than $expectedMinAmount"
+        ) {
+          sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(UnclaimedReward.COMPANION)(
+              dsoParty,
+              reward => BigDecimal(reward.data.amount) >= expectedMinAmount,
+            ) should not be empty
+        }
 
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(Amulet.COMPANION)(dsoParty, _ => true) shouldBe empty
