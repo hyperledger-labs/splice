@@ -5,8 +5,8 @@
 
 .. _app_dev_validator_api:
 
-Validator API
-=============
+Validator APIs
+==============
 
 The Validator App is part of a :term:`CN Validator` or :term:`CN Supervalidator` node.
 It connects to a Canton participant and provides the following functionality:

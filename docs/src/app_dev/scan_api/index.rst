@@ -5,8 +5,9 @@
 
 .. _app_dev_scan_api:
 
-Scan API
-========
+Scan APIs
+=========
+
 The Scan App is part of a :term:`CN Supervalidator` (SV) node.
 The Scan App is shown in the context of an SV node in the following diagram:
 

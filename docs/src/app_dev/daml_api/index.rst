@@ -5,8 +5,8 @@
 
 .. _app_dev_daml_api:
 
-Daml API
-========
+Splice Daml APIs
+================
 
 API docs for daml packages
 
