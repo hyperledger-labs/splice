@@ -1054,7 +1054,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
         inside(refs.wallet.listSubscriptionRequests()) { case Seq(storeRequest) =>
           storeRequest.contractId shouldBe subscriptionRequest
           refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
-
         }
       },
     )(
