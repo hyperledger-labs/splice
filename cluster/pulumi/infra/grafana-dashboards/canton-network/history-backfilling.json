@@ -18,16 +18,41 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6365,
+  "id": 3085,
   "links": [],
   "panels": [
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 21,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "There are three backfilling background tasks:\n\n1. `ScanHistoryBackfillingTrigger` backfills regular updates\n    - Data is loaded from peer scan apps using BFT network calls\n1. `ScanHistoryBackfillingTrigger` backfills import updates\n    - Data is loaded from peer scan apps using BFT network calls\n1. `TxLogBackfillingTrigger` backfills txlog entries\n    - Data is loaded from the local UpdateHistory\n\nThe tasks are completed sequentially in the above order.\nE.g., txlog backfilling won't start until update history backfilling is complete.",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.4.0",
+      "title": "Overview",
+      "type": "text"
+    },
     {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 0
+        "y": 7
       },
       "id": 7,
       "panels": [],
@@ -99,9 +124,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 1
+        "y": 8
       },
-      "id": 1,
+      "id": 17,
       "options": {
         "legend": {
           "calcs": [],
@@ -197,7 +222,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 1
+        "y": 8
       },
       "id": 5,
       "options": {
@@ -295,7 +320,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 9
+        "y": 16
       },
       "id": 2,
       "options": {
@@ -393,7 +418,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 9
+        "y": 16
       },
       "id": 6,
       "options": {
@@ -471,7 +496,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 17
+        "y": 24
       },
       "id": 15,
       "options": {
@@ -585,7 +610,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 17
+        "y": 24
       },
       "id": 3,
       "options": {
@@ -625,7 +650,409 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 25
+        "y": 32
+      },
+      "id": 16,
+      "panels": [],
+      "title": "Import Updates (scan)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max by(namespace)(splice_history_import_updates_backfilling_contract_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Backfilled import contracts count",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "id": 20,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "max by (namespace)(rate(splice_history_import_updates_backfilling_contract_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Rate backfilled contracts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 70,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "bool_yes_no"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 41
+      },
+      "id": 19,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "max by(namespace)(splice_history_import_updates_backfilling_completed{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Import update backfilling completed",
+      "type": "state-timeline"
+    },
+    {
+      "datasource": {
+        "default": true,
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Value"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": ""
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 41
+      },
+      "id": 18,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "min by(namespace)((splice_history_import_updates_backfilling_latest_migration_id{namespace=~\"$namespace\", migration=~\"$migration\"}>-1))",
+          "format": "time_series",
+          "instant": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "Value"
+        }
+      ],
+      "title": "Last migration id backfilled",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 49
       },
       "id": 8,
       "panels": [],
@@ -697,7 +1124,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 26
+        "y": 50
       },
       "id": 9,
       "options": {
@@ -720,9 +1147,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(namespace)(splice_history_txlog_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "expr": "max by(namespace)(splice_history_txlog_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\", service=~\"$service\"})",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}} {{service}}",
           "range": true,
           "refId": "A"
         }
@@ -795,7 +1222,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 26
+        "y": 50
       },
       "id": 10,
       "options": {
@@ -818,9 +1245,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (namespace)(rate(splice_history_txlog_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
+          "expr": "max by (namespace)(rate(splice_history_txlog_backfilling_transaction_count{namespace=~\"$namespace\", migration=~\"$migration\", service=~\"$service\"}[5m]))",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}} {{service}}",
           "range": true,
           "refId": "A"
         }
@@ -893,7 +1320,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 58
       },
       "id": 11,
       "options": {
@@ -916,9 +1343,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(namespace)(splice_history_txlog_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "expr": "max by(namespace)(splice_history_txlog_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\", service=~\"$service\"})",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}} {{service}}",
           "range": true,
           "refId": "A"
         }
@@ -991,7 +1418,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 58
       },
       "id": 12,
       "options": {
@@ -1014,9 +1441,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max by(namespace)(rate(splice_history_txlog_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\"}[5m]))",
+          "expr": "max by(namespace)(rate(splice_history_txlog_backfilling_event_count{namespace=~\"$namespace\", migration=~\"$migration\", service=~\"$service\"}[5m]))",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}}{{service}}",
           "range": true,
           "refId": "A"
         }
@@ -1066,10 +1493,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 11,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 66
       },
       "id": 13,
       "options": {
@@ -1092,17 +1519,17 @@
         {
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "max by(namespace)(splice_history_txlog_backfilling_completed{namespace=~\"$namespace\", migration=~\"$migration\"})",
+          "expr": "max by(namespace, service) (splice_history_txlog_backfilling_completed{namespace=~\"$namespace\", migration=~\"$migration\", service=~\"$service\"})",
           "format": "time_series",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}} {{service}}",
           "range": true,
           "refId": "A",
           "useBackend": false
         }
       ],
-      "title": "Backfilling completed",
+      "title": "TxLog backfilling completed",
       "type": "state-timeline"
     },
     {
@@ -1180,10 +1607,10 @@
         ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 11,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 66
       },
       "id": 14,
       "options": {
@@ -1206,10 +1633,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "min by(namespace)((splice_history_txlog_backfilling_latest_record_time{namespace=~\"$namespace\", migration=~\"$migration\"}>-62135596800000)/1000)",
+          "expr": "min by(namespace)((splice_history_txlog_backfilling_latest_record_time{namespace=~\"$namespace\", migration=~\"$migration\", service=~\"$service\"}>-62135596800000)/1000)",
           "format": "time_series",
           "instant": false,
-          "legendFormat": "__auto",
+          "legendFormat": "{{namespace}} {{service}}",
           "range": true,
           "refId": "Value"
         }
@@ -1271,6 +1698,24 @@
         "refresh": 1,
         "regex": "",
         "type": "query"
+      },
+      {
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "definition": "label_values(splice_history_txlog_backfilling_completed,service)",
+        "includeAll": true,
+        "name": "service",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(splice_history_txlog_backfilling_completed,service)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
       }
     ]
   },
@@ -1282,6 +1727,6 @@
   "timezone": "UTC",
   "title": "History backfiling",
   "uid": "fe12ejqgwdlvke",
-  "version": 12,
+  "version": 4,
   "weekStart": ""
 }
