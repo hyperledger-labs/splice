@@ -6,16 +6,20 @@ import {
   ActionRequiredSection,
   ActionRequiredData,
 } from '../../components/governance/ActionRequiredSection';
+import { ContractId } from '@daml/types';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
 const requests: ActionRequiredData[] = [
   {
     actionName: 'Feature Application',
+    contractId: '2abcde123456' as ContractId<VoteRequest>,
     votingCloses: '2024-09-25 11:00',
     createdAt: '2024-09-25 11:00',
     requester: 'sv1',
   },
   {
     actionName: 'Set DSO Rules Configuration',
+    contractId: '2bcde123456' as ContractId<VoteRequest>,
     votingCloses: '2024-09-25 11:00',
     createdAt: '2024-09-25 11:00',
     requester: 'sv2',
@@ -46,6 +50,7 @@ describe('Action Required', () => {
   test('should render action required request details', () => {
     const actionRequired = {
       actionName: 'Feature Application',
+      contractId: '2abcde123456' as ContractId<VoteRequest>,
       votingCloses: '2029-09-25 11:00',
       createdAt: '2029-09-25 11:00',
       requester: 'sv1',
@@ -76,6 +81,7 @@ describe('Action Required', () => {
   test('should render isYou badge for requests created by viewing sv', () => {
     const actionRequired = {
       actionName: 'Feature Application',
+      contractId: '2abcde123456' as ContractId<VoteRequest>,
       votingCloses: '2029-09-25 11:00',
       createdAt: '2029-09-25 11:00',
       requester: 'sv1',
@@ -91,6 +97,7 @@ describe('Action Required', () => {
   test('should not render isYou badge for requests created by other svs', () => {
     const actionRequired = {
       actionName: 'Feature Application',
+      contractId: '2abcde123456' as ContractId<VoteRequest>,
       votingCloses: '2029-09-25 11:00',
       createdAt: '2029-09-25 11:00',
       requester: 'sv1',
