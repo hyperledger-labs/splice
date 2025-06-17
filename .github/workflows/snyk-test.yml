@@ -1,0 +1,24 @@
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  node_snyk_test:
+    runs-on: self-hosted-docker-small
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@4a528b5c534bb771b6e3772656a8e0e9dc902f8b
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  python_snyk_test:
+    runs-on: self-hosted-docker-small
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/python@4a528b5c534bb771b6e3772656a8e0e9dc902f8b
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
