@@ -58,7 +58,7 @@ while [ "$#" -gt 0 ]; do
   param_value="${1#*=}"
 
   # Check for duplicate parameters
-  if [ -n "${PROVIDED_ARGS[$param_name]}" ]; then
+  if [[ -n "${PROVIDED_ARGS[$param_name]:-}" ]]; then
     echo "Error: --$param_name specified more than once" >&2
     exit 1
   fi
