@@ -3,8 +3,8 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ArrowForward, ContentCopy } from '@mui/icons-material';
-import { Badge, Box, Button, Card, Chip, Grid, IconButton, Link, Typography } from '@mui/material';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { Badge, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 
 export interface ActionRequiredData {
   contractId: ContractId<VoteRequest>;
@@ -67,7 +67,6 @@ interface ActionCardProps {
 
 const ActionCard = (props: ActionCardProps) => {
   const { action, createdAt, contractId, votingEnds, requester, isYou } = props;
-  const navigate = useNavigate();
 
   return (
     <Card

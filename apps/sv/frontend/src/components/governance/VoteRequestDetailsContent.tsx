@@ -17,13 +17,10 @@ import {
   Typography,
 } from '@mui/material';
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-// import { PartyId } from '../../../../../common/frontend/lib/components';
-import { theme } from '../../../../../common/frontend/lib/theme';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { VoteListingStatus } from './VotesListingSection';
-import { PartyId } from '@lfdecentralizedtrust/splice-common-frontend';
+import { PartyId, theme } from '@lfdecentralizedtrust/splice-common-frontend';
 import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Link as RouterLink } from 'react-router-dom';
 
@@ -132,7 +129,6 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
   const [reason, setReason] = useState('');
-  const navigate = useNavigate();
 
   const handleVoteTabChange = (_event: React.SyntheticEvent, newValue: VoteTab) => {
     setVoteTabValue(newValue);
