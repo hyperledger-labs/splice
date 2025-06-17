@@ -14,6 +14,9 @@ auth:
   audience: "OIDC_AUTHORITY_SV_AUDIENCE"
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # optionally, reconfigure the timeouts:
+  # connectionTimeout: "10 seconds"
+  # readTimeout: "10 seconds"
 cometBFT:
   enabled: true
   connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"

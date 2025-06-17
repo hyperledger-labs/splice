@@ -108,6 +108,14 @@ spec:
               value: {{ .Values.auth.audience | quote }}
             - name: SPLICE_APP_SV_AUTH_JWKS_URL
               value: {{ .Values.auth.jwksUrl | quote }}
+            {{ if .Values.auth.connectionTimeout }}
+            - name: SPLICE_APP_VALIDATOR_AUTH_CONNECTION_TIMEOUT
+              value: {{ .Values.auth.connectionTimeout | quote }}
+            {{ end }}
+            {{ if .Values.auth.readTimeout }}
+            - name: SPLICE_APP_VALIDATOR_AUTH_READ_TIMEOUT
+              value: {{ .Values.auth.readTimeout | quote }}
+            {{ end }}
             {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
             - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
               value: |
