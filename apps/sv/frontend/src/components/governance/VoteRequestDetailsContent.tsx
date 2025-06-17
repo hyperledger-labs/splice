@@ -23,8 +23,8 @@ import { theme } from '../../../../../common/frontend/lib/theme';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { VoteListingStatus } from './VotesListingSection';
-import { sanitizeUrl } from '@braintree/sanitize-url';
 import { PartyId } from '@lfdecentralizedtrust/splice-common-frontend';
+import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 dayjs.extend(relativeTime);
 
@@ -49,7 +49,7 @@ export interface ConfigChange {
 
 export interface UpdateSvRewardWeightProposal {
   svToUpdate: string;
-  weightChange: ConfigChange;
+  weightChange: string;
 }
 
 export interface AmuletRulesConfigProposal {
@@ -141,58 +141,6 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
     navigate('/governance-beta/vote-requests');
   };
 
-  // const mockAllVotes: ProposalVote[] = [
-  //   {
-  //     sv: 'SV1-Foundatiosfabf123456789',
-  //     reason: {
-  //       url: 'https://localhost/',
-  //       body: 'I accept, as I requested the vote.',
-  //     },
-  //     vote: 'accepted',
-  //   },
-  //   {
-  //     sv: 'SV2-Foundatiosfabf123456789',
-  //     reason: {
-  //       url: 'https://localhost/',
-  //       body: 'I accept',
-  //     },
-  //     vote: 'accepted',
-  //   },
-  //   {
-  //     sv: 'SV3-Foundatiosfabf123456789',
-  //     reason: {
-  //       url: 'https://localhost/',
-  //       body: 'I reject',
-  //     },
-  //     vote: 'rejected',
-  //   },
-  //   {
-  //     sv: 'SV4-Foundatiosfabf123456789',
-  //     reason: undefined,
-  //     vote: 'no-vote',
-  //     isYou: true,
-  //   },
-  // ];
-
-  // const mockConfigChanges: ConfigChange[] = [
-  //   {
-  //     fieldName: 'Max Text Length',
-  //     currentValue: 1024,
-  //     newValue: 2000,
-  //   },
-  //   {
-  //     fieldName: 'Leader Inactivity Timeout',
-  //     currentValue: 70000000,
-  //     newValue: 80000000,
-  //   },
-  // ];
-
-  // const mockWeightChange: ConfigChange = {
-  //   fieldName: 'Weight',
-  //   currentValue: 101,
-  //   newValue: 202,
-  // };
-
   //TODO: Use reduce to do this on one pass or keep this for readability?
   const acceptedVotes = votes.filter(vote => vote.vote === 'accepted');
   const rejectedVotes = votes.filter(vote => vote.vote === 'rejected');
@@ -265,28 +213,6 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
             {proposalDetails.action === 'SRARC_SetConfig' && (
               <ConfigValuesChanges changes={proposalDetails.proposal.configChanges} />
             )}
-
-            {/* <Divider sx={{ my: 1 }} /> */}
-            {/* <FeatureAppSection */}
-            {/*   appToFeature={'qwuretypioretyweioruytoirutyeoirtuywreoituyreotiwuryeoti'} */}
-            {/* /> */}
-
-            {/* <Divider sx={{ my: 1 }} /> */}
-            {/* <UnfeatureAppSection */}
-            {/*   appToUnfeature={'qwuretypioretyweioruytoirutyeoirtuywreoituyreotiwuryeoti'} */}
-            {/* /> */}
-
-            {/* <Divider sx={{ my: 1 }} /> */}
-            {/* <MemberSection memberPartyId="Canton-Foundatiosfabf..." /> */}
-
-            {/* <Divider sx={{ my: 1 }} /> */}
-            {/* <ConfigValuesChanges changes={mockConfigChanges} /> */}
-
-            {/* <Divider sx={{ my: 1 }} /> */}
-            {/* <UpdateSvRewardWeightSection */}
-            {/*   svToUpdate={'qwuretypioretyweioruytoirutyeoirtuywreoituyreotiwuryeoti'} */}
-            {/*   weightChange={mockWeightChange} */}
-            {/* /> */}
 
             <Divider sx={{ my: 1 }} />
 
@@ -383,6 +309,7 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
               <VoteItem
                 key={`${vote.vote}-${index}`}
                 voter={vote.sv}
+                url={vote.reason?.url || ''}
                 comment={vote.reason?.body || ''}
                 status={vote.vote}
                 isYou={vote.isYou}
@@ -457,20 +384,20 @@ const DetailItem = ({ label, value }: DetailItemProps) => {
 
 interface VoteItemProps {
   voter: string;
+  url: string;
   comment: string;
   status: VoteStatus;
   isClosed?: boolean;
   isYou?: boolean;
 }
 
-const VoteItem = ({ voter, comment, status, isClosed, isYou = false }: VoteItemProps) => {
+const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: VoteItemProps) => {
   const getStatusColor = () => {
     switch (status) {
       case 'accepted':
         return theme.palette.success.main;
       case 'rejected':
         return theme.palette.error.main;
-      //TODO: Use theme for this later
       case 'no-vote':
         return isClosed ? theme.palette.error.main : '#ff9800';
       default:
@@ -523,6 +450,13 @@ const VoteItem = ({ voter, comment, status, isClosed, isYou = false }: VoteItemP
         {comment && (
           <Typography variant="body2" color="text.secondary">
             {comment}
+          </Typography>
+        )}
+        {url && (
+          <Typography variant="body2" color="text.secondary">
+            <Link href={sanitizeUrl(url)} target="_blank" color="primary">
+              {sanitizeUrl(url)}
+            </Link>
           </Typography>
         )}
       </Box>
@@ -601,7 +535,7 @@ const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
 
 interface UpdateSvRewardWeightSectionProps {
   svToUpdate: string;
-  weightChange: ConfigChange;
+  weightChange: string;
 }
 
 const UpdateSvRewardWeightSection = ({
@@ -618,7 +552,7 @@ const UpdateSvRewardWeightSection = ({
           <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
         </Typography>
 
-        <ConfigValuesChanges changes={[weightChange]} />
+        <DetailItem label="Weight" value={weightChange} />
       </Box>
     </Box>
   );
