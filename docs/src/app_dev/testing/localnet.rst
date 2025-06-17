@@ -8,92 +8,205 @@
 Docker-Compose Based Deployment of a Local Network
 ==================================================
 
-This section describes how to deploy a local network using docker-compose.
-This is useful for app developers who want a complete standalone environment to develop against. We will be deploying 2 main nodes namely:
+Localnet provides a straightforward topology comprising three participants, three validators, a PostgreSQL database, and several web applications (wallet, sv, scan) behind an NGINX gateway. Each validator plays a distinct role within the Splice ecosystem:
 
-1. A super validator node
-2. A validator node
+- **app-provider**: for the user operating their application
+- **app-user**: for a user wanting to use the app from the App Provider
+- **sv**: for providing the Global Synchronizer and handling AMT
 
-Each node will be deployed with all its dependencies.
-The details of what each node deploys can be seen in the `docker-compose.yaml` files in the `docker-compose` directory of the release bundle described below.
+Designed primarily for development and testing, Localnet is not intended for production use.
+
+Setup
+-----
+
+Before starting, ensure you have configured the following environment variables:
+
+- **IMAGE_TAG**: Specifies the version of Splice to be used in Localnet.
+- **LOCALNET_DIR**: Specifies the path to the Localnet directory.
+
+You can enable or disable any of the three validators using Docker Compose profiles (e.g., ``--profile app-provider``) alongside the corresponding environment variables (e.g., ``APP_PROVIDER_PROFILE=on/off``). By default, all three validators are active.
+
+Additional environment variables include:
+
+- **LOCALNET_ENV_DIR**: Overrides the default environment file directory. The default is ``$LOCALNET_DIR/env``.
+- **LOCALNET_DIR/compose.env**: Contains Docker Compose configuration variables.
+- **LOCALNET_ENV_DIR/common.env**: Shared environment variables across Docker Compose and container configurations. It sets default ports, DB credentials, and Splice UI configurations.
+
+Depending on the desired environment **ENV** (local or dev), either ``LOCALNET_ENV_DIR/dev.env`` or ``LOCALNET_ENV_DIR/local.env`` will be applied to both Docker Compose and Splice containers, with ``local`` set as the default.
+
+Resource constraints for containers can be configured via:
+- **LOCALNET_DIR/resource-constraints.yaml**
+
+Exposed Ports
+-------------
+
+The following section details the ports used by various services. The default database port is **DB_PORT=5432**.
+
+Other ports are generated using specific patterns based on the validator:
+
+- For the Super Validator (sv), the port is specified as ``4${PORT_SUFFIX}``.
+- For the App Provider, the port is specified as ``3${PORT_SUFFIX}``.
+- For the App User, the port is specified as ``2${PORT_SUFFIX}``.
+
+These patterns apply to the following ports suffixes:
+
+- **PARTICIPANT_LEDGER_API_PORT_SUFFIX**: 901
+- **PARTICIPANT_ADMIN_API_PORT_SUFFIX**: 902
+- **PARTICIPANT_JSON_API_PORT_SUFFIX**: 975
+- **VALIDATOR_ADMIN_API_PORT_SUFFIX**: 903
+- **CANTON_HTTP_HEALTHCHECK_PORT_SUFFIX**: 900
+- **CANTON_GRPC_HEALTHCHECK_PORT_SUFFIX**: 961
 
 
-Requirements
-------------
+UI Ports are defined as follows:
 
-1) A working docker and docker-compose installation
-2) The release artifacts that can be downloaded from here: |bundle_download_link|. Extract the bundle once complete.
+- **APP_USER_UI_PORT**: 2000
+- **APP_PROVIDER_UI_PORT**: 3000
+- **SV_UI_PORT**: 4000
 
+Database
+--------
 
-Deploying the nodes
--------------------
+Localnet uses a single PostgreSQL database for all components. Database configurations are sourced from ``LOCALNET_ENV_DIR/postgres.env``.
 
-You can spin up a docker-compose based Super-Validator as follows:
+Application UIs
+---------------
+
+- **App User Wallet UI**
+
+    - **URL**: `http://wallet.localhost:2000 <http://wallet.localhost:2000>`_
+    - **Description**: Interface for managing user wallets.
+
+- **App Provider Wallet UI**
+
+    - **URL**: `http://wallet.localhost:3000 <http://wallet.localhost:3000>`_
+    - **Description**: Interface for managing user wallets.
+
+- **Super Validator Web UI**
+
+    - **URL**: `http://sv.localhost:4000 <http://sv.localhost:4000>`_
+    - **Description**: Interface for super validator functionalities.
+
+- **Scan Web UI**
+
+    - **URL**: `http://scan.localhost:4000 <http://scan.localhost:4000>`_
+    - **Description**: Interface to monitor transactions.
+
+    .. note::
+         `LocalNet` rounds may take up to 6 rounds (equivalent to one hour) to display in the scan UI.
+
+The ``*.localhost`` domains will resolve to your local host IP ``127.0.0.1``.
+
+Default Wallet Users
+--------------------
+
+- **App User**: app-user
+- **App Provider**: app-provider
+- **SV**: sv
+
+Swagger UI
+----------
+
+When the ``swagger-ui`` profile is enabled, the Swagger UI for the ``JSON Ledger API HTTP Endpoints`` across all running participants is available at `http://localhost:9090 <http://localhost:9090>`_.
+Note: Some endpoints require a JWT token when using the **Try it out** feature. One method to obtain this token is via the Canton Console. Start the Canton Console `make canton-console` and execute the following command:
+
+.. code-block:: none
+
+     `app-provider`.adminToken
+
+For proper functionality, Swagger UI relies on a localhost nginx proxy for ``canton.localhost`` configured for each participant. For example, the ``JSON Ledger API HTTP Endpoints`` for the app-provider can be accessed at the nginx proxy URL ``http://canton.localhost:${APP_PROVIDER_UI_PORT}`` via Swagger UI, which corresponds to accessing ``localhost:3${PARTICIPANT_JSON_API_PORT}`` directly. The nginx proxy only adds additional headers to resolve CORS issues within Swagger UI.
+
+Run in localnet
+----------------
+
+start
+^^^^^
 
 .. code-block:: bash
 
-   cd splice-node/docker-compose/sv
-   ./start.sh -w
+   docker compose --env-file $LOCALNET_DIR/compose.env \
+                  --env-file $LOCALNET_DIR/env/common.env \
+                  --env-file $LOCALNET_DIR/env/local.env \
+                  -f $LOCALNET_DIR/compose.yaml \
+                  -f $LOCALNET_DIR/resource-constraints.yaml \
+                  --profile sv \
+                  --profile app-provider \
+                  --profile app-user up -d
 
-It will take a few minutes for the SV to be ready, after which you can use it to onboard a new
-validator. You can verify that the SV is up and running by opening a browser at http://sv.localhost:8080.
-
-.. note::
-
-    If you have already deployed a validator against an existing network, you will need to first
-    tear it down and wipe all its data, as a validator cannot be moved between networks.
-    To do that, stop the validator with `./stop.sh` from the `compose/validator` directory,
-    and wipe out all its data with `docker volume rm compose_postgres-splice`.
-
-
-Before you can onboard a new validator, you need to generate an onboarding secret for it and create a party_hint.
-You can generate the secret by running the following command:
+stop
+^^^^
 
 .. code-block:: bash
 
-   curl -X POST http://sv.localhost:8080/api/sv/v0/devnet/onboard/validator/prepare
+   docker compose --env-file $LOCALNET_DIR/compose.env \
+                  --env-file $LOCALNET_DIR/env/common.env \
+                  --env-file $LOCALNET_DIR/env/local.env \
+                  -f $LOCALNET_DIR/compose.yaml \
+                  -f $LOCALNET_DIR/resource-constraints.yaml \
+                  --profile sv \
+                  --profile app-provider \
+                  --profile app-user down -v
 
-You should get a 200 OK text response that contains the onboarding secret in the body.
-
-The `party_hint` should be chosen by you and should match the format ``<organization>-<function>-<enumerator>``, where organization & function are alphanumerical, and enumerator is an integer.
-
-Once you have the onboarding secret and the party hint, you can start and onboard a new validator with the following command:
+start with swagger-ui
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
-   cd ../validator
-   ./start.sh -o "<onboarding_secret>" -p <party_hint> -l -w
+   docker compose --env-file $LOCALNET_DIR/compose.env \
+                  --env-file $LOCALNET_DIR/env/common.env \
+                  --env-file $LOCALNET_DIR/env/local.env \
+                  -f $LOCALNET_DIR/compose.yaml \
+                  -f $LOCALNET_DIR/resource-constraints.yaml \
+                  --profile sv \
+                  --profile app-provider \
+                  --profile app-user \
+                  --profile swagger-ui up -d
 
-Note that ``-l`` automatically configures the validator with the correct configuration required in order for it to use the docker-compose SV created above.
-You can verify the validator is up and running by opening a browser at http://wallet.localhost:8080.
+stop with swagger-ui
+^^^^^^^^^^^^^^^^^^^^^
 
-To tear everything down, run ``./stop.sh`` from both the ``compose/validator`` and ``compose/sv`` directories.
-As above, this will retain the data for reuse. In order to completely wipe out
-the network's and validator's data, also run ``docker volume rm splice-validator_postgres-splice splice-sv_postgres-splice-sv``.
+.. code-block:: bash
+
+   docker compose --env-file $LOCALNET_DIR/compose.env \
+                  --env-file $LOCALNET_DIR/env/common.env \
+                  --env-file $LOCALNET_DIR/env/local.env \
+                  -f $LOCALNET_DIR/compose.yaml \
+                  -f $LOCALNET_DIR/resource-constraints.yaml \
+                  --profile sv \
+                  --profile app-provider \
+                  --profile app-user \
+                  --profile swagger-ui down -v
+
+console
+^^^^^^^
+
+.. code-block:: bash
+
+   docker compose --env-file $LOCALNET_DIR/compose.env \
+                  --env-file $LOCALNET_DIR/env/common.env \
+                  --env-file $LOCALNET_DIR/env/local.env \
+                  -f $LOCALNET_DIR/compose.yaml \
+                  -f $LOCALNET_DIR/resource-constraints.yaml \
+                  run --rm console
+
+Run in devnet
+-------------
+
+.. code-block:: bash
+
+   export ENV=dev
+   export SV_PROFILE=off
+   export IMAGE_TAG=??? # Set the image tag to the desired value
+   export MIGRATION_ID=??? # Set the migration ID to the desired value
+   docker compose --env-file ${LOCALNET_DIR}/compose.env \
+                  --env-file ${LOCALNET_DIR}/env/common.env \
+                  --env-file ${LOCALNET_DIR}/env/dev.env \
+                  -f ${LOCALNET_DIR}/compose.yaml \
+                  -f ${LOCALNET_DIR}/resource-constraints.yaml \
+                  --profile app-provider \
+                  --profile app-user up -d
+
+Please ensure that the MIGRATION_ID and IMAGE_TAG environment variables are correctly configured for the development network.
+For more information and the correct values, please visit: https://sync.global/sv-network/
 
 
-UIs
----
-
-The following table lists the UIs available for the deployed nodes.
-
-
-.. list-table::
-   :widths: 25 35 40
-   :header-rows: 1
-
-   * - Application
-     - URL
-     - Credentials
-   * - Super Validator UI
-     - http://sv.localhost:8080
-     - ``administrator``
-   * - Wallet
-     - http://wallet.localhost:8080
-     - ``administrator`` and ``alice``
-   * - Scan
-     - http://scan.localhost:8080
-     - N/A
-   * - ANS
-     - http://ans.localhost:8080
-     - ``administrator`` and ``alice``

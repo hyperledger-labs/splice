@@ -195,8 +195,6 @@ services:
   swagger-ui:
     image: swaggerapi/swagger-ui
     container_name: swagger-ui
-    volumes:
-      - ${LOCALNET_DIR}/docker/swagger-ui/entrypoint.sh:/entrypoint.sh
     environment:
       URLS: '[{"url": "http://canton.localhost:${APP_PROVIDER_UI_PORT}/docs/openapi", "name": "app-provider"},
               {"url": "http://canton.localhost:${APP_USER_UI_PORT}/docs/openapi", "name": "app-user"},
