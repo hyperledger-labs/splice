@@ -74,33 +74,31 @@ class DisabledWalletTimeBasedIntegrationTest
           )
         ) - smallAmount
 
-      suppressFailedClues(loggerFactory) {
-        eventually(30.seconds) {
+      eventually(30.seconds) {
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(SvRewardCoupon.COMPANION)(
+            dsoParty,
+            coupon => {
+              coupon.data.sv == sv1Backend.getDsoInfo().svParty.toProtoPrimitive &&
+              coupon.data.round.number == currentRound
+            },
+          ) should not be empty
+
+        advanceRoundsByOneTick
+        currentRound += 1
+
+        silentClue(
+          s"Check that there is at least one unclaimed reward larger than $expectedMinAmount"
+        ) {
           sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(SvRewardCoupon.COMPANION)(
+            .filterJava(UnclaimedReward.COMPANION)(
               dsoParty,
-              coupon => {
-                coupon.data.sv == sv1Backend.getDsoInfo().svParty.toProtoPrimitive &&
-                coupon.data.round.number == currentRound
-              },
+              reward => BigDecimal(reward.data.amount) >= expectedMinAmount,
             ) should not be empty
-
-          advanceRoundsByOneTick
-          currentRound += 1
-
-          clue(
-            s"Check that there is at least one unclaimed reward larger than $expectedMinAmount"
-          ) {
-            sv1Backend.participantClient.ledger_api_extensions.acs
-              .filterJava(UnclaimedReward.COMPANION)(
-                dsoParty,
-                reward => BigDecimal(reward.data.amount) >= expectedMinAmount,
-              ) should not be empty
-          }
-
-          sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(Amulet.COMPANION)(dsoParty, _ => true) shouldBe empty
         }
+
+        sv1Backend.participantClient.ledger_api_extensions.acs
+          .filterJava(Amulet.COMPANION)(dsoParty, _ => true) shouldBe empty
       }
     }
 
