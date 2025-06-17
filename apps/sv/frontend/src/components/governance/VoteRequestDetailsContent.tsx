@@ -25,6 +25,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { VoteListingStatus } from './VotesListingSection';
 import { PartyId } from '@lfdecentralizedtrust/splice-common-frontend';
 import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { Link as RouterLink } from 'react-router-dom';
 
 dayjs.extend(relativeTime);
 
@@ -137,10 +138,6 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
     setVoteTabValue(newValue);
   };
 
-  const handleBackToVotes = () => {
-    navigate('/governance-beta/vote-requests');
-  };
-
   //TODO: Use reduce to do this on one pass or keep this for readability?
   const acceptedVotes = votes.filter(vote => vote.vote === 'accepted');
   const rejectedVotes = votes.filter(vote => vote.vote === 'rejected');
@@ -169,8 +166,10 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
             Proposal Details
           </Typography>
           <Button
-            startIcon={<ArrowBack />}
-            onClick={handleBackToVotes}
+            component={RouterLink}
+            to="/governance-beta/vote-requests"
+            size="small"
+            startIcon={<ArrowBack fontSize="small" />}
             sx={{ color: 'text.secondary' }}
           >
             Back to all votes
