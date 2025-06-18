@@ -101,19 +101,22 @@ export const VoteRequestDetails: React.FC = () => {
 
   const dsoInfosQuery = useDsoInfos();
 
-  const ggg = useVoteRequestResultByCid(contractId as ContractId<VoteRequest>);
+  const { hasVoteRequest, hasVoteResult, voteRequest, voteResult, isPending } =
+    useVoteRequestResultByCid(contractId as ContractId<VoteRequest>);
 
-  if (dsoInfosQuery.isPending) {
+  if (dsoInfosQuery.isPending && isPending) {
     return <Loading />;
   }
 
-  // if (!ggg.isComplete) {
+  // if (!isComplete) {
   //   return <Typography variant="body1">Error, something went wrong.</Typography>;
   // }
 
-  const voteRequest = ggg.voteRequest;
-  const voteResult = ggg.voteResult;
-  const request = ggg.hasVoteRequest ? voteRequest?.payload : voteResult?.request;
+  const request = hasVoteRequest
+    ? voteRequest?.payload
+    : hasVoteResult
+      ? voteResult?.request
+      : undefined;
 
   if (!request) {
     return (
@@ -123,25 +126,16 @@ export const VoteRequestDetails: React.FC = () => {
     );
   }
 
-  console.log('yaya request', request);
-
   const svPartyId = dsoInfosQuery.data?.svPartyId || '';
   const allSvs = dsoInfosQuery.data?.dsoRules.payload.svs.entriesArray().map(e => e[0]) || [];
-  console.log(
-    'yaya dsoInfosQuery.data.dsoRules.payload.svs',
-    dsoInfosQuery.data?.dsoRules.payload.svs
-  );
-  console.log('yaya allSvs', allSvs);
-
   const amuletOrDsoAction = getActionValue(request.action);
-  console.log('yaya aa', amuletOrDsoAction);
 
   // check that amuletOrDsoAction is a supported action
   if (
     !amuletOrDsoAction ||
     Object.keys(actionTagToTitle(amuletName)).indexOf(amuletOrDsoAction.tag) === -1
   ) {
-    return <Typography variant="body1">Error, something went wrong. Unsupported action</Typography>;
+    return <Typography variant="body1">Error, something went wrong. Unsupported Action</Typography>;
   }
 
   const action = amuletOrDsoAction.tag as SupportedActionTag;
@@ -156,7 +150,7 @@ export const VoteRequestDetails: React.FC = () => {
     createdAt: createdAt,
     url: request.reason.url,
     summary: request.reason.body,
-    isVoteRequest: ggg.hasVoteRequest,
+    isVoteRequest: hasVoteRequest,
     proposal: buildProposal(request.action),
   } as ProposalDetails;
 
@@ -165,7 +159,7 @@ export const VoteRequestDetails: React.FC = () => {
     requesterIsYou: request.requester === svPartyId,
     votingCloses: dayjs(request.voteBefore).format(dateTimeFormatISO),
     voteTakesEffect: dayjs(request.targetEffectiveAt).format(dateTimeFormatISO),
-    status: ggg.hasVoteRequest ? 'In Progress' : getVoteResultStatus(voteResult?.outcome),
+    status: hasVoteRequest ? 'In Progress' : getVoteResultStatus(voteResult?.outcome),
   };
 
   const allVotes = request.votes.entriesArray().map(e => e[1]);
