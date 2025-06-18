@@ -95,7 +95,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   protected def validatorClient: ValidatorAppClientReference = {
     val env = provideEnvironment("NotUsed")
     // retry on e.g. network errors and rate limits
-    val token = eventuallySucceeds() {
+    val token = eventually() {
       Auth0Util.getAuth0ClientCredential(
         validatorAuth0Secret,
         validatorAuth0Audience,
