@@ -511,10 +511,11 @@ object SpliceTests extends LazyLogging {
     def eventuallySucceeds[T](
         timeUntilSuccess: FiniteDuration = 20.seconds,
         maxPollInterval: FiniteDuration = 5.seconds,
+        suppressErrors: Boolean = true,
     )(testCode: => T): T = {
       eventually(timeUntilSuccess, maxPollInterval) {
         try {
-          loggerFactory.suppressErrors(testCode)
+          if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
         } catch {
           case e: TestFailedException => throw e
           case NonFatal(e) => fail(e)
