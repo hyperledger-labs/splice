@@ -32,4 +32,4 @@ export SPLICE_APP_UI_NAME_SERVICE_NAME_ACRONYM=""
 
 docker compose -f "$script_dir/compose.yaml" down
 
-_info "Validator stopped. Note that its data is persisted in the compose_postgres-splice volume, and will be reused if started again."
+_info "Validator stopped. Note that its data is persisted in the splice-validator_postgres-splice volume, and will be reused if started again."

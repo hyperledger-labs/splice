@@ -176,7 +176,7 @@ ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
 If you have already deployed a validator on your machine, you will first need to irrecoverably destroy
 it and wipe its data, as that cannot be migrated to an authenticated validator on the same machine.
 To do that, first stop the validator with `./stop.sh` and wipe out all its data with
-`docker volume rm compose_postgres-splice`. You can now deploy a new validator with the
+`docker volume rm splice-validator_postgres-splice`. You can now deploy a new validator with the
 new configuration. In order to enable auth in the deployment, add the `-a` flag to the `start.sh`
 command, as follows:
 
