@@ -1,14 +1,30 @@
 import { ContractId } from '@daml/types';
 import { useVoteRequest } from './useVoteRequest';
-import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import {
+  DsoRules_CloseVoteRequestResult,
+  VoteRequest,
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
 const QUERY_LIMIT = 50;
 
-//TODO: Add an issue to move this to the backend!
-export const useVoteRequestResultByCid = (contractId: ContractId<VoteRequest>) => {
+interface UseVoteRequestResultByCidResult {
+  voteRequest: Contract<VoteRequest> | undefined;
+  voteResult: DsoRules_CloseVoteRequestResult | undefined;
+  hasVoteRequest: boolean;
+  hasVoteResult: boolean;
+  isPending: boolean;
+  isComplete: boolean;
+}
+
+//TODO: Write an issue to move this to the backend!
+export function useVoteRequestResultByCid(
+  contractId: ContractId<VoteRequest>
+): UseVoteRequestResultByCidResult {
   const votesHooks = useVotesHooks();
   const voteRequestQuery = useVoteRequest(contractId, false);
+
   const voteResultsWithAcceptedQuery = (accepted: boolean) =>
     votesHooks.useListVoteRequestResult(
       QUERY_LIMIT,
@@ -22,20 +38,21 @@ export const useVoteRequestResultByCid = (contractId: ContractId<VoteRequest>) =
   const acceptedResultsQuery = voteResultsWithAcceptedQuery(true);
   const notAcceptedResultsQuery = voteResultsWithAcceptedQuery(false);
 
+  const acceptedResult = acceptedResultsQuery.data?.find(
+    vr => vr.request.trackingCid === contractId
+  );
+  const notAcceptedResult = notAcceptedResultsQuery.data?.find(
+    vr => vr.request.trackingCid === contractId
+  );
+
   const hasVoteRequest =
     voteRequestQuery.isSuccess &&
     voteRequestQuery.data != null &&
     voteRequestQuery.data != undefined;
 
   const hasVoteResult =
-    (acceptedResultsQuery.isSuccess &&
-      acceptedResultsQuery.data.length > 0 &&
-      acceptedResultsQuery.data != null &&
-      acceptedResultsQuery.data != undefined) ||
-    (notAcceptedResultsQuery.isSuccess &&
-      notAcceptedResultsQuery.data.length > 0 &&
-      notAcceptedResultsQuery.data != null &&
-      notAcceptedResultsQuery.data != undefined);
+    (acceptedResultsQuery.isSuccess && acceptedResult != undefined) ||
+    (notAcceptedResultsQuery.isSuccess && notAcceptedResult != undefined);
 
   const isPending =
     voteRequestQuery.isPending ||
@@ -48,10 +65,7 @@ export const useVoteRequestResultByCid = (contractId: ContractId<VoteRequest>) =
     (notAcceptedResultsQuery.isSuccess || notAcceptedResultsQuery.isError);
 
   const voteRequest = voteRequestQuery.data;
-  const voteResult = [
-    ...(acceptedResultsQuery.data ?? []),
-    ...(notAcceptedResultsQuery.data ?? []),
-  ].find(vr => vr.request.trackingCid === contractId);
+  const voteResult = acceptedResult || notAcceptedResult;
 
   return {
     voteRequest: voteRequest,
@@ -61,4 +75,4 @@ export const useVoteRequestResultByCid = (contractId: ContractId<VoteRequest>) =
     isPending,
     isComplete,
   };
-};
+}

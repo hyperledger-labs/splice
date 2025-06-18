@@ -11,8 +11,6 @@ export function buildSynchronizerMap(
 ): ConfigChange[][] {
   const baseSynchronizers = baseConfig?.synchronizers.entriesArray();
   const currentSynchronizers = currentConfig?.synchronizers.entriesArray();
-  console.log('yaya baseSynchronizers', baseSynchronizers);
-  console.log('yaya currentSynchronizers', currentSynchronizers);
 
   const res = baseSynchronizers?.map(base => {
     return [
