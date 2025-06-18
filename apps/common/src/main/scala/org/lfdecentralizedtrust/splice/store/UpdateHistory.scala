@@ -250,6 +250,7 @@ class UpdateHistory(
             if (enableImportUpdateBackfill) {
               deleteInvalidAcsSnapshots(newHistoryId)
             } else {
+              logger.info(s"Not deleting invalid ACS snapshots for history $newHistoryId")
               Future.unit
             }
         } yield {
