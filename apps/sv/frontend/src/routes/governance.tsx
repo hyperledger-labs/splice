@@ -16,14 +16,14 @@ import {
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
-import { VotesListingSection } from '../components/governance/VotesListingSection';
+import { ProposalListingSection } from '../components/governance/ProposalListingSection';
 import {
   actionTagToTitle,
   computeVoteStats,
   computeYourVote,
   getVoteResultStatus,
 } from '../utils/governance';
-import { SupportedActionTag, VoteListingData } from '../utils/types';
+import { SupportedActionTag, ProposalListingData } from '../utils/types';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -126,7 +126,7 @@ export const Governance: React.FC = () => {
         status: 'In Progress',
         voteStats: computeVoteStats(votes),
         acceptanceThreshold: votingThreshold,
-      } as VoteListingData;
+      } as ProposalListingData;
     });
 
   const acceptedRequests = acceptedResultsQuery.data.filter(
@@ -156,7 +156,7 @@ export const Governance: React.FC = () => {
         status: getVoteResultStatus(vr.outcome),
         voteStats: computeVoteStats(votes),
         acceptanceThreshold: votingThreshold,
-      } as VoteListingData;
+      } as ProposalListingData;
     })
     .sort((a, b) => (dayjs(a.voteTakesEffect).isAfter(dayjs(b.voteTakesEffect)) ? -1 : 1));
 
@@ -174,14 +174,14 @@ export const Governance: React.FC = () => {
       </Box>
 
       <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
-      <VotesListingSection
+      <ProposalListingSection
         sectionTitle="Inflight Votes"
         data={inflightRequests}
         uniqueId="inflight-vote-requests"
         showVoteStats
         showAcceptanceThreshold
       />
-      <VotesListingSection
+      <ProposalListingSection
         sectionTitle="Vote History"
         data={voteHistory}
         uniqueId="vote-history"

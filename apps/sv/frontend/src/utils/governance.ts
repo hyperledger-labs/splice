@@ -15,7 +15,7 @@ import {
   SupportedActionTag,
   UnfeatureAppProposal,
   UpdateSvRewardWeightProposal,
-  VoteListingStatus,
+  ProposalListingStatus,
   YourVoteStatus,
 } from '../utils/types';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
@@ -31,7 +31,9 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
 });
 
-export const getVoteResultStatus = (outcome: VoteRequestOutcome | undefined): VoteListingStatus => {
+export const getVoteResultStatus = (
+  outcome: VoteRequestOutcome | undefined
+): ProposalListingStatus => {
   if (!outcome) return 'Unknown';
 
   switch (outcome.tag) {

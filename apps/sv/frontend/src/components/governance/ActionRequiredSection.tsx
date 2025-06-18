@@ -144,7 +144,7 @@ const ActionCard = (props: ActionCardProps) => {
 
         <Button
           component={RouterLink}
-          to={`/governance-beta/vote-requests/${contractId}`}
+          to={`/governance-beta/proposals/${contractId}`}
           endIcon={<ArrowForward fontSize="small" />}
           size="small"
           sx={{ alignSelf: { xs: 'flex-end', sm: 'center' } }}

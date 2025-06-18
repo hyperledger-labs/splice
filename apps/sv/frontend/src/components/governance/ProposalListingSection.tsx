@@ -19,18 +19,18 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { Link as RouterLink } from 'react-router-dom';
-import { VoteListingData, VoteListingStatus, YourVoteStatus } from '../../utils/types';
+import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
-interface VotesListingSectionProps {
+interface ProposalListingSectionProps {
   sectionTitle: string;
-  data: VoteListingData[];
+  data: ProposalListingData[];
   uniqueId: string;
   showVoteStats?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
 }
 
-export const VotesListingSection: React.FC<VotesListingSectionProps> = props => {
+export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const { sectionTitle, data, uniqueId, showVoteStats, showAcceptanceThreshold, showStatus } =
     props;
 
@@ -93,7 +93,7 @@ interface VoteRowProps {
   acceptanceThreshold: bigint;
   actionName: string;
   contractId: ContractId<VoteRequest>;
-  status: VoteListingStatus;
+  status: ProposalListingStatus;
   uniqueId: string;
   voteStats: Record<YourVoteStatus, number>;
   voteTakesEffect: string;
@@ -165,7 +165,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       <TableCell align="right" data-testid={`${uniqueId}-row-view-details`}>
         <Button
           component={RouterLink}
-          to={`/governance-beta/vote-requests/${contractId}`}
+          to={`/governance-beta/proposals/${contractId}`}
           size="small"
           endIcon={<ArrowForward fontSize="small" />}
         >
