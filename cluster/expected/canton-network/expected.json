@@ -645,7 +645,8 @@
             "key": "cn_apps",
             "operator": "Exists"
           }
-        ]
+        ],
+        "updateHistoryBackfillingValues": {}
       },
       "version": "0.3.20"
     },

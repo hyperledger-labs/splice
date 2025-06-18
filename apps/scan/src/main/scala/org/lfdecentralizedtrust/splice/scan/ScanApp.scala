@@ -172,6 +172,7 @@ class ScanApp(
         migrationInfo,
         participantId,
         config.cache.svNodeStateTtl,
+        config.importUpdateBackfillEnabled,
         nodeMetrics.dbScanStore,
       )
       acsSnapshotStore = AcsSnapshotStore(
