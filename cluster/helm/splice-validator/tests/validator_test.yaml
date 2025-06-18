@@ -112,3 +112,37 @@ tests:
           path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='ADDITIONAL_CONFIG_ENABLE_WALLET')].value
           value: |
             canton.validator-apps.validator_backend.enable-wallet = "false"
+
+  - it: "sets JWKS timeouts"
+    set:
+      # Things we need just to pass the schema
+      nodeIdentifier: "helm-mock-1-validator"
+      validatorPartyHint: "helm-mock-1"
+      validatorWalletUser: "mock-wallet-user-id"
+      scanAddress: "trusted.scan.mock.com"
+      spliceInstanceNames:
+        networkName: MockNet
+        networkFaviconUrl: https://mock.net/favicon.ico
+        amuletName: Mocklet
+        amuletNameAcronym: MCK
+        nameServiceName: Mock Name Service
+        nameServiceNameAcronym: MNS
+      topup:
+        enabled: false
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        audience: "mock_audience"
+        # actual test
+        jwks:
+          connectionTimeout: "33s"
+          readTimeout: "44s"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT')].value
+          value: "33s"
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='validator-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT')].value
+          value: "44s"

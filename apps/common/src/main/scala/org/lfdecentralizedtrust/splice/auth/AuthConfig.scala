@@ -3,6 +3,8 @@
 
 package org.lfdecentralizedtrust.splice.auth
 
+import com.digitalasset.canton.config.NonNegativeDuration
+
 import java.net.URL
 
 sealed trait AuthConfig {
@@ -18,6 +20,8 @@ object AuthConfig {
   case class Rs256(
       audience: String,
       jwksUrl: URL,
+      connectionTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(10),
+      readTimeout: NonNegativeDuration = NonNegativeDuration.ofSeconds(10),
   ) extends AuthConfig
 
   def hideConfidential(config: AuthConfig): AuthConfig = {
@@ -26,7 +30,8 @@ object AuthConfig {
       case Hs256Unsafe(audience, _) => Hs256Unsafe(audience, hidden)
       // being explicit here to avoid accidental leaks if we extend
       // `AuthConfig` at some point
-      case Rs256(audience, jwksUrl) => Rs256(audience, jwksUrl)
+      case Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
+        Rs256(audience, jwksUrl, connectionTimeout, readTimeout)
     }
   }
 }

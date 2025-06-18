@@ -496,7 +496,12 @@ class SvApp(
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
-        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+        case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
+          new RSAVerifier(
+            audience,
+            jwksUrl,
+            RSAVerifier.TimeoutsConfig(connectionTimeout, readTimeout),
+          )
       }
 
       // Start the servers for the SvApp's APIs

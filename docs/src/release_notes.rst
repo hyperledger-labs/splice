@@ -40,6 +40,10 @@ Upcoming
     <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
     `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
 
+- Auth
+
+  - Added an option to override the default connection and read timeouts for the JWKS URL when using ``auth.algorithm="rs-256"``.
+
 0.4.1
 -----
 
