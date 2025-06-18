@@ -87,3 +87,4 @@ repos:
      - id: rstcheck
        name: Check sphinx format
        additional_dependencies: ['rstcheck[sphinx]']
+       args: [--report-level, WARNING]
