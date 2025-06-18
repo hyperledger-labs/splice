@@ -92,10 +92,10 @@ abstract class ValidatorPreflightIntegrationTestBase
     limitValidatorUsers()
   }
 
-  protected def validatorClient: ValidatorAppClientReference = {
+  protected def validatorClient(suppressErrors: Boolean = true): ValidatorAppClientReference = {
     val env = provideEnvironment("NotUsed")
     // retry on e.g. network errors and rate limits
-    val token = eventually() {
+    val token = eventuallySucceeds(suppressErrors = suppressErrors) {
       Auth0Util.getAuth0ClientCredential(
         validatorAuth0Secret,
         validatorAuth0Audience,
@@ -107,8 +107,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   protected def limitValidatorUsers() = {
-    val client: ValidatorAppClientReference = validatorClient
-    val users = eventuallySucceeds()(client.listUsers())
+    val users = eventuallySucceeds()(validatorClient(suppressErrors = false).listUsers())
     val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
     val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
     if (users.length > offboardThreshold) {
@@ -121,7 +120,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         .foreach { user =>
           {
             logger.debug(s"Offboarding user: ${user}")
-            eventuallySucceeds()(validatorClient.offboardUser(user))
+            eventuallySucceeds()(validatorClient(suppressErrors = false).offboardUser(user))
           }
         }
     } else {
@@ -231,7 +230,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     }
 
     clue("Onboard charlie manually to share a party with Bob") {
-      validatorClient.onboardUser(charlieUser.id, Some(PartyId.tryFromProtoPrimitive(bobPartyId)))
+      validatorClient().onboardUser(charlieUser.id, Some(PartyId.tryFromProtoPrimitive(bobPartyId)))
     }
 
     withFrontEnd("charlie-validator") { implicit webDriver =>
@@ -400,7 +399,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   "can dump participant identities of validator" in { _ =>
-    validatorClient.dumpParticipantIdentities()
+    validatorClient().dumpParticipantIdentities()
   }
 
   "connect to all sequencers stated in latest DsoRules contract" in { implicit env =>
@@ -422,7 +421,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
           .value
 
-      val domainConnectionConfig = validatorClient.decentralizedSynchronizerConnectionConfig()
+      val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
       val connectedEndpointSet =
         domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
 
@@ -537,7 +536,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
         val (svSequencerEndpoint, _) = Endpoint
           .fromUris(NonEmpty.from(Seq(new URI(domainConfig.sequencer.toScala.value.url))).value)
           .value
-        val domainConnectionConfig = validatorClient.decentralizedSynchronizerConnectionConfig()
+        val domainConnectionConfig = validatorClient().decentralizedSynchronizerConnectionConfig()
         val connectedEndpointSet =
           domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
         connectedEndpointSet should contain(svSequencerEndpoint.forgetNE.loneElement.toString)
