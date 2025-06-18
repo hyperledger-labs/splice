@@ -5,6 +5,7 @@ module Splice.DsoRules where
 
 import Prelude hiding (all)
 import DA.Action (void, unless)
+import DA.Assert
 import DA.Either (partitionEithers)
 import DA.Exception
 import DA.Foldable (forA_, all)
@@ -113,6 +114,8 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Create ExternalPartyAmuletRules contract if it has not been created as part of network bootstrapping.
   | SRARC_CreateTransferCommandCounter DsoRules_CreateTransferCommandCounter
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
+  | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
+    -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract. 
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -281,6 +284,16 @@ data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_Amu
   with
     result : AmuletRules_ConvertFeaturedAppActivityMarkersResult
 
+data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with 
+    unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
+
+data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with 
+    unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
+    optUnclaimedRewardCid : Optional (ContractId UnclaimedReward)
+
+data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
+
+
 -- Workflow templates
 ---------------------
 
@@ -405,8 +418,9 @@ data DsoRulesConfig = DsoRulesConfig with
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
+    unallocatedUnclaimedActivityRecordTimeout : Optional RelTime -- ^ The TTL for contracts representing an unallocated unclaimed activity record.
   deriving (Eq, Show)
-
+  
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
       -- ^ The time at which the migration is scheduled to start.
@@ -1368,7 +1382,90 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
+    
+    
+    -- Unallocated unclaimed activity record 
+    ----------------------------------------
 
+    nonconsuming choice DsoRules_CreateUnallocatedUnclaimedActivityRecord : DsoRules_CreateUnallocatedUnclaimedActivityRecordResult
+      with
+        beneficiary : Party 
+        amount : Decimal 
+        reason : Text
+        unclaimedActivityRecordExpiresAt : Time
+      controller dso
+      do
+        now <- getTime
+        let expiresAt = now `addRelTime` (fromOptional (days 1) config.unallocatedUnclaimedActivityRecordTimeout)
+        unallocatedUnclaimedActivityRecordCid <- 
+          create UnallocatedUnclaimedActivityRecord with 
+            dso
+            beneficiary
+            amount
+            reason
+            expiresAt
+            unclaimedActivityRecordExpiresAt 
+        pure $ DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with ..
+
+    nonconsuming choice DsoRules_AllocateUnallocatedUnclaimedActivityRecord : DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult
+      with
+        unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
+        amuletRulesCid : ContractId AmuletRules
+        sv : Optional Party
+        unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
+          -- ^ A sufficient list of `UnclaimedReward` to be archived.
+          -- It must cover at least the requested amount.
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        UnallocatedUnclaimedActivityRecord{..} <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
+        assertWithinDeadline "UnclaimedActivityRecord.expiresAt" expiresAt
+
+        -- Sorting in descending order minimizes the number of `UnclaimedReward`s we need to archive
+        sortedUnclaimedRewards <- sortOn (Down . (._2)) <$> 
+          forA unclaimedRewardsToBurnCids (\cid -> do
+            unclaimedReward <- fetchChecked (ForDso with dso) cid
+            pure (cid, unclaimedReward.amount)
+          )
+        leftoverAmount <- archiveUnclaimedRewardsUntilTargetReached dso amount sortedUnclaimedRewards
+        optUnclaimedRewardCid <- 
+          if leftoverAmount == 0.0 
+          then pure None
+          else Some <$> create UnclaimedReward with dso; amount = leftoverAmount
+
+        AmuletRules_CreateUnclaimedActivityRecordResult unclaimedActivityRecordCid <- 
+          exercise amuletRulesCid AmuletRules_CreateUnclaimedActivityRecord with 
+            beneficiary
+            amount
+            reason
+            expiresAt = unclaimedActivityRecordExpiresAt
+
+        pure $ DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with ..
+
+    nonconsuming choice DsoRules_ExpireUnallocatedUnclaimedActivityRecord : DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
+      with
+        unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        unallocatedUnclaimedActivityRecord <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
+        assertDeadlineExceeded "UnclaimedActivityRecord.opensAt" unallocatedUnclaimedActivityRecord.expiresAt
+        pure $ DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult 
+
+
+archiveUnclaimedRewardsUntilTargetReached : Party -> Decimal -> [(ContractId UnclaimedReward, Decimal)] -> Update Decimal
+archiveUnclaimedRewardsUntilTargetReached _dso remaining [] 
+  | remaining == 0.0 = pure remaining
+  | otherwise = abort "insufficient unclaimed rewards"
+archiveUnclaimedRewardsUntilTargetReached dso remaining ((cid, amount) :: rest)
+  | remaining <= 0.0 = pure remaining
+  | amount <= remaining
+  = do void $ fetchAndArchive (ForDso with dso) cid
+       archiveUnclaimedRewardsUntilTargetReached dso (remaining - amount) rest
+  | otherwise
+  = do void $ fetchAndArchive (ForDso with dso) cid
+       pure (amount - remaining)
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
@@ -1424,6 +1521,7 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_UpdateSvRewardWeight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
+      SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
   ARC_AnsEntryContext with .. ->
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
@@ -1632,6 +1730,24 @@ getAndValidateSvParty rules (Some sv) = do
   require "SV party is an actual SV" (sv `Map.member` rules.svs)
   pure sv
 
+
+-- UnallocatedUnclaimedActivityRecord
+-------------------------------------
+
+-- TODOV: document
+template UnallocatedUnclaimedActivityRecord
+  with
+    dso : Party
+    beneficiary : Party -- ^ The owner of the `Amulet` to be minted
+    amount : Decimal -- ^ The amount of `Amulet` to be minted 
+    reason : Text -- ^ A reason to mint the `Amulet`
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract. 
+    unclaimedActivityRecordExpiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract. 
+  where 
+    signatory dso
+    ensure amount > 0.0
+
+
 -- instances
 ------------
 
@@ -1643,6 +1759,9 @@ instance HasCheckedFetch VoteRequest ForDso where
 
 instance HasCheckedFetch FeaturedAppRight ForDso where
   contractGroupId FeaturedAppRight {..} = ForDso with dso
+
+instance HasCheckedFetch UnallocatedUnclaimedActivityRecord ForDso where
+  contractGroupId UnallocatedUnclaimedActivityRecord {..} = ForDso with dso
 
 instance HasCheckedFetch Confirmation ForDso where
   contractGroupId Confirmation {..} = ForDso with dso
@@ -1660,6 +1779,7 @@ instance Patchable DsoRulesConfig where
     maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
+    unallocatedUnclaimedActivityRecordTimeout = patch new.unallocatedUnclaimedActivityRecordTimeout base.unallocatedUnclaimedActivityRecordTimeout current.unallocatedUnclaimedActivityRecordTimeout 
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with

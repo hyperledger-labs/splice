@@ -160,6 +160,7 @@ test_designExample= do
   ignoreBalanceChanges === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
+    inputUnclaimedActivityRecordAmount = Some 0.0
     inputValidatorFaucetAmount = Some 0.0
     inputSvRewardAmount = 0.0
     inputAmuletAmount = refreshAmuletAmount + lockedAmuletAmount

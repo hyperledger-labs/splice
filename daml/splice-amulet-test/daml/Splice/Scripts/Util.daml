@@ -692,7 +692,8 @@ genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body =
       expectUnlessZero svRewardAmountMetaKey summary.inputSvRewardAmount
       expectUnlessZero appRewardAmountMetaKey summary.inputAppRewardAmount
       expectUnlessZero validatorRewardAmountMetaKey summary.inputValidatorRewardAmount
-      pure $ summary.inputAppRewardAmount + summary.inputValidatorRewardAmount + summary.inputSvRewardAmount
+      pure $ summary.inputAppRewardAmount + summary.inputValidatorRewardAmount + summary.inputSvRewardAmount + 
+        (fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount)
   let expectedBurn = totalHoldingsBefore + mint - totalHoldingsAfter
   -- mints are inferred, and show here as a negative burn
   if (expectedBurn < 0.0)
