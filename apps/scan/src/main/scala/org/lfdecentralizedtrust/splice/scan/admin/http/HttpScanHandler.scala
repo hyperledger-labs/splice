@@ -610,14 +610,13 @@ class HttpScanHandler(
       .map(ScanResource.ListValidatorLicensesResponse.OK)
   }
 
-  // TODO: (#7809) Add caching for sequencers per domain
   override def listDsoSequencers(
       respond: v0.ScanResource.ListDsoSequencersResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.ListDsoSequencersResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listDsoSequencers") { _ => _ =>
       store
-        .listFromSvNodeStates { nodeState =>
+        .listFromCachedSvNodeStates { nodeState =>
           for {
             (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
             sequencers = for {
@@ -670,7 +669,7 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.listDsoScans") { _ => _ =>
       store
-        .listDsoScans()
+        .listCachedDsoScans()
         .map(list =>
           definitions.ListDsoScansResponse(list.map { case (synchronizerId, scans) =>
             definitions.DomainScans(
