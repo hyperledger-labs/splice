@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import { render, screen } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
-import {
-  VoteListingData,
-  VotesListingSection,
-} from '../../components/governance/VotesListingSection';
+import { VotesListingSection } from '../../components/governance/VotesListingSection';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
+import { VoteListingData } from '../../utils/types';
 
 const inflightVoteRequests: VoteListingData[] = [
   {

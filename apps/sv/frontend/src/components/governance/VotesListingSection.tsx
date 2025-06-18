@@ -16,10 +16,10 @@ import {
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import { YourVoteStatus } from '../../routes/governance';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { Link as RouterLink } from 'react-router-dom';
+import { VoteListingData, VoteListingStatus, YourVoteStatus } from '../../utils/types';
 
 interface VotesListingSectionProps {
   sectionTitle: string;
@@ -28,25 +28,6 @@ interface VotesListingSectionProps {
   showVoteStats?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
-}
-
-export type VoteListingStatus =
-  | 'Accepted'
-  | 'In Progress'
-  | 'Implemented'
-  | 'Rejected'
-  | 'Expired'
-  | 'Unknown';
-
-export interface VoteListingData {
-  contractId: ContractId<VoteRequest>;
-  actionName: string;
-  votingCloses: string;
-  voteTakesEffect: string;
-  yourVote: YourVoteStatus;
-  status: VoteListingStatus;
-  voteStats: Record<YourVoteStatus, number>;
-  acceptanceThreshold: bigint;
 }
 
 export const VotesListingSection: React.FC<VotesListingSectionProps> = props => {

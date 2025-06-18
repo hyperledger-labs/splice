@@ -13,23 +13,17 @@ import dayjs from 'dayjs';
 import { ContractId } from '@daml/types';
 import {
   ActionRequiringConfirmation,
-  Vote,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
-import { VoteListingData, VotesListingSection } from '../components/governance/VotesListingSection';
-import { actionTagToTitle, getVoteResultStatus } from '../utils/governance';
-
-export type YourVoteStatus = 'accepted' | 'rejected' | 'no-vote';
-
-export type SupportedActionTag =
-  | 'CRARC_AddFutureAmuletConfigSchedule'
-  | 'CRARC_SetConfig'
-  | 'SRARC_GrantFeaturedAppRight'
-  | 'SRARC_OffboardSv'
-  | 'SRARC_RevokeFeaturedAppRight'
-  | 'SRARC_SetConfig'
-  | 'SRARC_UpdateSvRewardWeight';
+import { VotesListingSection } from '../components/governance/VotesListingSection';
+import {
+  actionTagToTitle,
+  computeVoteStats,
+  computeYourVote,
+  getVoteResultStatus,
+} from '../utils/governance';
+import { SupportedActionTag, VoteListingData } from '../utils/types';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -40,25 +34,6 @@ function getAction(action: ActionRequiringConfirmation): string {
     default:
       return 'Action tag not defined.';
   }
-}
-
-function computeVoteStats(votes: Vote[]): { accepted: number; rejected: number } {
-  return votes.reduce(
-    (acc, vote) => ({
-      accepted: acc.accepted + (vote.accept ? 1 : 0),
-      rejected: acc.rejected + (vote.accept ? 0 : 1),
-    }),
-    { accepted: 0, rejected: 0 }
-  );
-}
-
-function computeYourVote(votes: Vote[], svPartyId: string | undefined): YourVoteStatus {
-  if (svPartyId === undefined) {
-    return 'no-vote';
-  }
-
-  const vote = votes.find(vote => vote.sv === svPartyId);
-  return vote ? (vote.accept ? 'accepted' : 'rejected') : 'no-vote';
 }
 
 const QUERY_LIMIT = 50;
