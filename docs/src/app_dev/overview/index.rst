@@ -8,22 +8,24 @@
 Overview
 ========
 
-Canton Network applications are used to operate business processes spanning
+`Canton Network applications <https://docs.digitalasset.com/build/3.3/overview/introduction>`__
+are used to operate business processes spanning
 multiple organizations or business entities.
 Use the following documentation to build Canton Network applications and get them featured on the Canton Network:
 
-* Learn to build Canton Network applications from the tutorials, how-tos, explanations, and reference documentation maintained by Digital Asset: https://docs.digitalasset.com/build/3.3/
+.. TODO(#1156): link to https://docs.digitalasset.com/build/current/ instead of 3.4 when it is available
+
+* Learn to build Canton Network applications from the tutorials, how-tos, explanations, and reference documentation at
+  https://docs.digitalasset.com/build/3.3/
 * Browse the currently featured apps: https://sync.global/featured-apps/
 * Request an app to be featured: https://sync.global/featured-app-request/
 * Learn about ongoing CIPs to feature apps from the CIP mailing list (and consider joining the list): https://lists.sync.global/g/cip-discuss/topics
 * Learn about the rationale for featuring an app from the CIP repository: https://github.com/global-synchronizer-foundation/cips
+* Join the app development discussion in the `#gsf-global-synchronizer-appdev <https://app.slack.com/client/T03T53E10/C08FQRCRFUN>`__
+  Slack channel by sending a request to operations@sync.global for your Slack organization to be added to the channel.
 
-.. TODO::
-    call out app-dev channel and the lists for CIPs
 
-
-REST/gRPC APIs
---------------
+.. rubric:: REST/gRPC APIs
 
 When building an application for the Canton Network,
 you will typically integrate with some of the APIs provided by the Global Synchronizer and Validator Nodes.
@@ -39,13 +41,19 @@ you will typically integrate with some of the APIs provided by the Global Synchr
 See the :ref:`validator-network-diagram` for details on the components running as part of a Validator Node's and the APIs they provide.
 
 
-Daml APIs
----------
+.. rubric:: Splice Daml APIs
+
+Splice defines Daml APIs that decouple different applications on the Canton Network.
+
+
+
+
+.. rubric:: Splice Daml Models
 
 Splice implements a number of decentralized applications whose on-ledger state and workflows are implemented in Daml.
 Use the following resources to learn how to interact with this state and workflows.
 
-* Learn how to read and write Daml code using the documentation maintained by Digital Asset:
+* Learn how to read and write Daml code using the documentation at:
   https://docs.digitalasset.com/build/3.3/
 * Learn about the Daml packages that are part of Splice and their data models and workflows from
   :ref:`app_dev_daml_api`.

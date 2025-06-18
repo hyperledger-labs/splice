@@ -8,7 +8,7 @@
 Validator APIs
 ==============
 
-The Validator App is part of a :term:`CN Validator` or :term:`CN Supervalidator` node.
+The Validator App exposing the validator APIs is part of a :term:`CN Validator` or :term:`CN Supervalidator` node.
 It connects to a Canton participant and provides the following functionality:
 
   * It manages the Canton participant.
@@ -19,8 +19,7 @@ It connects to a Canton participant and provides the following functionality:
   * It exposes a REST API for interacting with core :term:`Canton Network` daml workflows (except those related to supervalidator operations).
     Examples are users programmatically managing their :term:`CN Wallet`.
 
-The REST API consists of a large number of endpoints with different purposes,
-which are listed below grouped as follows:
+The different validator APIs and their purpose are listed below.
 
 .. list-table::
    :widths: 10 30
