@@ -20,6 +20,9 @@ export function getDsoRulesConfig(
     nextScheduledSynchronizerUpgrade: nextScheduledSynchronizerUpgrade
       ? nextScheduledSynchronizerUpgrade
       : null,
+    unallocatedUnclaimedActivityRecordTimeout: {
+      microseconds: '86400000000',
+    },
     actionConfirmationTimeout: {
       microseconds: '3600000000',
     },
@@ -140,6 +143,8 @@ export function getExpectedDsoRulesConfigDiffsHTML(
     '  }\n' +
     '}</pre></div></li><li data-key="voteRequestTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">voteRequestTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "604800000000"\n' +
+    '}</pre></div></li><li data-key="unallocatedUnclaimedActivityRecordTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">unallocatedUnclaimedActivityRecordTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "microseconds": "86400000000"\n' +
     '}</pre></div></li></div>'.trim()
   );
 }
