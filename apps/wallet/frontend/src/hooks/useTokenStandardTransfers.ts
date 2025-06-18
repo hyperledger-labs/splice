@@ -3,7 +3,7 @@
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
-import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.9/lib/Splice/AmuletTransferInstruction';
+import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.10/lib/Splice/AmuletTransferInstruction';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
