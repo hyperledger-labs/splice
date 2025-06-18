@@ -1,5 +1,5 @@
 ..
-   Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+   Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 ..
    SPDX-License-Identifier: Apache-2.0
 
@@ -7,16 +7,16 @@ Overview
 ========
 
 ############
-Canton Coin Validator - Concepts
+Validator - Concepts
 ############
 
-Below is a high-level summary of the key concepts and technology relevant to operating a Canton Coin Validator—that is, a Canton participant node running the Canton Coin application. This summary focuses on what matters for validator operation, the benefits from the token economics, and the underlying technology.
+Below is a high-level summary of the key concepts and technology relevant to operating a Validator. This summary focuses on what matters for validator operation, the benefits from the token economics, and the underlying technology.
 
-**1. The Role of a Canton Coin Validator**
+**1. The Role of a Validator**
 -----------------------------
 
 * **Definition & Function:**
-A Validator in the Canton Coin ecosystem is a participant node that runs the Canton Coin application. Its primary roles are to:
+A Validator in the Global Synchronizer ecosystem primary roles are to:
         * **Validate transactions:** Process and validate both Canton application transactions (built using Daml) and Canton Coin transfers.
         * **Record activity:** Create “activity records” (for example, for coin usage and uptime) that later form the basis for minting rewards.
         * **Facilitate network connectivity:** Serve as an endpoint for users (via their participant nodes) connecting to the decentralized Global Synchronizer (the infrastructure layer that orders and delivers messages among nodes).
@@ -36,7 +36,7 @@ Validators work within the broader Canton Network—a “network of networks” 
         * Validators connect to synchronizers (aka Canton Service Providers, CSPs) to get a total order of encrypted messages.
         * The Global Synchronizer (deployed by a set of independent Super Validators) is a decentralized instance of a Canton synchronizer. It uses a Byzantine Fault Tolerant (BFT) consensus protocol to sequence transactions, ensuring that all validators receive a consistent ordering for any part of the ledger they see.
 
-* **Confirmation Protocol and Message Ordering:** 
+* **Confirmation Protocol and Message Ordering:**
          * When a transaction is initiated, it is structured into a tree, where each node in the tree represents a subtransaction in the overall atomic transaction. This means the transaction is “chopped” into pieces based on Daml’s privacy rules
          * Each validator receives only the portion of the transaction tree that the parties hosted on that Validator will verify.
          * A two-step confirmation process (a two-phase atomic commit with rollback) is used to both lock the involved contracts and ensure that all required parties have confirmed the transaction before it is finalized.
@@ -51,7 +51,7 @@ Validators work within the broader Canton Network—a “network of networks” 
 * **Burnt-Mint Equilibrium:**
          * **Fee Burninng:**  Users pay fees (denominated in USD but paid by burning Canton Coin) when they initiate Canton Coin transfers or when they create a traffic balance. Instead of paying these fees to a central authority, the coins are burned—i.e., removed from circulation.
          * **Minting Rewards:** Validators (as well as Super Validators and application providers) can mint new Canton Coins in return for their “utility” contributions:
-            * **Infrastructure Operation:** Super Validators operating synchronizer nodes earn minting rights by contributing to the synchronization service. 
+            * **Infrastructure Operation:** Super Validators operating synchronizer nodes earn minting rights by contributing to the synchronization service.
             * **Application Services:** Application providers can earn rewards any time they facilitate a transaction.
             * **Coin Usage:** When a user’s transfer (or coin burning) takes place via a Validator’s node, that Validator earns “minting rights” proportional to the fees (activity record weight) generated.
             * **Liveness Incentives:** Validators are rewarded for uptime and for being ready to serve transaction traffic. If a Validator does not use all its minting allowance via direct activity, a portion is allocated as a “liveness” bonus.
@@ -65,7 +65,7 @@ Validators work within the broader Canton Network—a “network of networks” 
            * These measures are in place to prevent gaming the system.
            * Some applications can be “featured” by a vote of Super Validators, which raises minting caps for their associated activity.
 * **Fee Structure Details:**
-         * **Transfer Fees:** 
+         * **Transfer Fees:**
             * A small percentage fee is applied to transfers (with regressive tiers so that higher-value transactions incur lower percentage fees).
          * **Resource Usage Fee:**
             * These fees cover the cost of network resources and include a base fee per output coin, coin locking fees, holding fees (to incentivize merging coins), and synchronizer traffic fees.
@@ -82,18 +82,18 @@ Validators work within the broader Canton Network—a “network of networks” 
          * As an Application Provider, you earn Canton Coins by processing transactions using the Global Synchronizer. Over time, minting by Application Providers approaches 50% of the total Canton Coin supply.
          * Over time, as the network usage increases (and fees burned increase), the validator’s ability to mint more coins may provide a competitive economic incentive.
 
-* **Scalability and Efficiency:** 
+* **Scalability and Efficiency:**
          * Validators process only the subset of the ledger relevant to their hosted users. This horizontal scalability means that your node can operate efficiently without having to store or validate every transaction on the network.
          * The use of multiple synchronizers (and the ability to connect to one or more centralized or decentralized synchronizers) reduces network bottlenecks and allows you to choose the infrastructure that best meets your latency, throughput, and trust requirements.
 
-* **Operational Flexibility:** 
+* **Operational Flexibility:**
          * Validators can operate either as independent node operators (hosting their own participant node) or as part of a broader infrastructure offering.
          * The system’s architecture and fee structure offer optionality: you may choose to prepay network traffic using Canton Coin or negotiate arrangements (for example, with third-party service providers) that suit your operational profile.
 
 **In Summary**
 -----------------------------
 
-A Canton Coin Validator is not just a passive participant; it is an active contributor to both the integrity and the economic dynamics of the Canton Network. By:
+A Validator is not just a passive participant; it is an active contributor to both the integrity and the economic dynamics of the Canton Network. By:
 
 * **Validating transactions** in a privacy-first, Daml-based ledger,
 * **Connecting to and synchronizing with decentralized synchronizers** using BFT protocols,
@@ -102,33 +102,10 @@ A Canton Coin Validator is not just a passive participant; it is an active contr
 
 You, as a node operator, play a central role in maintaining network consistency, security, and scalability while also benefiting from the token economics designed to reward real-world utility.
 
-This synthesis should give you a clear overview of the technology stack and economic incentives tied to operating a Canton Coin Validator. If you need more details on any particular mechanism (such as fee calculations, activity record structure, or minting rounds), the following white papers provides further technical specifications:
+This synthesis should give you a clear overview of the technology stack and economic incentives tied to operating a Validator. If you need more details on any particular mechanism (such as fee calculations, activity record structure, or minting rounds), the following white papers provides further technical specifications:
 
 * `Canton Network <https://www.digitalasset.com/hubfs/Canton/Canton%20Network%20-%20White%20Paper.pdf>`_
 * `Canton Coin <https://www.digitalasset.com/hubfs/Canton%20Network%20Files/Documents%20(whitepapers%2c%20etc...)/Canton%20Coin_%20A%20Canton-Network-native%20payment%20application.pdf>`_
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-         
-           
-
-
-
-
-
 
 
 
