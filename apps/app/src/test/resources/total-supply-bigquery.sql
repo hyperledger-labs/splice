@@ -34,30 +34,26 @@ SET
   SELECT
     COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, path))), 0)
   FROM
-    experiment_dataset.creates c,
-    experiment_dataset.transactions t
+    experiment_dataset.creates c
   WHERE
     NOT EXISTS (
     SELECT
       TRUE
     FROM
-      experiment_dataset.exercises e,
-      experiment_dataset.transactions t2
+      experiment_dataset.exercises e
     WHERE
-      e.update_row_id = t2.row_id
-      AND (t2.migration_id < migration_id
-        OR (t2.migration_id = migration_id
-          AND t2.record_time <= rt_micros))
+      (e.migration_id < migration_id
+        OR (e.migration_id = migration_id
+          AND e.record_time <= rt_micros))
       AND e.consuming
       AND e.template_id_module_name = module_name
       AND e.template_id_entity_name = entity_name
       AND e.contract_id = c.contract_id)
     AND c.template_id_module_name = module_name
     AND c.template_id_entity_name = entity_name
-    AND c.update_row_id = t.row_id -- we don't assume that t.row_id increases with record time
-    AND (t.migration_id < migration_id
-      OR (t.migration_id = migration_id
-        AND t.record_time <= rt_micros)));
+    AND (c.migration_id < migration_id
+      OR (c.migration_id = migration_id
+        AND c.record_time <= rt_micros)));
 END
   ;
 
@@ -146,16 +142,14 @@ SET
     + PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputValidatorRewardAmount))
     + PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputSvRewardAmount)))
 FROM
-  experiment_dataset.exercises e,
-  experiment_dataset.transactions t
+  experiment_dataset.exercises e
 WHERE
   e.choice = 'AmuletRules_Transfer'
   AND e.template_id_module_name = 'Splice.AmuletRules'
   AND e.template_id_entity_name = 'AmuletRules'
-  AND e.update_row_id = t.row_id -- we don't assume that t.row_id increases with record time
-  AND (t.migration_id < migration_id
-    OR (t.migration_id = migration_id
-      AND t.record_time <= UNIX_MICROS(as_of_record_time))));
+  AND (e.migration_id < migration_id
+    OR (e.migration_id = migration_id
+      AND e.record_time <= UNIX_MICROS(as_of_record_time))));
 END
   ;
 
@@ -218,8 +212,7 @@ SET result = (
                   SUM(result_burn(e.choice,
                                   e.result)) fees
               FROM
-                  experiment_dataset.exercises e,
-                  experiment_dataset.transactions t
+                  experiment_dataset.exercises e
               WHERE
                   ((e.choice IN ('AmuletRules_BuyMemberTraffic',
                                  'AmuletRules_Transfer',
@@ -229,17 +222,15 @@ SET result = (
                       OR (e.choice = 'TransferPreapproval_Renew'
                           AND e.template_id_entity_name = 'TransferPreapproval'))
                 AND e.template_id_module_name = 'Splice.AmuletRules'
-                AND e.update_row_id = t.row_id -- we don't assume that t.row_id increases with record time
-                AND (t.migration_id < migration_id
-                  OR (t.migration_id = migration_id
-                      AND t.record_time <= UNIX_MICROS(as_of_record_time))))
+                AND (e.migration_id < migration_id
+                  OR (e.migration_id = migration_id
+                      AND e.record_time <= UNIX_MICROS(as_of_record_time))))
           UNION ALL (-- Purchasing ANS Entries
               SELECT
                   SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, '$.record.fields[2].value.record.fields[0].value.numeric'))) fees -- .amount.initialAmount
               FROM
                   experiment_dataset.exercises e,
-                  experiment_dataset.creates c,
-                  experiment_dataset.transactions t
+                  experiment_dataset.creates c
               WHERE
                   ((e.choice = 'SubscriptionInitialPayment_Collect'
                       AND e.template_id_entity_name = 'SubscriptionInitialPayment'
@@ -250,10 +241,9 @@ SET result = (
                 AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
                 AND c.template_id_module_name = 'Splice.Amulet'
                 AND c.template_id_entity_name = 'Amulet'
-                AND e.update_row_id = t.row_id -- we don't assume that t.row_id increases with record time
-                AND (t.migration_id < migration_id
-                  OR (t.migration_id = migration_id
-                      AND t.record_time <= UNIX_MICROS(as_of_record_time))))));
+                AND (e.migration_id < migration_id
+                  OR (e.migration_id = migration_id
+                      AND e.record_time <= UNIX_MICROS(as_of_record_time))))));
 END;
 
 -- using the functions
