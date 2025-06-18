@@ -15,5 +15,5 @@ validator1:
   deduplicationDuration: 30m
 sv:
   scan:
-    # TODO(#15528): Remove this once the import update backfilling is enabled by default
+    # TODO(#1164): Remove this once the import update backfilling is enabled by default
     enableImportUpdateBackfill: true
