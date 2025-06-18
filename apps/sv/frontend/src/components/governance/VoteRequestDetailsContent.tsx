@@ -553,42 +553,6 @@ const UpdateSvRewardWeightSection = ({
   );
 };
 
-// interface AmuletRulesConfigSectionProps {
-//   configChanges: ConfigChange[];
-// }
-
-// function AmuletRulesConfigSection({ configChanges }: AmuletRulesConfigSectionProps) {
-//   return (
-//     <Box sx={{ py: 1 }}>
-//       <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
-//         Proposed Changes
-//       </Typography>
-
-//       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-//         <ConfigValuesChanges changes={configChanges} />
-//       </Box>
-//     </Box>
-//   );
-// }
-
-// interface DsoRulesConfigSectionProps {
-//   configChanges: ConfigChange[];
-// }
-
-// function DsoRulesConfigSection({ configChanges }: DsoRulesConfigSectionProps) {
-//   return (
-//     <Box sx={{ py: 1 }}>
-//       <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
-//         Proposed Changes
-//       </Typography>
-
-//       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-//         <ConfigValuesChanges changes={configChanges} />
-//       </Box>
-//     </Box>
-//   );
-// }
-
 interface ConfigRulesChangesProps {
   changes: ConfigChange[];
 }
