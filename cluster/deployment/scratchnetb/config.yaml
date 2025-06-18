@@ -16,4 +16,4 @@ validator1:
 sv:
   scan:
     # TODO(#1164): Remove this once the import update backfilling is enabled by default
-    enableImportUpdateBackfill: true
+    enableImportUpdatesBackfill: true
