@@ -69,7 +69,7 @@ export interface ProposalVotingInformation {
   requesterIsYou?: boolean;
   votingCloses: string;
   voteTakesEffect: string; // TODO: Can this be undefined. Thinking of effective at threshold here.
-  status: VoteListingStatus;
+  status: ProposalListingStatus;
 }
 
 export type YourVoteStatus = 'accepted' | 'rejected' | 'no-vote';
@@ -83,7 +83,7 @@ export type SupportedActionTag =
   | 'SRARC_SetConfig'
   | 'SRARC_UpdateSvRewardWeight';
 
-export type VoteListingStatus =
+export type ProposalListingStatus =
   | 'Accepted'
   | 'In Progress'
   | 'Implemented'
@@ -91,13 +91,13 @@ export type VoteListingStatus =
   | 'Expired'
   | 'Unknown';
 
-export interface VoteListingData {
+export interface ProposalListingData {
   contractId: ContractId<VoteRequest>;
   actionName: string;
   votingCloses: string;
   voteTakesEffect: string;
   yourVote: YourVoteStatus;
-  status: VoteListingStatus;
+  status: ProposalListingStatus;
   voteStats: Record<YourVoteStatus, number>;
   acceptanceThreshold: bigint;
 }

@@ -24,7 +24,7 @@ import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useVoteRequestResultByCid } from '../hooks/useVoteRequestResultByCid';
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
-import { VoteRequestDetailsContent } from '../components/governance/VoteRequestDetailsContent';
+import { ProposalDetailsContent } from '../components/governance/ProposalDetailsContent';
 
 export const VoteRequestDetails: React.FC = () => {
   const { contractId } = useParams();
@@ -118,7 +118,7 @@ export const VoteRequestDetails: React.FC = () => {
       <div>
         VoteRequestDetails for {contractId} <br /> {voteRequest?.payload.action.tag}
       </div>
-      <VoteRequestDetailsContent
+      <ProposalDetailsContent
         contractId={ccid as ContractId<VoteRequest>}
         proposalDetails={proposalDetails}
         votingInformation={votingInformation}
