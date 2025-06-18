@@ -321,6 +321,7 @@ object SpliceUtil {
       dummyDomain.toProtoPrimitive, // activeSynchronizer
     ), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
+    Optional.of(new RelTime(TimeUnit.DAYS.toMicros(1))), // unallocatedUnclaimedActivityRecordTimeout
   )
 
   def defaultAmuletConfig(
