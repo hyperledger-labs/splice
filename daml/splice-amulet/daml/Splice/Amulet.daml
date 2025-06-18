@@ -77,6 +77,10 @@ data SvRewardCoupon_DsoExpireResult = SvRewardCoupon_DsoExpireResult with
 
 data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBeneficiaryResult
 
+data UnclaimedActivityRecord_ArchiveAsBeneficiaryResult = UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
+
+data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult
+
 -- | A amulet, which can be locked and whose amount expires over time.
 --
 -- The expiry serves to charge an inactivity fee, and thereby ensures that the
@@ -385,6 +389,32 @@ template UnclaimedReward with
 
     signatory dso
 
+-- | A record of activity that has been approved for Amulet minting but not yet 
+-- claimed by the beneficiary. 
+template UnclaimedActivityRecord
+  with
+    dso : Party
+    beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
+    amount : Decimal -- ^ The amount of `Amulet` to be minted.
+    reason : Text -- ^ A reason to mint the `Amulet`. 
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract. 
+  where 
+    signatory dso
+    observer beneficiary
+    ensure amount > 0.0
+
+    -- Choice called by the beneficiary as part of a AmuletRules_Transfer to claim the activity record.
+    choice UnclaimedActivityRecord_ArchiveAsBeneficiary : UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
+      controller beneficiary
+      do pure UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
+
+    choice UnclaimedActivityRecord_DsoExpire : UnclaimedActivityRecord_DsoExpireResult
+      controller dso
+      do 
+        assertDeadlineExceeded "UnclaimedActivityRecord.opensAt" expiresAt
+        pure UnclaimedActivityRecord_DsoExpireResult
+  
+
 requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
 requireAmuletExpiredForAllOpenRounds roundCid amulet = do
   round <- fetchReferenceData (ForDso with dso = amulet.dso) roundCid
@@ -423,3 +453,6 @@ instance HasCheckedFetch FeaturedAppActivityMarker ForOwner where
 
 instance HasCheckedFetch FeaturedAppActivityMarker ForDso where
   contractGroupId FeaturedAppActivityMarker {..} = ForDso with dso
+
+instance HasCheckedFetch UnclaimedActivityRecord ForOwner where
+  contractGroupId UnclaimedActivityRecord{..} = ForOwner with dso; owner = beneficiary

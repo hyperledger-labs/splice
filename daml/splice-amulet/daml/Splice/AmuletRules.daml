@@ -89,6 +89,11 @@ data AmuletRules_UpdateFutureAmuletConfigScheduleResult = AmuletRules_UpdateFutu
 data AmuletRules_ConvertFeaturedAppActivityMarkersResult = AmuletRules_ConvertFeaturedAppActivityMarkersResult with
     appRewardCouponCids : [ContractId AppRewardCoupon]
 
+data AmuletRules_CreateUnclaimedActivityRecordResult = AmuletRules_CreateUnclaimedActivityRecordResult with 
+    unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
+
+data AmuletRules_ExpireUnclaimedActivityRecordResult = AmuletRules_ExpireUnclaimedActivityRecordResult
+
 -- | The rules governing how Amulet users can modify the Amulet state managed by the DSO party.
 template AmuletRules
   with
@@ -627,6 +632,30 @@ template AmuletRules
              else pure []
          pure AmuletRules_ConvertFeaturedAppActivityMarkersResult with appRewardCouponCids = concat markerCids
 
+
+    -- Unclaimed activity record 
+    -----------------------------
+
+    nonconsuming choice AmuletRules_CreateUnclaimedActivityRecord : AmuletRules_CreateUnclaimedActivityRecordResult
+      with
+        beneficiary : Party 
+        amount : Decimal 
+        reason : Text 
+        expiresAt : Time 
+      controller dso
+      do
+        unclaimedActivityRecordCid <- create UnclaimedActivityRecord with ..
+        pure AmuletRules_CreateUnclaimedActivityRecordResult with ..
+
+    nonconsuming choice AmuletRules_ExpireUnclaimedActivityRecord : AmuletRules_ExpireUnclaimedActivityRecordResult
+      with
+        unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
+      controller dso
+      do
+        void $ exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
+        pure AmuletRules_ExpireUnclaimedActivityRecordResult 
+
+
 -- Transfer logic
 -- ==============
 
@@ -719,6 +748,7 @@ executeTransfer config context dso t = do
           nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
+          optionalMetadata unclaimedActivityRecordAmountMetaKey show summary.inputUnclaimedActivityRecordAmount $
           TextMap.empty
 
   return TransferResult with
@@ -745,6 +775,7 @@ data TransferInputsSummary = TransferInputsSummary with
     totalHoldingFees : Decimal
     amountArchivedAsOfRoundZero : Decimal
     changeToHoldingFeesRate : Decimal
+    totalUnclaimedActivityRecordAmount : Optional Decimal
   deriving (Eq, Show)
 
 type TransferOutputsSummary = [PreprocessedTransferOutput]
@@ -813,6 +844,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
       totalHoldingFees = 0.0
       amountArchivedAsOfRoundZero = 0.0
       changeToHoldingFeesRate = 0.0
+      totalUnclaimedActivityRecordAmount = Some 0.0
 
     summarizeAndConsumeInput round s (InputAmulet amuletCid) = do
       amulet <- fetchAndArchive forOwner amuletCid
@@ -823,6 +855,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount + amulet.amount.initialAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalSvRewardAmount = s.totalSvRewardAmount
         totalHoldingFees = s.totalHoldingFees + holdingFee
@@ -840,6 +873,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount + coupon.amount * issuancePerCoupon
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalSvRewardAmount = s.totalSvRewardAmount
         totalHoldingFees = s.totalHoldingFees
@@ -860,6 +894,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount + coupon.amount * miningRound.issuancePerValidatorRewardCoupon
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalSvRewardAmount = s.totalSvRewardAmount
         totalHoldingFees = s.totalHoldingFees
@@ -877,6 +912,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
         totalSvRewardAmount = s.totalSvRewardAmount + intToDecimal coupon.weight * miningRound.issuancePerSvRewardCoupon
         totalHoldingFees = s.totalHoldingFees
@@ -891,6 +927,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount =
           s.totalValidatorFaucetAmount + getIssuingMiningRoundIssuancePerValidatorFaucetCoupon miningRound
         totalSvRewardAmount = s.totalSvRewardAmount
@@ -901,6 +938,23 @@ summarizeAndConsumeInputs csum dso sender inps = do
     summarizeAndConsumeInput _round s (ExtTransferInput _dummyUnitField optInputValidatorFaucetCoupon) = do
       optional (pure s) (summarizeAndConsumeValidatorFaucetInput s) optInputValidatorFaucetCoupon
 
+    summarizeAndConsumeInput _round s (InputUnclaimedActivityRecord unclaimedActivityRecordCid) = do
+      unclaimedActivityRecord <- fetchButArchiveLater forOwner unclaimedActivityRecordCid
+      -- we use the UnclaimedActivityRecord_ArchiveAsBeneficiary choice to signal 
+      -- the archival of the unclaimed activity record upon the request of the beneficiary
+      exercise unclaimedActivityRecordCid UnclaimedActivityRecord_ArchiveAsBeneficiary
+      return TransferInputsSummary with
+        totalAmuletAmount = s.totalAmuletAmount
+        totalAppRewardAmount = s.totalAppRewardAmount
+        totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = 
+          (+ unclaimedActivityRecord.amount) <$> s.totalUnclaimedActivityRecordAmount
+        totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
+        totalSvRewardAmount = s.totalSvRewardAmount 
+        totalHoldingFees = s.totalHoldingFees
+        amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
+        changeToHoldingFeesRate = s.changeToHoldingFeesRate
+
     summarizeAndConsumeValidatorFaucetInput s couponCid = do
       coupon <- fetchAndArchive forOwner couponCid
       -- compute balance change
@@ -909,6 +963,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
+        totalUnclaimedActivityRecordAmount = s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount =
           s.totalValidatorFaucetAmount + getIssuingMiningRoundIssuancePerValidatorFaucetCoupon miningRound
         totalSvRewardAmount = s.totalSvRewardAmount
@@ -969,6 +1024,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       inp.totalAmuletAmount
       + inp.totalAppRewardAmount
       + inp.totalValidatorRewardAmount
+      + fromOptional 0.0 inp.totalUnclaimedActivityRecordAmount
       + inp.totalValidatorFaucetAmount
       + inp.totalSvRewardAmount
       - inp.totalHoldingFees - totalOutputAmount - sum outputFees
@@ -993,6 +1049,7 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       -- NOTE: we include the validator faucet amount as part of the validator reward amount, so that clients
       -- unaware of CIP-3 do not get the impression that amulet is created out of thin air.
       inputValidatorRewardAmount = inp.totalValidatorRewardAmount + inp.totalValidatorFaucetAmount
+      inputUnclaimedActivityRecordAmount = inp.totalUnclaimedActivityRecordAmount
       inputValidatorFaucetAmount = Some inp.totalValidatorFaucetAmount
       inputSvRewardAmount = inp.totalSvRewardAmount
       holdingFees = inp.totalHoldingFees
@@ -1183,6 +1240,7 @@ data TransferInput
       optInputValidatorFaucetCoupon : Optional (ContractId ValidatorFaucetCoupon)
         -- ^ Added in CIP-3. Optional validator faucet coupon input into this transfer.
   | InputValidatorLivenessActivityRecord (ContractId ValidatorLivenessActivityRecord)
+  | InputUnclaimedActivityRecord (ContractId UnclaimedActivityRecord)
   deriving (Eq, Ord, Show)
 
 -- | Smart constructor for inputing validator faucet coupons into a transfer.
@@ -1283,6 +1341,8 @@ data TransferSummary = TransferSummary with
     amuletPrice : Decimal -- ^ The amulet price at the round this transfer was executed.
     inputValidatorFaucetAmount : Optional Decimal
       -- ^ Added in CIP-3. Total amount of validator faucet coupon issuance input into this transfer.
+    inputUnclaimedActivityRecordAmount : Optional Decimal
+      -- ^ Total amount of unclaimed activity record issuance input into this transfer.
   deriving (Show, Eq)
 
 data BalanceChange = BalanceChange with
