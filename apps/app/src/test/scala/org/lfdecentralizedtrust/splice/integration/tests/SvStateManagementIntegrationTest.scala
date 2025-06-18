@@ -393,6 +393,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           sv1Backend.getDsoInfo().dsoRules.payload.config.maxTextLength,
           sv1Backend.getDsoInfo().dsoRules.payload.config.decentralizedSynchronizer,
           sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.unallocatedUnclaimedActivityRecordTimeout,
         )
 
         val action: ActionRequiringConfirmation =
