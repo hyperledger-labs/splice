@@ -15,6 +15,7 @@ import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.*
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   holdingv1,
   metadatav1,
@@ -49,6 +50,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
 
 import java.time.{Duration, Instant}
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 
 // mock verification triggers this
@@ -76,7 +78,11 @@ class BftScanConnectionTest
     }
     connections.foreach { connection =>
       // all of this is noise...
-      when(connection.getAmuletRulesWithState(eqTo(None))(any[ExecutionContext], any[TraceContext]))
+      when(
+        connection.getAmuletRulesWithState(
+          any[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]]
+        )(any[ExecutionContext], any[TraceContext])
+      )
         .thenReturn(
           Future.successful(
             ContractWithState(
@@ -184,6 +190,7 @@ class BftScanConnectionTest
       synchronizerId = synchronizerId,
     )
   }
+  val refreshSeconds = 10000L
   def getBft(
       initialConnections: Seq[SingleScanConnection],
       connectionBuilder: Uri => Future[SingleScanConnection] = _ =>
@@ -198,7 +205,7 @@ class BftScanConnectionTest
         initialFailedConnections,
         connectionBuilder,
         Bft.getScansInDsoRules,
-        NonNegativeFiniteDuration.ofSeconds(1),
+        NonNegativeFiniteDuration.ofSeconds(refreshSeconds),
         retryProvider,
         loggerFactory,
       ),
@@ -278,16 +285,83 @@ class BftScanConnectionTest
       connections.foreach(makeMockReturn(_, partyIdA))
 
       // we initialize with just the first one, and the second one will be "built" when we refresh
-      val bft = getBft(connections.take(1), _ => Future.successful(connections(1)))
-      clock.advance(Duration.ofSeconds(2))
+      val refreshCalled = new AtomicInteger(0)
+      val bft = getBft(
+        connections.take(1),
+        _ => {
+          refreshCalled.incrementAndGet()
+          Future.successful(connections(1))
+        },
+      )
+      clock.advance(Duration.ofSeconds(refreshSeconds + 1))
+      // even after advancing it shouldn't refresh yet, as that's less than refreshSeconds
+      clock.advance(Duration.ofSeconds(1))
+      clock.advance(Duration.ofSeconds(1))
+      clock.advance(Duration.ofSeconds(1))
+      clock.advance(Duration.ofSeconds(1))
 
       // eventually the refresh goes through and the second connection is used
       eventually() {
+        refreshCalled.intValue() should be(1)
         val result = bft.getDsoPartyId().futureValue
         try { verify(connections(1), atLeast(1)).getDsoPartyId() }
         catch { case cause: MockitoAssertionError => fail("Mockito fail", cause) }
         result should be(partyIdA)
       }
+    }
+
+    "refresh the list of scans faster if there are not enough available scans" in {
+      val connections = getMockedConnections(n = 4)
+      val connectionsMap = connections.map(c => c.config.adminApi.url -> c).toMap
+
+      connections.foreach(makeMockReturn(_, partyIdA))
+      val refreshCalled = connections.map(_.config.adminApi.url -> new AtomicInteger(0)).toMap
+
+      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
+        {
+          // all failed until retried enough times
+          val bft = getBft(
+            Seq.empty,
+            uri => {
+              val calls = refreshCalled(uri).incrementAndGet()
+              if (calls > 3) {
+                Future.successful(connectionsMap(uri))
+              } else {
+                Future.failed(new RuntimeException("some'rror"))
+              }
+            },
+            initialFailedConnections = connections
+              .map(connection => connection.config.adminApi.url -> new RuntimeException("Failed"))
+              .toMap,
+          )
+          // trigger the first refresh, this is only required in tests, prod code retries already on BftScanConnection init
+          clock.advance(Duration.ofSeconds(refreshSeconds + 1))
+          // and then refresh until it's called enough times
+          eventually() {
+            clock.advance(Duration.ofSeconds(1))
+            forAll(refreshCalled) { case (_, calls) =>
+              calls.intValue() should be >= 3
+            }
+          }
+
+          // eventually the refresh goes through and the second connection is used
+          eventually() {
+            bft.scanList.scanConnections.open should have size 4
+            bft.scanList.scanConnections.failed should be(0)
+            val result = bft.getDsoPartyId().futureValue
+            try { verify(connections(1), atLeast(1)).getDsoPartyId() }
+            catch { case cause: MockitoAssertionError => fail("Mockito fail", cause) }
+            result should be(partyIdA)
+          }
+        },
+        entries =>
+          forAll(entries) { entry =>
+            entry.warningMessage should include("Failed to connect to scan").or(
+              include("which are fewer than the necessary")
+            )
+          },
+      )
+
     }
 
     "fail if too many Scans failed to connect" in {
