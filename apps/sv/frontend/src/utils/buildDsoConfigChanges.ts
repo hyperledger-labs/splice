@@ -2,43 +2,46 @@
 // SPDX-License-Identifier: Apache-2.0
 import { DsoRulesConfig } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { DsoDecentralizedSynchronizerConfig } from '@daml.js/splice-dso-governance/lib/Splice/DSO/DecentralizedSynchronizer/module';
-import { ConfigChange } from '../components/governance/VoteRequestDetailsContent';
 import { Optional } from '@daml/types';
+import { ConfigChange } from './types';
 
 export function buildSynchronizerMap(
   baseConfig: DsoDecentralizedSynchronizerConfig | undefined,
   currentConfig: DsoDecentralizedSynchronizerConfig | undefined
-): ConfigChange[][] {
+): ConfigChange[] {
   const baseSynchronizers = baseConfig?.synchronizers.entriesArray();
   const currentSynchronizers = currentConfig?.synchronizers.entriesArray();
 
-  const res = baseSynchronizers?.map(base => {
-    return [
-      {
-        fieldName: `Decentralized Synchronizer`,
-        currentValue: base[0] || '',
-        newValue: base[0] || '', // TODO: confirm that this doesn't change here
-        isId: true,
-      },
-      {
-        fieldName: `Decentralized Synchronizer (state)`,
-        currentValue: base[1].state || '',
-        newValue: currentSynchronizers?.find(c => c[0] === base[0])?.[1].state || '',
-      },
-      {
-        fieldName: `Decentralized Synchronizer (cometBftGenesisJson)`,
-        currentValue: base[1].cometBftGenesisJson || '',
-        newValue: currentSynchronizers?.find(c => c[0] === base[0])?.[1].cometBftGenesisJson || '',
-      },
-      {
-        fieldName: `Decentralized Synchronizer (ACS Commitment Reconciliation Interval)`,
-        currentValue: base[1].acsCommitmentReconciliationInterval || '',
-        newValue:
-          currentSynchronizers?.find(c => c[0] === base[0])?.[1]
-            .acsCommitmentReconciliationInterval || '',
-      },
-    ];
-  });
+  const res = baseSynchronizers
+    ?.map(base => {
+      return [
+        {
+          fieldName: `Decentralized Synchronizer`,
+          currentValue: base[0] || '',
+          newValue: base[0] || '', // TODO: confirm that this doesn't change here
+          isId: true,
+        },
+        {
+          fieldName: `Decentralized Synchronizer (state)`,
+          currentValue: base[1].state || '',
+          newValue: currentSynchronizers?.find(c => c[0] === base[0])?.[1].state || '',
+        },
+        {
+          fieldName: `Decentralized Synchronizer (cometBftGenesisJson)`,
+          currentValue: base[1].cometBftGenesisJson || '',
+          newValue:
+            currentSynchronizers?.find(c => c[0] === base[0])?.[1].cometBftGenesisJson || '',
+        },
+        {
+          fieldName: `Decentralized Synchronizer (ACS Commitment Reconciliation Interval)`,
+          currentValue: base[1].acsCommitmentReconciliationInterval || '',
+          newValue:
+            currentSynchronizers?.find(c => c[0] === base[0])?.[1]
+              .acsCommitmentReconciliationInterval || '',
+        },
+      ];
+    })
+    .flat();
 
   return res || [];
 }
@@ -124,10 +127,7 @@ export function buildDsoConfigChanges(
       newValue: after?.maxTextLength || '',
     },
 
-    ...buildSynchronizerMap(
-      before?.decentralizedSynchronizer,
-      after?.decentralizedSynchronizer
-    ).flat(),
+    ...buildSynchronizerMap(before?.decentralizedSynchronizer, after?.decentralizedSynchronizer),
 
     {
       fieldName: 'Decentralized Synchronizer (Last Synchronizer ID)',

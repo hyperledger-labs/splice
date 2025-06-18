@@ -4,93 +4,27 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { ContractId } from '@daml/types';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import {
-  ActionRequiringConfirmation,
-  VoteRequest,
-} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import {
-  AmuletRulesConfigProposal,
-  DsoRulesConfigProposal,
-  FeatureAppProposal,
-  OffBoardMemberProposal,
   ProposalDetails,
   ProposalVote,
   ProposalVotingInformation,
-  UnfeatureAppProposal,
-  UpdateSvRewardWeightProposal,
-  VoteRequestDetailsContent,
-} from '../components/governance/VoteRequestDetailsContent';
+  SupportedActionTag,
+} from '../utils/types';
 import { Typography } from '@mui/material';
-import { SupportedActionTag } from './governance';
 import { useSvConfig } from '../utils';
-import { actionTagToTitle, getVoteResultStatus } from '../utils/governance';
+import {
+  actionTagToTitle,
+  buildProposal,
+  getActionValue,
+  getVoteResultStatus,
+} from '../utils/governance';
 import { useDsoInfos } from '../contexts/SvContext';
 import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useVoteRequestResultByCid } from '../hooks/useVoteRequestResultByCid';
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
-import { buildDsoConfigChanges } from '../utils/buildDsoConfigChanges';
-import { buildAmuletConfigChanges } from '../utils/buildAmuletConfigChanges';
-
-const buildProposal = (action: ActionRequiringConfirmation) => {
-  if (action.tag === 'ARC_DsoRules') {
-    const dsoAction = action.value.dsoAction;
-    switch (dsoAction.tag) {
-      case 'SRARC_OffboardSv':
-        return {
-          memberToOffboard: dsoAction.value.sv,
-        } as OffBoardMemberProposal;
-      case 'SRARC_UpdateSvRewardWeight':
-        return {
-          svToUpdate: dsoAction.value.svParty,
-          weightChange: dsoAction.value.newRewardWeight,
-        } as UpdateSvRewardWeightProposal;
-      case 'SRARC_GrantFeaturedAppRight':
-        return {
-          provider: dsoAction.value.provider,
-        } as FeatureAppProposal;
-      case 'SRARC_RevokeFeaturedAppRight':
-        return {
-          rightContractId: dsoAction.value.rightCid,
-        } as UnfeatureAppProposal;
-      case 'SRARC_SetConfig':
-        return {
-          configChanges: buildDsoConfigChanges(
-            dsoAction.value.baseConfig,
-            dsoAction.value.newConfig
-          ),
-        } as DsoRulesConfigProposal;
-      default:
-        return {};
-    }
-  } else if (action.tag === 'ARC_AmuletRules') {
-    const amuletAction = action.value.amuletRulesAction;
-    switch (amuletAction.tag) {
-      case 'CRARC_SetConfig':
-        return {
-          configChanges: buildAmuletConfigChanges(
-            amuletAction.value.baseConfig,
-            amuletAction.value.newConfig
-          ),
-        } as AmuletRulesConfigProposal;
-      default:
-        return {};
-    }
-  }
-};
-
-const getActionValue = (a: ActionRequiringConfirmation) => {
-  if (!a) return undefined;
-
-  switch (a.tag) {
-    case 'ARC_AmuletRules':
-      return a.value.amuletRulesAction;
-    case 'ARC_DsoRules':
-      return a.value.dsoAction;
-    default:
-      return undefined;
-  }
-};
+import { VoteRequestDetailsContent } from '../components/governance/VoteRequestDetailsContent';
 
 export const VoteRequestDetails: React.FC = () => {
   const { contractId } = useParams();

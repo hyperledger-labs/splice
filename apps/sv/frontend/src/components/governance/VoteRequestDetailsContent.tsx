@@ -19,74 +19,18 @@ import {
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { VoteListingStatus } from './VotesListingSection';
 import { PartyId, theme } from '@lfdecentralizedtrust/splice-common-frontend';
 import { sanitizeUrl } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { Link as RouterLink } from 'react-router-dom';
+import {
+  ConfigChange,
+  ProposalDetails,
+  ProposalVote,
+  ProposalVotingInformation,
+  VoteStatus,
+} from '../../utils/types';
 
 dayjs.extend(relativeTime);
-
-export interface OffBoardMemberProposal {
-  memberToOffboard: string;
-}
-
-export interface FeatureAppProposal {
-  provider: string;
-}
-
-export interface UnfeatureAppProposal {
-  rightContractId: string; //TODO: Should this be a CId or something more specific?
-}
-
-export interface ConfigChange {
-  fieldName: string;
-  currentValue: string | number;
-  newValue: string | number;
-  isId?: boolean;
-}
-
-export interface UpdateSvRewardWeightProposal {
-  svToUpdate: string;
-  weightChange: string;
-}
-
-export interface AmuletRulesConfigProposal {
-  configChanges: ConfigChange[];
-}
-
-export interface DsoRulesConfigProposal {
-  configChanges: ConfigChange[];
-}
-
-type ProposalActionMap = {
-  SRARC_OffboardSv: OffBoardMemberProposal;
-  SRARC_GrantFeaturedAppRight: FeatureAppProposal;
-  SRARC_RevokeFeaturedAppRight: UnfeatureAppProposal;
-  SRARC_UpdateSvRewardWeight: UpdateSvRewardWeightProposal;
-  CRARC_SetConfig: AmuletRulesConfigProposal;
-  SRARC_SetConfig: DsoRulesConfigProposal;
-  // If no proposal type is defined, can use unknown or a specific type:
-  CRARC_AddFutureAmuletConfigSchedule: unknown;
-};
-
-export type ProposalDetails = {
-  actionName: string;
-  createdAt: string;
-  url: string;
-  summary: string;
-  isVoteRequest?: boolean;
-} & {
-  // Use types to enforce the right proposal params for the selected action.
-  [Tag in keyof ProposalActionMap]: { action: Tag; proposal: ProposalActionMap[Tag] };
-}[keyof ProposalActionMap];
-
-export interface ProposalVotingInformation {
-  requester: string;
-  requesterIsYou?: boolean;
-  votingCloses: string;
-  voteTakesEffect: string; // TODO: Can this be undefined. Thinking of effective at threshold here.
-  status: VoteListingStatus;
-}
 
 export interface VoteRequestDetailsContentProps {
   contractId: ContractId<VoteRequest>;
@@ -95,27 +39,7 @@ export interface VoteRequestDetailsContentProps {
   votes: ProposalVote[];
 }
 
-type VoteStatus = 'accepted' | 'rejected' | 'no-vote';
 type VoteTab = Extract<VoteStatus, 'accepted' | 'rejected' | 'no-vote'> | 'all';
-
-interface VoteReason {
-  url: string;
-  body: string;
-}
-
-export type ProposalVote = {
-  sv: string;
-  isYou?: boolean;
-} & (
-  | {
-      vote: 'no-vote';
-      reason?: undefined;
-    }
-  | {
-      vote: 'accepted' | 'rejected';
-      reason: VoteReason;
-    }
-);
 
 const now = () => dayjs();
 
