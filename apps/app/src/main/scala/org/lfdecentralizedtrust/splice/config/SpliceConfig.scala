@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
+  ScanCacheConfig,
   ScanSynchronizerConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
@@ -427,6 +428,8 @@ object SpliceConfig {
       ConfigReader.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(
         BftSequencerConfig(_, _, _)
       )
+    implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
+      deriveReader[ScanCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -794,6 +797,8 @@ object SpliceConfig {
       )
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
+    implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
+      deriveWriter[ScanCacheConfig]
 
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]
