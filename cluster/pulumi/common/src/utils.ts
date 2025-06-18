@@ -59,19 +59,6 @@ export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
 
-// TODO(#15528) Remove once backfilling is enabled by default
-export const ENABLE_IMPORT_UPDATE_BACKFILLING = config.envFlag(
-  'ENABLE_IMPORT_UPDATE_BACKFILLING',
-  false
-);
-export const updateHistoryBackfillingValues = ENABLE_IMPORT_UPDATE_BACKFILLING
-  ? {
-      updateHistoryBackfilling: {
-        importUpdatesEnabled: true,
-      },
-    }
-  : {};
-
 export type LogLevel = 'INFO' | 'DEBUG';
 
 export type ApprovedSvIdentity = {

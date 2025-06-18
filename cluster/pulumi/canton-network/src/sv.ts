@@ -38,7 +38,6 @@ import {
   svCometBftGovernanceKeySecret,
   SvIdKey,
   svUserIds,
-  updateHistoryBackfillingValues,
   validatorOnboardingSecretName,
 } from 'splice-pulumi-common';
 import {
@@ -47,6 +46,7 @@ import {
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   SvParticipant,
+  updateHistoryBackfillingValues,
 } from 'splice-pulumi-common-sv';
 import { SvConfig } from 'splice-pulumi-common-sv/src/config';
 import {
