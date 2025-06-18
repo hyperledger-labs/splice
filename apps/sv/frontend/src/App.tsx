@@ -93,13 +93,10 @@ const App: React.FC = () => {
           <Route path="votes" element={<Voting />} />
           <Route
             path="governance-beta"
-            element={<Navigate to="/governance-beta/vote-requests" replace />} //TODO: Change to /proposals
+            element={<Navigate to="/governance-beta/proposals" replace />}
           />
-          <Route path="governance-beta/vote-requests" element={<Governance />} />
-          <Route
-            path="governance-beta/vote-requests/:contractId"
-            element={<VoteRequestDetails />}
-          />
+          <Route path="governance-beta/proposals" element={<Governance />} />
+          <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
           <Route path="delegate" element={<Delegate />} />
         </Route>
       </Route>

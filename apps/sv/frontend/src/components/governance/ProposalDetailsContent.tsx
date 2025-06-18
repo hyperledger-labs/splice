@@ -32,7 +32,7 @@ import {
 
 dayjs.extend(relativeTime);
 
-export interface VoteRequestDetailsContentProps {
+export interface ProposalDetailsContentProps {
   contractId: ContractId<VoteRequest>;
   proposalDetails: ProposalDetails;
   votingInformation: ProposalVotingInformation;
@@ -43,7 +43,7 @@ type VoteTab = Extract<VoteStatus, 'accepted' | 'rejected' | 'no-vote'> | 'all';
 
 const now = () => dayjs();
 
-export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps> = props => {
+export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = props => {
   const { proposalDetails, votingInformation, votes } = props;
 
   const hasExpired = dayjs(votingInformation.votingCloses).isBefore(now());
@@ -87,7 +87,7 @@ export const VoteRequestDetailsContent: React.FC<VoteRequestDetailsContentProps>
           </Typography>
           <Button
             component={RouterLink}
-            to="/governance-beta/vote-requests"
+            to="/governance-beta/proposals"
             size="small"
             startIcon={<ArrowBack fontSize="small" />}
             sx={{ color: 'text.secondary' }}
