@@ -13,18 +13,17 @@ scanAddress: "TRUSTED_SCAN_URL"
 # useSequencerConnectionsFromScan: false
 # TRUSTED_SINGLE_SEQUENCER_END
 
-# Replace OPERATOR_WALLET_USER_ID with the user id in your IAM that you want to use to log into
-# the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``
-# not only the suffix ``43b68e1e4978b000cefba352``:
-# You can specify multiple user ids if you want multiple users to be able to log into your wallet.
-validatorWalletUsers:
-  - "OPERATOR_WALLET_USER_ID"
+# Replace OPERATOR_WALLET_USER_IDS with the quoted user id in your IAM that you want to use to log into
+# the wallet as the SV party. Note that this should be the full user id, e.g., ``"auth0|43b68e1e4978b000cefba352"``
+# not only the suffix ``"43b68e1e4978b000cefba352"``:
+# You can specify multiple user ids if you want multiple users to be able to log into your wallet : ``"userid1", "userid2"``
+validatorWalletUsers: [OPERATOR_WALLET_USER_IDS]
 auth:
   # replace OIDC_AUTHORITY_VALIDATOR_AUDIENCE with the audience of your choice
   audience: "OIDC_AUTHORITY_VALIDATOR_AUDIENCE"
 
-  # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
-  jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
+  # replace OIDC_AUTHORITY_URL & OIDC_AUTHORITY_JWKS_SUB_URL with your provider's OIDC base URL and JWKS sub-URL
+  jwksUrl: "https://OIDC_AUTHORITY_URL/OIDC_AUTHORITY_JWKS_SUB_URL
 
 # ENABLEWALLET_START
 # This will disable the wallet HTTP server and wallet automations when set to false
