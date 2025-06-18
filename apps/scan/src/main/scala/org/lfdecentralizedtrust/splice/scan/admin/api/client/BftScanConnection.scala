@@ -941,15 +941,18 @@ object BftScanConnection {
             )
             .asRuntimeException()
         )
-      } else if (newScans.isEmpty && removedScans.isEmpty && currentFailed.isEmpty) {
-        logger.debug("Not updating scan list as there are no changes.")
-        Future.successful(currentState)
       } else {
         for {
           (newScansFailedConnections, newScansSuccessfulConnections) <- attemptConnections(
             newScans
           )
         } yield {
+          logger.info(
+            s"New successful scans: ${newScansSuccessfulConnections.map(_._1)}, " +
+              s"new failed scans: ${newScansFailedConnections.map(_._1)}, " +
+              s"removed scans: $removedScans"
+          )
+
           removedScans.foreach { url =>
             currentScanConnections.get(url).foreach { case (connection, svName) =>
               logger.info(
