@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { ConfigChange } from '../components/governance/VoteRequestDetailsContent';
 import { Optional } from '@daml/types';
 import { AmuletConfig, PackageConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import { Tuple2 } from '@daml.js/daml-prim-DA-Types-1.0.0/lib/DA/Types';
@@ -8,6 +7,7 @@ import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Ty
 import { IssuanceConfig } from '@daml.js/splice-amulet/lib/Splice/Issuance';
 import { Schedule } from '@daml.js/splice-amulet/lib/Splice/Schedule';
 import { AmuletDecentralizedSynchronizerConfig } from '@daml.js/splice-amulet/lib/Splice/DecentralizedSynchronizer';
+import { ConfigChange } from './types';
 
 export function buildAmuletConfigChanges(
   before: Optional<AmuletConfig<'USD'>>,
