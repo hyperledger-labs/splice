@@ -293,6 +293,8 @@ data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_Alloca
 
 data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
 
+data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult
+
 
 -- Workflow templates
 ---------------------
@@ -1431,12 +1433,12 @@ template DsoRules with
           then pure None
           else Some <$> create UnclaimedReward with dso; amount = leftoverAmount
 
-        AmuletRules_CreateUnclaimedActivityRecordResult unclaimedActivityRecordCid <- 
-          exercise amuletRulesCid AmuletRules_CreateUnclaimedActivityRecord with 
-            beneficiary
-            amount
-            reason
-            expiresAt = unclaimedActivityRecordExpiresAt
+        unclaimedActivityRecordCid <- create UnclaimedActivityRecord with 
+          dso
+          beneficiary
+          amount
+          reason
+          expiresAt = unclaimedActivityRecordExpiresAt
 
         pure $ DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with ..
 
@@ -1450,6 +1452,16 @@ template DsoRules with
         unallocatedUnclaimedActivityRecord <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertDeadlineExceeded "UnclaimedActivityRecord.opensAt" unallocatedUnclaimedActivityRecord.expiresAt
         pure $ DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult 
+
+    nonconsuming choice DsoRules_ExpireUnclaimedActivityRecord : DsoRules_ExpireUnclaimedActivityRecordResult
+      with
+        unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
+        sv : Optional Party
+      controller sv
+      do
+        _ <- getAndValidateSvParty this sv
+        void $ exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
+        pure DsoRules_ExpireUnclaimedActivityRecordResult 
 
 
 archiveUnclaimedRewardsUntilTargetReached : Party -> Decimal -> [(ContractId UnclaimedReward, Decimal)] -> Update Decimal
