@@ -8,6 +8,7 @@ import {
 } from '../../components/governance/ActionRequiredSection';
 import { ContractId } from '@daml/types';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { MemoryRouter } from 'react-router-dom';
 
 const requests: ActionRequiredData[] = [
   {
@@ -29,7 +30,11 @@ const requests: ActionRequiredData[] = [
 
 describe('Action Required', () => {
   test('should render Action Required Section', async () => {
-    render(<ActionRequiredSection actionRequiredRequests={requests} />);
+    render(
+      <MemoryRouter>
+        <ActionRequiredSection actionRequiredRequests={requests} />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('Action Required')).toBeDefined();
 
@@ -41,7 +46,11 @@ describe('Action Required', () => {
   });
 
   test('should render all action required requests', () => {
-    render(<ActionRequiredSection actionRequiredRequests={requests} />);
+    render(
+      <MemoryRouter>
+        <ActionRequiredSection actionRequiredRequests={requests} />
+      </MemoryRouter>
+    );
 
     const cards = screen.getAllByTestId('action-required-card');
     expect(cards.length).toBe(requests.length);
@@ -56,7 +65,11 @@ describe('Action Required', () => {
       requester: 'sv1',
     };
 
-    render(<ActionRequiredSection actionRequiredRequests={[actionRequired]} />);
+    render(
+      <MemoryRouter>
+        <ActionRequiredSection actionRequiredRequests={[actionRequired]} />
+      </MemoryRouter>
+    );
 
     const action = screen.getByTestId('action-required-action');
     expect(action).toBeDefined();
@@ -88,7 +101,11 @@ describe('Action Required', () => {
       isYou: true,
     };
 
-    render(<ActionRequiredSection actionRequiredRequests={[actionRequired]} />);
+    render(
+      <MemoryRouter>
+        <ActionRequiredSection actionRequiredRequests={[actionRequired]} />
+      </MemoryRouter>
+    );
 
     const isYou = screen.getByTestId('action-required-you');
     expect(isYou).toBeDefined();
@@ -103,7 +120,11 @@ describe('Action Required', () => {
       requester: 'sv1',
     };
 
-    render(<ActionRequiredSection actionRequiredRequests={[actionRequired]} />);
+    render(
+      <MemoryRouter>
+        <ActionRequiredSection actionRequiredRequests={[actionRequired]} />
+      </MemoryRouter>
+    );
 
     expect(() => screen.getByTestId('action-required-you')).toThrowError(
       /Unable to find an element/
