@@ -111,4 +111,4 @@ export const updateHistoryBackfillingValues = svConfig?.scan?.enableImportUpdate
         batchSize: 100,
       },
     }
-  : {};
+  : undefined;
