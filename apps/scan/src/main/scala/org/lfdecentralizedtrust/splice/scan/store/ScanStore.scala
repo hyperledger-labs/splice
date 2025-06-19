@@ -319,6 +319,7 @@ object ScanStore {
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
       svNodeStateCacheTtl: NonNegativeFiniteDuration,
+      enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
   )(implicit
       ec: ExecutionContext,
@@ -337,6 +338,7 @@ object ScanStore {
           domainMigrationInfo,
           participantId,
           svNodeStateCacheTtl,
+          enableImportUpdateBackfill,
           metrics,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")

@@ -90,6 +90,9 @@ export const SvConfigSchema = z.object({
           volumeSize: z.string().optional(),
         })
         .optional(),
+      scan: z.object({
+        enableImportUpdatesBackfill: z.boolean().optional(),
+      }),
     })
     .optional(),
 });
@@ -99,3 +102,13 @@ export type Config = z.infer<typeof SvConfigSchema>;
 // eslint-disable-next-line
 // @ts-ignore
 export const svConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
+
+export const updateHistoryBackfillingValues = svConfig?.scan?.enableImportUpdatesBackfill
+  ? {
+      updateHistoryBackfilling: {
+        enabled: true,
+        importUpdatesEnabled: true,
+        batchSize: 100,
+      },
+    }
+  : undefined;
