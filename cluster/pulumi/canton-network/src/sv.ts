@@ -541,7 +541,7 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
-    updateHistoryBackfillingValues,
+    ...updateHistoryBackfillingValues,
   };
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
