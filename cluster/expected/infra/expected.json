@@ -616,7 +616,7 @@
   },
   {
     "custom": true,
-    "id": "projects/da-cn-devnet/secrets/dns01-sa-key-secret/versions/1",
+    "id": "projects/da-cn-devnet/secrets/dns01-sa-key-secret/versions/latest",
     "inputs": {},
     "name": "dns01-sa-key-secret",
     "provider": "",
