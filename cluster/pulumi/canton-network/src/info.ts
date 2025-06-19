@@ -1,5 +1,6 @@
+import * as pulumi from "@pulumi/pulumi";
+
 import {
-  activeVersion,
   DecentralizedSynchronizerMigrationConfig,
   ExactNamespace,
   installSpliceHelmChart,
@@ -15,6 +16,8 @@ import {
 
 export function installInfo(
   xns: ExactNamespace,
+  host: string,
+  gateway: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
 ) {
@@ -27,7 +30,7 @@ export function installInfo(
     deploymentDetails: {
       network: "XXXX", // FIXME: Placeholder, replace with actual network name
       sv: {
-        version: cnChartVerstionToString(activeVersion),
+        version: cnChartVerstionToString(decentralizedSynchronizerMigrationConfig.active.version),
       },
       configDigest: {
         allowedIpRanges: {
@@ -57,9 +60,13 @@ export function installInfo(
         } : null,
       },
     },
+    istioVirtualService: {
+      host: host,
+      gateway: gateway,
+    },
   };
 
-  const info = installSpliceHelmChart(xns, 'info', 'splice-info', infoValues, activeVersion);
+  const info = installSpliceHelmChart(xns, 'info', 'splice-info', infoValues, decentralizedSynchronizerMigrationConfig.active.version);
 
   return info;
 }

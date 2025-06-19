@@ -527,6 +527,10 @@
           }
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "istioVirtualService": {
+          "gateway": "cluster-ingress/cn-http-gateway",
+          "host": "info.sv-2.mock.global.canton.network.digitalasset.com"
+        },
         "sequencerAddress": "global-domain-3-sequencer",
         "tolerations": [
           {

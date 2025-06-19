@@ -245,6 +245,8 @@ export async function installSvNode(
 
   installInfo(
     xns,
+    `info.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+    "cluster-ingress/cn-http-gateway",
     decentralizedSynchronizerUpgradeConfig,
     canton.decentralizedSynchronizer,
   );
