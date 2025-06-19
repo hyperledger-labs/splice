@@ -102,39 +102,6 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       )(metricsContext)
   }
 
-  object ImportUpdatesBackfilling {
-    private val importUpdatesBackfillingPrefix: MetricName = prefix :+ "import-updates-backfilling"
-
-    val latestMigrationId: Gauge[Long] =
-      metricsFactory.gauge(
-        MetricInfo(
-          name = importUpdatesBackfillingPrefix :+ "latest-migration-id",
-          summary = "The migration id of the latest backfilled import update",
-          Traffic,
-        ),
-        initial = -1L,
-      )(metricsContext)
-
-    val contractCount: Counter =
-      metricsFactory.counter(
-        MetricInfo(
-          name = importUpdatesBackfillingPrefix :+ "contract-count",
-          summary = "The number of contracts that have been backfilled",
-          Traffic,
-        )
-      )(metricsContext)
-
-    val completed: Gauge[Int] =
-      metricsFactory.gauge(
-        MetricInfo(
-          name = importUpdatesBackfillingPrefix :+ "completed",
-          summary = "Whether it was completed (1) or not (0)",
-          Debug,
-        ),
-        initial = 0,
-      )(metricsContext)
-  }
-
   object UpdateHistory {
     private val updateHistoryPrefix: MetricName = prefix :+ "updates"
 

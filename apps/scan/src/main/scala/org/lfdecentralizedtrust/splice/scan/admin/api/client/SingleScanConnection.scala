@@ -521,20 +521,6 @@ class SingleScanConnection private[client] (
       ),
     )
 
-  override def getImportUpdates(
-      migrationId: Long,
-      afterUpdateId: String,
-      count: Int,
-  )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.GetImportUpdates(
-        migrationId,
-        afterUpdateId,
-        count,
-      ),
-    )
-
   override def listDsoRulesVoteRequests()(implicit
       tc: TraceContext,
       ec: ExecutionContext,

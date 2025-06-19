@@ -28,7 +28,6 @@ import org.lfdecentralizedtrust.splice.scan.store.{ScanHistoryBackfilling, ScanS
 import org.lfdecentralizedtrust.splice.store.{
   HistoryBackfilling,
   HistoryMetrics,
-  ImportUpdatesBackfilling,
   PageLimit,
   TreeUpdateWithMigrationId,
 }
@@ -94,19 +93,10 @@ class ScanHistoryBackfillingTrigger(
       store.updateHistory.getBackfillingState().map {
         case BackfillingState.Complete =>
           historyMetrics.UpdateHistoryBackfilling.completed.updateValue(1)
-          historyMetrics.ImportUpdatesBackfilling.completed.updateValue(1)
           Seq.empty
-        case BackfillingState.InProgress(updatesComplete, _) =>
-          if (!updatesComplete) {
-            historyMetrics.ImportUpdatesBackfilling.completed.updateValue(0)
-            Seq(ScanHistoryBackfillingTrigger.BackfillTask())
-          } else {
-            historyMetrics.UpdateHistoryBackfilling.completed.updateValue(1)
-            Seq(ScanHistoryBackfillingTrigger.ImportUpdatesBackfillTask())
-          }
+        case BackfillingState.InProgress =>
+          Seq(ScanHistoryBackfillingTrigger.BackfillTask())
         case BackfillingState.NotInitialized =>
-          historyMetrics.UpdateHistoryBackfilling.completed.updateValue(0)
-          historyMetrics.ImportUpdatesBackfilling.completed.updateValue(0)
           Seq(ScanHistoryBackfillingTrigger.InitializeBackfillingTask(findHistoryStartAfter))
       }
     }
@@ -121,8 +111,6 @@ class ScanHistoryBackfillingTrigger(
   ): Future[TaskOutcome] = task match {
     case ScanHistoryBackfillingTrigger.InitializeBackfillingTask(_) =>
       initializeBackfilling()
-    case ScanHistoryBackfillingTrigger.ImportUpdatesBackfillTask() =>
-      performImportUpdatesBackfilling()
     case ScanHistoryBackfillingTrigger.BackfillTask() =>
       performBackfilling()
   }
@@ -194,8 +182,9 @@ class ScanHistoryBackfillingTrigger(
     synchronized {
       val batchSize = 100
       for {
-        updates <- store.updateHistory.getUpdatesWithoutImportUpdates(
+        updates <- store.updateHistory.getUpdates(
           findHistoryStartAfter,
+          includeImportUpdates = false,
           PageLimit.tryCreate(batchSize),
         )
         _ = updates.lastOption.foreach(u =>
@@ -284,32 +273,10 @@ class ScanHistoryBackfillingTrigger(
         TaskNoop
       case HistoryBackfilling.Outcome.BackfillingIsComplete =>
         historyMetrics.UpdateHistoryBackfilling.completed.updateValue(1)
-        logger.info("UpdateHistory backfilling is complete")
+        logger.info(
+          "UpdateHistory backfilling is complete, this trigger should not do any work ever again"
+        )
         TaskSuccess("Backfilling completed")
-    }
-  } yield outcome
-
-  private def performImportUpdatesBackfilling()(implicit
-      traceContext: TraceContext
-  ): Future[TaskOutcome] = for {
-    connection <- getOrCreateScanConnection()
-    backfilling = getOrCreateBackfilling(connection)
-    outcome <- backfilling.backfillImportUpdates().map {
-      case ImportUpdatesBackfilling.Outcome.MoreWorkAvailableNow(workDone) =>
-        historyMetrics.ImportUpdatesBackfilling.completed.updateValue(0)
-        // Using MetricsContext.Empty is okay, because it's merged with the StoreMetrics context
-        historyMetrics.ImportUpdatesBackfilling.contractCount.inc(
-          workDone.backfilledContracts
-        )(MetricsContext.Empty)
-        historyMetrics.ImportUpdatesBackfilling.latestMigrationId.updateValue(workDone.migrationId)
-        TaskSuccess("Backfilling import updates step completed")
-      case ImportUpdatesBackfilling.Outcome.MoreWorkAvailableLater =>
-        historyMetrics.ImportUpdatesBackfilling.completed.updateValue(0)
-        TaskNoop
-      case ImportUpdatesBackfilling.Outcome.BackfillingIsComplete =>
-        historyMetrics.ImportUpdatesBackfilling.completed.updateValue(1)
-        logger.info("UpdateHistory backfilling import updates is complete")
-        TaskSuccess("Backfilling import updates completed")
     }
   } yield outcome
 
@@ -334,10 +301,6 @@ object ScanHistoryBackfillingTrigger {
       prettyOfClass(param("after", _.after))
   }
   final case class BackfillTask() extends Task {
-    override def pretty: Pretty[this.type] =
-      prettyOfClass()
-  }
-  final case class ImportUpdatesBackfillTask() extends Task {
     override def pretty: Pretty[this.type] =
       prettyOfClass()
   }

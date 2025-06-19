@@ -152,16 +152,6 @@ class BftScanConnectionTest
     when(mock.getUpdatesBefore(migrationId, synchronizerId, before, Some(atOrAfter), count))
       .thenReturn(Future.successful(updates))
   }
-  def makeMockReturnImportUpdates(
-      mock: SingleScanConnection,
-      migrationId: Long,
-      after: String,
-      updates: Seq[UpdateHistoryResponse],
-      count: Int,
-  ): Unit = {
-    when(mock.getImportUpdates(migrationId, after, count))
-      .thenReturn(Future.successful(updates))
-  }
   def makeMockFailUpdatesBefore(
       mock: SingleScanConnection,
       before: CantonTimestamp,
@@ -511,11 +501,9 @@ class BftScanConnectionTest
       val infoResponse =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange = Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(2))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(2))),
             complete = true,
-            importUpdatesComplete = true,
           )
         )
       connections.foreach(makeMockReturnMigrationInfo(_, 0, infoResponse))
@@ -531,11 +519,9 @@ class BftScanConnectionTest
       def infoResponse(start: Int, complete: Boolean) =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = if (complete) Some(0) else None,
-            recordTimeRange = Map(synchronizerId -> DomainRecordTimeRange(ctime(start), ctime(10))),
-            lastImportUpdateId = Some("updateId1"),
+            if (complete) Some(0) else None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(start), ctime(10))),
             complete = complete,
-            importUpdatesComplete = complete,
           )
         )
       makeMockReturnMigrationInfo(connections(0), 1, None)
@@ -549,11 +535,9 @@ class BftScanConnectionTest
       } yield migrationInfo should be(
         Some(
           SourceMigrationInfo(
-            previousMigrationId = Some(0),
-            recordTimeRange = Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(10))),
-            lastImportUpdateId = Some("updateId1"),
+            Some(0),
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(10))),
             complete = true,
-            importUpdatesComplete = true,
           )
         )
       )
@@ -564,11 +548,9 @@ class BftScanConnectionTest
       val infoResponse =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange = Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(2))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(2))),
             complete = true,
-            importUpdatesComplete = true,
           )
         )
       connections.foreach(makeMockReturnMigrationInfo(_, 0, infoResponse))
@@ -586,12 +568,9 @@ class BftScanConnectionTest
       def infoResponse(first: Int, last: Int, complete: Boolean) =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange =
-              Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
-            importUpdatesComplete = complete,
           )
         )
 
@@ -626,12 +605,9 @@ class BftScanConnectionTest
       def infoResponse(first: Int, last: Int, complete: Boolean) =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange =
-              Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
-            importUpdatesComplete = complete,
           )
         )
 
@@ -659,12 +635,9 @@ class BftScanConnectionTest
       def infoResponse(first: Int, last: Int, complete: Boolean) =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange =
-              Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
-            importUpdatesComplete = complete,
           )
         )
 
@@ -698,12 +671,9 @@ class BftScanConnectionTest
       def infoResponse(first: Int, last: Int, complete: Boolean) =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange =
-              Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
-            importUpdatesComplete = complete,
           )
         )
 
@@ -740,57 +710,14 @@ class BftScanConnectionTest
       }
     }
 
-    "fail when consensus cannot be reached for import updates info" in {
-      val connections = getMockedConnections(n = 7) // f=2
-      def infoResponse(last: Int, complete: Boolean) =
-        Some(
-          SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange = Map(synchronizerId -> DomainRecordTimeRange(ctime(1), ctime(10))),
-            lastImportUpdateId = Some(s"updateId${last}"),
-            complete = complete,
-            importUpdatesComplete = complete,
-          )
-        )
-
-      def mockResponses(connection: Int, last: Int) = {
-        makeMockReturnMigrationInfo(connections(connection), 0, infoResponse(last, true))
-      }
-
-      // Two scans return last id = 2
-      mockResponses(0, 2)
-      mockResponses(1, 2)
-      // Two scans return last id = 3
-      mockResponses(2, 3)
-      mockResponses(3, 3)
-      // Two scan returns last id = 4
-      mockResponses(4, 4)
-      mockResponses(5, 4)
-      // One scan returns last id = 5
-      mockResponses(6, 5)
-
-      val bft = getBft(connections)
-
-      // Note: getUpdatesBefore() doesn't produce WARN logs, so we don't need to suppress them
-      for {
-        failure <- bft.getMigrationInfo(0).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-        code should be(StatusCodes.BadGateway)
-        message should include("Failed to reach consensus from 5 Scan nodes")
-      }
-    }
-
-    "fail when consensus cannot be reached for updates" in {
+    "fail when when consensus cannot be reached" in {
       val connections = getMockedConnections(n = 7) // f=2
       def infoResponse(first: Int, last: Int, complete: Boolean) =
         Some(
           SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange =
-              Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
-            lastImportUpdateId = Some("updateId1"),
+            None,
+            Map(synchronizerId -> DomainRecordTimeRange(ctime(first), ctime(last))),
             complete = complete,
-            importUpdatesComplete = complete,
           )
         )
 
@@ -823,53 +750,6 @@ class BftScanConnectionTest
       // Note: getUpdatesBefore() doesn't produce WARN logs, so we don't need to suppress them
       for {
         failure <- bft.getUpdatesBefore(0, synchronizerId, ctime(5), None, 10).failed
-      } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
-        code should be(StatusCodes.BadGateway)
-        message should include("Failed to reach consensus from 5 Scan nodes")
-      }
-    }
-
-    "fail when consensus cannot be reached for import updates" in {
-      val connections = getMockedConnections(n = 7) // f=2
-      def infoResponse(last: Int, complete: Boolean) =
-        Some(
-          SourceMigrationInfo(
-            previousMigrationId = None,
-            recordTimeRange = Map(),
-            lastImportUpdateId = Some(s"updateId${last}"),
-            complete = complete,
-            importUpdatesComplete = complete,
-          )
-        )
-
-      def mockResponses(connection: Int, last: Int, updates: Seq[Int]) = {
-        makeMockReturnMigrationInfo(connections(connection), 0, infoResponse(last, true))
-        makeMockReturnImportUpdates(
-          connections(connection),
-          0,
-          "",
-          updates.map(testUpdate),
-          10,
-        )
-      }
-
-      // Two scans return updates [1,2,3,5]
-      mockResponses(0, 5, Seq(1, 2, 3, 5))
-      mockResponses(1, 5, Seq(1, 2, 3, 5))
-      // Two scans return updates [1,3,4,5]
-      mockResponses(2, 5, Seq(1, 3, 4, 5))
-      mockResponses(3, 5, Seq(1, 3, 4, 5))
-      // Two scans return updates [1,2,3,4,5]
-      mockResponses(4, 5, Seq(1, 2, 3, 4, 5))
-      mockResponses(5, 5, Seq(1, 2, 3, 4, 5))
-      // One scans returns updates [1,5]
-      mockResponses(6, 5, Seq(1, 5))
-
-      val bft = getBft(connections)
-
-      // Note: getImportUpdates() doesn't produce WARN logs, so we don't need to suppress them
-      for {
-        failure <- bft.getImportUpdates(0, "", 10).failed
       } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
         code should be(StatusCodes.BadGateway)
         message should include("Failed to reach consensus from 5 Scan nodes")

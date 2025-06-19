@@ -6,16 +6,12 @@ package org.lfdecentralizedtrust.splice.scan.store
 import com.daml.ledger.javaapi.data as javaApi
 import org.lfdecentralizedtrust.splice.environment.ledger.api.TransactionTreeUpdate
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BackfillingScanConnection
-import org.lfdecentralizedtrust.splice.store.{
-  HistoryBackfilling,
-  ImportUpdatesBackfilling,
-  TreeUpdateWithMigrationId,
-}
-import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.SourceMigrationInfo
+import org.lfdecentralizedtrust.splice.store.{HistoryBackfilling, TreeUpdateWithMigrationId}
+import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.{Outcome, SourceMigrationInfo}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -23,11 +19,15 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** Backfills the scan history by copying data from a remote source history to the destination history.
+  *
+  * The algorithm caches the set of all remote connections, along with "static data" for the remote history.
+  * Some of the data (such as the record time range) is technically not static because remote scans
+  * could be backfilling themselves, but the algorithm is designed to terminate correctly as long as the cache
+  * is eventually updated.
   */
 class ScanHistoryBackfilling(
     connection: BackfillingScanConnection,
-    destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse]
-      with ImportUpdatesBackfilling.DestinationImportUpdates[UpdateHistoryResponse],
+    destinationHistory: HistoryBackfilling.DestinationHistory[UpdateHistoryResponse],
     currentMigrationId: Long,
     batchSize: Int = 100,
     override val loggerFactory: NamedLoggerFactory,
@@ -36,29 +36,21 @@ class ScanHistoryBackfilling(
 ) extends NamedLogging {
 
   private val sourceHistory =
-    new HistoryBackfilling.SourceHistory[UpdateHistoryResponse]
-      with ImportUpdatesBackfilling.SourceImportUpdates[UpdateHistoryResponse] {
+    new HistoryBackfilling.SourceHistory[UpdateHistoryResponse] {
       def isReady: Boolean = true
 
-      override def migrationInfo(migrationId: Long)(implicit
+      def migrationInfo(migrationId: Long)(implicit
           tc: TraceContext
       ): Future[Option[SourceMigrationInfo]] =
         connection.getMigrationInfo(migrationId)
 
-      override def items(
+      def items(
           migrationId: Long,
           synchronizerId: SynchronizerId,
           before: CantonTimestamp,
           count: Int,
       )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] =
         connection.getUpdatesBefore(migrationId, synchronizerId, before, None, count)
-
-      def importUpdates(
-          migrationId: Long,
-          afterUpdateId: String,
-          count: Int,
-      )(implicit tc: TraceContext): Future[Seq[UpdateHistoryResponse]] =
-        connection.getImportUpdates(migrationId, afterUpdateId, count)
     }
 
   private val backfilling =
@@ -70,22 +62,8 @@ class ScanHistoryBackfilling(
       loggerFactory,
     )
 
-  private val importUpdatesBackfilling =
-    new ImportUpdatesBackfilling(
-      destinationHistory,
-      sourceHistory,
-      batchSize = batchSize,
-      loggerFactory,
-    )
-
-  def backfill()(implicit tc: TraceContext): Future[HistoryBackfilling.Outcome] = {
+  def backfill()(implicit tc: TraceContext): Future[Outcome] = {
     backfilling.backfill()
-  }
-
-  def backfillImportUpdates()(implicit
-      tc: TraceContext
-  ): Future[ImportUpdatesBackfilling.Outcome] = {
-    importUpdatesBackfilling.backfillImportUpdates()
   }
 }
 

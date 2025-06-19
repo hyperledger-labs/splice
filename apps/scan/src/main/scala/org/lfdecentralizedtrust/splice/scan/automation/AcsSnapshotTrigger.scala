@@ -65,9 +65,7 @@ class AcsSnapshotTrigger(
     *         And also for past migrations, whether the SV was present in them or not.
     */
   private def isHistoryBackfilled(migrationId: Long)(implicit tc: TraceContext) = {
-    updateHistory.sourceHistory
-      .migrationInfo(migrationId)
-      .map(_.exists(i => i.complete && i.importUpdatesComplete))
+    updateHistory.sourceHistory.migrationInfo(migrationId).map(_.exists(_.complete))
   }
 
   private def retrieveTask()(implicit
@@ -115,8 +113,9 @@ class AcsSnapshotTrigger(
           Future.successful(None)
         case Some(task) =>
           updateHistory
-            .getUpdatesWithoutImportUpdates(
+            .getUpdates(
               Some((currentMigrationId, task.snapshotRecordTime)),
+              includeImportUpdates = true,
               PageLimit.tryCreate(1),
             )
             .map(_.headOption)
@@ -206,7 +205,6 @@ class AcsSnapshotTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = task match {
     case AcsSnapshotTrigger.Task(snapshotRecordTime, migrationId, lastSnapshot) =>
-      assert(task.snapshotRecordTime > CantonTimestamp.MinValue)
       store
         .insertNewSnapshot(lastSnapshot, migrationId, snapshotRecordTime)
         .map { insertCount =>
@@ -234,13 +232,15 @@ class AcsSnapshotTrigger(
       tc: TraceContext,
   ): Future[Option[AcsSnapshotTrigger.Task]] = {
     updateHistory
-      .getUpdatesWithoutImportUpdates(
+      .getUpdates(
         Some(
           (
             migrationId,
-            CantonTimestamp.MinValue,
+            // exclude ACS imports, which have record_time=MinValue
+            CantonTimestamp.MinValue.plusSeconds(1L),
           )
         ),
+        includeImportUpdates = true,
         PageLimit.tryCreate(1),
       )
       .map(_.headOption)
