@@ -389,8 +389,10 @@ template UnclaimedReward with
 
     signatory dso
 
--- | A record of activity that has been approved for Amulet minting but not yet 
--- claimed by the beneficiary. 
+-- | A record of activity that can be minted by the beneficiary. 
+-- Note that these do not come out of the per-round issuance but are instead created by burning 
+-- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate 
+-- time-based expiry instead of being tied to a round like the other activity records.
 template UnclaimedActivityRecord
   with
     dso : Party
