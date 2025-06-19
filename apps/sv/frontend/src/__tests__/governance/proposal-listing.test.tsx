@@ -6,6 +6,7 @@ import { ProposalListingSection } from '../../components/governance/ProposalList
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ProposalListingData } from '../../utils/types';
+import { MemoryRouter } from 'react-router-dom';
 
 const inflightVoteRequests: ProposalListingData[] = [
   {
@@ -56,12 +57,14 @@ const voteHistory: ProposalListingData[] = [
 describe('Inflight Vote Requests', () => {
   test('should render inflight vote requests section', async () => {
     render(
-      <ProposalListingSection
-        sectionTitle="Inflight Vote Requests"
-        data={inflightVoteRequests}
-        uniqueId="inflight-vote-request"
-        showStatus
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={inflightVoteRequests}
+          uniqueId="inflight-vote-request"
+          showStatus
+        />
+      </MemoryRouter>
     );
 
     expect(screen.getByTestId('inflight-vote-request-section')).toBeDefined();
@@ -70,12 +73,14 @@ describe('Inflight Vote Requests', () => {
 
   test('should render all inflight vote requests', () => {
     render(
-      <ProposalListingSection
-        sectionTitle="Inflight Vote Requests"
-        data={inflightVoteRequests}
-        uniqueId="inflight-vote-request"
-        showStatus
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={inflightVoteRequests}
+          uniqueId="inflight-vote-request"
+          showStatus
+        />
+      </MemoryRouter>
     );
 
     const rows = screen.getAllByTestId('inflight-vote-request-row');
@@ -95,13 +100,15 @@ describe('Inflight Vote Requests', () => {
     } as ProposalListingData;
 
     render(
-      <ProposalListingSection
-        sectionTitle="Inflight Vote Requests"
-        data={[data]}
-        uniqueId={uniqueId}
-        showVoteStats
-        showAcceptanceThreshold
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={[data]}
+          uniqueId={uniqueId}
+          showVoteStats
+          showAcceptanceThreshold
+        />
+      </MemoryRouter>
     );
 
     const table = screen.getByTestId(`${uniqueId}-section-table`);
@@ -142,12 +149,14 @@ describe('Inflight Vote Requests', () => {
     } as ProposalListingData;
 
     render(
-      <ProposalListingSection
-        sectionTitle="Inflight Vote Requests"
-        data={[data]}
-        uniqueId={uniqueId}
-        showStatus
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={[data]}
+          uniqueId={uniqueId}
+          showStatus
+        />
+      </MemoryRouter>
     );
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
@@ -170,12 +179,14 @@ describe('Inflight Vote Requests', () => {
     } as ProposalListingData;
 
     render(
-      <ProposalListingSection
-        sectionTitle="Inflight Vote Requests"
-        data={[data]}
-        uniqueId={uniqueId}
-        showStatus
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={[data]}
+          uniqueId={uniqueId}
+          showStatus
+        />
+      </MemoryRouter>
     );
 
     const yourVote = screen.getByTestId(`${uniqueId}-row-your-vote`);
@@ -189,12 +200,14 @@ describe('Inflight Vote Requests', () => {
     const uniqueId = 'inflight-vote-request';
 
     render(
-      <ProposalListingSection
-        sectionTitle="Inflight Vote Requests"
-        data={[]}
-        uniqueId={uniqueId}
-        showStatus
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Inflight Vote Requests"
+          data={[]}
+          uniqueId={uniqueId}
+          showStatus
+        />
+      </MemoryRouter>
     );
 
     const sectionInfo = await screen.findByTestId(`${uniqueId}-section-info`);
@@ -205,7 +218,9 @@ describe('Inflight Vote Requests', () => {
 describe('Vote history', () => {
   test('should render vote history section', async () => {
     render(
-      <ProposalListingSection sectionTitle="Vote History" data={[]} uniqueId="vote-history" />
+      <MemoryRouter>
+        <ProposalListingSection sectionTitle="Vote History" data={[]} uniqueId="vote-history" />
+      </MemoryRouter>
     );
 
     expect(screen.getByTestId('vote-history-section')).toBeDefined();
@@ -214,11 +229,13 @@ describe('Vote history', () => {
 
   test('should render all vote history', () => {
     render(
-      <ProposalListingSection
-        sectionTitle="Vote History"
-        data={voteHistory}
-        uniqueId="vote-history"
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Vote History"
+          data={voteHistory}
+          uniqueId="vote-history"
+        />
+      </MemoryRouter>
     );
 
     const rows = screen.getAllByTestId('vote-history-row');
@@ -238,12 +255,14 @@ describe('Vote history', () => {
     } as ProposalListingData;
 
     render(
-      <ProposalListingSection
-        sectionTitle="Vote History"
-        data={[data]}
-        uniqueId={uniqueId}
-        showStatus
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Vote History"
+          data={[data]}
+          uniqueId={uniqueId}
+          showStatus
+        />
+      </MemoryRouter>
     );
 
     const table = screen.getByTestId(`${uniqueId}-section-table`);
@@ -270,12 +289,14 @@ describe('Vote history', () => {
 
   test('should show info message when no vote history is available', async () => {
     render(
-      <ProposalListingSection
-        sectionTitle="Voting History"
-        data={[]}
-        showStatus
-        uniqueId="voting-history"
-      />
+      <MemoryRouter>
+        <ProposalListingSection
+          sectionTitle="Voting History"
+          data={[]}
+          showStatus
+          uniqueId="voting-history"
+        />
+      </MemoryRouter>
     );
 
     const alertInfo = screen.getByTestId('voting-history-section-info');
