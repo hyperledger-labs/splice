@@ -26,6 +26,10 @@ contentType: "application/json"
 #       version: "0.3.4"
 #     legacy: null
 
+# istioVirtualService:  # optional, configures the Istio VirtualService for routing
+#   host: "info.example.com"
+#   gateway: "istio-gateway-example"
+
 resources:
   limits:
     cpu: 500m
