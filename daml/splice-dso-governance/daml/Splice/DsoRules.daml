@@ -1457,7 +1457,7 @@ template DsoRules with
 archiveUnclaimedRewardsUntilTargetReached : Party -> Decimal -> [(ContractId UnclaimedReward, Decimal)] -> Update Decimal
 archiveUnclaimedRewardsUntilTargetReached _dso remaining [] 
   | remaining == 0.0 = pure remaining
-  | otherwise = abort "insufficient unclaimed rewards"
+  | otherwise = abort $ "insufficient unclaimed rewards: " <> show remaining
 archiveUnclaimedRewardsUntilTargetReached dso remaining ((cid, amount) :: rest)
   | remaining <= 0.0 = pure remaining
   | amount <= remaining
