@@ -171,6 +171,7 @@ jobs:
     secrets: inherit
 
   final_result:
+    name: "ci / final_result"
     if: ${{ always() && github.event_name == 'pull_request' }}
     needs:
     - cancel_if_not_opt_in
