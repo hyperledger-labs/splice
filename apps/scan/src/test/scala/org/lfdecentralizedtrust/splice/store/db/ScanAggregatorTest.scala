@@ -460,7 +460,7 @@ class ScanAggregatorTest
       }
     }
 
-    "Aggregate round_party_totals where some parties are not always taking part" in {
+    "Aggregate round_party_totals where some parties are not active in all rounds" in {
       cleanup()
       val (aggr, store) = mkAggregator(dsoParty).futureValue
       val lastRound = 5L
