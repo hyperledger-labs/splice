@@ -940,6 +940,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
 
     summarizeAndConsumeInput _round s (InputUnclaimedActivityRecord unclaimedActivityRecordCid) = do
       unclaimedActivityRecord <- fetchAndArchive forOwner unclaimedActivityRecordCid
+      assertWithinDeadline "UnclaimedActivityRecord.expiresAt" unclaimedActivityRecord.expiresAt
       return TransferInputsSummary with
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
