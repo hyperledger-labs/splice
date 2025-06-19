@@ -125,7 +125,8 @@ ${conditionalString(
   AND timestamp <= "2025-05-14T09:00:00.000Z")
 `
 )}
-${conditionalString( // making this condition more complicated causes GCP to be unable to parse the query because there's too many filters
+${conditionalString(
+  // making this condition more complicated causes GCP to be unable to parse the query because there's too many filters
   isDevNet,
   `-- TODO(hyperledger-labs/splice#447): remove this once configured cardinality is respected
   -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
