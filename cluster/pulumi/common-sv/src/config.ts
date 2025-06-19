@@ -106,7 +106,9 @@ export const svConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
 export const updateHistoryBackfillingValues = svConfig?.scan?.enableImportUpdatesBackfill
   ? {
       updateHistoryBackfilling: {
+        enabled: true,
         importUpdatesEnabled: true,
+        batchSize: 100,
       },
     }
   : {};
