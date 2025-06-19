@@ -865,7 +865,7 @@ object ConfigTransforms {
   def enableImportUpdateBackfilling(): ConfigTransform =
     updateAllScanAppConfigs((_, config) =>
       config
-        .copy(importUpdateBackfillEnabled = true)
+        .copy(updateHistoryBackfillImportUpdatesEnabled = true)
     )
 
 }

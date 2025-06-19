@@ -71,7 +71,7 @@ class ScanAutomationService(
         svName,
         ledgerClient,
         config.updateHistoryBackfillBatchSize,
-        config.importUpdateBackfillEnabled,
+        config.updateHistoryBackfillImportUpdatesEnabled,
         svParty,
         upgradesConfig,
         triggerContext,
