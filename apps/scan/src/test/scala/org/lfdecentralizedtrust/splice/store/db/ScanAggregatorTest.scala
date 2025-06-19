@@ -697,6 +697,7 @@ class ScanAggregatorTest
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
       svNodeStateCacheTtl = NonNegativeFiniteDuration.ofSeconds(30),
+      enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory()),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

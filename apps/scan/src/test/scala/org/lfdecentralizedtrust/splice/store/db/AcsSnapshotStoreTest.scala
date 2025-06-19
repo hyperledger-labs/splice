@@ -830,7 +830,8 @@ class AcsSnapshotStoreTest
       dsoParty,
       backfillingRequired,
       loggerFactory,
-      true,
+      enableissue12777Workaround = true,
+      enableImportUpdateBackfill = true,
     )
     updateHistory.ingestionSink.initialize().map(_ => updateHistory)
   }

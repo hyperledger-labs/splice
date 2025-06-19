@@ -46,6 +46,7 @@ import {
   DecentralizedSynchronizerNode,
   InstalledMigrationSpecificSv,
   SvParticipant,
+  updateHistoryBackfillingValues,
 } from 'splice-pulumi-common-sv';
 import { SvConfig } from 'splice-pulumi-common-sv/src/config';
 import {
@@ -540,6 +541,7 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
+    ...updateHistoryBackfillingValues,
   };
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {

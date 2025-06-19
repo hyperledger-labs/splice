@@ -252,6 +252,7 @@ abstract class UpdateHistoryTestBase
       backfillingRequired,
       loggerFactory,
       enableissue12777Workaround = true,
+      enableImportUpdateBackfill = true,
     )
   }
 

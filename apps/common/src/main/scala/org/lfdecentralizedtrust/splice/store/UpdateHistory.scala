@@ -77,6 +77,7 @@ class UpdateHistory(
     val backfillingRequired: BackfillingRequirement,
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
+    enableImportUpdateBackfill: Boolean,
     val oMetrics: Option[HistoryMetrics] = None,
 )(implicit
     ec: ExecutionContext,
@@ -245,7 +246,13 @@ class UpdateHistory(
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
 
-          _ <- deleteInvalidAcsSnapshots(newHistoryId)
+          _ <-
+            if (enableImportUpdateBackfill) {
+              deleteInvalidAcsSnapshots(newHistoryId)
+            } else {
+              logger.info(s"Not deleting invalid ACS snapshots for history $newHistoryId")
+              Future.unit
+            }
         } yield {
           state.updateAndGet(
             _.copy(
@@ -649,6 +656,7 @@ class UpdateHistory(
   private[this] def deleteInvalidAcsSnapshots(
       historyId: Long
   )(implicit tc: TraceContext): Future[Unit] = {
+    assert(enableImportUpdateBackfill)
     def migrationsWithCorruptSnapshots(): Future[Set[Long]] = {
       for {
         migrationsWithImportUpdates <- storage
@@ -1834,7 +1842,8 @@ class UpdateHistory(
 
   def getBackfillingState()(implicit
       tc: TraceContext
-  ): Future[BackfillingState] = getBackfillingStateForHistory(historyId)
+  ): Future[BackfillingState] =
+    getBackfillingStateForHistory(historyId)
 
   private[this] def getBackfillingStateForHistory(historyId: Long)(implicit
       tc: TraceContext
@@ -1855,6 +1864,9 @@ class UpdateHistory(
           .map {
             case Some((updatesComplete, importUpdatesComplete)) =>
               if (updatesComplete && importUpdatesComplete) {
+                BackfillingState.Complete
+              } else if (updatesComplete && !enableImportUpdateBackfill) {
+                // If import update backfilling is disabled, behave as if it was not implemented
                 BackfillingState.Complete
               } else {
                 BackfillingState.InProgress(

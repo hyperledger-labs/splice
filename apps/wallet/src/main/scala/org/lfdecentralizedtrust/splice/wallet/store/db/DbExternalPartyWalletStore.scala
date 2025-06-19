@@ -47,6 +47,7 @@ class DbExternalPartyWalletStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = false,
+      enableImportUpdateBackfill = false,
       BackfillingRequirement.BackfillingNotRequired,
     )
     with ExternalPartyWalletStore

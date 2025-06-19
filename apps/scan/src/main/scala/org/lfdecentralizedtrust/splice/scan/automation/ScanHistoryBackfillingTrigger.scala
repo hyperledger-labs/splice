@@ -49,6 +49,7 @@ class ScanHistoryBackfillingTrigger(
     svName: String,
     ledgerClient: SpliceLedgerClient,
     batchSize: Int,
+    importUpdateBackfillingEnabled: Boolean,
     svParty: PartyId,
     upgradesConfig: UpgradesConfig,
     override protected val context: TriggerContext,
@@ -122,6 +123,11 @@ class ScanHistoryBackfillingTrigger(
     case ScanHistoryBackfillingTrigger.InitializeBackfillingTask(_) =>
       initializeBackfilling()
     case ScanHistoryBackfillingTrigger.ImportUpdatesBackfillTask() =>
+      if (!importUpdateBackfillingEnabled) {
+        throw new RuntimeException(
+          "Import updates backfilling is disabled, this place should not be reached"
+        )
+      }
       performImportUpdatesBackfilling()
     case ScanHistoryBackfillingTrigger.BackfillTask() =>
       performBackfilling()

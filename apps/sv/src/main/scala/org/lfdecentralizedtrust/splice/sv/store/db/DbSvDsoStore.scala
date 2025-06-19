@@ -98,6 +98,7 @@ class DbSvDsoStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = false,
+      enableImportUpdateBackfill = false,
       BackfillingRequirement.BackfillingNotRequired,
     )
     with SvDsoStore

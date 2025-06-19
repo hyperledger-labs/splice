@@ -99,6 +99,7 @@ class DbScanStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     svNodeStateCacheTtl: NonNegativeFiniteDuration,
+    enableImportUpdateBackfill: Boolean,
     storeMetrics: DbScanStoreMetrics,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -131,6 +132,7 @@ class DbScanStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = true,
+      enableImportUpdateBackfill = enableImportUpdateBackfill,
       BackfillingRequirement.NeedsBackfilling,
       Some(storeMetrics.history),
     )

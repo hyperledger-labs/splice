@@ -554,6 +554,7 @@ class TxLogBackfillingStoreTest
       backfillingRequired,
       loggerFactory,
       enableissue12777Workaround = true,
+      enableImportUpdateBackfill = true,
     )
   }
 
