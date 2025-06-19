@@ -411,7 +411,7 @@ template UnclaimedActivityRecord
     choice UnclaimedActivityRecord_DsoExpire : UnclaimedActivityRecord_DsoExpireResult
       controller dso
       do 
-        assertDeadlineExceeded "UnclaimedActivityRecord.opensAt" expiresAt
+        assertDeadlineExceeded "UnclaimedActivityRecord.expiresAt" expiresAt
         pure UnclaimedActivityRecord_DsoExpireResult
   
 
