@@ -862,31 +862,12 @@ final class ScanAggregator(
       left join previous_totals pt
       on        nt.party = pt.party;
 
-      insert into active_parties (
-        store_id,
-        party,
-        closed_round
-      ) select $roundTotalsStoreId, party, round from temp_cumulative_totals temp on conflict do nothing;
-
       insert into active_parties (store_id, party, closed_round)
       select $roundTotalsStoreId, party, max(round)
-      from temp_cumulative_totals temp
-      where not exists (
-        select 1 from active_parties ap
-        where ap.store_id = $roundTotalsStoreId
-        and ap.party = temp.party
-      ) group by party;
-
-      update active_parties ap
-      set closed_round = temp.closed_round
-      from (
-        select max(round) as closed_round,
-               party
-        from   temp_cumulative_totals
-        group  by party
-      ) temp
-      where temp.party = ap.party
-      and ap.store_id = $roundTotalsStoreId;
+      from temp_cumulative_totals
+      group by party
+      on conflict (store_id, party)
+      do update set closed_round = excluded.closed_round;
 
       insert into round_party_totals (
                   store_id,
