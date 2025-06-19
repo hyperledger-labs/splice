@@ -90,9 +90,11 @@ export const SvConfigSchema = z.object({
           volumeSize: z.string().optional(),
         })
         .optional(),
-      scan: z.object({
-        enableImportUpdatesBackfill: z.boolean().optional(),
-      }),
+      scan: z
+        .object({
+          enableImportUpdatesBackfill: z.boolean().optional(),
+        })
+        .optional(),
     })
     .optional(),
 });
