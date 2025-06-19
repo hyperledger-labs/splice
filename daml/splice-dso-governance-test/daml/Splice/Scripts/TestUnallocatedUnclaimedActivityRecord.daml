@@ -21,13 +21,14 @@ import Splice.Scripts.Util
 test_UnclaimedActivityRecord_FullFlow : Script ()
 test_UnclaimedActivityRecord_FullFlow = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
-  sv1UserId <- validateUserId "sv1"
+  alice <- allocateParty "alice"
+  aliceUserId <- validateUserId "alice"
   [(dsoRulesCid, _)] <- query @DsoRules dso
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   now <- getTime
   let 
     amountToMint = 10.0
-    reason = "sv1 has achieved milestone 1"
+    reason = "Alice has achieved milestone 1"
     unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
 
   -- start issuing
@@ -42,7 +43,7 @@ test_UnclaimedActivityRecord_FullFlow = do
     ARC_DsoRules with
       dsoAction = SRARC_CreateUnallocatedUnclaimedActivityRecord 
         DsoRules_CreateUnallocatedUnclaimedActivityRecord with
-          beneficiary = sv1
+          beneficiary = alice
           amount = amountToMint
           reason
           unclaimedActivityRecordExpiresAt
@@ -59,14 +60,14 @@ test_UnclaimedActivityRecord_FullFlow = do
   [(_, leftoverUnclaimedReward)] <- query @UnclaimedReward dso
   leftoverUnclaimedReward.amount === initialUnclaimedReward.amount - amountToMint
 
-  -- SV1 redeem the UnclaimedActivityRecord himself
-  [(unclaimedActivityRecordCid, _)] <- query @UnclaimedActivityRecord sv1
-  context <- getPaymentTransferContext app AmuletUser with userId = sv1UserId; primaryParty = sv1 
+  -- Alice redeem the UnclaimedActivityRecord herself
+  [(unclaimedActivityRecordCid, _)] <- query @UnclaimedActivityRecord alice
+  context <- getPaymentTransferContext app AmuletUser with userId = aliceUserId; primaryParty = alice 
   transferResult <- 
-    submitMulti [sv1] [dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+    submitMulti [alice] [dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
-        sender = sv1
-        provider = sv1
+        sender = alice
+        provider = alice
         inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
         outputs = []
         beneficiaries = None 
@@ -78,18 +79,19 @@ test_UnclaimedActivityRecord_FullFlow = do
 
 test_DsoRules_CreateUnallocatedUnclaimedActivityRecord : Script ()
 test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
-  (_app, dso, (sv1, _sv2, _sv3, _sv4)) <- initMainNet
+  (_app, dso, (_sv1, _sv2, _sv3, _sv4)) <- initMainNet
+  alice <- allocateParty "alice"
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
   now <- getTime
   let
     amountToMint = 15.0
-    reason = "sv1 has achieved milestone 1"
+    reason = "Alice has achieved milestone 1"
     unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
     valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord = 
       DsoRules_CreateUnallocatedUnclaimedActivityRecord with
-        beneficiary = sv1
+        beneficiary = alice
         amount = amountToMint
-        reason = "sv1 has achieved milestone 1"
+        reason = "Alice has achieved milestone 1"
         unclaimedActivityRecordExpiresAt
 
   -- Unhappy path - invalid amounts
@@ -106,7 +108,7 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
   [(_, unallocatedUnclaimedActivityRecord)] <- query @UnallocatedUnclaimedActivityRecord dso 
   unallocatedUnclaimedActivityRecord === UnallocatedUnclaimedActivityRecord with 
     dso 
-    beneficiary = sv1
+    beneficiary = alice
     amount = amountToMint
     reason 
     unclaimedActivityRecordExpiresAt
@@ -115,13 +117,14 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
 
 test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord : Script ()
 test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord = do
-  (_app, dso, (sv1, sv2, _sv3, _sv4)) <- initMainNet
+  (_app, dso, (_sv1, sv2, _sv3, _sv4)) <- initMainNet
+  alice <- allocateParty "alice"
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   now <- getTime
   let 
     amountToMint = 15.0
-    beneficiary = sv1
+    beneficiary = alice  
     unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
     unallocatedUnclaimedActivityRecordTimeout = fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout
     context = TestContext with 
@@ -165,7 +168,8 @@ test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord = do
 
 test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord : Script ()
 test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord = do 
-  (_app, dso, (sv1, sv2, _sv3, _sv4)) <- initMainNet
+  (_app, dso, (_sv1, sv2, _sv3, _sv4)) <- initMainNet
+  alice <- allocateParty "alice"
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   now <- getTime
@@ -173,7 +177,7 @@ test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord = do
     amountToMint = 10.0
     unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
     unallocatedUnclaimedActivityRecordTimeout = fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout
-    beneficiary = sv1
+    beneficiary = alice
     context = TestContext with 
       dso 
       beneficiary 
