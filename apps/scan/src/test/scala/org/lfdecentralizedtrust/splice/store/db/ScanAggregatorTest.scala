@@ -496,6 +496,60 @@ class ScanAggregatorTest
       }
     }
 
+    "Aggregate round_party_totals where some parties are not active in some rounds, then active again in other rounds" in {
+      cleanup()
+      val (aggr, store) = mkAggregator(dsoParty).futureValue
+      val lastRound = 9L
+      val middleRound = 5L
+      val firstParties = Seq(1, 2)
+      val firstRounds = Seq(0L, 1L, 2L)
+      val middleParties = Seq(3, 4, 5)
+      val middleRounds = Seq(3L, 4L, 5L)
+      // new parties start to get active after the middle rounds, not active in the last rounds
+      val newParties = Seq(6, 7, 8)
+      val newPartyRounds = Seq(6L, 7L)
+      // first parties are active in the first and last rounds, not in the middle or 'new party rounds'
+      val lastParties = firstParties
+      val lastRounds = Seq(8L, 9L)
+
+      for {
+        first <- generateRoundPartyTotalsRange(store, firstRounds, firstParties)
+        middle <- generateRoundPartyTotalsRange(store, middleRounds, middleParties)
+        newOnes <- generateRoundPartyTotalsRange(store, newPartyRounds, newParties)
+        last <- generateRoundPartyTotalsRange(store, lastRounds, lastParties)
+        expectedRoundPartyRewardTotals = sumRoundPartyTotalsPerRound(
+          first ++ middle ++ newOnes ++ last
+        )
+      } yield {
+        aggregateRounds(aggr, 0, middleRound - 1)
+        aggregateRounds(aggr, middleRound, lastRound)
+        assertRoundPartyTotalsWithLeaderBoards(
+          expectedRoundPartyRewardTotals,
+          aggr,
+          store,
+          lastRound,
+          lastRound.toInt,
+        )
+        val activeParties = queryActiveParties()
+
+        forAll(firstParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(lastRounds.last)
+        }
+        forAll(middleParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(middleRounds.last)
+        }
+        forAll(newParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(newPartyRounds.last)
+        }
+      }
+    }
+
     "Fail to backfill aggregates if it cannot read aggregates before round" in {
       val (aggr, store) = mkAggregator(dsoParty).futureValue
       val now = CantonTimestamp.now()
