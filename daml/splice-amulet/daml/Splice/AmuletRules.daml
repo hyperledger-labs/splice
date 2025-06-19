@@ -939,10 +939,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
       optional (pure s) (summarizeAndConsumeValidatorFaucetInput s) optInputValidatorFaucetCoupon
 
     summarizeAndConsumeInput _round s (InputUnclaimedActivityRecord unclaimedActivityRecordCid) = do
-      unclaimedActivityRecord <- fetchButArchiveLater forOwner unclaimedActivityRecordCid
-      -- we use the UnclaimedActivityRecord_ArchiveAsBeneficiary choice to signal 
-      -- the archival of the unclaimed activity record upon the request of the beneficiary
-      exercise unclaimedActivityRecordCid UnclaimedActivityRecord_ArchiveAsBeneficiary
+      unclaimedActivityRecord <- fetchAndArchive forOwner unclaimedActivityRecordCid
       return TransferInputsSummary with
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount

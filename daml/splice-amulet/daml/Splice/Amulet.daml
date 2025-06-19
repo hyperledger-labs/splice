@@ -405,11 +405,6 @@ template UnclaimedActivityRecord
     observer beneficiary
     ensure amount > 0.0
 
-    -- Choice called by the beneficiary as part of a AmuletRules_Transfer to claim the activity record.
-    choice UnclaimedActivityRecord_ArchiveAsBeneficiary : UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
-      controller beneficiary
-      do pure UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
-
     choice UnclaimedActivityRecord_DsoExpire : UnclaimedActivityRecord_DsoExpireResult
       controller dso
       do 
