@@ -525,19 +525,33 @@ testUnclaimedActivityRecordTransferInput = do
   let 
     amountToMint = 10.0
     expiresAt = addRelTime now (days 2)
+    unclaimedActivityRecord = UnclaimedActivityRecord with 
+      dso = app.dso
+      beneficiary = alice.primaryParty
+      amount = amountToMint
+      reason = "Alice is doing great"
+      expiresAt
 
   runNextIssuance app
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  unclaimedActivityRecordCid <- submit app.dso $ 
-    createCmd UnclaimedActivityRecord with 
-      dso = app.dso
-      beneficiary = alice.primaryParty
-      amount = amountToMint
-      reason = "Alice is doing great"
-      expiresAt 
+  -- Unhappy path - UnclaimedActivityRecord has expired
+  expiredUnclaimedActivityRecordCid <- submit app.dso $ 
+    createCmd unclaimedActivityRecord with expiresAt = addRelTime now (- hours 1)
+  submitMultiMustFail [alice.primaryParty] [app.dso] $ 
+    exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputUnclaimedActivityRecord expiredUnclaimedActivityRecordCid]
+        outputs = []
+        beneficiaries = None 
+      context = context.context
 
+  -- Happy path 
+  unclaimedActivityRecordCid <- submit app.dso $ 
+    createCmd unclaimedActivityRecord
   transferResult <-
     checkTransferMetadata app TxKind_MergeSplit alice.primaryParty $
     checkBalanceChanges defaultAppWithUsers $ 
