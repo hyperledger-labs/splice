@@ -27,6 +27,11 @@ if [ -f /app/pre-bootstrap.sh ]; then
   source /app/pre-bootstrap.sh
 fi
 
+if [ -n "${OVERRIDE_BOOTSTRAP_SCRIPT:-}" ]; then
+  json_log "Overwriting bootstrap script from environment variable"
+  echo "$OVERRIDE_BOOTSTRAP_SCRIPT" > /app/bootstrap.sc
+fi
+
 if [ -f /app/bootstrap.sc ]; then
   ARGS+=( --bootstrap /app/bootstrap-entrypoint.sc )
 fi
