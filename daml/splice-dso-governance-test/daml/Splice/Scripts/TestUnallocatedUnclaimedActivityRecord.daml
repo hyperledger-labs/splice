@@ -154,11 +154,13 @@ test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord = do
   -- Allocate - various combinations of unclaimed rewards
   allocate unallocatedUnclaimedActivityRecordCid None context with unclaimedRewardAmounts = [5.0, 10.0]
   unallocatedUnclaimedActivityRecordCid <- mkUnallocatedUnclaimedActivityRecord context
-  allocate unallocatedUnclaimedActivityRecordCid None context with unclaimedRewardAmounts = [4.0, 5.0, 10.0]  
+  allocate unallocatedUnclaimedActivityRecordCid None context with unclaimedRewardAmounts = [10.0, 5.0, 4.0]
+  unallocatedUnclaimedActivityRecordCid <- mkUnallocatedUnclaimedActivityRecord context
+  allocate unallocatedUnclaimedActivityRecordCid (Some 4.0) context with unclaimedRewardAmounts = [4.0, 5.0, 10.0]
   unallocatedUnclaimedActivityRecordCid <- mkUnallocatedUnclaimedActivityRecord context
   allocate unallocatedUnclaimedActivityRecordCid (Some 3.0) context with unclaimedRewardAmounts = [8.0, 10.0]
   unallocatedUnclaimedActivityRecordCid <- mkUnallocatedUnclaimedActivityRecord context
-  allocate unallocatedUnclaimedActivityRecordCid (Some 3.0) context with unclaimedRewardAmounts = [4.0, 8.0, 10.0]
+  allocate unallocatedUnclaimedActivityRecordCid (Some 3.0) context with unclaimedRewardAmounts = [10.0, 8.0, 4.0]
   pure ()
 
 test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord : Script ()
