@@ -201,6 +201,44 @@ test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord = do
     setTime now
   pure ()  
 
+test_DsoRules_ExpireUnclaimedActivityRecord : Script ()
+test_DsoRules_ExpireUnclaimedActivityRecord = script do
+  (_app, dso, (_sv1, sv2, _sv3, _sv4)) <- initMainNet
+  alice <- allocateParty "alice"
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+  now <- getTime
+  let 
+    beneficiary = alice
+    amount = 10.0
+    reason = "Alice is doing great"
+    expiresAt = addRelTime now (days 2)
+
+  -- Create an UnclaimedActivityRecord
+  unclaimedActivityRecordCid <- submit dso $
+    createCmd UnclaimedActivityRecord with 
+      dso
+      beneficiary
+      amount
+      reason
+      expiresAt
+
+  -- Unhappy path - UnclaimedActivityRecordCid has not expired
+  submitMultiMustFail [sv2] [dso] $ 
+    exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with 
+      unclaimedActivityRecordCid 
+      sv = Some sv2
+
+  -- Happy path 
+  _ <- do 
+    setTime expiresAt
+    submitMulti [sv2] [dso] $ 
+      exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with 
+        unclaimedActivityRecordCid 
+        sv = Some sv2
+    setTime now    
+  pure ()
+
+
 data TestContext = TestContext with 
   dso : Party 
   beneficiary : Party
