@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.util.{Contract, HoldingsSummary, PackageQ
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
@@ -737,17 +737,14 @@ class AcsSnapshotStoreTest
             backfillingRequired = BackfillingRequirement.NeedsBackfilling,
           )
           store1 = mkStore(updateHistory1)
+          migrationsWithCorruptSnapshots1 <- store1.updateHistory.migrationsWithCorruptSnapshots()
+          _ = migrationsWithCorruptSnapshots1 shouldBe Set.empty
           update1 <- ingestCreate(
             updateHistory1,
             amuletRules(),
             timestamp1.minusSeconds(1L),
           )
           _ <- store1.insertNewSnapshot(None, firstMigration, timestamp1)
-          snapshot1first <- store1.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
-          snapshot1second <- store1.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
-
-          _ = snapshot1first.map(_.snapshotRecordTime).value should be(timestamp1)
-          _ = snapshot1second should be(None)
 
           // Second migration. This is missing the import update corresponding to the create above.
           updateHistory2 <- mkUpdateHistory(
@@ -760,58 +757,34 @@ class AcsSnapshotStoreTest
             amuletRules(),
             timestamp2.minusSeconds(1L),
           )
+
+          // This snapshot on the second migration is corrupt, it should be possible to detect and delete it
           _ <- store2.insertNewSnapshot(None, secondMigration, timestamp2)
-          snapshot2first <- store2.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
-          snapshot2second <- store2.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
 
-          _ = snapshot2first.map(_.snapshotRecordTime).value should be(timestamp1)
-          _ = snapshot2second.map(_.snapshotRecordTime).value should be(timestamp2)
-          _ = snapshot2second.map(s => s.lastRowId - s.firstRowId).value should be(0)
+          migrationsWithCorruptSnapshots2 <- store2.updateHistory.migrationsWithCorruptSnapshots()
+          _ = migrationsWithCorruptSnapshots2 shouldBe Set(secondMigration)
 
-          // Mark backfilling as complete, but import update backfilling as not complete.
-          // This is the state affected SVs should be in.
-          _ <- updateHistory1.initializeBackfilling(
-            joiningMigrationId = firstMigration,
-            joiningSynchronizerId = SynchronizerId.tryFromString(update1.tree.getSynchronizerId),
-            joiningUpdateId = update1.tree.getUpdateId,
-            complete = false,
-          )
-          _ <- updateHistory1.destinationHistory.markBackfillingComplete()
+          corruptSnapshot <- store2.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
+          _ = corruptSnapshot.value.snapshotRecordTime shouldBe timestamp2
 
-          //  Re-initialize the store. This should delete the second snapshot.
-          updateHistory3 <- mkUpdateHistory(
+          _ <- store2.deleteSnapshot(corruptSnapshot.value)
+          corruptSnapshotAfterDelete <- store2.lookupSnapshotBefore(
             secondMigration,
-            backfillingRequired = BackfillingRequirement.NeedsBackfilling,
+            CantonTimestamp.MaxValue,
           )
-          store3 = mkStore(updateHistory3)
-          snapshot3first <- store3.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
-          snapshot3second <- store3.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
-
-          _ = snapshot3first.map(_.snapshotRecordTime).value should be(timestamp1)
-          _ = snapshot3second should be(None)
+          _ = corruptSnapshotAfterDelete should be(empty)
 
           // Ingest some import update to simulate the import update backfilling and re-create the snapshot
           _ <- ingestCreate(
-            updateHistory3,
+            updateHistory2,
             amuletRules(),
             CantonTimestamp.MinValue,
           )
-          _ <- updateHistory1.destinationHistory.markImportUpdatesBackfillingComplete()
-          _ <- store3.insertNewSnapshot(None, secondMigration, timestamp2)
+          _ <- store2.insertNewSnapshot(None, secondMigration, timestamp2)
 
-          // Re-initialize the store. The second snapshot should now not be deleted.
-          updateHistory4 <- mkUpdateHistory(
-            secondMigration,
-            backfillingRequired = BackfillingRequirement.NeedsBackfilling,
-          )
-          store4 = mkStore(updateHistory4)
-          snapshot4first <- store4.lookupSnapshotBefore(firstMigration, CantonTimestamp.MaxValue)
-          snapshot4second <- store4.lookupSnapshotBefore(secondMigration, CantonTimestamp.MaxValue)
-        } yield {
-          snapshot4first.map(_.snapshotRecordTime).value should be(timestamp1)
-          snapshot4second.map(_.snapshotRecordTime).value should be(timestamp2)
-          snapshot4second.map(s => s.lastRowId - s.firstRowId).value should be(1)
-        }
+          migrationsWithCorruptSnapshots3 <- store2.updateHistory.migrationsWithCorruptSnapshots()
+          _ = migrationsWithCorruptSnapshots3 shouldBe Set.empty
+        } yield succeed
       }
     }
   }

@@ -135,6 +135,41 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       )(metricsContext)
   }
 
+  object CorruptAcsSnapshots {
+    private val corruptAcsSnapshotsPrefix: MetricName = prefix :+ "corrupt-acs-snapshots"
+
+    type CantonTimestampMicros =
+      Long // OpenTelemetry Gauges only allow numeric types and there's no way to map it
+    val latestRecordTime: Gauge[CantonTimestampMicros] =
+      metricsFactory.gauge(
+        MetricInfo(
+          name = corruptAcsSnapshotsPrefix :+ "latest-record-time",
+          summary = "The record time of the latest corrupt snapshot that has been deleted",
+          Traffic,
+        ),
+        initial = CantonTimestamp.MinValue.toMicros,
+      )(metricsContext)
+
+    val count: Counter =
+      metricsFactory.counter(
+        MetricInfo(
+          name = corruptAcsSnapshotsPrefix :+ "count",
+          summary = "The number of corrupt ACS snapshots deleted",
+          Traffic,
+        )
+      )(metricsContext)
+
+    val completed: Gauge[Int] =
+      metricsFactory.gauge(
+        MetricInfo(
+          name = corruptAcsSnapshotsPrefix :+ "completed",
+          summary = "Whether all corrupt snapshots are deleted (1) or not (0)",
+          Debug,
+        ),
+        initial = 0,
+      )(metricsContext)
+  }
+
   object UpdateHistory {
     private val updateHistoryPrefix: MetricName = prefix :+ "updates"
 
