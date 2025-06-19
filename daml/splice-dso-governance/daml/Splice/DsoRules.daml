@@ -1729,10 +1729,12 @@ getAndValidateSvParty rules (Some sv) = do
   pure sv
 
 
--- UnallocatedUnclaimedActivityRecord
--------------------------------------
+-- Unallocated unclaimed activity record
+----------------------------------------
 
--- TODOV: document
+-- | A governance-approved record representing intent to reward a beneficiary.
+-- Once sufficient `UnclaimedReward` contracts are allocated and archived,
+-- this contract results in the creation of a mintable `UnclaimedActivityRecord`.
 template UnallocatedUnclaimedActivityRecord
   with
     dso : Party
