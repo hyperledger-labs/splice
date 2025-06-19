@@ -1421,13 +1421,11 @@ template DsoRules with
         UnallocatedUnclaimedActivityRecord{..} <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertWithinDeadline "UnclaimedActivityRecord.expiresAt" expiresAt
 
-        -- Sorting in descending order minimizes the number of `UnclaimedReward`s we need to archive
-        sortedUnclaimedRewards <- sortOn (Down . (._2)) <$> 
-          forA unclaimedRewardsToBurnCids (\cid -> do
-            unclaimedReward <- fetchChecked (ForDso with dso) cid
-            pure (cid, unclaimedReward.amount)
-          )
-        leftoverAmount <- archiveUnclaimedRewardsUntilTargetReached dso amount sortedUnclaimedRewards
+        unclaimedRewards <- forA unclaimedRewardsToBurnCids $ \cid -> do
+          unclaimedReward <- fetchChecked (ForDso with dso) cid
+          pure (cid, unclaimedReward.amount)
+        
+        leftoverAmount <- archiveUnclaimedRewardsUntilTargetReached dso amount unclaimedRewards
         optUnclaimedRewardCid <- 
           if leftoverAmount == 0.0 
           then pure None
