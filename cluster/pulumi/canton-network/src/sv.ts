@@ -65,6 +65,7 @@ import {
 } from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
+import { installInfo } from './info';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -241,6 +242,12 @@ export async function installSvNode(
       },
     },
     config
+  );
+
+  installInfo(
+    xns,
+    decentralizedSynchronizerUpgradeConfig,
+    canton.decentralizedSynchronizer,
   );
 
   const svApp = installSvApp(
