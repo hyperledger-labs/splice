@@ -40,6 +40,7 @@ Global Synchronizer for the Canton Network
    app_dev/validator_api/index
    app_dev/ledger_api/index
    app_dev/daml_api/index
+   app_dev/daml_models/index
    app_dev/testing/index
 
 

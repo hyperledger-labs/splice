@@ -8,45 +8,69 @@
 Overview
 ========
 
-An application on the Canton Network is defined by the kind of APIs it integrates with.
-We explain all the APIs available from the Global Synchronizer and a validator node :ref:`here <splice_app_apis>`.
+`Canton Network applications <https://docs.digitalasset.com/build/3.3/overview/introduction>`__
+are used to operate business processes spanning
+multiple organizations or business entities.
+Use the following documentation to build Canton Network applications and get them featured on the Canton Network:
 
-At a high-level, we can distinguish between the following two kinds of apps:
+.. TODO(#1156): link to https://docs.digitalasset.com/build/current/ instead of 3.4 when it is available
 
-* Read-Only Apps: these apps build functionality by using read-only APIs, and thus cannot mutate the ledger.
-* Daml Apps: these apps integrate directly or indirectly with the Ledger API
-  to create new contracts or exercise choices on the ledger to drive on-ledger workflows.
-
-You can find more information in the following sub-sections:
-
-.. toctree::
-
-   read-only-apps
-   daml-apps
-
-
-.. todo::
-
-   - add overview over types of APIs and which apps need what
-   - for Daml apps
-
-      - explain app provider and app user nodes
-      - refer to the TSA training for the in-depth explanation of building Daml apps
+* Learn to build Canton Network applications from the tutorials, how-tos, explanations, and reference documentation at
+  https://docs.digitalasset.com/build/3.3/
+* Browse the currently featured apps: https://sync.global/featured-apps/
+* Request an app to be featured: https://sync.global/featured-app-request/
+* Learn about ongoing CIPs to feature apps from the CIP mailing list (and consider joining the list): https://lists.sync.global/g/cip-discuss/topics
+* Learn about the rationale for featuring an app from the CIP repository: https://github.com/global-synchronizer-foundation/cips
+* Join the app development discussion in the `#gsf-global-synchronizer-appdev <https://app.slack.com/client/T03T53E10/C08FQRCRFUN>`__
+  Slack channel by sending a request to operations@sync.global for your Slack organization to be added to the channel.
 
 
-.. todo:: split into validator/wallet api, scan api, daml, ledger API
-.. todo:: add section on testing including spinning up localnet
-.. todo:: add section on deployment for app devs, e.g., DAR uploads
-.. todo::
+.. rubric:: REST/gRPC APIs
 
-    Add overview of how to integrate with CC at the Daml level
+When building an application for the Canton Network,
+you will typically integrate with some of the APIs provided by the Global Synchronizer and Validator Nodes.
 
-    - use the token standard
-    - mention the `AppPaymentRequestFlow` as deprecated
-    - clearly mark splice subscription API as deprecated
+* Use the :ref:`app_dev_ledger_api` to access the view of the ledger as seen by the parties hosted on a Validator Node and submit transaction to the ledger.
+* Use the :ref:`app_dev_scan_api` to access the view of the ledger and its infrastructure as seen by all SV Nodes.
+  Note that this view is the one visible to the DSO party and does not includes any of the data that is private to the parties hosted on Validator Nodes.
+  Use the :ref:`app_dev_ledger_api` to access that data.
+* Use the :ref:`app_dev_validator_api` to access higher-level functionality provided by the
+  Splice Validator App running alongside the Canton Participant node in a
+  Validator Node.
 
-    Where possible refer to splice Daml code as the primary source; consider adding Daml docs where they are missing for this to work.
+See the :ref:`validator-network-diagram` for details on the components running as part of a Validator Node's and the APIs they provide.
 
+
+.. rubric:: Splice Daml APIs
+
+Splice defines Daml APIs that decouple different applications on the Canton Network.
+
+
+
+
+.. rubric:: Splice Daml Models
+
+Splice implements a number of decentralized applications whose on-ledger state and workflows are implemented in Daml.
+Use the following resources to learn how to interact with this state and workflows.
+
+* Learn how to read and write Daml code using the documentation at:
+  https://docs.digitalasset.com/build/3.3/
+* Learn about the Daml packages that are part of Splice and their data models and workflows from
+  :ref:`app_dev_daml_api`.
+
+.. todo:: split into data schemas and interface packages
+
+
+    .. todo::
+
+        Add overview of how to integrate with CC at the Daml level
+
+        - use the token standard
+        - mention the `AppPaymentRequestFlow` as deprecated
+        - clearly mark splice subscription API as deprecated
+
+
+.. todo:: fix the toc-tree below to not nest below
 
 .. toctree::
 

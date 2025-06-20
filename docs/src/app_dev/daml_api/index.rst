@@ -5,28 +5,43 @@
 
 .. _app_dev_daml_api:
 
-Daml API
-========
+Daml APIs
+================
 
-API docs for daml packages
+APIs used to decouple different Canton Network applications.
+When building Daml code that interacts with workflows of other apps in the Canton Network,
+you should use these APIs to decouple your code from the upgrading cycles of your dependencies.
 
 
-.. toctree::
-   :maxdepth: 1
+Canton Network Token Standard APIs (CIP-0056)
+---------------------------------------------
 
-   ../api/splice-amulet/index
-   ../api/splice-amulet-name-service/index
-   ../api/splice-dso-governance/index
-   ../api/splice-util/index
-   ../api/splice-validator-lifecycle/index
-   ../api/splice-wallet/index
-   ../api/splice-wallet-payments/index
-   ../api/splice-api-featured-app-v1/index
-   ../api/splice-token-standard-test/index
-   ../api/splice-api-token-metadata-v1/index
-   ../api/splice-api-token-holding-v1/index
-   ../api/splice-api-token-transfer-instruction-v1/index
-   ../api/splice-api-token-allocation-request-v1/index
-   ../api/splice-api-token-allocation-instruction-v1/index
-   ../api/splice-api-token-allocation-v1/index
-   ../api/splice-api-token-burn-mint-v1/index
+* See the `text of the CIP-0056 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md>`__
+  for its background on its design and its specification.
+* See the `README in its source-code <https://github.com/hyperledger-labs/splice/tree/main/token-standard#readme>`__ for background on how to use the APIs.
+* See the reference docs below for the Daml interfaces that are part of the Canton Network Token Standard.
+
+   .. toctree::
+      :maxdepth: 1
+
+      ../api/splice-api-token-metadata-v1/index
+      ../api/splice-api-token-holding-v1/index
+      ../api/splice-api-token-transfer-instruction-v1/index
+      ../api/splice-api-token-allocation-request-v1/index
+      ../api/splice-api-token-allocation-instruction-v1/index
+      ../api/splice-api-token-allocation-v1/index
+      ../api/splice-api-token-burn-mint-v1/index
+
+.. TODO(): also add links to OpenAPI docs for the REST API parts of these APIs
+
+Featured App Activity Markers API (CIP-0047)
+--------------------------------------------
+
+* See the `text of the CIP-0047 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0047/cip-0047.md>`__
+  for its background on its design and its specification.
+* See the reference docs below for the Daml interfaces that are part of the Featured App Activity Markers API.
+
+   .. toctree::
+      :maxdepth: 1
+
+      ../api/splice-api-featured-app-v1/index
