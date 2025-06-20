@@ -14,7 +14,9 @@ Community-Contributed Documentation
    Contributions to enhance accuracy and completeness are always welcome.
 
 .. toctree::
+   :maxdepth: 1
 
    oidc-config-okta-keycloak.rst
    docker-compose-helm-chart.rst
+   helm-kubernetes-templating-tool.rst
    
