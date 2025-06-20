@@ -1399,6 +1399,9 @@ template DsoRules with
       do
         now <- getTime
         let expiresAt = now `addRelTime` (fromOptional (days 1) config.unallocatedUnclaimedActivityRecordTimeout)
+        -- Sanity check
+        require "UnclaimedActivityRecord expires after UnallocatedUnclaimedActivityRecord" $ 
+          unclaimedActivityRecordExpiresAt > expiresAt
         unallocatedUnclaimedActivityRecordCid <- 
           create UnallocatedUnclaimedActivityRecord with 
             dso
