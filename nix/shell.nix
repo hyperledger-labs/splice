@@ -99,6 +99,7 @@ in pkgs.mkShell {
     skopeo
     sphinx
     sphinx-lint
+    snyk
     tmux
     toxiproxy
     unzip
