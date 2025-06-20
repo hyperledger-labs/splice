@@ -46,7 +46,7 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 #. Stop the validator and participant using ``./stop.sh``.
 
-#. Wipe out the existing database volume: ``docker volume rm compose_postgres-splice``.
+#. Wipe out the existing database volume: ``docker volume rm splice-validator_postgres-splice``.
 
 #. Start only the postgres container: ``docker compose up -d postgres-splice``
 
