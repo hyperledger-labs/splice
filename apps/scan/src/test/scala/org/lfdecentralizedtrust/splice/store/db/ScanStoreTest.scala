@@ -2239,6 +2239,7 @@ trait AmuletTransferUtil { self: StoreTest =>
         Optional.empty(),
       ),
       Collections.emptyMap(),
+      Collections.emptyMap(),
       true,
     )
     contract(
