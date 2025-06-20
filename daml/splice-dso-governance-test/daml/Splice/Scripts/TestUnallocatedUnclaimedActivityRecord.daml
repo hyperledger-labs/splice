@@ -25,11 +25,6 @@ test_UnclaimedActivityRecord_FullFlow = do
   aliceUserId <- validateUserId "alice"
   [(dsoRulesCid, _)] <- query @DsoRules dso
   [(amuletRulesCid, _)] <- query @AmuletRules dso
-  now <- getTime
-  let 
-    amountToMint = 10.0
-    reason = "Alice has achieved milestone 1"
-    unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
 
   -- start issuing
   runNextIssuance app
@@ -37,6 +32,12 @@ test_UnclaimedActivityRecord_FullFlow = do
   -- merge unclaimed rewards 
   mergeUnclaimedRewards app 
   [(unclaimedRewardCid, initialUnclaimedReward)] <- query @UnclaimedReward dso
+
+  now <- getTime
+  let 
+    amountToMint = 10.0
+    reason = "Alice has achieved milestone 1"
+    unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
 
   -- Vote
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
@@ -87,6 +88,7 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
     amountToMint = 15.0
     reason = "Alice has achieved milestone 1"
     unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
+    unallocatedUnclaimedActivityRecordTimeout = fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout
     valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord = 
       DsoRules_CreateUnallocatedUnclaimedActivityRecord with
         beneficiary = alice
@@ -94,13 +96,21 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
         reason = "Alice has achieved milestone 1"
         unclaimedActivityRecordExpiresAt
 
-  -- Unhappy path - invalid amounts
+  -- Unhappy paths
+  ---------------- 
+  -- Invalid amounts
   submitMustFail dso $
     exerciseCmd dsoRulesCid valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord with 
       amount = 0.0
   submitMustFail dso $
     exerciseCmd dsoRulesCid valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord with 
       amount = -10.0
+  -- Invalid unclaimedActivityRecordExpiresAt 
+  -- UnclaimedActivityRecord must expire after UnallocatedUnclaimedActivityRecord
+  submitMustFail dso $
+    exerciseCmd dsoRulesCid valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord with 
+      unclaimedActivityRecordExpiresAt = 
+        (now `addRelTime` (unallocatedUnclaimedActivityRecordTimeout)) `addRelTime` (- hours 1)
 
   -- Happy path 
   submit dso $
