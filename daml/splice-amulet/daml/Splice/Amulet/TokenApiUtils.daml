@@ -57,6 +57,9 @@ svRewardAmountMetaKey = amuletPrefix <> "sv-rewards"
 appRewardAmountMetaKey : Text
 appRewardAmountMetaKey = amuletPrefix <> "app-rewards"
 
+unclaimedActivityRecordAmountMetaKey : Text
+unclaimedActivityRecordAmountMetaKey = amuletPrefix <> "unclaimed-activity-records"
+
 validatorRewardAmountMetaKey : Text
 validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"
 
