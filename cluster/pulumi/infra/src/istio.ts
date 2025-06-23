@@ -1,11 +1,13 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { local } from '@pulumi/command';
+import { dsoSize, istioCometbftExternalPort } from 'splice-pulumi-common-sv';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
   activeVersion,
   DecentralizedSynchronizerUpgradeConfig,
+  DeploySvRunbook,
   ExactNamespace,
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
@@ -158,13 +160,18 @@ function configureInternalGatewayService(
 ) {
   const externalIPRanges = loadIPRanges();
   // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = Array.from(
-    Array(DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1).keys()
-  ).flatMap((domain: number) => {
-    return Array.from(Array(10).keys()).map(node => {
-      return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
+  const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
+    .map(migrationInfo => migrationInfo.id)
+    .flatMap((domain: number) => {
+      return (DeploySvRunbook ? [0] : [])
+        .concat(Array.from(Array(dsoSize).keys()).map(n => n + 1))
+        .map(node => {
+          return ingressPort(
+            `cometbft-${domain}-${node}-gw`,
+            istioCometbftExternalPort(domain, node)
+          );
+        });
     });
-  });
   return configureGatewayService(
     ingressNs,
     ingressIp,
