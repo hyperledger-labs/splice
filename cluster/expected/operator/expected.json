@@ -209,6 +209,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "deployment",
             "namespace": "operator"
           },
@@ -284,6 +285,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
