@@ -1,6 +1,7 @@
 -- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 -- SPDX-License-Identifier: Apache-2.0
 
+{-# LANGUAGE MultiWayIf #-}
 module Splice.DsoRules where
 
 import Prelude hiding (all)
@@ -1426,15 +1427,14 @@ template DsoRules with
         UnallocatedUnclaimedActivityRecord{..} <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertWithinDeadline "UnclaimedActivityRecord.expiresAt" expiresAt
 
-        unclaimedRewards <- forA unclaimedRewardsToBurnCids $ \cid -> do
-          unclaimedReward <- fetchChecked (ForDso with dso) cid
-          pure (cid, unclaimedReward.amount)
-        
-        leftoverAmount <- archiveUnclaimedRewardsUntilTargetReached dso amount unclaimedRewards
+        totalUnclaimedRewards <- sum <$> forA unclaimedRewardsToBurnCids \cid -> do
+          unclaimedReward <- fetchAndArchive (ForDso with dso) cid
+          pure unclaimedReward.amount
+        let leftover = totalUnclaimedRewards - amount
         optUnclaimedRewardCid <- 
-          if leftoverAmount == 0.0 
-          then pure None
-          else Some <$> create UnclaimedReward with dso; amount = leftoverAmount
+          if | leftover < 0.0 -> abort $ "insufficient unclaimed rewards: " <> show (abs leftover)
+             | leftover == 0.0 -> pure None
+             | otherwise -> Some <$> create UnclaimedReward with dso; amount = leftover
 
         unclaimedActivityRecordCid <- create UnclaimedActivityRecord with 
           dso
@@ -1466,19 +1466,6 @@ template DsoRules with
         void $ exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult 
 
-
-archiveUnclaimedRewardsUntilTargetReached : Party -> Decimal -> [(ContractId UnclaimedReward, Decimal)] -> Update Decimal
-archiveUnclaimedRewardsUntilTargetReached _dso remaining [] 
-  | remaining == 0.0 = pure remaining
-  | otherwise = abort $ "insufficient unclaimed rewards: " <> show remaining
-archiveUnclaimedRewardsUntilTargetReached dso remaining ((cid, amount) :: rest)
-  | remaining <= 0.0 = pure remaining
-  | amount <= remaining
-  = do void $ fetchAndArchive (ForDso with dso) cid
-       archiveUnclaimedRewardsUntilTargetReached dso (remaining - amount) rest
-  | otherwise
-  = do void $ fetchAndArchive (ForDso with dso) cid
-       pure (amount - remaining)
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)
 pruneAtLeastOne now schedule =
