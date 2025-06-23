@@ -10,6 +10,7 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 import {
   activeVersion,
   DecentralizedSynchronizerUpgradeConfig,
+  DeploySvRunbook,
   ExactNamespace,
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
@@ -160,12 +161,10 @@ function configureInternalGatewayService(
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
     .map(migrationInfo => migrationInfo.id)
     .flatMap((domain: number) => {
-      return Array.from(Array(dsoSize).keys()).map(node => {
-        // Cometbft node indices start at 1
-        const nodeIndex = node + 1;
+      return (DeploySvRunbook ? [0] : []).concat(Array.from(Array(dsoSize).keys()).map(n => n + 1)).map(node => {
         return ingressPort(
           `cometbft-${domain}-${node}-gw`,
-          istioCometbftExternalPort(domain, nodeIndex)
+          istioCometbftExternalPort(domain, node)
         );
       });
     });
