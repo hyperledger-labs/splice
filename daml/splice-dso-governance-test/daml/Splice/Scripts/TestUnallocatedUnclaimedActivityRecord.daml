@@ -5,8 +5,9 @@ module Splice.Scripts.TestUnallocatedUnclaimedActivityRecord where
 
 import DA.Assert
 import DA.Action (void, when)
-import DA.Optional (fromSome, whenSome)
+import DA.Optional (fromSome)
 import DA.Time
+import DA.Traversable qualified as Traversable
 
 import Daml.Script
 
@@ -278,16 +279,16 @@ allocate unallocatedUnclaimedActivityRecordCid optExpectedLeftover TestContext{.
   -- Create UnclaimedRewards
   unclaimedRewardsToBurnCids <- forA unclaimedRewardAmounts (mkUnclaimedReward dso)
   -- Allocate the UnallocatedUnclaimedActivityRecord
-  result <- submitMulti [sv] [dso]  $ 
+  optUnclaimedRewardCid <- (.optUnclaimedRewardCid) <$> submitMulti [sv] [dso] do 
     exerciseCmd dsoRulesCid DsoRules_AllocateUnallocatedUnclaimedActivityRecord with 
       unallocatedUnclaimedActivityRecordCid
       amuletRulesCid
       unclaimedRewardsToBurnCids
       sv
-  -- Assertions
-  whenSome (result.optUnclaimedRewardCid) $ \unclaimedRewardCid -> do
-    Some unclaimedReward <- queryContractId @UnclaimedReward dso unclaimedRewardCid
-    Some unclaimedReward.amount === optExpectedLeftover
+  optLeftover <- fmap (.amount) . join <$> 
+    Traversable.forA optUnclaimedRewardCid \unclaimedRewardCid ->
+      queryContractId @UnclaimedReward dso unclaimedRewardCid 
+  optLeftover === optExpectedLeftover
 
 expireMustFail : ContractId UnallocatedUnclaimedActivityRecord -> TestContext -> Script ()
 expireMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
