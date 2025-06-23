@@ -240,10 +240,13 @@ test_DsoRules_ExpireUnclaimedActivityRecord = script do
   -- Happy path 
   _ <- do 
     setTime expiresAt
-    submitMulti [sv2] [dso] $ 
-      exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with 
-        unclaimedActivityRecordCid 
-        sv = sv2
+    DsoRules_ExpireUnclaimedActivityRecordResult unclaimedRewardCid <- 
+      submitMulti [sv2] [dso] $ 
+        exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with 
+          unclaimedActivityRecordCid 
+          sv = sv2
+    Some unclaimedReward <- queryContractId @UnclaimedReward dso unclaimedRewardCid
+    unclaimedReward === UnclaimedReward with dso; amount
     setTime now    
   pure ()
 

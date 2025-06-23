@@ -294,7 +294,8 @@ data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_Alloca
 
 data DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult = DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
 
-data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult
+data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActivityRecordResult with
+    unclaimedRewardCid : ContractId UnclaimedReward
 
 
 -- Workflow templates
@@ -1463,8 +1464,9 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        void $ exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
-        pure DsoRules_ExpireUnclaimedActivityRecordResult 
+        UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <- 
+          exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
+        pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
 
 pruneAtLeastOne : Ord t => t -> Schedule t a -> Optional (Schedule t a)

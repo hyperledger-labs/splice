@@ -79,7 +79,8 @@ data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBenefic
 
 data UnclaimedActivityRecord_ArchiveAsBeneficiaryResult = UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
 
-data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult
+data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with 
+  unclaimedRewardCid : ContractId UnclaimedReward
 
 -- | A amulet, which can be locked and whose amount expires over time.
 --
@@ -409,7 +410,8 @@ template UnclaimedActivityRecord
       controller dso
       do 
         assertDeadlineExceeded "UnclaimedActivityRecord.expiresAt" expiresAt
-        pure UnclaimedActivityRecord_DsoExpireResult
+        unclaimedRewardCid <- create UnclaimedReward with dso; amount
+        pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
   
 
 requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
