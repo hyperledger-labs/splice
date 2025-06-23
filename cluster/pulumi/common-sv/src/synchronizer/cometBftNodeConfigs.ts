@@ -35,7 +35,7 @@ export class CometBftNodeConfigs {
       privateKey: staticConf.privateKey,
       identifier: this.nodeIdentifier,
       externalAddress: this.p2pExternalAddress(staticConf.nodeIndex),
-      istioPort: istioCometbftExternalPort(this._domainMigrationId, staticConf.nodeIndex),
+      istioPort: this.istioExternalPort(staticConf.nodeIndex),
       retainBlocks: staticConf.retainBlocks,
       validator: staticConf.validator,
     };
@@ -80,13 +80,13 @@ export class CometBftNodeConfigs {
   }
 
   private p2pExternalAddress(nodeIndex: number): string {
-    return `${CLUSTER_HOSTNAME}:${istioCometbftExternalPort(this._domainMigrationId, nodeIndex)}`;
+    return `${CLUSTER_HOSTNAME}:${this.istioExternalPort(nodeIndex)}`;
+  }
+
+  private istioExternalPort(nodeIndex: number) {
+    // TODO(#10482) Revisit port scheme
+    return nodeIndex >= 10
+      ? Number(`26${this._domainMigrationId}${nodeIndex}`)
+      : Number(`26${this._domainMigrationId}${nodeIndex}6`);
   }
 }
-
-export const istioCometbftExternalPort = (migrationId: number, nodeIndex: number): number => {
-  // TODO(DACH-NY/canton-network-node#10482) Revisit port scheme
-  return nodeIndex >= 10
-    ? Number(`26${migrationId}${nodeIndex}`)
-    : Number(`26${migrationId}${nodeIndex}6`);
-};
