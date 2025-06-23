@@ -160,15 +160,11 @@ function configureInternalGatewayService(
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
     .map(migrationInfo => migrationInfo.id)
     .flatMap((domain: number) =>
-        // node = 0 is the sv runbook. We always include that as relying on SPLICE_DEPLOY_SV_RUNBOOK doesn't work well
-        // for jobs where we deploy the sv runbook in a separate step so the core infra stack still runs with SPLICE_DEPLOY_SV_RUNBOOK=false.
-        Array.from(Array(dsoSize + 1).keys())
-        .map(node =>
-          ingressPort(
-            `cometbft-${domain}-${node}-gw`,
-            istioCometbftExternalPort(domain, node)
-          )
-        )
+      // node = 0 is the sv runbook. We always include that as relying on SPLICE_DEPLOY_SV_RUNBOOK doesn't work well
+      // for jobs where we deploy the sv runbook in a separate step so the core infra stack still runs with SPLICE_DEPLOY_SV_RUNBOOK=false.
+      Array.from(Array(dsoSize + 1).keys()).map(node =>
+        ingressPort(`cometbft-${domain}-${node}-gw`, istioCometbftExternalPort(domain, node))
+      )
     );
   return configureGatewayService(
     ingressNs,
