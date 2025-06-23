@@ -3,6 +3,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { local } from '@pulumi/command';
+import { dsoSize, istioCometbftExternalPort } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
@@ -156,13 +157,18 @@ function configureInternalGatewayService(
 ) {
   const externalIPRanges = loadIPRanges();
   // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = Array.from(
-    Array(DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1).keys()
-  ).flatMap((domain: number) => {
-    return Array.from(Array(10).keys()).map(node => {
-      return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
+  const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
+    .map(migrationInfo => migrationInfo.id)
+    .flatMap((domain: number) => {
+      return Array.from(Array(dsoSize).keys()).map(node => {
+        // Cometbft node indices start at 1
+        const nodeIndex = node + 1;
+        return ingressPort(
+          `cometbft-${domain}-${node}-gw`,
+          istioCometbftExternalPort(domain, nodeIndex)
+        );
+      });
     });
-  });
   return configureGatewayService(
     ingressNs,
     ingressIp,
