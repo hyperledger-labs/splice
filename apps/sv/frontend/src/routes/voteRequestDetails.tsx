@@ -114,16 +114,11 @@ export const VoteRequestDetails: React.FC = () => {
   });
 
   return (
-    <>
-      <div>
-        VoteRequestDetails for {contractId} <br /> {voteRequest?.payload.action.tag}
-      </div>
-      <ProposalDetailsContent
-        contractId={ccid as ContractId<VoteRequest>}
-        proposalDetails={proposalDetails}
-        votingInformation={votingInformation}
-        votes={votes}
-      />
-    </>
+    <ProposalDetailsContent
+      contractId={ccid as ContractId<VoteRequest>}
+      proposalDetails={proposalDetails}
+      votingInformation={votingInformation}
+      votes={votes}
+    />
   );
 };

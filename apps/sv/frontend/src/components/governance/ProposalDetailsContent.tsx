@@ -82,7 +82,7 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
     <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}>
       <Box sx={{ width: '100%', p: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>
+          <Typography variant="h4" sx={{ flexGrow: 1 }} data-testid="proposal-details-title">
             Proposal Details
           </Typography>
           <Button
@@ -98,12 +98,17 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
         <Paper sx={{ bgcolor: 'background.paper', p: 6 }}>
           {/* Proposal Details Section */}
-          <Typography variant="h6" component="h2" gutterBottom sx={{ mb: 3 }}>
-            Proposal Details
-          </Typography>
+          {/* <Typography variant="h6" component="h2" gutterBottom sx={{ mb: 3 }}> */}
+          {/*   Proposal Details */}
+          {/* </Typography> */}
 
           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-            <DetailItem label="Action" value={proposalDetails.actionName} />
+            <DetailItem
+              label="Action"
+              value={proposalDetails.actionName}
+              labelId="proposal-details-action-label"
+              valueId="proposal-details-action-value"
+            />
             <Divider sx={{ my: 1 }} />
 
             {proposalDetails.action === 'SRARC_OffboardSv' && (
@@ -135,7 +140,12 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
             <Divider sx={{ my: 1 }} />
 
-            <DetailItem label="Summary" value={proposalDetails.summary} />
+            <DetailItem
+              label="Summary"
+              value={proposalDetails.summary}
+              labelId="proposal-details-summary-label"
+              valueId="proposal-details-summary-value"
+            />
             <Divider sx={{ my: 1 }} />
 
             <DetailItem
@@ -145,6 +155,8 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                   {sanitizeUrl(proposalDetails.url)}
                 </Link>
               }
+              labelId="proposal-details-url-label"
+              valueId="proposal-details-url-value"
             />
           </Box>
 
@@ -155,7 +167,10 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
             Voting Information
           </Typography>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          <Box
+            sx={{ display: 'flex', flexDirection: 'column' }}
+            data-testid="proposal-details-voting-information"
+          >
             <Box sx={{ py: 1 }}>
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Requester
@@ -174,10 +189,14 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Voting Expires At
               </Typography>
-              <Typography variant="body1" gutterBottom>
+              <Typography variant="body1" data-testid="proposal-details-voting-closes" gutterBottom>
                 {dayjs(votingInformation.votingCloses).fromNow()}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                data-testid="proposal-details-voting-closes-value"
+              >
                 {votingInformation.votingCloses}
               </Typography>
             </Box>
@@ -187,16 +206,29 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Voting Takes Effect On
               </Typography>
-              <Typography variant="body1" gutterBottom>
+              <Typography
+                variant="body1"
+                data-testid="proposal-details-vote-takes-effect"
+                gutterBottom
+              >
                 {dayjs(votingInformation.voteTakesEffect).fromNow()}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                data-testid="proposal-details-vote-takes-effect-value"
+              >
                 {votingInformation.voteTakesEffect}
               </Typography>
             </Box>
             <Divider sx={{ my: 1 }} />
 
-            <DetailItem label="Status" value={votingInformation.status} />
+            <DetailItem
+              label="Status"
+              value={votingInformation.status}
+              labelId="proposal-details-status-label"
+              valueId="proposal-details-status-value"
+            />
           </Box>
 
           <Divider sx={{ mt: 1, mb: 8 }} />
@@ -207,10 +239,23 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           </Typography>
 
           <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-            <Tabs value={voteTabValue} onChange={handleVoteTabChange} aria-label="vote tabs">
-              <Tab label={`All (${votes.length})`} value="all" />
-              <Tab label={`Accepted (${acceptedVotes.length})`} value="accepted" />
-              <Tab label={`Rejected (${rejectedVotes.length})`} value="rejected" />
+            <Tabs
+              value={voteTabValue}
+              onChange={handleVoteTabChange}
+              aria-label="vote tabs"
+              data-testid="votes-tabs"
+            >
+              <Tab label={`All (${votes.length})`} value="all" data-testid="all-votes-tab" />
+              <Tab
+                label={`Accepted (${acceptedVotes.length})`}
+                value="accepted"
+                data-testid="accepted-votes-tab"
+              />
+              <Tab
+                label={`Rejected (${rejectedVotes.length})`}
+                value="rejected"
+                data-testid="rejected-votes-tab"
+              />
               <Tab
                 label={
                   (isClosed ? 'Did not Vote' : 'Awaiting Response') +
@@ -219,11 +264,15 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
                   ')'
                 }
                 value="no-vote"
+                data-testid="no-vote-votes-tab"
               />
             </Tabs>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}>
+          <Box
+            sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 4 }}
+            data-testid="proposal-details-votes"
+          >
             {getFilteredVotes().map((vote, index) => (
               <VoteItem
                 key={`${vote.vote}-${index}`}
@@ -246,33 +295,40 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 
           <Divider sx={{ my: 4 }} />
 
-          {proposalDetails.isVoteRequest && (
+          {proposalDetails.isVoteRequest && !isClosed && (
             <>
               {/* Your Vote Section */}
               <Typography variant="h6" component="h2" gutterBottom>
                 Your Vote
               </Typography>
 
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box
+                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+                data-testid="proposal-details-your-vote-section"
+              >
                 <TextField
                   label="Your Reason"
                   multiline
                   rows={4}
                   value={reason}
                   onChange={e => setReason(e.target.value)}
-                  // variant="outlined"
-                  // fullWidth
-                  // sx={{
-                  //   '& .MuiOutlinedInput-root': {
-                  //     bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  //   },
-                  // }}
+                  inputProps={{ 'data-testid': 'proposal-details-your-vote-input' }}
                 />
                 <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 2 }}>
-                  <Button variant="contained" color="success" sx={{ minWidth: 100 }}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    sx={{ minWidth: 100 }}
+                    data-testid="proposal-details-your-vote-accept"
+                  >
                     Accept
                   </Button>
-                  <Button variant="contained" color="error" sx={{ minWidth: 100 }}>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    sx={{ minWidth: 100 }}
+                    data-testid="proposal-details-your-vote-reject"
+                  >
                     Reject
                   </Button>
                 </Box>
@@ -288,15 +344,25 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
 interface DetailItemProps {
   label: string;
   value: string | React.ReactNode;
+  labelId?: string;
+  valueId?: string;
 }
 
-const DetailItem = ({ label, value }: DetailItemProps) => {
+const DetailItem = ({ label, value, labelId, valueId }: DetailItemProps) => {
   return (
     <Box sx={{ py: 1 }}>
-      <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+      <Typography
+        variant="subtitle2"
+        color="text.secondary"
+        id={labelId}
+        data-testid={labelId}
+        gutterBottom
+      >
         {label}
       </Typography>
-      <Typography variant="body1">{value}</Typography>
+      <Typography variant="body1" id={valueId} data-testid={valueId}>
+        {value}
+      </Typography>
     </Box>
   );
 };
@@ -347,6 +413,7 @@ const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: Vote
         justifyContent: 'space-between',
         alignItems: 'flex-start',
       }}
+      data-testid="proposal-details-vote"
     >
       <Box sx={{ flexGrow: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -363,6 +430,7 @@ const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: Vote
                 ml: 1,
                 bgcolor: 'rgba(255, 255, 255, 0.1)',
               }}
+              data-testid="proposal-details-your-vote-chip"
             />
           )}
         </Box>
@@ -391,7 +459,11 @@ const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: Vote
             mr: 1,
           }}
         />
-        <Typography variant="body2" color={getStatusColor()}>
+        <Typography
+          variant="body2"
+          color={getStatusColor()}
+          data-testid="proposal-details-vote-status-value"
+        >
           {getStatusText()}
         </Typography>
       </Box>
@@ -405,7 +477,11 @@ interface OffboardMemberSectionProps {
 
 const OffboardMemberSection = ({ memberPartyId }: OffboardMemberSectionProps) => {
   return (
-    <Box sx={{ py: 1 }}>
+    <Box
+      sx={{ py: 1 }}
+      id="proposal-details-offboard-member-section"
+      data-testid="proposal-details-offboard-member-section"
+    >
       <Typography variant="subtitle2" color="text.secondary" gutterBottom>
         Member
       </Typography>
@@ -426,13 +502,22 @@ interface FeatureAppSectionProps {
 
 const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
   return (
-    <Box sx={{ py: 1 }}>
+    <Box
+      sx={{ py: 1 }}
+      id="proposal-details-feature-app-section"
+      data-testid="proposal-details-feature-app-section"
+    >
       {/* <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 2 }}> */}
       {/*   Feature Application */}
       {/* </Typography> */}
 
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <DetailItem label="Provider ID" value={provider} />
+        <DetailItem
+          label="Provider ID"
+          value={provider}
+          labelId="proposal-details-feature-app-label"
+          valueId="proposal-details-feature-app-value"
+        />
       </Box>
     </Box>
   );
@@ -444,9 +529,18 @@ interface UnfeatureAppSectionProps {
 
 const UnfeatureAppSection = ({ rightContractId }: UnfeatureAppSectionProps) => {
   return (
-    <Box sx={{ py: 1 }}>
+    <Box
+      sx={{ py: 1 }}
+      id="proposal-details-unfeature-app-section"
+      data-testid="proposal-details-unfeature-app-section"
+    >
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-        <DetailItem label="Contract ID" value={rightContractId} />
+        <DetailItem
+          label="Contract ID"
+          value={rightContractId}
+          labelId="proposal-details-unfeature-app-label"
+          valueId="proposal-details-unfeature-app-value"
+        />
       </Box>
     </Box>
   );
@@ -462,7 +556,11 @@ const UpdateSvRewardWeightSection = ({
   weightChange,
 }: UpdateSvRewardWeightSectionProps) => {
   return (
-    <Box sx={{ py: 1 }}>
+    <Box
+      sx={{ py: 1 }}
+      id="proposal-details-update-sv-reward-weight-section"
+      data-testid="proposal-details-update-sv-reward-weight-section"
+    >
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
           Member
@@ -471,7 +569,12 @@ const UpdateSvRewardWeightSection = ({
           <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
         </Typography>
 
-        <DetailItem label="Weight" value={weightChange} />
+        <DetailItem
+          label="Weight"
+          value={weightChange}
+          labelId="proposal-details-weight-label"
+          valueId="proposal-details-weight-value"
+        />
       </Box>
     </Box>
   );
@@ -483,8 +586,18 @@ interface ConfigRulesChangesProps {
 
 const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
   return (
-    <Box sx={{ py: 1 }}>
-      <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
+    <Box
+      sx={{ py: 1 }}
+      id="proposal-details-config-changes-section"
+      data-testid="proposal-details-config-changes-section"
+    >
+      <Typography
+        variant="subtitle2"
+        color="text.secondary"
+        gutterBottom
+        sx={{ mb: 2 }}
+        data-testid="proposal-details-config-changes-section-title"
+      >
         Proposed Changes
       </Typography>
 
@@ -498,8 +611,16 @@ const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
         )}
 
         {changes.map((change, index) => (
-          <Box key={index} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="body1" sx={{ minWidth: 200 }}>
+          <Box
+            key={index}
+            sx={{ display: 'flex', alignItems: 'center', gap: 2 }}
+            data-testid="config-change"
+          >
+            <Typography
+              variant="body1"
+              sx={{ minWidth: 200 }}
+              data-testid="config-change-field-name"
+            >
               {change.fieldName}
             </Typography>
 
@@ -512,11 +633,16 @@ const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
                 minWidth: 80,
                 textAlign: 'center',
               }}
+              data-testid="config-change-current-value-container"
             >
               {change.isId ? (
-                <PartyId partyId={`${change.currentValue}`} />
+                <PartyId partyId={`${change.currentValue}`} id="config-change-current-value" />
               ) : (
-                <Typography variant="body2" fontFamily="monospace">
+                <Typography
+                  variant="body2"
+                  fontFamily="monospace"
+                  data-testid="config-change-current-value"
+                >
                   {change.currentValue}
                 </Typography>
               )}
@@ -535,11 +661,16 @@ const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
                 minWidth: 80,
                 textAlign: 'center',
               }}
+              data-testid="config-change-new-value-container"
             >
               {change.isId ? (
-                <PartyId partyId={`${change.newValue}`} />
+                <PartyId partyId={`${change.newValue}`} id="config-change-new-value" />
               ) : (
-                <Typography variant="body2" fontFamily="monospace">
+                <Typography
+                  variant="body2"
+                  fontFamily="monospace"
+                  data-testid="config-change-new-value"
+                >
                   {change.newValue}
                 </Typography>
               )}
