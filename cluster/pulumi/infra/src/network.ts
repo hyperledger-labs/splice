@@ -10,6 +10,7 @@ import {
   GCP_PROJECT,
   getDnsNames,
   isDevNet,
+  privateNetwork,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
 
@@ -232,18 +233,11 @@ function clusterCertificate(
   );
 }
 
-const project = gcp.config.project;
-
 function natGateway(
   clusterName: string,
   egressIp: gcp.compute.Address,
   options = {}
 ): gcp.compute.RouterNat {
-  const privateNetwork = gcp.compute.Network.get(
-    'default',
-    `projects/${project}/global/networks/default`
-  );
-
   const subnet = gcp.compute.getSubnetworkOutput({
     name: `cn-${clusterName}net-subnet`,
   });

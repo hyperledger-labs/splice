@@ -7,6 +7,7 @@ import { Resource } from '@pulumi/pulumi';
 import { CnChartVersion } from './artifacts';
 import { clusterSmallDisk, config } from './config';
 import { spliceConfig } from './config/config';
+import { privateNetwork } from './gcpNetwork';
 import { installSpliceHelmChart } from './helm';
 import { installPostgresPasswordSecret } from './secrets';
 import { ChartValues, CLUSTER_BASENAME, ExactNamespace, GCP_ZONE } from './utils';
@@ -15,14 +16,6 @@ const enableCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.enabled;
 const protectCloudSql = spliceConfig.pulumiProjectConfig.cloudSql.protected;
 const cloudSqlDbInstance = spliceConfig.pulumiProjectConfig.cloudSql.tier;
 const cloudSqlEnterprisePlus = spliceConfig.pulumiProjectConfig.cloudSql.enterprisePlus;
-
-const project = gcp.organizations.getProjectOutput({});
-
-// use existing default network (needs to have a private vpc connection)
-const privateNetwork = gcp.compute.Network.get(
-  'default',
-  pulumi.interpolate`projects/${project.name}/global/networks/default`
-);
 
 function generatePassword(name: string, opts?: pulumi.ResourceOptions): random.RandomPassword {
   return new random.RandomPassword(
