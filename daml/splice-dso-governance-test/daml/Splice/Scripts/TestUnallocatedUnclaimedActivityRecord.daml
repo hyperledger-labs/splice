@@ -57,7 +57,7 @@ test_UnclaimedActivityRecord_FullFlow = do
         unallocatedUnclaimedActivityRecordCid
         amuletRulesCid
         unclaimedRewardsToBurnCids = [unclaimedRewardCid] 
-        sv = Some sv2
+        sv = sv2
   [(_, leftoverUnclaimedReward)] <- query @UnclaimedReward dso
   leftoverUnclaimedReward.amount === initialUnclaimedReward.amount - amountToMint
 
@@ -236,7 +236,7 @@ test_DsoRules_ExpireUnclaimedActivityRecord = script do
   submitMultiMustFail [sv2] [dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with 
       unclaimedActivityRecordCid 
-      sv = Some sv2
+      sv = sv2
 
   -- Happy path 
   _ <- do 
@@ -244,7 +244,7 @@ test_DsoRules_ExpireUnclaimedActivityRecord = script do
     submitMulti [sv2] [dso] $ 
       exerciseCmd dsoRulesCid DsoRules_ExpireUnclaimedActivityRecord with 
         unclaimedActivityRecordCid 
-        sv = Some sv2
+        sv = sv2
     setTime now    
   pure ()
 
@@ -269,7 +269,7 @@ allocateMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
       unallocatedUnclaimedActivityRecordCid
       amuletRulesCid
       unclaimedRewardsToBurnCids
-      sv = Some sv
+      sv
 
 allocate 
    : ContractId UnallocatedUnclaimedActivityRecord 
@@ -285,7 +285,7 @@ allocate unallocatedUnclaimedActivityRecordCid optExpectedLeftover TestContext{.
       unallocatedUnclaimedActivityRecordCid
       amuletRulesCid
       unclaimedRewardsToBurnCids
-      sv = Some sv
+      sv
   -- Assertions
   whenSome (result.optUnclaimedRewardCid) $ \unclaimedRewardCid -> do
     Some unclaimedReward <- queryContractId @UnclaimedReward dso unclaimedRewardCid
@@ -296,14 +296,14 @@ expireMustFail unallocatedUnclaimedActivityRecordCid TestContext{..} = do
   submitMultiMustFail [sv] [dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireUnallocatedUnclaimedActivityRecord with 
       unallocatedUnclaimedActivityRecordCid
-      sv = Some sv  
+      sv  
 
 expire : ContractId UnallocatedUnclaimedActivityRecord -> TestContext -> Script ()
 expire unallocatedUnclaimedActivityRecordCid TestContext{..} = do
   void $ submitMulti [sv] [dso] $ 
     exerciseCmd dsoRulesCid DsoRules_ExpireUnallocatedUnclaimedActivityRecord with 
       unallocatedUnclaimedActivityRecordCid
-      sv = Some sv 
+      sv
 
 mkUnallocatedUnclaimedActivityRecord : TestContext -> Script (ContractId UnallocatedUnclaimedActivityRecord)
 mkUnallocatedUnclaimedActivityRecord TestContext{..} = do
