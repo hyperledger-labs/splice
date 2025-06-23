@@ -41,16 +41,25 @@ class RateLimiter(
       lastUpdateNanos: Long,
       approvedTasks: Double,
   ) {
-    def update(now: Long): State = {
+
+    private def computeApprovedTasks(now: Long): Double = {
       // determine the time elapsed since we submitted last time
       val deltaNanos = now - lastUpdateNanos
       // determine the fractional number of commands that we were allowed to submit in that period
       val adjust = maxTasksPerSecond.value * deltaNanos.toDouble / 1e9
       // remove that number from the "approvedTasks"
-      val newApprovedTasks = Math.max(0, approvedTasks - adjust)
-      // if the newApprovedTasks is below the maxBurst value, approve the request and increment the approvedTasks
+      Math.max(0, approvedTasks - adjust)
+    }
+
+    def getCurrentTaskAllowance(now: Long): Double = {
+      maxBurst - computeApprovedTasks(now)
+    }
+
+    def update(now: Long): State = {
+      val newApprovedTasks = computeApprovedTasks(now)
+      // if approving this task would not exceed the maxBurst threshold, the request is approved.
       // this allows bursts of up to "maxBurst" and thereafter enforces a strictly continuous rate limit
-      if (newApprovedTasks < maxBurst) {
+      if (newApprovedTasks + 1 < maxBurst) {
         State(approvedLastTask = true, now, newApprovedTasks + 1)
       } else State(approvedLastTask = false, now, newApprovedTasks)
     }
@@ -63,6 +72,12 @@ class RateLimiter(
   final def checkAndUpdateRate(): Boolean = {
     val now = nanoTime
     currentState_.updateAndGet(_.update(now)).approvedLastTask
+  }
+
+  /** Returns how far we are from hitting the rate limit at the current moment in time. */
+  final def getCurrentAllowance: Double = {
+    val now = nanoTime
+    currentState_.get().getCurrentTaskAllowance(now)
   }
 
 }

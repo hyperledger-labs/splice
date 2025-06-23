@@ -48,7 +48,7 @@ object ConcurrentEnvironmentLimiter extends LazyLogging {
 
   val IntegrationTestConcurrencyLimit = "canton-test.integration.concurrency"
 
-  private val concurrencyLimit: Int = System.getProperty(IntegrationTestConcurrencyLimit, "3").toInt
+  private val concurrencyLimit: Int = System.getProperty(IntegrationTestConcurrencyLimit, "1").toInt
 
   /** Configured to be fair so earlier started tests will be first to get environments */
   private val semaphore = new Semaphore(concurrencyLimit, true)
