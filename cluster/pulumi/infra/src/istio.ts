@@ -161,12 +161,14 @@ function configureInternalGatewayService(
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
     .map(migrationInfo => migrationInfo.id)
     .flatMap((domain: number) => {
-      return (DeploySvRunbook ? [0] : []).concat(Array.from(Array(dsoSize).keys()).map(n => n + 1)).map(node => {
-        return ingressPort(
-          `cometbft-${domain}-${node}-gw`,
-          istioCometbftExternalPort(domain, node)
-        );
-      });
+      return (DeploySvRunbook ? [0] : [])
+        .concat(Array.from(Array(dsoSize).keys()).map(n => n + 1))
+        .map(node => {
+          return ingressPort(
+            `cometbft-${domain}-${node}-gw`,
+            istioCometbftExternalPort(domain, node)
+          );
+        });
     });
   return configureGatewayService(
     ingressNs,
