@@ -10,7 +10,6 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 import {
   activeVersion,
   DecentralizedSynchronizerUpgradeConfig,
-  DeploySvRunbook,
   ExactNamespace,
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
@@ -160,16 +159,13 @@ function configureInternalGatewayService(
   // see notes when installing a CometBft node in the full deployment
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
     .map(migrationInfo => migrationInfo.id)
-    .flatMap((domain: number) => {
-      return (DeploySvRunbook ? [0] : [])
-        .concat(Array.from(Array(dsoSize).keys()).map(n => n + 1))
-        .map(node => {
-          return ingressPort(
-            `cometbft-${domain}-${node}-gw`,
-            istioCometbftExternalPort(domain, node)
-          );
-        });
-    });
+    .flatMap((domain: number) =>
+      // node = 0 is the sv runbook. We always include that as relying on SPLICE_DEPLOY_SV_RUNBOOK doesn't work well
+      // for jobs where we deploy the sv runbook in a separate step so the core infra stack still runs with SPLICE_DEPLOY_SV_RUNBOOK=false.
+      Array.from(Array(dsoSize + 1).keys()).map(node =>
+        ingressPort(`cometbft-${domain}-${node}-gw`, istioCometbftExternalPort(domain, node))
+      )
+    );
   return configureGatewayService(
     ingressNs,
     ingressIp,
