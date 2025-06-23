@@ -454,7 +454,7 @@ class HttpWalletHandler(
       )
       retryProvider.retryForClientCalls(
         "accept_app_payment",
-        "Accept app payment request",
+        s"Accept app payment request  for contract $requestCid",
         exerciseWalletAmuletAction(
           new amuletoperation.CO_AppPayment(requestCid),
           user,
@@ -738,7 +738,7 @@ class HttpWalletHandler(
                 s"Created TransferPreapprovalProposal with contract ID $proposalCid. Now waiting for automation to create the TransferPreapproval."
               )
               preapproval <- retryProvider.getValueWithRetries(
-                RetryFor.Automation,
+                RetryFor.InitializingClientCalls,
                 "getTransferPreapproval",
                 s"wait for validator automation to create TransferPreapproval for ${store.key.endUserParty}",
                 store.getTransferPreapproval(store.key.endUserParty),
