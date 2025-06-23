@@ -6,7 +6,6 @@ package com.digitalasset.canton.console.commands
 import cats.syntax.either.*
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Inspection.*
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Package.DarData
@@ -80,6 +79,7 @@ import spray.json.DeserializationException
 import java.time.Instant
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
+import scala.util.Try
 
 sealed trait SynchronizerChoice
 object SynchronizerChoice {
@@ -89,7 +89,6 @@ object SynchronizerChoice {
 }
 
 private[console] object ParticipantCommands {
-
   object dars {
 
     def upload(
@@ -164,9 +163,10 @@ private[console] object ParticipantCommands {
   object synchronizers {
 
     def reference_to_config(
-        sequencers: NonEmpty[Map[SequencerAlias, SequencerReference]],
+        sequencers: Seq[SequencerReference],
         synchronizerAlias: SynchronizerAlias,
         manualConnect: Boolean = false,
+        synchronizerId: Option[SynchronizerId] = None,
         maxRetryDelay: Option[NonNegativeFiniteDuration] = None,
         priority: Int = 0,
         sequencerTrustThreshold: PositiveInt = PositiveInt.one,
@@ -176,14 +176,14 @@ private[console] object ParticipantCommands {
       SynchronizerConnectionConfig(
         synchronizerAlias,
         SequencerConnections.tryMany(
-          sequencers.toSeq.map { case (alias, sequencer) =>
-            sequencer.sequencerConnection.withAlias(alias)
+          sequencers.map { sequencer =>
+            sequencer.sequencerConnection.withAlias(SequencerAlias.tryCreate(sequencer.name))
           },
           sequencerTrustThreshold,
           submissionRequestAmplification,
         ),
         manualConnect = manualConnect,
-        None,
+        synchronizerId,
         priority,
         None,
         maxRetryDelay,
@@ -208,8 +208,7 @@ private[console] object ParticipantCommands {
           case Right(bs) => bs
         }
       }
-      SynchronizerConnectionConfig.grpc(
-        SequencerAlias.Default,
+      SynchronizerConnectionConfig.tryGrpcSingleConnection(
         synchronizerAlias,
         connection,
         manualConnect,
@@ -1764,14 +1763,17 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           sequencer - A local sequencer reference
           alias - The name you will be using to refer to this synchronizer. Can not be changed anymore.
           manualConnect - Whether this connection should be handled manually and also excluded from automatic re-connect.
+          synchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
           maxRetryDelayMillis - Maximal amount of time (in milliseconds) between two connection attempts.
           priority - The priority of the synchronizer. The higher the more likely a synchronizer will be used.
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
+          validation - Whether to validate the connectivity and ids of the given sequencers (default All)
         """)
     def connect_local(
         sequencer: SequencerReference,
         alias: SynchronizerAlias,
         manualConnect: Boolean = false,
+        synchronizerId: Option[SynchronizerId] = None,
         maxRetryDelayMillis: Option[Long] = None,
         priority: Int = 0,
         synchronize: Option[NonNegativeDuration] = Some(
@@ -1780,9 +1782,10 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
     ): Unit = {
       val config = ParticipantCommands.synchronizers.reference_to_config(
-        NonEmpty.mk(Seq, SequencerAlias.Default -> sequencer).toMap,
+        Seq(sequencer),
         alias,
         manualConnect,
+        synchronizerId,
         maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
         priority,
       )
@@ -1798,6 +1801,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           alias - The name you will be using to refer to this synchronizer. Cannot be changed anymore.
           performHandshake - If true (default), will perform a handshake with the synchronizer. If no, will only store the configuration without any query to the synchronizer.
           manualConnect - Whether this connection should be handled manually and also excluded from automatic re-connect.
+          synchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
           maxRetryDelayMillis - Maximal amount of time (in milliseconds) between two connection attempts.
           priority - The priority of the synchronizer. The higher the more likely a synchronizer will be used.
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
@@ -1808,6 +1812,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         alias: SynchronizerAlias,
         performHandshake: Boolean = true,
         manualConnect: Boolean = false,
+        synchronizerId: Option[SynchronizerId] = None,
         maxRetryDelayMillis: Option[Long] = None,
         priority: Int = 0,
         synchronize: Option[NonNegativeDuration] = Some(
@@ -1816,11 +1821,12 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
     ): Unit = {
       val config = ParticipantCommands.synchronizers.reference_to_config(
-        NonEmpty.mk(Seq, SequencerAlias.Default -> sequencer).toMap,
-        alias,
+        sequencers = Seq(sequencer),
+        synchronizerAlias = alias,
         manualConnect = manualConnect,
-        maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
-        priority,
+        synchronizerId = synchronizerId,
+        maxRetryDelay = maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
+        priority = priority,
       )
       register_by_config(config, performHandshake = performHandshake, validation, synchronize)
     }
@@ -1861,10 +1867,26 @@ trait ParticipantAdministration extends FeatureFlagFilter {
       }
     }
 
+    @Help.Summary(
+      "Macro to connect to multiple local sequencers of the same synchronizer."
+    )
+    @Help.Description("""
+        The arguments are:
+          synchronizerAlias - The name you will be using to refer to this synchronizer. Cannot be changed anymore.
+          sequencers - The list of sequencer references to connect to.
+          manualConnect - Whether this connection should be handled manually and also excluded from automatic re-connect.
+          synchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
+          priority - The priority of the synchronizer. The higher the more likely a synchronizer will be used.
+          synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
+          sequencerTrustThreshold - Set the minimum number of sequencers that must agree before a message is considered valid.
+          submissionRequestAmplification - Define how often client should try to send a submission request that is eligible for deduplication.
+          validation - Whether to validate the connectivity and ids of the given sequencers (default All)
+        """)
     def connect_local_bft(
-        synchronizer: NonEmpty[Map[SequencerAlias, SequencerReference]],
-        alias: SynchronizerAlias,
+        sequencers: Seq[SequencerReference],
+        synchronizerAlias: SynchronizerAlias,
         manualConnect: Boolean = false,
+        synchronizerId: Option[SynchronizerId] = None,
         maxRetryDelayMillis: Option[Long] = None,
         priority: Int = 0,
         synchronize: Option[NonNegativeDuration] = Some(
@@ -1876,13 +1898,55 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
     ): Unit = {
       val config = ParticipantCommands.synchronizers.reference_to_config(
-        synchronizer,
-        alias,
+        sequencers = sequencers,
+        synchronizerAlias = synchronizerAlias,
+        manualConnect = manualConnect,
+        synchronizerId = synchronizerId,
+        maxRetryDelay = maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
+        priority = priority,
+        sequencerTrustThreshold = sequencerTrustThreshold,
+        submissionRequestAmplification = submissionRequestAmplification,
+      )
+      connect_by_config(config, validation, synchronize)
+    }
+
+    @Help.Summary(
+      "Macro to connect to multiple sequencers of the same synchronizer."
+    )
+    @Help.Description("""
+        The arguments are:
+          synchronizerAlias - The name you will be using to refer to this synchronizer. Cannot be changed anymore.
+          connections - The list of sequencer connections, can be defined by urls.
+          manualConnect - Whether this connection should be handled manually and also excluded from automatic re-connect.
+          synchronizerId - An optional Synchronizer Id to ensure the connection is made to the correct synchronizer.
+          priority - The priority of the synchronizer. The higher the more likely a synchronizer will be used.
+          synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
+          sequencerTrustThreshold - Set the minimum number of sequencers that must agree before a message is considered valid.
+          submissionRequestAmplification - Define how often client should try to send a submission request that is eligible for deduplication.
+          validation - Whether to validate the connectivity and ids of the given sequencers (default All)
+        """)
+    def connect_bft(
+        connections: Seq[SequencerConnection],
+        synchronizerAlias: SynchronizerAlias,
+        synchronizerId: Option[SynchronizerId] = None,
+        manualConnect: Boolean = false,
+        priority: Int = 0,
+        synchronize: Option[NonNegativeDuration] = Some(
+          consoleEnvironment.commandTimeouts.bounded
+        ),
+        sequencerTrustThreshold: PositiveInt = PositiveInt.one,
+        submissionRequestAmplification: SubmissionRequestAmplification =
+          SubmissionRequestAmplification.NoAmplification,
+        validation: SequencerConnectionValidation = SequencerConnectionValidation.All,
+    ): Unit = {
+      val config = SynchronizerConnectionConfig.tryGrpc(
+        synchronizerAlias,
+        connections,
         manualConnect,
-        maxRetryDelayMillis.map(NonNegativeFiniteDuration.tryOfMillis),
+        synchronizerId = synchronizerId,
         priority,
-        sequencerTrustThreshold,
-        submissionRequestAmplification,
+        sequencerTrustThreshold = sequencerTrustThreshold,
+        submissionRequestAmplification = submissionRequestAmplification,
       )
       connect_by_config(config, validation, synchronize)
     }
@@ -1998,9 +2062,9 @@ trait ParticipantAdministration extends FeatureFlagFilter {
            or:
            connect_multi("mysynchronizer", Seq("https://host1.mysynchronizer.net", "https://host2.mysynchronizer.net", "https://host3.mysynchronizer.net"))
 
-        To create a more advanced connection config use synchronizers.toConfig with a single host,
+        To create a more advanced connection config use synchronizers.to_config with a single host,
         |then use config.addConnection to add additional connections before connecting:
-           config = myparticipaint.synchronizers.toConfig("mysynchronizer", "https://host1.mysynchronizer.net", ...otherArguments)
+           config = myparticipaint.synchronizers.to_config("mysynchronizer", "https://host1.mysynchronizer.net", ...otherArguments)
            config = config.addConnection("https://host2.mysynchronizer.net", "https://host3.mysynchronizer.net")
            myparticipant.synchronizers.connect(config)
 
@@ -2173,7 +2237,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
               case (config, _) if config.synchronizerAlias == synchronizerAlias => config
             }
             .toRight(s"No such synchronizer $synchronizerAlias configured")
-          newConfig = modifier(cfg)
+          newConfig <- Try(modifier(cfg)).toEither.leftMap(_.toString)
           _ <- Either.cond(
             newConfig.synchronizerAlias == cfg.synchronizerAlias,
             (),
@@ -2181,7 +2245,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           )
           _ <- adminCommand(
             ParticipantAdminCommands.SynchronizerConnectivity.ModifySynchronizerConnection(
-              modifier(cfg),
+              newConfig,
               validation,
             )
           ).toEither
