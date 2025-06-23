@@ -18,3 +18,5 @@ export type Config = z.infer<typeof OperatorDeploymentConfigSchema>;
 // @ts-ignore
 const fullConfig = OperatorDeploymentConfigSchema.parse(clusterYamlConfig);
 export const operatorDeploymentConfig = fullConfig.operatorDeployment;
+
+export const PulumiOperatorGracePeriod = 1800;
