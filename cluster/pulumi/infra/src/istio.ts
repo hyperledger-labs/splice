@@ -3,7 +3,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { local } from '@pulumi/command';
-import { dsoSize, istioCometbftExternalPort } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
@@ -158,14 +157,12 @@ function configureInternalGatewayService(
   const externalIPRanges = loadIPRanges();
   // see notes when installing a CometBft node in the full deployment
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
-    .map(migrationInfo => migrationInfo.id)
-    .flatMap((domain: number) =>
-      // node = 0 is the sv runbook. We always include that as relying on SPLICE_DEPLOY_SV_RUNBOOK doesn't work well
-      // for jobs where we deploy the sv runbook in a separate step so the core infra stack still runs with SPLICE_DEPLOY_SV_RUNBOOK=false.
-      Array.from(Array(dsoSize + 1).keys()).map(node =>
-        ingressPort(`cometbft-${domain}-${node}-gw`, istioCometbftExternalPort(domain, node))
-      )
-    );
+    .map(m => m.id)
+    .flatMap((domain: number) => {
+      return Array.from(Array(10).keys()).map(node => {
+        return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
+      });
+    });
   return configureGatewayService(
     ingressNs,
     ingressIp,
