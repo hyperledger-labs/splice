@@ -32,6 +32,7 @@ import useLookupTransferPreapproval from '../hooks/scan-proxy/useLookupTransferP
 import BftAnsField from './BftAnsField';
 import { useFeatureSupport } from '../hooks/useFeatureSupport';
 import AmountInput from './AmountInput';
+import { PendingOffers } from './PendingOffers';
 
 const SendTransfer: React.FC = () => {
   const { createTransferOffer, transferPreapprovalSend, createTransferViaTokenStandard } =
@@ -252,6 +253,7 @@ const SendTransfer: React.FC = () => {
           </DisableConditionally>
         </CardContent>
       </Card>
+      <PendingOffers />
     </Stack>
   );
 };
