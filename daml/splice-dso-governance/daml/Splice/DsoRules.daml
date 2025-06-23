@@ -1416,13 +1416,13 @@ template DsoRules with
       with
         unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
         amuletRulesCid : ContractId AmuletRules
-        sv : Optional Party
+        sv : Party
         unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
           -- ^ A sufficient list of `UnclaimedReward` to be archived.
           -- It must cover at least the requested amount.
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        _ <- getAndValidateSvParty this (Some sv)
         UnallocatedUnclaimedActivityRecord{..} <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertWithinDeadline "UnclaimedActivityRecord.expiresAt" expiresAt
 
@@ -1448,10 +1448,10 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireUnallocatedUnclaimedActivityRecord : DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
       with
         unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
-        sv : Optional Party
+        sv : Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        _ <- getAndValidateSvParty this (Some sv)
         unallocatedUnclaimedActivityRecord <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
         assertDeadlineExceeded "UnclaimedActivityRecord.opensAt" unallocatedUnclaimedActivityRecord.expiresAt
         pure $ DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult 
@@ -1459,10 +1459,10 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireUnclaimedActivityRecord : DsoRules_ExpireUnclaimedActivityRecordResult
       with
         unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
-        sv : Optional Party
+        sv : Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
+        _ <- getAndValidateSvParty this (Some sv)
         void $ exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult 
 
