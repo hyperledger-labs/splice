@@ -37,7 +37,7 @@ final class UseBftSequencer(
     val sequencerGroups: SequencerSynchronizerGroups = SingleSynchronizer,
     dynamicallyOnboardedSequencerNames: Seq[InstanceName] = Seq.empty,
     shouldGenerateEndpointsOnly: Boolean = false,
-) extends EnvironmentSetupPlugin {
+) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
 
   val sequencerEndpoints
       : SingleUseCell[Map[InstanceName, BftBlockOrdererConfig.P2PEndpointConfig]] =

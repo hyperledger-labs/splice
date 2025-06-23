@@ -10,6 +10,7 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.NonEmptyReturningOps.*
 import com.digitalasset.base.error.RpcError
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, TopologyAdminCommands}
 import com.digitalasset.canton.admin.api.client.data.topology.*
