@@ -213,15 +213,13 @@ class ManagedNodes[
         promise: Promise[Either[StartupError, NodeBootstrap]]
     ): EitherT[Future, StartupError, NodeBootstrap] = {
       val params = parametersFor(name)
-
-      val instanceCreated = create(name, config)
-
       val startup = for {
         // start migration
         _ <- EitherT(Future(checkMigration(name, config.storage, params)))
         instance = {
-          nodes.put(name, StartingUp(promise, instanceCreated)).discard
-          instanceCreated
+          val instance = create(name, config)
+          nodes.put(name, StartingUp(promise, instance)).discard
+          instance
         }
         declarativeHandler <-
           instance
