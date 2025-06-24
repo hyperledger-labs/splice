@@ -136,7 +136,4 @@ Timeout .*expired, but readers are still active
 # test significantly so for now we don't bother.
 ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 
-# TODO(#930) - investigate this on the canton side
-Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
-
 # Make sure to have a trailing newline

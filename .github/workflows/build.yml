@@ -170,10 +170,10 @@ jobs:
   scala_test_wall_clock_time_bft:
     uses: ./.github/workflows/build.scala_test.yml
     with:
-      runs_on: self-hosted-k8s-large
+      runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names.log'
       start_canton_options: -we
-      parallelism: 10
+      parallelism: 8
       test_name: wall-clock-time-bft
       with_gcp_creds: true
       pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"

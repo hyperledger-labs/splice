@@ -40,6 +40,7 @@ import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 
 import java.time.Instant
 import java.util.Optional
+import scala.collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
@@ -152,7 +153,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )
     actAndCheck(
       "A number of SVs less than the required number of voters cast a vote",
-      Seq(sv1Backend, sv2Backend).foreach { sv =>
+      Seq(sv1Backend, sv2Backend).par.foreach { sv =>
         sv.castVote(
           voteRequest.contractId,
           true,
@@ -192,7 +193,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     )
     actAndCheck(
       "A number of SVs less than the required number of voters cast a vote",
-      Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
+      Seq(sv1Backend, sv2Backend, sv3Backend).par.foreach { sv =>
         sv.castVote(
           voteRequest.contractId,
           false,
