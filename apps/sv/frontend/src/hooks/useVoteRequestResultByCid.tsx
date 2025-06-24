@@ -18,7 +18,7 @@ interface UseVoteRequestResultByCidResult {
   isComplete: boolean;
 }
 
-//TODO: Write an issue to move this to the backend!
+//TODO(#1208): Move this logic to the backend and expose via a new endpoint
 export function useVoteRequestResultByCid(
   contractId: ContractId<VoteRequest>
 ): UseVoteRequestResultByCidResult {

@@ -189,7 +189,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                 Voting Expires At
               </Typography>
-              <Typography variant="body1" data-testid="proposal-details-voting-closes" gutterBottom>
+              <Typography
+                variant="body1"
+                data-testid="proposal-details-voting-closes-duration"
+                gutterBottom
+              >
                 {dayjs(votingInformation.votingCloses).fromNow()}
               </Typography>
               <Typography
@@ -208,18 +212,22 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
               </Typography>
               <Typography
                 variant="body1"
-                data-testid="proposal-details-vote-takes-effect"
+                data-testid="proposal-details-vote-takes-effect-duration"
                 gutterBottom
               >
-                {dayjs(votingInformation.voteTakesEffect).fromNow()}
+                {votingInformation.voteTakesEffect === 'Threshold'
+                  ? 'Threshold'
+                  : dayjs(votingInformation.voteTakesEffect).fromNow()}
               </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                data-testid="proposal-details-vote-takes-effect-value"
-              >
-                {votingInformation.voteTakesEffect}
-              </Typography>
+              {votingInformation.voteTakesEffect !== 'Threshold' && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  data-testid="proposal-details-vote-takes-effect-value"
+                >
+                  {votingInformation.voteTakesEffect}
+                </Typography>
+              )}
             </Box>
             <Divider sx={{ my: 1 }} />
 

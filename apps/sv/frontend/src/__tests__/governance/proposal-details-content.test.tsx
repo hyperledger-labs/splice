@@ -619,6 +619,39 @@ describe('Proposal Details > Votes & Voting', () => {
     expect(noVoteContent.every(v => v === 'No Vote')).toBe(true);
   });
 
+  test('renders correctly when vote takes effect is threshold', () => {
+    const votingInformation = {
+      requester: 'sv1',
+      requesterIsYou: true,
+      votingCloses: '2029-01-01 13:00',
+      voteTakesEffect: 'Threshold',
+      status: 'In Progress',
+    } as ProposalVotingInformation;
+
+    render(
+      <Wrapper>
+        <ProposalDetailsContent
+          contractId={voteRequest.contractId}
+          proposalDetails={voteRequest.proposalDetails}
+          votingInformation={votingInformation}
+          votes={voteRequest.votes}
+        />
+      </Wrapper>
+    );
+
+    const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
+    expect(votingInformationSection).toBeDefined();
+
+    const voteTakesEffectDuration = within(votingInformationSection).getByTestId(
+      'proposal-details-vote-takes-effect-duration'
+    );
+    expect(voteTakesEffectDuration.textContent).toBe('Threshold');
+
+    expect(() =>
+      within(votingInformationSection).getByTestId('proposal-details-vote-takes-effect-value')
+    ).toThrowError(/Unable to find an element/);
+  });
+
   test('should render voting form for vote request when voting has not closed', () => {
     render(
       <Wrapper>
