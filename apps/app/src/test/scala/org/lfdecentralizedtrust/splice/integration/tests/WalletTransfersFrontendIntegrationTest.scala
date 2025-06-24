@@ -122,6 +122,10 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
                 offerCard.childElement(className("transfer-offer-sender"))
               ) should matchText(expectedAns(aliceUserParty, aliceAnsName))
 
+              seleniumText(
+                offerCard.childElement(className("transfer-offer-received"))
+              ) should matchText(expectedAns(bobUserParty, bobAnsName))
+
               offerCard
                 .childElement(className("transfer-offer-amulet-amount"))
                 .text should matchText(
@@ -143,6 +147,7 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceAnsName = perTestCaseName("alice")
+      val aliceAnsDisplay = expectedAns(aliceUserParty, aliceAnsName)
 
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       val bobAnsName = perTestCaseName("bob")
@@ -189,6 +194,10 @@ abstract class BaseWalletTransfersFrontendIntegrationTest
             seleniumText(
               offerCard.childElement(className("transfer-offer-sender"))
             ) should matchText(bobAnsDisplay)
+
+            seleniumText(
+              offerCard.childElement(className("transfer-offer-received"))
+            ) should matchText(aliceAnsDisplay)
 
             offerCard.childElement(className("transfer-offer-expiry")).text should matchText(
               s"Expires $expectedExpiry"
