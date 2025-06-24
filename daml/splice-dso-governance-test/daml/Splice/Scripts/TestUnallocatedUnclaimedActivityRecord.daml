@@ -5,7 +5,6 @@ module Splice.Scripts.TestUnallocatedUnclaimedActivityRecord where
 
 import DA.Assert
 import DA.Action (void, when)
-import DA.Optional (fromSome)
 import DA.Time
 import DA.Traversable qualified as Traversable
 
@@ -38,7 +37,7 @@ test_UnclaimedActivityRecord_FullFlow = do
   let 
     amountToMint = 10.0
     reason = "Alice has achieved milestone 1"
-    unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
+    expiresAt = now `addRelTime` (days 2)
 
   -- Vote
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
@@ -48,7 +47,7 @@ test_UnclaimedActivityRecord_FullFlow = do
           beneficiary = alice
           amount = amountToMint
           reason
-          unclaimedActivityRecordExpiresAt
+          expiresAt
 
   -- Allocate UnallocatedUnclaimedActivityRecord
   [(unallocatedUnclaimedActivityRecordCid, _)] <- query @UnallocatedUnclaimedActivityRecord dso
@@ -83,19 +82,18 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord : Script ()
 test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
   (_app, dso, (_sv1, _sv2, _sv3, _sv4)) <- initMainNet
   alice <- allocateParty "alice"
-  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  [(dsoRulesCid, _)] <- query @DsoRules dso
   now <- getTime
   let
     amountToMint = 15.0
     reason = "Alice has achieved milestone 1"
-    unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
-    unallocatedUnclaimedActivityRecordTimeout = fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout
+    expiresAt = now `addRelTime` (days 2)
     valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord = 
       DsoRules_CreateUnallocatedUnclaimedActivityRecord with
         beneficiary = alice
         amount = amountToMint
         reason = "Alice has achieved milestone 1"
-        unclaimedActivityRecordExpiresAt
+        expiresAt
 
   -- Unhappy paths
   ---------------- 
@@ -106,12 +104,11 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
   submitMustFail dso $
     exerciseCmd dsoRulesCid valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord with 
       amount = -10.0
-  -- Invalid unclaimedActivityRecordExpiresAt 
-  -- UnclaimedActivityRecord must expire after UnallocatedUnclaimedActivityRecord
+  -- Invalid expiresAt 
+  -- UnclaimedActivityRecord must expire after current time
   submitMustFail dso $
     exerciseCmd dsoRulesCid valid_DsoRules_CreateUnallocatedUnclaimedActivityRecord with 
-      unclaimedActivityRecordExpiresAt = 
-        (now `addRelTime` (unallocatedUnclaimedActivityRecordTimeout)) `addRelTime` (- hours 1)
+      expiresAt = now `addRelTime` (- hours 1)
 
   -- Happy path 
   submit dso $
@@ -122,27 +119,25 @@ test_DsoRules_CreateUnallocatedUnclaimedActivityRecord  = do
     beneficiary = alice
     amount = amountToMint
     reason 
-    unclaimedActivityRecordExpiresAt
-    expiresAt = now `addRelTime` (fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout)
+    expiresAt
   pure ()
 
 test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord : Script ()
 test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord = do
   (_app, dso, (_sv1, sv2, _sv3, _sv4)) <- initMainNet
   alice <- allocateParty "alice"
-  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  [(dsoRulesCid, _)] <- query @DsoRules dso
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   now <- getTime
   let 
     amountToMint = 15.0
     beneficiary = alice  
-    unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
-    unallocatedUnclaimedActivityRecordTimeout = fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout
+    expiresAt = now `addRelTime` (days 2)
     context = TestContext with 
       dso 
       beneficiary 
       sv = sv2
-      unclaimedActivityRecordExpiresAt
+      expiresAt
       dsoRulesCid
       amuletRulesCid
       amountToMint
@@ -159,7 +154,7 @@ test_DsoRules_AllocateUnallocatedUnclaimedActivityRecord = do
   allocateMustFail unallocatedUnclaimedActivityRecordCid context with unclaimedRewardAmounts = [4.0, 10.0]
   -- Allocate - UnallocatedUnclaimedActivityRecord has expired
   _ <- do
-    setTime $ now `addRelTime` (unallocatedUnclaimedActivityRecordTimeout + hours 1)
+    setTime $ expiresAt `addRelTime` hours 1
     allocateMustFail unallocatedUnclaimedActivityRecordCid context 
     setTime now 
 
@@ -179,19 +174,18 @@ test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord : Script ()
 test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord = do 
   (_app, dso, (_sv1, sv2, _sv3, _sv4)) <- initMainNet
   alice <- allocateParty "alice"
-  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
+  [(dsoRulesCid, _)] <- query @DsoRules dso
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   now <- getTime
   let 
     amountToMint = 10.0
-    unclaimedActivityRecordExpiresAt = now `addRelTime` (days 2)
-    unallocatedUnclaimedActivityRecordTimeout = fromSome dsoRules.config.unallocatedUnclaimedActivityRecordTimeout
+    expiresAt = now `addRelTime` (days 2)
     beneficiary = alice
     context = TestContext with 
       dso 
       beneficiary 
       sv = sv2
-      unclaimedActivityRecordExpiresAt
+      expiresAt
       dsoRulesCid
       amuletRulesCid
       amountToMint
@@ -205,7 +199,7 @@ test_DsoRules_ExpireUnallocatedUnclaimedActivityRecord = do
 
   -- Happy path - UnallocatedUnclaimedActivityRecord has expired
   _ <- do
-    setTime $ now `addRelTime` (unallocatedUnclaimedActivityRecordTimeout + hours 1)
+    setTime $ expiresAt `addRelTime` hours 1
     expire unallocatedUnclaimedActivityRecordCid context
     setTime now
   pure ()  
@@ -255,7 +249,7 @@ data TestContext = TestContext with
   dso : Party 
   beneficiary : Party
   sv : Party
-  unclaimedActivityRecordExpiresAt : Time
+  expiresAt : Time
   dsoRulesCid : ContractId DsoRules 
   amuletRulesCid : ContractId AmuletRules
   amountToMint : Decimal
@@ -314,7 +308,7 @@ mkUnallocatedUnclaimedActivityRecord TestContext{..} = do
       beneficiary
       amount = amountToMint
       reason = "milestone achieved by " <> show beneficiary
-      unclaimedActivityRecordExpiresAt
+      expiresAt
   pure result.unallocatedUnclaimedActivityRecordCid
 
 mkUnclaimedReward : Party -> Decimal -> Script (ContractId UnclaimedReward)

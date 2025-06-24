@@ -422,7 +422,6 @@ data DsoRulesConfig = DsoRulesConfig with
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
-    unallocatedUnclaimedActivityRecordTimeout : Optional RelTime -- ^ The TTL for contracts representing an unallocated unclaimed activity record.
   deriving (Eq, Show)
   
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
@@ -1396,14 +1395,12 @@ template DsoRules with
         beneficiary : Party 
         amount : Decimal 
         reason : Text
-        unclaimedActivityRecordExpiresAt : Time
+        expiresAt : Time
       controller dso
       do
         now <- getTime
-        let expiresAt = now `addRelTime` (fromOptional (days 1) config.unallocatedUnclaimedActivityRecordTimeout)
         -- Sanity check
-        require "UnclaimedActivityRecord expires after UnallocatedUnclaimedActivityRecord" $ 
-          unclaimedActivityRecordExpiresAt > expiresAt
+        require "UnclaimedActivityRecord expires after current time" $ expiresAt > now
         unallocatedUnclaimedActivityRecordCid <- 
           create UnallocatedUnclaimedActivityRecord with 
             dso
@@ -1411,22 +1408,21 @@ template DsoRules with
             amount
             reason
             expiresAt
-            unclaimedActivityRecordExpiresAt 
         pure $ DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with ..
 
     nonconsuming choice DsoRules_AllocateUnallocatedUnclaimedActivityRecord : DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult
       with
         unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
         amuletRulesCid : ContractId AmuletRules
-        sv : Party
         unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
           -- ^ A sufficient list of `UnclaimedReward` to be archived.
           -- It must cover at least the requested amount.
+        sv : Party
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
         UnallocatedUnclaimedActivityRecord{..} <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
-        assertWithinDeadline "UnclaimedActivityRecord.expiresAt" expiresAt
+        assertWithinDeadline "UnallocatedUnclaimedActivityRecord.expiresAt" expiresAt
 
         totalUnclaimedRewards <- sum <$> forA unclaimedRewardsToBurnCids \cid -> do
           unclaimedReward <- fetchAndArchive (ForDso with dso) cid
@@ -1442,7 +1438,7 @@ template DsoRules with
           beneficiary
           amount
           reason
-          expiresAt = unclaimedActivityRecordExpiresAt
+          expiresAt
 
         pure $ DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with ..
 
@@ -1454,8 +1450,8 @@ template DsoRules with
       do
         _ <- getAndValidateSvParty this (Some sv)
         unallocatedUnclaimedActivityRecord <- fetchAndArchive (ForDso with dso) unallocatedUnclaimedActivityRecordCid
-        assertDeadlineExceeded "UnclaimedActivityRecord.opensAt" unallocatedUnclaimedActivityRecord.expiresAt
-        pure $ DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult 
+        assertDeadlineExceeded "UnallocatedUnclaimedActivityRecord.expiresAt" unallocatedUnclaimedActivityRecord.expiresAt
+        pure $ DsoRules_ExpireUnallocatedUnclaimedActivityRecordResult
 
     nonconsuming choice DsoRules_ExpireUnclaimedActivityRecord : DsoRules_ExpireUnclaimedActivityRecordResult
       with
@@ -1745,8 +1741,7 @@ template UnallocatedUnclaimedActivityRecord
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted
     amount : Decimal -- ^ The amount of `Amulet` to be minted 
     reason : Text -- ^ A reason to mint the `Amulet`
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract. 
-    unclaimedActivityRecordExpiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract. 
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract. 
   where 
     signatory dso
     ensure amount > 0.0
@@ -1783,7 +1778,6 @@ instance Patchable DsoRulesConfig where
     maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
-    unallocatedUnclaimedActivityRecordTimeout = patch new.unallocatedUnclaimedActivityRecordTimeout base.unallocatedUnclaimedActivityRecordTimeout current.unallocatedUnclaimedActivityRecordTimeout 
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with

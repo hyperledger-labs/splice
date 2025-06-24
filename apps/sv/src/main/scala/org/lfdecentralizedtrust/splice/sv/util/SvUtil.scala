@@ -253,7 +253,6 @@ object SvUtil {
     1024, // maxTextLength
     defaultDsoDecentralizedSynchronizerConfig(synchronizerId), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
-    Optional.of(new RelTime(TimeUnit.DAYS.toMicros(1))), // unallocatedUnclaimedActivityRecordTimeout
   )
 
   def keyPairMatches(
