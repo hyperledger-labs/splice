@@ -19,7 +19,7 @@ export const useVoteRequest = (
       Contract.decodeOpenAPI(
         (await lookupDsoRulesVoteRequest(contractId)).dso_rules_vote_request,
         VoteRequest
-      ), // || null,
+      ),
     retry,
   });
 };
