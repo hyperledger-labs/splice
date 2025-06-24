@@ -25,7 +25,7 @@ import com.digitalasset.canton.admin.participant.v30.{
   PruningServiceGrpc,
 }
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -288,7 +288,7 @@ class ParticipantAdminConnection(
     )
   }
 
-  def downloadAcsSnapshot(
+  def downloadAcsSnapshotForPartyMigration(
       parties: Set[PartyId],
       filterSynchronizerId: SynchronizerId,
       timestamp: Instant,
@@ -309,6 +309,37 @@ class ParticipantAdminConnection(
       )
     ).discard
     requestComplete.future
+  }
+
+  def downloadAcsSnapshotForSynchronizerMigration(
+      parties: Set[PartyId],
+      synchronizerId: SynchronizerId,
+      timestamp: Instant,
+      disasterRecovery: Boolean,
+  )(implicit traceContext: TraceContext): Future[ByteString] = {
+    // ExportAcsAtTimestamp only works if the timestamp corresponds to a PartyToParticipant change so this
+    // is required for synchronizer migrations and disaster recovery. Without the force flag,
+    // this will fail until we have processed a timestamp >= requested timestamp. On migrations this is guaranteed
+    // to happen for all nodes due to time proofs. On disaster recovery, we cannot guarantee this so we
+    // use force=true which will not wait until a timestamp >= requested timestamp has been processed.
+    getHighestOffsetByTimestamp(synchronizerId, timestamp, force = disasterRecovery).flatMap {
+      offset =>
+        downloadAcsSnapshotAtOffset(parties, synchronizerId, offset.unwrap)
+    }
+  }
+
+  def getHighestOffsetByTimestamp(
+      synchronizerId: SynchronizerId,
+      timestamp: Instant,
+      force: Boolean,
+  )(implicit tc: TraceContext): Future[NonNegativeLong] = {
+    runCmd(
+      ParticipantAdminCommands.PartyManagement
+        .GetHighestOffsetByTimestamp(synchronizerId, timestamp, force)
+    ).map { offset =>
+      logger.debug(s"Translated $timestamp on $synchronizerId to $offset with force=$force")
+      offset
+    }
   }
 
   def downloadAcsSnapshotAtOffset(

@@ -560,6 +560,7 @@ class HttpSvAdminHandler(
         .getDomainDataSnapshot(
           Instant.parse(timestamp),
           partyId.map(Codec.tryDecode(Codec.Party)(_)),
+          disasterRecovery = true,
         )
         .map { response =>
           val responseHttp = response.toHttp
