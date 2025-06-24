@@ -721,7 +721,7 @@ executeTransfer config context dso t = do
           nonZeroMetadata svRewardAmountMetaKey summary.inputSvRewardAmount $
           nonZeroMetadata appRewardAmountMetaKey summary.inputAppRewardAmount $
           nonZeroMetadata validatorRewardAmountMetaKey summary.inputValidatorRewardAmount $
-          optionalMetadata unclaimedActivityRecordAmountMetaKey show summary.inputUnclaimedActivityRecordAmount $
+          optionalNonZeroMetadata unclaimedActivityRecordAmountMetaKey summary.inputUnclaimedActivityRecordAmount $
           TextMap.empty
 
   return TransferResult with
