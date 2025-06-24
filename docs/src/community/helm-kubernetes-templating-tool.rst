@@ -8,15 +8,15 @@
 Automated Helm/Kubernetes Templating Tool
 =========================================
 
-Managing deployments for Validator and Super Validator nodes using Kubernetes, Helm, and Git can be challenging, 
-especially when keeping multiple environments (DevNet, TestNet, MainNet) in sync with evolving configuration files and values. 
-Frequent version bumps, new variables, and hard migrations often require manual, error-prone updates to numerous values-*.yml files. 
-This manual process can lead to inconsistencies, missed configuration changes, and increased operational overhead. 
-The introduced solution provides a templating tool designed to automate and simplify the management of Helm values and environment-specific configurations. 
-This tool is intended as a supplemental resource for users seeking additional automation and templating flexibility alongside the official deployment guides. 
+Managing deployments for Validator and Super Validator nodes using Kubernetes, Helm, and Git can be challenging,
+especially when keeping multiple environments (DevNet, TestNet, MainNet) in sync with evolving configuration files and values.
+Frequent version bumps, new variables, and hard migrations often require manual, error-prone updates to numerous ``values-*.yml`` files.
+This manual process can lead to inconsistencies, missed configuration changes, and increased operational overhead.
+The introduced solution provides a templating tool designed to automate and simplify the management of Helm values and environment-specific configurations.
+This tool is intended as a supplemental resource for users seeking additional automation and templating flexibility alongside the official deployment guides.
 To learn more about officially supported Kubernetes-based deployments, refer to :ref:`Kubernetes-Based Deployment of a Validator node <k8s_validator>` and :ref:`Kubernetes-Based Deployment of a Super Validator node <sv-helm>`.
 
-Thanks to Stéphane Loeuillet for sharing this solution in a community discussion. 
+Thanks to Stéphane Loeuillet for sharing this solution in a community discussion.
 For more details and future updates, see the `kaikodata/canton-tooling <https://github.com/kaikodata/canton-tooling/blob/master/kubernetes/README.md#canton-templating-script>`_ repository.
 
 Key Features of the Solution
