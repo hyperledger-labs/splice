@@ -41,6 +41,14 @@ nonZeroMetadata k n m
   | n == aunit = m
   | otherwise = TextMap.insert k (show n) m
 
+-- | Add an metadata entry for an optional value if it is non-zero number.
+optionalNonZeroMetadata : (Eq a, Additive a, Show a) => Text -> Optional a -> TextMap Text -> TextMap Text
+optionalNonZeroMetadata k optN m = 
+  case optN of
+    None -> m
+    Some n 
+      | n == aunit -> m
+      | otherwise -> TextMap.insert k (show n) m
 
 -- Amulet Metadata keys
 -----------------------
