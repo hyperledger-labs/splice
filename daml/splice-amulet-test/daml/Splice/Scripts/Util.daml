@@ -689,11 +689,13 @@ genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body =
   mint <- case extractSummary result of
     None -> pure 0.0
     Some summary -> do
+      let inputUnclaimedActivityRecordAmount = fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount
       expectUnlessZero svRewardAmountMetaKey summary.inputSvRewardAmount
       expectUnlessZero appRewardAmountMetaKey summary.inputAppRewardAmount
       expectUnlessZero validatorRewardAmountMetaKey summary.inputValidatorRewardAmount
+      expectUnlessZero unclaimedActivityRecordAmountMetaKey inputUnclaimedActivityRecordAmount
       pure $ summary.inputAppRewardAmount + summary.inputValidatorRewardAmount + summary.inputSvRewardAmount + 
-        (fromOptional 0.0 summary.inputUnclaimedActivityRecordAmount)
+        inputUnclaimedActivityRecordAmount
   let expectedBurn = totalHoldingsBefore + mint - totalHoldingsAfter
   -- mints are inferred, and show here as a negative burn
   if (expectedBurn < 0.0)
