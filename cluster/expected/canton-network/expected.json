@@ -531,7 +531,9 @@
           "gateway": "cluster-ingress/cn-http-gateway",
           "host": "info.sv-2.mock.global.canton.network.digitalasset.com"
         },
-        "sequencerAddress": "global-domain-3-sequencer",
+        "runtimeDetails": {
+          "scanUrl": "http://scan-app.sv-1:5012"
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",

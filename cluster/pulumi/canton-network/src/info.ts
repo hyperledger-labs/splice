@@ -20,13 +20,16 @@ export function installInfo(
   gateway: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
+  scanUrl: string,
 ) {
   function cnChartVerstionToString(version: CnChartVersion): string {
     return version.type === 'remote' ? version.version : 'local';
   }
 
   const infoValues = {
-    sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
+    runtimeDetails: {
+      scanUrl: scanUrl,
+    },
     deploymentDetails: {
       network: "XXXX", // FIXME: Placeholder, replace with actual network name
       sv: {

@@ -249,6 +249,7 @@ export async function installSvNode(
     "cluster-ingress/cn-http-gateway",
     decentralizedSynchronizerUpgradeConfig,
     canton.decentralizedSynchronizer,
+    `http://scan-app.${config.nodeName}:5012`,
   );
 
   const svApp = installSvApp(
