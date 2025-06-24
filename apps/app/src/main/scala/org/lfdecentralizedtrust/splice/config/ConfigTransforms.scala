@@ -278,7 +278,7 @@ object ConfigTransforms {
         c.domains.copy(global =
           c.domains.global.copy(buyExtraTraffic =
             c.domains.global.buyExtraTraffic
-              .copy(grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(30)))
+              .copy(grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(15)))
           )
         )
       )
@@ -288,7 +288,7 @@ object ConfigTransforms {
     ConfigTransforms.updateAllValidatorAppConfigs_(c =>
       c.copy(treasury =
         c.treasury.copy(
-          grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(30))
+          grpcDeadline = Some(NonNegativeFiniteDuration.ofSeconds(15))
         )
       )
     )
