@@ -103,7 +103,7 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   );
 }
 
-describe('Proposal Details', () => {
+describe('Proposal Details Content', () => {
   test('should render proposal details page', async () => {
     render(
       <Wrapper>
