@@ -10,7 +10,7 @@ export interface FeatureAppProposal {
 }
 
 export interface UnfeatureAppProposal {
-  rightContractId: string; //TODO: Should this be a CId or something more specific?
+  rightContractId: string;
 }
 
 export interface ConfigChange {
@@ -68,7 +68,7 @@ export interface ProposalVotingInformation {
   requester: string;
   requesterIsYou?: boolean;
   votingCloses: string;
-  voteTakesEffect: string; // TODO: Can this be undefined. Thinking of effective at threshold here.
+  voteTakesEffect: string;
   status: ProposalListingStatus;
 }
 
