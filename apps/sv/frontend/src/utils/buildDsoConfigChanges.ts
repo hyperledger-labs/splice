@@ -142,7 +142,6 @@ export function buildDsoConfigChanges(
       isId: true,
     },
     {
-      // TODO: format this field in UTC
       fieldName: 'Next Scheduled Synchronizer Upgrade Time',
       currentValue: before?.nextScheduledSynchronizerUpgrade?.time || '',
       newValue: after?.nextScheduledSynchronizerUpgrade?.time || '',

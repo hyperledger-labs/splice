@@ -88,11 +88,14 @@ export const VoteRequestDetails: React.FC = () => {
     proposal: buildProposal(request.action),
   } as ProposalDetails;
 
+  console.log('yaya effectiveAt', request.targetEffectiveAt);
   const votingInformation: ProposalVotingInformation = {
     requester: request.requester,
     requesterIsYou: request.requester === svPartyId,
     votingCloses: dayjs(request.voteBefore).format(dateTimeFormatISO),
-    voteTakesEffect: dayjs(request.targetEffectiveAt).format(dateTimeFormatISO),
+    voteTakesEffect: request.targetEffectiveAt
+      ? dayjs(request.targetEffectiveAt).format(dateTimeFormatISO)
+      : 'Threshold',
     status: hasVoteRequest ? 'In Progress' : getVoteResultStatus(voteResult?.outcome),
   };
 
