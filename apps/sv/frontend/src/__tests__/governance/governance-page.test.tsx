@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 import { SvConfigProvider } from '../../utils';
 import userEvent from '@testing-library/user-event';
@@ -73,7 +73,7 @@ describe.skip('Governance Page', () => {
     expect(actions.length).toBe(4);
   });
 
-  test('should show the correct number of Inflight Vote Requests', async () => {
+  test('should show the correct number of Inflight Proposals', async () => {
     const user = userEvent.setup();
 
     render(<GovernanceWithConfig />);
@@ -85,7 +85,7 @@ describe.skip('Governance Page', () => {
     );
   });
 
-  test('should correctly display the number of completed Vote Requests (History)', async () => {
+  test('should correctly display the number of completed Proposals', async () => {
     const user = userEvent.setup();
 
     render(<GovernanceWithConfig />);
@@ -96,5 +96,82 @@ describe.skip('Governance Page', () => {
     expect(voteRequests.length).toBe(5);
 
     expect(true).toBe(true);
+  });
+
+  test('click on Details link to see Proposal Details (Action Required)', async () => {
+    const user = userEvent.setup();
+
+    render(<GovernanceWithConfig />);
+
+    await navigateToGovernancePage(user);
+
+    const actions = screen.getAllByTestId('action-required-card');
+
+    const viewDetailsLink = await within(actions[0]).findByTestId('action-required-view-details');
+    expect(viewDetailsLink).toBeDefined();
+
+    await user.click(viewDetailsLink);
+
+    const proposalDetails = screen.getByTestId('proposal-details-title');
+    expect(proposalDetails).toBeDefined();
+  });
+
+  test('proposal details page should render all details', async () => {
+    const user = userEvent.setup();
+
+    render(<GovernanceWithConfig />);
+
+    await navigateToGovernancePage(user);
+
+    const actions = screen.getAllByTestId('action-required-card');
+
+    const viewDetailsLink = await within(actions[0]).findByTestId('action-required-view-details');
+    expect(viewDetailsLink).toBeDefined();
+
+    await user.click(viewDetailsLink);
+
+    const proposalDetails = screen.getByTestId('proposal-details-title');
+    expect(proposalDetails).toBeDefined();
+
+    const action = screen.getByTestId('proposal-details-action-value');
+    expect(action).toBeDefined();
+
+    const summary = screen.getByTestId('proposal-details-summary-value');
+    expect(summary).toBeDefined();
+
+    const url = screen.getByTestId('proposal-details-url-value');
+    expect(url).toBeDefined();
+
+    const votingInformationSection = screen.getByTestId('proposal-details-voting-information');
+    expect(votingInformationSection).toBeDefined();
+
+    const requesterInput = within(votingInformationSection).getByTestId(
+      'proposal-details-requester-party-id-input'
+    );
+    expect(requesterInput).toBeDefined();
+
+    const votingClosesIso = within(votingInformationSection).getByTestId(
+      'proposal-details-voting-closes-value'
+    );
+    expect(votingClosesIso).toBeDefined();
+
+    const voteTakesEffectIso = within(votingInformationSection).getByTestId(
+      'proposal-details-vote-takes-effect-value'
+    );
+    expect(voteTakesEffectIso).toBeDefined();
+
+    const status = screen.getByTestId('proposal-details-status-value');
+    expect(status).toBeDefined();
+
+    const votesSection = screen.getByTestId('proposal-details-votes');
+    expect(votesSection).toBeDefined();
+
+    const votes = within(votesSection).getAllByTestId('proposal-details-vote');
+    expect(votes.length).toBeGreaterThan(0);
+
+    expect(screen.getByTestId('proposal-details-your-vote-section')).toBeDefined();
+    expect(screen.getByTestId('proposal-details-your-vote-input')).toBeDefined();
+    expect(screen.getByTestId('proposal-details-your-vote-accept')).toBeDefined();
+    expect(screen.getByTestId('proposal-details-your-vote-reject')).toBeDefined();
   });
 });
