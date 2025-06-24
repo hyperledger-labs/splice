@@ -2237,7 +2237,6 @@ trait AmuletTransferUtil { self: StoreTest =>
           newSynchronizerId,
         ),
         Optional.empty(),
-        Optional.empty(),
       ),
       Collections.emptyMap(),
       true,
