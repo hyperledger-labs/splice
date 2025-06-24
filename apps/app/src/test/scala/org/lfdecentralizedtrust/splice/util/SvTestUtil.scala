@@ -216,7 +216,6 @@ trait SvTestUtil extends TestCommon {
     dsoRulesConfig.maxTextLength,
     dsoRulesConfig.decentralizedSynchronizer,
     domainUpgradeSchedule.toJava,
-    dsoRulesConfig.unallocatedUnclaimedActivityRecordTimeout,
   )
 
   def computeAmuletsToIssueToSvs(

@@ -571,7 +571,6 @@ testDsoRulesConfigChange = do
         voteRequestTimeout = days (7 + 1)
         dsoDelegateInactiveTimeout = seconds (70 + 1)
         maxTextLength = 1024 + 1
-        unallocatedUnclaimedActivityRecordTimeout = Some $ days (1 + 1)
         nextScheduledSynchronizerUpgrade = Some (SynchronizerUpgradeSchedule with
                                                     time = addRelTime now (days 4)
                                                     migrationId = 1)

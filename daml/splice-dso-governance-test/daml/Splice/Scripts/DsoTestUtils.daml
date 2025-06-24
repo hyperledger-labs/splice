@@ -78,7 +78,6 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet amuletPrice = do
         maxTextLength = 1024
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
-        unallocatedUnclaimedActivityRecordTimeout = Some (days 1)
   let amuletConfig = defaultAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
