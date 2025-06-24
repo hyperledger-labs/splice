@@ -286,6 +286,57 @@ function configurePublicGatewayService(
   );
 }
 
+const istioApiVersion = 'security.istio.io/v1beta1';
+
+function istioAccessPolicies(
+  ingressNs: k8s.core.v1.Namespace,
+  externalIPRanges: pulumi.Output<string[]>,
+  suffix: string
+) {
+  const selector = {
+    matchLabels: {
+      app: `istio-ingress${suffix}`,
+    },
+  };
+  const defaultDenyAll = new k8s.apiextensions.CustomResource(
+    `istio-access-policy-deny-all${suffix}`,
+    {
+      apiVersion: istioApiVersion,
+      kind: 'AuthorizationPolicy',
+      metadata: {
+        name: `istio-access-policy-deny-all${suffix}`,
+        namespace: ingressNs.metadata.name,
+      },
+      // empty spec is deny all
+      spec: { selector },
+    }
+  );
+  return externalIPRanges.apply(ipRanges => {
+    // There doesn't seem to be an istio-level limit on number of IP lists but at some point we probably hit some k8s limits on the size of a definition so we split it into 100 IP ranges per policy.
+    const chunkSize = 100;
+    const chunks = Array.from({ length: Math.ceil(ipRanges.length / chunkSize) }, (_, i) =>
+      ipRanges.slice(i * chunkSize, i * chunkSize + chunkSize)
+    );
+    const policies = chunks.map(
+      (chunk, i) =>
+        new k8s.apiextensions.CustomResource(`istio-access-policy-allow${suffix}-${i}`, {
+          apiVersion: istioApiVersion,
+          kind: 'AuthorizationPolicy',
+          metadata: {
+            name: `istio-access-policy-allow${suffix}-${i}`,
+            namespace: ingressNs.metadata.name,
+          },
+          spec: {
+            selector,
+            action: 'ALLOW',
+            rules: [{ from: [{ source: { remoteIpBlocks: chunk } }] }],
+          },
+        })
+    );
+    return [defaultDenyAll].concat(policies);
+  });
+}
+
 // Note that despite the helm chart name being "gateway", this does not actually
 // deploy an istio "gateway" resource, but rather the istio-ingress LoadBalancer
 // service and the istio-ingress pod.
@@ -297,6 +348,7 @@ function configureGatewayService(
   istiod: k8s.helm.v3.Release,
   suffix: string
 ) {
+  const istioPolicies = istioAccessPolicies(ingressNs, externalIPRanges, suffix);
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
@@ -326,7 +378,8 @@ function configureGatewayService(
         },
         service: {
           loadBalancerIP: ingressIp,
-          loadBalancerSourceRanges: externalIPRanges,
+          // We limit IPs using istio instead of through loadBalancerSourceRanges as the latter has a size limit.
+          loadBalancerSourceRanges: ['0.0.0.0/0'],
           // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
           // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
           // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
@@ -343,7 +396,10 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: [ingressNs, istiod],
+      dependsOn: istioPolicies.apply(policies => {
+        const base: pulumi.Resource[] = [ingressNs, istiod];
+        return base.concat(policies);
+      }),
     }
   );
   // Turn on envoy access logging on the ingress gateway
