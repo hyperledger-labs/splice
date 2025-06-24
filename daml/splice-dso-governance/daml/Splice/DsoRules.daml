@@ -1429,7 +1429,7 @@ template DsoRules with
           pure unclaimedReward.amount
         let leftover = totalUnclaimedRewards - amount
         optUnclaimedRewardCid <- 
-          if | leftover < 0.0 -> abort $ "insufficient unclaimed rewards: " <> show (abs leftover)
+          if | leftover < 0.0 -> abort $ "insufficient unclaimed rewards: " <> show (negate leftover)
              | leftover == 0.0 -> pure None
              | otherwise -> Some <$> create UnclaimedReward with dso; amount = leftover
 

@@ -46,9 +46,7 @@ optionalNonZeroMetadata : (Eq a, Additive a, Show a) => Text -> Optional a -> Te
 optionalNonZeroMetadata k optN m = 
   case optN of
     None -> m
-    Some n 
-      | n == aunit -> m
-      | otherwise -> TextMap.insert k (show n) m
+    Some n -> nonZeroMetadata k n m
 
 -- Amulet Metadata keys
 -----------------------
