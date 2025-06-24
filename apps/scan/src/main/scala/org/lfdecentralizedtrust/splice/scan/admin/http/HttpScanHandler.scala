@@ -1236,10 +1236,12 @@ class HttpScanHandler(
               )
             }
           case Some(time) =>
-            participantAdminConnection.downloadAcsSnapshot(
+            // To support more timestamp we use forSynchronizerMigration instead of forPartyMigration
+            participantAdminConnection.downloadAcsSnapshotForSynchronizerMigration(
               Set(partyId),
               timestamp = time.toInstant,
-              filterSynchronizerId = synchronizerId,
+              synchronizerId = synchronizerId,
+              disasterRecovery = false,
             )
         }
       } yield {

@@ -39,14 +39,16 @@ class AcsExporter(
   def exportAcsAtTimestamp(
       domain: SynchronizerId,
       timestamp: Instant,
+      disasterRecovery: Boolean,
       parties: PartyId*
   )(implicit
       tc: TraceContext
   ): Future[ByteString] = {
-    participantAdminConnection.downloadAcsSnapshot(
+    participantAdminConnection.downloadAcsSnapshotForSynchronizerMigration(
       parties = parties.toSet,
-      filterSynchronizerId = domain,
+      synchronizerId = domain,
       timestamp = timestamp,
+      disasterRecovery = disasterRecovery,
     )
   }
 
@@ -88,10 +90,11 @@ class AcsExporter(
       )
       acsSnapshotTimestamp = domainParamsStateTopology.base.validFrom
       snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
-        participantAdminConnection.downloadAcsSnapshot(
+        participantAdminConnection.downloadAcsSnapshotForSynchronizerMigration(
           parties = parties.toSet,
-          filterSynchronizerId = domain,
+          synchronizerId = domain,
           timestamp = acsSnapshotTimestamp,
+          disasterRecovery = false,
         )
       )
     } yield {
