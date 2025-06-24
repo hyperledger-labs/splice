@@ -80,8 +80,8 @@ trait ParticipantAdminDarsConnection {
       dars: Seq[DarResource],
       fromDate: Option[Instant],
       maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
-  )(implicit
-      tc: TraceContext
+  )(
+      implicit tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
     ensureTopologyMapping[VettedPackages](
