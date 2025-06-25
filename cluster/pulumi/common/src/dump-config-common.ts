@@ -179,7 +179,7 @@ export async function initDumpConfig(): Promise<void> {
             }
           case PulumiFunction.GCP_GET_CLUSTER:
             return {
-              nodePools: [{networkConfigs: [{podIpv4CidrBlock: '10.160.0.0/16'}]}]
+              nodePools: [{ networkConfigs: [{ podIpv4CidrBlock: '10.160.0.0/16' }] }],
             };
           case PulumiFunction.GCP_GET_SECRET_VERSION:
             if (args.inputs.secret.startsWith('sv') && args.inputs.secret.endsWith('-id')) {
