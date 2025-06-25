@@ -426,7 +426,12 @@ class UserWalletTxLogParser(
                 tree.getChildNodeIds(exercised).asScala.toList,
                 synchronizerId,
               )
-            }.map(_.mergeBalanceChangesIntoTransfer(TransferTransactionSubtype.AppPaymentCollected))
+            }.map(
+              _.mergeBalanceChangesIntoTransfer(
+                TransferTransactionSubtype.AppPaymentCollected,
+                None,
+              )
+            )
 
           case AcceptedAppPayment_Reject(node) =>
             now(
@@ -474,7 +479,8 @@ class UserWalletTxLogParser(
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
-                TransferTransactionSubtype.SubscriptionInitialPaymentCollected
+                TransferTransactionSubtype.SubscriptionInitialPaymentCollected,
+                None,
               )
             )
 
@@ -528,7 +534,8 @@ class UserWalletTxLogParser(
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
-                TransferTransactionSubtype.SubscriptionPaymentCollected
+                TransferTransactionSubtype.SubscriptionPaymentCollected,
+                None,
               )
             )
 
@@ -575,8 +582,9 @@ class UserWalletTxLogParser(
                 synchronizerId,
               )
             }.map { x =>
-              x.setTransferSubtype(
-                TransferTransactionSubtype.CreateTokenStandardTransferInstruction
+              x.mergeBalanceChangesIntoTransfer(
+                TransferTransactionSubtype.CreateTokenStandardTransferInstruction,
+                Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
               ).setTransferDescription(
                 node.argument.value.transfer.meta.values
                   .getOrDefault(TokenStandardMetadata.reasonMetaKey, "")
@@ -586,8 +594,6 @@ class UserWalletTxLogParser(
                 node.argument.value.transfer.amount
               ).setTransferInstructionCid(
                 cid
-              ).setEventId(
-                EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
               )
             }
 
@@ -600,11 +606,10 @@ class UserWalletTxLogParser(
               )
             }.map { x =>
               x.mergeBalanceChangesIntoTransfer(
-                TransferTransactionSubtype.TransferInstruction_Accept
+                TransferTransactionSubtype.TransferInstruction_Accept,
+                Some(EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)),
               ).setTransferInstructionCid(
                 exercised.getContractId
-              ).setEventId(
-                EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
               )
             }
 
@@ -618,13 +623,11 @@ class UserWalletTxLogParser(
             }.map {
               _.ensureBalanceChangeTxLogEntry(tree, endUserParty)
                 .setBalanceChangeSubtype(
-                  BalanceChangeTransactionSubtype.TransferInstruction_Withdraw
+                  BalanceChangeTransactionSubtype.TransferInstruction_Withdraw,
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
                 )
                 .setTransferInstructionCid(
                   exercised.getContractId
-                )
-                .setEventId(
-                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
                 )
             }
 
@@ -638,13 +641,11 @@ class UserWalletTxLogParser(
             }.map {
               _.ensureBalanceChangeTxLogEntry(tree, endUserParty)
                 .setBalanceChangeSubtype(
-                  BalanceChangeTransactionSubtype.TransferInstruction_Reject
+                  BalanceChangeTransactionSubtype.TransferInstruction_Reject,
+                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId),
                 )
                 .setTransferInstructionCid(
                   exercised.getContractId
-                )
-                .setEventId(
-                  EventId.prefixedFromUpdateIdAndNodeId(tree.getUpdateId, exercised.getNodeId)
                 )
             }
 
@@ -954,12 +955,13 @@ object UserWalletTxLogParser {
     }
 
     def setBalanceChangeSubtype(
-        transactionSubtype: BalanceChangeTransactionSubtype
+        transactionSubtype: BalanceChangeTransactionSubtype,
+        eventId: String,
     ): State = {
       State(
         entries = entries.map {
           case b: BalanceChangeTxLogEntry =>
-            b.copy(subtype = Some(transactionSubtype.toProto))
+            b.copy(subtype = Some(transactionSubtype.toProto), eventId = eventId)
           case other => other
         }
       )
@@ -1013,24 +1015,6 @@ object UserWalletTxLogParser {
       )
     }
 
-    /** Sets the eventId for all entries that store eventIds to the given eventId.
-      *
-      * This is useful when you want to re-use the parsing logic of existing methods
-      * like State.fromTransfer for some new event but want the TxLogEntry to reflect
-      * the eventId of the new event.
-      */
-    def setEventId(eventId: String): State = {
-      State(
-        entries = entries.map {
-          case e: UnknownTxLogEntry => e.copy(eventId = eventId)
-          case e: TransferTxLogEntry => e.copy(eventId = eventId)
-          case e: BalanceChangeTxLogEntry => e.copy(eventId = eventId)
-          case e: NotificationTxLogEntry => e.copy(eventId = eventId)
-          case e => e
-        }
-      )
-    }
-
     /** Given a parsing state where the parser has encountered exactly one transfer and zero or more balance changes,
       * returns a parsing state where all the balance changes have been merged into the transfer event.
       *
@@ -1038,7 +1022,8 @@ object UserWalletTxLogParser {
       * them for a transfer. In this case, we only want to display one balance change for the user.
       */
     def mergeBalanceChangesIntoTransfer(
-        transactionSubtype: TransferTransactionSubtype
+        transactionSubtype: TransferTransactionSubtype,
+        transferEventIdOverride: Option[String],
     ): State = {
       val balanceChanges = entries.foldLeft(Map[String, BigDecimal]())((changes, entry) =>
         entry match {
@@ -1062,6 +1047,7 @@ object UserWalletTxLogParser {
         case t: TransferTxLogEntry =>
           Some(
             t.copy(
+              eventId = transferEventIdOverride.getOrElse(t.eventId),
               subtype = Some(transactionSubtype.toProto),
               sender = t.sender.map(netAmount),
               receivers = t.receivers.map(netAmount),
@@ -1449,8 +1435,10 @@ object UserWalletTxLogParser {
 
       stateFromPaymentCollection
         .appended(stateFromBurntAmulet)
-        .mergeBalanceChangesIntoTransfer(transactionSubtype)
-        .setEventId(EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId))
+        .mergeBalanceChangesIntoTransfer(
+          transactionSubtype,
+          Some(EventId.prefixedFromUpdateIdAndNodeId(tx.getUpdateId, event.getNodeId)),
+        )
     }
 
     /** State from a choice that returns a `MintSummary`.

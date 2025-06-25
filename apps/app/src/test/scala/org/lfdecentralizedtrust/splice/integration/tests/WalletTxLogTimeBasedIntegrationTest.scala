@@ -15,12 +15,18 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.wallet.store.{
   BalanceChangeTxLogEntry,
+  PartyAndAmount,
   TransferTxLogEntry,
+  TxLogEntry,
   TxLogEntry as walletLogEntry,
 }
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
 
 import java.time.Duration
+import java.util.UUID
 
 class WalletTxLogTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -336,6 +342,134 @@ class WalletTxLogTimeBasedIntegrationTest
           },
         ),
       )
+    }
+
+    "Token Standard: expired locked amulet can be used as input, and txlog parses correctly" in {
+      implicit env =>
+        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+        advanceRoundsByOneTick
+
+        val expiryMinutes = 1L
+        val tapAmount = 10_000L
+        val lockAmount = 5_000L
+        val transferAmount = 6_000L
+
+        aliceWalletClient.tap(walletAmuletToUsd(tapAmount, amuletPrice))
+        TriggerTestUtil.setTriggersWithin(
+          triggersToPauseAtStart =
+            // important that the holding is still locked so we can use it as input
+            activeSvs.map(_.dsoDelegateBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
+          Seq.empty,
+        ) {
+          val trackingId = UUID.randomUUID().toString
+
+          actAndCheck(
+            "lock the tapped amulet",
+            lockAmulets(
+              aliceValidatorBackend,
+              aliceParty,
+              aliceValidatorBackend.getValidatorPartyId(),
+              aliceWalletClient.list().amulets,
+              BigDecimal(lockAmount),
+              sv1ScanBackend,
+              java.time.Duration.ofMinutes(expiryMinutes),
+              env.environment.clock.now,
+            ),
+          )(
+            "Wait for locked amulet to appear",
+            _ => {
+              aliceWalletClient.list().lockedAmulets should have size (1)
+            },
+          )
+
+          advanceTime(
+            Duration
+              .ofMinutes(expiryMinutes)
+              // otherwise the time is equal to expiry and it doesn't get picked up, which is very confusing
+              .plusSeconds(1L)
+          )
+
+          val offerResponse = aliceWalletClient.createTokenStandardTransfer(
+            bobParty,
+            transferAmount, // will need the locked amulet as input
+            "transfer offer description",
+            CantonTimestamp.now().plusSeconds(60),
+            trackingId,
+          )
+          val offer = inside(offerResponse.output) {
+            case members.TransferInstructionPending(value) =>
+              new TransferInstruction.ContractId(value.transferInstructionCid)
+          }
+
+          val (aliceTxs, bobTxs) = clue("Alice and Bob parse all tx log entries") {
+            eventually() {
+              val aliceTxs = aliceWalletClient.listTransactions(None, 1000)
+              // tap + lock + transfer instruction
+              aliceTxs should have size 3
+              val bobTxs = bobWalletClient.listTransactions(None, 1000)
+              // transfer instruction
+              bobTxs should have size 1
+              (aliceTxs, bobTxs)
+            }
+          }
+
+          checkTxHistory(
+            aliceWalletClient,
+            Seq(
+              // create transfer instruction
+              { case logEntry: TransferTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
+                logEntry.transferInstructionCid shouldBe offer.contractId
+                logEntry.transferInstructionReceiver shouldBe bobParty.toProtoPrimitive
+                logEntry.transferInstructionAmount shouldBe Some(BigDecimal(transferAmount))
+                logEntry.description shouldBe "transfer offer description"
+                // No balance is transferred here so receivers is empty
+                logEntry.receivers shouldBe empty
+                val expectedExtraLock = BigDecimal(transferAmount - lockAmount)
+                logEntry.sender.value.amount should beWithin(
+                  -expectedExtraLock * 1.25,
+                  -expectedExtraLock,
+                )
+              },
+              // locking of 5k
+              { case logEntry: TransferTxLogEntry =>
+                // The `lockAmulets` utility function directly exercises the `AmuletRules_Transfer` choice.
+                // This will appear as the catch-all "unknown transfer" in the history.
+                logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.Transfer.toProto
+                logEntry.transferInstructionCid shouldBe ""
+                logEntry.transferInstructionAmount shouldBe None
+                logEntry.description shouldBe ""
+                // No balance is transferred here so receivers is empty
+                logEntry.receivers shouldBe empty
+                logEntry.sender.value.amount should beWithin(
+                  -(lockAmount + smallAmount),
+                  -lockAmount,
+                )
+              },
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
+                logEntry.amount shouldBe BigDecimal(tapAmount)
+              },
+            ),
+          )
+
+          checkTxHistory(
+            bobWalletClient,
+            Seq(
+              { case logEntry: TransferTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.CreateTokenStandardTransferInstruction.toProto
+                logEntry.transferInstructionCid shouldBe offer.contractId
+                logEntry.transferInstructionReceiver shouldBe bobParty.toProtoPrimitive
+                logEntry.transferInstructionAmount shouldBe Some(BigDecimal(transferAmount))
+                logEntry.description shouldBe "transfer offer description"
+                logEntry.receivers shouldBe Seq(PartyAndAmount(bobParty.toProtoPrimitive, 0))
+                logEntry.sender.value.amount shouldBe 0
+              }
+            ),
+          )
+        }
     }
   }
 }
