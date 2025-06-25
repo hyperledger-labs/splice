@@ -379,6 +379,7 @@ function configureGatewayService(
         service: {
           loadBalancerIP: ingressIp,
           // We limit IPs using istio instead of through loadBalancerSourceRanges as the latter has a size limit.
+          // See https://github.com/DACH-NY/canton-network-internal/issues/626
           loadBalancerSourceRanges: ['0.0.0.0/0'],
           // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
           // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
