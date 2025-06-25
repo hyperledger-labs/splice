@@ -195,6 +195,7 @@ class ScanApp(
         retryProvider,
         loggerFactory,
         store,
+        storage,
         acsSnapshotStore,
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,

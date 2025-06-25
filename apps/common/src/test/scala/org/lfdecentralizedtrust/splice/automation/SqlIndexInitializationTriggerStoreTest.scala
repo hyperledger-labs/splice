@@ -33,7 +33,6 @@ class SqlIndexInitializationTriggerStoreTest
     "create custom indexes with default settings" in {
       val trigger = new SqlIndexInitializationTrigger(
         storage = storage,
-        config = storage.dbConfig,
         context = triggerContext,
       )
       trigger.run(paused = false)
@@ -49,7 +48,6 @@ class SqlIndexInitializationTriggerStoreTest
     "warn about unknown indexes" in {
       val trigger = new SqlIndexInitializationTrigger(
         storage = storage,
-        config = storage.dbConfig,
         context = triggerContext,
         expectedIndexes = Map.empty,
       )
@@ -72,7 +70,6 @@ class SqlIndexInitializationTriggerStoreTest
     "drop index" in {
       val trigger = new SqlIndexInitializationTrigger(
         storage = storage,
-        config = storage.dbConfig,
         context = triggerContext,
         expectedIndexes = SqlIndexInitializationTrigger.flywayIndexes ++ Map(
           "test_index" -> IndexAction.Drop
@@ -99,7 +96,6 @@ class SqlIndexInitializationTriggerStoreTest
     "become unhealthy if index creation fails" in {
       val trigger = new SqlIndexInitializationTrigger(
         storage = storage,
-        config = storage.dbConfig,
         context = triggerContext,
         expectedIndexes = SqlIndexInitializationTrigger.flywayIndexes ++ Map(
           "invalid_index_definition" -> IndexAction.Create(
