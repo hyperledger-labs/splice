@@ -35,7 +35,9 @@ runs:
 
     - name: Setup
       shell: bash
-      run: ./.github/actions/scripts/common_setup.sh
+      # if pull request: github.event.pull_request.head.sha is set and github.sha will be ignored
+      # if not pull request: github.event.pull_request.head.sha is set evaluates to empty string and github.sha is used instead
+      run: ./.github/actions/scripts/common_setup.sh ${{ github.event.pull_request.head.sha }} ${{ github.sha }}
 
     - name: Set up Nix
       uses: ./.github/actions/nix/setup_self_hosted_nix
