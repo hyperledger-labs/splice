@@ -21,9 +21,11 @@ Use the following documentation to build Canton Network applications and get the
 * Learn to build Canton Network applications from the tutorials, how-tos, explanations, and reference documentation at
   https://docs.digitalasset.com/build/3.3/
 * Browse the currently featured apps: https://sync.global/featured-apps/
-* Request an app to be featured: https://sync.global/featured-app-request/
-* Learn about ongoing CIPs to feature apps from the CIP mailing list (and consider joining the list): https://lists.sync.global/g/cip-discuss/topics
-* Learn about the rationale for featuring an app from the CIP repository: https://github.com/global-synchronizer-foundation/cips
+* Request your app to be featured: https://sync.global/featured-app-request/
+
+  * These requests are published on the `Tokenomics mailing list <https://lists.sync.global/g/tokenomics/topics>`__.
+    Browse that list for inspiration and to see what other apps are being built.
+
 * Join the app development discussion in the `#gsf-global-synchronizer-appdev <https://app.slack.com/client/T03T53E10/C08FQRCRFUN>`__
   Slack channel by sending a request to operations@sync.global for your Slack organization to be added to the channel.
 

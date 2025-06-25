@@ -112,9 +112,12 @@ Requests always operate on the primary party of the user specified as the subjec
 Port Configuration
 -------------------
 
-All Splice apps expose HTTP APIs.
-The port they are exposed on is configured under ``admin-api.port``, e.g.,
-this config file would expose the validator API on port 5003:
+All Splice apps expose HTTP APIs,
+which are typically served by a reverse proxy on a well-known URL.
+
+In case you do need to access them directly, their
+port is configured under ``admin-api.port``, e.g., this config file would expose
+the validator API on port 5003:
 
 .. code-block::
 
@@ -127,6 +130,4 @@ this config file would expose the validator API on port 5003:
      }
    }
 
-Note that this port usually does not matter when accessing one of the :ref:`app_dev_public_http_apis`,
-as they are typically served by a reverse proxy that maps the port to a well-known URL.
 
