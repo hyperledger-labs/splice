@@ -56,6 +56,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore()
           result <- store.lookupValidatorOnboardingBySecretWithOffset("whatever")
         } yield result should be(QueryResult(acsOffset, None))
+        throw new RuntimeException("expected to fail in a fork.")
       }
 
     }
