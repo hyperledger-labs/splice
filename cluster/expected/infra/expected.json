@@ -1107,6 +1107,132 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-allow-0",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "action": "ALLOW",
+        "rules": [
+          {
+            "from": [
+              {
+                "source": {
+                  "remoteIpBlocks": [
+                    "<internal IPs>",
+                    "1.2.3.4/32",
+                    "5.6.7.8/32",
+                    "11.12.13.14/32",
+                    "4.3.2.1/32",
+                    "8.7.6.5/32",
+                    "8.7.6.4/32",
+                    "9.8.7.6/32",
+                    "11.22.33.45/32",
+                    "12.34.56.78/32",
+                    "10.160.0.0/16"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-allow-0",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-allow-public-0",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "action": "ALLOW",
+        "rules": [
+          {
+            "from": [
+              {
+                "source": {
+                  "remoteIpBlocks": [
+                    "0.0.0.0/0"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress-public"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-allow-public-0",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-deny-all-public",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress-public"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-deny-all-public",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-deny-all",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-deny-all",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "base",
       "compat": "true",
       "maxHistory": 10,
@@ -1321,16 +1447,7 @@
         "service": {
           "externalTrafficPolicy": "Local",
           "loadBalancerSourceRanges": [
-            "<internal IPs>",
-            "1.2.3.4/32",
-            "5.6.7.8/32",
-            "11.12.13.14/32",
-            "4.3.2.1/32",
-            "8.7.6.5/32",
-            "8.7.6.4/32",
-            "9.8.7.6/32",
-            "11.22.33.45/32",
-            "12.34.56.78/32"
+            "0.0.0.0/0"
           ],
           "ports": [
             {
