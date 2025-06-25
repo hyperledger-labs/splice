@@ -8,6 +8,14 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Validator
+
+  - Fix a bug where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
+    if the receiver's provider party was featured.
+
 0.4.2
 -----
 
