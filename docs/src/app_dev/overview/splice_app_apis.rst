@@ -13,7 +13,7 @@ Splice HTTP APIs
 Public HTTP APIs
 ----------------
 
-There are two sets of public HTTP APIs exposed by Splice applications, as can be
+There are two sets of public HTTP APIs exposed by Splice applications, as can be seen
 in the :ref:`validator-network-diagram`:
 
 * The :ref:`app_dev_scan_api` are exposed by the Scan App of SV nodes and
