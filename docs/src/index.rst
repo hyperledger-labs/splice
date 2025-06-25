@@ -50,7 +50,6 @@ Global Synchronizer for the Canton Network
    :caption: Background
 
    background/architecture
-   background/splice_app_apis
 
 .. todo:: Add Background sections containing
 

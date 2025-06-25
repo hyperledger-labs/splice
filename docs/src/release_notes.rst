@@ -9,7 +9,7 @@ Release Notes
 =============
 
 Upcoming
-----
+--------
 
 - Docs
 

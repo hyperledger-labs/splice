@@ -14,7 +14,15 @@ Public HTTP APIs
 ----------------
 
 There are two sets of public HTTP APIs exposed by Splice applications, as can be seen
-in the :ref:`validator-network-diagram`:
+in the diagram below:
+
+..
+   _LucidChart link: https://lucid.app/lucidchart/cc18d86e-95aa-4a20-9677-160599132a3e/edit?viewport_loc=-2531%2C-3450%2C4045%2C2266%2C0_0&invitationId=inv_f7bcd7ba-780d-4887-8c24-973cc757b06e
+
+
+.. image:: ../overview/images/app-connectivity-diagram.png
+  :width: 800
+  :alt: App Network Diagram
 
 * The :ref:`app_dev_scan_api` are exposed by the Scan App of SV nodes and
   provides access to the view of the ledger and its infrastructure as seen by all SV Nodes.
@@ -25,8 +33,11 @@ in the :ref:`validator-network-diagram`:
   serves to manage the Validator Node and the Splice Wallets of parties hosted
   locally on the Validator Node.
 
-All Splice applications (e.g., the validator app) expose HTTP APIs
-as can be seen from the network diagram.
+The Ledger API is not part of Splice, and thus not documented here. See :ref:`app_dev_ledger_api` for details on how to use the Ledger API.
+
+Some of the Splice apps also define additional HTTP APIs that are not public, and are subject to change without notice.
+If you do need some of them for your app, please create an issue on https://github.com/hyperledger-labs/splice,
+so that you can align with the Splice team on the API, your needs, and the required stability guarantees.
 
 .. toctree::
    :hidden:
@@ -39,7 +50,7 @@ as can be seen from the network diagram.
 OpenAPI Conventions
 -------------------
 
-The APIs are documented using `OpenAPI specifications <https://www.openapis.org/>`_.
+The HTTP APIs of Splice apps are documented using `OpenAPI specifications <https://www.openapis.org/>`_.
 You can download the OpenAPI specification for Splice's applications here: |openapi_download_link|.
 
 API Stability
