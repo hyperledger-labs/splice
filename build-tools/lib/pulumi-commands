@@ -276,8 +276,6 @@ function subcmd_ci_apply_sv() {
        _info "Bootstrapping SV from ${BOOTSTRAPPING_CONFIG}"
     fi
 
-    local -x CHARTS_VERSION="${1-}"
-
     _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
@@ -358,8 +356,6 @@ function subcmd_ci_apply_validator() {
        _info "Bootstrapping Validator from ${BOOTSTRAPPING_CONFIG}"
     fi
 
-    local -x CHARTS_VERSION="${1-}"
-
     _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
@@ -400,11 +396,6 @@ function subcmd_apply_multi() {
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
-
-    if [ -z "${MULTI_VALIDATOR_IMAGE_VERSION:-}" ]; then
-        MULTI_VALIDATOR_IMAGE_VERSION=$(get-snapshot-version)
-        export MULTI_VALIDATOR_IMAGE_VERSION
-    fi
 
     _uses_pulumi_stack multi-validator
     subcmd_pulumi multi-validator up --yes --skip-preview --show-sames "${args[@]}"
