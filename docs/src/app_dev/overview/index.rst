@@ -38,7 +38,7 @@ Use the guidance below to learn which ones to use and how to use them.
 * Use the :ref:`app_dev_ledger_api` to access the view of the ledger as seen by the parties hosted on a Validator Node and submit transaction to the ledger.
 * Use the :ref:`app_dev_scan_api` to access the view of the ledger and its infrastructure as seen by all SV Nodes.
   Note that this view is the one visible to the DSO party and does not includes any of the data that is private to the parties hosted on Validator Nodes.
-  Use the :ref:`app_dev_ledger_api` to access that data.
+  Use the :ref:`app_dev_ledger_api` to access the data of parties hosted on the Validator Node.
 * Use the :ref:`app_dev_validator_api` to access higher-level functionality provided by the
   Splice Validator App running alongside the Canton Participant node in a
   Validator Node.

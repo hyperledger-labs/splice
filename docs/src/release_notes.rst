@@ -8,7 +8,7 @@
 Release Notes
 =============
 
-Next
+Upcoming
 ----
 
 - Docs
