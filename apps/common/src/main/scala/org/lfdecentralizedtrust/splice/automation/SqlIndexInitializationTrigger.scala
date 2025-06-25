@@ -3,10 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
-import com.digitalasset.canton.config.{DbConfig, StorageConfig}
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, *}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.digitalasset.canton.util.MonadUtil
@@ -27,7 +27,6 @@ import scala.util.Try
   */
 class SqlIndexInitializationTrigger(
     storage: DbStorage,
-    config: StorageConfig,
     protected val context: TriggerContext,
     expectedIndexes: Map[String, IndexAction] = defaultExpectedIndexes,
 )(implicit ec: ExecutionContext, tracer: Tracer)
@@ -53,7 +52,7 @@ class SqlIndexInitializationTrigger(
   }
 
   override def complete()(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    config match {
+    storage.dbConfig match {
       case postgresConfig: DbConfig.Postgres =>
         val schemaName = getPostgresSchema(postgresConfig)
         completePostgres(schemaName)
@@ -99,6 +98,23 @@ class SqlIndexInitializationTrigger(
 }
 
 object SqlIndexInitializationTrigger {
+
+  def apply(
+      storage: Storage,
+      triggerContext: TriggerContext,
+      expectedIndexes: Map[String, IndexAction] = defaultExpectedIndexes,
+  )(implicit ec: ExecutionContext, tracer: Tracer): SqlIndexInitializationTrigger = storage match {
+    case dbStorage: DbStorage =>
+      new SqlIndexInitializationTrigger(
+        dbStorage,
+        triggerContext,
+        expectedIndexes,
+      )
+    case storageType =>
+      // Same behavior as in `ScanStore.apply` and similar - we only really support DbStorage in our apps.
+      throw new RuntimeException(s"Unsupported storage type $storageType")
+  }
+
   final case class IndexData(
       tableName: String,
       definition: String,
