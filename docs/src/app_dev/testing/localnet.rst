@@ -32,8 +32,6 @@ Additional environment variables include:
 - **LOCALNET_DIR/compose.env**: Contains Docker Compose configuration variables.
 - **LOCALNET_ENV_DIR/common.env**: Shared environment variables across Docker Compose and container configurations. It sets default ports, DB credentials, and Splice UI configurations.
 
-Depending on the desired environment **ENV** (local or dev), either ``LOCALNET_ENV_DIR/dev.env`` or ``LOCALNET_ENV_DIR/local.env`` will be applied to both Docker Compose and Splice containers, with ``local`` set as the default.
-
 Resource constraints for containers can be configured via:
 - **LOCALNET_DIR/resource-constraints.yaml**
 
@@ -126,7 +124,6 @@ start
 
    docker compose --env-file $LOCALNET_DIR/compose.env \
                   --env-file $LOCALNET_DIR/env/common.env \
-                  --env-file $LOCALNET_DIR/env/local.env \
                   -f $LOCALNET_DIR/compose.yaml \
                   -f $LOCALNET_DIR/resource-constraints.yaml \
                   --profile sv \
@@ -140,7 +137,6 @@ stop
 
    docker compose --env-file $LOCALNET_DIR/compose.env \
                   --env-file $LOCALNET_DIR/env/common.env \
-                  --env-file $LOCALNET_DIR/env/local.env \
                   -f $LOCALNET_DIR/compose.yaml \
                   -f $LOCALNET_DIR/resource-constraints.yaml \
                   --profile sv \
@@ -154,7 +150,6 @@ start with swagger-ui
 
    docker compose --env-file $LOCALNET_DIR/compose.env \
                   --env-file $LOCALNET_DIR/env/common.env \
-                  --env-file $LOCALNET_DIR/env/local.env \
                   -f $LOCALNET_DIR/compose.yaml \
                   -f $LOCALNET_DIR/resource-constraints.yaml \
                   --profile sv \
@@ -169,7 +164,6 @@ stop with swagger-ui
 
    docker compose --env-file $LOCALNET_DIR/compose.env \
                   --env-file $LOCALNET_DIR/env/common.env \
-                  --env-file $LOCALNET_DIR/env/local.env \
                   -f $LOCALNET_DIR/compose.yaml \
                   -f $LOCALNET_DIR/resource-constraints.yaml \
                   --profile sv \
@@ -184,29 +178,7 @@ console
 
    docker compose --env-file $LOCALNET_DIR/compose.env \
                   --env-file $LOCALNET_DIR/env/common.env \
-                  --env-file $LOCALNET_DIR/env/local.env \
                   -f $LOCALNET_DIR/compose.yaml \
                   -f $LOCALNET_DIR/resource-constraints.yaml \
                   run --rm console
-
-Run in devnet
--------------
-
-.. code-block:: bash
-
-   export ENV=dev
-   export SV_PROFILE=off
-   export IMAGE_TAG=??? # Set the image tag to the desired value
-   export MIGRATION_ID=??? # Set the migration ID to the desired value
-   docker compose --env-file ${LOCALNET_DIR}/compose.env \
-                  --env-file ${LOCALNET_DIR}/env/common.env \
-                  --env-file ${LOCALNET_DIR}/env/dev.env \
-                  -f ${LOCALNET_DIR}/compose.yaml \
-                  -f ${LOCALNET_DIR}/resource-constraints.yaml \
-                  --profile app-provider \
-                  --profile app-user up -d
-
-Please ensure that the MIGRATION_ID and IMAGE_TAG environment variables are correctly configured for the development network.
-For more information and the correct values, please visit: https://sync.global/sv-network/
-
 
