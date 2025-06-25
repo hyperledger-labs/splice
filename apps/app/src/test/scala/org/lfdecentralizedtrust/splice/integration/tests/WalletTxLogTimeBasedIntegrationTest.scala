@@ -8,6 +8,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
   ExpiredLockedAmuletTrigger,
 }
 import org.lfdecentralizedtrust.splice.util.{
+  EventId,
   SplitwellTestUtil,
   SvTestUtil,
   TriggerTestUtil,
@@ -22,9 +23,13 @@ import org.lfdecentralizedtrust.splice.wallet.store.{
 }
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
+import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.splice.http.v0.definitions.DamlValueEncoding.members.CompactJson
 import org.lfdecentralizedtrust.splice.http.v0.definitions.Transfer.TransferKind
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransferInstructionResultOutput.members
+import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent
+import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem
 
 import java.time.Duration
 import java.util.UUID
@@ -455,6 +460,27 @@ class WalletTxLogTimeBasedIntegrationTest
               },
             ),
           )
+
+          // make sure that the OwnerExpireLock is in the update
+          val createTransferUpdateId = inside(aliceTxs) {
+            case (transfer: TransferTxLogEntry) +: _ =>
+              EventId.updateIdFromEventId(transfer.eventId)
+          }
+          val createTransferUpdate = sv1ScanBackend.getUpdate(createTransferUpdateId, CompactJson)
+          createTransferUpdate match {
+            case UpdateHistoryItem.members.UpdateHistoryReassignment(_) =>
+              fail("cannot be a reassignment")
+            case UpdateHistoryItem.members.UpdateHistoryTransaction(value) =>
+              inside(value.eventsById.values) { case trees =>
+                forExactly(1, trees) {
+                  case TreeEvent.members.ExercisedEvent(value) =>
+                    value.choice should be(
+                      splice.amulet.LockedAmulet.CHOICE_LockedAmulet_OwnerExpireLock.name
+                    )
+                  case _ => fail("irrelevant")
+                }
+              }
+          }
 
           checkTxHistory(
             bobWalletClient,
