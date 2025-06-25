@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { local } from '@pulumi/command';
@@ -8,8 +9,10 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
   activeVersion,
+  CLUSTER_NAME,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
+  GCP_PROJECT,
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
@@ -154,6 +157,16 @@ function configureInternalGatewayService(
   ingressIp: pulumi.Output<string>,
   istiod: k8s.helm.v3.Release
 ) {
+  const cluster = gcp.container.getCluster({
+    name: CLUSTER_NAME,
+    project: GCP_PROJECT,
+  });
+  // The loopback traffic would be prevented by our policy. To still allow it, we
+  // add the node pool ip ranges to the list.
+  // eslint-disable-next-line promise/prefer-await-to-then
+  const internalIPRanges = cluster.then(c =>
+    c.nodePools.map(p => p.networkConfigs.map(c => c.podIpv4CidrBlock)).flat()
+  );
   const externalIPRanges = loadIPRanges();
   // see notes when installing a CometBft node in the full deployment
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
@@ -166,7 +179,7 @@ function configureInternalGatewayService(
   return configureGatewayService(
     ingressNs,
     ingressIp,
-    externalIPRanges,
+    pulumi.all([externalIPRanges, internalIPRanges]).apply(([a, b]) => a.concat(b)),
     [
       ingressPort('grpc-cd-pub-api', 5008),
       ingressPort('grpc-cs-p2p-api', 5010),

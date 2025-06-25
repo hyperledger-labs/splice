@@ -14,6 +14,7 @@ export enum PulumiFunction {
   GCP_GET_PROJECT = 'gcp:organizations/getProject:getProject',
   GCP_GET_SUB_NETWORK = 'gcp:compute/getSubnetwork:getSubnetwork',
   GCP_GET_SECRET_VERSION = 'gcp:secretmanager/getSecretVersion:getSecretVersion',
+  GCP_GET_CLUSTER = 'gcp:container/getCluster:getCluster',
 }
 
 export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
@@ -176,6 +177,10 @@ export async function initDumpConfig(): Promise<void> {
               );
               break;
             }
+          case PulumiFunction.GCP_GET_CLUSTER:
+            return {
+              nodePools: [{networkConfigs: [{podIpv4CidrBlock: '10.160.0.0/16'}]}]
+            };
           case PulumiFunction.GCP_GET_SECRET_VERSION:
             if (args.inputs.secret.startsWith('sv') && args.inputs.secret.endsWith('-id')) {
               return {
