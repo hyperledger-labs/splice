@@ -10,6 +10,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{FutureHelpers, HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTrigger.IndexAction
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
@@ -39,6 +40,7 @@ class SqlIndexInitializationTriggerStoreTest
       for {
         _ <- trigger.finished.failOnShutdown
         indexNames <- listIndexNames()
+        _ <- dropIndexes(SqlIndexInitializationTrigger.customIndexes.keySet.toSeq).failOnShutdown
       } yield {
         indexNames should contain allElementsOf SqlIndexInitializationTrigger.customIndexes.keySet
         trigger.isHealthy shouldBe true
@@ -124,6 +126,18 @@ class SqlIndexInitializationTriggerStoreTest
         "listIndexes",
       )
       .failOnShutdown
+  }
+
+  private def dropIndexes(indexNames: Seq[String]): FutureUnlessShutdown[Unit] = {
+    MonadUtil
+      .sequentialTraverse(indexNames) { indexName =>
+        storage
+          .update(
+            sqlu"drop index if exists #${indexName}",
+            s"drop $indexName index",
+          )
+      }
+      .map(_ => ())
   }
   private lazy val clock = new SimClock(loggerFactory = loggerFactory)
   private lazy val triggerContext: TriggerContext = TriggerContext(
