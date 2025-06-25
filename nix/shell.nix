@@ -88,6 +88,7 @@ in pkgs.mkShell {
     python3Packages.sphinxcontrib-openapi
     python3Packages.sphinx-autobuild
     python3Packages.waitress
+    python3.pkgs.pip  # TODO(DACH-NY/canton-network-internal#565): Remove this once we switch to poetry
     python3.pkgs.sphinx-reredirects
     redocly
     ripgrep
