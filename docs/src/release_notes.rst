@@ -16,6 +16,12 @@ Upcoming
   - Fix a bug where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
     if the receiver's provider party was featured.
 
+- Synchronizer Migrations
+
+  - Fix a rare bug where a crash of the validator or SV while trying
+    to restore the data after a migration could result in an
+    inconsistent state being restore.
+
 0.4.2
 -----
 
