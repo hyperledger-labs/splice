@@ -23,5 +23,5 @@ WITH daml_TransferOutput_jsons AS (
   SELECT DISTINCT JSON_VALUE(TransferOutput,
                              -- .receiver
                              '$.record.fields[0].value.party') party_id
-  FROM daml_TransferOutput_jsons
-       INNER JOIN UNNEST(daml_TransferOutput_jsons.TransferOutput_array) AS TransferOutput;
+  FROM daml_TransferOutput_jsons src
+       INNER JOIN UNNEST(src.TransferOutput_array) AS TransferOutput;
