@@ -585,6 +585,16 @@ If the top-up amount is below the synchronizer-wide ``minTopupAmount`` (see :ref
 ``minTopupInterval`` is automatically stretched so that at least ``minTopupAmount`` bytes of traffic are
 purchased while respecting the configured ``targetThroughput``.
 
+For example:
+`targetThroughput:20000` (0.02MB) with `minTopupInterval:1m` is indicating that your node is expected use 0.02MB of traffic every second, and the balance should be checked and topped-up if needed every 60 seconds. 
+This configuration will check the nodes available traffic balance every 1 minute and if the balance is ever under 1.2MB (0.02MB * 60), it will purchase an additional 1.2MB.
+
+`targetThroughput:20000` (0.02MB) with `minTopupInterval:30s` is indicating that your node is expected use 0.02MB of traffic every second, and the balance should be checked and topped-up if needed every 30 seconds. 
+This configuration will check the nodes available traffic balance every 30 seconds and if the balance is ever under 0.6MB (0.02MB * 30), it will purchase an additional 0.6MB.
+
+`targetThroughput:200000` (0.2MB) with `minTopupInterval:1m` is indicating that your node is expected use 0.2MB of traffic every second, and the balance should be checked and topped-up if needed every 60 seconds. 
+This configuration will check the nodes available traffic balance every 60 seconds and if the balance is ever under 12MB (0.2MB * 60), it will purchase an additional 12MB.
+
 The next top-up gets triggered when all of the following conditions are met:
 
 - The available :ref:`extra traffic balance <traffic_accounting>` drops below the configured top-up amount
