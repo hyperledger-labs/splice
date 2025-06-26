@@ -22,6 +22,6 @@ WITH daml_TransferOutput_jsons AS (
        LIMIT 100) -- TODO (DACH-NY/canton-network-internal#703) remove limit for full test
   SELECT DISTINCT JSON_VALUE(TransferOutput,
                              -- .receiver
-                             '$.record.fields[0].value.party')
+                             '$.record.fields[0].value.party') party_id
   FROM daml_TransferOutput_jsons
        INNER JOIN UNNEST(daml_TransferOutput_jsons.TransferOutput_array) AS TransferOutput;
