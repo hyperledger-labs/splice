@@ -954,10 +954,16 @@ object UserWalletTxLogParser {
       )
     }
 
+    /** Only safe when we can guarantee we have a single BalanceChangeTxLogEntry.
+      */
     def setBalanceChangeSubtype(
         transactionSubtype: BalanceChangeTransactionSubtype,
         eventId: String,
     ): State = {
+      assert(
+        entries.collect { case t: BalanceChangeTxLogEntry => t }.length == 1,
+        s"Entries: $entries",
+      )
       State(
         entries = entries.map {
           case b: BalanceChangeTxLogEntry =>
