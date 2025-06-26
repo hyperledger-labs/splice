@@ -16,6 +16,7 @@ Release Notes
   - Fix a `bug (#1216) <https://github.com/hyperledger-labs/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
     if the receiver's provider party was featured.
   - Fix a bug where uploading dars would not immediately vet the dependencies that had a vetting entry effective in the future.
+  - Fix a `bug (#1215)  <https://github.com/hyperledger-labs/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
 
 0.4.2
 -----
