@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
-import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
 import org.lfdecentralizedtrust.splice.store.db.AcsRowData
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{
@@ -287,17 +286,9 @@ object MultiDomainAcsStore {
     /** Whether the scope might contain an event of the given template. */
     def mightContain(identifier: Identifier): Boolean
 
-    def decodeMatchingContract(
-        ev: CreatedEvent
-    ): Option[Contract[?, ?]]
-
     def matchingContractToRow(
         ev: CreatedEvent
     ): Option[R]
-
-    def decodeMatchingContractFromRow(
-        row: SelectFromAcsTableResult
-    )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]]
 
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
@@ -315,12 +306,10 @@ object MultiDomainAcsStore {
     CreatedEvent => Option[Contract[TCid, T]]
   private type EncodeToRow[TCid <: ContractId[T], T <: Template, R <: AcsRowData] =
     Contract[TCid, T] => R
-  private type DecodeFromRow = (SelectFromAcsTableResult, TemplateJsonDecoder) => Contract[?, ?]
 
   case class TemplateFilter[TCid <: ContractId[T], T <: Template, R <: AcsRowData](
       evPredicate: CreatedEvent => Boolean,
       decodeFromCreatedEvent: DecodeFromCreatedEvent[TCid, T],
-      decodeFromRow: DecodeFromRow,
       encodeToRow: EncodeToRow[TCid, T, R],
   ) {
     def matchingContractToRow(
@@ -328,13 +317,6 @@ object MultiDomainAcsStore {
     ): Option[R] = {
       decodeFromCreatedEvent(ev).map(encodeToRow)
     }
-
-    def mapEncode[R2 <: AcsRowData](f: R => R2): TemplateFilter[TCid, T, R2] = TemplateFilter(
-      evPredicate,
-      decodeFromCreatedEvent,
-      decodeFromRow,
-      contract => f(encodeToRow(contract)),
-    )
   }
 
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
@@ -374,15 +356,6 @@ object MultiDomainAcsStore {
       templateFiltersWithoutPackageNames.contains(QualifiedName(identifier))
     }
 
-    override def decodeMatchingContract(
-        ev: CreatedEvent
-    ): Option[Contract[?, ?]] = {
-      for {
-        templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
-        contract <- templateFilter.decodeFromCreatedEvent(ev)
-      } yield contract
-    }
-
     override def matchingContractToRow(
         ev: CreatedEvent
     ): Option[R] = {
@@ -390,14 +363,6 @@ object MultiDomainAcsStore {
         templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
         row <- templateFilter.matchingContractToRow(ev)
       } yield row
-    }
-
-    override def decodeMatchingContractFromRow(
-        row: SelectFromAcsTableResult
-    )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]] = {
-      for {
-        templateFilter <- templateFiltersWithoutPackageNames.get(row.templateIdQualifiedName)
-      } yield templateFilter.decodeFromRow(row, templateJsonDecoder)
     }
 
     override def isStakeholderOf(ev: CreatedEvent): Boolean = {
@@ -413,8 +378,6 @@ object MultiDomainAcsStore {
       p: Contract[TCid, T] => Boolean
   )(
       encode: EncodeToRow[TCid, T, R]
-  )(implicit
-      companionClass: ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T]
   ): (
       PackageQualifiedName,
       TemplateFilter[TCid, T, R],
@@ -427,8 +390,6 @@ object MultiDomainAcsStore {
           c.exists(p)
         },
         ev => Contract.fromCreatedEvent(templateCompanion)(ev),
-        (row, templateJsonDecoder) =>
-          row.toContract(templateCompanion)(companionClass, templateJsonDecoder),
         encode,
       ),
     )
