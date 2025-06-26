@@ -24,4 +24,4 @@ WITH daml_TransferOutput_jsons AS (
                              -- .receiver
                              '$.record.fields[0].value.party')
   FROM daml_TransferOutput_jsons
-       INNER JOIN daml_TransferOutput_jsons.TransferOutput_array AS TransferOutput;
+       INNER JOIN UNNEST(daml_TransferOutput_jsons.TransferOutput_array) AS TransferOutput;
