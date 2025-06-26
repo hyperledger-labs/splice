@@ -79,7 +79,10 @@ final class DbMultiDomainAcsStore[TXE](
     acsStoreDescriptor: StoreDescriptor,
     txLogStoreDescriptor: Option[StoreDescriptor],
     override protected val loggerFactory: NamedLoggerFactory,
-    contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
+    contractFilter: MultiDomainAcsStore.ContractFilter[
+      _ <: AcsRowData,
+      _ <: AcsInterfaceViewRowData,
+    ],
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,

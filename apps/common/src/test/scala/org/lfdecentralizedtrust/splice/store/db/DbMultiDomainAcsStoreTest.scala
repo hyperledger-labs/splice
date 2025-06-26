@@ -354,7 +354,10 @@ class DbMultiDomainAcsStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
+      filter: MultiDomainAcsStore.ContractFilter[
+        GenericAcsRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
+      ],
   ) = {
     mkStoreWithAcsRowDataF(
       acsId,
@@ -372,7 +375,7 @@ class DbMultiDomainAcsStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[R],
+      filter: MultiDomainAcsStore.ContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested],
       acsTableName: String,
       txLogTableName: Option[String],
   ) = {

@@ -9,11 +9,15 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.AppPaymentRequest
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent
-import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, IndexColumnValue}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsRowData,
+  IndexColumnValue,
+}
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.util.MonadUtil
 
 import java.util.concurrent.atomic.AtomicReference
@@ -41,7 +45,10 @@ abstract class MultiDomainAcsStoreTest[
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
 
-  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
+  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
+    GenericAcsRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -59,7 +66,10 @@ abstract class MultiDomainAcsStoreTest[
       txLogId: Option[Int] = Some(1),
       domainMigrationId: Long = 0,
       participantId: ParticipantId = ParticipantId("MultiDomainAcsStoreTest"),
-      filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = defaultContractFilter,
+      filter: MultiDomainAcsStore.ContractFilter[
+        GenericAcsRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
+      ] = defaultContractFilter,
   ): Store
 
   protected type Store = S

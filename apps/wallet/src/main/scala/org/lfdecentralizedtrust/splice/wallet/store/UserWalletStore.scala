@@ -10,9 +10,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
+  amulettransferinstruction as amuletTransferInstructionCodegen,
   round as roundCodegen,
   validatorlicense as validatorCodegen,
-  amulettransferinstruction as amuletTransferInstructionCodegen,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as ansCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
@@ -40,6 +40,7 @@ import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -486,7 +487,7 @@ object UserWalletStore {
   def contractFilter(
       key: Key,
       domainMigrationId: Long,
-  ): ContractFilter[UserWalletAcsStoreRowData] = {
+  ): ContractFilter[UserWalletAcsStoreRowData, AcsInterfaceViewRowData.NoInterfacesIngested] = {
     val endUser = key.endUserParty.toProtoPrimitive
     val validator = key.validatorParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive

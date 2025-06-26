@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHisto
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
 import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
   AcsJdbcTypes,
   AcsRowData,
   DbMultiDomainAcsStore,
@@ -507,7 +508,10 @@ class TxLogBackfillingStoreTest
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
 
-  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
+  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
+    GenericAcsRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -563,7 +567,7 @@ class TxLogBackfillingStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[R],
+      filter: MultiDomainAcsStore.ContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested],
       acsTableName: String,
       txLogTableName: Option[String],
   ) = {

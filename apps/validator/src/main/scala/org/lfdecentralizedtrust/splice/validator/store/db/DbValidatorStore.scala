@@ -20,7 +20,12 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsQueries,
+  AcsTables,
+  DbAppStore,
+}
 import org.lfdecentralizedtrust.splice.store.{LimitHelpers, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -87,7 +92,8 @@ class DbValidatorStore(
 
   override lazy val acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
+        org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] = ValidatorStore.contractFilter(key, domainMigrationId)
 
   import multiDomainAcsStore.waitUntilAcsIngested

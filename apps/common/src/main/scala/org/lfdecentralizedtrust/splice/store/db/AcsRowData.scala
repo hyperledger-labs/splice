@@ -23,6 +23,18 @@ object TxLogRowData {
   def noIndices = TxLogRowDataWithoutIndices
 }
 
+trait AcsInterfaceViewRowData {
+  def indexColumns: Seq[(String, IndexColumnValue[?])]
+}
+object AcsInterfaceViewRowData {
+
+  /** Just a helper trait for when a store doesn't care about interfaces.
+    */
+  trait NoInterfacesIngested extends AcsInterfaceViewRowData {
+    def indexColumns: Seq[Nothing] = Seq.empty
+  }
+}
+
 case class IndexColumnValue[V](value: V)(private implicit val setParameter: SetParameter[V])
 object IndexColumnValue {
   import scala.language.implicitConversions // convenience

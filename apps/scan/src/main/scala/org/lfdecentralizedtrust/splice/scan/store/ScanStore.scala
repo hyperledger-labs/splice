@@ -29,7 +29,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregator,
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanAcsStoreRowData
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
   Contract,
@@ -42,7 +42,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
@@ -74,7 +74,10 @@ trait ScanStore
 
   def domainMigrationId: Long
 
-  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
+  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
+    ScanAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] =
     ScanStore.contractFilter(key, domainMigrationId)
 
   def lookupAmuletRules()(implicit
@@ -348,7 +351,10 @@ object ScanStore {
   def contractFilter(
       key: ScanStore.Key,
       domainMigrationId: Long,
-  ): MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] = {
+  ): MultiDomainAcsStore.ContractFilter[
+    ScanAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
     val dso = key.dsoParty.toProtoPrimitive
 

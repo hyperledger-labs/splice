@@ -11,7 +11,11 @@ import com.daml.ledger.api.v2.transaction_filter.{
 }
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
-import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
+import com.daml.ledger.javaapi.data.codegen.{
+  ContractId,
+  DamlRecord,
+  ContractCompanion as JavaContractCompanion,
+}
 import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -22,7 +26,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
-import org.lfdecentralizedtrust.splice.store.db.AcsRowData
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsRowData}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
@@ -270,7 +274,7 @@ object MultiDomainAcsStore {
   }
 
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
-  trait ContractFilter[R <: AcsRowData] {
+  trait ContractFilter[R <: AcsRowData, IR <: AcsInterfaceViewRowData] {
 
     def templateIds: Set[PackageQualifiedName]
 
@@ -319,14 +323,30 @@ object MultiDomainAcsStore {
     }
   }
 
+  case class InterfaceFilter[ICid <: ContractId[Marker], Marker, View <: DamlRecord[
+    ?
+  ], IR <: AcsInterfaceViewRowData](
+      evPredicate: CreatedEvent => Boolean,
+      decodeFromCreatedEvent: CreatedEvent => Option[Contract[ICid, View]],
+      encodeToRow: Contract[ICid, View] => IR,
+  ) {
+    def matchingContractToRow(ev: CreatedEvent): Option[IR] = {
+      decodeFromCreatedEvent(ev).map(encodeToRow)
+    }
+  }
+
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
-  case class SimpleContractFilter[R <: AcsRowData](
+  case class SimpleContractFilter[R <: AcsRowData, IR <: AcsInterfaceViewRowData](
       primaryParty: PartyId,
       templateFilters: Map[
         PackageQualifiedName,
         TemplateFilter[?, ?, R],
       ],
-  ) extends ContractFilter[R] {
+      interfaceFilters: Map[
+        PackageQualifiedName,
+        InterfaceFilter[?, ?, ?, IR],
+      ],
+  ) extends ContractFilter[R, IR] {
 
     // TODO(#829) Drop this once the ledger API exposes package names
     // on the read path.
@@ -369,6 +389,20 @@ object MultiDomainAcsStore {
       val eventStakeholder = (ev.getSignatories.asScala ++ ev.getObservers.asScala).toSet
       eventStakeholder.contains(primaryParty.toProtoPrimitive)
     }
+  }
+  object SimpleContractFilter {
+    def apply[R <: AcsRowData](
+        primaryParty: PartyId,
+        templateFilters: Map[
+          PackageQualifiedName,
+          TemplateFilter[?, ?, R],
+        ],
+    ): SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested] =
+      SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested](
+        primaryParty,
+        templateFilters,
+        Map.empty,
+      )
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
@@ -467,8 +501,6 @@ object MultiDomainAcsStore {
       )
     }
 
-    def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(companion: C): Boolean
-
     def typeId(companion: C): Identifier
 
     def toContractId(companion: C, contractId: String): TCid
@@ -489,10 +521,6 @@ object MultiDomainAcsStore {
       override def fromCreatedEvent(companion: Contract.Companion.Template[TCid, T])(
           event: CreatedEvent
       ): Option[Contract[TCid, T]] = Contract.fromCreatedEvent(companion)(event)
-
-      override def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(
-          companion: Contract.Companion.Template[TCid, T]
-      ): Boolean = filter.mightContain(companion)
 
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
         companion.getTemplateIdWithPackageId
