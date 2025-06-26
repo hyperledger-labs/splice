@@ -226,8 +226,6 @@ class ValidatorApp(
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
-                      connection,
-                      config.ledgerApiUser,
                       config.domains.global.alias,
                       migrationDump.domainId,
                       sequencerConnections,
