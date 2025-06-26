@@ -1,0 +1,35 @@
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  snyk_test:
+    name: Snyk Test
+    runs-on: self-hosted-docker-medium
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup
+        id: setup
+        uses: ./.github/actions/tests/common_test_setup
+        with:
+          test_name: snyk
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      - name: run sbt npmInstall
+        uses: ./.github/actions/sbt/execute_sbt_command
+        with:
+          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          cmd: "npmInstall"
+      - name: run npm-install for Pulumi
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            make cluster/pulumi/build
+      - name: Run Snyk to check for vulnerabilities
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: |
+            snyk auth ${{ secrets.SNYK_TOKEN }}
+            snyk test --all-projects --exclude=build.sbt
