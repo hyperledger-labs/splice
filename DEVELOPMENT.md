@@ -33,7 +33,7 @@
     ```
 1. Configure artifactory credentials
    Currently, building this repo requires access to Digital Asset's enterprise artifactory. To gain access,
-   please contact the Maintainers of this repo, per MAINTAINERS.md.
+   please send an email to support@digitalasset.com and list the email addresses of the people that need access.
    Once you have access to artifactory, you can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
    Your username is shown at the top of the page (under "User profile: XX").
    1. For Nix to download `canton`.
