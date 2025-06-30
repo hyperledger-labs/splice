@@ -35,12 +35,14 @@ Global Synchronizer for the Canton Network
    :maxdepth: 2
    :caption: Application Development
 
+
    app_dev/overview/index
-   app_dev/scan_api/index
-   app_dev/validator_api/index
-   app_dev/ledger_api/index
-   app_dev/daml_api/index
+   app_dev/overview/version_information
    app_dev/testing/index
+   app_dev/ledger_api/index
+   app_dev/overview/splice_app_apis
+   app_dev/daml_api/index
+   app_dev/daml_models/index
 
 
 .. toctree::
