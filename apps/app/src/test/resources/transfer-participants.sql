@@ -7,6 +7,13 @@ DECLARE
 SET as_of_record_time = PARSE_TIMESTAMP('%FT%TZ', '2025-06-26T00:00:00Z');
 SET migration_id = 3;
 
+CREATE TEMP FUNCTION TransferOutputs_receivers(TransferOutput_array array<json>)
+  RETURNS array<string> AS (ARRAY(
+    SELECT JSON_VALUE(TransferOutput,
+                      -- .receiver
+                      '$.record.fields[0].value.party')
+    FROM UNNEST(TransferOutput_array) AS TransferOutput));
+
 WITH daml_Transfer_jsons AS (
        SELECT JSON_VALUE(e.argument,
                          -- .transfer.sender
@@ -24,8 +31,10 @@ WITH daml_Transfer_jsons AS (
            OR (e.migration_id = migration_id
                AND e.record_time <= UNIX_MICROS(as_of_record_time)))
        LIMIT 100) -- TODO (DACH-NY/canton-network-internal#703) remove limit for full test
-  SELECT DISTINCT JSON_VALUE(TransferOutput,
-                             -- .receiver
-                             '$.record.fields[0].value.party') party_id
+  SELECT DISTINCT party_id
   FROM daml_Transfer_jsons src
-       INNER JOIN UNNEST(src.TransferOutput_array) AS TransferOutput;
+       INNER JOIN UNNEST(
+           ARRAY_CONCAT(
+             [src.Transfer_sender],
+             TransferOutputs_receivers(src.TransferOutput_array)))
+         AS party_id;
