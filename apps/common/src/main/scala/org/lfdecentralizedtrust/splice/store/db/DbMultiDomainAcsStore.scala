@@ -1481,7 +1481,7 @@ final class DbMultiDomainAcsStore[TXE](
         summary: MutableIngestionSummary,
     )(implicit
         tc: TraceContext
-    ) = {
+    ): DBIOAction[Int, NoStream, Effect.Write] = {
       contractFilter.matchingContractToRow(createdEvent) match {
         case None =>
           val errMsg =

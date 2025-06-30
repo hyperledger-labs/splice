@@ -263,6 +263,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       createdAtRound: Long,
       ratePerRound: BigDecimal,
       version: DarResource = DarResources.amulet_current,
+      dso: PartyId = dsoParty,
   ) = {
     val templateId = new Identifier(
       version.packageId,
@@ -270,7 +271,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amuletCodegen.Amulet.TEMPLATE_ID.getEntityName,
     )
     val template = new amuletCodegen.Amulet(
-      dsoParty.toProtoPrimitive,
+      dso.toProtoPrimitive,
       owner.toProtoPrimitive,
       new feesCodegen.ExpiringAmount(
         numeric(amount),

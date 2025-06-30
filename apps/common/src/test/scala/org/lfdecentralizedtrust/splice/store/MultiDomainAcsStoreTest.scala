@@ -17,8 +17,10 @@ import org.lfdecentralizedtrust.splice.store.db.{
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
-import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.MonadUtil
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
@@ -45,9 +47,13 @@ abstract class MultiDomainAcsStoreTest[
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
 
+  case class GenericInterfaceRowData() extends AcsInterfaceViewRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+
   protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
     GenericAcsRowData,
-    AcsInterfaceViewRowData.NoInterfacesIngested,
+    GenericInterfaceRowData,
   ] = {
     import MultiDomainAcsStore.mkFilter
 
@@ -57,6 +63,12 @@ abstract class MultiDomainAcsStoreTest[
         mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured) { contract =>
           GenericAcsRowData(contract)
         }
+      ),
+      interfaceFilters = Map(
+        // will include both Amulet & DummyHolding
+        mkFilterInterface(holdingv1.Holding.INTERFACE)(
+          _.payload.instrumentId.admin == dsoParty.toProtoPrimitive
+        )(_ => GenericInterfaceRowData())
       ),
     )
   }
@@ -68,7 +80,7 @@ abstract class MultiDomainAcsStoreTest[
       participantId: ParticipantId = ParticipantId("MultiDomainAcsStoreTest"),
       filter: MultiDomainAcsStore.ContractFilter[
         GenericAcsRowData,
-        AcsInterfaceViewRowData.NoInterfacesIngested,
+        GenericInterfaceRowData,
       ] = defaultContractFilter,
   ): Store
 
@@ -139,6 +151,17 @@ abstract class MultiDomainAcsStoreTest[
     )
   }
   private val charsetMatchingDbBytes = java.nio.charset.Charset forName "UTF-8"
+
+  private def dummyHolding(owner: PartyId, amount: BigDecimal, issuer: PartyId) = {
+    val templateId = DummyHolding.TEMPLATE_ID
+    val payload =
+      new DummyHolding(owner.toProtoPrimitive, issuer.toProtoPrimitive, amount.bigDecimal)
+    contract(
+      identifier = templateId,
+      contractId = new DummyHolding.ContractId(nextCid()),
+      payload = payload,
+    )
+  }
 
   protected def reassignmentContractOrder[AC](
       unordered: Seq[AC],
@@ -766,12 +789,13 @@ abstract class MultiDomainAcsStoreTest[
       val contractFilter = {
         import MultiDomainAcsStore.mkFilter
 
-        MultiDomainAcsStore.SimpleContractFilter(
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
           dsoParty,
           templateFilters = Map(
             mkFilter(evenCompanion)(_ => true)(GenericAcsRowData(_)),
             mkFilter(oddCompanion)(_ => true)(GenericAcsRowData(_)),
           ),
+          interfaceFilters = Map.empty,
         )
       }
       implicit val store: Store = mkStore(0, Some(0), 0L, sampleParticipantId, contractFilter)
@@ -784,6 +808,43 @@ abstract class MultiDomainAcsStoreTest[
           Seq[ConstrainedTemplate](evenCompanion, oddCompanion),
         )
       } yield contracts.map(_.contractId.contractId) shouldBe expectedOrder.map(_.coid)
+    }
+
+    "ingest and return interface views" in {
+      implicit val store = mkStore()
+      val includedAmulet =
+        (1 to 3).map(n => amulet(providerParty(n), BigDecimal(n), n.toLong, BigDecimal(0.00001)))
+      val excludedAmulet = (4 to 6).map(n =>
+        amulet(
+          providerParty(n),
+          BigDecimal(n),
+          n.toLong,
+          BigDecimal(0.00001),
+          dso = providerParty(42), // this is excluded in the interface filter
+        )
+      )
+      val includedDummy = (1 to 3).map(n => dummyHolding(providerParty(n), BigDecimal(n), dsoParty))
+      val excludedDummy = (4 to 6).map(n =>
+        dummyHolding(
+          providerParty(n),
+          BigDecimal(n),
+          issuer = providerParty(42), // this is excluded in the interface filter
+        )
+      )
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- MonadUtil.sequentialTraverse(
+          includedAmulet ++ excludedAmulet
+        ) { contract =>
+          d1.create(contract)
+        }
+        _ <- MonadUtil.sequentialTraverse(
+          includedDummy ++ excludedDummy
+        ) { contract =>
+          d1.create(contract)
+        }
+      } yield succeed
     }
   }
 }

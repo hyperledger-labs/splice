@@ -84,12 +84,14 @@ class DbMultiDomainAcsStoreTest
         txLogId = Some(1),
         migrationId = 0,
         participantId = mkParticipantId("DbMultiDomainAcsStoreTest"),
-        filter = MultiDomainAcsStore.SimpleContractFilter(
-          dsoParty,
-          templateFilters = Map(
-            mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
+        filter =
+          MultiDomainAcsStore.SimpleContractFilter[BobbyTablesRowData, GenericInterfaceRowData](
+            dsoParty,
+            templateFilters = Map(
+              mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
+            ),
+            Map.empty,
           ),
-        ),
         acsTableName = "scan_acs_store", // to have extra columns
         txLogTableName = Some("txlog_store_template"),
       )
@@ -356,7 +358,7 @@ class DbMultiDomainAcsStoreTest
       participantId: ParticipantId,
       filter: MultiDomainAcsStore.ContractFilter[
         GenericAcsRowData,
-        AcsInterfaceViewRowData.NoInterfacesIngested,
+        GenericInterfaceRowData,
       ],
   ) = {
     mkStoreWithAcsRowDataF(
@@ -375,7 +377,7 @@ class DbMultiDomainAcsStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested],
+      filter: MultiDomainAcsStore.ContractFilter[R, GenericInterfaceRowData],
       acsTableName: String,
       txLogTableName: Option[String],
   ) = {

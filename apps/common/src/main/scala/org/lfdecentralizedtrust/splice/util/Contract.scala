@@ -262,4 +262,12 @@ object Contract {
       .decodeCreated(companion)(ev)
       .map(fromCodegenContract(_, ev))
   }
+
+  def fromCreatedEvent[ICid <: ContractId[Marker], Marker, View <: DamlRecord[View]](
+      companion: Companion.Interface[ICid, Marker, View]
+  )(ev: CreatedEvent): Option[Contract[ICid, View]] = {
+    JavaDecodeUtil
+      .decodeCreated(companion)(ev)
+      .map(fromCodegenContract(_, ev))
+  }
 }

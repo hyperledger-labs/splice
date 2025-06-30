@@ -323,12 +323,17 @@ object MultiDomainAcsStore {
     }
   }
 
+  private type DecodeInterfaceFromCreatedEvent[ICid, View] =
+    CreatedEvent => Option[Contract[ICid, View]]
+  private type EncodeInterfaceToRow[ICid, View, IR <: AcsInterfaceViewRowData] =
+    Contract[ICid, View] => IR
+
   case class InterfaceFilter[ICid <: ContractId[Marker], Marker, View <: DamlRecord[
     ?
   ], IR <: AcsInterfaceViewRowData](
       evPredicate: CreatedEvent => Boolean,
-      decodeFromCreatedEvent: CreatedEvent => Option[Contract[ICid, View]],
-      encodeToRow: Contract[ICid, View] => IR,
+      decodeFromCreatedEvent: DecodeInterfaceFromCreatedEvent[ICid, View],
+      encodeToRow: EncodeInterfaceToRow[ICid, View, IR],
   ) {
     def matchingContractToRow(ev: CreatedEvent): Option[IR] = {
       decodeFromCreatedEvent(ev).map(encodeToRow)
@@ -424,6 +429,28 @@ object MultiDomainAcsStore {
           c.exists(p)
         },
         ev => Contract.fromCreatedEvent(templateCompanion)(ev),
+        encode,
+      ),
+    )
+
+  def mkFilterInterface[ICid <: ContractId[Marker], Marker, View <: DamlRecord[
+    View
+  ], IR <: AcsInterfaceViewRowData](
+      interfaceCompanion: Contract.Companion.Interface[ICid, Marker, View]
+  )(p: Contract[ICid, View] => Boolean)(
+      encode: EncodeInterfaceToRow[ICid, View, IR]
+  ): (
+      PackageQualifiedName,
+      InterfaceFilter[ICid, Marker, View, IR],
+  ) =
+    (
+      PackageQualifiedName(interfaceCompanion.getTemplateIdWithPackageId),
+      InterfaceFilter(
+        ev => {
+          val c = Contract.fromCreatedEvent(interfaceCompanion)(ev)
+          c.exists(p)
+        },
+        ev => Contract.fromCreatedEvent(interfaceCompanion)(ev),
         encode,
       ),
     )
