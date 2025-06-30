@@ -87,6 +87,7 @@ export interface WalletTransferOffer {
   conversionRate: string;
   convertedCurrency: ConvertedCurrency;
   senderId: string;
+  receiverId: string;
   expiry: string;
   isTokenStandard: boolean;
 }
