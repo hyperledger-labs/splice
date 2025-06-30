@@ -45,7 +45,15 @@ Use the guidance below to learn which ones to use and how to use them.
   Splice Validator App running alongside the Canton Participant node in a
   Validator Node.
 
-See the :ref:`validator-network-diagram` for details on the components running as part of a Validator Node's and the APIs they provide.
+See the diagram below to learn about which components serve which APIs and how they are connected to each other.
+
+..
+   _LucidChart link: https://lucid.app/lucidchart/cc18d86e-95aa-4a20-9677-160599132a3e/edit?viewport_loc=-2531%2C-3450%2C4045%2C2266%2C0_0&invitationId=inv_f7bcd7ba-780d-4887-8c24-973cc757b06e
+
+
+.. image:: ../overview/images/app-connectivity-diagram.png
+  :width: 800
+  :alt: App Network Diagram
 
 
 Splice Daml APIs Overview
