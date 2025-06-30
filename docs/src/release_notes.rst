@@ -8,6 +8,35 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Daml
+
+  - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+
+    This requires an upgrade to the following Daml versions:
+
+    ================== =======
+    name               version
+    ================== =======
+    amulet             0.1.9
+    amuletNameService  0.1.9
+    dsoGovernance      0.1.13
+    validatorLifecycle 0.1.3
+    wallet             0.1.9
+    walletPayments     0.1.9
+    ================== =======
+
+- Backend
+
+  - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
+    the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.
+
+- UI
+
+  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+
 0.4.3
 -----
 
