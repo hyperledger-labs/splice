@@ -26,9 +26,7 @@ Global Synchronizer for the Canton Network
    :maxdepth: 2
    :caption: Overview
 
-   overview/index.rst
-
-  
+   overview.rst
 
 .. toctree::
    :maxdepth: 2

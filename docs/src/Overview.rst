@@ -6,13 +6,9 @@
 Overview
 ========
 
-############
-Validator - Concepts
-############
-
 Below is a high-level summary of the key concepts and technology relevant to operating a Validator. This summary focuses on what matters for validator operation, the benefits from the token economics, and the underlying technology.
 
-**1. The Role of a Validator**
+Role of a Validator
 -----------------------------
 
 * **Definition & Function:**
@@ -25,7 +21,7 @@ A Validator in the Global Synchronizer ecosystem primary roles are to:
 * **Operational context:**
 Validators work within the broader Canton Network—a “network of networks” where each node stores only the data it needs (thanks to Daml’s privacy model) and synchronizes with other Validators (and non-Validator Participant nodes) via synchronizers. Validators typically connect to one or more of these synchronizers (which might be run as centralized or decentralized services) to receive and confirm encrypted messages.
 
-**2. Validator Operation & Underlying Technology**
+Validator Operation & Underlying Technology
 -----------------------------
 
 * **Daml Ledger Model & Privacy:** The system is built on the Daml smart contract language and ledger model.
@@ -45,7 +41,7 @@ Validators work within the broader Canton Network—a “network of networks” 
          * Validators must manage bandwidth and storage usage since each transaction synchronized on the Global Synchronizer, e.g. Canton Coin transfers is associated with resource usage fees (e.g., base transfer fees, coin locking fees, holding fees, and traffic fees).
          * To create new traffic balances (expressed in megabytes), Validators burn Canton Coin and send proof of the burn to Super Validators, who then update the traffic balance for the Validator. This ensures that transaction sequencing and message delivery remain efficient.
 
-**3. Token Economics & Minting Incentives**
+Token Economics & Minting Incentives
 ------------------------------
 
 * **Burnt-Mint Equilibrium:**
@@ -72,7 +68,7 @@ Validators work within the broader Canton Network—a “network of networks” 
          * **Fee conversion:**
             * The conversion between USD-denominated fees and Canton Coin is updated every minting cycle, with the conversion rate determined on-chain by Super Validators.
 
-**4. Benefits and Practical Considerations for Node Operators:**
+Benefits and Practical Considerations for Node Operators
 -----------------------------
 
 *  **Direct Financial Incentives:**
@@ -90,7 +86,7 @@ Validators work within the broader Canton Network—a “network of networks” 
          * Validators can operate either as independent node operators (hosting their own participant node) or as part of a broader infrastructure offering.
          * The system’s architecture and fee structure offer optionality: you may choose to prepay network traffic using Canton Coin or negotiate arrangements (for example, with third-party service providers) that suit your operational profile.
 
-**In Summary**
+In Summary
 -----------------------------
 
 A Validator is not just a passive participant; it is an active contributor to both the integrity and the economic dynamics of the Canton Network. By:
