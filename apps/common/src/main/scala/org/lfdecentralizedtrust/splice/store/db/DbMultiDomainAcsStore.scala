@@ -1524,38 +1524,64 @@ final class DbMultiDomainAcsStore[TXE](
         summary: MutableIngestionSummary,
     )(implicit
         tc: TraceContext
-    ): DBIOAction[Int, NoStream, Effect.Write] = {
-      contractFilter.matchingContractToRow(createdEvent) match {
-        case None =>
+    ) = {
+      (
+        contractFilter.matchingInterfaceRows(createdEvent),
+        contractFilter.matchingContractToRow(createdEvent),
+      ) match {
+        case (Some((fallbackRowData, interfaces)), rowData) =>
+          insertContract(rowData.getOrElse(fallbackRowData), createdEvent, stateData, summary)
+            .flatMap { eventNumber =>
+              DBIO.sequence(interfaces.map { interfaceRow =>
+                val interfaceId = interfaceRow.interfaceId
+                val viewJson = interfaceRow.interfaceView
+                // TODO: errors
+                // TODO: index columns
+                (sql"""
+                insert into interface_views_template(acs_event_number, interface_id, interface_view, view_compute_error)
+                values ($eventNumber, $interfaceId, $viewJson, '{}'::jsonb)""").toActionBuilder.asUpdate
+              })
+            }
+        case (None, Some(rowData)) =>
+          insertContract(rowData, createdEvent, stateData, summary)
+        case _ =>
           val errMsg =
             s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested."
           logger.error(errMsg)
           throw new IllegalArgumentException(errMsg)
-        case Some(rowData) =>
-          summary.ingestedCreatedEvents.addOne(createdEvent)
+      }
+    }
 
-          val contract = rowData.contract
-          val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-          val templateId = contract.identifier
-          val templateIdQualifiedName = QualifiedName(templateId)
-          val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-          val createArguments = payloadJsonFromDefinedDataType(contract.payload)
-          val createdAt = Timestamp.assertFromInstant(contract.createdAt)
-          val contractExpiresAt = rowData.contractExpiresAt
-          val ContractStateRowData(
-            assignedDomain,
-            reassignmentCounter,
-            reassignmentTargetDomain,
-            reassignmentSourceDomain,
-            reassignmentSubmitter,
-            reassignmentUnassignId,
-          ) = stateData
+    private def insertContract(
+        rowData: AcsRowData,
+        createdEvent: CreatedEvent,
+        stateData: ContractStateRowData,
+        summary: MutableIngestionSummary,
+    ): DBIOAction[Long, NoStream, Effect.Write] = {
+      summary.ingestedCreatedEvents.addOne(createdEvent)
 
-          val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
-          val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+      val contract = rowData.contract
+      val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
+      val templateId = contract.identifier
+      val templateIdQualifiedName = QualifiedName(templateId)
+      val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
+      val createArguments = payloadJsonFromDefinedDataType(contract.payload)
+      val createdAt = Timestamp.assertFromInstant(contract.createdAt)
+      val contractExpiresAt = rowData.contractExpiresAt
+      val ContractStateRowData(
+        assignedDomain,
+        reassignmentCounter,
+        reassignmentTargetDomain,
+        reassignmentSourceDomain,
+        reassignmentSubmitter,
+        reassignmentUnassignId,
+      ) = stateData
 
-          import storage.DbStorageConverters.setParameterByteArray
-          (sql"""
+      val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
+      val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+
+      import storage.DbStorageConverters.setParameterByteArray
+      (sql"""
                 insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name,
                                            create_arguments, created_event_blob, created_at, contract_expires_at,
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
@@ -1565,8 +1591,8 @@ final class DbMultiDomainAcsStore[TXE](
                         $createArguments, ${contract.createdEventBlob}, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
-              """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
-      }
+              """ ++ indexColumnNameValues ++ sql") returning event_number").toActionBuilder
+        .asUpdateReturning[Long]
     }
 
     private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary) = {

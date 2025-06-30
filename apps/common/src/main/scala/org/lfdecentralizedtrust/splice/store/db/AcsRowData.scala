@@ -3,7 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.daml.ledger.javaapi.data.Identifier
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import io.circe.Json
 import org.lfdecentralizedtrust.splice.util.Contract
 import slick.jdbc.{PositionedParameters, SetParameter}
 
@@ -11,6 +13,14 @@ trait AcsRowData {
   val contract: Contract[?, ?]
   def contractExpiresAt: Option[Timestamp]
   def indexColumns: Seq[(String, IndexColumnValue[?])]
+}
+
+object AcsRowData {
+  case class AcsRowDataFromInterface(contract: Contract[?, ?]) extends AcsRowData {
+    override def contractExpiresAt: Option[Timestamp] = None
+
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
 }
 
 trait TxLogRowData {
@@ -24,15 +34,15 @@ object TxLogRowData {
 }
 
 trait AcsInterfaceViewRowData {
+  val interfaceId: Identifier
+  val interfaceView: Json
   def indexColumns: Seq[(String, IndexColumnValue[?])]
 }
 object AcsInterfaceViewRowData {
 
   /** Just a helper trait for when a store doesn't care about interfaces.
     */
-  trait NoInterfacesIngested extends AcsInterfaceViewRowData {
-    def indexColumns: Seq[Nothing] = Seq.empty
-  }
+  trait NoInterfacesIngested extends AcsInterfaceViewRowData
 }
 
 case class IndexColumnValue[V](value: V)(private implicit val setParameter: SetParameter[V])

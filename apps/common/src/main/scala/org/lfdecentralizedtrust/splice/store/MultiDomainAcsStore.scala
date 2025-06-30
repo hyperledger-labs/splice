@@ -302,6 +302,10 @@ object MultiDomainAcsStore {
         ev: CreatedEvent
     ): Option[R]
 
+    def matchingInterfaceRows(
+        ev: CreatedEvent
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])]
+
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
     def ensureStakeholderOf(ev: CreatedEvent): Unit = {
@@ -396,6 +400,20 @@ object MultiDomainAcsStore {
         templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
         row <- templateFilter.matchingContractToRow(ev)
       } yield row
+    }
+
+    override def matchingInterfaceRows(
+        ev: CreatedEvent
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])] = {
+      val contract = AcsRowData.AcsRowDataFromInterface(
+        Contract(
+          ev.getTemplateId,
+          new ContractId[DamlRecord[?]](ev.getContractId),
+          ev.getArguments,
+          ev.getCreatedEventBlob,
+          ev.getCreatedAt,
+        )
+      )
     }
 
     override def isStakeholderOf(ev: CreatedEvent): Boolean = {
