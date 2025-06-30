@@ -37,6 +37,12 @@ Upcoming
 
   - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
 
+- Docs
+
+  - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
+  - Add relevant links to the new application developer documentation pages published by Digital Asset at
+    https://docs.digitalasset.com/build/3.3/.
+
 0.4.3
 -----
 
