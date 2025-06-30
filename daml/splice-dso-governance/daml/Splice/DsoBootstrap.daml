@@ -60,7 +60,9 @@ template DsoBootstrap with
         -- create the DSO rules with the SV1 as the sole sv
         let sv1SvInfo = SvInfo with
               name = sv1Name
-              joinedAsOfRound = Round 0
+              joinedAsOfRound = case initialRound of
+                                  None -> Round 0
+                                  Some(round) -> Round round
               svRewardWeight = sv1RewardWeight
               participantId = sv1ParticipantId
         let dsoRules = DsoRules with
