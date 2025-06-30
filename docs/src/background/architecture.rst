@@ -11,6 +11,8 @@ Architecture
 .. todo:: add more architecture docs (possibly starting with the architecture currently in the scan bulk api docs)
 
 
+.. _daml_code_architecture:
+
 Daml Code Architecture
 ----------------------
 

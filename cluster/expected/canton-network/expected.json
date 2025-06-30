@@ -723,7 +723,7 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "delegatelessAutomation": false,
+        "delegatelessAutomation": true,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",

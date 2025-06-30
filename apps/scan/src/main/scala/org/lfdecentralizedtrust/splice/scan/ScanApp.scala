@@ -249,7 +249,7 @@ class ScanApp(
         config.spliceInstanceNames,
         participantAdminConnection,
         sequencerAdminConnection,
-        store,
+        automation,
         acsSnapshotStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
@@ -273,6 +273,7 @@ class ScanApp(
 
       tokenStandardMetadataHandler = new HttpTokenStandardMetadataHandler(
         store,
+        config.spliceInstanceNames,
         loggerFactory,
       )()
 

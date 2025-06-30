@@ -209,7 +209,6 @@ class ValidatorAutomationService(
       connection,
       store,
       contactPoint,
-      packageVersionSupport,
     )
   )
 
