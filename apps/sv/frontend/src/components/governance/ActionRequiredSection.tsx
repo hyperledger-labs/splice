@@ -1,9 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ContractId } from '@daml/types';
 import { ArrowForward, ContentCopy } from '@mui/icons-material';
 import { Badge, Box, Button, Card, Chip, Grid, IconButton, Typography } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 
 export interface ActionRequiredData {
+  contractId: ContractId<VoteRequest>;
   actionName: string;
   votingCloses: string;
   createdAt: string;
@@ -41,6 +45,7 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
             key={index}
             action={ar.actionName}
             createdAt={ar.createdAt}
+            contractId={ar.contractId}
             votingEnds={ar.votingCloses}
             requester={ar.requester}
             isYou={ar.isYou}
@@ -53,6 +58,7 @@ export const ActionRequiredSection: React.FC<ActionRequiredProps> = (
 
 interface ActionCardProps {
   action: string;
+  contractId: ContractId<VoteRequest>;
   createdAt: string;
   votingEnds: string;
   requester: string;
@@ -60,7 +66,7 @@ interface ActionCardProps {
 }
 
 const ActionCard = (props: ActionCardProps) => {
-  const { action, createdAt, votingEnds, requester, isYou } = props;
+  const { action, createdAt, contractId, votingEnds, requester, isYou } = props;
 
   return (
     <Card
@@ -137,12 +143,14 @@ const ActionCard = (props: ActionCardProps) => {
         </Grid>
 
         <Button
-          endIcon={<ArrowForward />}
+          component={RouterLink}
+          to={`/governance-beta/proposals/${contractId}`}
+          endIcon={<ArrowForward fontSize="small" />}
           size="small"
           sx={{ alignSelf: { xs: 'flex-end', sm: 'center' } }}
           data-testid="action-required-view-details"
         >
-          View Details
+          Details
         </Button>
       </Box>
     </Card>
