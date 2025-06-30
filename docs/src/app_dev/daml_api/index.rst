@@ -16,6 +16,7 @@ These APIs are not mandatory to use. Feel free to build your own Daml APIs, pote
 using the APIs below as inspiration.
 
 
+.. _app_dev_token_standard_overview:
 
 Canton Network Token Standard APIs (CIP-0056)
 ---------------------------------------------
