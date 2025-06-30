@@ -361,27 +361,6 @@ class BftScanConnection(
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
     bftCall(_.lookupTransferPreapprovalByParty(receiver))
 
-  override def listDsoRulesVoteRequests()(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    bftCall(_.listDsoRulesVoteRequests())
-
-  override def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[VoteRequest.ContractId]
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[
-    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-  ] = bftCall(_.listVoteRequestsByTrackingCid(voteRequestCids))
-
-  def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    bftCall(_.lookupVoteRequest(contractId))
-
   override def listVoteRequestResults(
       actionName: Option[String],
       accepted: Option[Boolean],
