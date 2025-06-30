@@ -276,20 +276,23 @@ class DockerComposeValidatorFrontendIntegrationTest
           "participant"
         )
       }
-    }
-  }
 
-  "docker-compose based validator with auth works" in { _ =>
-    val validatorUserPassword = sys.env(s"COMPOSE_VALIDATOR_WEB_UI_PASSWORD")
+      clue("Stop the validator (without wiping its data)") {
+        Seq("build-tools/splice-compose.sh", "stop") !
+      }
 
-    withComposeValidator(
-      extraClue = "with auth",
-      startFlags = Seq("-a"),
-      extraEnv = Seq(
-        "GCP_CLUSTER_BASENAME" -> "cidaily" // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
-      ),
-    ) {
+      clue("Restart the validator, with auth") {
+        startComposeValidator(
+          extraClue = "with auth",
+          startFlags = Seq("-a"),
+          extraEnv = Seq(
+            "GCP_CLUSTER_BASENAME" -> "cidaily" // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
+          ),
+        )
+      }
+
       withFrontEnd("frontend") { implicit webDriver =>
+        val validatorUserPassword = sys.env(s"COMPOSE_VALIDATOR_WEB_UI_PASSWORD")
         eventuallySucceeds()(go to s"http://wallet.localhost")
         completeAuth0LoginWithAuthorization(
           "http://wallet.localhost",
@@ -304,6 +307,7 @@ class DockerComposeValidatorFrontendIntegrationTest
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
       }
+
     }
   }
 }
