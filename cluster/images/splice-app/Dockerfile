@@ -37,7 +37,7 @@ RUN mkdir -p /app/splice-node/docs/html/cn-release-bundles
 RUN ln -s splice-node/bin/splice-node splice-image-bin
 
 # This Dockerfile is a modified version of Canton's Dockerfile
-FROM eclipse-temurin:17-jdk-jammy
+FROM eclipse-temurin:21-jdk-noble
 COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY --from=build /usr/bin/screen /usr/bin/screen
 COPY --from=build /app/ /app/

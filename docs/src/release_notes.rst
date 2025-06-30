@@ -8,6 +8,42 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- SV
+
+  - Add official support for :ref:`operating an SV participant with keys managed by an external Key Management Service (KMS) <sv-kms>`.
+
+- Deployment
+
+  - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
+  - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
+  - `/v2/updates` endpoints are now available on the Scan app, `/v1/updates` endpoints are deprecated.
+    The `/v2/updates` endpoints no longer return the `offset` field in responses,
+    and `events_by_id` are now lexicographically ordered by ID for conveniently viewing JSON results.
+
+- Scan
+
+  - Fix a bug where the ``/v0/holdings/summary`` endpoint would return incomplete results when the requested parties had more than 1000 holdings.
+    Additionally, that endpoint and ``/v0/holdings/state`` will now fail if an empty list of parties is provided.
+
+- Mediator
+
+  - Fix an issue where the mediator sometimes got stuck after initialization and required a restart to recover.
+
+- Validator
+
+  - docker-compose, breaking: Restoration from identities dump requires to
+    specify path to `identities.json` and not directory containing it. This is
+    consistent with the :ref:`documented
+    <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
+    `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
+
+- Auth
+
+  - Added an option to override the default connection and read timeouts for the JWKS URL when using ``auth.algorithm="rs-256"``.
+
 0.4.1
 -----
 

@@ -7,14 +7,7 @@
 
 set -euo pipefail
 
-SPLICE_ROOT=$( git rev-parse --show-toplevel )
-copy_script="scripts/copy-to-splice.sh"
 rename_script="scripts/check-repo-names.sh"
-if [[ -f "$SPLICE_ROOT/$copy_script" ]]; then
-  in_copy_src=yes
-else
-  in_copy_src=no
-fi
 
 function check_patterns_locally() {
   # removing NEVERMATCHES alternative causes these to never match
@@ -33,13 +26,13 @@ function check_patterns_locally() {
   local exceptions=(
     '(\b|[`_])cn-docs'
     '@cn-load-tester\.com'
-    '^[^:]+V001__create_schema\.sql:' # TODO (#15491) avoiding changing hashes
-    'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (#15747) auth0 env names
-    'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (#15741) new secret
+    '^[^:]+V001__create_schema\.sql:' # TODO (DACH-NY/canton-network-node#15491) avoiding changing hashes
+    'AUTH0_CN_MANAGEMENT_API_CLIENT_(ID|SECRET)|"dev" => ."AUTH0_CN"' # TODO (DACH-NY/canton-network-internal#395) auth0 env names
+    'ans-web-ui\.yaml:.*name: splice-app-cns-ui-auth' # TODO (DACH-NY/canton-network-internal#397) new secret
     'Headers.scala:.*"configs"'
     'Headers.scala:.*"configs-private"'
-    'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (#15745) TLS credential names in istio-gateway
-    'bigquery-import.sql:.*da-cn-ci-2' # TODO (#18620) parameterized project
+    'istio-gateway/.*gateway\.yaml:.*credentialName: cn-' # TODO (DACH-NY/canton-network-internal#396) TLS credential names in istio-gateway
+    'bigquery-import.sql:.*da-cn-ci-2' # TODO (DACH-NY/canton-network-internal#362) parameterized project
     'GcpConfig\.scala:' # cluster-specific
     '/da-cn-shared/cn-images|GOOGLE_CLOUD_PROJECT=da-cn-shared|"KMS_PROJECT_ID" -> "da-cn-shared"' # gcp
     '/cn-release-bundles' # docs route
@@ -47,6 +40,7 @@ function check_patterns_locally() {
     'SpliceTests\.scala.*getMeterProvider\.get."cn_tests"' # test metrics
     '^[^:]+package-lock\.json:.*"integrity"' # appears in hashes
     'Preflight.*Test.*\.scala:.*s"https://cns' # hostnames in preflights
+    'Test.*\.scala:.*da-cn-splice' # GCP project we use for KMS keys used in integration tests
     'cluster/images/splice-test-temp-runner-hook/index.js' # gha-runner-hook copied over
     'apps/app/src/test/resources/dumps/.*-identity-dump.json' # encoded snapshots can randomly contain 'cn'
     'token-standard/CHANGELOG.md'
@@ -63,6 +57,7 @@ function check_patterns_locally() {
     'cluster/stacks'
     'cluster/images/LICENSE'
     'expected.json'
+    'README.md'
   )
 
   local exception exceptions_args=()
@@ -97,44 +92,4 @@ function check_patterns_locally() {
   fi
 }
 
-function setup_temp_splice() {
-  local src="$1" tempsplice
-  tempsplice="$(mktemp -d)"
-  cd "$src"
-  local script_prefix
-  case $in_copy_src in
-    yes) script_prefix=;;
-    no) script_prefix='direnv exec .';;
-  esac
-  $script_prefix "$copy_script" "$tempsplice"
-  cd "$tempsplice"
-}
-
-function check_patterns() {
-  local optstring
-  case "$in_copy_src" in
-    yes)
-      optstring='h'
-      setup_temp_splice "$SPLICE_ROOT";;
-    no) optstring='hs:';;
-  esac
-
-  while getopts "$optstring" arg; do
-    case "$arg" in
-      h)
-        echo '  Options: [-s SPLICE_REPO]
-    -s: Run copy-to-splice from SPLICE_REPO first, and scan the result' 1>&2
-        exit 0;;
-      s)
-        if [[ ! -d $OPTARG ]]; then
-          echo "-s requires a splice repo directory" 1>&2
-          exit 1
-        fi
-        setup_temp_splice "$OPTARG";;
-      :|?) exit 1;;
-    esac
-  done
-  check_patterns_locally
-}
-
-check_patterns "$@"
+check_patterns_locally

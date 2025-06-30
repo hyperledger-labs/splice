@@ -167,43 +167,10 @@ Java as early as possible.
 
 To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala` and `asJava` methods.
 
-## Porting between branches
-
-Note that we often maintain multiple branches in parallel, e.g. ones for the release-lines
-that are deployed on Prod clusters, or ones for previous or coming major releases. It is
-therefore quite common that we need to port commits between the different branches.
-
-This can of course be done manually using `git` commands and github UI, but we also have
-automation to support it:
-
-Automatically on PRs:
-- On every PR that satisfies a set of conditions, you will automatically get a reminder
-  with a list of suggested branches you may wish to port this PR to. Check the boxes of
-  those that fit (you can also edit the comment and add other branches if needed).
-- Once the PR is merged, automation (in GitHub Actions) will pick up that reminder comment
-  and attempt to port this commit to the selected branches. If successful, you will be
-  asked to review the port PRs. Upon failure, a comment will be added to the original PR.
-- Note that on any unmerged PR, you can add a comment yourself that includes the string
-  `[backport]`, and any checked check box in that comment will be assumed to be a branch
-  to which you wish to port this PR, e.g. a comment:
-
-  [backport]
-
-  \- [x] my-branch
-
-  will cause your PR to be ported to the "my-branch" branch once merged.
-
-Manually:
-- There is also a manually triggered workflow for porting PRs that have already been merged.
-  To use that, navigate to the ["Backport a commit or PR across branches" workflow in the repo's Actions page](https://github.com/DACH-NY/canton-network-node/actions/workflows/backport.yml),
-  and press "Run workflow". You will be asked for a merged PR or a Git commit hash to port from,
-  the branch to port to, and the reviewer to request the review from. Run the workflow to create
-  a PR to port your contributions.
-
 ## Dev Docs
 
 We publish docs from each commit from `main` to
-https://digital-asset.github.io/decentralized-canton-sync/. This can
+https://hyperledger-labs.github.io/splice/. This can
 often be useful to answer support requests with a docs link even if
 those docs are still very recent.
 

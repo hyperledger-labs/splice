@@ -63,6 +63,7 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardCliTestDataTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with TokenStandardTest

@@ -234,7 +234,7 @@ class SvApp(
       localSynchronizerNode,
     )
       .recoverWith { case err =>
-        // TODO(#3474) Replace this by a more general solution for closing resources on
+        // TODO(#879) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
         localSynchronizerNode.foreach(_.close())
@@ -496,7 +496,12 @@ class SvApp(
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
-        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+        case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
+          new RSAVerifier(
+            audience,
+            jwksUrl,
+            RSAVerifier.TimeoutsConfig(connectionTimeout, readTimeout),
+          )
       }
 
       // Start the servers for the SvApp's APIs
@@ -778,7 +783,7 @@ object SvApp {
       )
   }
 
-  // TODO(#5364): move this and like functions into appropriate utility namespaces
+  // TODO(DACH-NY/canton-network-node#5364): move this and like functions into appropriate utility namespaces
   def prepareValidatorOnboarding(
       secret: ValidatorOnboardingSecret,
       expiresIn: NonNegativeFiniteDuration,

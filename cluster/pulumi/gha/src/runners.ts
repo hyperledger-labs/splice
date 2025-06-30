@@ -139,7 +139,7 @@ function installDockerRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.10.1',
+      version: '0.11.0',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
@@ -412,7 +412,7 @@ function installK8sRunnerScaleSet(
               {
                 name: '$job',
                 env: [
-                  // TODO (#18641): remove from here, already defined in splice-test-ci/Dockerfile
+                  // TODO (#556): remove from here, already defined in splice-test-ci/Dockerfile
                   { name: 'CI', value: 'true' },
                 ],
                 volumeMounts: [
@@ -474,7 +474,7 @@ function installK8sRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.10.1',
+      version: '0.11.0',
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
@@ -755,7 +755,7 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         // Note that the user needs admin rights on the repo for this to work, since the controller and
         // listeners use the actions/runners/registration-token endpoint to create a temporary token
         // for registration, and this endpoint seems to require admin rights.
-        // TODO(#17842): The recommended thing to do is use a GitHub App. See here for a guide
+        // TODO(DACH-NY/canton-network-node#17842): The recommended thing to do is use a GitHub App. See here for a guide
         // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
         github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
       },

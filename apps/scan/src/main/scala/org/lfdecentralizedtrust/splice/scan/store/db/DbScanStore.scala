@@ -5,7 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.caching.ScaffeineCache
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -83,6 +83,7 @@ import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 object DbScanStore {
   type CacheKey = java.lang.Long // caffeine metrics function demands AnyRefs
@@ -97,6 +98,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
+    svNodeStateCacheTtl: NonNegativeFiniteDuration,
     storeMetrics: DbScanStoreMetrics,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -109,7 +111,7 @@ class DbScanStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        version = 2, // TODO (#13454): bump when it will backfill.
+        version = 2, // TODO (DACH-NY/canton-network-node#13454): bump when it will backfill.
         name = "DbScanStore",
         party = key.dsoParty,
         participant = participantId,
@@ -464,7 +466,7 @@ class DbScanStore(
           (sql" < ", sql""" order by entry_number desc limit ${sqlLimit(limit)};""")
       }
 
-      // TODO (#11200): don't use the event id for pagination, use the entry number
+      // TODO (#960): don't use the event id for pagination, use the entry number
       for {
         rows <- storage.query(
           pageEndEventId.fold(
@@ -587,13 +589,39 @@ class DbScanStore(
       Scaffeine()
         .maximumSize(1000),
       key => getUncachedTotalAmuletBalance(key),
-      metrics = Some(storeMetrics.cache),
+      metrics = Some(storeMetrics.totalAmuletBalanceCache),
     )(logger, "amuletBalanceCache")
   }
-  // TODO(#11312) remove when amulet expiry works again
+  // TODO(#800) remove when amulet expiry works again
   def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal] = {
     totalAmuletBalanceCache.get(asOfEndOfRound)
   }
+
+  private val svNodeStateCache: ScaffeineCache.TunnelledAsyncLoadingCache[
+    Future,
+    Unit,
+    Seq[SvNodeState],
+  ] = {
+    implicit val tc = TraceContext.empty
+    ScaffeineCache.buildAsync[Future, Unit, Seq[SvNodeState]](
+      Scaffeine()
+        .expireAfterWrite(svNodeStateCacheTtl.asFiniteApproximation),
+      _ => this.listSvNodeStates(),
+      metrics = Some(storeMetrics.svNodeStateCache),
+    )(logger, "svNodeStateCache")
+  }
+
+  private def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] =
+    for {
+      dsoRules <- getDsoRulesWithState()
+      nodeStates <- Future.traverse(dsoRules.payload.svs.asScala.keys) { svPartyId =>
+        getSvNodeState(PartyId.tryFromProtoPrimitive(svPartyId))
+      }
+    } yield nodeStates.map(_.contract.payload).toVector
+
+  protected override def listCachedSvNodeStates()(implicit
+      tc: TraceContext
+  ): Future[Seq[SvNodeState]] = svNodeStateCache.get(())
 
   protected override def getUncachedTotalAmuletBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
@@ -606,7 +634,7 @@ class DbScanStore(
           // and sum the most recent total_amulet_balances for all parties.
           // using greatest(0, ...) to handle negative balances caused by amulets never expiring.
           storage.query(
-            // TODO(#11312) change to query from round_totals when amulet expiry works again
+            // TODO(#800) change to query from round_totals when amulet expiry works again
             sql"""
               with most_recent as (
                 select   max(closed_round) as closed_round,
@@ -1097,7 +1125,7 @@ class DbScanStore(
                 templateId.getEntityName
               )} and package_name = ${lengthLimited(packageName)}
               and record_time > $recordTime""",
-            // TODO(#14813): Order by row_id is suspicious
+            // TODO(#934): Order by row_id is suspicious
             orderLimit = sql"""order by row_id asc limit 1""",
           ).headOption,
           s"lookup[$templateId]",

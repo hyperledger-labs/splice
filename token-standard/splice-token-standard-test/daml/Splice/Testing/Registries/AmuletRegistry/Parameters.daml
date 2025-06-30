@@ -126,7 +126,7 @@ issuanceConfig_10plus = IssuanceConfig with
   amuletToIssuePerYear = 2.5e9
   validatorRewardPercentage = 0.2
   appRewardPercentage = 0.75
-  -- TODO(#9350): move these params out of the `IssuanceConfig` to save space and bandwidth for txs referencing `AmuletRules`
+  -- TODO(#827): move these params out of the `IssuanceConfig` to save space and bandwidth for txs referencing `AmuletRules`
   validatorRewardCap = 0.2
   featuredAppRewardCap = 100.0
   unfeaturedAppRewardCap = 0.6

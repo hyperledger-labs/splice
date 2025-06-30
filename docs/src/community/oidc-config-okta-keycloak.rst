@@ -12,6 +12,8 @@ To deploy a validator node, configure authentication using your preferred OIDC p
 This section provides instructions for Okta and Keycloak. 
 For Auth0 instructions and more details on configuring authentication, see :ref:`Configuring Authentication <helm-validator-auth>`.
 
+Thanks to Stéphane Loeuillet for contributing input in a `community discussion <https://github.com/global-synchronizer-foundation/docs/discussions/15#discussioncomment-12877002>`_, which forms the basis of the Okta section in this document.
+
 Okta
 ----
 

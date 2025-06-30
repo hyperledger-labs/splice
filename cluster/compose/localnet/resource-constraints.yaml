@@ -15,7 +15,7 @@ services:
     environment:
       _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx2560m"
   console:
-    mem_limit: 1g
+    mem_limit: 2g
     environment:
       _JAVA_OPTIONS: "-XX:+UseContainerSupport -XX:-UseCompressedOops"
   scan-web-ui:
@@ -24,7 +24,13 @@ services:
     mem_limit: 512mb
   wallet-web-ui-app-provider:
     mem_limit: 256mb
+  ans-web-ui-app-provider:
+    mem_limit: 256mb
   wallet-web-ui-app-user:
+    mem_limit: 256mb
+  ans-web-ui-app-user:
     mem_limit: 256mb
   wallet-web-ui-sv:
     mem_limit: 256mb
+  swagger-ui:
+    mem_limit: 128mb

@@ -266,7 +266,7 @@ const TransactionSubtypeText: React.FC<{ transaction: Transaction; primaryPartyI
       // ExtraTrafficPurchase
       text = 'Extra Traffic Purchase';
       break;
-    // TODO(#14568): Add frontend tests for the transfer pre-approval tx subtypes
+    // TODO(DACH-NY/canton-network-node#14568): Add frontend tests for the transfer pre-approval tx subtypes
     case 'AmuletRules_CreateTransferPreapproval':
       // TransferPreapprovalCreated
       text = 'Transfer Preapproval Created';
@@ -361,7 +361,7 @@ const TransactionSubtypeText: React.FC<{ transaction: Transaction; primaryPartyI
       break;
     case 'TransferFactory_Transfer': {
       const transfer = toTransfer(transaction);
-      // TODO(#19607) Improve display
+      // TODO(DACH-NY/canton-network-node#19607) Improve display
       const target =
         primaryPartyId == transfer.transferInstructionReceiver
           ? `from ${shortenPartyId(transfer.senderId)}`

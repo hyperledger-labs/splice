@@ -42,7 +42,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
   * Note that this is optional. An SV app can run without a dedicated domain node.
-  * TODO(#5195) Consider making this mandatory.
+  * TODO(DACH-NY/canton-network-node#5195) Consider making this mandatory.
   */
 final class LocalSynchronizerNode(
     participantAdminConnection: ParticipantAdminConnection,
@@ -375,7 +375,7 @@ final class LocalSynchronizerNode(
         "onboarding_sequencer",
         "Onbarding sequencer through sponsoring SV",
         svConnection.onboardSvSequencer(sequencerId).recover {
-          // TODO(#13410) - remove once canton returns a retryable error
+          // TODO(DACH-NY/canton-network-node#13410) - remove once canton returns a retryable error
           case HttpCommandException(_, StatusCodes.BadRequest, message)
               if message.contains("SNAPSHOT_NOT_FOUND") =>
             throw Status.NOT_FOUND
@@ -468,7 +468,7 @@ final class LocalSynchronizerNode(
 object LocalSynchronizerNode {
   def toEndpoint(config: ClientConfig): Endpoint = Endpoint(config.address, config.port)
 
-  // TODO(#5107) Consider using something other than a ClientConfig in the config file
+  // TODO(DACH-NY/canton-network-node#5107) Consider using something other than a ClientConfig in the config file
   // to simplify conversion to GrpcSequencerConnection.
   private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
     NonEmpty.mk(Seq, toEndpoint(config))

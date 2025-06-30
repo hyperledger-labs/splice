@@ -14,16 +14,13 @@ import { v4 as uuidv4 } from 'uuid';
 
 import {
   Alert,
-  Box,
   Button,
   Card,
   CardContent,
   Checkbox,
   FormControl,
   FormControlLabel,
-  InputAdornment,
   NativeSelect,
-  OutlinedInput,
   Stack,
   Switch,
   TextField,
@@ -31,21 +28,17 @@ import {
 } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import useLookupTransferPreapproval from '../hooks/scan-proxy/useLookupTransferPreapproval';
-import { useWalletConfig } from '../utils/config';
 import BftAnsField from './BftAnsField';
 import { useFeatureSupport } from '../hooks/useFeatureSupport';
+import AmountInput from './AmountInput';
 
 const SendTransfer: React.FC = () => {
-  const config = useWalletConfig();
   const { createTransferOffer, transferPreapprovalSend, createTransferViaTokenStandard } =
     useWalletClient();
-  const amuletPriceQuery = useAmuletPrice();
 
   const [useTokenStandardTransfer, setUseTokenStandardTransfer] = useState(true);
   const [receiver, setReceiver] = useState<string>('');
-  const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
   const [ccAmountText, setCCAmountText] = useState<string>('1');
   const [expDays, setExpDays] = useState('1');
   const [description, setDescription] = useState<string>('');
@@ -89,7 +82,7 @@ const SendTransfer: React.FC = () => {
       navigate('/transactions');
     },
     onError: error => {
-      // TODO (#5491): show an error to the user.
+      // TODO (DACH-NY/canton-network-node#5491): show an error to the user.
       console.error(
         `Failed to create transfer offer to ${receiver} of ${ccAmount} CC with trackingId ${deduplicationId}`,
         error
@@ -119,24 +112,13 @@ const SendTransfer: React.FC = () => {
       navigate('/transactions');
     },
     onError: error => {
-      // TODO (#5491): show an error to the user.
+      // TODO (DACH-NY/canton-network-node#5491): show an error to the user.
       console.error(
         `Failed to send transfer to ${receiver} of ${ccAmount} CC with deduplicationId ${deduplicationId}`,
         error
       );
     },
   });
-
-  useMemo(() => {
-    if (amuletPriceQuery.data) {
-      const usdAmount = amuletPriceQuery.data.times(ccAmount);
-      setUsdAmount(prev => (prev && prev.eq(usdAmount) ? prev : usdAmount));
-    }
-  }, [ccAmount, amuletPriceQuery.data]);
-
-  const onCCAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCCAmountText(e.target.value);
-  };
 
   if (featureSupport.isLoading) {
     return <Loading />;
@@ -198,42 +180,11 @@ const SendTransfer: React.FC = () => {
             </Stack>
           </Stack>
 
-          <Stack direction="column" mb={4} spacing={1}>
-            <Typography variant="h6">Amount</Typography>
-            <Box display="flex">
-              <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
-                <OutlinedInput
-                  id="create-offer-amulet-amount"
-                  type="text"
-                  value={ccAmountText}
-                  onChange={onCCAmountChange}
-                  endAdornment={
-                    <InputAdornment position="end">
-                      {config.spliceInstanceNames.amuletNameAcronym}
-                    </InputAdornment>
-                  }
-                  aria-describedby="outlined-amount-amulet-helper-text"
-                  error={BigNumber(ccAmountText).lte(0.0)}
-                  inputProps={{
-                    'aria-label': 'amount',
-                  }}
-                />
-              </FormControl>
-              {/* Slight deviation from the original design here. The USD field is below the CC field in the figma designs */}
-              <FormControl>
-                <OutlinedInput
-                  disabled
-                  id="create-offer-usd-amount"
-                  value={usd ?? '...'}
-                  endAdornment={<InputAdornment position="end">USD</InputAdornment>}
-                  aria-describedby="outlined-amount-usd-helper-text"
-                  inputProps={{
-                    'aria-label': 'amount',
-                  }}
-                />
-              </FormControl>
-            </Box>
-          </Stack>
+          <AmountInput
+            idPrefix="create-offer"
+            ccAmountText={ccAmountText}
+            setCcAmountText={setCCAmountText}
+          />
           {!(preapprovalResult.data && useTransferPreapproval) && (
             <Stack direction="column" mb={4} spacing={1}>
               <Typography variant="h6">Expiration</Typography>

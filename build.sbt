@@ -1149,7 +1149,7 @@ lazy val `apps-common-frontend` = {
           Some(npmRootDir.value),
         )
       },
-      // TODO(#7579) -- like npmLint and npmFix above, we could/should run vitest per project.
+      // TODO(#986) -- like npmLint and npmFix above, we could/should run vitest per project.
       // In this case, we really want to do that asap to better parallelize the task in CI.
       npmTest := {
         val log = streams.value.log

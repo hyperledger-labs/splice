@@ -37,7 +37,7 @@ case class ScanAppBackendConfig(
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     acsSnapshotPeriodHours: Int = 3,
     enableForcedAcsSnapshots: Boolean = false,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     spliceInstanceNames: SpliceInstanceNamesConfig,
@@ -46,13 +46,18 @@ case class ScanAppBackendConfig(
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
+    cache: ScanCacheConfig = ScanCacheConfig(),
 ) extends SpliceBackendConfig
-    with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
+    with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
+
+final case class ScanCacheConfig(
+    svNodeStateTtl: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30)
+)
 
 case class ScanAppClientConfig(
     adminApi: NetworkAppClientConfig,

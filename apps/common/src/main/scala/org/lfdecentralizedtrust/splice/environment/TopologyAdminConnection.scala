@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.{EitherT, OptionT}
-import cats.implicits.catsSyntaxOptionId
+import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxOptionId}
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
@@ -41,9 +41,13 @@ import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.time.FetchTimeResponse
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
-import com.digitalasset.canton.topology.admin.grpc.BaseQuery
+import com.digitalasset.canton.topology.admin.grpc.{
+  BaseQuery,
+  TopologyStoreId as ProtoTopologyStoreId,
+}
 import com.digitalasset.canton.topology.admin.v30.ExportTopologySnapshotResponse
 import com.digitalasset.canton.topology.store.TimeQuery.HeadState
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   TimeQuery,
@@ -65,8 +69,6 @@ import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyTransactionType,
 }
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId as ProtoTopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -596,18 +598,46 @@ abstract class TopologyAdminConnection(
       )
     )
 
-  private def proposeMapping[M <: TopologyMapping: ClassTag](
-      store: TopologyStoreId,
-      mapping: Either[String, M],
-      serial: PositiveInt,
-      isProposal: Boolean,
-  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] =
-    proposeMapping(
-      store,
-      mapping.valueOr(err => throw new IllegalArgumentException(s"Invalid topology mapping: $err")),
-      serial,
-      isProposal,
+  private def ensureInitialMapping[M <: TopologyMapping: ClassTag](
+      mappingE: Either[String, M]
+  )(implicit traceContext: TraceContext): Future[SignedTopologyTransaction[TopologyChangeOp, M]] = {
+    val mapping =
+      mappingE.valueOr(err => throw new IllegalArgumentException(s"Invalid topology mapping: $err"))
+    listAllTransactions(
+      TopologyStoreId.AuthorizedStore,
+      includeMappings = Set(
+        mapping.code
+      ),
+    ).flatMap(sameCodeTopologyMappings =>
+      sameCodeTopologyMappings
+        .find(_.mapping.uniqueKey == mapping.uniqueKey)
+        .flatMap(_.selectMapping[M])
+        .fold({
+          logger.info(
+            s"Proposing initial mapping for ${mapping.code} with serial 1: $mapping"
+          )
+          proposeMapping(
+            TopologyStoreId.AuthorizedStore,
+            mapping,
+            PositiveInt.one,
+            isProposal = false,
+          )
+        }) { existingTxWithSameUniqueCode =>
+          if (existingTxWithSameUniqueCode == mapping) {
+            logger.info(
+              s"Existing mapping found for ${mapping.code}: $mapping, returning existing transaction with serial ${existingTxWithSameUniqueCode.serial}"
+            )
+            existingTxWithSameUniqueCode.transaction.pure[Future]
+          } else {
+            throw Status.ALREADY_EXISTS
+              .withDescription(
+                s"Mapping with unique key ${mapping.uniqueKey} already exists with a different mapping: $existingTxWithSameUniqueCode"
+              )
+              .asRuntimeException()
+          }
+        }
     )
+  }
 
   private def proposeMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
@@ -762,16 +792,13 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, SequencerSynchronizerState]] = {
-    proposeMapping(
-      TopologyStoreId.AuthorizedStore,
+    ensureInitialMapping(
       SequencerSynchronizerState.create(
         synchronizerId,
         PositiveInt.one,
         active,
         observers,
-      ),
-      serial = PositiveInt.one,
-      isProposal = false,
+      )
     )
   }
 
@@ -864,17 +891,14 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, MediatorSynchronizerState]] =
-    proposeMapping(
-      TopologyStoreId.AuthorizedStore,
+    ensureInitialMapping(
       MediatorSynchronizerState.create(
         synchronizerId = synchronizerId,
         group = group,
         threshold = PositiveInt.one,
         active = active,
         observers = observers,
-      ),
-      serial = PositiveInt.one,
-      isProposal = false,
+      )
     )
 
   def ensureMediatorSynchronizerStateAdditionProposal(
@@ -961,15 +985,12 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, DecentralizedNamespaceDefinition]] =
-    proposeMapping(
-      TopologyStoreId.AuthorizedStore,
+    ensureInitialMapping(
       DecentralizedNamespaceDefinition.create(
         namespace,
         threshold,
         owners,
-      ),
-      serial = PositiveInt.one,
-      isProposal = false,
+      )
     )
 
   def ensureDecentralizedNamespaceDefinitionProposalAccepted(
@@ -1194,16 +1215,13 @@ abstract class TopologyAdminConnection(
   )(implicit
       traceContext: TraceContext
   ): Future[SignedTopologyTransaction[TopologyChangeOp, NamespaceDelegation]] =
-    proposeMapping(
-      TopologyStoreId.AuthorizedStore,
+    ensureInitialMapping(
       NamespaceDelegation.create(
         namespace,
         target,
         if (isRootDelegation) DelegationRestriction.CanSignAllMappings
         else DelegationRestriction.CanSignAllButNamespaceDelegations,
-      ),
-      serial = PositiveInt.one,
-      isProposal = false,
+      )
     )
 
   def initId(id: NodeIdentity)(implicit traceContext: TraceContext): Future[Unit] = {
@@ -1275,7 +1293,7 @@ abstract class TopologyAdminConnection(
         member.filterString,
       )
     ).map(
-      // TODO(#14815) Canton currently compares member IDs by string prefix instead of strict equality of
+      // TODO(#720) Canton currently compares member IDs by string prefix instead of strict equality of
       // member IDs in ListSynchronizerTrustCertificate, so we apply another filter for equality of the member ID
       _.filter(r => r.item.participantId.member.filterString == member.filterString)
         .map(r =>

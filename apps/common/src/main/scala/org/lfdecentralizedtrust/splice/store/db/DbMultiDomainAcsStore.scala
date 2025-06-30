@@ -222,7 +222,7 @@ final class DbMultiDomainAcsStore[TXE](
   def hasArchived(ids: Seq[ContractId[?]])(implicit
       traceContext: TraceContext
   ): Future[Boolean] =
-    // TODO(#6458): implement this as a single DB query
+    // TODO(#838): implement this as a single DB query
     Future.sequence(ids.map(lookupContractStateById)).map(_.exists(_.isEmpty))
 
   override def listContracts[C, TCid <: ContractId[_], T](
@@ -654,7 +654,7 @@ final class DbMultiDomainAcsStore[TXE](
   ): Source[SelectFromAcsTableWithStateResult, NotUsed] = {
     Source
       .future(
-        // TODO(#5534): this is currently waiting until the whole ACS has been ingested.
+        // TODO(#863): this is currently waiting until the whole ACS has been ingested.
         //  After switching to streaming ACS ingestion, we could start streaming contracts while
         //  the ACS is being ingested.
         waitUntilAcsIngested()
@@ -995,6 +995,7 @@ final class DbMultiDomainAcsStore[TXE](
     private def ingestUpdateAtOffset[E <: Effect](
         offset: Long,
         action: DBIOAction[?, NoStream, Effect.Read & Effect.Write],
+        isOffsetCheckpoint: Boolean = false,
     )(implicit
         tc: TraceContext
     ): DBIOAction[Unit, NoStream, Effect.Read & Effect.Write & Effect.Transactional] = {
@@ -1004,12 +1005,18 @@ final class DbMultiDomainAcsStore[TXE](
             action.andThen(updateOffset(offset))
           case Some(lastIngestedOffset) =>
             if (offset <= lastIngestedOffset) {
-              logger.warn(
-                s"Update offset $offset <= last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$acsStoreId), skipping database actions. " +
-                  "This is expected if the SQL query was automatically retried after a transient database error. " +
-                  "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                  "ingesting into the same logical database."
-              )
+              /* we can receive an offset equal to the last ingested and that can be safely ignore */
+              if (isOffsetCheckpoint) {
+                if (offset < lastIngestedOffset) {
+                  logger.warn(
+                    s"Checkpoint offset $offset < last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$acsStoreId), skipping database actions. This is expected if the SQL query was automatically retried after a transient database error. Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances ingesting into the same logical database."
+                  )
+                }
+              } else {
+                logger.warn(
+                  s"Update offset $offset <= last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$acsStoreId), skipping database actions. This is expected if the SQL query was automatically retried after a transient database error. Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances ingesting into the same logical database."
+                )
+              }
               DBIO.successful(())
             } else {
               action.andThen(updateOffset(offset))
@@ -1055,7 +1062,7 @@ final class DbMultiDomainAcsStore[TXE](
                 offset,
                 DBIO
                   .sequence(
-                    // TODO (#5643): batch inserts
+                    // TODO (#989): batch inserts
                     todoAcs.map { ac =>
                       for {
                         _ <- doIngestAcsInsert(
@@ -1183,7 +1190,10 @@ final class DbMultiDomainAcsStore[TXE](
         case TreeUpdateOrOffsetCheckpoint.Checkpoint(checkpoint) =>
           val offset = checkpoint.getOffset
           storage
-            .queryAndUpdate(ingestUpdateAtOffset(offset, DBIO.unit), "ingestOffsetCheckpoint")
+            .queryAndUpdate(
+              ingestUpdateAtOffset(offset, DBIO.unit, isOffsetCheckpoint = true),
+              "ingestOffsetCheckpoint",
+            )
             .map { _ =>
               state
                 .getAndUpdate(s => s.withUpdate(s.acsSize, offset))

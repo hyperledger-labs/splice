@@ -40,11 +40,12 @@ import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.config.{AuthTokenSourceConfig, SpliceConfig}
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.environment.{
+  DarResources,
   RetryProvider,
   SpliceEnvironment,
   SpliceEnvironmentFactory,
 }
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.{EnvironmentDefinition, InitialPackageVersions}
 import org.lfdecentralizedtrust.splice.integration.plugins.{
   ResetDecentralizedNamespace,
   ResetSequencerSynchronizerStateThreshold,
@@ -418,7 +419,7 @@ object SpliceTests extends LazyLogging {
       value should beWithin(range._1, range._2)
 
     // Upper bound for fees in any of the above transfers
-    // TODO(#10898): Figure out something better for upper bounds of fees
+    // TODO(#806): Figure out something better for upper bounds of fees
     val smallAmount: BigDecimal = BigDecimal(1.0)
     def beWithin(lower: BigDecimal, upper: BigDecimal): Matcher[BigDecimal] =
       be >= lower and be <= upper
@@ -511,10 +512,11 @@ object SpliceTests extends LazyLogging {
     def eventuallySucceeds[T](
         timeUntilSuccess: FiniteDuration = 20.seconds,
         maxPollInterval: FiniteDuration = 5.seconds,
+        suppressErrors: Boolean = true,
     )(testCode: => T): T = {
       eventually(timeUntilSuccess, maxPollInterval) {
         try {
-          loggerFactory.suppressErrors(testCode)
+          if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
         } catch {
           case e: TestFailedException => throw e
           case NonFatal(e) => fail(e)
@@ -571,6 +573,9 @@ object SpliceTests extends LazyLogging {
           Http().shutdownAllConnectionPools().map(_ => Done)
       }
     }
+
+    protected def splitwellDarPath =
+      s"daml/dars/splitwell-${InitialPackageVersions.initialPackageVersion(DarResources.splitwell)}.dar"
   }
 
   object BracketSynchronous {

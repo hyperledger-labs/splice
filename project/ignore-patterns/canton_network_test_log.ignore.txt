@@ -47,23 +47,23 @@ NoSuchFileException deleting temporal file.*selenium-manager
 # Trying to start a BiDi connection to Firefox repeatedly might fail some attempts with an 405 method not allowed
 Invalid Status code=405 text=Method Not Allowed","logger_name":"o.o.s.remote.http.WebSocket"
 
-# TODO(#7696) revisit after migration of tests to vitest
+# TODO(DACH-NY/canton-network-node#7696) revisit after migration of tests to vitest
 Trying to re-register template.*
 
 .*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 
-# TODO(#8300) Ignore errors related to global domain disconnection and reconnection after sequencers connections changed for now.
+# TODO(#979) Ignore errors related to global domain disconnection and reconnection after sequencers connections changed for now.
 # Revisit later to see if we can remove these.
 .*NOT_FOUND/UNKNOWN_INFORMEES.*The participant is not connected to any domain where the given informees are known.
 .*NOT_FOUND/SUBMISSION_DOMAIN_NOT_READY.*Trying to submit to a disconnected or not configured domain.
 
-# TODO(#8565): investigate and remove once fixed
+# TODO(#975): investigate and remove once fixed
 failed with UNKNOWN/channel closed.*SvAppLedgerApiConnectivityIntegrationTest
 
 # This might be logged between the test finishing and shutdown of the nodes (see #8991)
 Noticed an DsoRules epoch change.*DecentralizedSynchronizerMigrationIntegrationTest
 
-# TODO (#9979): this only applies to simtime.
+# TODO (#825): this only applies to simtime.
 # In simtime tests where the rounds are advanced too quickly, this trigger might not have enough time to receive the coupon.
 # Nevertheless, it is still useful to have the warning in production environments, where this should never happen.
 Skipped.*faucet coupons from last claimed round.*to current round
@@ -74,20 +74,20 @@ DB_CONNECTION_LOST.*Database health check failed to establish a valid connection
 # The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
 The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response
 
-# TODO (#9979): this only applies to simtime.
+# TODO (#825): this only applies to simtime.
 # Simtime failure, see https://github.com/DACH-NY/canton-network-node/issues/11998#issuecomment-2086304594
 INVALID_ARGUMENT.*SequencerTimeoutError
 
-# TODO (#12813): find a way to remove this
+# TODO (#758): find a way to remove this
 Encountered 4 consecutive transient failures \(polling interval .*
 
-# TODO (#13236): check if we can avoid such errors (they seem to happen when some HTTP API calls race with shutdowns)
+# TODO (#942): check if we can avoid such errors (they seem to happen when some HTTP API calls race with shutdowns)
 unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetrics
 
-# TODO (#13145): investigate what task is it still running and see if we can somehow fix it
+# TODO (#944): investigate what task is it still running and see if we can somehow fix it
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
-# TODO (#13985): we don't close cache metrics created by DbScanStoreMetrics
+# TODO (#939): we don't close cache metrics created by DbScanStoreMetrics
 Instrument daml.cache.* has recorded multiple values for the same attributes
 
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
@@ -95,10 +95,10 @@ Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 # internal selenium error. Potentially intermittent
 Exception managing firefox: error sending request for url .* http2 error: stream error received: refused stream before processing any application
 
-# TODO(#18150) - remove this
+# TODO(DACH-NY/canton-network-node#18150) - remove this
 Vetted state contains multiple entries
 
-# TODO(#17311) Remove conversion from future with shutdown to future
+# TODO(#645) Remove conversion from future with shutdown to future
 Splice unsafe shutdown future
 
 # Scan UI calls round-based endpoints that emit this error, even if we're only interested in the transaction log
@@ -108,12 +108,15 @@ Splice unsafe shutdown future
 .*CometBFT is not configured for this app.*
 
 # Expected during SV onboarding as we start scan and the sv app concurrently
-# TODO(#19670) maybe remove this again
+# TODO(#893) maybe remove this again
 Failed to read bft sequencers list from scan
 
 Failed to connect to scan of Digital-Asset-Eng-3.*AppUpgradeIntegrationTest
 
 # Ignore scan issues in disaster recovery tests as we don't start scan there
 Failed to connect to scan of .*DisasterRecoveryIntegrationTest
+
+# Ignore scan connection issues in reonboarding test.
+Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 
 # Make sure to have a trailing newline

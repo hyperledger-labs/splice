@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
 }
 import org.lfdecentralizedtrust.splice.environment.SpliceConsoleEnvironment
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
+  AllocateAmuletResponse,
   GetBuyTrafficRequestStatusResponse,
   GetTransferOfferStatusResponse,
   TransferInstructionResultResponse,
@@ -30,7 +31,10 @@ import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationv1,
+  transferinstructionv1,
+}
 
 abstract class WalletAppReference(
     override val spliceConsoleEnvironment: SpliceConsoleEnvironment,
@@ -544,6 +548,16 @@ abstract class WalletAppReference(
         HttpWalletAppClient.TokenStandard.WithdrawTransfer(contractId)
       )
     }
+
+  @Help.Summary("Creates an AmuletAllocation")
+  @Help.Description(
+    "Create an AmuletAllocation, which is an implementation of the Token Standard allocation for Amulet."
+  )
+  def allocateAmulet(spec: allocationv1.AllocationSpecification): AllocateAmuletResponse = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.AllocateAmulet(spec))
+    }
+  }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

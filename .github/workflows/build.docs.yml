@@ -4,8 +4,7 @@ on:
     inputs:
       commit_sha:
         type: string
-        required: false
-        default: ""
+        required: true
 
 jobs:
   docs:
@@ -38,30 +37,11 @@ jobs:
           # as it finishes fastest and we want to ensure that it includes test sources.
           cmd: "Test/compile docs/bundle"
 
-      # TODO(#1028): Reenable this
-      # - name: Push documentation
-      #   uses: ./.github/actions/nix/run_bash_command_in_nix
-      #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      #   env:
-      #     GH_USER: ${{ github.actor }}
-      #     GH_TOKEN: ${{ secrets.GH_ISSUES }}
-      #   with:
-      #     additional_nix_args: "--keep GH_USER --keep GH_TOKEN"
-      #     cmd: |
-      #       REPO_DIR="$(mktemp -d)"
-      #       export GIT_SSH_COMMAND="/usr/bin/ssh"
-      #       git config --global user.email "splice-maintainers@digitalasset.com"
-      #       git config --global user.name "DA Automation"
-      #       git clone https://$GH_USER:$GH_TOKEN@github.com/digital-asset/decentralized-canton-sync.git "$REPO_DIR" -b docs
-      #       # Given that we just wanna overwrite anything an rm + cp seems more straightforward than an rsync.
-      #       rm -rf "$REPO_DIR/docs"
-      #       cp -r "docs/html/html" "$REPO_DIR/docs"
-      #       # Required to make GH service the _static directory properly.
-      #       touch "$REPO_DIR/docs/.nojekyll"
-      #       cd "$REPO_DIR"
-      #       git add .
-      #       git commit -m 'Update documentation'
-      #       git push origin docs
+      - name: Upload documentation artifacts
+        uses: actions/upload-pages-artifact@2d163be3ddce01512f3eea7ac5b7023b5d643ce1
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        with:
+          path: docs/html/html
 
       - name: Post-SBT job
         uses: ./.github/actions/sbt/post_sbt

@@ -108,6 +108,14 @@ spec:
               value: {{ .Values.auth.audience | quote }}
             - name: SPLICE_APP_SV_AUTH_JWKS_URL
               value: {{ .Values.auth.jwksUrl | quote }}
+            {{ if (.Values.auth.jwks).connectionTimeout }}
+            - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
+              value: {{ .Values.auth.jwks.connectionTimeout | quote }}
+            {{ end }}
+            {{ if (.Values.auth.jwks).readTimeout }}
+            - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
+              value: {{ .Values.auth.jwks.readTimeout | quote }}
+            {{ end }}
             {{ if .Values.disableIngestUpdateHistoryFromParticipantBegin }}
             - name: ADDITIONAL_CONFIG_UPDATE_HISTORY_INGESTION
               value: |
@@ -151,7 +159,7 @@ spec:
                 canton.sv-apps.sv.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
             {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
-              #TODO(#15343) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
+              #TODO(#930) - switch to port 443 https://github.com/DACH-NY/canton/issues/23835
               value: |
                 canton.sv-apps.sv.local-synchronizer-node {
                   sequencer {

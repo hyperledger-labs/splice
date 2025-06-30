@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandExce
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.error.ErrorCodeUtils
+import com.digitalasset.canton.ledger.error.groups.RequestValidationErrors
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
   FutureUnlessShutdown,
@@ -63,7 +64,7 @@ final class RetryProvider(
 
   // Keep track of promises directly to avoid the promise accumulating references to stale futures that it should complete.
   // For more details check https://github.com/DACH-NY/canton-network-node/issues/9178
-  // TODO(#4405) Derive from FlagCloseable isClosing state.
+  // TODO(DACH-NY/canton-network-node#4405) Derive from FlagCloseable isClosing state.
   private val promisesRunningThatAreShutdownAware: java.util.Set[Promise[UnlessShutdown[?]]] =
     Collections.synchronizedSet(
       Collections.newSetFromMap(
@@ -576,7 +577,7 @@ object RetryProvider {
             val description = someDescription.getOrElse("No description provided")
             val errorCategory = someDescription.flatMap(ErrorCodeUtils.errorCategoryFromString)
             val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
-            val errorDetails = ErrorDetails.from(statusProto)
+            val errorDetails: Seq[ErrorDetails.ErrorDetail] = ErrorDetails.from(statusProto)
 
             def fatalError: ErrorKind = {
               logger.warn(
@@ -593,7 +594,15 @@ object RetryProvider {
               FatalErrorKind
             }
 
+            val isPruningError = errorDetails.exists {
+              case detail: ErrorDetails.ErrorInfoDetail =>
+                detail.errorCodeId == RequestValidationErrors.ParticipantPrunedDataAccessed.id
+              case _ => false
+            }
+
             errorCategory match {
+              // Pruning errors fall under FAILED_PRECONDITION which we usually retry but there is no chance to recover from it so we instead treat it as a fatal error.
+              case _ if isPruningError => fatalError
               case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
                 //  don't log the stack traces of transient gRPC exceptions to make the logs less noisy.
                 val msg =
@@ -608,7 +617,7 @@ object RetryProvider {
               case _
                   if retryableStatusCodes.contains(statusCode) ||
                     (
-                      // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
+                      // TODO(DACH-NY/canton-network-node#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
                       statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
                         "An error occurred. Please contact the operator and inquire about the request"
                       ) ||
@@ -621,7 +630,7 @@ object RetryProvider {
                         statusCode == Status.Code.INVALID_ARGUMENT &&
                         raw"The following stakeholders are not active on the target synchronizer".r
                           .findFirstMatchIn(description)
-                          .isDefined || // TODO(#10160) Remove this once Canton fixes the error code.
+                          .isDefined || // TODO(#822) Remove this once Canton fixes the error code.
                         (statusCode == Status.Code.INVALID_ARGUMENT &&
                           description.contains(
                             SequencerErrors.MaxSequencingTimeTooFar.id

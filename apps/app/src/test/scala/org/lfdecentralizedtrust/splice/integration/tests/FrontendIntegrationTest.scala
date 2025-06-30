@@ -5,8 +5,8 @@ import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   IntegrationTest,
   IntegrationTestWithSharedEnvironment,
-  TestCommon,
   SpliceTestConsoleEnvironment,
+  TestCommon,
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
@@ -26,18 +26,19 @@ import org.openqa.selenium.{
 import org.openqa.selenium.html5.WebStorage
 import org.openqa.selenium.json.{Json, JsonInput}
 import org.openqa.selenium.support.ui.{ExpectedCondition, ExpectedConditions, WebDriverWait}
-import org.scalatest.ParallelTestExecution
+import org.scalatest.{Assertion, ParallelTestExecution}
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
 import java.io.{File, StringReader}
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
-import java.time.Duration
+import java.time.{Duration, Instant, ZoneOffset}
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicLong
 import org.openqa.selenium.firefox.GeckoDriverService
 
+import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 import scala.concurrent.blocking
 import scala.concurrent.duration.*
@@ -308,19 +309,21 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   protected def clearWebDrivers(implicit ec: ExecutionContext) = {
     logger.info("Clearing web drivers")
-    webDrivers.values.toList.parTraverse { implicit webDriver =>
-      Future {
-        // Reset session storage so we see the login window again.
-        // You cannot reset session storage of about:blank so
-        // we exclude this.
-        if (currentUrl != "about:blank") {
-          webDriver.getSessionStorage().clear()
-          eventually() {
-            webDriver.getSessionStorage().keySet.asScala shouldBe empty
+    eventually(60.seconds) {
+      webDrivers.values.toList.parTraverse { implicit webDriver =>
+        Future {
+          // Reset session storage so we see the login window again.
+          // You cannot reset session storage of about:blank so
+          // we exclude this.
+          if (currentUrl != "about:blank") {
+            webDriver.getSessionStorage().clear()
+            eventually() {
+              webDriver.getSessionStorage().keySet.asScala shouldBe empty
+            }
           }
         }
-      }
-    }.futureValue
+      }.futureValue
+    }
     logger.info("Cleared web drivers")
   }
 
@@ -679,6 +682,37 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       }
     }
     clickOn(query)
+  }
+
+  private val DefaultDateTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+  def setDateTime(
+      party: String,
+      pickerId: String,
+      instant: Instant,
+      dateTimeFormat: DateTimeFormatter = DefaultDateTimeFormat,
+  )(implicit webDriver: WebDriverType): Assertion = {
+    setDateTime(party, pickerId, dateTimeFormat.format(instant.atOffset(ZoneOffset.UTC)))
+  }
+
+  def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
+      webDriver: WebDriverType
+  ): Assertion = {
+    clue(s"$party selects the date $dateTime") {
+      val dateTimePicker = webDriver.findElement(By.id(pickerId))
+      eventually() {
+        dateTimePicker.clear()
+        dateTimePicker.click()
+        // Typing in the "filler" characters can mess up the input badly
+        // Note: this breaks on Feb 29th because the date library validates that the day
+        // of the month is valid for the year you enter and because the year is entered
+        // one digit at a time that fails and it resets it to Feb 28th. Luckily,
+        // this does not happen very often …
+        dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
+        eventually()(
+          dateTimePicker.getAttribute("value").toLowerCase shouldBe dateTime.toLowerCase
+        )
+      }
+    }
   }
 }
 

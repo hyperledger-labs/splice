@@ -176,7 +176,14 @@ trait SplitwellTestUtil extends TestCommon with WalletTestUtil with TimeTestUtil
   ): AcceptedAppPayment.ContractId = {
     senderSplitwell.initiateTransfer(key, receiverAmounts)
     val request = eventually()(getSingleAppPaymentRequest(senderWallet))
-    senderWallet.acceptAppPaymentRequest(request.contractId)
+    val (cid, _) = actAndCheck(
+      "Sender accepts payment request",
+      senderWallet.acceptAppPaymentRequest(request.contractId),
+    )(
+      "Splitwell completes payment",
+      _ => senderWallet.listAcceptedAppPayments() should be(empty),
+    )
+    cid
   }
 
   protected def getSingleAppPaymentRequest(

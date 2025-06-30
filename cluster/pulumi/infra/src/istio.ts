@@ -21,11 +21,11 @@ import {
 import { clusterBasename, loadIPRanges } from './config';
 
 export const istioVersion = {
-  istio: '1.24.3',
+  istio: '1.26.1',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 243,
-    wasm: 200,
+    general: 259,
+    wasm: 216,
   },
 };
 
@@ -319,7 +319,7 @@ function configureGatewayService(
           },
         },
         autoscaling: {
-          maxReplicas: 10,
+          maxReplicas: 15,
         },
         podDisruptionBudget: {
           maxUnavailable: 1,
