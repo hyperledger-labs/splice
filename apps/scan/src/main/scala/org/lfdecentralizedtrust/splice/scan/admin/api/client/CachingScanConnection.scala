@@ -103,7 +103,7 @@ trait CachingScanConnection extends ScanConnection {
       case cacheO =>
         // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
         // requests that are not deduplicated against each other. We accept that as we expect low concurrency by default.
-        logger.debug(
+        logger.info(
           s"AmuletRules cache is empty or outdated, retrieving AmuletRules from CC scan."
         )
         for {
@@ -162,7 +162,7 @@ trait CachingScanConnection extends ScanConnection {
         case Some(ccr @ CachedAnsRules(_, ansRules)) if ccr.validAsOf(now, amuletRules) =>
           Future.successful(ansRules)
         case cacheO =>
-          logger.debug(
+          logger.info(
             s"ansRules cache is empty or outdated, retrieving AnsRules from CC scan."
           )
           for {
@@ -200,12 +200,12 @@ trait CachingScanConnection extends ScanConnection {
     val cache = cachedRounds.get()
     getAmuletRulesWithState().flatMap { amuletRules =>
       if (cache.validAsOf(now, amuletRules)) {
-        logger.info(
+        logger.debug(
           s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load ${cache.describeRounds}."
         )
         Future.successful(cache.getRoundTuple)
       } else {
-        logger.debug(
+        logger.info(
           s"querying the scan app for the latest round information because the cache expired at ${cache.cacheValidUntil}"
         )
         for {
