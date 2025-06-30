@@ -992,6 +992,32 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       appRewardBalance -> validatorRewardBalance
     }
 
+  /** Directly creates a new unclaimed reward. */
+  def createUnclaimedReward(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      amount: BigDecimal = BigDecimal(10),
+      synchronizerId: Option[SynchronizerId] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): amuletCodegen.UnclaimedReward.ContractId = {
+    val unclaimedReward =
+      new amuletCodegen.UnclaimedReward(
+        dsoParty.toProtoPrimitive,
+        amount.bigDecimal,
+      ).create
+    val created = participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(dsoParty),
+        readAs = Seq.empty,
+        update = unclaimedReward,
+        synchronizerId = synchronizerId,
+      )
+    created.contractId
+  }
+
+
   protected def retryCommandSubmission[T](f: => T) = {
     eventually() {
       try {

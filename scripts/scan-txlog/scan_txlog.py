@@ -3281,6 +3281,9 @@ class State:
 
         return HandleTransactionResult.empty()
 
+    def handle_allocate_unallocated_unclaimed_activity_record(self, transaction, event):
+        return self.handle_merge_unclaimed_rewards(transaction, event)
+
     def handle_claim_expired_rewards(self, transaction, event):
         assert len(event.child_event_ids) == 1
         amulet_rules_event = transaction.events_by_id[event.child_event_ids[0]]
@@ -3779,6 +3782,12 @@ class State:
             case "DsoRules_SetSynchronizerNodeConfig":
                 return HandleTransactionResult.empty()
             case "DsoRules_UpdateAmuletPriceVote":
+                return HandleTransactionResult.empty()
+            case "DsoRules_AllocateUnallocatedUnclaimedActivityRecord":
+                return self.handle_allocate_unallocated_unclaimed_activity_record(transaction, event)
+            case "DsoRules_ExpireUnallocatedUnclaimedActivityRecord":
+                return HandleTransactionResult.empty()
+            case "DsoRules_ExpireUnclaimedActivityRecord":
                 return HandleTransactionResult.empty()
             case "AmuletRules_Fetch":
                 return HandleTransactionResult.empty()

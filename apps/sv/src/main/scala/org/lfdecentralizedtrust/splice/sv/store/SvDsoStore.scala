@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_act
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_ConfirmSvOnboarding,
+  UnallocatedUnclaimedActivityRecord,
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding as so
@@ -615,6 +616,18 @@ trait SvDsoStore
       now: CantonTimestamp,
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleAnsSubscription]]
+
+  def listExpiredUnallocatedUnclaimedActivityRecord: ListExpiredContracts[
+    UnallocatedUnclaimedActivityRecord.ContractId,
+    UnallocatedUnclaimedActivityRecord,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(UnallocatedUnclaimedActivityRecord.COMPANION)
+
+  def listExpiredUnclaimedActivityRecord: ListExpiredContracts[
+    splice.amulet.UnclaimedActivityRecord.ContractId,
+    splice.amulet.UnclaimedActivityRecord,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.amulet.UnclaimedActivityRecord.COMPANION)
 
   def listSvOnboardingConfirmed(
       limit: Limit = Limit.DefaultLimit
@@ -1295,6 +1308,22 @@ object SvDsoStore {
       ) { contract =>
         DsoAcsStoreRowData(
           contract
+        )
+      },
+      mkFilter(splice.dsorules.UnallocatedUnclaimedActivityRecord.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+        )
+      },
+      mkFilter(splice.amulet.UnclaimedActivityRecord.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
         )
       },
     )
