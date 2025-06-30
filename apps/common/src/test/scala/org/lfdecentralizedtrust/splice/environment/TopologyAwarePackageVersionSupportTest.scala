@@ -110,12 +110,6 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
   "TopologyAwarePackageVersionSupport" should {
 
     testFeatureSupport(
-      "ValidatorLicenseMetadata",
-      DarResources.amulet_0_1_3,
-      packageVersionSupport.supportsValidatorLicenseMetadata,
-    )
-
-    testFeatureSupport(
       "ValidatorLicenseActivity",
       DarResources.amulet_0_1_3,
       packageVersionSupport.supportsValidatorLicenseActivity,

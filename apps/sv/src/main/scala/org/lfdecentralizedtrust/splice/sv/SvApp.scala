@@ -426,8 +426,6 @@ class SvApp(
             config,
             retryProvider,
             logger,
-            clock,
-            packageVersionSupport,
           )
         },
         // Ensure Daml-level invariants for the SV
@@ -527,7 +525,6 @@ class SvApp(
         cometBftClient,
         loggerFactory,
         config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
-        packageVersionSupport,
       )
 
       adminHandler = new HttpSvAdminHandler(
@@ -1186,8 +1183,6 @@ object SvApp {
       config: SvAppBackendConfig,
       retryProvider: RetryProvider,
       logger: TracedLogger,
-      clock: Clock,
-      packageVersionSupport: PackageVersionSupport,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val store = dsoStoreWithIngestion.store
     val svParty = store.key.svParty
@@ -1209,31 +1204,22 @@ object SvApp {
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
               val dsoParty = store.key.dsoParty
-              for {
-                validatorLicenseMetadataFeatureSupport <- packageVersionSupport
-                  .supportsValidatorLicenseMetadata(
-                    Seq(dsoParty, svParty),
-                    clock.now,
-                  )
-                cmd = dsoRules.exercise(
-                  _.exerciseDsoRules_OnboardValidator(
-                    svParty.toProtoPrimitive,
-                    svParty.toProtoPrimitive,
-                    Some(BuildInfo.compiledVersion)
-                      .filter(_ => validatorLicenseMetadataFeatureSupport.supported)
-                      .toJava,
-                    Some(config.contactPoint)
-                      .filter(_ => validatorLicenseMetadataFeatureSupport.supported)
-                      .toJava,
-                  )
+              val cmd = dsoRules.exercise(
+                _.exerciseDsoRules_OnboardValidator(
+                  svParty.toProtoPrimitive,
+                  svParty.toProtoPrimitive,
+                  Some(BuildInfo.compiledVersion).toJava,
+                  Some(config.contactPoint).toJava,
                 )
+              )
+
+              for {
                 _ <- dsoStoreWithIngestion.connection
                   .submit(
                     actAs = Seq(svParty),
                     readAs = Seq(dsoParty),
                     cmd,
                   )
-                  .withPreferredPackage(validatorLicenseMetadataFeatureSupport.packageIds)
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
                       "org.lfdecentralizedtrust.splice.sv.createSvValidatorLicense",
