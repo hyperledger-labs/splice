@@ -7,8 +7,12 @@ DECLARE
 SET as_of_record_time = PARSE_TIMESTAMP('%FT%TZ', '2025-06-26T00:00:00Z');
 SET migration_id = 3;
 
-WITH daml_TransferOutput_jsons AS (
-       SELECT JSON_QUERY_ARRAY(e.argument,
+WITH daml_Transfer_jsons AS (
+       SELECT JSON_VALUE(e.argument,
+                         -- .transfer.sender
+                         '$.record.fields[0].value.record.fields[0].value.party')
+              Transfer_sender,
+              JSON_QUERY_ARRAY(e.argument,
                                -- .transfer.outputs[]
                                '$.record.fields[0].value.record.fields[3].value.list.elements')
               TransferOutput_array
@@ -23,5 +27,5 @@ WITH daml_TransferOutput_jsons AS (
   SELECT DISTINCT JSON_VALUE(TransferOutput,
                              -- .receiver
                              '$.record.fields[0].value.party') party_id
-  FROM daml_TransferOutput_jsons src
+  FROM daml_Transfer_jsons src
        INNER JOIN UNNEST(src.TransferOutput_array) AS TransferOutput;
