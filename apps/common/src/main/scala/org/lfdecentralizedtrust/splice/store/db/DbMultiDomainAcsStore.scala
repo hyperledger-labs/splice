@@ -8,7 +8,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
@@ -62,6 +62,7 @@ import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescr
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
@@ -730,6 +731,48 @@ final class DbMultiDomainAcsStore[TXE](
             state.reassignmentUnassignId.contains(out.id)
           case _ => false
         }
+    }
+  }
+
+  override def listInterfaceViews[C, ICid <: ContractId[?], View <: DamlRecord[View]](
+      companion: C,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Seq[Contract[ICid, View]]] = waitUntilAcsIngested {
+    val interfaceId = companionClass.typeId(companion)
+    val opName = s"listInterfaceViews:${interfaceId.getEntityName}"
+    for {
+      rows <- storage.query(
+        sql"""
+             SELECT contract_id, interface_view
+             FROM interface_views_template interface
+               JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
+             WHERE interface_id = $interfaceId
+             ORDER BY interface.acs_event_number
+           """.as[(String, Json)],
+        opName,
+      )
+    } yield {
+      val limited = applyLimit(opName, limit, rows)
+      limited.map { case (contractId, viewJson) =>
+        companionClass
+          .fromJson(companion)(
+            interfaceId,
+            contractId,
+            viewJson,
+            ByteString.EMPTY,
+            java.time.Instant.now(),
+          )
+          .fold(
+            err =>
+              throw new IllegalStateException(
+                s"Stored a contract that cannot be decoded as interface view $interfaceId: $err"
+              ),
+            identity,
+          )
+      }
     }
   }
 

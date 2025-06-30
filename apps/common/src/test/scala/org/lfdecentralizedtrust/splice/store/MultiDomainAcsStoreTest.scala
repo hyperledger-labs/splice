@@ -844,7 +844,16 @@ abstract class MultiDomainAcsStoreTest[
         ) { contract =>
           d1.create(contract)
         }
-      } yield succeed
+        result <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )(MultiDomainAcsStore.interfaceCompanion, implicitly)
+      } yield {
+        result.map(
+          _.contractId.contractId
+        ) should contain theSameElementsAs ((includedAmulet ++ includedDummy).map(
+          _.contractId.contractId
+        ))
+      }
     }
   }
 }

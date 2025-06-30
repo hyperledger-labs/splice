@@ -228,6 +228,14 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       tc: TraceContext
   ): Future[Boolean]
 
+  def listInterfaceViews[C, ICid <: ContractId[?], View <: DamlRecord[View]](
+      companion: C,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Seq[Contract[ICid, View]]]
+
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
     */
@@ -566,6 +574,41 @@ object MultiDomainAcsStore {
           decoder: TemplateJsonDecoder
       ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
         Contract.fromHttp(typeId(companion), cId, decoder.decodeTemplate(companion))(
+          templateId,
+          payload,
+          createdEventBlob,
+          createdAt,
+        )
+      }
+    }
+
+  implicit def interfaceCompanion[ICid <: ContractId[Marker], Marker, View <: DamlRecord[View]]
+      : ContractCompanion[Contract.Companion.Interface[ICid, Marker, View], ICid, View] =
+    new ContractCompanion[Contract.Companion.Interface[ICid, Marker, View], ICid, View] {
+      override def fromCreatedEvent(
+          companion: Contract.Companion.Interface[ICid, Marker, View]
+      )(event: CreatedEvent): Option[Contract[ICid, View]] =
+        Contract.fromCreatedEvent(companion)(event)
+
+      override def typeId(companion: Contract.Companion.Interface[ICid, Marker, View]): Identifier =
+        companion.getTemplateIdWithPackageId
+
+      override def toContractId(
+          companion: Companion.Interface[ICid, Marker, View],
+          contractId: String,
+      ): ICid = companion.toContractId(new ContractId[Marker](contractId))
+
+      override protected def fromJson(
+          companion: Companion.Interface[ICid, Marker, View],
+          cId: ICid,
+          templateId: Identifier,
+          payload: Json,
+          createdEventBlob: ByteString,
+          createdAt: Instant,
+      )(implicit
+          decoder: TemplateJsonDecoder
+      ): Either[ProtoDeserializationError, Contract[ICid, View]] = {
+        Contract.fromHttp(typeId(companion), cId, decoder.decodeInterface(companion))(
           templateId,
           payload,
           createdEventBlob,
