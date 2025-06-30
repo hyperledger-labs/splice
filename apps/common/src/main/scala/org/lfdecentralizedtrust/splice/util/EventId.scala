@@ -21,11 +21,20 @@ object EventId {
     s"#$updateId:$nodeId"
   }
 
+  def updateIdFromEventId(eventId: String): String = {
+    splitEventIdOrFail(eventId)._1
+  }
+
   def nodeIdFromEventId(eventId: String): Int = {
+    splitEventIdOrFail(eventId)._2
+  }
+
+  private def splitEventIdOrFail(eventId: String): (String, Int) = {
     eventId.split(":") match {
-      case Array(_, nodeId) => nodeId.toInt
+      case Array(updateId, nodeId) => (updateId.drop(1) /*drop leading '#' */, nodeId.toInt)
       case _ => throw new IllegalArgumentException(s"Invalid eventId format: $eventId")
     }
+
   }
 
   // TODO(#640) - remove this conversion as it's costly

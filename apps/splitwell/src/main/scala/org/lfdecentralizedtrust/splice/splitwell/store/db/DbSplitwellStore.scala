@@ -61,6 +61,7 @@ class DbSplitwellStore(
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
       enableissue12777Workaround = false,
+      enableImportUpdateBackfill = false,
       BackfillingRequirement.BackfillingNotRequired,
     )
     with AcsTables

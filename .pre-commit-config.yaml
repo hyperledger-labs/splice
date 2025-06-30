@@ -88,3 +88,4 @@ repos:
        name: Check sphinx format
        args: [--report-level, WARNING]
        additional_dependencies: ['rstcheck[sphinx]']
+       args: [--report-level, WARNING]

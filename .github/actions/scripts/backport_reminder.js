@@ -16,14 +16,8 @@ async function getBranchesForCluster(deps, cluster) {
   const upgrade = config.synchronizerMigration.upgrade?.releaseReference.gitReference;
   const archived = config.synchronizerMigration.archived?.map((a) => a.releaseReference?.gitReference);
 
-  const envrc = await getFileFromGit(deps, `cluster/deployment/${cluster}/.envrc.vars`, 'main');
-  const regex = /export OVERRIDE_VERSION=["]?[0-9]+.[0-9]+.[0-9]+["]?/g;
-  const overrideVersion = envrc.match(regex)[0];
-  const cnVersion = overrideVersion.split('=')[1].replaceAll('"', '');
-  const cnVersionBranch = `refs/heads/release-line-${cnVersion}`;
-
   return {
-    cnVersion: cnVersionBranch,
+    cnVersion: active,
     active,
     upgrade,
     archived

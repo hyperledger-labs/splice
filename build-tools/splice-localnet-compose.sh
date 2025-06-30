@@ -35,7 +35,6 @@ ACTION=$1
 DOCKER_COMPOSE_CMD=( docker compose
     --env-file "$LOCALNET_DIR/compose.env"
     --env-file "$LOCALNET_DIR/env/common.env"
-    --env-file "$LOCALNET_DIR/env/local.env"
     -f "$LOCALNET_DIR/compose.yaml"
     -f "$LOCALNET_DIR/resource-constraints.yaml"
     --profile sv

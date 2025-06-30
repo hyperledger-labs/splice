@@ -14,6 +14,7 @@ export enum PulumiFunction {
   GCP_GET_PROJECT = 'gcp:organizations/getProject:getProject',
   GCP_GET_SUB_NETWORK = 'gcp:compute/getSubnetwork:getSubnetwork',
   GCP_GET_SECRET_VERSION = 'gcp:secretmanager/getSecretVersion:getSecretVersion',
+  GCP_GET_CLUSTER = 'gcp:container/getCluster:getCluster',
 }
 
 export class SecretsFixtureMap extends Map<string, Auth0ClientSecret> {
@@ -112,9 +113,6 @@ export const svRunbookAuth0Config = {
 export async function initDumpConfig(): Promise<void> {
   // DO NOT ADD NON SECRET VALUES HERE, ALL THE VALUES SHOULD BE DEFINED BY THE CLUSTER ENVIRONMENT in .envrc.vars
   // THIS IS REQUIRED TO ENSURE THAT THE DEPLOYMENT OPERATOR HAS THE SAME ENV AS A LOCAL RUN
-  if (!process.env.OPERATOR_IMAGE_VERSION) {
-    process.env.OPERATOR_IMAGE_VERSION = '0.0.1-deadbeef';
-  }
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_ID = 'mgmt';
   process.env.AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET = 's3cr3t';
   process.env.AUTH0_SV_MANAGEMENT_API_CLIENT_ID = 'mgmt';
@@ -179,6 +177,10 @@ export async function initDumpConfig(): Promise<void> {
               );
               break;
             }
+          case PulumiFunction.GCP_GET_CLUSTER:
+            return {
+              nodePools: [{ networkConfigs: [{ podIpv4CidrBlock: '10.160.0.0/16' }] }],
+            };
           case PulumiFunction.GCP_GET_SECRET_VERSION:
             if (args.inputs.secret.startsWith('sv') && args.inputs.secret.endsWith('-id')) {
               return {

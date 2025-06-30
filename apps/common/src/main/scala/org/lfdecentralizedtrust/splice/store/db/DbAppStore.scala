@@ -24,6 +24,7 @@ abstract class DbTxLogAppStore[TXE](
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     enableissue12777Workaround: Boolean,
+    enableImportUpdateBackfill: Boolean,
     backfillingRequired: BackfillingRequirement,
     oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
@@ -37,6 +38,7 @@ abstract class DbTxLogAppStore[TXE](
       domainMigrationInfo = domainMigrationInfo,
       participantId = participantId,
       enableissue12777Workaround = enableissue12777Workaround,
+      enableImportUpdateBackfill = enableImportUpdateBackfill,
       backfillingRequired,
       oHistoryMetrics = oHistoryMetrics,
     )
@@ -66,6 +68,7 @@ abstract class DbAppStore(
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     enableissue12777Workaround: Boolean,
+    enableImportUpdateBackfill: Boolean,
     backfillingRequired: BackfillingRequirement,
     oHistoryMetrics: Option[HistoryMetrics] = None,
 )(implicit
@@ -112,6 +115,7 @@ abstract class DbAppStore(
       backfillingRequired,
       loggerFactory,
       enableissue12777Workaround,
+      enableImportUpdateBackfill,
       oHistoryMetrics,
     )
 

@@ -52,7 +52,7 @@ EOF
   _update_cluster_config "$migration_config" "synchronizerMigration.$migration_type"
 }
 
-subcommand_whitelist[update_active_version]='Upgrade the version of the active migration id including CHARTS_VERSION'
+subcommand_whitelist[update_active_version]='Upgrade the version of the active migration id'
 
 function subcmd_update_active_version() {
     local cluster_directory
@@ -66,8 +66,6 @@ function subcmd_update_active_version() {
     else
         cluster_directory="${DEPLOYMENT_DIR}/${TARGET_CLUSTER}"
     fi
-    set -x
-    sed -i "s/^export CHARTS_VERSION=.*$/export CHARTS_VERSION=\"$1\"/" "$cluster_directory/.envrc.vars"
 }
 
 subcommand_whitelist[update_config_to_migrate]='Upgrade the cluster config.yaml to migrate cluster'

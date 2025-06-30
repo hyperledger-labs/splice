@@ -616,7 +616,7 @@
   },
   {
     "custom": true,
-    "id": "projects/da-cn-devnet/secrets/dns01-sa-key-secret/versions/1",
+    "id": "projects/da-cn-devnet/secrets/dns01-sa-key-secret/versions/latest",
     "inputs": {},
     "name": "dns01-sa-key-secret",
     "provider": "",
@@ -635,7 +635,7 @@
         "deployment_alerts.yaml": "apiVersion: 1\ngroups:\n    - orgId: 1\n      name: deployments\n      folder: canton-network\n      interval: 1m\n      rules:\n        - uid: adkhl6u18pqtce\n          title: Failing Stacks\n          condition: D\n          data:\n            - refId: A\n              relativeTimeRange:\n                from: 300\n                to: 0\n              datasourceUid: prometheus\n              model:\n                datasource:\n                    type: prometheus\n                    uid: prometheus\n                editorMode: code\n                exemplar: true\n                expr: splice_deployment_pulumi_stack_status{state=\"failed\"}\n                format: time_series\n                instant: true\n                interval: \"\"\n                intervalMs: 30000\n                legendFormat: stacks_active\n                maxDataPoints: 43200\n                range: false\n                refId: A\n            - refId: D\n              relativeTimeRange:\n                from: 300\n                to: 0\n              datasourceUid: __expr__\n              model:\n                conditions:\n                    - evaluator:\n                        params:\n                            - 0\n                        type: gt\n                      operator:\n                        type: and\n                      query:\n                        params:\n                            - D\n                      reducer:\n                        params: []\n                        type: last\n                      type: query\n                datasource:\n                    type: __expr__\n                    uid: __expr__\n                expression: A\n                intervalMs: 1000\n                maxDataPoints: 43200\n                refId: D\n                type: threshold\n          dashboardUid: QP_wDqDnz\n          panelId: 11\n          noDataState: OK\n          execErrState: OK\n          for: 5m\n          annotations:\n            __dashboardUid__: QP_wDqDnz\n            __panelId__: \"11\"\n            description: The pulumi operator failed to update the {{ $labels.stack }} stack. Check the logs for the deployment.\n            runbook_url: \"\"\n            severity: critical\n            summary: '{{ $labels.stack }} stack failed to update'\n          labels:\n            \"\": \"\"\n          isPaused: false\n        - uid: bdndg5g3x4kxsf\n          title: Deployments running\n          condition: A\n          data:\n            - refId: A\n              relativeTimeRange:\n                from: 300\n                to: 0\n              datasourceUid: prometheus\n              model:\n                editorMode: code\n                expr: splice_deployment_pulumi_stack_condition{type=\"Reconciling\"}\n                instant: true\n                intervalMs: 1000\n                legendFormat: __auto\n                maxDataPoints: 43200\n                range: false\n                refId: A\n          dashboardUid: QP_wDqDnz\n          panelId: 27\n          noDataState: OK\n          execErrState: Alerting\n          for: 5m\n          annotations:\n            __dashboardUid__: QP_wDqDnz\n            __panelId__: \"27\"\n            description: A deployment is currently running for the {{ $labels.stack }} stack.\n            runbook_url: \"\"\n            severity: info\n            summary: Stack {{ $labels.stack }} is being updated\n          labels:\n            \"\": \"\"\n          isPaused: false\n",
         "extra_k8s_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: storage\n    folder: k8s\n    interval: 5m\n    rules:\n      - uid: adlrbu5kog0sga\n        title: KubePersistentVolumeTooFull\n        condition: free_space_below_threshold\n        data:\n          - refId: free_space\n            relativeTimeRange:\n              from: 360\n              to: 0\n            datasourceUid: prometheus\n            model:\n              editorMode: code\n              expr: kubelet_volume_stats_available_bytes{job=\"kubelet\",metrics_path=\"/metrics\",namespace=~\".*\"} / kubelet_volume_stats_capacity_bytes{job=\"kubelet\",metrics_path=\"/metrics\",namespace=~\".*\"}\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: free_space\n          - refId: free_space_below_threshold\n            relativeTimeRange:\n              from: 360\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0.15\n                      - 0\n                    type: lt\n                  operator:\n                    type: and\n                  query:\n                    params: []\n                  reducer:\n                    params: []\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: free_space\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: free_space_below_threshold\n              type: threshold\n        dashboardUid: 919b92a8e8041bd567af9edab12c840c\n        panelId: 2\n        noDataState: Alerting\n        execErrState: Alerting\n        for: 5m\n        annotations:\n          __dashboardUid__: 919b92a8e8041bd567af9edab12c840c\n          __panelId__: \"2\"\n          severity: warning\n          description: The PersistentVolume claimed by {{ index $labels \"persistentvolumeclaim\" }} in Namespace {{ index $labels \"namespace\" }} is running out of disk space. Currently {{ humanizePercentage (index $values \"free_space\").Value }} is available.\n          runbook_url: https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepersistentvolumefillingup\n          summary: PersistentVolume is too full.\n        isPaused: false\n",
         "load-tester_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: load-tester\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: a1dbc4e8-7941-4351-9a14-f8573fd2be2b\n        title: K6 Request Failure Rate Exceeded\n        condition: D\n        data:\n          - refId: A\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: sum(k6_http_reqs_total)\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: A\n              useBackend: false\n          - refId: B\n            relativeTimeRange:\n              from: 300\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              disableTextWrap: false\n              editorMode: builder\n              expr: sum(k6_http_reqs_total{expected_response=\"false\"}) or on() vector(0)\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: B\n              useBackend: false\n          - refId: C\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: []\n                  reducer:\n                    params: []\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: ($B / $A) * 100\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: math\n          - refId: D\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 50\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: []\n                  reducer:\n                    params: []\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: C\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: D\n              type: threshold\n        noDataState: Alerting\n        execErrState: Alerting\n        for: 1m\n        annotations:\n          description: ''\n          runbook_url: ''\n          summary: The k6 load tester experienced HTTP request failures at a rate past the acceptable threshold\n        labels:\n          gcloud_filter: ''\n        isPaused: false\n      - uid: ddogbytusmz9cb\n        title: K6 Throughput Below Threshold\n        condition: C\n        data:\n          - refId: A\n            relativeTimeRange:\n              from: 3600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: rate(k6_transfers_completed_total{scenario=\"generate_load\"}[$__rate_interval])\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: A\n              useBackend: false\n          - refId: C\n            relativeTimeRange:\n              from: 3600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0.123\n                    type: lt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: B\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: C\n              type: threshold\n          - refId: B\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0\n                      - 0\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params: []\n                  reducer:\n                    params: []\n                    type: avg\n                  type: query\n              datasource:\n                name: Expression\n                type: __expr__\n                uid: __expr__\n              expression: A\n              hide: false\n              reducer: mean\n              refId: B\n              type: reduce\n        dashboardUid: ccbb2351-2ae2-462f-ae0e-f2c893ad1028\n        panelId: 28\n        noDataState: Alerting\n        execErrState: Alerting\n        for: 1m\n        annotations:\n          __dashboardUid__: ccbb2351-2ae2-462f-ae0e-f2c893ad1028\n          __panelId__: \"28\"\n          severity: warning\n          description: ''\n          runbook_url: ''\n          summary: Transaction rate from the k6 load tester is lower than expected threshold\n        labels:\n          '': ''\n        isPaused: false\n",
-        "mining-rounds_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: mining-rounds\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: ae74w21qca2o0e\n        title: Mining Rounds Not Advancing\n        condition: No new round\n        data:\n          - refId: Round number diff\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: min(max(max_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace) - min(min_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace))\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: Round number diff\n              useBackend: false\n          - refId: No new round\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0.1\n                    type: lt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n                  unloadEvaluator:\n                    params:\n                      - 0.9\n                    type: gt\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Round number diff\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: No new round\n              type: threshold\n        dashboardUid: ed94a332-4fa7-47f8-982b-fc997381175b\n        panelId: 1\n        noDataState: Alerting\n        execErrState: OK\n        for: 1m\n        annotations:\n          __dashboardUid__: ed94a332-4fa7-47f8-982b-fc997381175b\n          __panelId__: \"1\"\n          runbook_url: \"\"\n          summary: \"The open mining rounds have not advanced in the last 30m\"\n          description: 'None of our SV apps have seen the open mining round advancing in the last 30m. Either all of our SVs or a high enough number of SVs to break BFT guarantees are failing'\n          severity: critical\n        labels:\n          priority: high\n        isPaused: false\n",
+        "mining-rounds_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: mining-rounds\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: ae74w21qca2o0e\n        title: Mining Rounds Not Advancing\n        condition: No new round\n        data:\n          - refId: Round number diff\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              disableTextWrap: false\n              editorMode: builder\n              expr: max(max(max_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace) - min(min_over_time(splice_sv_dso_store_latest_open_mining_round[30m])) by (namespace))\n              fullMetaSearch: false\n              includeNullMetadata: true\n              instant: true\n              intervalMs: 1000\n              legendFormat: __auto\n              maxDataPoints: 43200\n              range: false\n              refId: Round number diff\n              useBackend: false\n          - refId: No new round\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 0.1\n                    type: lt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n                  unloadEvaluator:\n                    params:\n                      - 0.9\n                    type: gt\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Round number diff\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: No new round\n              type: threshold\n        dashboardUid: ed94a332-4fa7-47f8-982b-fc997381175b\n        panelId: 1\n        noDataState: Alerting\n        execErrState: OK\n        for: 1m\n        annotations:\n          __dashboardUid__: ed94a332-4fa7-47f8-982b-fc997381175b\n          __panelId__: \"1\"\n          runbook_url: \"\"\n          summary: \"The open mining rounds have not advanced in the last 30m\"\n          description: 'None of our SV apps have seen the open mining round advancing in the last 30m. Either all of our SVs or a high enough number of SVs to break BFT guarantees are failing'\n          severity: critical\n        labels:\n          priority: high\n        isPaused: false\n",
         "notification_policies.yaml": "apiVersion: 1\npolicies:\n  - orgId: 1\n    receiver: cn-ci-channel-notification\n    routes:\n      - receiver: cn-ci-channel-high-prio-notification\n        object_matchers:\n          - - priority\n            - '='\n            - high\n        group_wait: 30s\n        group_interval: 30m\n        repeat_interval: 4h\n        continue: true\n      - receiver: cn-ci-channel-notification\n        group_wait: 30s\n        group_interval: 30m\n        repeat_interval: 4h\n",
         "sv-status-report_alerts.yaml": "apiVersion: 1\ngroups:\n  - orgId: 1\n    name: sv status reports\n    folder: canton-network\n    interval: 1m\n    rules:\n      - uid: adlmhpz5iv4sgc\n        title: Report Creation Time Lag\n        condition: No recent report\n        data:\n          - refId: Report time lag\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: prometheus\n            model:\n              datasource:\n                type: prometheus\n                uid: prometheus\n              editorMode: code\n              expr: time() - max by (report_publisher) (splice_sv_status_report_creation_time_us{namespace=~\".*\", report_publisher=~\".*\", canton_version=~\".*\"}) / 1000000\n              instant: false\n              interval: \"\"\n              intervalMs: 30000\n              legendFormat: '{{report_publisher}}'\n              maxDataPoints: 43200\n              range: true\n              refId: Report time lag\n          - refId: Latest report time lag\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params: []\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - B\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Report time lag\n              intervalMs: 1000\n              maxDataPoints: 43200\n              reducer: last\n              refId: Latest report time lag\n              settings:\n                mode: dropNN\n              type: reduce\n          - refId: No recent report\n            relativeTimeRange:\n              from: 600\n              to: 0\n            datasourceUid: __expr__\n            model:\n              conditions:\n                - evaluator:\n                    params:\n                      - 300\n                    type: gt\n                  operator:\n                    type: and\n                  query:\n                    params:\n                      - C\n                  reducer:\n                    params: []\n                    type: last\n                  type: query\n              datasource:\n                type: __expr__\n                uid: __expr__\n              expression: Latest report time lag\n              intervalMs: 1000\n              maxDataPoints: 43200\n              refId: No recent report\n              type: threshold\n        dashboardUid: cdlm6c7fn7vuod\n        panelId: 18\n        noDataState: Alerting\n        execErrState: Alerting\n        for: 5m\n        annotations:\n          __dashboardUid__: cdlm6c7fn7vuod\n          __panelId__: \"18\"\n          severity: critical\n          description: The SV {{ $labels.report_publisher }} has not submitted a status report recently\n          runbook_url: \"\"\n          summary: Status report creation time lag too high\n        labels:\n          \"team\": \"support\"\n        isPaused: false\n",
         "templates.yaml": "# config file version\napiVersion: 1\n\n# List of templates to import or update\n# source https://community.grafana.com/t/working-configuration-example-for-alerts-templating-telegram-and-slack/80988\ntemplates:\n  - name: slack\n    template: |\n      {{ define \"slack_title\" }}\n        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}\n        {{- range .Alerts.Firing -}}\n          {{- if eq .Annotations.severity \"critical\" -}}\n            {{- $hasCritical = true -}}\n          {{- else if eq .Annotations.severity \"warning\" -}}\n            {{- $hasWarning = true -}}\n          {{- else if eq .Annotations.severity \"info\" -}}\n            {{- $hasInfo = true -}}\n          {{- else -}}\n            {{- $hasOthers = true -}}\n          {{- end -}}\n        {{- end -}}\n\n        mock\n        {{ if gt (len .Alerts.Firing) 0 }}\n          {{- if $hasCritical }}\n          🔥 {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing\n          {{- else if $hasWarning }}\n          ⚠️ {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing\n          {{- else }}\n          :information_source: {{ len .Alerts.Firing }} Alert{{ if gt (len .Alerts.Firing) 1 }}s{{ end }} firing\n          {{- end }}\n        {{ end }}\n        {{ if gt (len .Alerts.Resolved) 0 }} ✅ {{ len .Alerts.Resolved }} alert(s) resolved {{ end }}\n      {{ end }}\n\n      {{ define \"slack_message\" }}\n        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}\n        {{- range .Alerts.Firing -}}\n          {{- if eq .Annotations.severity \"critical\" -}}\n            {{- $hasCritical = true -}}\n          {{- else if eq .Annotations.severity \"warning\" -}}\n            {{- $hasWarning = true -}}\n          {{- else if eq .Annotations.severity \"info\" -}}\n            {{- $hasInfo = true -}}\n          {{- else -}}\n            {{- $hasOthers = true -}}\n          {{- end -}}\n        {{- end -}}\n        {{ if $hasCritical }} 🔥Critical alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity \"critical\" -}} {{ template \"slack_alert_firing\" .}} {{ end }} {{ end }} {{ end }}\n        {{ if $hasWarning }} ⚠️Warning alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity \"warning\" -}} {{ template \"slack_alert_firing\" .}} {{ end }} {{ end }} {{ end }}\n        {{ if $hasInfo }} :information_source:Info alerts {{ range .Alerts.Firing }} {{- if eq .Annotations.severity \"info\" -}} {{ template \"slack_alert_firing\" .}} {{ end }} {{ end }} {{ end }}\n        {{ if $hasOthers }} Other alerts {{ range .Alerts.Firing }} {{- if and (and (ne .Annotations.severity \"info\")  (ne .Annotations.severity \"warning\")) (ne .Annotations.severity \"critical\") -}} {{ template \"slack_alert_firing\" . }} {{ end }} {{ end }} {{ end }}\n        {{ if gt (len .Alerts.Resolved) 0 }} ✅Resolved Alerts {{ range .Alerts.Resolved }} {{ template \"slack_alert_resolved\" .}} {{ end }} {{ end }}\n      {{ end }}\n\n      {{ define \"slack_alert_firing\" }}\n        *{{ .Labels.alertname }}*\n        {{ .Annotations.summary }}\n        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}\n        {{- if .Labels.service }}\n        Service: {{ .Labels.service }}\n        {{- end }}\n        {{ template \"slack_gcloud_log_link\" . }}\n      {{ end }}\n\n      {{ define \"slack_alert_resolved\" }}\n        *{{ .Labels.alertname }}*\n        {{ if .Annotations.severity }}{{ .Annotations.severity }}{{ end }}\n        {{ .Annotations.summary }}\n        {{ if .Annotations.description }}{{ .Annotations.description }}{{ end }}\n      {{ end }}\n\n      {{ define \"slack_gcloud_log_link\" }}<https://console.cloud.google.com/logs/query;startTime={{ (.StartsAt.Add -600000000000).UTC.Format \"2006-01-02T15:04:05Z\"  }};endTime={{ (.StartsAt.Add 600000000000).UTC.Format \"2006-01-02T15:04:05Z\"  }};query=resource.labels.cluster_name%3D%22cn-mocknet%22%0A{{ .Labels.gcloud_filter }}?project=da-cn-devnet|cloud logs>{{ end }}\n\n      {{ define \"slack_color\" -}}\n        {{ $hasCritical := false }}{{ $hasWarning := false }}{{ $hasInfo := false }}{{ $hasOthers := false }}\n        {{- range .Alerts.Firing -}}\n          {{- if eq .Annotations.severity \"critical\" -}}\n            {{- $hasCritical = true -}}\n          {{- else if eq .Annotations.severity \"warning\" -}}\n            {{- $hasWarning = true -}}\n          {{- else if eq .Annotations.severity \"info\" -}}\n            {{- $hasInfo = true -}}\n          {{- else -}}\n            {{- $hasOthers = true -}}\n          {{- end -}}\n        {{- end -}}\n        {{ if eq .Status \"firing\" -}}\n          {{ if $hasCritical -}}\n            danger\n          {{- else if $hasWarning -}}\n            warning\n          {{- else -}}\n            #439FE0\n          {{- end -}}\n        {{ else -}}\n          good\n        {{- end }}\n      {{- end }}\n\n      {{ define \"support_email_message\" }}\n      [ MAINNET-DA2-SVN-CRITICAL-ALERT 9f2b7e1a-4c3d-58b9-9f1e-df9c4a5b6e7d ]\n      {{ if gt (len .Alerts.Firing) 0 }}**Firing**\n      {{ template \"__text_alert_list\" .Alerts.Firing }}{{ if gt (len .Alerts.Resolved) 0 }}\n      {{ end }}{{ end }}{{ if gt (len .Alerts.Resolved) 0 }}**Resolved**\n      {{ template \"__text_alert_list\" .Alerts.Resolved }}{{ end }}{{ end }}\n",
@@ -1107,6 +1107,132 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-allow-0",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "action": "ALLOW",
+        "rules": [
+          {
+            "from": [
+              {
+                "source": {
+                  "remoteIpBlocks": [
+                    "<internal IPs>",
+                    "1.2.3.4/32",
+                    "5.6.7.8/32",
+                    "11.12.13.14/32",
+                    "4.3.2.1/32",
+                    "8.7.6.5/32",
+                    "8.7.6.4/32",
+                    "9.8.7.6/32",
+                    "11.22.33.45/32",
+                    "12.34.56.78/32",
+                    "10.160.0.0/16"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-allow-0",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-allow-public-0",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "action": "ALLOW",
+        "rules": [
+          {
+            "from": [
+              {
+                "source": {
+                  "remoteIpBlocks": [
+                    "0.0.0.0/0"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress-public"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-allow-public-0",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-deny-all-public",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress-public"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-deny-all-public",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "istio-access-policy-deny-all",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "selector": {
+          "matchLabels": {
+            "app": "istio-ingress"
+          }
+        }
+      }
+    },
+    "name": "istio-access-policy-deny-all",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "base",
       "compat": "true",
       "maxHistory": 10,
@@ -1321,16 +1447,7 @@
         "service": {
           "externalTrafficPolicy": "Local",
           "loadBalancerSourceRanges": [
-            "<internal IPs>",
-            "1.2.3.4/32",
-            "5.6.7.8/32",
-            "11.12.13.14/32",
-            "4.3.2.1/32",
-            "8.7.6.5/32",
-            "8.7.6.4/32",
-            "9.8.7.6/32",
-            "11.22.33.45/32",
-            "12.34.56.78/32"
+            "0.0.0.0/0"
           ],
           "ports": [
             {
@@ -1446,186 +1563,6 @@
               "port": 6201,
               "protocol": "TCP",
               "targetPort": 6201
-            },
-            {
-              "name": "cometbft-0-0-gw",
-              "port": 26006,
-              "protocol": "TCP",
-              "targetPort": 26006
-            },
-            {
-              "name": "cometbft-0-1-gw",
-              "port": 26016,
-              "protocol": "TCP",
-              "targetPort": 26016
-            },
-            {
-              "name": "cometbft-0-2-gw",
-              "port": 26026,
-              "protocol": "TCP",
-              "targetPort": 26026
-            },
-            {
-              "name": "cometbft-0-3-gw",
-              "port": 26036,
-              "protocol": "TCP",
-              "targetPort": 26036
-            },
-            {
-              "name": "cometbft-0-4-gw",
-              "port": 26046,
-              "protocol": "TCP",
-              "targetPort": 26046
-            },
-            {
-              "name": "cometbft-0-5-gw",
-              "port": 26056,
-              "protocol": "TCP",
-              "targetPort": 26056
-            },
-            {
-              "name": "cometbft-0-6-gw",
-              "port": 26066,
-              "protocol": "TCP",
-              "targetPort": 26066
-            },
-            {
-              "name": "cometbft-0-7-gw",
-              "port": 26076,
-              "protocol": "TCP",
-              "targetPort": 26076
-            },
-            {
-              "name": "cometbft-0-8-gw",
-              "port": 26086,
-              "protocol": "TCP",
-              "targetPort": 26086
-            },
-            {
-              "name": "cometbft-0-9-gw",
-              "port": 26096,
-              "protocol": "TCP",
-              "targetPort": 26096
-            },
-            {
-              "name": "cometbft-1-0-gw",
-              "port": 26106,
-              "protocol": "TCP",
-              "targetPort": 26106
-            },
-            {
-              "name": "cometbft-1-1-gw",
-              "port": 26116,
-              "protocol": "TCP",
-              "targetPort": 26116
-            },
-            {
-              "name": "cometbft-1-2-gw",
-              "port": 26126,
-              "protocol": "TCP",
-              "targetPort": 26126
-            },
-            {
-              "name": "cometbft-1-3-gw",
-              "port": 26136,
-              "protocol": "TCP",
-              "targetPort": 26136
-            },
-            {
-              "name": "cometbft-1-4-gw",
-              "port": 26146,
-              "protocol": "TCP",
-              "targetPort": 26146
-            },
-            {
-              "name": "cometbft-1-5-gw",
-              "port": 26156,
-              "protocol": "TCP",
-              "targetPort": 26156
-            },
-            {
-              "name": "cometbft-1-6-gw",
-              "port": 26166,
-              "protocol": "TCP",
-              "targetPort": 26166
-            },
-            {
-              "name": "cometbft-1-7-gw",
-              "port": 26176,
-              "protocol": "TCP",
-              "targetPort": 26176
-            },
-            {
-              "name": "cometbft-1-8-gw",
-              "port": 26186,
-              "protocol": "TCP",
-              "targetPort": 26186
-            },
-            {
-              "name": "cometbft-1-9-gw",
-              "port": 26196,
-              "protocol": "TCP",
-              "targetPort": 26196
-            },
-            {
-              "name": "cometbft-2-0-gw",
-              "port": 26206,
-              "protocol": "TCP",
-              "targetPort": 26206
-            },
-            {
-              "name": "cometbft-2-1-gw",
-              "port": 26216,
-              "protocol": "TCP",
-              "targetPort": 26216
-            },
-            {
-              "name": "cometbft-2-2-gw",
-              "port": 26226,
-              "protocol": "TCP",
-              "targetPort": 26226
-            },
-            {
-              "name": "cometbft-2-3-gw",
-              "port": 26236,
-              "protocol": "TCP",
-              "targetPort": 26236
-            },
-            {
-              "name": "cometbft-2-4-gw",
-              "port": 26246,
-              "protocol": "TCP",
-              "targetPort": 26246
-            },
-            {
-              "name": "cometbft-2-5-gw",
-              "port": 26256,
-              "protocol": "TCP",
-              "targetPort": 26256
-            },
-            {
-              "name": "cometbft-2-6-gw",
-              "port": 26266,
-              "protocol": "TCP",
-              "targetPort": 26266
-            },
-            {
-              "name": "cometbft-2-7-gw",
-              "port": 26276,
-              "protocol": "TCP",
-              "targetPort": 26276
-            },
-            {
-              "name": "cometbft-2-8-gw",
-              "port": 26286,
-              "protocol": "TCP",
-              "targetPort": 26286
-            },
-            {
-              "name": "cometbft-2-9-gw",
-              "port": 26296,
-              "protocol": "TCP",
-              "targetPort": 26296
             },
             {
               "name": "cometbft-3-0-gw",
@@ -1983,7 +1920,7 @@
     "id": "",
     "inputs": {
       "description": "Logs with a severity level of warning or above",
-      "filter": "severity>=WARNING\nresource.type=\"k8s_container\"\nresource.labels.cluster_name=\"cn-mocknet\"\n-- Note that we ignore the validator runbook. This is because we reset it periodically, which sometimes produces noise.\nresource.labels.namespace_name=~\"sv|validator1|multi-validator|splitwell\"\n-(resource.labels.container_name=~\"participant\" AND jsonPayload.message=~\"Instrument .* has recorded multiple values for the same attributes.\")\n-- https://github.com/DACH-NY/canton-network-node/issues/10475\n-(resource.labels.container_name=\"cometbft\" AND\n  (   jsonPayload.err=~\"\\Aerror adding vote\\z|\\Aalready stopped\\z|use of closed network connection\"\n   OR jsonPayload._msg=~\"\\A(Stopping peer for error|Stopped accept routine, as transport is closed|Failed to write PacketMsg|Connection failed @ sendRoutine)\\z\"\n   OR jsonPayload.error=\"already stopped\"\n   OR textPayload=\"cp: not replacing '/cometbft/data/priv_validator_state.json'\"\n   OR (jsonPayload._msg=\"Error stopping connection\" AND jsonPayload.err=\"already stopped\")\n   OR jsonPayload._msg=\"Error adding peer to new bucket\"))\n-- execution context overload\n-jsonPayload.message=~\"Task runner canton-env-ec is .* overloaded\"\n-- on startup\n-textPayload=~\"Picked up JAVA_TOOL_OPTIONS:\"\n-- \\A and \\z anchor a search (=~) at beginning/end of string, respectively\n-- regex is significantly faster than OR; gcp docs themselves recommend\n-- regex-based factoring\n-resource.labels.container_name=~\"\\A(ans|wallet|scan|sv|splitwell)-web-ui\\z\"\n-- sequencer down\n-(resource.labels.namespace_name=~\"validator|splitwell\"\n  AND resource.labels.container_name=~\"participant\"\n  AND jsonPayload.message=~\"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Sequencer shutting down|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE\")\n-(resource.labels.container_name=\"postgres-exporter\" AND jsonPayload.msg=~\"Error loading config|Excluded databases\")\n-jsonPayload.message=~\"UnknownHostException\"\n-(resource.labels.container_name=~\"participant|mediator\" AND jsonPayload.message=~\"Late processing \\(or clock skew\\) of batch\")\n-(resource.labels.container_name=\"sequencer\" AND jsonPayload.stack_trace=~\"UnresolvedAddressException\")\n-(resource.labels.container_name=\"sequencer-pg\" AND\n  (\"checkpoints are occurring too frequently\" OR \"Consider increasing the configuration parameter \\\"max_wal_size\\\".\"))\n-(resource.labels.container_name=~\"participant\" AND\n  jsonPayload.message=~\"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has (missing|extra) recipients|LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients|channel.*shutdown did not complete gracefully in allotted|LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK.*: UnvettedPackages\")\n-(resource.labels.container_name=\"mediator\" AND\n  jsonPayload.message=~\"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*(Reason: (Missing root hash message for informee participants|Superfluous root hash message)|Received a (mediator|confirmation) response.*with an invalid root hash)\")\n-(jsonPayload.logger_name=~\"c.d.n.a.AdminAuthExtractor:\" AND jsonPayload.message=~\"Authorization Failed\")\n-(jsonPayload.level=\"error\" AND jsonPayload.msg=~\"/readyz\")\n-- The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938\n-jsonPayload.message=\"The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response.\"\n-- istio-proxy is spammy with warnings\n-(resource.labels.container_name=\"istio-proxy\" AND severity<ERROR)\n-resource.labels.container_name=\"postgres\"\n-(resource.labels.container_name=~\"postgres\" AND resource.labels.namespace_name=\"multi-validator\")\n-- TODO(DACH-NY/canton-network-internal#412): Remove this once we have improved our sv onboarding logic\n-(resource.labels.container_name=\"sv-app\" AND jsonPayload.stack_trace=~\"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node\")\n-- TODO(#695): Don't just ignore this - investigate!\n-(resource.labels.container_name=\"splitwell-app\" AND jsonPayload.message=~\"Waiting for domain Domain 'global' to be connected has not completed after\")\n-- TODO(#911): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher\n-(jsonPayload.message=~\"signalWhenIngested.* has not completed after .* milliseconds\")\n\n-- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection\n-(jsonPayload.\"span-name\"=\"MergeValidatorLicenseContractsTrigger\" AND (severity=WARNING OR \"has not vetted\"))\n-(jsonPayload.\"error-code\"=~\"ACS_COMMITMENT_MISMATCH\" AND jsonPayload.remote=~\"tw-cn-testnet-participant\")\n\n\n-- TODO(DACH-NY/canton-network-node#19192): suppressed faulty validator warnings until timestamp\n-(resource.labels.container_name=\"participant\"\n  AND resource.labels.namespace_name=\"sv-1\"\n  AND jsonPayload.message=~\"ACS_COMMITMENT_MISMATCH\"\n  AND jsonPayload.remote=~\"sender = PAR::tw-cn-testnet-participant-1::122051b3a160\"\n  AND timestamp <= \"2025-05-14T09:00:00.000Z\")\n",
+      "filter": "severity>=WARNING\nresource.type=\"k8s_container\"\nresource.labels.cluster_name=\"cn-mocknet\"\n-- Note that we ignore the validator runbook. This is because we reset it periodically, which sometimes produces noise.\nresource.labels.namespace_name=~\"sv|validator1|multi-validator|splitwell\"\n-(resource.labels.container_name=~\"participant\" AND jsonPayload.message=~\"Instrument .* has recorded multiple values for the same attributes.\")\n-- https://github.com/DACH-NY/canton-network-node/issues/10475\n-(resource.labels.container_name=\"cometbft\" AND\n  (   jsonPayload.err=~\"\\Aerror adding vote\\z|\\Aalready stopped\\z|use of closed network connection\"\n   OR jsonPayload._msg=~\"\\A(Stopping peer for error|Stopped accept routine, as transport is closed|Failed to write PacketMsg|Connection failed @ sendRoutine)\\z\"\n   OR jsonPayload.error=\"already stopped\"\n   OR textPayload=\"cp: not replacing '/cometbft/data/priv_validator_state.json'\"\n   OR (jsonPayload._msg=\"Error stopping connection\" AND jsonPayload.err=\"already stopped\")\n   OR jsonPayload._msg=\"Error adding peer to new bucket\"))\n-- execution context overload\n-jsonPayload.message=~\"Task runner canton-env-ec is .* overloaded\"\n-- on startup\n-textPayload=~\"Picked up JAVA_TOOL_OPTIONS:\"\n-- \\A and \\z anchor a search (=~) at beginning/end of string, respectively\n-- regex is significantly faster than OR; gcp docs themselves recommend\n-- regex-based factoring\n-resource.labels.container_name=~\"\\A(ans|wallet|scan|sv|splitwell)-web-ui\\z\"\n-- sequencer down\n-(resource.labels.namespace_name=~\"validator|splitwell\"\n  AND resource.labels.container_name=~\"participant\"\n  AND jsonPayload.message=~\"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Sequencer shutting down|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE\")\n-(resource.labels.container_name=\"postgres-exporter\" AND jsonPayload.msg=~\"Error loading config|Excluded databases\")\n-jsonPayload.message=~\"UnknownHostException\"\n-(resource.labels.container_name=~\"participant|mediator\" AND jsonPayload.message=~\"Late processing \\(or clock skew\\) of batch\")\n-(resource.labels.container_name=\"sequencer\" AND jsonPayload.stack_trace=~\"UnresolvedAddressException\")\n-(resource.labels.container_name=\"sequencer-pg\" AND\n  (\"checkpoints are occurring too frequently\" OR \"Consider increasing the configuration parameter \\\"max_wal_size\\\".\"))\n-(resource.labels.container_name=~\"participant\" AND\n  jsonPayload.message=~\"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has (missing|extra) recipients|LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients|channel.*shutdown did not complete gracefully in allotted|LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK.*: UnvettedPackages\")\n-(resource.labels.container_name=\"mediator\" AND\n  jsonPayload.message=~\"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*(Reason: (Missing root hash message for informee participants|Superfluous root hash message)|Received a (mediator|confirmation) response.*with an invalid root hash)\")\n-(jsonPayload.logger_name=~\"c.d.n.a.AdminAuthExtractor:\" AND jsonPayload.message=~\"Authorization Failed\")\n-(jsonPayload.level=\"error\" AND jsonPayload.msg=~\"/readyz\")\n-- The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938\n-jsonPayload.message=\"The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response.\"\n-- istio-proxy is spammy with warnings\n-(resource.labels.container_name=\"istio-proxy\" AND severity<ERROR)\n-resource.labels.container_name=\"postgres\"\n-(resource.labels.container_name=~\"postgres\" AND resource.labels.namespace_name=\"multi-validator\")\n-- TODO(DACH-NY/canton-network-internal#412): Remove this once we have improved our sv onboarding logic\n-(resource.labels.container_name=\"sv-app\" AND jsonPayload.stack_trace=~\"io.grpc.StatusRuntimeException: FAILED_PRECONDITION: UNHANDLED_EXCEPTION.*SV party has not yet operated a node\")\n-- TODO(#695): Don't just ignore this - investigate!\n-(resource.labels.container_name=\"splitwell-app\" AND jsonPayload.message=~\"Waiting for domain Domain 'global' to be connected has not completed after\")\n-- TODO(#911): Our apps can't handle ingesting bursts of transactions after delays due to the record order publisher\n-(jsonPayload.message=~\"signalWhenIngested.* has not completed after .* milliseconds\")\n\n-- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection\n-(jsonPayload.\"span-name\"=\"MergeValidatorLicenseContractsTrigger\" AND (severity=WARNING OR \"has not vetted\"))\n-(jsonPayload.\"error-code\"=~\"ACS_COMMITMENT_MISMATCH\" AND jsonPayload.remote=~\"tw-cn-testnet-participant\")\n\n\n\n",
       "labelExtractors": {
         "cluster": "EXTRACT(resource.labels.cluster_name)",
         "namespace": "EXTRACT(resource.labels.namespace_name)"

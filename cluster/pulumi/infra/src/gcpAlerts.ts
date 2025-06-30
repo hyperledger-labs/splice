@@ -116,13 +116,23 @@ ${conditionalString(
     '))'
 )}
 ${conditionalString(
-  !isMainNet && !isDevNet,
-  `-- TODO(DACH-NY/canton-network-node#19192): suppressed faulty validator warnings until timestamp
--(resource.labels.container_name="participant"
+  isMainNet,
+  `-- TODO(DACH-NY/cn-test-failures#4768): suppressed faulty validator warnings until timestamp
+-(resource.labels.container_name="participant-1"
   AND resource.labels.namespace_name="sv-1"
   AND jsonPayload.message=~"ACS_COMMITMENT_MISMATCH"
-  AND jsonPayload.remote=~"sender = PAR::tw-cn-testnet-participant-1::122051b3a160"
-  AND timestamp <= "2025-05-14T09:00:00.000Z")
+  AND (
+    jsonPayload.remote=~"sender = PAR::tw-cn-mainnet-participant-1::1220bc64ba15"
+    OR jsonPayload.remote=~"sender = PAR::northisland-prod1::12204ef1928f"
+  )
+  AND timestamp <= "2025-07-14T00:00:00.000Z")
+`
+)}
+${conditionalString(
+  // making this condition more complicated causes GCP to be unable to parse the query because there's too many filters
+  isDevNet,
+  `-- TODO(hyperledger-labs/splice#447): remove this once configured cardinality is respected
+  -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
 `
 )}`,
     labelExtractors: {

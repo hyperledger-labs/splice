@@ -13,7 +13,7 @@ import {
 } from 'splice-pulumi-common';
 
 import { spliceEnvConfig } from '../config/envConfig';
-import { operatorDeploymentConfig } from './config';
+import { operatorDeploymentConfig, PulumiOperatorGracePeriod } from './config';
 import { GitFluxRef } from './flux-source';
 
 export type EnvRefs = { [key: string]: unknown };
@@ -360,6 +360,7 @@ function createStackCRV2(
             metadata: {
               name: `${name.replaceAll('.', '-')}`,
               namespace: namespaceName,
+              deletionGracePeriodSeconds: PulumiOperatorGracePeriod,
             },
             spec: {
               image: `pulumi/pulumi:${semver.gt(pulumiVersion, minimumPulumiVersionRequired) ? pulumiVersion : minimumPulumiVersionRequired}-nonroot`,
@@ -408,6 +409,7 @@ function createStackCRV2(
               podTemplate: {
                 spec: {
                   ...infraAffinityAndTolerations,
+                  terminationGracePeriodSeconds: PulumiOperatorGracePeriod,
                   volumes: [
                     {
                       name: 'gcp-credentials',

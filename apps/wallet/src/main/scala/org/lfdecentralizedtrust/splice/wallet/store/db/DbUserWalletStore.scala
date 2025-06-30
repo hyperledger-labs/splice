@@ -97,6 +97,7 @@ class DbUserWalletStore(
       domainMigrationInfo,
       participantId,
       enableissue12777Workaround = true,
+      enableImportUpdateBackfill = false,
       BackfillingRequirement.BackfillingNotRequired,
     )
     with UserWalletStore

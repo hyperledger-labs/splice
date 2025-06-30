@@ -11,6 +11,31 @@ Release Notes
 Upcoming
 --------
 
+- Docs
+
+  - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
+  - Add relevant links to the new application developer documentation pages published by Digital Asset at
+    https://docs.digitalasset.com/build/3.3/.
+
+0.4.3
+-----
+
+- Validator
+
+  - Fix a `bug (#1216) <https://github.com/hyperledger-labs/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
+    if the receiver's provider party was featured.
+  - Fix a bug where uploading dars would not immediately vet the dependencies that had a vetting entry effective in the future.
+  - Fix a `bug (#1215)  <https://github.com/hyperledger-labs/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
+
+- Synchronizer Migrations
+
+  - Fix a rare bug where a crash of the validator or SV while trying
+    to restore the data after a migration could result in an
+    inconsistent state being restore.
+
+0.4.2
+-----
+
 - SV
 
   - Add official support for :ref:`operating an SV participant with keys managed by an external Key Management Service (KMS) <sv-kms>`.
@@ -19,14 +44,14 @@ Upcoming
 
   - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
   - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
-  - `/v2/updates` endpoints are now available on the Scan app, `/v1/updates` endpoints are deprecated.
-    The `/v2/updates` endpoints no longer return the `offset` field in responses,
-    and `events_by_id` are now lexicographically ordered by ID for conveniently viewing JSON results.
 
 - Scan
 
   - Fix a bug where the ``/v0/holdings/summary`` endpoint would return incomplete results when the requested parties had more than 1000 holdings.
     Additionally, that endpoint and ``/v0/holdings/state`` will now fail if an empty list of parties is provided.
+  - ``/v2/updates`` endpoints are now available on the Scan app, ``/v1/updates`` endpoints are deprecated.
+    The ``/v2/updates`` endpoints no longer return the ``offset`` field in responses,
+    and ``events_by_id`` are now lexicographically ordered by ID for conveniently viewing JSON results.
 
 - Mediator
 
@@ -39,6 +64,10 @@ Upcoming
     consistent with the :ref:`documented
     <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
     `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
+
+- Auth
+
+  - Added an option to override the default connection and read timeouts for the JWKS URL when using ``auth.algorithm="rs-256"``.
 
 0.4.1
 -----
