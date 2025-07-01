@@ -136,4 +136,3 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
     loop(rewards, Seq.empty, BigDecimal(0))
   }
 }
- 
