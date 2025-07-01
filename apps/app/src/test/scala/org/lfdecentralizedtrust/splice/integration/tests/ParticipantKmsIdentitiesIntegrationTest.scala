@@ -31,12 +31,12 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
       .addConfigTransforms(
         (_, conf) => ConfigTransforms.bumpCantonPortsBy(22_000)(conf),
         (_, conf) => ConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
-        // comment this to generate a fresh dump with fresh keys
         (_, conf) =>
           updateAllValidatorConfigs { case (name, c) =>
             if (name == "aliceValidator") {
               c.copy(
                 domains = c.domains.copy(extra = Seq.empty),
+                // comment this to generate a fresh dump with fresh keys
                 participantBootstrappingDump = Some(
                   ParticipantBootstrapDumpConfig
                     .File(
@@ -98,8 +98,8 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
           "EXTRA_PARTICIPANT_DB" -> ("participant_extra_" + dbsSuffix),
           "KMS_TYPE" -> "gcp",
           "KMS_LOCATION_ID" -> "us-central1",
-          "KMS_PROJECT_ID" -> "da-cn-shared",
-          "KMS_KEY_RING_ID" -> "kms-ci",
+          "KMS_PROJECT_ID" -> "da-cn-splice",
+          "KMS_KEY_RING_ID" -> "integration-tests",
         ),
       )() {
         startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
@@ -169,8 +169,8 @@ class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with Stand
       )(
         "KMS_TYPE" -> "gcp",
         "KMS_LOCATION_ID" -> "us-central1",
-        "KMS_PROJECT_ID" -> "da-cn-shared",
-        "KMS_KEY_RING_ID" -> "kms-ci",
+        "KMS_PROJECT_ID" -> "da-cn-splice",
+        "KMS_KEY_RING_ID" -> "integration-tests",
       ) {
         startAllSync(sv1Backend, sv1ScanBackend, sv1ValidatorBackend)
 
