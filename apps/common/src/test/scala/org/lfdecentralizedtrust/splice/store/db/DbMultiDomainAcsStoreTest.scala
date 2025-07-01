@@ -412,7 +412,8 @@ class DbMultiDomainAcsStoreTest
     } yield ()
   }
 
-  case class BobbyTablesRowData(contract: Contract[?, ?]) extends AcsRowData {
+  case class BobbyTablesRowData(contract: Contract[?, ?])
+      extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq(

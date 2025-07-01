@@ -4,19 +4,41 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.util.Contract
 import slick.jdbc.{PositionedParameters, SetParameter}
 
+import java.time.Instant
+
 trait AcsRowData {
-  val contract: Contract[?, ?]
+  val identifier: Identifier
+  val contractId: ContractId[?]
+  val payload: Json
+  val createdEventBlob: ByteString
+  val createdAt: Instant
   def contractExpiresAt: Option[Timestamp]
   def indexColumns: Seq[(String, IndexColumnValue[?])]
 }
 
 object AcsRowData {
-  case class AcsRowDataFromInterface(contract: Contract[?, ?]) extends AcsRowData {
+  trait AcsRowDataFromContract extends AcsRowData {
+    val contract: Contract[?, ?]
+    override val identifier: Identifier = contract.identifier
+    override val contractId: ContractId[?] = contract.contractId
+    override val payload: Json = AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload)
+    override val createdEventBlob: ByteString = contract.createdEventBlob
+    override val createdAt: Instant = contract.createdAt
+  }
+  case class AcsRowDataFromInterface(
+      identifier: Identifier,
+      contractId: ContractId[?],
+      payload: Json,
+      createdEventBlob: ByteString,
+      createdAt: Instant,
+  ) extends AcsRowData {
     override def contractExpiresAt: Option[Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty

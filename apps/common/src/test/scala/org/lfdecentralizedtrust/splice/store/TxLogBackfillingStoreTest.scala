@@ -502,7 +502,7 @@ class TxLogBackfillingStoreTest
       ),
     )
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData {
+  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty

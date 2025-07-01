@@ -26,7 +26,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
-import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsRowData}
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes, AcsRowData}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
@@ -39,7 +39,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
@@ -304,7 +304,7 @@ object MultiDomainAcsStore {
 
     def matchingInterfaceRows(
         ev: CreatedEvent
-    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])]
+    )(implicit elc: ErrorLoggingContext): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])]
 
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
@@ -365,10 +365,15 @@ object MultiDomainAcsStore {
       ],
   ) extends ContractFilter[R, IR] {
 
-    // TODO(#829) Drop this once the ledger API exposes package names
-    // on the read path.
-    private val templateFiltersWithoutPackageNames =
-      templateFilters.view.map { case (name, filter) =>
+    private val templateFiltersWithoutPackageNames = filtersWithoutPackageNames(templateFilters)
+
+    private val interfaceFiltersWithoutPackageNames = filtersWithoutPackageNames(interfaceFilters)
+
+    // TODO(#829) Drop this once the ledger API exposes package names on the read path.
+    private def filtersWithoutPackageNames[F](
+        filters: Map[PackageQualifiedName, F]
+    ): Map[QualifiedName, F] =
+      filters.view.map { case (name, filter) =>
         name.qualifiedName -> filter
       }.toMap
 
@@ -404,16 +409,26 @@ object MultiDomainAcsStore {
 
     override def matchingInterfaceRows(
         ev: CreatedEvent
-    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])] = {
-      val contract = AcsRowData.AcsRowDataFromInterface(
-        Contract(
-          ev.getTemplateId,
-          new ContractId[DamlRecord[?]](ev.getContractId),
-          ev.getArguments,
-          ev.getCreatedEventBlob,
-          ev.getCreatedAt,
-        )
+    )(implicit elc: ErrorLoggingContext): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])] = {
+      val acsRowData = AcsRowData.AcsRowDataFromInterface(
+        ev.getTemplateId,
+        new ContractId[DamlRecord[?]](ev.getContractId),
+        AcsJdbcTypes.payloadJsonFromJavaApiDamlRecord(ev.getArguments),
+        ev.getCreatedEventBlob,
+        ev.getCreatedAt,
       )
+      val interfaceRowDatas = for {
+        (identifier, _) <- ev.getInterfaceViews.asScala
+        interfaceFilter <- interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier))
+        result <- interfaceFilter.matchingContractToRow(ev)
+      } yield result
+      // TODO: handle interface computation errors
+
+      if (interfaceRowDatas.isEmpty) {
+        None
+      } else {
+        Some(acsRowData -> interfaceRowDatas.toSeq)
+      }
     }
 
     override def isStakeholderOf(ev: CreatedEvent): Boolean = {

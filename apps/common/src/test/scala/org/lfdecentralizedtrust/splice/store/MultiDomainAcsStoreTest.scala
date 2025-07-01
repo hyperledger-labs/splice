@@ -19,6 +19,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.MonadUtil
+import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 
@@ -41,13 +42,16 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData {
+  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
 
-  case class GenericInterfaceRowData() extends AcsInterfaceViewRowData {
+  case class GenericInterfaceRowData(
+      override val interfaceId: Identifier,
+      override val interfaceView: Json,
+  ) extends AcsInterfaceViewRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
   }
 
@@ -68,7 +72,14 @@ abstract class MultiDomainAcsStoreTest[
         // will include both Amulet & DummyHolding
         mkFilterInterface(holdingv1.Holding.INTERFACE)(
           _.payload.instrumentId.admin == dsoParty.toProtoPrimitive
-        )(_ => GenericInterfaceRowData())
+        )(contract =>
+          GenericInterfaceRowData(
+            contract.identifier,
+            io.circe.parser
+              .parse(contract.payload.toJson)
+              .valueOrFail(s"Failed to parse interface payload of $contract"),
+          )
+        )
       ),
     )
   }
