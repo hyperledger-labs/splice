@@ -86,19 +86,19 @@ runs:
             sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
             sudo mkdir -p /etc/nix
             sudo chmod a+rw /etc/nix
-            if [[ "${{ inputs.oss_only }}" != true ]]; then
+            if [[ "${{ inputs.oss_only }}" == true ]]; then
+              echo "Using OSS only dependencies, not setting up Artifactory credentials"
+            else
               cat <<EOF > /etc/nix/netrc
               machine digitalasset.jfrog.io
               login ${{ inputs.artifactory_user }}
               password ${{ inputs.artifactory_password }}
           EOF
-            else
-              echo "Using OSS only dependencies, not setting up Artifactory credentials"
             fi
             export USER=$(whoami)
             echo "Running nix.sh"
             . ~/.nix-profile/etc/profile.d/nix.sh
-            if [[ "${{ inputs.oss_only }}" != true ]]; then
+            if [[ "${{ inputs.oss_only }}" == true ]]; then
               target="oss"
             else
               target="default"
