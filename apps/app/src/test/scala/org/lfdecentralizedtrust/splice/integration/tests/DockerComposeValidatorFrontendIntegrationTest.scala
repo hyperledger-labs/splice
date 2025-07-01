@@ -309,7 +309,7 @@ class DockerComposeValidatorFrontendIntegrationTest
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
-        userLoggedInAndHasBalance("administrator", adminTap)
+        userLoggedInAndHasBalance("da-ComposeValidator-1::", adminTap)
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
           "admin@compose-validator.com",
