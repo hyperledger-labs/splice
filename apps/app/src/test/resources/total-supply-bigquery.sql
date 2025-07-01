@@ -34,13 +34,13 @@ SET
   SELECT
     COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, path))), 0)
   FROM
-    experiment_dataset.creates c
+    mainnet_da2_scan.scan_sv_1_update_history_creates c
   WHERE
     NOT EXISTS (
     SELECT
       TRUE
     FROM
-      experiment_dataset.exercises e
+      mainnet_da2_scan.scan_sv_1_update_history_exercises e
     WHERE
       (e.migration_id < migration_id
         OR (e.migration_id = migration_id
@@ -138,7 +138,7 @@ SET
     + PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputValidatorRewardAmount))
     + PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputSvRewardAmount)))
 FROM
-  experiment_dataset.exercises e
+  mainnet_da2_scan.scan_sv_1_update_history_exercises e
 WHERE
   e.choice = 'AmuletRules_Transfer'
   AND e.template_id_module_name = 'Splice.AmuletRules'
@@ -209,7 +209,7 @@ CREATE TEMP FUNCTION burned(
                   SUM(result_burn(e.choice,
                                   e.result)) fees
               FROM
-                  experiment_dataset.exercises e
+                  mainnet_da2_scan.scan_sv_1_update_history_exercises e
               WHERE
                   ((e.choice IN ('AmuletRules_BuyMemberTraffic',
                                  'AmuletRules_Transfer',
@@ -226,8 +226,8 @@ CREATE TEMP FUNCTION burned(
               SELECT
                   SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, '$.record.fields[2].value.record.fields[0].value.numeric'))) fees -- .amount.initialAmount
               FROM
-                  experiment_dataset.exercises e,
-                  experiment_dataset.creates c
+                  mainnet_da2_scan.scan_sv_1_update_history_exercises e,
+                  mainnet_da2_scan.scan_sv_1_update_history_creates c
               WHERE
                   ((e.choice = 'SubscriptionInitialPayment_Collect'
                       AND e.template_id_entity_name = 'SubscriptionInitialPayment'
