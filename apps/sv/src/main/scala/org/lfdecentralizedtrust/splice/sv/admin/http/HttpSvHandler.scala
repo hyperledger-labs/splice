@@ -60,7 +60,6 @@ class HttpSvHandler(
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
     isBftSequencer: Boolean,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     ec: ExecutionContext,
     protected val tracer: Tracer,
@@ -749,18 +748,13 @@ class HttpSvHandler(
     for {
       dsoRules <- dsoStore.getDsoRules()
       now = clock.now
-      validatorLicenseMetadataFeatureSupport <- packageVersionSupport
-        .supportsValidatorLicenseMetadata(
-          Seq(svParty, candidateParty, dsoParty),
-          now,
-        )
       cmds = Seq(
         dsoRules.exercise(
           _.exerciseDsoRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
-            version.filter(_ => validatorLicenseMetadataFeatureSupport.supported).toJava,
-            contactPoint.filter(_ => validatorLicenseMetadataFeatureSupport.supported).toJava,
+            version.toJava,
+            contactPoint.toJava,
           )
         ),
         validatorOnboarding.exercise(
@@ -770,7 +764,6 @@ class HttpSvHandler(
       _ <- dsoStoreWithIngestion.connection
         .submit(Seq(svParty), Seq(dsoParty), cmds)
         .withSynchronizerId(dsoRules.domain)
-        .withPreferredPackage(validatorLicenseMetadataFeatureSupport.packageIds)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()
