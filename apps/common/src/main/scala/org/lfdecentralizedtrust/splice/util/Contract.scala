@@ -244,14 +244,16 @@ object Contract {
     */
   private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
-      ev: CreatedEvent,
+      identifier: Identifier,
+      createdEventBlob: ByteString,
+      createdAt: Instant,
   ): Contract[TCid, T] = {
     Contract(
-      identifier = contract.getContractTypeId,
+      identifier = identifier,
       contractId = contract.id,
       payload = contract.data,
-      createdEventBlob = ev.getCreatedEventBlob(),
-      createdAt = ev.createdAt,
+      createdEventBlob = createdEventBlob,
+      createdAt = createdAt,
     )
   }
 
@@ -260,7 +262,7 @@ object Contract {
   )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(fromCodegenContract(_, ev))
+      .map(fromCodegenContract(_, ev.getTemplateId, ev.getCreatedEventBlob, ev.createdAt))
   }
 
   def fromCreatedEvent[ICid <: ContractId[Marker], Marker, View <: DamlRecord[View]](
@@ -268,6 +270,13 @@ object Contract {
   )(ev: CreatedEvent): Option[Contract[ICid, View]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(fromCodegenContract(_, ev))
+      .map(contract =>
+        fromCodegenContract(
+          contract,
+          contract.getContractTypeId,
+          ev.getCreatedEventBlob,
+          ev.createdAt,
+        )
+      )
   }
 }
