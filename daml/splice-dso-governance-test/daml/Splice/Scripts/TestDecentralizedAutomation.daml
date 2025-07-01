@@ -184,6 +184,16 @@ testRequiredNumOfConfirmation = do
   confirmations <- query @Confirmation dso
   length confirmations === 3
 
+  -- test that expiry is checked
+  passTime (minutes 5)
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid
+    DsoRules_ExecuteConfirmedAction with
+      action
+      amuletRulesCid = Some amuletRulesCid
+      confirmationCids
+      sv = Some sv1
+  passTime (negate (minutes 5))
+
   -- There are 4 SVs in total, which implies f = 1 and thus 3 confirmations are required.
   submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
     DsoRules_ExecuteConfirmedAction with

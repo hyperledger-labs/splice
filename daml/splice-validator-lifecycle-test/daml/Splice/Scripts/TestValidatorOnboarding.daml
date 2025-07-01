@@ -44,6 +44,7 @@ testValidatorOnboardingExpire : Script ()
 testValidatorOnboardingExpire = do
 
   sv <- allocateParty "sv"
+  validator <- allocateParty "validator"
 
   let secret = "test"
   now <- getTime
@@ -53,6 +54,7 @@ testValidatorOnboardingExpire = do
 
   passTime(days 2)
 
+  _ <- submitMustFail sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Match "test" validator)
   _ <- submit sv $ exerciseCmd onboarding $ (ValidatorOnboarding_Expire)
 
   return ()
