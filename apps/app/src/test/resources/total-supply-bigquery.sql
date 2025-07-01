@@ -100,25 +100,25 @@ CREATE TEMP FUNCTION minted(
     as_of_record_time timestamp,
     migration_id int64
   ) RETURNS bignumeric AS ((
-SELECT
-  SUM(PARSE_BIGNUMERIC(JSON_VALUE(e.result,
-                                  -- .inputAppRewardAmount
-                                  TransferResult_summary('[0].value.numeric')))
-    + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
-                                  -- .inputValidatorRewardAmount
-                                  TransferResult_summary('[1].value.numeric')))
-    + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
-                                  -- .inputSvRewardAmount
-                                  TransferResult_summary('[2].value.numeric'))))
-FROM
-  mainnet_da2_scan.scan_sv_1_update_history_exercises e
-WHERE
-  e.choice = 'AmuletRules_Transfer'
-  AND e.template_id_module_name = 'Splice.AmuletRules'
-  AND e.template_id_entity_name = 'AmuletRules'
-  AND (e.migration_id < migration_id
-    OR (e.migration_id = migration_id
-      AND e.record_time <= UNIX_MICROS(as_of_record_time)))));
+  SELECT
+    SUM(PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+                                    -- .inputAppRewardAmount
+                                    TransferResult_summary('[0].value.numeric')))
+      + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+                                    -- .inputValidatorRewardAmount
+                                    TransferResult_summary('[1].value.numeric')))
+      + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+                                    -- .inputSvRewardAmount
+                                    TransferResult_summary('[2].value.numeric'))))
+  FROM
+    mainnet_da2_scan.scan_sv_1_update_history_exercises e
+  WHERE
+    e.choice = 'AmuletRules_Transfer'
+    AND e.template_id_module_name = 'Splice.AmuletRules'
+    AND e.template_id_entity_name = 'AmuletRules'
+    AND (e.migration_id < migration_id
+      OR (e.migration_id = migration_id
+        AND e.record_time <= UNIX_MICROS(as_of_record_time)))));
 
 
 -- fees from a Splice.AmuletRules:TransferResult
@@ -171,45 +171,45 @@ CREATE TEMP FUNCTION burned(
     as_of_record_time timestamp,
                               migration_id_arg int64
   ) RETURNS bignumeric AS ((
-    SELECT
-        SUM(fees)
-    FROM ((
-              SELECT
-                  SUM(result_burn(e.choice,
-                                  e.result)) fees
-              FROM
-                  mainnet_da2_scan.scan_sv_1_update_history_exercises e
-              WHERE
-                  ((e.choice IN ('AmuletRules_BuyMemberTraffic',
-                                 'AmuletRules_Transfer',
-                                 'AmuletRules_CreateTransferPreapproval',
-                                 'AmuletRules_CreateExternalPartySetupProposal')
-                      AND e.template_id_entity_name = 'AmuletRules')
-                      OR (e.choice = 'TransferPreapproval_Renew'
-                          AND e.template_id_entity_name = 'TransferPreapproval'))
-                AND e.template_id_module_name = 'Splice.AmuletRules'
-                AND (e.migration_id < migration_id_arg
-                  OR (e.migration_id = migration_id_arg
-                      AND e.record_time <= UNIX_MICROS(as_of_record_time))))
-          UNION ALL (-- Purchasing ANS Entries
-              SELECT
-                  SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, '$.record.fields[2].value.record.fields[0].value.numeric'))) fees -- .amount.initialAmount
-              FROM
-                  mainnet_da2_scan.scan_sv_1_update_history_exercises e,
-                  mainnet_da2_scan.scan_sv_1_update_history_creates c
-              WHERE
-                  ((e.choice = 'SubscriptionInitialPayment_Collect'
-                      AND e.template_id_entity_name = 'SubscriptionInitialPayment'
-                      AND c.contract_id = JSON_VALUE(e.result, '$.record.fields[2].value.contractId')) -- .amulet
-                      OR (e.choice = 'SubscriptionPayment_Collect'
-                          AND e.template_id_entity_name = 'SubscriptionPayment'
-                          AND c.contract_id = JSON_VALUE(e.result, '$.record.fields[1].value.contractId'))) -- .amulet
-                AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
-                AND c.template_id_module_name = 'Splice.Amulet'
-                AND c.template_id_entity_name = 'Amulet'
-                AND (e.migration_id < migration_id_arg
-                  OR (e.migration_id = migration_id_arg
-                      AND e.record_time <= UNIX_MICROS(as_of_record_time)))))));
+  SELECT
+      SUM(fees)
+  FROM ((
+            SELECT
+                SUM(result_burn(e.choice,
+                                e.result)) fees
+            FROM
+                mainnet_da2_scan.scan_sv_1_update_history_exercises e
+            WHERE
+                ((e.choice IN ('AmuletRules_BuyMemberTraffic',
+                               'AmuletRules_Transfer',
+                               'AmuletRules_CreateTransferPreapproval',
+                               'AmuletRules_CreateExternalPartySetupProposal')
+                    AND e.template_id_entity_name = 'AmuletRules')
+                    OR (e.choice = 'TransferPreapproval_Renew'
+                        AND e.template_id_entity_name = 'TransferPreapproval'))
+              AND e.template_id_module_name = 'Splice.AmuletRules'
+              AND (e.migration_id < migration_id_arg
+                OR (e.migration_id = migration_id_arg
+                    AND e.record_time <= UNIX_MICROS(as_of_record_time))))
+        UNION ALL (-- Purchasing ANS Entries
+            SELECT
+                SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, '$.record.fields[2].value.record.fields[0].value.numeric'))) fees -- .amount.initialAmount
+            FROM
+                mainnet_da2_scan.scan_sv_1_update_history_exercises e,
+                mainnet_da2_scan.scan_sv_1_update_history_creates c
+            WHERE
+                ((e.choice = 'SubscriptionInitialPayment_Collect'
+                    AND e.template_id_entity_name = 'SubscriptionInitialPayment'
+                    AND c.contract_id = JSON_VALUE(e.result, '$.record.fields[2].value.contractId')) -- .amulet
+                    OR (e.choice = 'SubscriptionPayment_Collect'
+                        AND e.template_id_entity_name = 'SubscriptionPayment'
+                        AND c.contract_id = JSON_VALUE(e.result, '$.record.fields[1].value.contractId'))) -- .amulet
+              AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
+              AND c.template_id_module_name = 'Splice.Amulet'
+              AND c.template_id_entity_name = 'Amulet'
+              AND (e.migration_id < migration_id_arg
+                OR (e.migration_id = migration_id_arg
+                    AND e.record_time <= UNIX_MICROS(as_of_record_time)))))));
 
 
 -- using the functions
