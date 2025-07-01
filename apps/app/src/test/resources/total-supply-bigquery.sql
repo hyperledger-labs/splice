@@ -11,10 +11,6 @@ DECLARE
   current_supply_total,
   allowed_mint,
   burned bignumeric;
-DECLARE
-  TransferResult_summary string;
-SET
-    TransferResult_summary = '$.record.fields[1].value.record.fields';
 
 CREATE TEMP FUNCTION
   iso_timestamp(iso8601_string string)
@@ -95,6 +91,10 @@ CREATE TEMP FUNCTION unminted(
     migration_id));
 
 
+CREATE TEMP FUNCTION TransferResult_summary(suffix string)
+    RETURNS string AS ('$.record.fields[1].value.record.fields' || suffix);
+
+
 -- All Amulet that was ever minted.
 CREATE TEMP FUNCTION minted(
     as_of_record_time timestamp,
@@ -103,13 +103,13 @@ CREATE TEMP FUNCTION minted(
 SELECT
   SUM(PARSE_BIGNUMERIC(JSON_VALUE(e.result,
                                   -- .inputAppRewardAmount
-                                  TransferResult_summary || '[0].value.numeric'))
+                                  TransferResult_summary('[0].value.numeric')))
     + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
                                   -- .inputValidatorRewardAmount
-                                  TransferResult_summary || '[1].value.numeric'))
+                                  TransferResult_summary('[1].value.numeric')))
     + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
                                   -- .inputSvRewardAmount
-                                  TransferResult_summary || '[2].value.numeric')))
+                                  TransferResult_summary('[2].value.numeric'))))
 FROM
   mainnet_da2_scan.scan_sv_1_update_history_exercises e
 WHERE
