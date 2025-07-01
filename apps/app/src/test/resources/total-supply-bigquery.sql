@@ -244,13 +244,13 @@ CREATE TEMP FUNCTION burned(
 
 
 -- using the functions
-SET as_of_record_time = iso_timestamp('2025-03-10T00:00:00Z');
-SET migration_id = 4;
-CALL experiment_dataset.locked(locked, as_of_record_time, migration_id);
-CALL experiment_dataset.unlocked(unlocked, as_of_record_time, migration_id);
-CALL experiment_dataset.unminted(unminted, as_of_record_time, migration_id);
-CALL experiment_dataset.minted(minted, as_of_record_time, migration_id);
-CALL experiment_dataset.burned(burned, as_of_record_time, migration_id);
+SET as_of_record_time = iso_timestamp('2025-07-01T00:00:00Z');
+SET migration_id = 3;
+SET locked = locked(as_of_record_time, migration_id);
+SET unlocked = unlocked(as_of_record_time, migration_id);
+SET unminted = unminted(as_of_record_time, migration_id);
+SET minted = minted(as_of_record_time, migration_id);
+SET burned = burned(as_of_record_time, migration_id);
 SET current_supply_total = locked + unlocked;
 SET allowed_mint = unminted + minted;
 SELECT
