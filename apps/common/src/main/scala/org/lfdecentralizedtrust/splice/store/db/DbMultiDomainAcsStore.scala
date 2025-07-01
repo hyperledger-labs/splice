@@ -750,7 +750,7 @@ final class DbMultiDomainAcsStore[TXE](
              SELECT contract_id, interface_view
              FROM interface_views_template interface
                JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
-             WHERE interface_id = $interfaceId
+             WHERE interface_id_qualified_name = ${QualifiedName(interfaceId)}
              ORDER BY interface.acs_event_number
            """.as[(String, Json)],
         opName,
@@ -1542,12 +1542,14 @@ final class DbMultiDomainAcsStore[TXE](
             .flatMap { eventNumber =>
               DBIO.sequence(interfaces.map { interfaceRow =>
                 val interfaceId = interfaceRow.interfaceId
+                val interfaceIdQualifiedName = QualifiedName(interfaceId)
+                val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
                 val viewJson = interfaceRow.interfaceView
                 // TODO: errors
                 // TODO: index columns
                 (sql"""
-                insert into interface_views_template(acs_event_number, interface_id, interface_view, view_compute_error)
-                values ($eventNumber, $interfaceId, $viewJson, '{}'::jsonb)""").toActionBuilder.asUpdate
+                insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
+                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null)""").toActionBuilder.asUpdate
               })
             }
         case (None, Some(rowData)) =>

@@ -239,7 +239,7 @@ object Contract {
   /** This method is private on purpose because we only want to allow the construction of a
     * [[org.lfdecentralizedtrust.splice.util.Contract]] instance through passing a [[com.daml.ledger.javaapi.data.CreatedEvent]]
     * instance and not through a [[com.daml.ledger.javaapi.data.Contract]] because
-    * the [[com.daml.ledger.javaapi.data.Contract]] doesn't have the `metadata`
+    * the [[com.daml.ledger.javaapi.data.Contract]] doesn't have the `createdEventBlob`
     * argument we need.
     */
   private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
@@ -247,7 +247,7 @@ object Contract {
       ev: CreatedEvent,
   ): Contract[TCid, T] = {
     Contract(
-      identifier = ev.getTemplateId,
+      identifier = contract.getContractTypeId,
       contractId = contract.id,
       payload = contract.data,
       createdEventBlob = ev.getCreatedEventBlob(),

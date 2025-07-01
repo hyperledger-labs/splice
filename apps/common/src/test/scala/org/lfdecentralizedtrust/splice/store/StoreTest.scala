@@ -601,6 +601,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       signatories: Seq[PartyId] = Seq.empty,
       packageName: String = dummyPackageName,
       observers: Seq[PartyId] = Seq.empty,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
   ): CreatedEvent = {
     new CreatedEvent(
       Seq.empty[String].asJava,
@@ -611,7 +612,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract.contractId.contractId,
       contract.payload.toValue,
       contract.createdEventBlob,
-      new java.util.HashMap(),
+      implementedInterfaces.asJava,
       new java.util.HashMap(),
       None.toJava,
       signatories.map(_.toProtoPrimitive).asJava,
@@ -839,10 +840,17 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       recordTime: Instant = defaultEffectiveAt,
       packageName: String = dummyPackageName,
       createdEventObservers: Seq[PartyId] = Seq.empty,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
   ) = mkTx(
     offset,
     createRequests.map[TreeEvent](
-      toCreatedEvent(_, createdEventSignatories, packageName, createdEventObservers)
+      toCreatedEvent(
+        _,
+        createdEventSignatories,
+        packageName,
+        createdEventObservers,
+        implementedInterfaces,
+      )
     ),
     synchronizerId,
     effectiveAt,
@@ -971,6 +979,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         recordTime: Instant = defaultEffectiveAt,
         packageName: String = dummyPackageName,
         createdEventObservers: Seq[PartyId] = Seq.empty,
+        implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -982,6 +991,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         recordTime,
         packageName,
         createdEventObservers,
+        implementedInterfaces,
       )
 
       store.testIngestionSink

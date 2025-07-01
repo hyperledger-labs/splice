@@ -20,7 +20,7 @@ import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.MonadUtil
 import io.circe.Json
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{holdingv1, metadatav1}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 
 import java.util.concurrent.atomic.AtomicReference
@@ -70,9 +70,9 @@ abstract class MultiDomainAcsStoreTest[
       ),
       interfaceFilters = Map(
         // will include both Amulet & DummyHolding
-        mkFilterInterface(holdingv1.Holding.INTERFACE)(
-          _.payload.instrumentId.admin == dsoParty.toProtoPrimitive
-        )(contract =>
+        mkFilterInterface(holdingv1.Holding.INTERFACE) { contract =>
+          contract.payload.instrumentId.admin == dsoParty.toProtoPrimitive
+        }(contract =>
           GenericInterfaceRowData(
             contract.identifier,
             io.circe.parser
@@ -171,6 +171,16 @@ abstract class MultiDomainAcsStoreTest[
       identifier = templateId,
       contractId = new DummyHolding.ContractId(nextCid()),
       payload = payload,
+    )
+  }
+
+  private def holdingView(owner: PartyId, amount: BigDecimal, admin: PartyId, id: String) = {
+    new holdingv1.HoldingView(
+      owner.toProtoPrimitive,
+      new holdingv1.InstrumentId(admin.toProtoPrimitive, id),
+      amount.bigDecimal,
+      java.util.Optional.empty,
+      new metadatav1.Metadata(java.util.Map.of()),
     )
   }
 
@@ -823,37 +833,60 @@ abstract class MultiDomainAcsStoreTest[
 
     "ingest and return interface views" in {
       implicit val store = mkStore()
+      val aDifferentIssuer = providerParty(42)
       val includedAmulet =
-        (1 to 3).map(n => amulet(providerParty(n), BigDecimal(n), n.toLong, BigDecimal(0.00001)))
+        (1 to 3).map(n =>
+          amulet(providerParty(n), BigDecimal(n), n.toLong, BigDecimal(0.00001)) -> holdingView(
+            providerParty(n),
+            BigDecimal(n),
+            dsoParty,
+            "AMT",
+          )
+        )
       val excludedAmulet = (4 to 6).map(n =>
         amulet(
           providerParty(n),
           BigDecimal(n),
           n.toLong,
           BigDecimal(0.00001),
-          dso = providerParty(42), // this is excluded in the interface filter
+          dso = aDifferentIssuer, // this is excluded in the interface filter
+        ) -> holdingView(providerParty(n), BigDecimal(n), aDifferentIssuer, "AMT")
+      )
+      val includedDummy = (1 to 3).map(n =>
+        dummyHolding(providerParty(n), BigDecimal(n), dsoParty) -> holdingView(
+          providerParty(n),
+          BigDecimal(n),
+          dsoParty,
+          "DUM",
         )
       )
-      val includedDummy = (1 to 3).map(n => dummyHolding(providerParty(n), BigDecimal(n), dsoParty))
       val excludedDummy = (4 to 6).map(n =>
         dummyHolding(
           providerParty(n),
           BigDecimal(n),
-          issuer = providerParty(42), // this is excluded in the interface filter
-        )
+          issuer = aDifferentIssuer, // this is excluded in the interface filter
+        ) -> holdingView(providerParty(n), BigDecimal(n), aDifferentIssuer, "DUM")
       )
       for {
         _ <- initWithAcs()
         _ <- assertList()
         _ <- MonadUtil.sequentialTraverse(
           includedAmulet ++ excludedAmulet
-        ) { contract =>
-          d1.create(contract)
+        ) { case (contract, interfaceView) =>
+          d1.create(
+            contract,
+            implementedInterfaces =
+              Map(holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> interfaceView.toValue),
+          )
         }
         _ <- MonadUtil.sequentialTraverse(
           includedDummy ++ excludedDummy
-        ) { contract =>
-          d1.create(contract)
+        ) { case (contract, interfaceView) =>
+          d1.create(
+            contract,
+            implementedInterfaces =
+              Map(holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> interfaceView.toValue),
+          )
         }
         result <- store.listInterfaceViews(
           holdingv1.Holding.INTERFACE
@@ -862,7 +895,7 @@ abstract class MultiDomainAcsStoreTest[
         result.map(
           _.contractId.contractId
         ) should contain theSameElementsAs ((includedAmulet ++ includedDummy).map(
-          _.contractId.contractId
+          _._1.contractId.contractId
         ))
       }
     }

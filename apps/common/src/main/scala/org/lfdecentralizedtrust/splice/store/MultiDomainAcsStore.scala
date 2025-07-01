@@ -374,12 +374,13 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean = {
-      val qualifiedName = QualifiedName(ev.getTemplateId)
+      val interfaceTemplates =
+        ev.getFailedInterfaceViews.keySet().asScala ++ ev.getInterfaceViews.asScala.keys
+      val matchingInterfaces =
+        interfaceTemplates.map(QualifiedName(_)).flatMap(interfaceFiltersWithoutPackageNames.get)
       templateFiltersWithoutPackageNames
-        .get(qualifiedName)
-        .exists(_.evPredicate(ev)) || interfaceFiltersWithoutPackageNames
-        .get(qualifiedName)
-        .exists(_.evPredicate(ev))
+        .get(QualifiedName(ev.getTemplateId))
+        .exists(_.evPredicate(ev)) || matchingInterfaces.exists(_.evPredicate(ev))
     }
 
     override def mightContain(
@@ -486,7 +487,10 @@ object MultiDomainAcsStore {
           val c = Contract.fromCreatedEvent(interfaceCompanion)(ev)
           c.exists(p)
         },
-        ev => Contract.fromCreatedEvent(interfaceCompanion)(ev),
+        ev => {
+          val result = Contract.fromCreatedEvent(interfaceCompanion)(ev)
+          result
+        },
         encode,
       ),
     )
