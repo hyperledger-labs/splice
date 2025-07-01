@@ -70,7 +70,9 @@ class DockerComposeValidatorFrontendIntegrationTest
     val aliceTap = 123.4
     val adminTap = 234.5
 
-    def userLoggedInAndHasBalance(userPrefix: String, tappedAmount: Double)(implicit webDriver: WebDriverType): Unit = {
+    def userLoggedInAndHasBalance(userPrefix: String, tappedAmount: Double)(implicit
+        webDriver: WebDriverType
+    ): Unit = {
       seleniumText(find(id("logged-in-user"))) should startWith(userPrefix)
       val balanceUsd = find(id("wallet-balance-usd"))
         .valueOrFail("Couldn't find balance")
