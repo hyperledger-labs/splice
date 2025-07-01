@@ -122,57 +122,54 @@ CREATE TEMP FUNCTION minted(
 
 
 -- fees from a Splice.AmuletRules:TransferResult
-CREATE TEMP FUNCTION
-    transferresult_fees(tr_json json)
-                       RETURNS bignumeric AS (-- .summary.holdingFees
-    PARSE_BIGNUMERIC(JSON_VALUE(tr_json, '$.record.fields[1].value.record.fields[5].value.numeric'))
-    -- .summary.senderChangeFee
-    + PARSE_BIGNUMERIC(JSON_VALUE(tr_json, '$.record.fields[1].value.record.fields[7].value.numeric'))
-    -- .summary.outputFees
-    + (
-    SELECT
-      COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)
-    FROM
-      UNNEST(JSON_QUERY_ARRAY(tr_json, '$.record.fields[1].value.record.fields[6].value.list.elements')) AS x));
+CREATE TEMP FUNCTION transferresult_fees(tr_json json)
+    RETURNS bignumeric AS (
+  -- .summary.holdingFees
+  PARSE_BIGNUMERIC(JSON_VALUE(tr_json, '$.record.fields[1].value.record.fields[5].value.numeric'))
+  -- .summary.senderChangeFee
+  + PARSE_BIGNUMERIC(JSON_VALUE(tr_json, '$.record.fields[1].value.record.fields[7].value.numeric'))
+  + (SELECT COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)
+     FROM
+       UNNEST(JSON_QUERY_ARRAY(tr_json,
+                -- .summary.outputFees
+                '$.record.fields[1].value.record.fields[6].value.list.elements')) AS x));
 
-CREATE TEMP FUNCTION
-    result_burn(choice string,
-                result json)
-               RETURNS bignumeric AS (CASE choice
-      WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer
-    -- AmuletRules_BuyMemberTrafficResult
-    PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[2].value.numeric')) -- .amuletPaid
-    + PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[5].value.numeric')) -- .summary.holdingFees
-    + PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[7].value.numeric')) -- .summary.senderChangeFee
-      WHEN 'AmuletRules_Transfer' THEN -- Amulet Burnt in Amulet Transfers
-    -- TransferResult
-    -- .summary.holdingFees
-    PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[5].value.numeric'))
-    -- .summary.senderChangeFee
-    + PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[7].value.numeric'))
-    -- .summary.outputFees
-    + (
-    SELECT
-      COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)
-    FROM
-      UNNEST(JSON_QUERY_ARRAY(result, '$.record.fields[1].value.record.fields[6].value.list.elements')) AS x)
-      WHEN 'AmuletRules_CreateTransferPreapproval' THEN PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[2].value.numeric')) -- .amuletPaid
-    + transferresult_fees(JSON_QUERY(result, '$.record.fields[1].value')) -- .transferResult
-      WHEN 'AmuletRules_CreateExternalPartySetupProposal' THEN PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[4].value.numeric')) -- .amuletPaid
-    + transferresult_fees(JSON_QUERY(result, '$.record.fields[3].value')) -- .transferResult
-      WHEN 'TransferPreapproval_Renew' THEN PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[4].value.numeric')) -- .amuletPaid
-    + transferresult_fees(JSON_QUERY(result, '$.record.fields[1].value')) -- .transferResult
-      ELSE 0
+CREATE TEMP FUNCTION result_burn(choice string, result json)
+    RETURNS bignumeric AS (
+  CASE choice
+    WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer
+      -- AmuletRules_BuyMemberTrafficResult
+      PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[2].value.numeric')) -- .amuletPaid
+      + PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[5].value.numeric')) -- .summary.holdingFees
+      + PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[7].value.numeric')) -- .summary.senderChangeFee
+    WHEN 'AmuletRules_Transfer' THEN -- Amulet Burnt in Amulet Transfers
+      -- TransferResult
+      -- .summary.holdingFees
+      PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[5].value.numeric'))
+      -- .summary.senderChangeFee
+      + PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[1].value.record.fields[7].value.numeric'))
+      + (SELECT COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)
+         -- .summary.outputFees
+         FROM UNNEST(JSON_QUERY_ARRAY(result, '$.record.fields[1].value.record.fields[6].value.list.elements')) AS x)
+    WHEN 'AmuletRules_CreateTransferPreapproval' THEN
+      PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[2].value.numeric')) -- .amuletPaid
+      + transferresult_fees(JSON_QUERY(result, '$.record.fields[1].value')) -- .transferResult
+    WHEN 'AmuletRules_CreateExternalPartySetupProposal' THEN
+      PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[4].value.numeric')) -- .amuletPaid
+      + transferresult_fees(JSON_QUERY(result, '$.record.fields[3].value')) -- .transferResult
+    WHEN 'TransferPreapproval_Renew' THEN
+      PARSE_BIGNUMERIC(JSON_VALUE(result, '$.record.fields[4].value.numeric')) -- .amuletPaid
+      + transferresult_fees(JSON_QUERY(result, '$.record.fields[1].value')) -- .transferResult
+    ELSE 0
   END
     );
 
 -- Amulet burned via fees.
 CREATE TEMP FUNCTION burned(
     as_of_record_time timestamp,
-                              migration_id_arg int64
+    migration_id_arg int64
   ) RETURNS bignumeric AS ((
-  SELECT
-      SUM(fees)
+  SELECT SUM(fees)
   FROM ((
             SELECT
                 SUM(result_burn(e.choice,
