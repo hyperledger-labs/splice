@@ -5,7 +5,7 @@ stdenv.mkDerivation rec {
   name = "canton";
   version = sources.version;
   src = builtins.fetchurl {
-    url = "https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-${sources.version}.tar.gz";
+    url = "https://www.canton.io/releases/canton-open-source-${sources.version}.tar.gz";
     sha256 = sources.sha256;
   };
   dontUnpack = true;
