@@ -114,7 +114,7 @@ in pkgs.mkShell {
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
-  COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
+  COMETBFT_DRIVER = if sources.use_enterprise then "${pkgs.cometbft_driver}" else "";
   PULUMI_HOME = "${pkgs.pulumi-bin}";
   IS_ENTERPRISE = if sources.use_enterprise then "true" else "false";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
