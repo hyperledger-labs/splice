@@ -50,16 +50,27 @@ Upcoming
     walletPayments     0.1.9
     ================== =======
 
-- Backend
+- SV
 
   - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
     the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.
+  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+
+- Scan
+
   - Fix a `bug (#1254) <https://github.com/hyperledger-labs/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
     based on the ``splice-instance-names`` config.
 
-- UI
+- Validator
 
-  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+  - **Breaking**: The validator app now enforces that the traffic
+    topup interval is >= the automation polling interval (30s by
+    default). Previously it implicitly rounded up if the topup
+    interval was smaller which caused confusion on how much traffic is
+    purchased each time. If your topup interval was >= 30s you are not
+    affected. If you are affected, set the topup interval to the
+    polling interval (30s unless changed) to recover the prior
+    behavior.
 
 - Docs
 
@@ -70,6 +81,7 @@ Upcoming
     an authenticated validator. A complete wipe of the validator database is not required, as
     opposed to what the docs previously stated. See the relevant section on :ref:`authenticated
     docker-compose validators <compose_validator_auth>`.
+
 
 
 

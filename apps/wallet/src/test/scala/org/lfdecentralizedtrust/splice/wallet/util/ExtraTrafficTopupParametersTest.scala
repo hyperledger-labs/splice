@@ -43,7 +43,7 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
   private def checkTopupParameters(
       topupParameters: ExtraTrafficTopupParameters,
       minTopupInterval: NonNegativeFiniteDuration,
-      triggerPollingInterval: NonNegativeFiniteDuration = defaultTriggerPollingInterval,
+      triggerPollingInterval: NonNegativeFiniteDuration,
       targetRate: BigDecimal = defaultTargetRate,
       minTopupAmount: Long = defaultMinTopupAmount,
   ) = {
@@ -56,21 +56,6 @@ class ExtraTrafficTopupParametersTest extends BaseTestWordSpec {
   }
 
   "Extra traffic top-up parameters" when {
-    "the min top-up interval is configured to be less than the trigger polling interval" should {
-      "behave as if the min top-up interval equals the polling interval" in {
-        val topupParams1 = mkExtraTrafficTopupParameters(
-          minTopupInterval = defaultTriggerPollingInterval * 0.5
-        )
-        val topupParams2 = mkExtraTrafficTopupParameters(
-          minTopupInterval = defaultTriggerPollingInterval
-        )
-        checkTopupParameters(
-          topupParams1,
-          minTopupInterval = defaultTriggerPollingInterval,
-        )
-        topupParams1 shouldBe topupParams2
-      }
-    }
 
     "target rate of zero" should {
       "not require any top-up at all" in {
