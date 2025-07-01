@@ -123,7 +123,7 @@ WHERE
 
 -- fees from a Splice.AmuletRules:TransferResult
 CREATE TEMP FUNCTION
-    transferresult_fees(tr_json string)
+    transferresult_fees(tr_json json)
                        RETURNS bignumeric AS (-- .summary.holdingFees
     PARSE_BIGNUMERIC(JSON_VALUE(tr_json, '$.record.fields[1].value.record.fields[5].value.numeric'))
     -- .summary.senderChangeFee
@@ -137,7 +137,7 @@ CREATE TEMP FUNCTION
 
 CREATE TEMP FUNCTION
     result_burn(choice string,
-                   result string)
+                result json)
                RETURNS bignumeric AS (CASE choice
       WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer
     -- AmuletRules_BuyMemberTrafficResult
