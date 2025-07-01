@@ -44,6 +44,13 @@ Upcoming
   - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
   - Add relevant links to the new application developer documentation pages published by Digital Asset at
     https://docs.digitalasset.com/build/3.3/.
+  - Fixed docker-compose docs around migrating from a non-authenticated validator to
+    an authenticated validator. A complete wipe of the validator database is not required, as
+    opposed to what the docs previously stated. See the relevant section on :ref:`authenticated
+    docker-compose validators <compose_validator_auth>`.
+
+
+
 
 0.4.3
 -----
