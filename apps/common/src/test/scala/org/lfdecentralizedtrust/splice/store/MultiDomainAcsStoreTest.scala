@@ -178,7 +178,7 @@ abstract class MultiDomainAcsStoreTest[
     new holdingv1.HoldingView(
       owner.toProtoPrimitive,
       new holdingv1.InstrumentId(admin.toProtoPrimitive, id),
-      amount.bigDecimal,
+      numeric(amount.bigDecimal),
       java.util.Optional.empty,
       new metadatav1.Metadata(java.util.Map.of()),
     )
@@ -892,11 +892,15 @@ abstract class MultiDomainAcsStoreTest[
           holdingv1.Holding.INTERFACE
         )(MultiDomainAcsStore.interfaceCompanion, implicitly)
       } yield {
-        result.map(
-          _.contractId.contractId
-        ) should contain theSameElementsAs ((includedAmulet ++ includedDummy).map(
-          _._1.contractId.contractId
-        ))
+        result should be((includedAmulet ++ includedDummy).map { case (contract, view) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            view,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
       }
     }
   }

@@ -747,24 +747,24 @@ final class DbMultiDomainAcsStore[TXE](
     for {
       rows <- storage.query(
         sql"""
-             SELECT contract_id, interface_view
+             SELECT contract_id, interface_view, acs.created_at, acs.created_event_blob
              FROM interface_views_template interface
                JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
              WHERE interface_id_qualified_name = ${QualifiedName(interfaceId)}
              ORDER BY interface.acs_event_number
-           """.as[(String, Json)],
+           """.as[(String, Json, Timestamp, Array[Byte])],
         opName,
       )
     } yield {
       val limited = applyLimit(opName, limit, rows)
-      limited.map { case (contractId, viewJson) =>
+      limited.map { case (contractId, viewJson, createdAt, createdEventBlob) =>
         companionClass
           .fromJson(companion)(
             interfaceId,
             contractId,
             viewJson,
-            ByteString.EMPTY,
-            java.time.Instant.now(),
+            ByteString.copyFrom(createdEventBlob),
+            createdAt.toInstant,
           )
           .fold(
             err =>
