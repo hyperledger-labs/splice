@@ -11,11 +11,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
 }
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
-import com.daml.ledger.javaapi.data.codegen.{
-  ContractId,
-  DamlRecord,
-  ContractCompanion as JavaContractCompanion,
-}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -284,19 +280,14 @@ object MultiDomainAcsStore {
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
   trait ContractFilter[R <: AcsRowData, IR <: AcsInterfaceViewRowData] {
 
-    def templateIds: Set[PackageQualifiedName]
-
     /** The filter required for ingestion into this store. */
     def ingestionFilter: IngestionFilter
 
     /** Whether the event is in scope. */
     def contains(ev: CreatedEvent): Boolean
 
-    /** Whether the scope might contain an event of the given template. */
-    def mightContain[TC, TCid, T](templateCompanion: JavaContractCompanion[TC, TCid, T]): Boolean
-
-    /** Whether the scope might contain an event of the given template. */
-    def mightContain(identifier: Identifier): Boolean
+    /** Whether the scope might contain an event of the given template and/or implemented interfaces. */
+    def mightContain(templateId: Identifier, implementedInterfaces: Seq[Identifier]): Boolean
 
     def matchingContractToRow(
         ev: CreatedEvent
@@ -377,25 +368,29 @@ object MultiDomainAcsStore {
         name.qualifiedName -> filter
       }.toMap
 
-    override val templateIds = templateFilters.keySet
-
     override val ingestionFilter =
       IngestionFilter(
         primaryParty
       )
 
-    override def contains(ev: CreatedEvent): Boolean =
+    override def contains(ev: CreatedEvent): Boolean = {
+      val qualifiedName = QualifiedName(ev.getTemplateId)
       templateFiltersWithoutPackageNames
-        .get(QualifiedName(ev.getTemplateId))
+        .get(qualifiedName)
+        .exists(_.evPredicate(ev)) || interfaceFiltersWithoutPackageNames
+        .get(qualifiedName)
         .exists(_.evPredicate(ev))
+    }
 
-    override def mightContain[TC, TCid, T](
-        templateCompanion: JavaContractCompanion[TC, TCid, T]
-    ): Boolean =
-      templateFilters.contains(PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId))
-
-    override def mightContain(identifier: Identifier): Boolean = {
-      templateFiltersWithoutPackageNames.contains(QualifiedName(identifier))
+    override def mightContain(
+        templateId: Identifier,
+        implementedInterfaces: Seq[Identifier],
+    ): Boolean = {
+      templateFiltersWithoutPackageNames.contains(
+        QualifiedName(templateId)
+      ) || implementedInterfaces.exists(interfaceId =>
+        interfaceFiltersWithoutPackageNames.contains(QualifiedName(interfaceId))
+      )
     }
 
     override def matchingContractToRow(
