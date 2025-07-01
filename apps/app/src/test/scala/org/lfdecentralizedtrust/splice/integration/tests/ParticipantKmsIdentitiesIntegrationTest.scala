@@ -16,9 +16,6 @@ import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 
 import java.nio.file.{Path, Paths}
 
-import org.scalatest.Ignore
-
-@Ignore
 class ParticipantKmsIdentitiesIntegrationTest extends IntegrationTest with StandaloneCanton {
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")

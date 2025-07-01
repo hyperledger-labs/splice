@@ -1,4 +1,4 @@
-{ pkgs, x86Pkgs, npmPkgs }:
+{ pkgs, x86Pkgs, npmPkgs, use_enterprise }:
 let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
@@ -114,9 +114,9 @@ in pkgs.mkShell {
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
-  COMETBFT_DRIVER = if sources.use_enterprise then "${pkgs.cometbft_driver}" else "";
+  COMETBFT_DRIVER = if use_enterprise then "${pkgs.cometbft_driver}" else "";
   PULUMI_HOME = "${pkgs.pulumi-bin}";
-  IS_ENTERPRISE = if sources.use_enterprise then "true" else "false";
+  IS_ENTERPRISE = if use_enterprise then "true" else "false";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
   LC_ALL = if stdenv.isDarwin then "" else "C.UTF-8";
   # Avoid "warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)"

@@ -1,10 +1,10 @@
-{ stdenv }:
+{ stdenv, use_enterprise }:
 let sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
 in
 stdenv.mkDerivation rec {
   name = "canton";
   version = sources.version;
-  src = if sources.use_enterprise then
+  src = if use_enterprise then
     builtins.fetchurl {
          url = "https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-${sources.version}.tar.gz";
          sha256 = sources.enterprise_sha256;

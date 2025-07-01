@@ -1,10 +1,10 @@
-{ stdenv }:
+{ stdenv, use_enterprise }:
 let sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
 in
 stdenv.mkDerivation rec {
   name = "daml2js";
   version = sources.version;
-  src = if sources.use_enterprise then
+  src = if use_enterprise then
       builtins.fetchurl {
         url = "https://digitalasset.jfrog.io/artifactory/assembly/daml/${sources.tooling_sdk_version}/daml-sdk-${sources.tooling_sdk_version}-${if stdenv.isDarwin then "macos" else "linux-intel"}.tar.gz";
         sha256 =
