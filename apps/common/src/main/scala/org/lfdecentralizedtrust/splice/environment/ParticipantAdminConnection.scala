@@ -18,14 +18,9 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
   PruningSchedule,
 }
-import com.digitalasset.canton.participant.admin.data.ContractIdImportMode
-import com.digitalasset.canton.admin.participant.v30.{
-  ExportAcsResponse,
-  ExportAcsAtTimestampResponse,
-  PruningServiceGrpc,
-}
+import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -288,79 +283,27 @@ class ParticipantAdminConnection(
     )
   }
 
-  def downloadAcsSnapshotForPartyMigration(
+  def downloadAcsSnapshot(
       parties: Set[PartyId],
-      filterSynchronizerId: SynchronizerId,
-      timestamp: Instant,
+      filterSynchronizerId: Option[SynchronizerId] = None,
+      timestamp: Option[Instant] = None,
+      force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     logger.debug(
       show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at timestamp $timestamp"
     )
     val requestComplete = Promise[ByteString]()
     // TODO(DACH-NY/canton-network-node#3298) just concatenate the byteString here. Make it scale to 2M contracts.
-    val observer =
-      new GrpcByteChunksToByteArrayObserver[ExportAcsAtTimestampResponse](requestComplete)
+    val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsOldResponse](requestComplete)
     runCmd(
-      ParticipantAdminCommands.PartyManagement.ExportAcsAtTimestamp(
+      ParticipantAdminCommands.ParticipantRepairManagement.ExportAcsOld(
         parties = parties,
+        partiesOffboarding = false,
         filterSynchronizerId,
         timestamp,
         observer,
-      )
-    ).discard
-    requestComplete.future
-  }
-
-  def downloadAcsSnapshotForSynchronizerMigration(
-      parties: Set[PartyId],
-      synchronizerId: SynchronizerId,
-      timestamp: Instant,
-      disasterRecovery: Boolean,
-  )(implicit traceContext: TraceContext): Future[ByteString] = {
-    // ExportAcsAtTimestamp only works if the timestamp corresponds to a PartyToParticipant change so this
-    // is required for synchronizer migrations and disaster recovery. Without the force flag,
-    // this will fail until we have processed a timestamp >= requested timestamp. On migrations this is guaranteed
-    // to happen for all nodes due to time proofs. On disaster recovery, we cannot guarantee this so we
-    // use force=true which will not wait until a timestamp >= requested timestamp has been processed.
-    getHighestOffsetByTimestamp(synchronizerId, timestamp, force = disasterRecovery).flatMap {
-      offset =>
-        downloadAcsSnapshotAtOffset(parties, synchronizerId, offset.unwrap)
-    }
-  }
-
-  def getHighestOffsetByTimestamp(
-      synchronizerId: SynchronizerId,
-      timestamp: Instant,
-      force: Boolean,
-  )(implicit tc: TraceContext): Future[NonNegativeLong] = {
-    runCmd(
-      ParticipantAdminCommands.PartyManagement
-        .GetHighestOffsetByTimestamp(synchronizerId, timestamp, force)
-    ).map { offset =>
-      logger.debug(s"Translated $timestamp on $synchronizerId to $offset with force=$force")
-      offset
-    }
-  }
-
-  def downloadAcsSnapshotAtOffset(
-      parties: Set[PartyId],
-      filterSynchronizerId: SynchronizerId,
-      offset: Long,
-  )(implicit traceContext: TraceContext): Future[ByteString] = {
-    logger.debug(
-      show"Downloading ACS snapshot from domain $filterSynchronizerId, for parties $parties at offset $offset"
-    )
-    val requestComplete = Promise[ByteString]()
-    // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
-    val observer =
-      new GrpcByteChunksToByteArrayObserver[ExportAcsResponse](requestComplete)
-    runCmd(
-      ParticipantAdminCommands.PartyManagement.ExportAcs(
-        parties = parties,
-        Some(filterSynchronizerId),
-        offset,
-        observer,
-        contractSynchronizerRenames = Map.empty,
+        Map.empty,
+        force,
       )
     ).discard
     requestComplete.future
@@ -374,10 +317,10 @@ class ParticipantAdminConnection(
       "Imports the acs in the participantl",
       runCmd(
         ParticipantAdminCommands.ParticipantRepairManagement
-          .ImportAcs(
+          .ImportAcsOld(
             acsBytes,
-            workflowIdPrefix = IMPORT_ACS_WORKFLOW_ID_PREFIX,
-            contractIdImportMode = ContractIdImportMode.Validation,
+            IMPORT_ACS_WORKFLOW_ID_PREFIX,
+            allowContractIdSuffixRecomputation = false,
           )
       ).map(_ => ()),
       logger,
