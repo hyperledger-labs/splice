@@ -279,7 +279,7 @@ runs:
         name: "logs-${{ inputs.test_suite_name }}-${{ inputs.runner_index }}"
 
     - name: Report Failures on Slack & Github
-      if: failure() && github.event_name == 'push'
+      if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./.github/actions/tests/failure_notifications
       with:
         workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'
