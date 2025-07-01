@@ -45,7 +45,7 @@ class DomainDataSnapshotGenerator(
   def getDomainDataSnapshot(
       timestamp: Instant,
       partyId: Option[PartyId],
-      disasterRecovery: Boolean,
+      force: Boolean,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -57,7 +57,7 @@ class DomainDataSnapshotGenerator(
       .exportAcsAtTimestamp(
         decentralizedSynchronizer,
         timestamp,
-        disasterRecovery,
+        force,
         partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_))*
       )
     dars <- darExporter.exportAllDars()

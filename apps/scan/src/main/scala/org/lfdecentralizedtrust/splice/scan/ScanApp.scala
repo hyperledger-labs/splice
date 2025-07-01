@@ -249,7 +249,7 @@ class ScanApp(
         config.spliceInstanceNames,
         participantAdminConnection,
         sequencerAdminConnection,
-        automation,
+        store,
         acsSnapshotStore,
         dsoAnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,

@@ -516,6 +516,7 @@ class SvApp(
         localSynchronizerNode,
         retryProvider,
         new DsoPartyMigration(
+          svAutomation,
           dsoAutomation,
           participantAdminConnection,
           retryProvider,
