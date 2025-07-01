@@ -284,7 +284,7 @@ class DockerComposeValidatorFrontendIntegrationTest
       clue("Restart the validator, with auth") {
         startComposeValidator(
           extraClue = "with auth",
-          startFlags = Seq("-a"),
+          startFlags = Seq("-a", "-P", "da-composeValidator-13"),
           extraEnv = Seq(
             "GCP_CLUSTER_BASENAME" -> "cidaily" // Any cluster should work, as long as its UI auth0 apps were created with the localhost callback URLs
           ),
