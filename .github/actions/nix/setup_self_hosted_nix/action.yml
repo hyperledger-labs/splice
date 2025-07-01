@@ -91,7 +91,7 @@ runs:
               machine digitalasset.jfrog.io
               login ${{ inputs.artifactory_user }}
               password ${{ inputs.artifactory_password }}
-              EOF
+          EOF
             else
               echo "Using OSS only dependencies, not setting up Artifactory credentials"
             fi
