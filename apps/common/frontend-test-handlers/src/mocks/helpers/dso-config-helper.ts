@@ -58,6 +58,9 @@ export function getDsoRulesConfig(
         maxNumGovernanceKeys: '2',
       },
     },
+    voteCooldownTime: {
+      microseconds: '60000000', // 1 minute
+    },
   };
 }
 

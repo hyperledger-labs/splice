@@ -241,6 +241,7 @@ object SvUtil {
     }
   }
 
+  // TODO(#1271): deduplicate with the definition in SpliceUtil
   def defaultDsoRulesConfig(synchronizerId: SynchronizerId): DsoRulesConfig = new DsoRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
@@ -253,6 +254,7 @@ object SvUtil {
     1024, // maxTextLength
     defaultDsoDecentralizedSynchronizerConfig(synchronizerId), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
+    Optional.empty(), // voteCooldownTime
   )
 
   def keyPairMatches(
