@@ -3,11 +3,12 @@
 
 module Splice.AmuletConfig where
 
+import DA.Time
+
 import Splice.Fees
 import Splice.DecentralizedSynchronizer
 import Splice.Issuance
 import Splice.Schedule
-import DA.Time
 import Splice.Util
 
 -- TODO(#14972): Get rid of the unused Amulet data type
@@ -52,10 +53,44 @@ defaultTransferPreapprovalFee = 0.00274
 
 -- Check constraints on config params on which the implementation of the choices rely.
 validAmuletConfig : AmuletConfig unit -> Bool
-validAmuletConfig AmuletConfig{..} =
-    tickDuration > days 0
-  && validIssuanceCurve issuanceCurve
-  && validAmuletDecentralizedSynchronizerConfig decentralizedSynchronizer
+validAmuletConfig AmuletConfig
+    -- intentional pattern match to avoid forgetting checking a field
+    { transferConfig
+    , issuanceCurve
+    , decentralizedSynchronizer
+    , tickDuration
+    , packageConfig
+    , transferPreapprovalFee
+    , featuredAppActivityMarkerAmount}
+  =
+    validTransferConfig transferConfig &&
+    validIssuanceCurve issuanceCurve &&
+    validAmuletDecentralizedSynchronizerConfig decentralizedSynchronizer &&
+    tickDuration > days 0 &&
+    validPackageConfig packageConfig &&
+    optional True (>= 0.0) transferPreapprovalFee &&
+    optional True (>= 0.0) featuredAppActivityMarkerAmount
+
+validTransferConfig : TransferConfig unit -> Bool
+validTransferConfig TransferConfig
+    { createFee
+    , holdingFee
+    , transferFee
+    , lockHolderFee
+    , extraFeaturedAppRewardAmount
+    , maxNumInputs
+    , maxNumOutputs
+    , maxNumLockHolders
+    }
+  =
+    positiveFixedFee createFee &&
+    positiveRatePerRound holdingFee &&
+    validSteppedRate transferFee &&
+    positiveFixedFee lockHolderFee &&
+    extraFeaturedAppRewardAmount >= 0.0 &&
+    maxNumInputs >= 1 &&
+    maxNumOutputs >= 1 &&
+    maxNumLockHolders >= 0
 
 -- | The package config defines for each daml package (identified by name)
 -- the package version that should be used for command submissions
@@ -69,6 +104,12 @@ data PackageConfig = PackageConfig
     wallet : Text
     walletPayments : Text
   deriving (Show, Eq)
+
+-- | Package configs are not constrained at the Daml level to maximize flexibility.
+-- In particular, empty packages versions might be used in the future to indicate that
+-- no version of that package should be vetted.
+validPackageConfig : PackageConfig -> Bool
+validPackageConfig _ = True
 
 instance Patchable (AmuletConfig USD) where
   patch new base current = AmuletConfig with

@@ -76,7 +76,7 @@ test = script do
   let bounded = amountExpiresAt amountExpiresAtRound5
   bounded === Singleton (Round 5)
   let (Singleton r) = bounded
-  estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Singleton t15_00
+  estimateOpenRoundCreatedAt config.tickDuration openRound3 (Singleton(addRelRound r (RelRound 2))) === Some (Singleton t15_00)
 
   -- lock expires at T00:12:30 before amulet expires at T00:15:00
   let lockExpireBeforeAmulet = doesLockExpireBeforeAmulet openRound3 lockExpiresAt12_30 amountExpiresAtRound5 config.tickDuration
@@ -122,7 +122,7 @@ testLargeAmuletExpiry = script do
         issuanceConfig = getValueAsOf issuingFor configUsd.issuanceCurve
         tickDuration = configUsd.tickDuration
 
-  estimateOpenRoundCreatedAt configUsd.tickDuration currentMiningRound expiringRound === AfterMaxBound
+  estimateOpenRoundCreatedAt configUsd.tickDuration currentMiningRound expiringRound === Some AfterMaxBound
   pure ()
 
 testExpireLockedAmulet : Script ()

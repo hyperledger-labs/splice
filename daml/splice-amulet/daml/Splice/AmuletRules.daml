@@ -250,7 +250,9 @@ template AmuletRules
     -- Amulet usage
     -------------
 
-    -- A choice to mint amulet when the DSO rules allow for that; e.g., when redeeming SV rewards.
+    -- A choice to mint amulet in a DevNet setup.
+    -- It is separate from the AmuletRules_DevNet_Tap choice for historic reasons,
+    -- as it used to be called as part of SV reward issuance.
     nonconsuming choice AmuletRules_Mint: AmuletRules_MintResult
       with
         receiver: Party
@@ -258,6 +260,7 @@ template AmuletRules
         openRound: ContractId OpenMiningRound
       controller dso, receiver
       do
+        require "isDevNet flag is true" isDevNet
         openRound <- fetchReferenceData (ForDso with dso) openRound
         let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
             expiringAmount = ExpiringAmount with
@@ -750,7 +753,7 @@ data TransferInputsSummary = TransferInputsSummary with
     changeToHoldingFeesRate : Decimal
     totalUnclaimedActivityRecordAmount : Optional Decimal
       -- ^ Note: Made optional as the addition of this field is checked by the upgrade checker
-      -- on package upload because `TransferInputsSummary` is serializable. 
+      -- on package upload because `TransferInputsSummary` is serializable.
   deriving (Eq, Show)
 
 type TransferOutputsSummary = [PreprocessedTransferOutput]
@@ -920,10 +923,10 @@ summarizeAndConsumeInputs csum dso sender inps = do
         totalAmuletAmount = s.totalAmuletAmount
         totalAppRewardAmount = s.totalAppRewardAmount
         totalValidatorRewardAmount = s.totalValidatorRewardAmount
-        totalUnclaimedActivityRecordAmount = 
+        totalUnclaimedActivityRecordAmount =
           (+ unclaimedActivityRecord.amount) <$> s.totalUnclaimedActivityRecordAmount
         totalValidatorFaucetAmount = s.totalValidatorFaucetAmount
-        totalSvRewardAmount = s.totalSvRewardAmount 
+        totalSvRewardAmount = s.totalSvRewardAmount
         totalHoldingFees = s.totalHoldingFees
         amountArchivedAsOfRoundZero = s.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
@@ -1316,7 +1319,7 @@ data TransferSummary = TransferSummary with
       -- ^ Added in CIP-3. Total amount of validator faucet coupon issuance input into this transfer.
     inputUnclaimedActivityRecordAmount : Optional Decimal
       -- ^ Total amount of unclaimed activity record issuance input into this transfer.
-      -- Note: Made optional as the addition of this field is checked by the upgrade checker. 
+      -- Note: Made optional as the addition of this field is checked by the upgrade checker.
   deriving (Show, Eq)
 
 data BalanceChange = BalanceChange with

@@ -65,24 +65,26 @@ testEstimateOpenRoundCreatedAt = script do
 
   let almostMax = time (date 9999 Dec 31) 23 57 30
   -- estimated to be at 9999-12-31T23:57:30.000000Z
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408704)) === (Singleton (almostMax))
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408704)) === Some (Singleton (almostMax))
   -- estimated to be at 10000-01-01T00:00:00.000000Z, which is larger than max value of DA.Time. ie, 9999-12-31T23:59:59.999999Z
   -- this will be regarded as never expired. (AfterMaxTime)
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408705)) === AfterMaxBound
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 61489146914)) === AfterMaxBound
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1678408705)) === Some AfterMaxBound
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 61489146914)) === Some AfterMaxBound
 
   -- estimate the creation time of round relative to round 0
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (-1))))
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (0))))
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1)) === (Singleton t00_00) -- T00:00:00
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 2)) === (Singleton t02_30) -- T00:02:30
-  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 3)) === (Singleton t05_00) -- T00:05:00
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (-1))) === None
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round (0))) === None
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 1)) === Some (Singleton t00_00) -- T00:00:00
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 2)) === Some (Singleton t02_30) -- T00:02:30
+  estimateOpenRoundCreatedAt tickDuration openRound0 (Singleton (Round 3)) === Some (Singleton t05_00) -- T00:05:00
 
   -- estimate the creation time of round relative to round 3
-  assertError(\_ -> estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round (3))))
-  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 4)) === (Singleton t07_30) -- T00:07:30
-  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 5)) === (Singleton t10_00) -- T00:10:00
-  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 6)) === (Singleton t12_30) -- T00:12:30
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round (3))) === None
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 4)) === Some (Singleton t07_30) -- T00:07:30
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 5)) === Some (Singleton t10_00) -- T00:10:00
+  estimateOpenRoundCreatedAt tickDuration openRound3 (Singleton (Round 6)) === Some (Singleton t12_30) -- T00:12:30
+
+
 
 testAmountExpiresAt : Script ()
 testAmountExpiresAt = do

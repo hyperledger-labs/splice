@@ -45,7 +45,12 @@ template TransferOffer
   where
     signatory sender
     observer receiver
-    ensure (DA.Text.length description < 280)
+    ensure
+      DA.Text.length description < 280 &&
+      DA.Text.length trackingId < 280
+      -- Note: the allowed trackingId length is probably way larger than required.
+      -- It is chosen this way to avoid issues with past versions of the code
+      -- that did not limit the offer length at all.
 
     choice TransferOffer_Accept : TransferOffer_AcceptResult
       with
