@@ -8,5 +8,6 @@
 
 set -euo pipefail
 
-latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
-echo "release-line-${latest_release}"
+# TODO(DACH-NY/canton-network-interna#713) Reset back to latest_release after the release is cut
+# latest_release=$(cat "$SPLICE_ROOT/LATEST_RELEASE")
+echo "release-line-0.4.4-snapshot.20250630.283.0.v06bbc9ce"
