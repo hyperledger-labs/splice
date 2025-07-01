@@ -68,15 +68,16 @@ class DockerComposeValidatorFrontendIntegrationTest
 
   "docker-compose based validator works" in { implicit env =>
     val aliceTap = 123.4
+    val adminTap = 234.5
 
-    def aliceLoggedInAndHasBalance()(implicit webDriver: WebDriverType): Unit = {
-      seleniumText(find(id("logged-in-user"))) should startWith("alice")
+    def userLoggedInAndHasBalance(userPrefix: String, tappedAmount: Double)(implicit webDriver: WebDriverType): Unit = {
+      seleniumText(find(id("logged-in-user"))) should startWith(userPrefix)
       val balanceUsd = find(id("wallet-balance-usd"))
         .valueOrFail("Couldn't find balance")
         .text
         .split(" ")
         .head
-      balanceUsd.toDouble should be > aliceTap - 5.0
+      balanceUsd.toDouble should be > tappedAmount - 5.0
     }
 
     val backupsDir: Path =
@@ -95,6 +96,7 @@ class DockerComposeValidatorFrontendIntegrationTest
           _ => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
         waitForTrafficPurchase()
+        tapAmulets(adminTap)
         actAndCheck(
           "Login as alice",
           loginOnCurrentPage(80, "alice", "wallet.localhost"),
@@ -224,7 +226,7 @@ class DockerComposeValidatorFrontendIntegrationTest
             click on "onboard-button",
           )(
             "Alice is logged in and maintained her balance",
-            _ => aliceLoggedInAndHasBalance(),
+            _ => userLoggedInAndHasBalance("alice", aliceTap),
           )
         }
         clue("Logout Alice") {
@@ -246,7 +248,7 @@ class DockerComposeValidatorFrontendIntegrationTest
             loginOnCurrentPage(80, "alice", "wallet.localhost"),
           )(
             "Alice is already onboarded, and still sees here balance",
-            _ => aliceLoggedInAndHasBalance(),
+            _ => userLoggedInAndHasBalance("alice", aliceTap),
           )
         }
       }
@@ -277,6 +279,11 @@ class DockerComposeValidatorFrontendIntegrationTest
         )
       }
 
+      withFrontEnd("frontend") { implicit webDriver =>
+        // Navigate out of the wallet to prevent errors in the logs as we restart the validator with auth
+        go to "about:blank"
+      }
+
       clue("Stop the validator (without wiping its data)") {
         Seq("build-tools/splice-compose.sh", "stop") !
       }
@@ -300,6 +307,7 @@ class DockerComposeValidatorFrontendIntegrationTest
           validatorUserPassword,
           () => seleniumText(find(id("logged-in-user"))) should startWith(partyHint),
         )
+        userLoggedInAndHasBalance("administrator", adminTap)
         completeAuth0LoginWithAuthorization(
           "http://ans.localhost",
           "admin@compose-validator.com",
