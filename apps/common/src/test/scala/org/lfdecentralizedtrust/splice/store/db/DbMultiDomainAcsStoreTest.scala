@@ -382,7 +382,9 @@ class DbMultiDomainAcsStoreTest
       txLogTableName: Option[String],
   ) = {
     val packageSignatures =
-      ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.amulet.all)
+      ResourceTemplateDecoder.loadPackageSignaturesFromResources(
+        DarResources.amulet.all ++ DarResources.TokenStandard.allPackageResources.flatMap(_.all)
+      )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
