@@ -11,6 +11,10 @@ DECLARE
   current_supply_total,
   allowed_mint,
   burned bignumeric;
+DECLARE
+  TransferResult_summary string;
+SET
+    TransferResult_summary = '$.record.fields[1].value.record.fields';
 
 CREATE TEMP FUNCTION
   iso_timestamp(iso8601_string string)
@@ -23,14 +27,7 @@ CREATE TEMP FUNCTION sum_bignumeric_acs(
     entity_name string,
     as_of_record_time timestamp,
     migration_id int64
-  ) RETURNS bignumeric AS (
-
-DECLARE
-  rt_micros int64;
-SET
-  rt_micros = UNIX_MICROS(as_of_record_time);
-
-  (
+  ) RETURNS bignumeric AS ((
   SELECT
     COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, path))), 0)
   FROM
@@ -44,7 +41,7 @@ SET
     WHERE
       (e.migration_id < migration_id
         OR (e.migration_id = migration_id
-          AND e.record_time <= rt_micros))
+          AND e.record_time <= UNIX_MICROS(as_of_record_time)))
       AND e.consuming
       AND e.template_id_module_name = module_name
       AND e.template_id_entity_name = entity_name
@@ -53,7 +50,7 @@ SET
     AND c.template_id_entity_name = entity_name
     AND (c.migration_id < migration_id
       OR (c.migration_id = migration_id
-        AND c.record_time <= rt_micros)));;
+        AND c.record_time <= UNIX_MICROS(as_of_record_time)))));
 
 
 -- Total unspent but locked Amulet amount.
@@ -61,18 +58,13 @@ CREATE TEMP FUNCTION locked(
     as_of_record_time timestamp,
     migration_id int64
   ) RETURNS bignumeric AS (
-
-DECLARE
-  locked_amulet_amulet_amount_initialAmount_path string;
-SET
-  locked_amulet_amulet_amount_initialAmount_path = '$.record.fields[0].value.record.fields[2].value.record.fields[0].value.numeric';
-
-  sum_bignumeric_acs(result,
-    locked_amulet_amulet_amount_initialAmount_path,
+  sum_bignumeric_acs(
+    -- (LockedAmulet) .amulet.amount.initialAmount
+    '$.record.fields[0].value.record.fields[2].value.record.fields[0].value.numeric',
     'Splice.Amulet',
     'LockedAmulet',
     as_of_record_time,
-    migration_id);
+    migration_id));
 
 
 -- Total unlocked, unspent Amulet.
@@ -80,18 +72,13 @@ CREATE TEMP FUNCTION unlocked(
     as_of_record_time timestamp,
     migration_id int64
   ) RETURNS bignumeric AS (
-
-DECLARE
-  amulet_amount_initialAmount_path string;
-SET
-  amulet_amount_initialAmount_path = '$.record.fields[2].value.record.fields[0].value.numeric';
-
-  sum_bignumeric_acs(result,
-    amulet_amount_initialAmount_path,
+  sum_bignumeric_acs(
+    -- (Amulet) .amount.initialAmount
+    '$.record.fields[2].value.record.fields[0].value.numeric',
     'Splice.Amulet',
     'Amulet',
     as_of_record_time,
-    migration_id);
+    migration_id));
 
 
 -- Amulet that was possible to mint, but was not minted.
@@ -99,44 +86,30 @@ CREATE TEMP FUNCTION unminted(
     as_of_record_time timestamp,
     migration_id int64
   ) RETURNS bignumeric AS (
-
-DECLARE
-  unclaimedreward_amount string;
-SET
-  unclaimedreward_amount = '$.record.fields[1].value.numeric';
-
-  sum_bignumeric_acs(result,
-    unclaimedreward_amount,
+  sum_bignumeric_acs(
+    -- (UnclaimedReward) .amount
+    '$.record.fields[1].value.numeric',
     'Splice.Amulet',
     'UnclaimedReward',
     as_of_record_time,
-    migration_id);
+    migration_id));
 
 
 -- All Amulet that was ever minted.
 CREATE TEMP FUNCTION minted(
     as_of_record_time timestamp,
     migration_id int64
-  ) RETURNS bignumeric AS (
-
-DECLARE
-  TransferResult_summary,
-  inputAppRewardAmount,
-  inputValidatorRewardAmount,
-  inputSvRewardAmount string;
-SET
-  TransferResult_summary = '$.record.fields[1].value.record.fields';
-SET
-  inputAppRewardAmount = TransferResult_summary || '[0].value.numeric';
-SET
-  inputValidatorRewardAmount = TransferResult_summary || '[1].value.numeric';
-SET
-  inputSvRewardAmount = TransferResult_summary || '[2].value.numeric';
-
-  (SELECT
-  SUM(PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputAppRewardAmount))
-    + PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputValidatorRewardAmount))
-    + PARSE_BIGNUMERIC(JSON_VALUE(e.result, inputSvRewardAmount)))
+  ) RETURNS bignumeric AS ((
+SELECT
+  SUM(PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+                                  -- .inputAppRewardAmount
+                                  TransferResult_summary || '[0].value.numeric'))
+    + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+                                  -- .inputValidatorRewardAmount
+                                  TransferResult_summary || '[1].value.numeric'))
+    + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+                                  -- .inputSvRewardAmount
+                                  TransferResult_summary || '[2].value.numeric')))
 FROM
   mainnet_da2_scan.scan_sv_1_update_history_exercises e
 WHERE
@@ -145,7 +118,7 @@ WHERE
   AND e.template_id_entity_name = 'AmuletRules'
   AND (e.migration_id < migration_id
     OR (e.migration_id = migration_id
-      AND e.record_time <= UNIX_MICROS(as_of_record_time))));;
+      AND e.record_time <= UNIX_MICROS(as_of_record_time)))));
 
 
 -- fees from a Splice.AmuletRules:TransferResult
@@ -197,11 +170,7 @@ CREATE TEMP FUNCTION
 CREATE TEMP FUNCTION burned(
     as_of_record_time timestamp,
                               migration_id int64
-  ) RETURNS bignumeric AS (
-
-
-
-  (
+  ) RETURNS bignumeric AS ((
     SELECT
         SUM(fees)
     FROM ((
@@ -240,7 +209,7 @@ CREATE TEMP FUNCTION burned(
                 AND c.template_id_entity_name = 'Amulet'
                 AND (e.migration_id < migration_id
                   OR (e.migration_id = migration_id
-                      AND e.record_time <= UNIX_MICROS(as_of_record_time))))));;
+                      AND e.record_time <= UNIX_MICROS(as_of_record_time)))))));
 
 
 -- using the functions
