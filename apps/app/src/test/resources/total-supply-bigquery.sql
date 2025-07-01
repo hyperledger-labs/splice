@@ -169,7 +169,7 @@ CREATE TEMP FUNCTION
 -- Amulet burned via fees.
 CREATE TEMP FUNCTION burned(
     as_of_record_time timestamp,
-                              migration_id int64
+                              migration_id_arg int64
   ) RETURNS bignumeric AS ((
     SELECT
         SUM(fees)
@@ -188,8 +188,8 @@ CREATE TEMP FUNCTION burned(
                       OR (e.choice = 'TransferPreapproval_Renew'
                           AND e.template_id_entity_name = 'TransferPreapproval'))
                 AND e.template_id_module_name = 'Splice.AmuletRules'
-                AND (e.migration_id < migration_id
-                  OR (e.migration_id = migration_id
+                AND (e.migration_id < migration_id_arg
+                  OR (e.migration_id = migration_id_arg
                       AND e.record_time <= UNIX_MICROS(as_of_record_time))))
           UNION ALL (-- Purchasing ANS Entries
               SELECT
@@ -207,8 +207,8 @@ CREATE TEMP FUNCTION burned(
                 AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
                 AND c.template_id_module_name = 'Splice.Amulet'
                 AND c.template_id_entity_name = 'Amulet'
-                AND (e.migration_id < migration_id
-                  OR (e.migration_id = migration_id
+                AND (e.migration_id < migration_id_arg
+                  OR (e.migration_id = migration_id_arg
                       AND e.record_time <= UNIX_MICROS(as_of_record_time)))))));
 
 
