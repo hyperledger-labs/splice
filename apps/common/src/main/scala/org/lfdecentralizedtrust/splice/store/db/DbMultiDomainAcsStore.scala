@@ -1545,11 +1545,12 @@ final class DbMultiDomainAcsStore[TXE](
                 val interfaceIdQualifiedName = QualifiedName(interfaceId)
                 val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
                 val viewJson = interfaceRow.interfaceView
+                val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
+                val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
                 // TODO: errors
-                // TODO: index columns
                 (sql"""
-                insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
-                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null)""").toActionBuilder.asUpdate
+                insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error #$indexColumnNames)
+                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
               })
             }
         case (None, Some(rowData)) =>
