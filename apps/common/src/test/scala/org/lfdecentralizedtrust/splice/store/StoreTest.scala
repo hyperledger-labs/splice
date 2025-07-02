@@ -602,6 +602,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       packageName: String = dummyPackageName,
       observers: Seq[PartyId] = Seq.empty,
       implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+      failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
   ): CreatedEvent = {
     new CreatedEvent(
       Seq.empty[String].asJava,
@@ -613,7 +614,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract.payload.toValue,
       contract.createdEventBlob,
       implementedInterfaces.asJava,
-      new java.util.HashMap(),
+      failedInterfaces.asJava,
       None.toJava,
       signatories.map(_.toProtoPrimitive).asJava,
       observers.map(_.toProtoPrimitive).asJava,
@@ -847,6 +848,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       packageName: String = dummyPackageName,
       createdEventObservers: Seq[PartyId] = Seq.empty,
       implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+      failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
   ) = mkTx(
     offset,
     createRequests.map[TreeEvent](
@@ -856,6 +858,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         packageName,
         createdEventObservers,
         implementedInterfaces,
+        failedInterfaces,
       )
     ),
     synchronizerId,
@@ -1002,6 +1005,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         packageName: String = dummyPackageName,
         createdEventObservers: Seq[PartyId] = Seq.empty,
         implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+        failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -1014,6 +1018,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         packageName,
         createdEventObservers,
         implementedInterfaces,
+        failedInterfaces,
       )
 
       store.testIngestionSink

@@ -24,6 +24,9 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
+import com.google.protobuf.util.JsonFormat
+import io.circe.Json
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 
 import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
@@ -337,6 +340,56 @@ class DbMultiDomainAcsStoreTest
           o2 <- store.lookupLastIngestedOffset()
           _ = o2 shouldBe Some(5)
         } yield succeed
+      }
+    }
+
+    "ingest view failures" in {
+      implicit val store = mkStore()
+      val contractsToFailedViews = (1 to 3).map { n =>
+        val contract = dummyHolding(providerParty(n), BigDecimal(n), dsoParty)
+        val failedView = com.google.rpc.Status
+          .newBuilder()
+          .setCode(n * 100)
+          .setMessage(s"test entry num $n")
+          .build()
+        contract -> failedView
+      }
+
+      for {
+        _ <- initWithAcs()
+        _ <- MonadUtil.sequentialTraverse(contractsToFailedViews) { case (contract, failedView) =>
+          d1.create(
+            contract,
+            failedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+            ),
+          )
+        }
+        storedResult <- {
+          // this is not meant to be exposed, so we have to check the DB directly
+          import storage.api.jdbcProfile.api.*
+          storage
+            .query(
+              sql"select view_compute_error from interface_views_template where view_compute_error is not null order by acs_event_number"
+                .as[Json],
+              "queryViewComputeErrors",
+            )
+            .failOnShutdown
+        }
+        // they shouldn't be returned since they can't be parsed
+        expectedEmpty <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        // Use grpc JsonFormat to parse the error details
+        val parsed = storedResult.map { json =>
+          val builder = com.google.rpc.Status.newBuilder()
+          JsonFormat.parser().ignoringUnknownFields().merge(json.noSpaces, builder)
+          builder.build()
+        }
+        parsed should be(contractsToFailedViews.map(_._2))
+
+        expectedEmpty shouldBe empty
       }
     }
 

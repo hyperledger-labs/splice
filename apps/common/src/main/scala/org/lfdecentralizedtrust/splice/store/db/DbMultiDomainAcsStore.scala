@@ -746,12 +746,14 @@ final class DbMultiDomainAcsStore[TXE](
     val interfaceId = companionClass.typeId(companion)
     val opName = s"listInterfaceViews:${interfaceId.getEntityName}"
     for {
+      // assumption: most rows will satisfy `AND interface_view IS NOT NULL`, so we don't need to index for it
       rows <- storage.query(
         sql"""
              SELECT contract_id, interface_view, acs.created_at, acs.created_event_blob
              FROM interface_views_template interface
                JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
              WHERE interface_id_qualified_name = ${QualifiedName(interfaceId)}
+               AND interface_view IS NOT NULL
              ORDER BY interface.acs_event_number
            """.as[(String, Json, Timestamp, Array[Byte])],
         opName,
@@ -1558,7 +1560,7 @@ final class DbMultiDomainAcsStore[TXE](
                   val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
                   val viewStatusJson = JsonFormat.printer.print(viewStatus)
                   (sql"""insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
-                         values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, null, $viewStatusJson)""").toActionBuilder.asUpdate
+                         values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, null, ($viewStatusJson)::jsonb)""").toActionBuilder.asUpdate
               })
             }
         case (None, Some(rowData)) =>

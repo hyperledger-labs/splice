@@ -175,7 +175,7 @@ abstract class MultiDomainAcsStoreTest[
   }
   private val charsetMatchingDbBytes = java.nio.charset.Charset forName "UTF-8"
 
-  private def dummyHolding(owner: PartyId, amount: BigDecimal, issuer: PartyId) = {
+  protected def dummyHolding(owner: PartyId, amount: BigDecimal, issuer: PartyId) = {
     val templateId = DummyHolding.TEMPLATE_ID
     val payload =
       new DummyHolding(owner.toProtoPrimitive, issuer.toProtoPrimitive, amount.bigDecimal)

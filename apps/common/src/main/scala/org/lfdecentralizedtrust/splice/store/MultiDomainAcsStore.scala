@@ -381,13 +381,18 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean = {
-      val interfaceTemplates =
-        ev.getFailedInterfaceViews.keySet().asScala ++ ev.getInterfaceViews.asScala.keys
-      val matchingInterfaces =
-        interfaceTemplates.map(QualifiedName(_)).flatMap(interfaceFiltersWithoutPackageNames.get)
-      templateFiltersWithoutPackageNames
+      val matchesTemplate = templateFiltersWithoutPackageNames
         .get(QualifiedName(ev.getTemplateId))
-        .exists(_.evPredicate(ev)) || matchingInterfaces.exists(_.evPredicate(ev))
+        .exists(_.evPredicate(ev))
+      lazy val successfulInterfaces = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
+        interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier)).exists(_.evPredicate(ev))
+      }
+      lazy val failedInterfaces = ev.getFailedInterfaceViews.asScala.filter {
+        case (identifier, _) =>
+          // for failed interfaces we cannot check the `evPredicate` yet we still must store the row
+          interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier))
+      }
+      matchesTemplate || successfulInterfaces.nonEmpty || failedInterfaces.nonEmpty
     }
 
     override def mightContain(
