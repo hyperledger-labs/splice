@@ -38,6 +38,7 @@ class DbExternalPartyWalletStore(
 ) extends DbAppStore(
       storage = storage,
       acsTableName = WalletTables.externalPartyAcsTableName,
+      interfaceViewsTableNameOpt = None,
       acsStoreDescriptor = StoreDescriptor(
         version = 1,
         name = "DbExternalPartyWalletStore",

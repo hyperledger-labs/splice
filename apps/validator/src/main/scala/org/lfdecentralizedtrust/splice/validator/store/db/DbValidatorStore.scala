@@ -62,6 +62,7 @@ class DbValidatorStore(
 ) extends DbAppStore(
       storage = storage,
       acsTableName = ValidatorTables.acsTableName,
+      interfaceViewsTableNameOpt = None,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(

@@ -99,6 +99,7 @@ class DbMultiDomainAcsStoreTest
           ),
         acsTableName = "scan_acs_store", // to have extra columns
         txLogTableName = Some("txlog_store_template"),
+        interfaceViewsTableNameOpt = None,
       )
       val coupon = c(1)
       for {
@@ -395,6 +396,10 @@ class DbMultiDomainAcsStoreTest
 
   }
 
+  override protected def additionalExpectedWarnings: Set[String] = Set(
+    "Storing failed interface computation" // for test "ingest view failures"
+  )
+
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
     DbMultiDomainAcsStore.StoreDescriptor(
       version = 1,
@@ -424,6 +429,7 @@ class DbMultiDomainAcsStoreTest
       filter,
       "acs_store_template",
       txLogId.map(_ => "txlog_store_template"),
+      Some("interface_views_template"),
     )
   }
 
@@ -435,6 +441,7 @@ class DbMultiDomainAcsStoreTest
       filter: MultiDomainAcsStore.ContractFilter[R, GenericInterfaceRowData],
       acsTableName: String,
       txLogTableName: Option[String],
+      interfaceViewsTableNameOpt: Option[String],
   ) = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -447,6 +454,7 @@ class DbMultiDomainAcsStoreTest
       storage,
       acsTableName,
       txLogTableName,
+      interfaceViewsTableNameOpt,
       storeDescriptor(acsId, participantId),
       txLogId.map(storeDescriptor(_, participantId)),
       loggerFactory,

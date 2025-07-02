@@ -580,6 +580,7 @@ class TxLogBackfillingStoreTest
       storage,
       acsTableName,
       txLogTableName,
+      None,
       storeDescriptor(acsId, participantId),
       txLogId.map(storeDescriptor(_, participantId)),
       loggerFactory,

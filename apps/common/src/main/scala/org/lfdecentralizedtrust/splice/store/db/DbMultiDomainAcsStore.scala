@@ -79,6 +79,7 @@ final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableNameOpt: Option[String],
+    interfaceViewsTableNameOpt: Option[String],
     acsStoreDescriptor: StoreDescriptor,
     txLogStoreDescriptor: Option[StoreDescriptor],
     override protected val loggerFactory: NamedLoggerFactory,
@@ -137,6 +138,10 @@ final class DbMultiDomainAcsStore[TXE](
 
   private[this] def txLogTableName =
     txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
+
+  private[this] def interfaceViewsTableName = interfaceViewsTableNameOpt.getOrElse(
+    throw new RuntimeException("This store does not ingest interfaces")
+  )
 
   // Some callers depend on all queries always returning sensible data, but may perform queries
   // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
@@ -750,7 +755,7 @@ final class DbMultiDomainAcsStore[TXE](
       rows <- storage.query(
         sql"""
              SELECT contract_id, interface_view, acs.created_at, acs.created_event_blob
-             FROM interface_views_template interface
+             FROM #$interfaceViewsTableName interface
                JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
              WHERE interface_id_qualified_name = ${QualifiedName(interfaceId)}
                AND interface_view IS NOT NULL
@@ -1552,7 +1557,7 @@ final class DbMultiDomainAcsStore[TXE](
                 val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
                 val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
                 (sql"""
-                insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error #$indexColumnNames)
+                insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error #$indexColumnNames)
                 values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
               } ++ failedInterfaces.map {
                 case row @ FailedInterfaceComputationRow(interfaceId, viewStatus) =>
@@ -1562,7 +1567,7 @@ final class DbMultiDomainAcsStore[TXE](
                   val interfaceIdQualifiedName = QualifiedName(interfaceId)
                   val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
                   val viewStatusJson = JsonFormat.printer.print(viewStatus)
-                  (sql"""insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
+                  (sql"""insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
                          values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, null, ($viewStatusJson)::jsonb)""").toActionBuilder.asUpdate
               })
             }
