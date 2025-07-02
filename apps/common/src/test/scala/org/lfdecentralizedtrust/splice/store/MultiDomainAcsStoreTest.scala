@@ -1030,6 +1030,81 @@ abstract class MultiDomainAcsStoreTest[
       }
     }
 
+    "archive ingested interface views" in {
+      implicit val store = mkStore()
+      val dummies = (1 to 3).map { n =>
+        val owner = providerParty(n)
+        (
+          dummyHolding(owner, BigDecimal(n), dsoParty),
+          holdingView(owner, BigDecimal(n), dsoParty, "DUM"),
+        )
+      }
+      val amulets = (4 to 6).map { n =>
+        val owner = providerParty(n)
+        (
+          amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.0001)),
+          holdingView(owner, BigDecimal(n), dsoParty, "AMT"),
+        )
+      }
+      for {
+        _ <- initWithAcs()
+        _ <- MonadUtil.sequentialTraverse(dummies) { case (contract, holdingView) =>
+          d1.create(
+            contract,
+            implementedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+            ),
+          )
+        }
+        _ <- MonadUtil.sequentialTraverse(amulets) { case (contract, holdingView) =>
+          d1.create(
+            contract,
+            implementedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+            ),
+          )
+        }
+        resultBeforeArchive <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        _ <- d1.archive(
+          amulets(1)._1,
+          implementedInterfaces = Seq(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID
+          ),
+        )
+        _ <- d1.archive(
+          dummies(1)._1,
+          implementedInterfaces = Seq(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID
+          ),
+        )
+        resultAfterArchive <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        resultBeforeArchive should be((dummies ++ amulets).map { case (contract, holdingView) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            holdingView,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
+        resultAfterArchive should be(Seq(dummies(0), dummies(2), amulets(0), amulets(2)).map {
+          case (contract, holdingView) =>
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contract.contractId.contractId),
+              holdingView,
+              contract.createdEventBlob,
+              contract.createdAt,
+            )
+        })
+      }
+    }
+
     "ingest and return interface views for a template that's included as template and interface" in {
       implicit val store = mkStore(filter = {
         import MultiDomainAcsStore.mkFilter

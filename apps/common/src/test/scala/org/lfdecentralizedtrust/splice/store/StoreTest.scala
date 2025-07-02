@@ -622,7 +622,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def toArchivedEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
+      contract: Contract[TCid, T],
+      implementedInterfaces: Seq[Identifier] = Seq.empty,
   ): ExercisedEvent = {
     new ExercisedEvent(
       Seq.empty.asJava,
@@ -638,7 +639,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       true,
       1,
       damlUnit.getInstance(),
-      Seq.empty.asJava,
+      implementedInterfaces.asJava,
     )
   }
 
@@ -716,7 +717,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exercised.isConsuming,
         nodeId,
         exercised.getExerciseResult,
-        Seq.empty.asJava,
+        exercised.getImplementedInterfaces,
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
@@ -1055,8 +1056,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def archive[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
+        implementedInterfaces: Seq[Identifier] = Seq.empty,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
-      val tx = mkTx(nextOffset(), Seq(toArchivedEvent(c)), domain, txEffectiveAt)
+      val tx =
+        mkTx(nextOffset(), Seq(toArchivedEvent(c, implementedInterfaces)), domain, txEffectiveAt)
       store.testIngestionSink
         .ingestUpdate(
           domain,
