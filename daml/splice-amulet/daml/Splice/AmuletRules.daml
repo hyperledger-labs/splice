@@ -1360,6 +1360,7 @@ template ExternalPartySetupProposal
     choice ExternalPartySetupProposal_Accept : ExternalPartySetupProposal_AcceptResult
       controller user
       do
+        assertWithinDeadline "ExternalPartySetupProposal.preapprovalExpiresAt" preapprovalExpiresAt
         validatorRightCid <- create ValidatorRight with
            dso
            validator
@@ -1373,11 +1374,36 @@ template ExternalPartySetupProposal
           expiresAt = preapprovalExpiresAt
         return ExternalPartySetupProposal_AcceptResult with ..
 
+    -- users can always reject the proposal
+    choice ExternalPartySetupProposal_Reject : ExternalPartySetupProposal_RejectResult
+      with
+        reason : Text
+      controller user
+      do return ExternalPartySetupProposal_RejectResult with dummyArg = ()
+
+    -- validators can always withdraw the proposal, also on expiry
+    choice ExternalPartySetupProposal_Withdraw : ExternalPartySetupProposal_WithdrawResult
+      with
+        reason : Text
+      controller validator
+      do return ExternalPartySetupProposal_WithdrawResult with dummyArg = ()
+
 data ExternalPartySetupProposal_AcceptResult = ExternalPartySetupProposal_AcceptResult
   with
     validatorRightCid : ContractId ValidatorRight
     transferPreapprovalCid : ContractId TransferPreapproval
   deriving (Show, Eq)
+
+data ExternalPartySetupProposal_RejectResult = ExternalPartySetupProposal_RejectResult
+  with
+    dummyArg : () -- to ensure this can be upgraded as a record
+  deriving (Show, Eq)
+
+data ExternalPartySetupProposal_WithdrawResult = ExternalPartySetupProposal_WithdrawResult
+  with
+    dummyArg : () -- to ensure this can be upgraded as a record
+  deriving (Show, Eq)
+
 
 -- Transfer Pre-approval
 -- ----------------------
