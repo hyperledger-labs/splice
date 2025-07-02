@@ -191,6 +191,101 @@ class ScanAggregatorTest
       roundTotals shouldBe None
     }
 
+    "2 append round totals from round zero to last closed round (inclusive)" in {
+      val (aggr, store) =
+        mkAggregator(dsoParty, initialRound = 1).futureValue
+      val range = (10 to 13)
+
+      val party1 = mkPartyId("party1")
+      for {
+        _ <- MonadUtil
+          .sequentialTraverse(range) { i =>
+            addAppReward(
+              store,
+              i.toLong,
+              i.toDouble - 10,
+              party1,
+            )
+          }
+        _ <- MonadUtil
+          .sequentialTraverse(range) { i =>
+            addValidatorReward(
+              store,
+              i.toLong,
+              (i + 1).toDouble - 10,
+              party1,
+            )
+          }
+        _ <- MonadUtil
+          .sequentialTraverse(range) { i =>
+            addClosedRound(
+              store,
+              i.toLong,
+            )
+          }
+      } yield {
+        val lastClosedRound = 12L
+        val previousRoundTotals = aggr.getLastAggregatedRoundTotals().futureValue
+        val _ = storage
+          .update_(
+            aggr.aggregateRoundTotals(previousRoundTotals, lastClosedRound),
+            "aggregate round totals",
+          )
+          .futureValueUS
+
+        val roundTotals0 = aggr.getRoundTotals(10L).futureValue.value
+        roundTotals0.copy(closedRoundEffectiveAt = CantonTimestamp.MinValue) shouldBe
+          RoundTotals(
+            closedRound = 10L,
+            closedRoundEffectiveAt = CantonTimestamp.MinValue,
+            appRewards = BigDecimal(0),
+            validatorRewards = BigDecimal(1),
+            cumulativeAppRewards = BigDecimal(0),
+            cumulativeValidatorRewards = BigDecimal(1),
+          )
+
+        val roundTotals1 = aggr.getRoundTotals(11L).futureValue.value
+        roundTotals1.copy(closedRoundEffectiveAt = CantonTimestamp.MinValue) shouldBe
+          RoundTotals(
+            closedRound = 11L,
+            closedRoundEffectiveAt = CantonTimestamp.MinValue,
+            appRewards = BigDecimal(1),
+            validatorRewards = BigDecimal(2),
+            cumulativeAppRewards = roundTotals0.appRewards + BigDecimal(1),
+            cumulativeValidatorRewards = roundTotals0.validatorRewards + BigDecimal(2),
+          )
+
+        val prevTotals = aggr.getLastAggregatedRoundTotals().futureValue.value
+
+        prevTotals.copy(closedRoundEffectiveAt = CantonTimestamp.MinValue) shouldBe
+          RoundTotals(
+            closedRound = 12L,
+            closedRoundEffectiveAt = CantonTimestamp.MinValue,
+            appRewards = BigDecimal(2),
+            validatorRewards = BigDecimal(3),
+            cumulativeAppRewards = BigDecimal(3),
+            cumulativeValidatorRewards = BigDecimal(6),
+          )
+        store
+          .getRewardsCollectedInRound(12L)
+          .futureValue shouldBe prevTotals.appRewards + prevTotals.validatorRewards
+        val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
+        round shouldBe prevTotals.closedRound
+        effectiveAt shouldBe prevTotals.closedRoundEffectiveAt.toInstant
+        store.getAggregatedRounds().futureValue.value shouldBe ScanAggregator.RoundRange(
+          10L,
+          prevTotals.closedRound,
+        )
+        store
+          .getRoundTotals(prevTotals.closedRound, prevTotals.closedRound)
+          .futureValue
+          .loneElement shouldBe prevTotals
+        store
+          .getRoundTotals(10L, prevTotals.closedRound)
+          .futureValue should contain theSameElementsAs Seq(roundTotals0, roundTotals1, prevTotals)
+      }
+    }
+
     "append round totals from round zero to last closed round (inclusive)" in {
       val (aggr, store) =
         mkAggregator(dsoParty).futureValue
@@ -856,7 +951,7 @@ class ScanAggregatorTest
       .map { case (party, totals) =>
         totals.foldLeft(List.empty[RoundPartyTotals]) { (acc, t) =>
           val prev =
-            acc.lastOption.getOrElse(RoundPartyTotals(party = party))
+            acc.lastOption.getOrElse(RoundPartyTotals(closedRound = 0, party = party))
           val rpt = RoundPartyTotals(
             closedRound = t.closedRound,
             party = t.party,
@@ -891,6 +986,7 @@ class ScanAggregatorTest
       dsoParty: PartyId,
       ingestFromParticipantBegin: Boolean = false,
       createReader: DbScanStore => ScanAggregatesReader = createReader,
+      initialRound: Int = 0,
   ): Future[(ScanAggregator, DbScanStore)] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -921,6 +1017,7 @@ class ScanAggregatorTest
       svNodeStateCacheTtl = NonNegativeFiniteDuration.ofSeconds(30),
       enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory()),
+      initialRound = initialRound,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

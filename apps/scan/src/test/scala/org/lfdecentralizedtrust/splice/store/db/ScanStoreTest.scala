@@ -2333,6 +2333,7 @@ class DbScanStoreTest
       svNodeStateCacheTtl = NonNegativeFiniteDuration.ofSeconds(30),
       enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory()),
+      initialRound = 0,
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

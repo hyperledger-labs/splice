@@ -62,6 +62,7 @@ final class ScanAggregator(
     logger.debug("Aggregation triggered.")
     (for {
       previousRoundTotals <- ensureConsecutiveAggregation()
+      _ = logger.debug(s"previousRoundTotals: $previousRoundTotals")
       lastClosedRoundO <- getLastCompletelyClosedRoundAfter(previousRoundTotals.map(_.closedRound))
       _ <- lastClosedRoundO match {
         case Some(lastClosedRound) =>
@@ -165,7 +166,6 @@ final class ScanAggregator(
   ): Future[Option[RoundTotals]] =
     for {
       lastRoundTotals <- getLastAggregatedRoundTotals()
-      prin <- getLastAggregatedRoundTotalsPrint()
       previousRoundTotals <- lastRoundTotals match {
         case Some(prev) =>
           logger.debug(
@@ -177,7 +177,6 @@ final class ScanAggregator(
             logger.debug(
               s"Aggregation starts from round $initialRound, store_id = $roundTotalsStoreId"
             )
-            logger.debug(s"MY QUERRY: $prin")
             Future.successful(None)
           } else {
             for {
@@ -185,7 +184,7 @@ final class ScanAggregator(
               prev <- openRound match {
                 case Some(round) if round == initialRound =>
                   logger.debug(
-                    s"Updating aggregates from DSO for round zero, store_id = $roundTotalsStoreId"
+                    s"Updating aggregates from DSO for round $round, store_id = $roundTotalsStoreId"
                   )
                   updateRoundAggregateFromDso(round)
                 case Some(round) if round > initialRound =>
@@ -324,22 +323,6 @@ final class ScanAggregator(
       .transactionally
   }
 
-  def getLastAggregatedRoundTotalsPrint()(implicit
-      traceContext: TraceContext
-  ): Future[Option[RoundTotals]] = {
-    val q = sql"""
-      select #$roundTotalsColumns
-      from   round_totals
-      where  store_id = $roundTotalsStoreId
-    """
-    storage
-      .querySingle(
-        q.as[RoundTotals].headOption,
-        "getLastAggregatedRoundTotals",
-      )
-      .value
-  }
-
   def getLastAggregatedRoundTotals()(implicit
       traceContext: TraceContext
   ): Future[Option[RoundTotals]] = {
@@ -445,12 +428,17 @@ final class ScanAggregator(
           "Open issuing or summarizing rounds for closed rounds: " + roundsOpenIssuingOrSummarizing
             .mkString(", ")
         )
+      _ = logger.debug(s"Rounds: $rounds")
       availableClosedRounds = (rounds
         .map(_._1)
         .toSet -- (roundsIncomplete ++ roundsOpenIssuingOrSummarizing).toSet).toVector.sorted
+      _ = logger.debug(s"availableClosedRounds: $availableClosedRounds")
       lastRound = availableClosedRounds.foldLeft(candidateLastRound) { (lastClosedRound, round) =>
-        if (round == lastClosedRound + 1) round else lastClosedRound
+        if (lastClosedRound == -1) round
+        else if (round == lastClosedRound + 1) round
+        else lastClosedRound
       }
+      _ = logger.debug(s"lastRound: $lastRound")
       result <-
         if ( // whether there might be another page
           rounds.sizeIs >= closedRoundsSinceLimit
@@ -459,10 +447,16 @@ final class ScanAggregator(
         ) {
           // effectively, if the fold above didn't terminate before the last
           // element, it might keep folding if we retrieve more closed rounds
+          logger.debug(
+            s"Rounds size: ${rounds.sizeIs}, closedRoundsSinceLimit: ${closedRoundsSinceLimit}, availableClosedRounds: $availableClosedRounds, lastRound: $lastRound"
+          )
           go(lastRound)
         } else
           Future successful {
             if (lastRound == lastAggregatedRound) {
+              logger.debug(
+                s"LastRound $lastRound is equal to lastAggregatedRound $lastAggregatedRound"
+              )
               None
             } else if (lastRound < lastAggregatedRound) {
               logger.error(
@@ -473,6 +467,7 @@ final class ScanAggregator(
               if (lastAggregatedRound == -1) {
                 if (isFirstSv) {
                   // only allowed to start from round zero with no previous total rounds if the scan is reading from participant begin (the sv1)
+                  logger.debug(s"Last round is $lastRound")
                   Some(lastRound)
                 } else {
                   logger.debug(
@@ -481,6 +476,7 @@ final class ScanAggregator(
                   None
                 }
               } else {
+                logger.debug(s"Last round is $lastRound")
                 Some(lastRound)
               }
             }
@@ -1023,7 +1019,7 @@ object ScanAggregator {
     }
 
   final case class RoundPartyTotals(
-      closedRound: Long = 0L,
+      closedRound: Long,
       party: String,
       appRewards: BigDecimal = zero,
       validatorRewards: BigDecimal = zero,
