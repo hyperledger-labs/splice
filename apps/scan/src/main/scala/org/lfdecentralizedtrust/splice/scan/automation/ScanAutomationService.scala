@@ -7,6 +7,7 @@ import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+  SqlIndexInitializationTrigger,
   TxLogBackfillingTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.UpgradesConfig
@@ -20,6 +21,7 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore}
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
@@ -34,6 +36,7 @@ class ScanAutomationService(
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
     store: ScanStore,
+    storage: Storage,
     snapshotStore: AcsSnapshotStore,
     ingestFromParticipantBegin: Boolean,
     ingestUpdateHistoryFromParticipantBegin: Boolean,
@@ -96,6 +99,12 @@ class ScanAutomationService(
       )
     )
   }
+  registerTrigger(
+    SqlIndexInitializationTrigger(
+      storage,
+      triggerContext,
+    )
+  )
 }
 
 object ScanAutomationService extends AutomationServiceCompanion {
