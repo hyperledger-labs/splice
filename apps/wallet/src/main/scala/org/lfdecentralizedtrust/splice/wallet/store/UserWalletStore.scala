@@ -255,9 +255,12 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
 
   /** Returns the list of unclaimed activity record. */
   def listUnclaimedActivityRecords(
-    limit: Limit = Limit.DefaultLimit,
+      limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[Seq[
-    Contract[amuletCodegen.UnclaimedActivityRecord.ContractId, amuletCodegen.UnclaimedActivityRecord]
+    Contract[
+      amuletCodegen.UnclaimedActivityRecord.ContractId,
+      amuletCodegen.UnclaimedActivityRecord,
+    ]
   ]] =
     for {
       rewards <- multiDomainAcsStore.listContracts(
@@ -268,7 +271,7 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
       limit,
       rewards.view
         .map(_.contract)
-        .toSeq
+        .toSeq,
     )
 
   final def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[

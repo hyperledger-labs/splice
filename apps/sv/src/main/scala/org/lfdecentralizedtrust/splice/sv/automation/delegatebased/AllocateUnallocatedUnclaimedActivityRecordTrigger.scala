@@ -7,7 +7,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
-  TriggerContext
+  TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.UnclaimedReward
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.UnallocatedUnclaimedActivityRecord
@@ -50,14 +50,16 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
   override def completeTaskAsDsoDelegate(
       unallocatedUnclaimedActivityRecord: UnallocatedUnclaimedActivityRecordContract,
       controller: String,
-  )(implicit tc: TraceContext): Future[TaskOutcome] = {  //)(implicit tc: TraceContext, ec: ExecutionContext): Future[TaskOutcome] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val store = svTaskContext.dsoStore
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       requiredAmount = unallocatedUnclaimedActivityRecord.payload.amount
       unclaimedRewardsToBurnCids <-
-        collectSufficientUnclaimedRewards(store, UNCLAIMED_REWARDS_LIMIT, requiredAmount).map(_.map(_.contractId))
+        collectSufficientUnclaimedRewards(store, UNCLAIMED_REWARDS_LIMIT, requiredAmount).map(
+          _.map(_.contractId)
+        )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AllocateUnallocatedUnclaimedActivityRecord(
           unallocatedUnclaimedActivityRecord.contract.contractId,
@@ -80,13 +82,16 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
   }
 
   private def collectSufficientUnclaimedRewards(
-    store: SvDsoStore,
-    limit: PageLimit,
-    requiredAmount: BigDecimal
-  )(implicit  tc: TraceContext, ec: ExecutionContext): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = {
+      store: SvDsoStore,
+      limit: PageLimit,
+      requiredAmount: BigDecimal,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = {
     def loop(
-      acc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-      accAmount: BigDecimal
+        acc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
+        accAmount: BigDecimal,
     ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = {
       if (accAmount >= requiredAmount) {
         Future.successful(takeSufficientUnclaimedRewards(acc, requiredAmount))
@@ -102,7 +107,8 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
             )
           } else {
             val updatedAcc = acc ++ newRewards
-            val updatedAmount = accAmount + newRewards.map(r => scala.math.BigDecimal(r.payload.amount)).sum
+            val updatedAmount =
+              accAmount + newRewards.map(r => scala.math.BigDecimal(r.payload.amount)).sum
             loop(updatedAcc, updatedAmount)
           }
         }
@@ -113,14 +119,14 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
   }
 
   private def takeSufficientUnclaimedRewards(
-    rewards: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-    target: BigDecimal
+      rewards: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
+      target: BigDecimal,
   ): Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]] = {
     @annotation.tailrec
     def loop(
-      remaining: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-      acc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-      sum: BigDecimal
+        remaining: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
+        acc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
+        sum: BigDecimal,
     ): Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]] = {
       if (sum >= target) acc
       else {

@@ -627,7 +627,9 @@ trait SvDsoStore
     splice.amulet.UnclaimedActivityRecord.ContractId,
     splice.amulet.UnclaimedActivityRecord,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.amulet.UnclaimedActivityRecord.COMPANION)
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.amulet.UnclaimedActivityRecord.COMPANION
+    )
 
   def listSvOnboardingConfirmed(
       limit: Limit = Limit.DefaultLimit
@@ -1318,13 +1320,12 @@ object SvDsoStore {
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
         )
       },
-      mkFilter(splice.amulet.UnclaimedActivityRecord.COMPANION)(co =>
-        co.payload.dso == dso
-      ) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
-        )
+      mkFilter(splice.amulet.UnclaimedActivityRecord.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
       },
     )
 

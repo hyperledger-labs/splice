@@ -13,24 +13,24 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 
 class ExpiredUnclaimedActivityRecordTrigger(
-  override protected val context: TriggerContext,
-  override protected val svTaskContext: SvTaskBasedTrigger.Context,
+    override protected val context: TriggerContext,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
-  override val ec: ExecutionContext,
-  mat: Materializer,
-  tracer: Tracer,
+    override val ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-  UnclaimedActivityRecord.ContractId,
-  UnclaimedActivityRecord,
-](
-  svTaskContext.dsoStore.multiDomainAcsStore,
-  svTaskContext.dsoStore.listExpiredUnclaimedActivityRecord,
-  UnclaimedActivityRecord.COMPANION,
-)
-  with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-    UnclaimedActivityRecord.ContractId,
-    UnclaimedActivityRecord,
-  ]]] {
+      UnclaimedActivityRecord.ContractId,
+      UnclaimedActivityRecord,
+    ](
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredUnclaimedActivityRecord,
+      UnclaimedActivityRecord.COMPANION,
+    )
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
+      UnclaimedActivityRecord.ContractId,
+      UnclaimedActivityRecord,
+    ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[
     AssignedContract[
       UnclaimedActivityRecord.ContractId,
@@ -41,19 +41,19 @@ class ExpiredUnclaimedActivityRecordTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
-    tc: TraceContext
+      tc: TraceContext
   ): Future[TaskOutcome] =
-      for {
-        dsoRules <- store.getDsoRules()
-        cmd = dsoRules.exercise(
-          _.exerciseDsoRules_ExpireUnclaimedActivityRecord(
-            co.work.contractId,
-            controller,
-          )
+    for {
+      dsoRules <- store.getDsoRules()
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_ExpireUnclaimedActivityRecord(
+          co.work.contractId,
+          controller,
         )
-        _ <- svTaskContext.connection
-          .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
-          .noDedup
-          .yieldUnit()
-      } yield TaskSuccess("archived expired unclaimed activity record")
+      )
+      _ <- svTaskContext.connection
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
+        .noDedup
+        .yieldUnit()
+    } yield TaskSuccess("archived expired unclaimed activity record")
 }

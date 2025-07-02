@@ -13,24 +13,24 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 
 class ExpiredUnallocatedUnclaimedActivityRecordTrigger(
-  override protected val context: TriggerContext,
-  override protected val svTaskContext: SvTaskBasedTrigger.Context,
+    override protected val context: TriggerContext,
+    override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
-  override val ec: ExecutionContext,
-  mat: Materializer,
-  tracer: Tracer,
+    override val ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-  UnallocatedUnclaimedActivityRecord.ContractId,
-  UnallocatedUnclaimedActivityRecord,
-](
-  svTaskContext.dsoStore.multiDomainAcsStore,
-  svTaskContext.dsoStore.listExpiredUnallocatedUnclaimedActivityRecord,
-  UnallocatedUnclaimedActivityRecord.COMPANION,
-)
-  with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-    UnallocatedUnclaimedActivityRecord.ContractId,
-    UnallocatedUnclaimedActivityRecord,
-  ]]] {
+      UnallocatedUnclaimedActivityRecord.ContractId,
+      UnallocatedUnclaimedActivityRecord,
+    ](
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredUnallocatedUnclaimedActivityRecord,
+      UnallocatedUnclaimedActivityRecord.COMPANION,
+    )
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
+      UnallocatedUnclaimedActivityRecord.ContractId,
+      UnallocatedUnclaimedActivityRecord,
+    ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[
     AssignedContract[
       UnallocatedUnclaimedActivityRecord.ContractId,
@@ -41,7 +41,7 @@ class ExpiredUnallocatedUnclaimedActivityRecordTrigger(
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(co: Task, controller: String)(implicit
-    tc: TraceContext
+      tc: TraceContext
   ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()

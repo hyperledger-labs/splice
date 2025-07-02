@@ -753,9 +753,10 @@ class TreasuryService(
         maxNumInputs,
         issuingRoundsMap,
       )
-      (unclaimedActivityRecordsQuantity, unclaimedActivityRecordInputs) <- getUnclaimedActivityRecordsAndQuantity(
-        maxNumInputs,
-      )
+      (unclaimedActivityRecordsQuantity, unclaimedActivityRecordInputs) <-
+        getUnclaimedActivityRecordsAndQuantity(
+          maxNumInputs
+        )
     } yield {
       val createFeeCc = SpliceUtil.dollarsToCC(configUsd.createFee.fee, amuletPrice)
       if (
@@ -1009,17 +1010,17 @@ class TreasuryService(
     } yield (appRewardsAmuletQuantity, appRewardInputs)
 
   private def getUnclaimedActivityRecordsAndQuantity(
-      maxNumInputs: Int,
+      maxNumInputs: Int
   )(implicit
       tc: TraceContext
   ): Future[(BigDecimal, Seq[(BigDecimal, InputUnclaimedActivityRecord)])] =
     for {
       unclaimedActivityRecordsInputs <- userStore.listUnclaimedActivityRecords(
-        PageLimit.tryCreate(maxNumInputs),
+        PageLimit.tryCreate(maxNumInputs)
       )
-      unclaimedActivityRecordsQuantity = unclaimedActivityRecordsInputs.map(uar =>
-        scala.math.BigDecimal(uar.payload.amount)
-      ).sum
+      unclaimedActivityRecordsQuantity = unclaimedActivityRecordsInputs
+        .map(uar => scala.math.BigDecimal(uar.payload.amount))
+        .sum
       unclaimedActivityRecordInputs = unclaimedActivityRecordsInputs.map(uar =>
         (
           new scala.math.BigDecimal(uar.payload.amount),

@@ -149,4 +149,3 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredUnclaimedActivityRecordTrigger],
   )
 }
-
