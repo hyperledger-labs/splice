@@ -20,6 +20,5 @@ stdenv.mkDerivation rec {
     tar --strip-components=1 -C $out -xzf $src
     # extract the first component of the path names
     tar -tzf $src | sed -ne '1s,/.*,,p' > $out/SUBDIR;
-    ln -s $out/bin/canton $out/bin/canton-test
   '';
 }
