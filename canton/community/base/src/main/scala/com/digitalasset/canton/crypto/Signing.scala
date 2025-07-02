@@ -773,7 +773,7 @@ object SigningKeyUsage {
     * topology requests such as OwnerToKeyMappings and PartyToKeyMappings. Generally, any key not
     * intended for namespace or identity delegation will have this usage automatically assigned.
     */
-  private case object ProofOfOwnership extends SigningKeyUsage {
+  case object ProofOfOwnership extends SigningKeyUsage {
     override val identifier: String = "proof-of-ownership"
     override val dbType: Byte = 4
     override def toProtoEnum: v30.SigningKeyUsage =
@@ -1444,7 +1444,7 @@ object SigningPublicKeyWithName {
 final case class SigningPrivateKey private (
     id: Fingerprint,
     format: CryptoKeyFormat,
-    protected[crypto] val key: ByteString,
+    val key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]],
 )(

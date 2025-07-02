@@ -561,7 +561,8 @@ object TlsClientConfigOnlyTrustFile {
       : CantonConfigValidator[TlsClientConfigOnlyTrustFile] = CantonConfigValidator.validateAll
 }
 
-/** */
+/**
+  */
 final case class TlsClientCertificate(certChainFile: PemFileOrString, privateKeyFile: PemFile)
     extends UniformCantonConfigValidation
 object TlsClientCertificate {

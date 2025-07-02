@@ -33,7 +33,7 @@ trait HasReassignmentCommandsHelpers {
       submittingParty: LfPartyId,
       participantOverride: Option[LocalParticipantReference] = None,
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): (UpdateService.UnassignedWrapper, Completion) = {
     import env.*
 
@@ -85,7 +85,7 @@ trait HasReassignmentCommandsHelpers {
       submittingParty: PartyId,
       participantOverrideO: Option[LocalParticipantReference] = None,
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Completion = {
     val unassignmentCmd = getReassignmentCommand(
       cmd = getUnassignmentCmd(cid = cid, source = source, target = target),
@@ -115,7 +115,7 @@ trait HasReassignmentCommandsHelpers {
       submittingParty: LfPartyId,
       participantOverride: Option[LocalParticipantReference] = None,
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): (UpdateService.AssignedWrapper, Completion) = {
     import env.*
 
@@ -167,7 +167,7 @@ trait HasReassignmentCommandsHelpers {
       submittingParty: PartyId,
       participantOverrideO: Option[LocalParticipantReference] = None,
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): Completion = {
     val assignmentCmd = getReassignmentCommand(
       cmd = getAssignmentCmd(
@@ -198,7 +198,7 @@ trait HasReassignmentCommandsHelpers {
       cmd: proto.reassignment_commands.ReassignmentCommands,
       participantOverride: Option[LocalParticipantReference] = None,
   )(implicit
-      env: TestConsoleEnvironment
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
   ): ConsoleCommandResult[proto.command_submission_service.SubmitReassignmentResponse] =
     participantOverride
       .getOrElse(env.participant1)

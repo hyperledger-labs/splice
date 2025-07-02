@@ -16,6 +16,7 @@ import com.digitalasset.canton.config.{
   MonitoringConfig,
   NonNegativeFiniteDuration as NonNegativeFiniteDurationConfig,
 }
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.bootstrap.{
   NetworkBootstrapper,
   NetworkTopologyDescription,
@@ -46,7 +47,7 @@ import monocle.macros.syntax.lens.*
 
 abstract class ExternalSequencerIntegrationTest(override val name: String)
     extends CommunityIntegrationTest
-    with SharedEnvironment
+    with SharedEnvironment[CantonConfig, CantonEnvironment]
     with HasExecutionContext
     with BasicSequencerTest
     with SequencerRestartTest {

@@ -37,7 +37,7 @@ class ApiRequestLogger(
       headers: Metadata,
       next: ServerCallHandler[ReqT, RespT],
   ): ServerCall.Listener[ReqT] = {
-    val requestTraceContext: TraceContext = inferRequestTraceContext
+    val requestTraceContext: TraceContext = TraceContextGrpc.inferServerRequestTraceContext
 
     val sender = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR).toString)
       .getOrElse("unknown sender")
