@@ -2,7 +2,7 @@ package org.lfdecentralizedtrust.splice.store
 
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.*
@@ -19,7 +19,6 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.MonadUtil
-import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationrequestv1,
   allocationv1,
@@ -57,7 +56,7 @@ abstract class MultiDomainAcsStoreTest[
 
   case class GenericInterfaceRowData(
       override val interfaceId: Identifier,
-      override val interfaceView: Json,
+      override val interfaceView: DamlRecord[?],
   ) extends AcsInterfaceViewRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
   }
@@ -82,9 +81,7 @@ abstract class MultiDomainAcsStoreTest[
         }(contract =>
           GenericInterfaceRowData(
             contract.identifier,
-            io.circe.parser
-              .parse(contract.payload.toJson)
-              .valueOrFail(s"Failed to parse interface payload of $contract"),
+            contract.payload,
           )
         ),
         mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE) { contract =>
@@ -92,9 +89,7 @@ abstract class MultiDomainAcsStoreTest[
         }(contract =>
           GenericInterfaceRowData(
             contract.identifier,
-            io.circe.parser
-              .parse(contract.payload.toJson)
-              .valueOrFail(s"Failed to parse interface payload of $contract"),
+            contract.payload,
           )
         ),
       ),
@@ -1122,9 +1117,7 @@ abstract class MultiDomainAcsStoreTest[
             }(contract =>
               GenericInterfaceRowData(
                 contract.identifier,
-                io.circe.parser
-                  .parse(contract.payload.toJson)
-                  .valueOrFail(s"Failed to parse interface payload of $contract"),
+                contract.payload,
               )
             )
           ),

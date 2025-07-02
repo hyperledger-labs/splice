@@ -1545,7 +1545,8 @@ final class DbMultiDomainAcsStore[TXE](
                 val interfaceId = interfaceRow.interfaceId
                 val interfaceIdQualifiedName = QualifiedName(interfaceId)
                 val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
-                val viewJson = interfaceRow.interfaceView
+                val viewJson =
+                  AcsJdbcTypes.payloadJsonFromDefinedDataType(interfaceRow.interfaceView)
                 val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
                 val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
                 (sql"""

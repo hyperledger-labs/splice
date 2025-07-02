@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.protobuf.ByteString
 import io.circe.Json
@@ -57,7 +57,7 @@ object TxLogRowData {
 
 trait AcsInterfaceViewRowData {
   val interfaceId: Identifier
-  val interfaceView: Json
+  val interfaceView: DamlRecord[?]
   def indexColumns: Seq[(String, IndexColumnValue[?])]
 }
 object AcsInterfaceViewRowData {
