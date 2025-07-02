@@ -341,6 +341,7 @@ object MultiDomainAcsStore {
   case class InterfaceFilter[ICid <: ContractId[Marker], Marker, View <: DamlRecord[
     ?
   ], IR <: AcsInterfaceViewRowData](
+      interfaceId: Identifier,
       evPredicate: CreatedEvent => Boolean,
       decodeFromCreatedEvent: DecodeInterfaceFromCreatedEvent[ICid, View],
       encodeToRow: EncodeInterfaceToRow[ICid, View, IR],
@@ -377,7 +378,8 @@ object MultiDomainAcsStore {
 
     override val ingestionFilter =
       IngestionFilter(
-        primaryParty
+        primaryParty,
+        interfaceFilters.values.map(_.interfaceId).toSeq,
       )
 
     override def contains(ev: CreatedEvent): Boolean = {
@@ -503,6 +505,7 @@ object MultiDomainAcsStore {
     (
       PackageQualifiedName(interfaceCompanion.getTemplateIdWithPackageId),
       InterfaceFilter(
+        interfaceCompanion.TEMPLATE_ID_WITH_PACKAGE_ID,
         ev => {
           val c = Contract.fromCreatedEvent(interfaceCompanion)(ev)
           c.exists(p)
@@ -520,6 +523,7 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
+      includeInterfaces: Seq[Identifier],
       includeCreatedEventBlob: Boolean = true,
   ) {
 
@@ -527,13 +531,27 @@ object MultiDomainAcsStore {
       LapiTransactionFilter(
         filtersByParty = Map(
           primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
-            Seq(
+            CumulativeFilter(
+              CumulativeFilter.IdentifierFilter.WildcardFilter(
+                com.daml.ledger.api.v2.transaction_filter.WildcardFilter(includeCreatedEventBlob)
+              )
+            ) +: includeInterfaces.map { interfaceId =>
               CumulativeFilter(
-                CumulativeFilter.IdentifierFilter.WildcardFilter(
-                  com.daml.ledger.api.v2.transaction_filter.WildcardFilter(includeCreatedEventBlob)
+                CumulativeFilter.IdentifierFilter.InterfaceFilter(
+                  com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
+                    Some(
+                      com.daml.ledger.api.v2.value.Identifier(
+                        packageId = interfaceId.getPackageId,
+                        moduleName = interfaceId.getModuleName,
+                        entityName = interfaceId.getEntityName,
+                      )
+                    ),
+                    includeInterfaceView = true,
+                    includeCreatedEventBlob = includeCreatedEventBlob,
+                  )
                 )
               )
-            )
+            }
           )
         ),
         filtersForAnyParty = None,
