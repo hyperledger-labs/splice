@@ -91,6 +91,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -660,6 +661,7 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
+                        Optional.of(sv1Config.initialRound),
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(

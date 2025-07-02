@@ -23,7 +23,7 @@ import {
 } from 'wallet-openapi';
 
 import * as payment from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
-import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.9/lib/Splice/AmuletTransferInstruction';
+import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';
 import { AppPaymentRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import {
   Subscription,

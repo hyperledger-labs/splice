@@ -174,6 +174,7 @@ class ScanApp(
         config.cache.svNodeStateTtl,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        config.initialRound,
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,

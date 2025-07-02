@@ -39,6 +39,7 @@ final class ScanAggregator(
     val loggerFactory: NamedLoggerFactory,
     domainMigrationId: Long,
     val timeouts: ProcessingTimeout,
+    val initialRound: Int,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -94,13 +95,15 @@ final class ScanAggregator(
       res <-
         earliestClosedRound match {
           case None =>
-            logger.debug("No closed round found in round_totals, not backfilling aggregates.")
-            Future.successful(None)
-          case Some(0L) =>
             logger.debug(
-              s"Round zero exists. No need to backfill aggregates."
+              s"No closed round found in round_totals, not backfilling aggregates with initial round = $initialRound."
             )
-            Future.successful(Some(0L))
+            Future.successful(None)
+          case Some(round) if round == initialRound =>
+            logger.debug(
+              s"Initial round $initialRound exists. No need to backfill aggregates."
+            )
+            Future.successful(Some(round))
           case Some(closedRound) =>
             val backFillRound = closedRound - 1L
             logger.debug(
@@ -162,6 +165,7 @@ final class ScanAggregator(
   ): Future[Option[RoundTotals]] =
     for {
       lastRoundTotals <- getLastAggregatedRoundTotals()
+      prin <- getLastAggregatedRoundTotalsPrint()
       previousRoundTotals <- lastRoundTotals match {
         case Some(prev) =>
           logger.debug(
@@ -170,18 +174,21 @@ final class ScanAggregator(
           Future.successful(lastRoundTotals)
         case None =>
           if (isFirstSv) {
-            logger.debug(s"Aggregation starts from round 0, store_id = $roundTotalsStoreId")
+            logger.debug(
+              s"Aggregation starts from round $initialRound, store_id = $roundTotalsStoreId"
+            )
+            logger.debug(s"MY QUERRY: $prin")
             Future.successful(None)
           } else {
             for {
               openRound <- findFirstOpenMiningRound()
               prev <- openRound match {
-                case Some(round) if round == 0L =>
+                case Some(round) if round == initialRound =>
                   logger.debug(
                     s"Updating aggregates from DSO for round zero, store_id = $roundTotalsStoreId"
                   )
-                  updateRoundAggregateFromDso(0)
-                case Some(round) if round > 0L =>
+                  updateRoundAggregateFromDso(round)
+                case Some(round) if round > initialRound =>
                   logger.debug(
                     s"Aggregation starts from round $round once last aggregates are updated from DSO, store_id = $roundTotalsStoreId"
                   )
@@ -317,6 +324,22 @@ final class ScanAggregator(
       .transactionally
   }
 
+  def getLastAggregatedRoundTotalsPrint()(implicit
+      traceContext: TraceContext
+  ): Future[Option[RoundTotals]] = {
+    val q = sql"""
+      select #$roundTotalsColumns
+      from   round_totals
+      where  store_id = $roundTotalsStoreId
+    """
+    storage
+      .querySingle(
+        q.as[RoundTotals].headOption,
+        "getLastAggregatedRoundTotals",
+      )
+      .value
+  }
+
   def getLastAggregatedRoundTotals()(implicit
       traceContext: TraceContext
   ): Future[Option[RoundTotals]] = {
@@ -324,7 +347,7 @@ final class ScanAggregator(
       select #$roundTotalsColumns
       from   round_totals
       where  store_id = $roundTotalsStoreId
-      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals where store_id = $roundTotalsStoreId)
+      and    closed_round = (select coalesce(max(closed_round), $initialRound) from round_totals where store_id = $roundTotalsStoreId)
     """
     storage
       .querySingle(
@@ -341,7 +364,7 @@ final class ScanAggregator(
       select closed_round
       from   round_totals
       where  store_id = $roundTotalsStoreId
-      and    closed_round = (select coalesce(min(closed_round), 0) from round_totals where store_id = $roundTotalsStoreId)
+      and    closed_round = (select coalesce(min(closed_round), $initialRound) from round_totals where store_id = $roundTotalsStoreId)
     """
     storage
       .querySingle(
@@ -399,6 +422,7 @@ final class ScanAggregator(
       traceContext: TraceContext
   ): Future[Option[Long]] = {
     val lastAggregatedRound = lastAggregatedRoundO.getOrElse(-1L)
+    logger.debug(s"lastAggregatedRound: $lastAggregatedRound")
     def go(candidateLastRound: Long): Future[Option[Long]] = for {
       rounds <- getClosedMiningRoundsSinceLastAggregated(candidateLastRound)
       _ = if (rounds.nonEmpty) logger.debug {
@@ -633,7 +657,7 @@ final class ScanAggregator(
         group by  round
         union all
         select    round,
-                  max(coalesce(closed_round_effective_at,0)) as closed_round_effective_at,
+                  max(coalesce(closed_round_effective_at, $initialRound)) as closed_round_effective_at,
                   0 as app_rewards,
                   0 as validator_rewards,
                   0 as change_to_initial_amount_as_of_round_zero,
@@ -940,7 +964,7 @@ object ScanAggregator {
     def contains(round: Long): Boolean = round >= start && round <= end
   }
   final case class RoundTotals(
-      closedRound: Long = 0L,
+      closedRound: Long,
       closedRoundEffectiveAt: CantonTimestamp = CantonTimestamp.MinValue,
       appRewards: BigDecimal = zero,
       validatorRewards: BigDecimal = zero,

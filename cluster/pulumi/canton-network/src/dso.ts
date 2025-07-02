@@ -19,7 +19,7 @@ import {
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
-import { StaticCometBftConfigWithNodeName, svConfigs } from 'splice-pulumi-common-sv';
+import { StaticCometBftConfigWithNodeName, svConfig, svConfigs } from 'splice-pulumi-common-sv';
 import {
   clusterSvsConfiguration,
   SequencerPruningConfig,
@@ -70,6 +70,7 @@ export class Dso extends pulumi.ComponentResource {
     },
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
+    initialRound?: string,
     isFirstSv = false,
     cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
     extraDependsOn: CnInput<pulumi.Resource>[] = []
@@ -113,6 +114,7 @@ export class Dso extends pulumi.ComponentResource {
         onboardingPollingInterval: this.args.onboardingPollingInterval,
         sweep: svConf.sweep,
         cometBftGovernanceKey,
+        initialRound,
       },
       this.args.decentralizedSynchronizerUpgradeConfig,
       extraDependsOn
@@ -181,6 +183,7 @@ export class Dso extends pulumi.ComponentResource {
       },
       additionalSvIdentities,
       this.args.expectedValidatorOnboardings,
+      svConfig?.initialRound,
       true,
       cometBftGovernanceKeys[sv1Conf.onboardingName]
     );
@@ -214,6 +217,7 @@ export class Dso extends pulumi.ComponentResource {
         cometBft,
         additionalSvIdentities,
         [],
+        svConfig?.initialRound,
         false,
         cometBftGovernanceKeys[conf.onboardingName],
         incrementalOnboarding ? previousSvs.map(sv => sv.svApp) : []

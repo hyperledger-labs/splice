@@ -4,7 +4,7 @@ import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
 import { AmuletPosition } from 'wallet-openapi';
 
-import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.9/lib/Splice/AmuletTransferInstruction';
+import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';
 import {
   Subscription,
   SubscriptionIdleState,

@@ -262,7 +262,8 @@ export async function installSvNode(
     canton.decentralizedSynchronizer,
     svApp,
     canton.participant,
-    appsPostgres
+    appsPostgres,
+    config.initialRound
   );
 
   if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
@@ -404,6 +405,7 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialRound: config.initialRound,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     ...(useCantonBft
@@ -508,7 +510,8 @@ function installScan(
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: pulumi.Resource,
   participant: SvParticipant,
-  postgres: Postgres
+  postgres: Postgres,
+  initialRound?: string
 ) {
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
@@ -542,6 +545,7 @@ function installScan(
       : {}),
     enablePostgresMetrics: true,
     ...updateHistoryBackfillingValues,
+    initialRound: initialRound,
   };
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {

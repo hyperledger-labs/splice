@@ -321,6 +321,7 @@ object ScanStore {
       svNodeStateCacheTtl: NonNegativeFiniteDuration,
       enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
+      initialRound: Int,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -340,6 +341,7 @@ object ScanStore {
           svNodeStateCacheTtl,
           enableImportUpdateBackfill,
           metrics,
+          initialRound,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
