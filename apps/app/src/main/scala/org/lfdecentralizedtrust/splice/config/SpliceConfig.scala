@@ -692,6 +692,16 @@ object SpliceConfig {
               s"Pruning retention period ${conf.participantPruningSchedule.map(_.retention)} must be bigger than the deduplication duration ${conf.deduplicationDuration}"
             ),
           )
+          _ <- Either.cond(
+            {
+              val traffic = conf.domains.global.buyExtraTraffic
+              traffic.targetThroughput.value <= 0 || traffic.minTopupInterval.duration >= conf.automation.pollingInterval.duration
+            },
+            (),
+            ConfigValidationFailed(
+              s"topup interval ${conf.domains.global.buyExtraTraffic.minTopupInterval} must not be smaller than the polling interval ${conf.automation.pollingInterval}"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
