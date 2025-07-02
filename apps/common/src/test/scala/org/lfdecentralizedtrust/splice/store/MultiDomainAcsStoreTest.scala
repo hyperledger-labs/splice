@@ -1218,6 +1218,43 @@ abstract class MultiDomainAcsStoreTest[
         )
       }
     }
+
+    "ingest interface views in assignment updates" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val assignedHolding = (
+        amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty),
+        holdingView(owner, BigDecimal(10), dsoParty, "AMT"),
+      )
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.assign(
+          assignedHolding._1 -> d1,
+          nextReassignmentId,
+          1,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> assignedHolding._2.toValue
+          ),
+        )
+        result <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        result should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(assignedHolding._1.contractId.contractId),
+              assignedHolding._2,
+              assignedHolding._1.createdEventBlob,
+              assignedHolding._1.createdAt,
+            )
+          )
+        )
+      }
+    }
+
   }
 }
 
