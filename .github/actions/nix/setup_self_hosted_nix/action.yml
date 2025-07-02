@@ -9,8 +9,8 @@ inputs:
     description: 'The Artifactory password'
     required: true
   oss_only:
-    description: 'Restrict upstream dependencies (e.g. Canton) to OSS versions'
-    default: 'true' # FIXME: default should be false, setting it to true for testing
+    description: 'Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)'
+    default: 'false'
     required: false
   cache_version:
     description: 'The cache version'
