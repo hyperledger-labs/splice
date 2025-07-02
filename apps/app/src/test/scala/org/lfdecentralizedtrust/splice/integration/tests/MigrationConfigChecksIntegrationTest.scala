@@ -38,7 +38,7 @@ class MigrationConfigChecksIntegrationTest extends IntegrationTest {
         loggerFactory.assertThrowsAndLogsSeq[RuntimeException](
           aliceValidatorLocalBackend.startSync(),
           entries => {
-            // We should fail before even finding out (via talking to scan) that migration ID 1 does not exist.
+            // We should fail before even finding out that migration ID 1 does not exist.
             forAll(entries) {
               _.message should not include ("sequencer connections for migration id 1 is empty")
             }

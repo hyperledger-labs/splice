@@ -2174,6 +2174,28 @@ class UpdateHistory(
 }
 
 object UpdateHistory {
+
+  // Separate method so we can use this without a full UpdateHistory instance.
+  def getHighestKnownMigrationId(
+      storage: DbStorage
+  )(implicit
+      ec: ExecutionContext,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[Option[Long]] = {
+    for {
+      queryResult <- storage.query(
+      sql"""
+        select max(migration_id)
+        from update_history_transactions
+      """.as[Option[Long]],
+      "getHighestKnownMigrationId",
+    )
+    } yield {
+      queryResult.headOption.flatten
+    }
+  }
+
   sealed trait BackfillingRequirement
   object BackfillingRequirement {
 
