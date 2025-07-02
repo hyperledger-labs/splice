@@ -680,7 +680,7 @@ template DsoRules with
           assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation self amuletRulesCid action
+        executeActionRequiringConfirmation dso self amuletRulesCid action
         return DsoRules_ExecuteConfirmedActionResult
 
 
@@ -803,7 +803,7 @@ template DsoRules with
 
                     Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         pure $ VRO_Accepted with
                           effectiveAt = effectiveTime
                       catch
@@ -821,7 +821,7 @@ template DsoRules with
 
                     None | numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
                         -- TODO(#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
@@ -1497,12 +1497,14 @@ summarizeDso dsoRules = DsoSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
+executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act of
   ARC_AmuletRules with .. ->
     case amuletRulesCid of
       None -> error "amuletRulesCid was not defined."
       Some amuletRulesCid -> do
+        -- prudent engineering: check that the DSO party is as expected
+        void $ fetchChecked (ForDso with dso) amuletRulesCid
         case amuletRulesAction of
           CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_MiningRound_Archive choiceArg -> void $ exercise amuletRulesCid choiceArg
@@ -1510,7 +1512,8 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
           CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
-  ARC_DsoRules with .. ->
+  ARC_DsoRules with .. -> do
+    void $ fetchChecked (ForDso with dso) dsoRulesCid
     case dsoAction of
       SRARC_AddSv choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_OffboardSv choiceArg -> void $ exercise dsoRulesCid choiceArg
@@ -1522,7 +1525,8 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
-  ARC_AnsEntryContext with .. ->
+  ARC_AnsEntryContext with .. -> do
+    void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
       ANSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
@@ -1751,6 +1755,9 @@ template UnallocatedUnclaimedActivityRecord
 
 -- instances
 ------------
+
+instance HasCheckedFetch DsoRules ForDso where
+  contractGroupId DsoRules {..} = ForDso with dso
 
 instance HasCheckedFetch ElectionRequest ForDso where
   contractGroupId ElectionRequest {..} = ForDso with dso

@@ -13,8 +13,10 @@ Upcoming
 
 - Daml
 
-  - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+  - Implements `CIP 64 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
   - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+
+      - CC-2 (low severity): addressed by enabling delegateless automation by default
 
       - CC-4 (low severity): addressed by
 
@@ -46,6 +48,8 @@ Upcoming
         - calling ``FeaturedAppRight_Withdraw`` in the implementation of ``DsoRules_RevokeFeaturedAppRight``
         - calling ``Confirmation_Expire`` in the implementation of ``DsoRules_ExpireStaleConfirmation``
 
+      - S-7 (auditor suggestion): addressed by checking the ``dso`` party whenever
+        executing a confirmed action.
 
 
     These Daml changes requires an upgrade to the following Daml versions:
@@ -55,7 +59,7 @@ Upcoming
     ================== =======
     amulet             0.1.9
     amuletNameService  0.1.9
-    dsoGovernance      0.1.13
+    dsoGovernance      0.1.14
     validatorLifecycle 0.1.4
     wallet             0.1.9
     walletPayments     0.1.9
