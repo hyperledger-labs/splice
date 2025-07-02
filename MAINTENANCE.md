@@ -11,7 +11,7 @@ Update the version in the `nix/cometbft-driver-sources.json` file
    Artifactory can be found [here](https://digitalasset.jfrog.io/ui/repos/tree/General/canton-enterprise).
 3. Compute the hashes of the corresponding enterprise and oss versions by running:
    `nix store prefetch-file --json --hash-type sha256 https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-<version>.tar.gz | jq -r '.hash'` and
-   `nix store prefetch-file --json --hash-type sha256  https://www.canton.io/releases/canton-open-source-3.3.0-snapshot.20250630.15992.0.vb8ce8c94.tar.gz | jq -r '.hash'`
+   `nix store prefetch-file --json --hash-type sha256  https://www.canton.io/releases/canton-open-source-<version>.tar.gz | jq -r '.hash'`
 4. Update the Canton version and hashes of the oss and enterprise versions in `nix/canton-sources.json`.
 5. In case you have also made configuration changes to Canton in `simple-topology-canton.conf`, remember
    to also make the corresponding changes for our cluster deployments. It is recommended to test any configuration
