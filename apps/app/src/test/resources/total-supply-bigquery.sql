@@ -16,6 +16,43 @@ CREATE TEMP FUNCTION
   iso_timestamp(iso8601_string string)
   RETURNS timestamp AS (PARSE_TIMESTAMP('%FT%TZ', iso8601_string));
 
+CREATE TEMP FUNCTION daml_prim_path(selector string)
+    RETURNS string AS (
+  CASE selector
+    WHEN 'numeric' THEN '.numeric'
+    WHEN 'contractId' THEN '.contractId'
+    WHEN 'list' THEN '.list.elements'
+    WHEN 'party' THEN '.party'
+    -- we treat records just like outer layer;
+    -- see how paths start with `$.record`
+    WHEN 'record' THEN ''
+    ELSE ERROR('Unknown Daml primitive case: ' || selector)
+  END
+);
+
+-- Return a full JSON path to a nested Daml record field.  A field lookup like
+-- `.x.y.z` can be accessed as follows:
+-- 1. Find the record that defines `x`.
+-- 2. Find the 0-based index of `x` in that record, in order of its fields.
+--    For example, consider it the fourth field (index 3) for this example.
+-- 3. Next, move to the type of the `x` field, which should have `y`.
+-- 4. Repeat step (2) for `y` to find the next index.
+--    In this example, suppose it is the first field (index 0).
+-- 5. Repeat steps (3) and (4) for `z`.
+--    In this example, suppose it is the second field (index 1).
+-- 6. The first argument here is `[3, 0, 1]` for this example.
+-- 7. Finally, check the type of `z`; see `daml_prim_path` for a matching
+--    selector to pass here.
+CREATE TEMP FUNCTION daml_record_path(
+    field_indices array<int64>,
+    prim_selector string
+  ) RETURNS string AS (
+  CONCAT('$.record.fields[',
+         ARRAY_TO_STRING(field_indices, '].value.record.fields['),
+         '].value',
+         daml_prim_path(prim_selector))
+);
+
 -- Find the ACS as of given time and sum bignumerics at path in the payload.
 CREATE TEMP FUNCTION sum_bignumeric_acs(
     path string,
