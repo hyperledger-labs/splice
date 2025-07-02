@@ -321,7 +321,7 @@ abstract class ReassignmentServiceIntegrationTest
         getAssignmentCmd(
           source = daId,
           target = acmeId,
-          unassignmentId = unassignedEvent.unassignId,
+          reassignmentId = unassignedEvent.reassignmentId,
         ),
         submittingParty = signatory.toLf,
       )
@@ -361,12 +361,11 @@ abstract class ReassignmentServiceIntegrationTest
         )
 
       // Assign contract
-      val reassignmentId = getReassignmentId(unassignedEvent)
       val assignmentCmd = getReassignmentCommand(
         getAssignmentCmd(
           source = daId,
           target = acmeId,
-          unassignmentId = unassignedEvent.unassignId,
+          reassignmentId = unassignedEvent.reassignmentId,
         ),
         submittingParty = signatory.toLf,
       )
@@ -378,7 +377,7 @@ abstract class ReassignmentServiceIntegrationTest
       )
 
       inside(res) { case error: GenericCommandError =>
-        error.cause should include(reassignmentId.toString)
+        error.cause should include(unassignedEvent.reassignmentId.toString)
         error.cause should include("unknown reassignment id")
       }
 
@@ -493,7 +492,7 @@ abstract class ReassignmentServiceIntegrationTest
           getAssignmentCmd(
             source = daId,
             target = acmeId,
-            unassignmentId = unassignedEvent.unassignId,
+            reassignmentId = unassignedEvent.reassignmentId,
           ),
           getUnassignmentCmd(cid = contract2.id.toLf, source = daId, target = acmeId),
         ),
@@ -505,7 +504,7 @@ abstract class ReassignmentServiceIntegrationTest
       }
 
       // Cleaning
-      assign(unassignedEvent.unassignId, daId, acmeId, signatory.toLf)
+      assign(unassignedEvent.reassignmentId, daId, acmeId, signatory.toLf)
       IouSyntax.archive(participant1)(contract1, signatory)
       IouSyntax.archive(participant1)(contract2, signatory)
     }
@@ -538,12 +537,12 @@ abstract class ReassignmentServiceIntegrationTest
           getAssignmentCmd(
             source = daId,
             target = acmeId,
-            unassignmentId = unassignedEvent1.unassignId,
+            reassignmentId = unassignedEvent1.reassignmentId,
           ),
           getAssignmentCmd(
             source = daId,
             target = acmeId,
-            unassignmentId = unassignedEvent2.unassignId,
+            reassignmentId = unassignedEvent2.reassignmentId,
           ),
         ),
         submittingParty = signatory.toLf,
@@ -554,8 +553,8 @@ abstract class ReassignmentServiceIntegrationTest
       }
 
       // Cleaning
-      assign(unassignedEvent1.unassignId, daId, acmeId, signatory.toLf)
-      assign(unassignedEvent2.unassignId, daId, acmeId, signatory.toLf)
+      assign(unassignedEvent1.reassignmentId, daId, acmeId, signatory.toLf)
+      assign(unassignedEvent2.reassignmentId, daId, acmeId, signatory.toLf)
       IouSyntax.archive(participant1)(contract1, signatory)
       IouSyntax.archive(participant1)(contract2, signatory)
     }
@@ -680,7 +679,7 @@ abstract class ReassignmentServiceIntegrationTest
 
     val expectedUnassignedEvent = proto.reassignment.UnassignedEvent(
       offset = 0L,
-      unassignId = unassignedEvent.unassignId, // We don't know this value
+      reassignmentId = unassignedEvent.reassignmentId, // We don't know this value
       contractId = cid.coid,
       templateId = expectedTemplateId,
       source = daId.logical.toProtoPrimitive,
@@ -731,7 +730,7 @@ abstract class ReassignmentServiceIntegrationTest
     )
 
     val (assignedEvent, assignmentCompletion) = assign(
-      unassignId = unassignedEvent.unassignId,
+      reassignmentId = unassignedEvent.reassignmentId,
       source = daId,
       target = acmeId,
       submittingParty = submittingParty.toLf,
@@ -751,7 +750,7 @@ abstract class ReassignmentServiceIntegrationTest
     val expectedAssignedEvent = proto.reassignment.AssignedEvent(
       source = daId.logical.toProtoPrimitive,
       target = acmeId.logical.toProtoPrimitive,
-      unassignId = expectedUnassignedEvent.unassignId,
+      reassignmentId = expectedUnassignedEvent.reassignmentId,
       submitter = submittingParty.toLf,
       reassignmentCounter = 1,
       createdEvent = Some(expectedCreatedEvent),

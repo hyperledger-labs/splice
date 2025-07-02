@@ -95,7 +95,7 @@ class MediatorEventProcessorTest
           trafficReceipt = None, // not relevant
           protocolVersion = testedProtocolVersion,
         )
-      )(TraceContext.createNew()),
+      )(TraceContext.createNew("test")),
     )
 
   private def mkMediatorRequest(
@@ -361,7 +361,7 @@ class MediatorEventProcessorTest
       val event3 = mkEvent(
         ts(2),
         mkDefaultOpenEnvelope(
-          TopologyTransactionsBroadcast(physicalSynchronizerId, Seq.empty, testedProtocolVersion)
+          TopologyTransactionsBroadcast(physicalSynchronizerId, Seq.empty)
         ),
       )
 

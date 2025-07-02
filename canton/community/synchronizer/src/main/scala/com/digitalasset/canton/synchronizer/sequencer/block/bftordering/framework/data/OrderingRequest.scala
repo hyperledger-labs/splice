@@ -6,12 +6,12 @@ package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewo
 import com.digitalasset.canton.crypto.HashBuilder
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.synchronizer.block.BlockFormat
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.SupportedVersions
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.EpochNumber
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
-  SupportedVersions,
-  data,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.OrderingRequest.ValidTags
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.version.{
@@ -31,12 +31,21 @@ final case class OrderingRequest(
     orderingStartInstant: Option[Instant] =
       None, // Used for metrics support only, unset in unit and simulation tests
 ) {
+
+  def isTagValid: Boolean =
+    ValidTags.contains(tag)
+
   def addToHashBuilder(hashBuilder: HashBuilder): Unit =
     hashBuilder
       .add(payload)
       .add(tag)
       .add(orderingStartInstant.toString)
       .discard
+}
+
+object OrderingRequest {
+  val ValidTags: Set[String] =
+    Set(BlockFormat.AcknowledgeTag, BlockFormat.SendTag)
 }
 
 final case class OrderingRequestBatchStats(requests: Int, bytes: Int)

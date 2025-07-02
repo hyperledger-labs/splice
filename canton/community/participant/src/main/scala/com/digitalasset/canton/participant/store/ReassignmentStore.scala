@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.store
 import cats.data.EitherT
 import cats.implicits.catsSyntaxParallelTraverse_
 import cats.syntax.either.*
+import cats.syntax.functor.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -143,7 +144,7 @@ object ReassignmentStore {
         .parTraverse_ { case (targetSynchronizer, eventsForSynchronizer) =>
           lazy val updates = eventsForSynchronizer
             .map { case (event, offset) =>
-              s"${event.reassignmentInfo.sourceSynchronizer} ${event.reassignmentInfo.unassignId} (${event.reassignment}): $offset"
+              s"${event.reassignmentInfo.sourceSynchronizer} ${event.reassignmentInfo.reassignmentId} (${event.reassignment}): $offset"
             }
             .mkString(", ")
 
@@ -154,10 +155,7 @@ object ReassignmentStore {
               )
             offsets = eventsForSynchronizer.flatMap { case (reassignmentEvent, globalOffset) =>
               reassignmentGlobalOffset(reassignmentEvent.reassignment, globalOffset).map {
-                ReassignmentId(
-                  reassignmentEvent.reassignmentInfo.sourceSynchronizer,
-                  reassignmentEvent.reassignmentInfo.unassignId,
-                ) -> _
+                reassignmentEvent.reassignmentInfo.reassignmentId -> _
               }
             }
             _ = tracedLogger.debug(s"Updated global offsets for reassignments: $updates")
@@ -265,15 +263,15 @@ object ReassignmentStore {
   /** The data for a reassignment and possible when the reassignment was completed. */
   final case class ReassignmentEntry(
       reassignmentId: ReassignmentId,
+      sourceSynchronizer: Source[SynchronizerId],
       contracts: NonEmpty[Seq[SerializableContract]],
       unassignmentRequest: Option[FullUnassignmentTree],
       reassignmentGlobalOffset: Option[ReassignmentGlobalOffset],
+      unassignmentTs: CantonTimestamp,
       assignmentTs: Option[CantonTimestamp],
   ) {
     def unassignmentDataO: Option[UnassignmentData] =
-      unassignmentRequest.map(UnassignmentData(reassignmentId, _))
-    def unassignmentTs: CantonTimestamp = reassignmentId.unassignmentTs
-    def sourceSynchronizer: Source[SynchronizerId] = reassignmentId.sourceSynchronizer
+      unassignmentRequest.map(UnassignmentData(reassignmentId, _, unassignmentTs))
     def unassignmentGlobalOffset: Option[Offset] = reassignmentGlobalOffset.flatMap(_.unassignment)
     def assignmentGlobalOffset: Option[Offset] = reassignmentGlobalOffset.flatMap(_.assignment)
 
@@ -284,26 +282,32 @@ object ReassignmentStore {
     def apply(
         reassignmentData: UnassignmentData,
         reassignmentGlobalOffset: Option[ReassignmentGlobalOffset],
+        unassignmentTs: CantonTimestamp,
         tsCompletion: Option[CantonTimestamp],
     ): ReassignmentEntry =
       ReassignmentEntry(
         reassignmentData.reassignmentId,
+        reassignmentData.sourceSynchronizer.map(_.logical),
         reassignmentData.contracts.contracts.map(_.contract),
         Some(reassignmentData.unassignmentRequest),
         reassignmentGlobalOffset,
+        unassignmentTs,
         tsCompletion,
       )
 
     def apply(
         assignmentData: AssignmentData,
         reassignmentGlobalOffset: Option[ReassignmentGlobalOffset],
+        unassignmentTs: CantonTimestamp,
         tsCompletion: Option[CantonTimestamp],
     ): ReassignmentEntry =
       ReassignmentEntry(
         assignmentData.reassignmentId,
+        assignmentData.sourceSynchronizer,
         assignmentData.contracts.contracts.map(_.contract),
         None,
         reassignmentGlobalOffset,
+        unassignmentTs,
         tsCompletion,
       )
   }

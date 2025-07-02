@@ -96,7 +96,7 @@ class ConfirmationRequestAndResponseProcessorTest
 
   protected lazy val factory: ExampleTransactionFactory =
     new ExampleTransactionFactory()(
-      synchronizerId = synchronizerId.logical,
+      psid = synchronizerId,
       mediatorGroup = mediatorGroupRecipient,
     )
   protected lazy val fullInformeeTree: FullInformeeTree =
@@ -125,7 +125,6 @@ class ConfirmationRequestAndResponseProcessorTest
       initialSynchronizerParameters,
       CantonTimestamp.Epoch,
       None,
-      synchronizerId.logical,
     )
 
   protected val confirmationResponseTimeout: NonNegativeFiniteDuration =
@@ -145,7 +144,7 @@ class ConfirmationRequestAndResponseProcessorTest
     SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
 
   private lazy val topology: TestingTopology = TestingTopology.from(
-    synchronizers = Set(synchronizerId.logical),
+    synchronizers = Set(synchronizerId),
     topology = Map(
       submitter -> Map(participant -> ParticipantPermission.Confirmation),
       signatory ->
@@ -169,7 +168,7 @@ class ConfirmationRequestAndResponseProcessorTest
 
   private lazy val identityFactory2 = {
     val topology2 = TestingTopology.from(
-      synchronizers = Set(synchronizerId.logical),
+      synchronizers = Set(synchronizerId),
       topology = Map(
         submitter -> Map(participant1 -> ParticipantPermission.Confirmation),
         signatory -> Map(participant2 -> ParticipantPermission.Confirmation),
@@ -201,7 +200,7 @@ class ConfirmationRequestAndResponseProcessorTest
   private lazy val identityFactoryOnlySubmitter =
     TestingIdentityFactory(
       TestingTopology.from(
-        synchronizers = Set(synchronizerId.logical),
+        synchronizers = Set(synchronizerId),
         topology = Map(
           submitter -> Map(participant1 -> ParticipantPermission.Confirmation)
         ),
@@ -214,7 +213,7 @@ class ConfirmationRequestAndResponseProcessorTest
     )
 
   protected lazy val synchronizerSyncCryptoApi: SynchronizerCryptoClient =
-    identityFactory.forOwnerAndSynchronizer(mediatorId, synchronizerId.logical)
+    identityFactory.forOwnerAndSynchronizer(mediatorId, synchronizerId)
 
   protected lazy val requestIdTs = CantonTimestamp.Epoch
   protected lazy val requestId = RequestId(requestIdTs)
@@ -235,7 +234,6 @@ class ConfirmationRequestAndResponseProcessorTest
         syncCryptoApi,
         mediatorId,
         sequencerSend,
-        testedProtocolVersion,
         loggerFactory,
       )
     private val timeTracker: SynchronizerTimeTracker = mock[SynchronizerTimeTracker]
@@ -250,20 +248,18 @@ class ConfirmationRequestAndResponseProcessorTest
     )
     mediatorState.initialize(CantonTimestamp.MinValue).futureValueUS
     val processor = new ConfirmationRequestAndResponseProcessor(
-      synchronizerId,
       mediatorId,
       verdictSender,
       syncCryptoApi,
       timeTracker,
       mediatorState,
-      testedProtocolVersion,
       loggerFactory,
       timeouts,
     )
   }
 
   private lazy val synchronizerSyncCryptoApi2: SynchronizerCryptoClient =
-    identityFactory2.forOwnerAndSynchronizer(sequencer, synchronizerId.logical)
+    identityFactory2.forOwnerAndSynchronizer(sequencer, synchronizerId)
 
   def signedResponse(
       confirmers: Set[LfPartyId],
@@ -274,7 +270,7 @@ class ConfirmationRequestAndResponseProcessorTest
     val responses: ConfirmationResponses = ConfirmationResponses.tryCreate(
       requestId,
       fullInformeeTree.transactionId.toRootHash,
-      factory.physicalSynchronizerId,
+      factory.psid,
       participant,
       NonEmpty.mk(
         Seq,
@@ -291,7 +287,7 @@ class ConfirmationRequestAndResponseProcessorTest
       .trySignAndCreate(
         responses,
         participantCrypto
-          .tryForSynchronizer(synchronizerId.logical, defaultStaticSynchronizerParameters)
+          .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
           .currentSnapshotApproximation,
         testedProtocolVersion,
       )
@@ -304,7 +300,7 @@ class ConfirmationRequestAndResponseProcessorTest
     val confirmationResponses: ConfirmationResponses = ConfirmationResponses.tryCreate(
       requestId,
       fullInformeeTree.transactionId.toRootHash,
-      factory.physicalSynchronizerId,
+      factory.psid,
       participant,
       responses,
       testedProtocolVersion,
@@ -314,14 +310,14 @@ class ConfirmationRequestAndResponseProcessorTest
       .trySignAndCreate(
         confirmationResponses,
         participantCrypto
-          .tryForSynchronizer(synchronizerId.logical, defaultStaticSynchronizerParameters)
+          .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
           .currentSnapshotApproximation,
         testedProtocolVersion,
       )
   }
 
   def sign(tree: FullInformeeTree): Signature = identityFactory
-    .forOwnerAndSynchronizer(participant, synchronizerId.logical)
+    .forOwnerAndSynchronizer(participant, synchronizerId)
     .awaitSnapshot(CantonTimestamp.Epoch)
     .futureValueUS
     .sign(tree.tree.rootHash.unwrap, SigningKeyUsage.ProtocolOnly)
@@ -344,7 +340,6 @@ class ConfirmationRequestAndResponseProcessorTest
         RootHashMessage(
           fullInformeeTree.tree.rootHash,
           synchronizerId,
-          testedProtocolVersion,
           TransactionViewType,
           testTopologyTimestamp,
           SerializedRootHashMessagePayload.empty,
@@ -460,7 +455,7 @@ class ConfirmationRequestAndResponseProcessorTest
         response = ConfirmationResponses.tryCreate(
           reqId,
           fullInformeeTree.transactionId.toRootHash,
-          factory.physicalSynchronizerId,
+          factory.psid,
           participant,
           NonEmpty.mk(
             Seq,
@@ -532,7 +527,6 @@ class ConfirmationRequestAndResponseProcessorTest
         RootHashMessage(
           correctRootHash,
           synchronizerId,
-          testedProtocolVersion,
           correctViewType,
           testTopologyTimestamp,
           SerializedRootHashMessagePayload.empty,
@@ -596,7 +590,6 @@ class ConfirmationRequestAndResponseProcessorTest
         RootHashMessage(
           rootHash,
           synchronizerId,
-          testedProtocolVersion,
           correctViewType,
           testTopologyTimestamp,
           SerializedRootHashMessagePayload.empty,
@@ -777,7 +770,7 @@ class ConfirmationRequestAndResponseProcessorTest
       val otherMediatorGroupIndex = MediatorGroupRecipient(mediatorGroup2.index)
       val factoryOtherMediatorId =
         new ExampleTransactionFactory()(
-          synchronizerId = synchronizerId.logical,
+          psid = synchronizerId,
           mediatorGroup = otherMediatorGroupIndex,
         )
       val fullInformeeTreeOther =
@@ -787,7 +780,6 @@ class ConfirmationRequestAndResponseProcessorTest
       val rootHashMessage = RootHashMessage(
         mediatorRequest.rootHash,
         synchronizerId,
-        testedProtocolVersion,
         mediatorRequest.viewType,
         testTopologyTimestamp,
         SerializedRootHashMessagePayload.empty,
@@ -873,7 +865,6 @@ class ConfirmationRequestAndResponseProcessorTest
       val rootHashMessage = RootHashMessage(
         fullInformeeTree.transactionId.toRootHash,
         synchronizerId,
-        testedProtocolVersion,
         ViewType.TransactionViewType,
         testTopologyTimestamp,
         SerializedRootHashMessagePayload.empty,
@@ -1129,7 +1120,6 @@ class ConfirmationRequestAndResponseProcessorTest
       val rootHashMessage = RootHashMessage(
         fullInformeeTree.transactionId.toRootHash,
         synchronizerId,
-        testedProtocolVersion,
         ViewType.TransactionViewType,
         testTopologyTimestamp,
         SerializedRootHashMessagePayload.empty,
@@ -1146,7 +1136,7 @@ class ConfirmationRequestAndResponseProcessorTest
         val response = ConfirmationResponses.tryCreate(
           requestId,
           fullInformeeTree.transactionId.toRootHash,
-          factory.physicalSynchronizerId,
+          factory.psid,
           participant,
           NonEmpty.mk(
             Seq,
@@ -1165,7 +1155,7 @@ class ConfirmationRequestAndResponseProcessorTest
           .trySignAndCreate(
             response,
             participantCrypto
-              .tryForSynchronizer(synchronizerId.logical, defaultStaticSynchronizerParameters)
+              .tryForSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
               .currentSnapshotApproximation,
             testedProtocolVersion,
           )
@@ -1266,7 +1256,6 @@ class ConfirmationRequestAndResponseProcessorTest
       val rootHashMessage = RootHashMessage(
         fullInformeeTree.transactionId.toRootHash,
         synchronizerId,
-        testedProtocolVersion,
         ViewType.TransactionViewType,
         testTopologyTimestamp,
         SerializedRootHashMessagePayload.empty,
@@ -1350,7 +1339,6 @@ class ConfirmationRequestAndResponseProcessorTest
       val rootHashMessage = RootHashMessage(
         mediatorRequest.rootHash,
         synchronizerId,
-        testedProtocolVersion,
         mediatorRequest.viewType,
         testTopologyTimestamp,
         SerializedRootHashMessagePayload.empty,
@@ -1407,7 +1395,7 @@ class ConfirmationRequestAndResponseProcessorTest
 
     "reject request if some informee is not hosted by an active participant" in {
       val synchronizerSyncCryptoApi =
-        identityFactoryOnlySubmitter.forOwnerAndSynchronizer(mediatorId, synchronizerId.logical)
+        identityFactoryOnlySubmitter.forOwnerAndSynchronizer(mediatorId, synchronizerId)
       val sut = new Fixture(synchronizerSyncCryptoApi)
 
       val request =
@@ -1436,7 +1424,7 @@ class ConfirmationRequestAndResponseProcessorTest
 
     "inactive mediator ignores requests" in {
       val synchronizerSyncCryptoApi3 =
-        identityFactory3.forOwnerAndSynchronizer(mediatorId, synchronizerId.logical)
+        identityFactory3.forOwnerAndSynchronizer(mediatorId, synchronizerId)
       val sut = new Fixture(synchronizerSyncCryptoApi3)
 
       val mediatorRequest =
@@ -1444,7 +1432,6 @@ class ConfirmationRequestAndResponseProcessorTest
       val rootHashMessage = RootHashMessage(
         mediatorRequest.rootHash,
         synchronizerId,
-        testedProtocolVersion,
         mediatorRequest.viewType,
         testTopologyTimestamp,
         SerializedRootHashMessagePayload.empty,

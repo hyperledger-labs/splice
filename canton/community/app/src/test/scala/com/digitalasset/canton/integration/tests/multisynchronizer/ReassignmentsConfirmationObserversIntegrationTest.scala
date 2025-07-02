@@ -7,7 +7,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.{LocalParticipantReference, LocalSequencerReference}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
   UseCommunityReferenceBlockSequencer,
@@ -43,7 +42,6 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 }
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{BaseTest, SynchronizerAlias, config}
 
 import scala.collection.concurrent.TrieMap
@@ -172,8 +170,8 @@ sealed trait ReassignmentsConfirmationObserversIntegrationTest
       }
 
   "Observers on a contract" should {
-    def lookupReassignment(participant: LocalParticipantReference, reassignmentId: ReassignmentId)(
-        implicit env: TestConsoleEnvironment
+    def lookupReassignment(participant: LocalParticipantReference, reassignmentId: String)(implicit
+        env: TestConsoleEnvironment
     ): Either[ReassignmentStore.ReassignmentLookupError, UnassignmentData] = {
       import env.*
 
@@ -181,7 +179,7 @@ sealed trait ReassignmentsConfirmationObserversIntegrationTest
         .get(acmeId)
         .value
         .reassignmentStore
-        .lookup(reassignmentId)
+        .lookup(ReassignmentId.tryCreate(reassignmentId))
         .value
         .failOnShutdown
         .futureValue
@@ -220,12 +218,10 @@ sealed trait ReassignmentsConfirmationObserversIntegrationTest
       )
 
       // Unassignment
-      val unassignId =
+      val reassignmentId =
         participant1.ledger_api.commands
           .submit_unassign(signatory, Seq(iou.id.toLf), daId, acmeId)
-          .unassignId
-      val reassignmentId =
-        ReassignmentId(Source(daId), CantonTimestamp.fromProtoPrimitive(unassignId.toLong).value)
+          .reassignmentId
 
       // Check that reassignment store is populated on 3 participants
       eventually() {
@@ -234,7 +230,7 @@ sealed trait ReassignmentsConfirmationObserversIntegrationTest
         lookupReassignment(participant3, reassignmentId).value shouldBe a[UnassignmentData]
       }
 
-      participant1.ledger_api.commands.submit_assign(signatory, unassignId, daId, acmeId)
+      participant1.ledger_api.commands.submit_assign(signatory, reassignmentId, daId, acmeId)
 
       // no confirmation sent by p2, hosting observer2
       // no confirmation sent by p3, hosting signatory with observing permissions
@@ -274,12 +270,12 @@ sealed trait ReassignmentsConfirmationObserversIntegrationTest
 
       val iou = IouSyntax.createIou(participant1, Some(daId))(signatory, observer1)
 
-      val unassignId =
+      val reassignmentId =
         participant1.ledger_api.commands
           .submit_unassign(signatory, Seq(iou.id.toLf), daId, acmeId)
-          .unassignId
+          .reassignmentId
 
-      participant1.ledger_api.commands.submit_assign(signatory, unassignId, daId, acmeId)
+      participant1.ledger_api.commands.submit_assign(signatory, reassignmentId, daId, acmeId)
     }
   }
 

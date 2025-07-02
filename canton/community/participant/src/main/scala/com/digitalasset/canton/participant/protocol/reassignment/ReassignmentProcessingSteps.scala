@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.protocol.reassignment
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
@@ -59,14 +60,14 @@ import com.digitalasset.canton.store.ConfirmationRequestSessionKeyStore
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ErrorUtil, ReassignmentTag}
+import com.digitalasset.canton.util.ReassignmentTag
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 
 import scala.collection.concurrent
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-trait ReassignmentProcessingSteps[
+private[reassignment] trait ReassignmentProcessingSteps[
     SubmissionParam,
     SubmissionResult,
     RequestViewType <: ReassignmentViewType,
@@ -82,6 +83,8 @@ trait ReassignmentProcessingSteps[
   val participantId: ParticipantId
 
   val synchronizerId: ReassignmentTag[PhysicalSynchronizerId]
+
+  val protocolVersion: ReassignmentTag[ProtocolVersion]
 
   protected def contractAuthenticator: ContractAuthenticator
 
@@ -106,6 +109,11 @@ trait ReassignmentProcessingSteps[
 
   override type FullView <: FullReassignmentViewTree
   override type ParsedRequestType = ParsedReassignmentRequest[FullView]
+
+  protected def reassignmentId(
+      fullViewTree: FullView,
+      requestTimestamp: CantonTimestamp,
+  ): ReassignmentId
 
   override def embedNoMediatorError(error: NoMediatorError): ReassignmentProcessorError =
     GenericStepsError(error)
@@ -160,18 +168,21 @@ trait ReassignmentProcessingSteps[
       reassignmentRef: ReassignmentRef,
       submitterLf: LfPartyId,
       rootHash: RootHash,
-  ): EitherT[Future, ReassignmentProcessorError, PendingReassignmentSubmission] = {
-    val pendingSubmission = PendingReassignmentSubmission()
+      mkReassignmentId: CantonTimestamp => ReassignmentId,
+  ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, PendingReassignmentSubmission] = {
+    val pendingSubmission = PendingReassignmentSubmission(mkReassignmentId)
     val existing = pendingSubmissionMap.putIfAbsent(rootHash, pendingSubmission)
-    EitherT.cond[Future](
-      existing.isEmpty,
-      pendingSubmission,
-      DuplicateReassignmentTreeHash(
-        reassignmentRef,
-        submitterLf,
-        rootHash,
-      ): ReassignmentProcessorError,
-    )
+    EitherT
+      .cond[Future](
+        existing.isEmpty,
+        pendingSubmission,
+        DuplicateReassignmentTreeHash(
+          reassignmentRef,
+          submitterLf,
+          rootHash,
+        ): ReassignmentProcessorError,
+      )
+      .mapK(FutureUnlessShutdown.outcomeK)
   }
 
   protected def decryptTree(
@@ -253,6 +264,7 @@ trait ReassignmentProcessingSteps[
         mediator,
         snapshot,
         synchronizerParameters,
+        reassignmentId(viewTree, ts),
       )
     )
   }
@@ -269,11 +281,13 @@ trait ReassignmentProcessingSteps[
       rootHash: RootHash,
       malformedPayloads: Seq[MalformedPayload],
   )(implicit traceContext: TraceContext): Option[ConfirmationResponses] =
-    // TODO(i12926) This will crash the ConnectedSynchronizer
-    ErrorUtil.internalError(
-      new UnsupportedOperationException(
-        s"Received a unassignment/assignment request with id $requestId with all payloads being malformed. Crashing..."
-      )
+    ProcessingSteps.constructResponsesForMalformedPayloads(
+      requestId = requestId,
+      rootHash = rootHash,
+      malformedPayloads = malformedPayloads,
+      synchronizerId = synchronizerId.unwrap,
+      participantId = participantId,
+      protocolVersion = protocolVersion.unwrap,
     )
 
   override def eventAndSubmissionIdForRejectedCommand(
@@ -368,6 +382,7 @@ trait ReassignmentProcessingSteps[
 
   protected def createConfirmationResponses(
       requestId: RequestId,
+      malformedPayloads: Seq[MalformedPayload],
       topologySnapshot: TopologySnapshot,
       protocolVersion: ProtocolVersion,
       confirmingParties: Set[LfPartyId],
@@ -375,6 +390,34 @@ trait ReassignmentProcessingSteps[
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Option[ConfirmationResponses]] =
+    if (malformedPayloads.nonEmpty) {
+      FutureUnlessShutdown.pure(
+        ProcessingSteps.constructResponsesForMalformedPayloads(
+          requestId = requestId,
+          rootHash = validationResult.rootHash,
+          malformedPayloads = malformedPayloads,
+          synchronizerId = synchronizerId.unwrap,
+          participantId = participantId,
+          protocolVersion = protocolVersion,
+        )
+      )
+    } else {
+      responsesForWellformedPayloads(
+        requestId,
+        topologySnapshot,
+        protocolVersion,
+        confirmingParties,
+        validationResult,
+      )
+    }
+
+  private def responsesForWellformedPayloads(
+      requestId: RequestId,
+      topologySnapshot: TopologySnapshot,
+      protocolVersion: ProtocolVersion,
+      confirmingParties: Set[LfPartyId],
+      validationResult: ReassignmentValidationResult,
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Option[ConfirmationResponses]] =
     for {
       hostedConfirmingParties <-
         if (validationResult.isReassigningParticipant)
@@ -386,13 +429,15 @@ trait ReassignmentProcessingSteps[
           FutureUnlessShutdown.pure(Set.empty[LfPartyId])
 
       contractAuthenticationResult <-
-        if (hostedConfirmingParties.nonEmpty) validationResult.contractAuthenticationResultF.value
+        if (hostedConfirmingParties.nonEmpty)
+          validationResult.commonValidationResult.contractAuthenticationResultF.value
         else
           FutureUnlessShutdown.pure(Right(()))
     } yield {
       if (hostedConfirmingParties.isEmpty) None
       else {
-        val authenticationErrorO = validationResult.participantSignatureVerificationResult
+        val authenticationErrorO =
+          validationResult.commonValidationResult.participantSignatureVerificationResult
 
         val authenticationRejection = authenticationErrorO.map(err =>
           LocalRejectError.MalformedRejects.MalformedRequest
@@ -403,20 +448,21 @@ trait ReassignmentProcessingSteps[
           LocalRejectError.MalformedRejects.ModelConformance.Reject(err.toString)
         )
 
-        val submitterCheckRejection = validationResult.submitterCheckResult.map(err =>
-          LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message)
-        )
-
-        val failedValidationRejection =
-          validationResult.reassigningParticipantValidationResult.map(err =>
+        val submitterCheckRejection =
+          validationResult.commonValidationResult.submitterCheckResult.map(err =>
             LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message)
           )
 
-        val activnessRejection =
+        val failedValidationRejection =
+          validationResult.reassigningParticipantValidationResult.errors.map(err =>
+            LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message)
+          )
+
+        val activenessRejection =
           localRejectFromActivenessCheck(requestId, validationResult)
 
         val localRejections =
-          (modelConformanceRejection ++ activnessRejection.toList ++
+          (modelConformanceRejection ++ activenessRejection.toList ++
             authenticationRejection.toList ++ submitterCheckRejection ++ failedValidationRejection)
             .map { err =>
               err.logWithContext()
@@ -466,7 +512,7 @@ trait ReassignmentProcessingSteps[
   def checkPhase7Validations(
       reassignmentValidationResult: ReassignmentValidationResult
   ): FutureUnlessShutdown[Option[TransactionRejection]] =
-    reassignmentValidationResult.contractAuthenticationResultF.value.map {
+    reassignmentValidationResult.commonValidationResult.contractAuthenticationResultF.value.map {
       contractAuthenticationResult =>
         val modelConformanceRejection =
           contractAuthenticationResult
@@ -477,15 +523,18 @@ trait ReassignmentProcessingSteps[
             .toOption
 
         val authenticationRejection =
-          reassignmentValidationResult.participantSignatureVerificationResult.map(err =>
-            LocalRejectError.MalformedRejects.MalformedRequest
-              .Reject(err.message)
+          reassignmentValidationResult.commonValidationResult.participantSignatureVerificationResult
+            .map(err =>
+              LocalRejectError.MalformedRejects.MalformedRequest
+                .Reject(err.message)
+            )
+
+        val submitterCheckRejection =
+          reassignmentValidationResult.commonValidationResult.submitterCheckResult.map(err =>
+            LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message)
           )
 
-        val submitterCheckRejection = reassignmentValidationResult.submitterCheckResult.map(err =>
-          LocalRejectError.ReassignmentRejects.ValidationFailed.Reject(err.message)
-        )
-        (modelConformanceRejection.toList ++ authenticationRejection.toList ++ submitterCheckRejection.toList).headOption
+        modelConformanceRejection.orElse(authenticationRejection).orElse(submitterCheckRejection)
     }
 
 }
@@ -493,8 +542,9 @@ trait ReassignmentProcessingSteps[
 object ReassignmentProcessingSteps {
 
   final case class PendingReassignmentSubmission(
+      mkReassignmentId: CantonTimestamp => ReassignmentId,
       reassignmentCompletion: Promise[com.google.rpc.status.Status] =
-        Promise[com.google.rpc.status.Status]()
+        Promise[com.google.rpc.status.Status](),
   )
 
   final case class ParsedReassignmentRequest[VT <: FullReassignmentViewTree](
@@ -511,6 +561,7 @@ object ReassignmentProcessingSteps {
       override val mediator: MediatorGroupRecipient,
       override val snapshot: SynchronizerSnapshotSyncCryptoApi,
       override val synchronizerParameters: DynamicSynchronizerParametersWithValidity,
+      reassignmentId: ReassignmentId,
   ) extends ParsedRequest[ReassignmentSubmitterMetadata] {
     override def rootHash: RootHash = fullViewTree.rootHash
   }
@@ -560,8 +611,17 @@ object ReassignmentProcessingSteps {
 
   final case class ContractError(message: String) extends ReassignmentProcessorError
 
-  final case class UnknownSynchronizer(synchronizerId: SynchronizerId, context: String)
-      extends ReassignmentProcessorError {
+  final case class UnknownPhysicalSynchronizer(
+      physicalSynchronizerId: PhysicalSynchronizerId,
+      context: String,
+  ) extends ReassignmentProcessorError {
+    override def message: String = s"Unknown synchronizer $physicalSynchronizerId when $context"
+  }
+
+  final case class UnknownSynchronizer(
+      synchronizerId: SynchronizerId,
+      context: String,
+  ) extends ReassignmentProcessorError {
     override def message: String = s"Unknown synchronizer $synchronizerId when $context"
   }
 

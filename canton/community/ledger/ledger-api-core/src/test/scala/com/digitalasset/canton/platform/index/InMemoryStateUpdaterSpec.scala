@@ -42,6 +42,7 @@ import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate
 import com.digitalasset.canton.platform.store.interfaces.TransactionLogUpdate.CreatedEvent
 import com.digitalasset.canton.platform.store.interning.StringInterningView
 import com.digitalasset.canton.platform.{DispatcherState, InMemoryState}
+import com.digitalasset.canton.protocol.ReassignmentId
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag
@@ -440,7 +441,7 @@ object InMemoryStateUpdaterSpec {
           sourceSynchronizer = ReassignmentTag.Source(synchronizerId1),
           targetSynchronizer = ReassignmentTag.Target(synchronizerId2),
           submitter = Option(party1),
-          unassignId = CantonTimestamp.assertFromLong(155555L),
+          reassignmentId = ReassignmentId.tryCreate("155555"),
           isReassigningParticipant = true,
         ),
         reassignment = Reassignment.Batch(
@@ -466,7 +467,7 @@ object InMemoryStateUpdaterSpec {
           sourceSynchronizer = ReassignmentTag.Source(synchronizerId2),
           targetSynchronizer = ReassignmentTag.Target(synchronizerId1),
           submitter = Option(party2),
-          unassignId = CantonTimestamp.assertFromLong(1555551L),
+          reassignmentId = ReassignmentId.tryCreate("1555551"),
           isReassigningParticipant = true,
         ),
         reassignment = Reassignment.Batch(
@@ -928,7 +929,7 @@ object InMemoryStateUpdaterSpec {
         sourceSynchronizer = ReassignmentTag.Source(source),
         targetSynchronizer = ReassignmentTag.Target(target),
         submitter = Option(party1),
-        unassignId = CantonTimestamp.assertFromLong(155555L),
+        reassignmentId = ReassignmentId.tryCreate("155555"),
         isReassigningParticipant = true,
       ),
       reassignment = Reassignment.Batch(
@@ -957,7 +958,7 @@ object InMemoryStateUpdaterSpec {
         sourceSynchronizer = ReassignmentTag.Source(source),
         targetSynchronizer = ReassignmentTag.Target(target),
         submitter = Option(party2),
-        unassignId = CantonTimestamp.assertFromLong(1555551L),
+        reassignmentId = ReassignmentId.tryCreate("1555551"),
         isReassigningParticipant = true,
       ),
       reassignment = Reassignment.Batch(

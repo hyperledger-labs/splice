@@ -76,7 +76,7 @@ class SequencerReaderTestV2
   private val cryptoD =
     valueOrFail(
       crypto
-        .forSynchronizer(synchronizerId.logical, defaultStaticSynchronizerParameters)
+        .forSynchronizer(synchronizerId, defaultStaticSynchronizerParameters)
         .toRight("no crypto api")
     )(
       "synchronizer crypto"
@@ -136,12 +136,10 @@ class SequencerReaderTestV2
     val eventSignaller = new ManualEventSignaller()
     val reader = new SequencerReader(
       testConfig,
-      synchronizerId,
       storeSpy,
       cryptoD,
       eventSignaller,
       topologyClientMember,
-      testedProtocolVersion,
       timeouts,
       loggerFactory,
     )
@@ -624,7 +622,7 @@ class SequencerReaderTestV2
 
           delivers = testData.map { case (_, sequenceTs, signingTs) =>
             val storeEvent = TraceContext
-              .withNewTraceContext { eventTraceContext =>
+              .withNewTraceContext("test") { eventTraceContext =>
                 mockDeliverStoreEvent(
                   sender = aliceId,
                   payloadId = PayloadId(ts0.plusSeconds(sequenceTs)),

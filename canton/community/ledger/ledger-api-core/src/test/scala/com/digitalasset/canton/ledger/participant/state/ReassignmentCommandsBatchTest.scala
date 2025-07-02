@@ -4,7 +4,6 @@
 package com.digitalasset.canton.ledger.participant.state
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.{ExampleTransactionFactory, ReassignmentId}
 import com.digitalasset.canton.topology.{SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
@@ -25,7 +24,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
   private val assign = ReassignmentCommand.Assign(
     Source(synchronizerId(1)),
     Target(synchronizerId(2)),
-    CantonTimestamp.Epoch,
+    ReassignmentId.tryCreate("0"),
   )
 
   "ReassignmentCommandsBatch.create" when {
@@ -47,7 +46,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
       ReassignmentCommandsBatch.create(Seq(assign)) shouldBe Right(
         ReassignmentCommandsBatch.Assignments(
           target = assign.targetSynchronizer,
-          reassignmentId = ReassignmentId(assign.sourceSynchronizer, assign.unassignId),
+          reassignmentId = assign.reassignmentId,
         )
       )
     }
@@ -92,7 +91,7 @@ class ReassignmentCommandsBatchTest extends AnyWordSpec with Matchers {
       ReassignmentCommandsBatch.create(
         Seq(
           assign,
-          assign.copy(unassignId = assign.unassignId.plusSeconds(1)),
+          assign.copy(reassignmentId = ReassignmentId.tryCreate("1")),
         )
       ) shouldBe Left(ReassignmentCommandsBatch.MixedAssignWithOtherCommands)
     }

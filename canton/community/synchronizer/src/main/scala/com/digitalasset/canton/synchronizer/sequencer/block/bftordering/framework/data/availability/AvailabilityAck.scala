@@ -7,7 +7,7 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose, Signature, v30}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.FingerprintKeyId
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.crypto.FingerprintKeyId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   EpochNumber,
@@ -25,7 +25,7 @@ final case class AvailabilityAck(from: BftNodeId, signature: Signature) {
         (),
         ValidationError.NodeNotInTopology,
       )
-      keyId = FingerprintKeyId.toBftKeyId(signature.signedBy)
+      keyId = FingerprintKeyId.toBftKeyId(signature.authorizingLongTermKey)
       _ <- Either.cond(
         currentOrderingTopology.nodesTopologyInfo
           .get(from)

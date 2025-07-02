@@ -16,12 +16,7 @@ import com.digitalasset.canton.protocol.{v30, *}
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.topology.{
-  ParticipantId,
-  PhysicalSynchronizerId,
-  SynchronizerId,
-  UniqueIdentifier,
-}
+import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
 import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
@@ -145,6 +140,7 @@ object AssignmentViewTree
   */
 final case class AssignmentCommonData private (
     override val salt: Salt,
+    sourceSynchronizerId: Source[PhysicalSynchronizerId],
     targetSynchronizerId: Target[PhysicalSynchronizerId],
     targetMediatorGroup: MediatorGroupRecipient,
     stakeholders: Stakeholders,
@@ -153,13 +149,16 @@ final case class AssignmentCommonData private (
     reassigningParticipants: Set[ParticipantId],
 )(
     hashOps: HashOps,
-    override val representativeProtocolVersion: RepresentativeProtocolVersion[
-      AssignmentCommonData.type
-    ],
     override val deserializedFrom: Option[ByteString],
 ) extends MerkleTreeLeaf[AssignmentCommonData](hashOps)
     with HasProtocolVersionedWrapper[AssignmentCommonData]
     with ReassignmentCommonData {
+
+  override val representativeProtocolVersion: RepresentativeProtocolVersion[
+    AssignmentCommonData.type
+  ] = AssignmentCommonData.protocolVersionRepresentativeFor(
+    targetSynchronizerId.unwrap.protocolVersion
+  )
 
   @transient override protected lazy val companionObj: AssignmentCommonData.type =
     AssignmentCommonData
@@ -167,6 +166,7 @@ final case class AssignmentCommonData private (
   protected def toProtoV30: v30.AssignmentCommonData =
     v30.AssignmentCommonData(
       salt = Some(salt.toProtoV30),
+      sourcePhysicalSynchronizerId = sourceSynchronizerId.unwrap.toProtoPrimitive,
       targetPhysicalSynchronizerId = targetSynchronizerId.unwrap.toProtoPrimitive,
       targetMediatorGroup = targetMediatorGroup.group.value,
       stakeholders = Some(stakeholders.toProtoV30),
@@ -204,24 +204,23 @@ object AssignmentCommonData
 
   def create(hashOps: HashOps)(
       salt: Salt,
-      targetSynchronizer: Target[PhysicalSynchronizerId],
+      sourcePSId: Source[PhysicalSynchronizerId],
+      targetPSId: Target[PhysicalSynchronizerId],
       targetMediatorGroup: MediatorGroupRecipient,
       stakeholders: Stakeholders,
       uuid: UUID,
       submitterMetadata: ReassignmentSubmitterMetadata,
-      targetProtocolVersion: Target[
-        ProtocolVersion
-      ], // TODO(#25482) Reduce duplication in parameters
       reassigningParticipants: Set[ParticipantId],
   ): AssignmentCommonData = AssignmentCommonData(
     salt = salt,
-    targetSynchronizerId = targetSynchronizer,
+    sourceSynchronizerId = sourcePSId,
+    targetSynchronizerId = targetPSId,
     targetMediatorGroup = targetMediatorGroup,
     stakeholders = stakeholders,
     uuid = uuid,
     submitterMetadata = submitterMetadata,
     reassigningParticipants = reassigningParticipants,
-  )(hashOps, protocolVersionRepresentativeFor(targetProtocolVersion.unwrap), None)
+  )(hashOps, None)
 
   private[this] def fromProtoV30(
       hashOps: HashOps,
@@ -231,6 +230,7 @@ object AssignmentCommonData
   ): ParsingResult[AssignmentCommonData] = {
     val v30.AssignmentCommonData(
       saltP,
+      sourceSynchronizerP,
       targetSynchronizerP,
       stakeholdersP,
       uuidP,
@@ -241,6 +241,9 @@ object AssignmentCommonData
 
     for {
       salt <- ProtoConverter.parseRequired(Salt.fromProtoV30, "salt", saltP)
+      sourceSynchronizerId <- PhysicalSynchronizerId
+        .fromProtoPrimitive(sourceSynchronizerP, "source_physical_synchronizer_id")
+        .map(Source(_))
       targetSynchronizerId <- PhysicalSynchronizerId
         .fromProtoPrimitive(targetSynchronizerP, "target_physical_synchronizer_id")
         .map(Target(_))
@@ -263,17 +266,16 @@ object AssignmentCommonData
           .fromProtoPrimitive(uid, "reassigning_participant_uids")
           .map(ParticipantId(_))
       )
-
-      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
     } yield AssignmentCommonData(
       salt,
+      sourceSynchronizerId,
       targetSynchronizerId,
       MediatorGroupRecipient(targetMediatorGroup),
       stakeholders = stakeholders,
       uuid,
       submitterMetadata,
       reassigningParticipants = reassigningParticipants.toSet,
-    )(hashOps, rpv, Some(bytes))
+    )(hashOps, Some(bytes))
   }
 }
 
@@ -413,9 +415,8 @@ final case class FullAssignmentTree(tree: AssignmentViewTree)
     tree.mediatorMessage(submittingParticipantSignature, protocolVersion.unwrap)
 
   // Synchronizers
-  override def sourceSynchronizer: Source[SynchronizerId] = reassignmentId.sourceSynchronizer
-  override def targetSynchronizer: Target[PhysicalSynchronizerId] =
-    commonData.targetSynchronizerId
+  override def sourceSynchronizer: Source[PhysicalSynchronizerId] = commonData.sourceSynchronizerId
+  override def targetSynchronizer: Target[PhysicalSynchronizerId] = commonData.targetSynchronizerId
 
   override def synchronizerId: PhysicalSynchronizerId = commonData.targetSynchronizerId.unwrap
   override def mediator: MediatorGroupRecipient = commonData.targetMediatorGroup

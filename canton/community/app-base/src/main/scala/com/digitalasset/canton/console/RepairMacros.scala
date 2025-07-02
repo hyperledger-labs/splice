@@ -7,7 +7,6 @@ import better.files.*
 import cats.syntax.either.*
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -72,7 +71,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         protocolVersion: ProtocolVersion,
         targetPath: String,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("download_identity") { implicit traceContext =>
         val targetDir = createAndCheckTargetDirectory(File(targetPath))
         logger.info(s"Downloading identity from node ${node.name} to $targetDir")
         if (!node.is_running) {
@@ -134,7 +133,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
           // Initial synchronizer state, needed for the sequencer to open the init service offering `assign_from_genesis_state`
           val synchronizerGenesisTransactions = node.topology.transactions
             .list(
-              store = TopologyStoreId.Synchronizer(synchronizerId),
+              store = synchronizerId,
               timeQuery = TimeQuery.Snapshot(
                 SignedTopologyTransaction.InitialTopologySequencingTime.immediateSuccessor // Convention used only by internal Canton tooling
               ),
@@ -214,7 +213,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         staticSynchronizerParameters: StaticSynchronizerParameters,
         sequencerConnections: SequencerConnections,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("upload_identity") { implicit traceContext =>
         val sourceDir = File(sourcePath)
 
         ErrorUtil.requireArgument(sourceDir.exists, s"Directory $sourceDir does not exist")
@@ -300,7 +299,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         node: LocalParticipantReference,
         targetPath: String,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("download_dars") { implicit traceContext =>
         val darsDir = createAndCheckTargetDirectory(File(targetPath, DARS))
         node.dars.list().filterNot(_.name.startsWith("AdminWorkflow")).foreach { dar =>
           noTracingLogger.info(s"Downloading dar ${dar.name}")
@@ -312,7 +311,7 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
         node: LocalParticipantReference,
         sourcePath: String,
     ): Unit =
-      TraceContext.withNewTraceContext { implicit traceContext =>
+      TraceContext.withNewTraceContext("upload_dars") { implicit traceContext =>
         ErrorUtil.requireState(node.is_running, s"Node ${node.name} is not running")
         val darsDir = File(sourcePath, DARS)
         val files = darsDir.list
@@ -345,15 +344,6 @@ class RepairMacros(override val loggerFactory: NamedLoggerFactory)
       }
   }
 
-  /** Party replication commands!
-    *
-    * The following group contains a set of party replication commands. These commands can be used
-    * to replicate a party from one node to another. The commands come with some limitations /
-    * caveats / capabilities:
-    *
-    *   - If the party is not managed by the source participant, then the appropriate topology state
-    *     needs to be manually prepared before running any of the steps.
-    */
   @Help.Summary(
     "Commands useful to replicate parties from one participant to another",
     FeatureFlag.Repair,

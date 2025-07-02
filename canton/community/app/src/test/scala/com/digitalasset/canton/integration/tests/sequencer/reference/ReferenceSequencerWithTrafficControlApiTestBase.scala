@@ -9,11 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveDouble, PositiveInt}
-import com.digitalasset.canton.config.{
-  BatchAggregatorConfig,
-  ProcessingTimeout,
-  SessionSigningKeysConfig,
-}
+import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.{HashPurpose, Signature, SynchronizerCryptoClient}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -39,7 +35,10 @@ import com.digitalasset.canton.sequencing.traffic.{
 import com.digitalasset.canton.store.db.DbTest
 import com.digitalasset.canton.synchronizer.metrics.{SequencerHistograms, SequencerMetrics}
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameters
+import com.digitalasset.canton.synchronizer.sequencer.config.{
+  SequencerNodeParameterConfig,
+  SequencerNodeParameters,
+}
 import com.digitalasset.canton.synchronizer.sequencer.store.DbSequencerStoreTest
 import com.digitalasset.canton.synchronizer.sequencer.traffic.{
   SequencerRateLimitError,
@@ -253,7 +252,6 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ProcessingTimeout()
       ),
       protocol = CantonNodeParameters.Protocol.Impl(
-        sessionSigningKeys = SessionSigningKeysConfig.disabled,
         alphaVersionSupport = false,
         betaVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
@@ -371,7 +369,6 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
       sequencerMetrics,
     )
       .create(
-        synchronizerId,
         SequencerId(synchronizerId.uid),
         clock,
         clock,
@@ -383,7 +380,7 @@ abstract class ReferenceSequencerWithTrafficControlApiTestBase
         ),
         FutureSupervisor.Noop,
         SequencerTrafficConfig(),
-        minimumSequencingTime = CantonTimestamp.MinValue,
+        minimumSequencingTime = SequencerNodeParameterConfig.DefaultMinimumSequencingTime,
         runtimeReady = FutureUnlessShutdown.unit,
       )
       .futureValueUS

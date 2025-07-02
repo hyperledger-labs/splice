@@ -5,10 +5,8 @@ package com.digitalasset.canton.participant.protocol
 
 import cats.implicits.toBifunctorOps
 import com.digitalasset.canton.crypto.{HashOps, HmacOps, Salt}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
-import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
+import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
 import com.digitalasset.daml.lf.value.Value.{ContractId, ThinContractInstance}
 
 trait ContractAuthenticator {
@@ -27,7 +25,7 @@ trait ContractAuthenticator {
     * @param contract
     *   the fat contract contract
     */
-  def authenticateFat(contract: FatContractInstance): Either[String, Unit]
+  def authenticateFat(contract: LfFatContractInst): Either[String, Unit]
 
   /** This method is used in contract upgrade verification to ensure that the metadata computed by
     * the upgraded template matches the original metadata.
@@ -57,18 +55,14 @@ object ContractAuthenticator {
 
 class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends ContractAuthenticator {
 
-  def authenticateFat(contract: FatContractInstance): Either[String, Unit] = {
+  override def authenticateFat(contract: LfFatContractInst): Either[String, Unit] = {
     val gk = contract.contractKeyWithMaintainers.map(Versioned(contract.version, _))
     for {
       metadata <- ContractMetadata.create(contract.signatories, contract.stakeholders, gk)
       driverMetadata <- DriverContractMetadata
         .fromLfBytes(contract.cantonData.toByteArray)
         .leftMap(_.toString)
-      createTime <- contract.createdAt match {
-        case CreationTime.CreatedAt(time) => Right(CantonTimestamp(time))
-        case CreationTime.Now =>
-          Left(s"Cannot determine creation time for contract ${contract.contractId}.")
-      }
+
       contractInstance <- SerializableRawContractInstance
         .create(
           Versioned(
@@ -84,7 +78,7 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
       _ <- authenticate(
         contract.contractId,
         driverMetadata.salt,
-        LedgerCreateTime(createTime),
+        contract.createdAt,
         metadata,
         contractInstance,
       )
@@ -115,7 +109,7 @@ class ContractAuthenticatorImpl(unicumGenerator: UnicumGenerator) extends Contra
   def authenticate(
       contractId: LfContractId,
       contractSalt: Salt,
-      ledgerTime: LedgerCreateTime,
+      ledgerTime: CreationTime.CreatedAt,
       metadata: ContractMetadata,
       rawContractInstance: SerializableRawContractInstance,
   ): Either[String, Unit] = {

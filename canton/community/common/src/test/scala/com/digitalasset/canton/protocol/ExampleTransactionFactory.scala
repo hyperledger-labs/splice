@@ -18,7 +18,6 @@ import com.digitalasset.canton.data.TransactionViewDecomposition.{NewView, SameV
 import com.digitalasset.canton.data.ViewPosition.MerklePathElement
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.client.TopologySnapshot
@@ -47,7 +46,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageName
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray}
 import com.digitalasset.daml.lf.language.LanguageVersion
-import com.digitalasset.daml.lf.transaction.Versioned
+import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
 import com.digitalasset.daml.lf.value.Value
 import com.digitalasset.daml.lf.value.Value.*
 import org.scalatest.EitherValues
@@ -58,6 +57,8 @@ import scala.collection.immutable.HashMap
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Random
+
+import BaseTest.*
 
 /** Provides convenience methods for creating [[ExampleTransaction]]s and parts thereof.
   */
@@ -106,13 +107,13 @@ object ExampleTransactionFactory {
       CantonContractIdVersion.maximumSupportedVersion(BaseTest.testedProtocolVersion).value
 
     val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
-      synchronizerId = SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::da")),
+      psid = SynchronizerId(UniqueIdentifier.tryFromProtoPrimitive("synchronizer::da")).toPhysical,
       mediator = MediatorGroupRecipient(MediatorGroupIndex.one),
       transactionUuid = new UUID(1L, 1L),
       viewPosition = ViewPosition(List.empty),
       viewParticipantDataSalt = TestSalt.generateSalt(1),
       createIndex = 0,
-      ledgerCreateTime = LedgerCreateTime(ledgerTime),
+      ledgerCreateTime = CreationTime.CreatedAt(ledgerTime.toLf),
       metadata = metadata,
       suffixedContractInstance = ExampleTransactionFactory.asSerializableRaw(instance),
       cantonContractIdVersion = contractIdVersion,
@@ -357,7 +358,7 @@ object ExampleTransactionFactory {
       contractId,
       asSerializableRaw(contractInstance),
       metadata,
-      LedgerCreateTime(ledgerTime),
+      CreationTime.CreatedAt(ledgerTime.toLf),
       salt,
     )
 
@@ -439,9 +440,9 @@ class ExampleTransactionFactory(
     val transactionSalt: Salt = TestSalt.generateSalt(0),
     val transactionSeed: SaltSeed = TestSalt.generateSeed(0),
     val transactionUuid: UUID = UUID.fromString("11111111-2222-3333-4444-555555555555"),
-    val synchronizerId: SynchronizerId = SynchronizerId(
+    val psid: PhysicalSynchronizerId = SynchronizerId(
       UniqueIdentifier.tryFromProtoPrimitive("example::default")
-    ),
+    ).toPhysical,
     val mediatorGroup: MediatorGroupRecipient = MediatorGroupRecipient(MediatorGroupIndex.zero),
     val ledgerTime: CantonTimestamp = CantonTimestamp.Epoch,
     val ledgerTimeUsed: CantonTimestamp = CantonTimestamp.Epoch.minusSeconds(1),
@@ -451,8 +452,6 @@ class ExampleTransactionFactory(
     extends EitherValues {
 
   private val protocolVersion = versionOverride.getOrElse(BaseTest.testedProtocolVersion)
-  val physicalSynchronizerId: PhysicalSynchronizerId =
-    PhysicalSynchronizerId(synchronizerId, protocolVersion)
   private val cantonContractIdVersion = AuthenticatedContractIdVersionV11
   private val random = new Random(0)
 
@@ -567,13 +566,13 @@ class ExampleTransactionFactory(
     val viewParticipantDataSalt = participantDataSalt(viewIndex)
     val (contractSalt, unicum) = unicumGenerator
       .generateSaltAndUnicum(
-        synchronizerId,
+        psid,
         mediatorGroup,
         transactionUuid,
         viewPosition,
         viewParticipantDataSalt,
         createIndex,
-        LedgerCreateTime(ledgerTime),
+        CreationTime.CreatedAt(ledgerTime.toLf),
         metadata,
         asSerializableRaw(suffixedContractInstance),
         cantonContractIdVersion,
@@ -805,8 +804,8 @@ class ExampleTransactionFactory(
 
   val commonMetadata: CommonMetadata =
     CommonMetadata
-      .create(cryptoOps, protocolVersion)(
-        physicalSynchronizerId,
+      .create(cryptoOps)(
+        psid,
         mediatorGroup,
         Salt.tryDeriveSalt(transactionSeed, 1, cryptoOps),
         transactionUuid,

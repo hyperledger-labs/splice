@@ -11,6 +11,7 @@ import com.daml.ledger.api.v2.command_service.{
 }
 import com.daml.ledger.api.v2.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v2.transaction_filter.TransactionFormat
+import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.api.v2.{
   command_completion_service,
   command_service,
@@ -44,6 +45,7 @@ import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.*
 import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, webSocketBody}
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class JsCommandService(
@@ -137,6 +139,8 @@ class JsCommandService(
     } yield result
   }
 
+  // TODO(#23504) remove when TransactionTree is removed from the API
+  @nowarn("cat=deprecation")
   def submitAndWaitForTransactionTree(
       callerContext: CallerContext
   ): TracedInput[JsCommands] => Future[
@@ -229,26 +233,26 @@ final case class JsSubmitAndWaitForReassignmentResponse(
 object JsCommand {
   sealed trait Command
   final case class CreateCommand(
-      templateId: String,
+      templateId: Identifier,
       createArguments: Json,
   ) extends Command
 
   final case class ExerciseCommand(
-      templateId: String,
+      templateId: Identifier,
       contractId: String,
       choice: String,
       choiceArgument: Json,
   ) extends Command
 
   final case class CreateAndExerciseCommand(
-      templateId: String,
+      templateId: Identifier,
       createArguments: Json,
       choice: String,
       choiceArgument: Json,
   ) extends Command
 
   final case class ExerciseByKeyCommand(
-      templateId: String,
+      templateId: Identifier,
       contractKey: Json,
       choice: String,
       choiceArgument: Json,
@@ -269,6 +273,7 @@ final case class JsCommands(
     disclosedContracts: Seq[com.daml.ledger.api.v2.commands.DisclosedContract] = Seq.empty,
     synchronizerId: Option[String] = None,
     packageIdSelectionPreference: Seq[String] = Seq.empty,
+    prefetchContractKeys: Seq[js.PrefetchContractKey] = Seq.empty,
 )
 
 object JsCommandService extends DocumentationEndpoints {

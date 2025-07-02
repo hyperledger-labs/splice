@@ -16,6 +16,7 @@ import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.event_query_service.GetEventsByContractIdResponse
 import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionResponse as ExecuteResponseProto,
+  GetPreferredPackagesResponse,
   HashingSchemeVersion,
   PackagePreference,
   PrepareSubmissionResponse as PrepareResponseProto,
@@ -710,6 +711,44 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               )
           )
         }
+
+      @Help.Summary("Get the preferred packages for constructing a command submission")
+      @Help.Description(
+        """A preferred package is the highest-versioned package for a provided package-name
+           that is vetted by all the participants hosting the provided parties.
+           Ledger API clients should use this endpoint for constructing command submissions
+           that are compatible with the provided preferred package, by making informed decisions on:
+             - which are the compatible packages that can be used to create contracts
+             - which contract or exercise choice argument version can be used in the command
+             - which choices can be executed on a template or interface of a contract
+
+           Generally it is enough to provide the requirements for the command's root package-names.
+           Additional package-name requirements can be provided when additional informees need to use
+           package dependencies of the command's root packages.
+
+           parties: The parties whose vetting state should be considered when computing the preferred package
+           packageName: The package name for which the preferred package is requested
+           synchronizerId: The synchronizer whose topology state to use for resolving this query.
+                           If not specified. the topology state of all the synchronizers the participant is connected to will be used.
+           vettingValidAt: The timestamp at which the package vetting validity should be computed
+                           If not provided, the participant's current clock time is used.
+          """
+      )
+      def preferred_packages(
+          packageVettingRequirements: Map[LfPackageName, Set[PartyId]],
+          synchronizerId: Option[SynchronizerId] = None,
+          vettingValidAt: Option[CantonTimestamp] = None,
+      ): GetPreferredPackagesResponse =
+        consoleEnvironment.run {
+          ledgerApiCommand(
+            LedgerApiCommands.InteractiveSubmissionService
+              .PreferredPackages(
+                packageVettingRequirements.view.mapValues(_.map(_.toLf)).toMap,
+                synchronizerId,
+                vettingValidAt,
+              )
+          )
+        }
     }
 
     @Help.Summary("Submit commands", FeatureFlag.Testing)
@@ -847,11 +886,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
           | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
           | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
-          | The unassignId should be the one returned by the corresponding submit_unassign command."""
+          | The reassignmentId should be the one returned by the corresponding submit_unassign command."""
       )
       def submit_assign(
           submitter: PartyId,
-          unassignId: String,
+          reassignmentId: String,
           source: SynchronizerId,
           target: SynchronizerId,
           workflowId: String = "",
@@ -861,7 +900,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       ): AssignedWrapper =
         submit_assign_with_format(
           submitter = submitter,
-          unassignId = unassignId,
+          reassignmentId = reassignmentId,
           source = source,
           target = target,
           workflowId = workflowId,
@@ -881,11 +920,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
           | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
           | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
-          | The unassignId should be the one returned by the corresponding submit_unassign command."""
+          | The reassignmentId should be the one returned by the corresponding submit_unassign command."""
       )
       def submit_assign_with_format(
           submitter: PartyId,
-          unassignId: String,
+          reassignmentId: String,
           source: SynchronizerId,
           target: SynchronizerId,
           workflowId: String = "",
@@ -898,7 +937,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           ledgerApiCommand(
             LedgerApiCommands.CommandService.SubmitAndWaitAssign(
               submitter = submitter.toLf,
-              unassignId = unassignId,
+              reassignmentId = reassignmentId,
               source = source,
               target = target,
               workflowId = workflowId,
@@ -1014,7 +1053,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
         )
         val assigned = submit_assign(
           submitter,
-          unassigned.unassignId,
+          unassigned.reassignmentId,
           source,
           target,
           workflowId,
@@ -1032,7 +1071,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
       )
       def submit_assign_async(
           submitter: PartyId,
-          unassignId: String,
+          reassignmentId: String,
           source: SynchronizerId,
           target: SynchronizerId,
           workflowId: String = "",
@@ -1048,7 +1087,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
               commandId = commandId,
               submitter = submitter.toLf,
               submissionId = submissionId,
-              unassignId = unassignId,
+              reassignmentId = reassignmentId,
               source = source,
               target = target,
             )
@@ -2264,11 +2303,11 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
             | participants who were involved in the assignment. The call blocks until the assignment commits or fails.
             | Fails if the assignment doesn't commit, or if it doesn't become visible to the involved participants in time.
             | Timeout specifies the time how long to wait until the reassignment appears in the update stream for the submitting and all the involved participants.
-            | The unassignId should be the one returned by the corresponding submit_unassign command."""
+            | The reassignmentId should be the one returned by the corresponding submit_unassign command."""
         )
         def submit_assign(
             submitter: PartyId,
-            unassignId: String,
+            reassignmentId: String,
             source: SynchronizerId,
             target: SynchronizerId,
             workflowId: String = "",
@@ -2279,7 +2318,7 @@ trait BaseLedgerApiAdministration extends NoTracing with StreamingCommandHelper 
           ledger_api.commands
             .submit_assign(
               submitter,
-              unassignId,
+              reassignmentId,
               source,
               target,
               workflowId,

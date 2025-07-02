@@ -11,25 +11,22 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.sequencing.protocol.MaxRequestSizeToDeserialize
 import com.digitalasset.canton.synchronizer.block.BlockFormat
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftOrderingModuleSystemInitializer.BftOrderingStores
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig.DefaultEpochLength
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.AvailabilityModuleConfig
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.memory.SimulationAvailabilityStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.memory.SimulationEpochStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.network.data.memory.SimulationP2PEndpointsStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.EpochChecker
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.OutputModule.RequestInspector
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.memory.SimulationOutputMetadataStore
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.{
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.{
   P2PEndpoint,
   PlainTextP2PEndpoint,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.DefaultEpochLength
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftOrderingModuleSystemInitializer.BftOrderingStores
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.availability.data.memory.SimulationAvailabilityStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.memory.SimulationEpochStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.EpochChecker
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.OutputModule.RequestInspector
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.memory.SimulationOutputMetadataStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.memory.SimulationP2PEndpointsStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.{
+  BftBlockOrdererConfig,
   BftOrderingModuleSystemInitializer,
-  BftSequencerBaseTest,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.SimulationBlockSubscription
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
@@ -57,12 +54,17 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.simulati
   SimulationOrderingTopologyProvider,
   SimulationTopologyHelpers,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
+  BftSequencerBaseTest,
+  endpointToTestBftNodeId,
+}
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingServiceReceiveRequest
 import com.digitalasset.canton.time.{Clock, SimClock}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import pprint.PPrinter
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
@@ -142,7 +144,7 @@ trait BftOrderingSimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
             ),
             endpoint,
             stores = {
-              val simulationEpochStore = new SimulationEpochStore()
+              val simulationEpochStore = new SimulationEpochStore(firstStage.failOnViewChange)
               BftOrderingStores(
                 new SimulationP2PEndpointsStore(
                   initialEndpoints.filterNot(_ == endpoint).toSet
@@ -162,152 +164,180 @@ trait BftOrderingSimulationTest extends AnyFlatSpec with BftSequencerBaseTest {
       val epochChecker = new SimEpochChecker(loggerFactory)
       val allSimulationTestNodeDataCell =
         new AtomicReference[Map[BftNodeId, SimulationTestNodeData]](Map.empty)
-      stages.zipWithIndex.foreach { case (SimulationTestStageSettings(simSettings), idx) =>
-        val stageStart = clock.now
+      stages.zipWithIndex.foreach {
+        case (SimulationTestStageSettings(simSettings, failOnViewChange), idx) =>
+          val stageStart = clock.now
 
-        logger.info(s"Starting stage ${idx + 1} (of $stagesCount) at $stageStart")
+          logger.info(s"Starting stage ${idx + 1} (of $stagesCount) at $stageStart")
 
-        val availabilityRandom = new Random(simSettings.localSettings.randomSeed)
+          val availabilityRandom = new Random(simSettings.localSettings.randomSeed)
 
-        val numberOfOnboardedNodes = simSettings.nodeOnboardingDelays.size
-        val newlyOnboardedAll = simSettings.nodeOnboardingDelays.zipWithIndex.view.map {
-          case (delay, i) =>
-            val endpoint =
-              PlainTextP2PEndpoint(hostname(i + firstNewlyOnboardedIndex), Port.tryCreate(0))
-                .asInstanceOf[P2PEndpoint]
-            val stores = {
-              val simulationEpochStore = new SimulationEpochStore()
-              BftOrderingStores(
-                // For newly onboarded nodes we will add endpoints to all other nodes when it gets added
-                // so the store will start empty
-                new SimulationP2PEndpointsStore(Set.empty),
-                new SimulationAvailabilityStore(),
-                simulationEpochStore,
-                epochStoreReader = simulationEpochStore,
-                new SimulationOutputMetadataStore(fail(_)),
-              )
-            }
-            endpointToTestBftNodeId(endpoint) -> SimulationTestNodeData(
-              simulationTopologyData =
-                SimulationTopologyHelpers.generateSingleSimulationTopologyData(
-                  stageStart,
-                  NodeSimulationTopologyDataFactory.generate(
-                    topologyRandom,
-                    onboardingTime = Some(delay),
-                    topologySettings = simSettings.topologySettings,
-                    stopKeyRotations = simSettings.durationOfFirstPhaseWithFaults,
+          val numberOfOnboardedNodes = simSettings.nodeOnboardingDelays.size
+          val newlyOnboardedAll = simSettings.nodeOnboardingDelays.zipWithIndex.view.map {
+            case (delay, i) =>
+              val endpoint =
+                PlainTextP2PEndpoint(hostname(i + firstNewlyOnboardedIndex), Port.tryCreate(0))
+                  .asInstanceOf[P2PEndpoint]
+              val stores = {
+                val simulationEpochStore = new SimulationEpochStore(failOnViewChange)
+                BftOrderingStores(
+                  // For newly onboarded nodes we will add endpoints to all other nodes when it gets added
+                  // so the store will start empty
+                  new SimulationP2PEndpointsStore(Set.empty),
+                  new SimulationAvailabilityStore(),
+                  simulationEpochStore,
+                  epochStoreReader = simulationEpochStore,
+                  new SimulationOutputMetadataStore(fail(_)),
+                )
+              }
+              endpointToTestBftNodeId(endpoint) -> SimulationTestNodeData(
+                simulationTopologyData =
+                  SimulationTopologyHelpers.generateSingleSimulationTopologyData(
+                    stageStart,
+                    NodeSimulationTopologyDataFactory.generate(
+                      topologyRandom,
+                      onboardingTime = Some(delay),
+                      topologySettings = simSettings.topologySettings,
+                      stopKeyRotations = simSettings.durationOfFirstPhaseWithFaults,
+                    ),
                   ),
-                ),
-              endpoint = endpoint,
-              stores,
-              initializeImmediately = false,
-            )
-        }.toMap
-        logger.debug(s"$newlyOnboardedAll")
-
-        val allNodes = alreadyOnboardedAll ++ newlyOnboardedAll
-        allSimulationTestNodeDataCell.set(allNodes)
-        def initializer(
-            endpoint: P2PEndpoint,
-            stores: BftOrderingStores[SimulationEnv],
-            initializeImmediately: Boolean,
-        ): SimulationInitializerT =
-          newInitializer(
-            endpoint,
-            () =>
-              allSimulationTestNodeDataCell.get().map { case (_, endpointData) =>
-                endpointData.endpoint -> endpointData.simulationTopologyData
-              },
-            stores,
-            sendQueue,
-            clock,
-            availabilityRandom,
-            epochChecker,
-            simSettings,
-            initializeImmediately,
-          )
-        simulationTestStage = simulationTestStage match {
-          case None => // First stage
-            val model =
-              new BftOrderingVerifier(
-                sendQueue,
-                allNodes.view.mapValues(_.stores.outputStore).toMap,
-                allNodes.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
-                alreadyOnboardedAll.keys.toSeq,
-                simSettings,
-                loggerFactory,
+                endpoint = endpoint,
+                stores,
+                initializeImmediately = false,
               )
-            val onboardingManager = new SequencerSnapshotOnboardingManager(
-              newlyOnboardedAll.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
-              alreadyOnboardedAll.keys.toSeq,
-              allNodes.view.mapValues(_.endpoint).toMap,
-              allNodes.view.mapValues(_.stores).toMap,
-              model,
-              simSettings,
-            )
-            val simulation =
-              SimulationModuleSystem(
-                allNodes.map { case (_, endpointData) =>
-                  endpointData.endpoint -> initializer(
-                    endpointData.endpoint,
-                    endpointData.stores,
-                    endpointData.initializeImmediately,
-                  )
+          }.toMap
+          logger.debug(s"$newlyOnboardedAll")
+
+          val allNodes = alreadyOnboardedAll ++ newlyOnboardedAll
+          allSimulationTestNodeDataCell.set(allNodes)
+          def initializer(
+              endpoint: P2PEndpoint,
+              stores: BftOrderingStores[SimulationEnv],
+              initializeImmediately: Boolean,
+          ): SimulationInitializerT =
+            newInitializer(
+              endpoint,
+              () =>
+                allSimulationTestNodeDataCell.get().map { case (_, endpointData) =>
+                  endpointData.endpoint -> endpointData.simulationTopologyData
                 },
-                onboardingManager,
-                simSettings,
-                clock,
-                timeouts,
-                loggerFactory,
-              )
-            Some(SimulationTestStage(simulation, model, onboardingManager))
-
-          case Some(stage) => // Subsequent stages
-            val newModel =
-              stage.model.newStage(
-                simSettings,
-                newlyOnboardedAll.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
-                newlyOnboardedAll.view.mapValues(_.stores.outputStore).toMap,
-              )
-            val newOnboardingManager = stage.onboardingManager.newStage(
-              newlyOnboardedAll.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
-              allNodes.view.mapValues(_.endpoint).toMap,
-              newModel,
+              stores,
+              sendQueue,
+              clock,
+              availabilityRandom,
+              epochChecker,
               simSettings,
+              initializeImmediately,
             )
-            Some(
-              SimulationTestStage(
-                stage.simulation.newStage(
+          simulationTestStage = simulationTestStage match {
+            case None => // First stage
+              val model =
+                new BftOrderingVerifier(
+                  sendQueue,
+                  allNodes.view.mapValues(_.stores.outputStore).toMap,
+                  allNodes.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
+                  alreadyOnboardedAll.keys.toSeq,
                   simSettings,
-                  newOnboardingManager,
-                  newlyOnboardedAll.map { case (_, endpointData) =>
-                    endpointData.endpoint ->
-                      initializer(
-                        endpointData.endpoint,
-                        endpointData.stores,
-                        endpointData.initializeImmediately,
-                      )
-                  },
-                ),
-                newModel,
-                newOnboardingManager,
+                  loggerFactory,
+                )
+              val onboardingManager = new SequencerSnapshotOnboardingManager(
+                newlyOnboardedAll.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
+                alreadyOnboardedAll.keys.toSeq,
+                allNodes.view.mapValues(_.endpoint).toMap,
+                allNodes.view.mapValues(_.stores).toMap,
+                model,
+                simSettings,
               )
+              val simulation =
+                SimulationModuleSystem(
+                  allNodes.map { case (_, endpointData) =>
+                    endpointData.endpoint -> initializer(
+                      endpointData.endpoint,
+                      endpointData.stores,
+                      endpointData.initializeImmediately,
+                    )
+                  },
+                  onboardingManager,
+                  simSettings,
+                  clock,
+                  timeouts,
+                  loggerFactory,
+                )
+              Some(SimulationTestStage(simulation, model, onboardingManager))
+
+            case Some(stage) => // Subsequent stages
+              val newModel =
+                stage.model.newStage(
+                  simSettings,
+                  newlyOnboardedAll.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
+                  newlyOnboardedAll.view.mapValues(_.stores.outputStore).toMap,
+                )
+              val newOnboardingManager = stage.onboardingManager.newStage(
+                newlyOnboardedAll.view.mapValues(_.simulationTopologyData.onboardingTime).toMap,
+                allNodes.view.mapValues(_.endpoint).toMap,
+                newModel,
+                simSettings,
+              )
+              Some(
+                SimulationTestStage(
+                  stage.simulation.newStage(
+                    simSettings,
+                    newOnboardingManager,
+                    newlyOnboardedAll.map { case (_, endpointData) =>
+                      endpointData.endpoint ->
+                        initializer(
+                          endpointData.endpoint,
+                          endpointData.stores,
+                          endpointData.initializeImmediately,
+                        )
+                    },
+                  ),
+                  newModel,
+                  newOnboardingManager,
+                )
+              )
+          }
+
+          val stage =
+            simulationTestStage
+              .getOrElse(fail("The simulation object was not set but it should always be"))
+
+          try {
+            loggerFactory.assertLoggedWarningsAndErrorsSeq(
+              stage.simulation.run(stage.model),
+              log => log shouldBe Seq.empty,
             )
-        }
+          } catch {
+            case e: Throwable =>
+              val testClass =
+                s"""class <testName> extends BftOrderingSimulationTest {
+                   |  override val numberOfRuns: Int = 1
+                   |  override val numberOfInitialNodes = $numberOfInitialNodes
+                   |
+                   |  override def generateStages(): NonEmpty[Seq[SimulationTestStageSettings]] = NonEmpty(
+                   |    Seq,
+                   |    ${stages
+                    .map { stage =>
+                      PPrinter(additionalHandlers = Simulation.fixupDurationPrettyPrinting)(
+                        stage,
+                        initialOffset = 4,
+                      )
+                    }
+                    .mkString(",\n")}
+                   |  )
+                   |}""".stripMargin
 
-        val stage =
-          simulationTestStage
-            .getOrElse(fail("The simulation object was not set but it should always be"))
+              logger.error(
+                s"Uncaught exception during simulation, test class that will reproduce:\n$testClass",
+                e,
+              )
+              fail(e)
+          }
 
-        loggerFactory.assertLoggedWarningsAndErrorsSeq(
-          stage.simulation.run(stage.model),
-          log => log shouldBe Seq.empty,
-        )
+          // Prepare for next stage
+          firstNewlyOnboardedIndex += numberOfOnboardedNodes
 
-        // Prepare for next stage
-        firstNewlyOnboardedIndex += numberOfOnboardedNodes
-
-        alreadyOnboardedAll = allNodes
+          alreadyOnboardedAll = allNodes
       }
     }
   }
@@ -420,7 +450,10 @@ object BftOrderingSimulationTest {
     override protected def pretty: Pretty[SimulationTestNodeData.this.type] = adHocPrettyInstance
   }
 
-  final case class SimulationTestStageSettings(simulationSettings: SimulationSettings)
+  final case class SimulationTestStageSettings(
+      simulationSettings: SimulationSettings,
+      failOnViewChange: Boolean = false,
+  )
 
   final case class SimulationTestStage(
       simulation: SimulationT,
@@ -428,55 +461,6 @@ object BftOrderingSimulationTest {
       onboardingManager: SequencerSnapshotOnboardingManager,
   )
 }
-
-/*
-// TODO(#25531) currently consensus overwrites the previous crypto provider with the current on startup
-// TODO(#25536) availability currently don't support all other nodes doing key rotations
-class TestKeyRotations extends BftOrderingSimulationTest {
-  override def numberOfRuns: Int = 10
-  override def numberOfInitialNodes: Int = 2
-
-  private val random = new Random(4)
-
-  override def generateStages(): Seq[SimulationTestStageSettings] = Seq(
-    SimulationTestStageSettings(
-      SimulationSettings(
-        LocalSettings(random.nextLong()),
-        NetworkSettings(random.nextLong()),
-        TopologySettings(
-          random.nextLong(),
-          shouldDoKeyRotations = true,
-        ),
-        1 minute,
-        nodeOnboardingDelays = Seq(
-          35 seconds
-        ),
-      )
-    )
-  )
-}
- */
-
-/*
-// TODO(#25531) currently consensus overwrites the previous crypto provider with the current on startup
-class consensusOverwritesOnStartupTheTopologyInfo extends BftOrderingSimulationTest {
-  override def numberOfRuns: Int = 1
-  override def numberOfInitialNodes: Int = 2
-
-  override def generateStages(): Seq[SimulationTestStageSettings] = Seq(
-    SimulationTestStageSettings(
-      SimulationSettings(
-        localSettings = LocalSettings(-4969378402838085704L),
-        networkSettings = NetworkSettings(-1499461942424923123L),
-        topologySettings = TopologySettings(-1501433639903096045L, shouldDoKeyRotations = true),
-        durationOfFirstPhaseWithFaults = 1 minute,
-        nodeOnboardingDelays = List(35 seconds),
-      )
-    )
-  )
-}
-
- */
 
 class BftOrderingSimulationTest1NodeNoFaults extends BftOrderingSimulationTest {
   override val numberOfRuns: Int = 10
@@ -610,6 +594,34 @@ class BftOrderingSimulationTestWithConcurrentOnboardingsNoFaults extends BftOrde
   )
 }
 
+class BftOrderingSimulationTestWithOnboardingAndKeyRotationsNoFaults
+    extends BftOrderingSimulationTest {
+  override def numberOfRuns: Int = 5
+  override def numberOfInitialNodes: Int = 2
+
+  private val random = new Random(4)
+  private val durationOfFirstPhaseWithFaults = 1.minute
+
+  override def generateStages(): NonEmpty[Seq[SimulationTestStageSettings]] =
+    NonEmpty(
+      Seq,
+      SimulationTestStageSettings(
+        SimulationSettings(
+          LocalSettings(random.nextLong()),
+          NetworkSettings(random.nextLong()),
+          TopologySettings(
+            random.nextLong(),
+            shouldDoKeyRotations = true,
+          ),
+          durationOfFirstPhaseWithFaults,
+          nodeOnboardingDelays =
+            Seq(generateNodeOnboardingDelay(durationOfFirstPhaseWithFaults, random)),
+        )
+      ),
+    )
+
+}
+
 // Allows catch-up state transfer testing without requiring CFT.
 class BftOrderingSimulationTestWithPartitions extends BftOrderingSimulationTest {
   override val numberOfRuns: Int = 4
@@ -670,7 +682,6 @@ class BftOrderingSimulationTest2NodesBootstrap extends BftOrderingSimulationTest
 
 // Simulation test about empty blocks, needed to pass the liveness check.
 class BftOrderingEmptyBlocksSimulationTest extends BftOrderingSimulationTest {
-  // At the moment of writing, the test requires 12 runs to fail on the liveness check when there's no "silent network detection".
   override val numberOfRuns: Int = 15
   override val numberOfInitialNodes: Int = 2
 
@@ -695,14 +706,11 @@ class BftOrderingEmptyBlocksSimulationTest extends BftOrderingSimulationTest {
         // This will result in empty blocks only.
         clientRequestInterval = None,
         clientRequestApproximateByteSize = None,
-        // This value is lower than the default to prevent view changes from ensuring liveness (as we want empty blocks to ensure it).
-        // When the simulation becomes "healthy", we don't know when the last crash (resetting the view change timeout)
-        // or view change happened. Similarly, we don't know how "advanced" the empty block creation at that moment is.
-        // Since the simulation is deterministic and runs multiple times, we can base this value on the empty block creation
-        // interval to get the desired test coverage.
-        livenessCheckInterval = AvailabilityModuleConfig.EmptyBlockCreationInterval * 2 + 1.second
-          + 1.second, // TODO(#24283)  This value can't be too low, so adding an extra second
-      )
+      ),
+      // The purpose of this test is to make sure we progress time by making empty blocks. As such we don't want view
+      // changes to happen (since they would also make the network do progress). So we need to explicitly check that
+      // no ViewChanges happened.
+      failOnViewChange = true,
     ),
   )
 }

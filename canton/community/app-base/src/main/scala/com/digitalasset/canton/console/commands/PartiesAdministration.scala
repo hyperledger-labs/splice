@@ -44,7 +44,6 @@ import com.digitalasset.canton.grpc.FileStreamObserver
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -227,7 +226,7 @@ class ParticipantPartiesAdministrationGroup(
             partyId,
             participants,
             threshold,
-            synchronizerId.logical,
+            synchronizerId,
             mustFullyAuthorize,
             synchronize,
           ).toEither
@@ -264,7 +263,7 @@ class ParticipantPartiesAdministrationGroup(
       partyId: PartyId,
       participants: Seq[ParticipantId],
       threshold: PositiveInt,
-      synchronizerId: SynchronizerId,
+      synchronizerId: PhysicalSynchronizerId,
       mustFullyAuthorize: Boolean,
       synchronize: Option[NonNegativeDuration],
   ): ConsoleCommandResult[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
@@ -291,7 +290,7 @@ class ParticipantPartiesAdministrationGroup(
           // let the topology service determine the appropriate keys to use
           signedBy = Seq.empty,
           serial = nextSerial,
-          store = TopologyStoreId.Synchronizer(synchronizerId),
+          store = synchronizerId,
           mustFullyAuthorize = mustFullyAuthorize,
           change = TopologyChangeOp.Replace,
           forceChanges = ForceFlags.none,
@@ -312,7 +311,7 @@ class ParticipantPartiesAdministrationGroup(
         party,
         removes = List(this.participantId),
         forceFlags = forceFlags,
-        store = TopologyStoreId.Synchronizer(synchronizerId.logical),
+        store = synchronizerId,
       )
       .discard
   }
@@ -548,6 +547,41 @@ class ParticipantPartiesAdministrationGroup(
       )
   }
 
+  @Help.Summary("Find highest ledger offset by timestamp.")
+  @Help.Description(
+    """This command attempts to find the highest ledger offset among all events belonging
+      |to a synchronizer that have a record time before or at the given timestamp.
+      |
+      |Returns the highest ledger offset, or an error.
+      |
+      |Possible failure causes:
+      |- The requested timestamp is too far in the past for which no events exist anymore.
+      |- There are no events for the given synchronizer.
+      |- Not all events have been processed fully and/or published to the Ledger API DB
+      |  until the requested timestamp.
+      |
+      |Depending on the failure cause, this command can be tried to get a ledger offset.
+      |For example, if not all events have been processed fully and/or published to the
+      |Ledger API DB, a retry makes sense.
+      |
+      |The arguments are:
+      |- synchronizerId: Restricts the query to a particular synchronizer.
+      |- timestamp: A point in time.
+      |- force: Defaults to false. If true, returns the highest currently known ledger offset
+      |  with a record time before or at the given timestamp.
+      |"""
+  )
+  def find_highest_offset_by_timestamp(
+      synchronizerId: SynchronizerId,
+      timestamp: Instant,
+      force: Boolean = false,
+  ): NonNegativeLong = consoleEnvironment.run {
+    reference.adminCommand(
+      ParticipantAdminCommands.PartyManagement
+        .GetHighestOffsetByTimestamp(synchronizerId, timestamp, force)
+    )
+  }
+
   @Help.Summary("Export active contracts for the given set of parties to a file.")
   @Help.Description(
     """This command exports the current Active Contract Set (ACS) of a given set of parties to a
@@ -656,7 +690,7 @@ object TopologySynchronisation {
       partyAssignment: Set[(PartyId, T)],
       timeout: NonNegativeDuration,
   )(implicit env: ConsoleEnvironment): Unit =
-    TraceContext.withNewTraceContext { _ =>
+    TraceContext.withNewTraceContext("await_topology") { _ =>
       ConsoleMacros.utils.retry_until_true(timeout) {
         val partiesWithId = partyAssignment.map { case (party, participantRef) =>
           (party, participantRef.id)

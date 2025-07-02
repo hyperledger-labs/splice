@@ -29,6 +29,7 @@ import com.digitalasset.canton.topology.{
   Namespace,
   ParticipantId,
   PartyId,
+  PhysicalSynchronizerId,
   SequencerId,
   SynchronizerId,
 }
@@ -43,13 +44,16 @@ import scala.math.Ordering.Implicits.*
 
 final class GeneratorsTransaction(
     protocolVersion: ProtocolVersion,
+    generatorsLf: GeneratorsLf,
     generatorsProtocol: GeneratorsProtocol,
+    generatorsTopology: GeneratorsTopology,
+    generatorsSequencing: GeneratorsSequencing,
 ) {
   import GeneratorsCrypto.*
-  import GeneratorsLf.*
+  import generatorsLf.*
   import generatorsProtocol.*
-  import GeneratorsSequencing.*
-  import GeneratorsTopology.*
+  import generatorsSequencing.*
+  import generatorsTopology.*
   import Generators.*
   import com.digitalasset.canton.config.GeneratorsConfig.*
 
@@ -93,6 +97,12 @@ final class GeneratorsTransaction(
       onboarding <- Arbitrary.arbBool.arbitrary
     } yield HostingParticipant(pid, permission, onboarding)
   )
+
+  implicit val synchronizerUpgradeAnnouncementArb: Arbitrary[SynchronizerUpgradeAnnouncement] =
+    Arbitrary(for {
+      psid <- Arbitrary.arbitrary[PhysicalSynchronizerId]
+      upgradeTime <- Arbitrary.arbitrary[CantonTimestamp]
+    } yield SynchronizerUpgradeAnnouncement(psid, upgradeTime))
 
   implicit val topologyMappingArb: Arbitrary[TopologyMapping] = genArbitrary
 

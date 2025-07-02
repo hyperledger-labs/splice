@@ -7,13 +7,11 @@ import com.daml.ledger.api.v2 as proto
 import com.daml.ledger.api.v2.completion.Completion
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService
 import com.digitalasset.canton.console.{ConsoleCommandResult, LocalParticipantReference}
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.GrpcAdminCommandSupport.ParticipantReferenceOps
 import com.digitalasset.canton.integration.util.GrpcServices.ReassignmentsService
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{
   BaseTest,
   LedgerCommandId,
@@ -111,7 +109,7 @@ trait HasReassignmentCommandsHelpers {
   }
 
   protected def assign(
-      unassignId: String,
+      reassignmentId: String,
       source: SynchronizerId,
       target: SynchronizerId,
       submittingParty: LfPartyId,
@@ -125,11 +123,11 @@ trait HasReassignmentCommandsHelpers {
     val ledgerEnd = participant.ledger_api.state.end()
 
     logger.debug(
-      s"Submitting assignment of $unassignId on behalf of $submittingParty (source=$source, target=$target)"
+      s"Submitting assignment of $reassignmentId on behalf of $submittingParty (source=$source, target=$target)"
     )
     participant.ledger_api.commands.submit_assign_async(
       submitter = submittingParty,
-      unassignId = unassignId,
+      reassignmentId = reassignmentId,
       source = source,
       target = target,
       commandId = commandId,
@@ -163,7 +161,7 @@ trait HasReassignmentCommandsHelpers {
   }
 
   protected def failingAssignment(
-      unassignId: String,
+      reassignmentId: String,
       source: SynchronizerId,
       target: SynchronizerId,
       submittingParty: PartyId,
@@ -175,7 +173,7 @@ trait HasReassignmentCommandsHelpers {
       cmd = getAssignmentCmd(
         source = source,
         target = target,
-        unassignmentId = unassignId,
+        reassignmentId = reassignmentId,
       ),
       userId = userId,
       workflowId = Some(workflowId),
@@ -226,11 +224,11 @@ trait HasReassignmentCommandsHelpers {
   protected def getAssignmentCmd(
       source: SynchronizerId,
       target: SynchronizerId,
-      unassignmentId: String,
+      reassignmentId: String,
   ): proto.reassignment_commands.ReassignmentCommand.Command.AssignCommand =
     proto.reassignment_commands.ReassignmentCommand.Command.AssignCommand(
       proto.reassignment_commands.AssignCommand(
-        unassignId = unassignmentId,
+        reassignmentId = reassignmentId,
         source = source.toProtoPrimitive,
         target = target.toProtoPrimitive,
       )
@@ -268,10 +266,4 @@ trait HasReassignmentCommandsHelpers {
     workflowId,
     submittingParty,
   )
-
-  protected def getReassignmentId(out: UpdateService.UnassignedWrapper): ReassignmentId =
-    ReassignmentId(
-      sourceSynchronizer = Source(SynchronizerId.tryFromString(out.source)),
-      unassignmentTs = CantonTimestamp.assertFromLong(out.unassignId.toLong),
-    )
 }

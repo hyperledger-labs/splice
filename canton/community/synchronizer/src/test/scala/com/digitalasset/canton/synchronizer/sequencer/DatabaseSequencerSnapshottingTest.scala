@@ -15,6 +15,7 @@ import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer as CantonSequencer
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.store.{DbSequencerStoreTest, SequencerStore}
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{MediatorId, TestingIdentityFactory, TestingTopology}
@@ -34,7 +35,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
     TestingTopology(),
     loggerFactory,
     DynamicSynchronizerParameters.initialValues(clock, testedProtocolVersion),
-  ).forOwnerAndSynchronizer(owner = mediatorId, synchronizerId.logical)
+  ).forOwnerAndSynchronizer(owner = mediatorId, psid)
 
   private val requestSigner = RequestSigner(crypto, testedProtocolVersion, loggerFactory)
 
@@ -65,11 +66,9 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
       DefaultProcessingTimeouts.testing,
       storage,
       sequencerStore,
-      minimumSequencingTime = CantonTimestamp.MinValue,
+      minimumSequencingTime = SequencerNodeParameterConfig.DefaultMinimumSequencingTime,
       clock,
-      synchronizerId,
       sequencerId,
-      testedProtocolVersion,
       crypto,
       metrics,
       loggerFactory,
@@ -149,7 +148,7 @@ trait DatabaseSequencerSnapshottingTest extends SequencerApiTest with DbTest {
         secondSequencer = createSequencerWithSnapshot(
           Some(
             SequencerInitialState(
-              synchronizerId,
+              psid,
               snapshot,
               latestSequencerEventTimestamp = None,
               initialTopologyEffectiveTimestamp = None,

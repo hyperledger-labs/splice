@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.admin.inspection
 import cats.Eval
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
+import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
@@ -187,7 +188,6 @@ final class SyncStateInspection(
   def findContractPayloads(
       synchronizerId: SynchronizerId,
       contractIds: Seq[LfContractId],
-      limit: Int,
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Map[LfContractId, SerializableContract]] = {
@@ -205,7 +205,7 @@ final class SyncStateInspection(
             synchronizerAlias,
           )
 
-        synchronizerAcsInspection.findContractPayloads(neCids, limit)
+        synchronizerAcsInspection.findContractPayloads(neCids)
     }
   }
 
@@ -429,8 +429,7 @@ final class SyncStateInspection(
       contractsWithReassignmentCounter = contracts.map(c => c -> snapshot(c.contractId)._2)
 
       filteredByParty = contractsWithReassignmentCounter.collect {
-        case (contract, reassignmentCounter)
-            if parties.intersect(contract.metadata.stakeholders).nonEmpty =>
+        case (contract, reassignmentCounter) if parties.intersect(contract.stakeholders).nonEmpty =>
           (contract.contractId, reassignmentCounter)
       }
     } yield filteredByParty.toSet
@@ -846,7 +845,7 @@ final class SyncStateInspection(
     * @return
     */
   private def getIntervalsBehindForParticipants(
-      filteredKnownParticipants: Map[SynchronizerId, Set[ParticipantId]],
+      filteredKnownParticipants: Map[PhysicalSynchronizerId, Set[ParticipantId]],
       participantsFilter: Option[NonEmpty[Seq[ParticipantId]]],
       syncPersistentState: SyncPersistentState,
   )(implicit
@@ -1052,10 +1051,12 @@ final class SyncStateInspection(
       participantFilter: Option[NonEmpty[Seq[ParticipantId]]],
   )(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[SynchronizerId, Set[ParticipantId]]] = {
-    val filteredSynchronizerIds = syncPersistentStateManager.getAllLatest.keySet.toSeq
-      .filter { synchronizerId =>
-        synchronizerFilter.fold(true)(_.contains(synchronizerId))
+  ): FutureUnlessShutdown[Map[PhysicalSynchronizerId, Set[ParticipantId]]] = {
+    val filteredSynchronizerIds = syncPersistentStateManager.getAllLatest.toSeq
+      .mapFilter { case (synchronizerId, state) =>
+        Option.when(synchronizerFilter.fold(true)(_.contains(synchronizerId)))(
+          state.physicalSynchronizerId
+        )
       }
 
     MonadUtil
