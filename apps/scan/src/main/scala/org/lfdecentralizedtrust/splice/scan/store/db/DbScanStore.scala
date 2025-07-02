@@ -101,7 +101,7 @@ class DbScanStore(
     svNodeStateCacheTtl: NonNegativeFiniteDuration,
     enableImportUpdateBackfill: Boolean,
     storeMetrics: DbScanStoreMetrics,
-    initialRound: Int,
+    initialRound: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -192,7 +192,7 @@ class DbScanStore(
         loggerFactory,
         domainMigrationId,
         timeouts,
-        initialRound,
+        initialRound.toInt,
       )
     )
 

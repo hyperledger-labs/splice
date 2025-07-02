@@ -321,7 +321,7 @@ object ScanStore {
       svNodeStateCacheTtl: NonNegativeFiniteDuration,
       enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
-      initialRound: Int,
+      initialRound: Long,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
