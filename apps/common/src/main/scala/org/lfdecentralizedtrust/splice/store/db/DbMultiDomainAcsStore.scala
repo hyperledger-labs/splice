@@ -1555,7 +1555,10 @@ final class DbMultiDomainAcsStore[TXE](
                 insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error #$indexColumnNames)
                 values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
               } ++ failedInterfaces.map {
-                case FailedInterfaceComputationRow(interfaceId, viewStatus) =>
+                case row @ FailedInterfaceComputationRow(interfaceId, viewStatus) =>
+                  logger.warn(
+                    s"Storing failed interface computation for ${createdEvent.getContractId}: $row"
+                  )
                   val interfaceIdQualifiedName = QualifiedName(interfaceId)
                   val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
                   val viewStatusJson = JsonFormat.printer.print(viewStatus)
