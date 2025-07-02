@@ -9,14 +9,17 @@ jobs:
     runs-on: self-hosted-docker-tiny
     if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     steps:
-      - name: Add labels to PRs from forks
+      - name: Assign PR from fork
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
         with:
           script: |
             const pr = context.payload.pull_request;
-            await github.rest.issues.addAssignees({
-              issue_number: pr.number,
-              owner: pr.base.repo.owner.login,
-              repo: pr.base.repo.name,
-              assignees: ['isegall-da', 'martinflorian-da', 'ray-roestenburg-da'],
-            });
+            // Only add assignees if the PR isn't already assigned to someone
+            if (!pr.assignee && !pr.assignees.length) {
+              await github.rest.issues.addAssignees({
+                issue_number: pr.number,
+                owner: pr.base.repo.owner.login,
+                repo: pr.base.repo.name,
+                assignees: ['isegall-da', 'martinflorian-da', 'ray-roestenburg-da'],
+              });
+            }

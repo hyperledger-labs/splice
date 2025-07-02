@@ -535,11 +535,6 @@ class SingleScanConnection private[client] (
       ),
     )
 
-  override def listDsoRulesVoteRequests()(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = ???
-
   override def listVoteRequestResults(
       actionName: Option[String],
       accepted: Option[Boolean],
@@ -559,30 +554,6 @@ class SingleScanConnection private[client] (
       effectiveFrom,
       effectiveTo,
       limit,
-    ),
-  )
-
-  override def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[VoteRequest.ContractId]
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[
-    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-  ] = runHttpCmd(
-    config.adminApi.url,
-    HttpScanAppClient.ListVoteRequestsByTrackingCid(
-      voteRequestCids
-    ),
-  )
-
-  override def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] = runHttpCmd(
-    config.adminApi.url,
-    HttpScanAppClient.LookupVoteRequest(
-      contractId
     ),
   )
 

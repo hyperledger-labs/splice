@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.admin.api.client
 
 import cats.data.OptionT
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{FeaturedAppRight, ValidatorRight}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
@@ -44,7 +44,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters.MapHasAsJava
 import scala.jdk.OptionConverters.*
 
 trait ScanConnection
@@ -141,7 +140,7 @@ trait ScanConnection
       )
   }
 
-  def listVoteRequests()(implicit
+  protected def listVoteRequests()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
@@ -190,27 +189,6 @@ trait ScanConnection
       )
     }
   }
-
-  def getPaymentTransferContext(ledgerConnection: SpliceLedgerConnection, providerPartyId: PartyId)(
-      implicit tc: TraceContext
-  ): Future[(PaymentTransferContext, DisclosedContracts.NE)] =
-    for {
-      (appTransferContext, disclosedContracts) <- getAppTransferContext(
-        ledgerConnection,
-        providerPartyId,
-      )
-    } yield (
-      new PaymentTransferContext(
-        appTransferContext.amuletRules,
-        new TransferContext(
-          appTransferContext.openMiningRound,
-          Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-          Map.empty[String, ValidatorRight.ContractId].asJava,
-          appTransferContext.featuredAppRight,
-        ),
-      ),
-      disclosedContracts,
-    )
 
   def getAppTransferContextForRound(
       ledgerConnection: SpliceLedgerConnection,
@@ -265,11 +243,6 @@ trait ScanConnection
       tc: TraceContext,
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]]
 
-  def listDsoRulesVoteRequests()(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]]
-
   def listVoteRequestResults(
       actionName: Option[String],
       accepted: Option[Boolean],
@@ -282,19 +255,6 @@ trait ScanConnection
       tc: TraceContext,
   ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
-  def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[VoteRequest.ContractId]
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[
-    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-  ]
-
-  def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
 }
 
 object ScanConnection {

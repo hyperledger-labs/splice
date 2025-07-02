@@ -157,18 +157,18 @@ amountExpiresAt e =
   e.createdAt `addBoundedRelRound` spentWithRatePerRound e.ratePerRound e.initialAmount
 
 -- | `estimateOpenRoundCreatedAt tickDuration currentMiningRound targetRound` estimates
--- creation `Time` of a specified `targetRound`.
-estimateOpenRoundCreatedAt : RelTime -> OpenMiningRound -> BoundedSet Round -> BoundedSet Time
+-- creation `Time` of a specified `targetRound` provided that one is in the future.
+estimateOpenRoundCreatedAt : RelTime -> OpenMiningRound -> BoundedSet Round -> Optional (BoundedSet Time)
 estimateOpenRoundCreatedAt tickDuration currentMiningRound (Singleton targetRound)
-  | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
-  | otherwise = do
+  | currentMiningRound.round >= targetRound = None
+  | otherwise =
     let relRound = subRound targetRound currentMiningRound.round
     -- Note: To estimate the time when the target open mining round is being created but not yet open,
     -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
         relMicros = (relRound.diff - 1) `boundedTimes` (convertRelTimeToMicroseconds tickDuration)
         relTime = convertMicrosecondsToRelTime <$> relMicros
-    addBoundedRelTime currentMiningRound.opensAt relTime
-estimateOpenRoundCreatedAt _ _ AfterMaxBound = AfterMaxBound
+    in Some (addBoundedRelTime currentMiningRound.opensAt relTime)
+estimateOpenRoundCreatedAt _ _ AfterMaxBound = Some AfterMaxBound
 
 
 -- | A lock held by multiple parties until its expiry.
@@ -190,8 +190,10 @@ doesLockExpireBeforeAmulet currentOpenRound lock e tickDuration =
       -- point in time;(Singleton  and we ensure that a amulet can be expired as soon as it can
       -- definitely not be used as an input to transfer anymore.
       expiringRound = addToBoundedRound r (RelRound 2)
-      amuletExpiresAt = estimateOpenRoundCreatedAt tickDuration currentOpenRound expiringRound
-  in lock.expiresAt `boundedLessTime` amuletExpiresAt
+      optAmuletExpiresAt = estimateOpenRoundCreatedAt tickDuration currentOpenRound expiringRound
+  in case optAmuletExpiresAt of
+    None -> False -- as the amulet is already expired
+    Some amuletExpiresAt -> lock.expiresAt `boundedLessTime` amuletExpiresAt
 
 -- | `isAmuletExpired openRound amuletAmount` computes whether the expiring `amuletAmount`
 -- is definitely expired in case the `openRound` is open.

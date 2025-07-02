@@ -10,11 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{
-  BuildInfo,
-  PackageVersionSupport,
-  SpliceLedgerConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.{BuildInfo, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -22,7 +18,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -32,7 +27,6 @@ class ValidatorLicenseMetadataTrigger(
     connection: SpliceLedgerConnection,
     store: ValidatorStore,
     contactPoint: String,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit override val ec: ExecutionContext, override val tracer: Tracer, mat: Materializer)
     extends ScheduledTaskTrigger[ValidatorLicenseMetadataTrigger.Task] {
 
@@ -42,37 +36,27 @@ class ValidatorLicenseMetadataTrigger(
       tc: TraceContext
   ): Future[Seq[ValidatorLicenseMetadataTrigger.Task]] =
     for {
-      validatorLicenseMetadataFeatureSupport <- packageVersionSupport
-        .supportsValidatorLicenseMetadata(
-          Seq(validator, store.key.dsoParty),
-          now,
-        )
       tasks <-
-        if (validatorLicenseMetadataFeatureSupport.supported) {
-          for {
-            licenseO <- store
-              .lookupValidatorLicenseWithOffset()
-              .map(_.value.flatMap(_.toAssignedContract))
-          } yield {
-            licenseO.toList
-              .filter(license =>
-                license.payload.metadata.toScala.fold(true)(metadata =>
-                  (metadata.version != BuildInfo.compiledVersion || metadata.contactPoint != contactPoint) &&
-                    (now - CantonTimestamp.tryFromInstant(metadata.lastUpdatedAt))
-                      .compareTo(ValidatorLicenseMetadataTrigger.minMetadataUpdateInterval) > 0
-                )
+        for {
+          licenseO <- store
+            .lookupValidatorLicenseWithOffset()
+            .map(_.value.flatMap(_.toAssignedContract))
+        } yield {
+          licenseO.toList
+            .filter(license =>
+              license.payload.metadata.toScala.fold(true)(metadata =>
+                (metadata.version != BuildInfo.compiledVersion || metadata.contactPoint != contactPoint) &&
+                  (now - CantonTimestamp.tryFromInstant(metadata.lastUpdatedAt))
+                    .compareTo(ValidatorLicenseMetadataTrigger.minMetadataUpdateInterval) > 0
               )
-              .map(license =>
-                ValidatorLicenseMetadataTrigger.Task(
-                  BuildInfo.compiledVersion,
-                  contactPoint,
-                  license,
-                  validatorLicenseMetadataFeatureSupport,
-                )
+            )
+            .map(license =>
+              ValidatorLicenseMetadataTrigger.Task(
+                BuildInfo.compiledVersion,
+                contactPoint,
+                license,
               )
-          }
-        } else {
-          Future.successful(Seq.empty)
+            )
         }
     } yield tasks
 
@@ -91,7 +75,6 @@ class ValidatorLicenseMetadataTrigger(
         ),
       )
       .noDedup
-      .withPreferredPackage(task.work.featureSupport.packageIds)
       .yieldUnit()
       .map(_ =>
         TaskSuccess(
@@ -118,14 +101,12 @@ object ValidatorLicenseMetadataTrigger {
       targetVersion: String,
       targetContactPoint: String,
       existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
-      featureSupport: FeatureSupport,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
         param("targetVersion", _.targetVersion.doubleQuoted),
         param("targetContactPoint", _.targetContactPoint.doubleQuoted),
         param("existingLicense", _.existingLicense),
-        param("featureSupport", _.featureSupport),
       )
     }
   }

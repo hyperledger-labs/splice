@@ -4,6 +4,7 @@
 -- | Unit tests for the fees module
 module Splice.Scripts.UnitTests.Fees where
 
+import DA.Action (unless)
 import DA.Assert ((===))
 import DA.Time
 
@@ -29,3 +30,15 @@ test_chargeRatePerDay = do
   where
     expectedCharge = 101.0 * 0.03
     ratePerDay = RatePerDay with rate = 0.03
+
+test_validSteppedRate : Script ()
+test_validSteppedRate = do
+    test True [(100.0, 0.001), (1000.0, 0.0001), (100000.0, 0.00001)]
+    test False []
+    test False [(100.0, 0.001), (100.0, 0.0001)]
+    test False [(100.0, 0.001), (90.0, 0.0001)]
+  where
+    test isValid steps = do
+        let steppedRate = SteppedRate with initialRate = 0.01, steps
+        unless (isValid == validSteppedRate steppedRate) $
+            error $ "SteppedRate validity check failed for " <> show (isValid, steppedRate)

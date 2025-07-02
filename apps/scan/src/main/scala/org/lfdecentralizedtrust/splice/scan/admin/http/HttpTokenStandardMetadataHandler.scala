@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import org.lfdecentralizedtrust.splice.config.SpliceInstanceNamesConfig
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 import org.lfdecentralizedtrust.splice.scan.store.ScanStore
 
@@ -12,6 +13,7 @@ import scala.concurrent.Future
 
 class HttpTokenStandardMetadataHandler(
     store: ScanStore,
+    spliceInstanceNames: SpliceInstanceNamesConfig,
     protected val loggerFactory: NamedLoggerFactory,
 )(
 ) extends v1.Handler[TraceContext]
@@ -60,8 +62,8 @@ class HttpTokenStandardMetadataHandler(
 
   val amuletInstrument = v1.definitions.Instrument(
     id = "Amulet",
-    name = "Amulet",
-    symbol = "Amulet",
+    name = spliceInstanceNames.amuletName,
+    symbol = spliceInstanceNames.amuletNameAcronym,
     decimals = 10,
     supportedApis = Map(
       "splice-api-token-metadata-v1" -> 1,

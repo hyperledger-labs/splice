@@ -274,6 +274,7 @@ class ScanApp(
 
       tokenStandardMetadataHandler = new HttpTokenStandardMetadataHandler(
         store,
+        config.spliceInstanceNames,
         loggerFactory,
       )()
 
