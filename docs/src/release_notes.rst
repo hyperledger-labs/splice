@@ -14,8 +14,35 @@ Upcoming
 - Daml
 
   - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
 
-    This requires an upgrade to the following Daml versions:
+      - CC-4 (low severity): addressed by
+
+        - checking that ``expiresAt`` is in the future in the choice body of
+          ``DsoRules_ExecuteConfirmedAction``, ``DsoRules_AddConfirmedSv``, and ``ValidatorOnboarding_Match``.
+
+      - CC-5 (low severity): addressed by
+
+        - requiring steps of a valid ``SteppedRate`` to be strictly ascending
+        - enforcing this validation on the ``transferFee`` in ``AmuletConfig``
+        - failing ``chargeSteppedRate`` if a negative step is found
+
+      - S-2 (auditor suggestion): addressed by
+
+        - adding basic validation for all fields of ``AmuletConfig`` to reduce the risk of misconfigurations
+        - restricting the choice ``AmuletRules_Mint`` to only be called in DevNet setups
+        - properly handling the edge case of amulet that expired when checking whether a lock expires before an amulet
+          in the ``doesLockExpireBeforeAmulet`` function
+        - checking that ``createdAt`` and ``ratePerRound`` of an ``ExpiringAmount`` are positive;
+          and enforcing that check in the ``expiringAmount`` smart constructor
+        - checking that the ``validatorRewardPercentage`` and the ``appRewardPercentage`` in a valid
+          ``IssuanceConfig`` are non-negative and do not exceed 100%
+        - changing the ``ensure`` clause of ``MemberTraffic`` to enforce non-empty ``memberId`` and ``synchronizerId`` fields
+        - enforcing a length limit of 280 characters on the ``trackingId`` of ``TransferOffer``
+          as a prudent engineering measure
+
+
+    These Daml changes requires an upgrade to the following Daml versions:
 
     ================== =======
     name               version
@@ -23,27 +50,46 @@ Upcoming
     amulet             0.1.9
     amuletNameService  0.1.9
     dsoGovernance      0.1.13
-    validatorLifecycle 0.1.3
+    validatorLifecycle 0.1.4
     wallet             0.1.9
     walletPayments     0.1.9
     ================== =======
 
-- Backend
+- SV
 
   - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
     the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.
+  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+
+- Scan
+
   - Fix a `bug (#1254) <https://github.com/hyperledger-labs/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
     based on the ``splice-instance-names`` config.
 
-- UI
+- Validator
 
-  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+  - **Breaking**: The validator app now enforces that the traffic
+    topup interval is >= the automation polling interval (30s by
+    default). Previously it implicitly rounded up if the topup
+    interval was smaller which caused confusion on how much traffic is
+    purchased each time. If your topup interval was >= 30s you are not
+    affected. If you are affected, set the topup interval to the
+    polling interval (30s unless changed) to recover the prior
+    behavior.
 
 - Docs
 
   - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
   - Add relevant links to the new application developer documentation pages published by Digital Asset at
     https://docs.digitalasset.com/build/3.3/.
+  - Fixed docker-compose docs around migrating from a non-authenticated validator to
+    an authenticated validator. A complete wipe of the validator database is not required, as
+    opposed to what the docs previously stated. See the relevant section on :ref:`authenticated
+    docker-compose validators <compose_validator_auth>`.
+
+
+
+
 
 0.4.3
 -----

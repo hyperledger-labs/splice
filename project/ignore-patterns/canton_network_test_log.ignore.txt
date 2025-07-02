@@ -119,4 +119,7 @@ Failed to connect to scan of .*DisasterRecoveryIntegrationTest
 # Ignore scan connection issues in reonboarding test.
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 
+# Log suppression doesn't seem to work here as the tests use a different logger
+topup interval 1 second must not be smaller than the polling interval 30 seconds.*SpliceConfigTest
+
 # Make sure to have a trailing newline

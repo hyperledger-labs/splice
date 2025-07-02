@@ -3,6 +3,8 @@
 
 module Splice.ValidatorOnboarding where
 
+import DA.Assert
+
 import Splice.Util
 
 data ValidatorOnboarding_MatchResult = ValidatorOnboarding_MatchResult with
@@ -31,6 +33,7 @@ template ValidatorOnboarding with
         validator : Party
       controller sv
       do
+        assertWithinDeadline "ValidatorOnboarding.expiresAt" expiresAt
         require "provided secret matches the stored secret" (providedSecret == candidateSecret)
         usedSecret <- create UsedSecret with
           secret = candidateSecret
@@ -41,8 +44,7 @@ template ValidatorOnboarding with
     choice ValidatorOnboarding_Expire : ValidatorOnboarding_ExpireResult
       controller sv
       do
-        now <- getTime
-        require "ValidatorOnboarding has expired" (now >= expiresAt)
+        assertDeadlineExceeded "ValidatorOnboarding.expiresAt" expiresAt
         pure ValidatorOnboarding_ExpireResult
 
 

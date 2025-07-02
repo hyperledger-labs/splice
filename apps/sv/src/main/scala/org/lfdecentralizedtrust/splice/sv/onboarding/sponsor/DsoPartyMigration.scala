@@ -4,6 +4,9 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.EitherT
+import cats.syntax.foldable.*
+import com.digitalasset.base.error.utils.ErrorDetails
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
   RetryFor,
@@ -12,17 +15,20 @@ import org.lfdecentralizedtrust.splice.environment.{
 import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting
 import org.lfdecentralizedtrust.splice.sv.onboarding.DsoPartyHosting.DsoPartyMigrationFailure
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
+import org.lfdecentralizedtrust.splice.sv.store.{SvSvStore, SvDsoStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.repair.RepairServiceError
 import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class DsoPartyMigration(
+    svStoreWithIngestion: AppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
@@ -33,6 +39,7 @@ class DsoPartyMigration(
 ) extends NamedLogging {
 
   private val dsoStore = dsoStoreWithIngestion.store
+  private val svParty = dsoStore.key.svParty
   private val dsoParty = dsoStore.key.dsoParty
   private val partyHosting = new SponsorDsoPartyHosting(
     participantAdminConnection,
@@ -67,6 +74,24 @@ class DsoPartyMigration(
       authorizedAt: Instant,
       decentralizedSynchronizer: SynchronizerId,
   )(implicit tc: TraceContext): Future[ByteString] = {
+    def submitDummyTransaction(): Future[Unit] =
+      svStoreWithIngestion.connection
+        .submit(
+          Seq(svParty),
+          Seq.empty,
+          // The transaction here is arbitrary with the restriction that it should not have the DSO as a stakeholder.
+          // FeaturedAppRight just happens to be one of the simplest templates we have.
+          new FeaturedAppRight(svParty.toProtoPrimitive, svParty.toProtoPrimitive).createAnd
+            .exerciseArchive(),
+        )
+        .withSynchronizerId(decentralizedSynchronizer)
+        .noDedup
+        .yieldUnit()
+    // Acquiring the ACS snapshot is tricky due to two issues:
+    // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
+    //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
+    //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with DSO as the stakeholder.
+    // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we give up.
     for {
       snapshot <- {
         retryProvider.retry(
@@ -74,11 +99,37 @@ class DsoPartyMigration(
           "download_acs_snapshot",
           show"Download ACS snapshot for DSO at $authorizedAt",
           participantAdminConnection
-            .downloadAcsSnapshotForPartyMigration(
+            .downloadAcsSnapshot(
               Set(dsoParty),
-              filterSynchronizerId = decentralizedSynchronizer,
-              timestamp = authorizedAt,
-            ),
+              filterSynchronizerId = Some(decentralizedSynchronizer),
+              timestamp = Some(authorizedAt),
+            )
+            .recoverWith { case ex: StatusRuntimeException =>
+              val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
+              for {
+                // Special case some exceptions
+                _ <- errorDetails.traverse_ {
+                  case ErrorDetails
+                        .ErrorInfoDetail(RepairServiceError.UnavailableAcsSnapshot.id, metadata) =>
+                    val msg =
+                      s"Requested record time $authorizedAt has been pruned: $metadata, make sure that journal-garbage-collection-delay is configured sufficiently high"
+                    logger.warn(msg)
+                    Future.failed(Status.INVALID_ARGUMENT.withDescription(msg).asRuntimeException())
+                  case ErrorDetails.ErrorInfoDetail(
+                        RepairServiceError.InvalidAcsSnapshotTimestamp.id,
+                        metadata,
+                      ) =>
+                    logger.info(
+                      s"Requested record time $authorizedAt is not yet clean: $metadata, submitting dummy transaction"
+                    )
+                    submitDummyTransaction()
+                  case _ => Future.unit
+                }
+              } yield {
+                // Rethrow everything else
+                throw ex
+              }
+            },
           logger,
         )
       }

@@ -44,7 +44,6 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{
 import org.lfdecentralizedtrust.splice.http.v0.scan.ScanResource
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, scan as v0}
 import org.lfdecentralizedtrust.splice.scan.store.{AcsSnapshotStore, ScanStore, TxLogEntry}
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
 import org.lfdecentralizedtrust.splice.util.{
   Codec,
   Contract,
@@ -54,10 +53,9 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.admin.data.ActiveContract
+import com.digitalasset.canton.participant.admin.data.ActiveContractOld as ActiveContract
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{ByteStringUtil, GrpcStreamingUtils, ResourceUtil}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -67,7 +65,6 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Try, Using}
-import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
@@ -101,7 +98,7 @@ class HttpScanHandler(
     spliceInstanceNames: SpliceInstanceNamesConfig,
     participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection: SequencerAdminConnection,
-    protected val storeWithIngestion: AppStoreWithIngestion[ScanStore],
+    protected val store: ScanStore,
     snapshotStore: AcsSnapshotStore,
     dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
@@ -118,7 +115,6 @@ class HttpScanHandler(
     with HttpValidatorLicensesHandler
     with HttpFeatureSupportHandler {
 
-  private val store = storeWithIngestion.store
   override protected val workflowId: String = this.getClass.getSimpleName
   override protected val votesStore: VotesStore = store
   override protected val validatorLicensesStore: AppStore = store
@@ -1151,37 +1147,17 @@ class HttpScanHandler(
   /** Filter the given ACS snapshot to contracts the given party is a stakeholder on */
   // TODO(#828) Move this logic inside a Canton gRPC API.
   private def filterAcsSnapshot(input: ByteString, stakeholder: PartyId): ByteString = {
-    val decompressedBytes =
-      ByteStringUtil
-        .decompressGzip(input, None)
-        .valueOr(err =>
-          throw Status.INVALID_ARGUMENT
-            .withDescription(s"Failed to decompress bytes: $err")
-            .asRuntimeException
-        )
-    val contracts = ResourceUtil.withResource(
-      new ByteArrayInputStream(decompressedBytes.toByteArray)
-    ) { inputSource =>
-      GrpcStreamingUtils
-        .parseDelimitedFromTrusted[ActiveContract](
-          inputSource,
-          ActiveContract,
-        )
-        .valueOr(err =>
-          throw Status.INVALID_ARGUMENT
-            .withDescription(s"Failed to parse contracts in acs snapshot: $err")
-            .asRuntimeException
-        )
-    }
+    val contracts = ActiveContract
+      .loadFromByteString(input)
+      .valueOr(error =>
+        throw Status.INTERNAL
+          .withDescription(s"Failed to read ACS snapshot: ${error}")
+          .asRuntimeException()
+      )
     val output = ByteString.newOutput
     Using.resource(new GZIPOutputStream(output)) { outputStream =>
-      contracts
-        .filter(c =>
-          c.contract.getCreatedEvent.signatories.contains(
-            stakeholder.toLf
-          ) || c.contract.getCreatedEvent.observers.contains(stakeholder.toLf)
-        )
-        .foreach { c =>
+      contracts.filter(c => c.contract.metadata.stakeholders.contains(stakeholder.toLf)).foreach {
+        c =>
           c.writeDelimitedTo(outputStream) match {
             case Left(error) =>
               throw Status.INTERNAL
@@ -1189,7 +1165,7 @@ class HttpScanHandler(
                 .asRuntimeException()
             case Right(_) => outputStream.flush()
           }
-        }
+      }
     }
     output.toByteString
   }
@@ -1204,20 +1180,6 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
-        synchronizerId <- store
-          .lookupAmuletRules()
-          .map(
-            _.getOrElse(
-              throw io.grpc.Status.FAILED_PRECONDITION
-                .withDescription("No amulet rules.")
-                .asRuntimeException()
-            ).state.fold(
-              identity,
-              throw io.grpc.Status.FAILED_PRECONDITION
-                .withDescription("Amulet rules are in flight.")
-                .asRuntimeException(),
-            )
-          )
         // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and ANS entries.
         // This means the SV participants ingest data for that party and we can take a snapshot for that party.
         // To make sure the snapshot is the same regardless of which SV is queried, we filter it down to
@@ -1226,24 +1188,10 @@ class HttpScanHandler(
         // that users backup their own ACS.
         // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- recordTime match {
-          case None =>
-            storeWithIngestion.connection.ledgerEnd().flatMap { offset =>
-              participantAdminConnection.downloadAcsSnapshotAtOffset(
-                Set(partyId),
-                offset = offset,
-                filterSynchronizerId = synchronizerId,
-              )
-            }
-          case Some(time) =>
-            // To support more timestamp we use forSynchronizerMigration instead of forPartyMigration
-            participantAdminConnection.downloadAcsSnapshotForSynchronizerMigration(
-              Set(partyId),
-              timestamp = time.toInstant,
-              synchronizerId = synchronizerId,
-              disasterRecovery = false,
-            )
-        }
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+          Set(partyId),
+          timestamp = recordTime.map(_.toInstant),
+        )
       } yield {
         val filteredAcsSnapshot =
           filterAcsSnapshot(acsSnapshot, store.key.dsoParty)

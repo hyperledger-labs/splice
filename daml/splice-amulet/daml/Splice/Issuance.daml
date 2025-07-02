@@ -40,6 +40,7 @@ validIssuanceConfig this@IssuanceConfig{..} =
        amuletToIssuePerYear > 0.0
     && validatorRewardPercentage >= 0.0
     && appRewardPercentage >= 0.0
+    && (validatorRewardPercentage + appRewardPercentage) <= 1.0
     && validatorRewardCap >= 0.0
     && featuredAppRewardCap >= 0.0
     && unfeaturedAppRewardCap >= 0.0
