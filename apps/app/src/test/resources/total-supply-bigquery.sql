@@ -47,9 +47,10 @@ CREATE TEMP FUNCTION daml_record_path(
     field_indices array<int64>,
     prim_selector string
   ) RETURNS string AS (
-  CONCAT('$.record.fields[',
-         ARRAY_TO_STRING(field_indices, '].value.record.fields['),
-         '].value',
+  CONCAT('$',
+         (SELECT STRING_AGG(CONCAT('.record.fields[', CAST(i AS STRING), '].value'),
+                            '' ORDER BY offset)
+          FROM UNNEST(field_indices) AS i WITH OFFSET),
          daml_prim_path(prim_selector))
 );
 
