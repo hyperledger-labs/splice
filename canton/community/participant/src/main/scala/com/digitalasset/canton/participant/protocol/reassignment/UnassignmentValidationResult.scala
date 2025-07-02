@@ -149,6 +149,7 @@ object UnassignmentValidationResult {
     def isSuccessful(implicit ec: ExecutionContext): FutureUnlessShutdown[Boolean] =
       for {
         modelConformanceCheck <- contractAuthenticationResultF.value
-      } yield activenessResult.isSuccessful && participantSignatureVerificationResult.isEmpty && reassigningParticipantValidationResult.isEmpty && modelConformanceCheck.isRight
+      } yield activenessResult.isSuccessful && participantSignatureVerificationResult.isEmpty
+        && reassigningParticipantValidationResult.isEmpty && modelConformanceCheck.isRight
   }
 }

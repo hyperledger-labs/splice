@@ -6,9 +6,8 @@ package com.digitalasset.canton.integration.tests
 import better.files.*
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.admin.api.client.data.StaticSynchronizerParameters
-import com.digitalasset.canton.config.{CantonConfig, DbConfig}
+import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.plugins.{UseCommunityReferenceBlockSequencer, UseH2}
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
@@ -32,7 +31,7 @@ import scala.concurrent.duration.DurationInt
   */
 trait SynchronizerBootstrapWithSeparateConsolesIntegrationTest
     extends CommunityIntegrationTest
-    with SharedEnvironment[CantonConfig, CantonEnvironment]
+    with SharedEnvironment
     with HasExecutionContext {
 
   override lazy val environmentDefinition: EnvironmentDefinition =

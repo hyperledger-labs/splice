@@ -65,7 +65,7 @@ final case class CommitmentContractMetadata(
 
 object CommitmentContractMetadata
     extends VersioningCompanion[
-      CommitmentContractMetadata
+      CommitmentContractMetadata,
     ] {
 
   override def versioningTable: VersioningTable = VersioningTable(
