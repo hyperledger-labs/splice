@@ -18,6 +18,10 @@ inputs:
   artifactory_password:
     description: "The Artifactory password"
     required: true
+  oss_only:
+    description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
+    required: false
+    default: "false"
 
 outputs:
   sbt_cache_hits:
@@ -44,6 +48,7 @@ runs:
         artifactory_password: ${{ inputs.artifactory_password }}
         cache_version: 4
         should_save: ${{ inputs.save_nix_cache }}
+        oss_only: ${{ inputs.oss_only }}
 
     - name: Set up SBT
       if: inputs.with_sbt == 'true'
