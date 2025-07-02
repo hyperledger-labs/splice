@@ -614,7 +614,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteOut = Seq(
-            (c(1), d1, d2, tf0, 1L)
+            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> None)
@@ -631,7 +631,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteIn = Seq(
-            (c(1), d1, d2, tf0, 1L)
+            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> Some(d2))
@@ -675,7 +675,7 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextReassignmentId
       for {
         _ <- initWithAcs(
-          incompleteOut = Seq((cFeatured(1), d1, d2, tf0, 1L))
+          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(cFeatured(1), d1, d2, tf0, 1L))
         )
         _ <- assertIncompleteReassignments()
       } yield succeed
@@ -740,7 +740,7 @@ abstract class MultiDomainAcsStoreTest[
         // incomplete unassign
         _ <- initWithAcs(
           incompleteOut = Seq(
-            (c(1), d1, d2, tf0, 1L)
+            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ = eventually()(transfers.get should have length 1)
@@ -783,7 +783,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)),
-          incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
+          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(c(2), d1, d2, tf2, 3L)),
         )
         _ = assertSize("Initial", 1)
         // unassign before assign
@@ -1120,6 +1120,14 @@ abstract class MultiDomainAcsStoreTest[
         ),
         holdingView(owner, BigDecimal(10), providerParty(42), "AMT"),
       )
+      val incompleteOutHoldings = (2 to 5).map(n =>
+        amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.00001), dso = dsoParty) ->
+          holdingView(owner, BigDecimal(n.toLong), dsoParty, "AMT")
+      )
+      val incompleteInHolding = (6 to 8).map(n =>
+        amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.00001), dso = dsoParty) ->
+          holdingView(owner, BigDecimal(n), dsoParty, "AMT")
+      )
       val acs = Seq(
         StoreTest.AcsImportEntry(
           aHolding._1,
@@ -1148,7 +1156,33 @@ abstract class MultiDomainAcsStoreTest[
         ),
       )
       for {
-        _ <- initWithAcs(acs)
+        _ <- initWithAcs(
+          acs,
+          incompleteOut = incompleteOutHoldings.map { case (contract, holdingView) =>
+            StoreTest.AcsImportIncompleteEntry(
+              contract,
+              d1,
+              d2,
+              nextReassignmentId,
+              1L,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+              ),
+            )
+          },
+          incompleteIn = incompleteInHolding.map { case (contract, holdingView) =>
+            StoreTest.AcsImportIncompleteEntry(
+              contract,
+              d2,
+              d1,
+              nextReassignmentId,
+              1L,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+              ),
+            )
+          },
+        )
         resultHolding <- store.listInterfaceViews(
           holdingv1.Holding.INTERFACE
         )
@@ -1156,15 +1190,18 @@ abstract class MultiDomainAcsStoreTest[
           allocationrequestv1.AllocationRequest.INTERFACE
         )
       } yield {
-        resultHolding should be(Seq(aHolding, (aTwoInterfaces._1, aTwoInterfaces._2)).map {
-          case (contract, holdingView) =>
-            Contract(
-              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
-              new holdingv1.Holding.ContractId(contract.contractId.contractId),
-              holdingView,
-              contract.createdEventBlob,
-              contract.createdAt,
-            )
+        val allHoldings = Seq(
+          aHolding,
+          (aTwoInterfaces._1, aTwoInterfaces._2),
+        ) ++ incompleteOutHoldings ++ incompleteInHolding
+        resultHolding should be(allHoldings.map { case (contract, holdingView) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            holdingView,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
         })
         resultAllocationRequest should be(
           Seq(

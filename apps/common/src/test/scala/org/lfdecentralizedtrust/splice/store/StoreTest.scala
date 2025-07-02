@@ -760,6 +760,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source: SynchronizerId,
       target: SynchronizerId,
       counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord],
   ): IncompleteReassignmentEvent.Unassign = IncompleteReassignmentEvent.Unassign(
     toUnassignEvent(
       contract.contractId,
@@ -768,7 +769,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       target,
       counter,
     ),
-    toCreatedEvent(contract, Seq(dsoParty)),
+    toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
   )
 
   protected def toIncompleteAssign(
@@ -777,6 +778,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source: SynchronizerId,
       target: SynchronizerId,
       counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord],
   ): IncompleteReassignmentEvent.Assign = IncompleteReassignmentEvent.Assign(
     toAssignEvent(
       contract,
@@ -784,6 +786,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source,
       target,
       counter,
+      implementedInterfaces,
     )
   )
 
@@ -809,12 +812,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source: SynchronizerId,
       target: SynchronizerId,
       counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord],
   ): ReassignmentEvent.Assign = ReassignmentEvent.Assign(
     unassignId = unassignId,
     submitter = userParty(1),
     source = source,
     target = target,
-    createdEvent = toCreatedEvent(contract, Seq(dsoParty)),
+    createdEvent =
+      toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
     counter = counter,
   )
 
@@ -860,9 +865,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def acs(
       acs: Seq[StoreTest.AcsImportEntry] = Seq.empty,
-      incompleteOut: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] =
-        Seq.empty,
-      incompleteIn: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] = Seq.empty,
+      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
@@ -874,32 +878,49 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           counter,
         )
       },
-      incompleteOut.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
-        toIncompleteUnassign(
-          c,
-          tfid,
-          sourceDomain,
-          targetDomain,
-          counter,
-        )
+      incompleteOut.map {
+        case StoreTest.AcsImportIncompleteEntry(
+              c,
+              sourceDomain,
+              targetDomain,
+              tfid,
+              counter,
+              implementedInterfaces,
+            ) =>
+          toIncompleteUnassign(
+            c,
+            tfid,
+            sourceDomain,
+            targetDomain,
+            counter,
+            implementedInterfaces,
+          )
       },
-      incompleteIn.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
-        toIncompleteAssign(
-          c,
-          tfid,
-          sourceDomain,
-          targetDomain,
-          counter,
-        )
+      incompleteIn.map {
+        case StoreTest.AcsImportIncompleteEntry(
+              c,
+              sourceDomain,
+              targetDomain,
+              tfid,
+              counter,
+              implementedInterfaces,
+            ) =>
+          toIncompleteAssign(
+            c,
+            tfid,
+            sourceDomain,
+            targetDomain,
+            counter,
+            implementedInterfaces,
+          )
       },
     )
   } yield ()
 
   protected def initWithAcs(
       activeContracts: Seq[StoreTest.AcsImportEntry] = Seq.empty,
-      incompleteOut: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] =
-        Seq.empty,
-      incompleteIn: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] = Seq.empty,
+      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
@@ -1109,6 +1130,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
         offset: Long = nextOffset(),
+        implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
         offset,
@@ -1118,6 +1140,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           contractAndDomain._2,
           domain,
           counter,
+          implementedInterfaces,
         ),
         recordTime,
       )
@@ -1389,6 +1412,15 @@ object StoreTest {
   case class AcsImportEntry(
       contract: Contract[?, ?],
       synchronizerId: SynchronizerId,
+      counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+  )
+
+  case class AcsImportIncompleteEntry(
+      contract: Contract[?, ?],
+      sourceDomain: SynchronizerId,
+      targetDomain: SynchronizerId,
+      tfid: String,
       counter: Long,
       implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
   )
