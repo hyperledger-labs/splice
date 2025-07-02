@@ -22,7 +22,12 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
-import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes, AcsRowData}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsJdbcTypes,
+  AcsRowData,
+  FailedInterfaceComputationRow,
+}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
@@ -295,7 +300,9 @@ object MultiDomainAcsStore {
 
     def matchingInterfaceRows(
         ev: CreatedEvent
-    )(implicit elc: ErrorLoggingContext): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])]
+    )(implicit
+        elc: ErrorLoggingContext
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR], Seq[FailedInterfaceComputationRow])]
 
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
@@ -405,7 +412,9 @@ object MultiDomainAcsStore {
 
     override def matchingInterfaceRows(
         ev: CreatedEvent
-    )(implicit elc: ErrorLoggingContext): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])] = {
+    )(implicit
+        elc: ErrorLoggingContext
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR], Seq[FailedInterfaceComputationRow])] = {
       val acsRowData = AcsRowData.AcsRowDataFromInterface(
         ev.getTemplateId,
         new ContractId[DamlRecord[?]](ev.getContractId),
@@ -418,12 +427,18 @@ object MultiDomainAcsStore {
         interfaceFilter <- interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier))
         result <- interfaceFilter.matchingContractToRow(ev)
       } yield result
-      // TODO: handle interface computation errors
+      val failedInterfaces = ev.getFailedInterfaceViews.asScala.collect {
+        case (identifier, status)
+            if interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier)) &&
+              // this filter should ideally not be necessary, but it's better than getting CHECK constraint violations
+              !ev.getInterfaceViews.containsKey(identifier) =>
+          FailedInterfaceComputationRow(identifier, status)
+      }
 
-      if (interfaceRowDatas.isEmpty) {
+      if (interfaceRowDatas.isEmpty && failedInterfaces.isEmpty) {
         None
       } else {
-        Some(acsRowData -> interfaceRowDatas.toSeq)
+        Some((acsRowData, interfaceRowDatas.toSeq, failedInterfaces.toSeq))
       }
     }
 

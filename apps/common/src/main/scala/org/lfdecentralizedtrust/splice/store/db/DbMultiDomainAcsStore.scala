@@ -63,6 +63,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.google.protobuf.ByteString
+import com.google.protobuf.util.JsonFormat
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
@@ -1533,7 +1534,7 @@ final class DbMultiDomainAcsStore[TXE](
         contractFilter.matchingInterfaceRows(createdEvent),
         contractFilter.matchingContractToRow(createdEvent),
       ) match {
-        case (Some((fallbackRowData, interfaces)), rowData) =>
+        case (Some((fallbackRowData, interfaces, failedInterfaces)), rowData) =>
           // when both a template filter and an interface filter are defined,
           // the AcsRowData from the template filter takes priority,
           // as that one defines any potential index columns,
@@ -1547,10 +1548,16 @@ final class DbMultiDomainAcsStore[TXE](
                 val viewJson = interfaceRow.interfaceView
                 val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
                 val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
-                // TODO: errors
                 (sql"""
                 insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error #$indexColumnNames)
                 values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
+              } ++ failedInterfaces.map {
+                case FailedInterfaceComputationRow(interfaceId, viewStatus) =>
+                  val interfaceIdQualifiedName = QualifiedName(interfaceId)
+                  val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
+                  val viewStatusJson = JsonFormat.printer.print(viewStatus)
+                  (sql"""insert into interface_views_template(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
+                         values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, null, $viewStatusJson)""").toActionBuilder.asUpdate
               })
             }
         case (None, Some(rowData)) =>

@@ -67,6 +67,8 @@ object AcsInterfaceViewRowData {
   trait NoInterfacesIngested extends AcsInterfaceViewRowData
 }
 
+case class FailedInterfaceComputationRow(interfaceId: Identifier, viewStatus: com.google.rpc.Status)
+
 case class IndexColumnValue[V](value: V)(private implicit val setParameter: SetParameter[V])
 object IndexColumnValue {
   import scala.language.implicitConversions // convenience
