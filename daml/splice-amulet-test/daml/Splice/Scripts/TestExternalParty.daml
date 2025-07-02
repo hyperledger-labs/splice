@@ -12,31 +12,17 @@ import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Scripts.Util
 
+testExternalPartySetup : Script ()
 testExternalPartySetup = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   externalUser <- setupUserWithoutValidatorRight app "externalUser"
-  now <- getTime
-  let preapprovalExpiresAt = now `addRelTime` days 1
-
-  -- This would be submitted by the validator hosting the external party
-  -- As part of the creation of the proposal, the validator also pays for the creation of the
-  -- initial pre-approval contract to enable receiving amulets for the external party.
-  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
-  context <- getPaymentTransferContext app aliceValidator
-  amuletCid <- tap app aliceValidator 50.0
-  AmuletRules_CreateExternalPartySetupProposalResult{..} <-
-    checkTxMetadata app TxKind_Burn aliceValidator.primaryParty $
-    submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
-      context = context
-      inputs = [InputAmulet amuletCid]
-      user = externalUser.primaryParty
-      validator = aliceValidator.primaryParty
-      preapprovalExpiresAt
+  (proposalCid, proposal) <- createExternalPartySetupProposal app aliceValidator externalUser.primaryParty
 
   -- Externally signed transaction to accept proposal.
   ExternalPartySetupProposal_AcceptResult{..} <- submit externalUser.primaryParty $ exerciseCmd proposalCid ExternalPartySetupProposal_Accept {}
   -- check transfer pre-approval was created
+  now <- getTime
   Some transferPreapproval1 <- queryContractId app.dso transferPreapprovalCid
   transferPreapproval1 === TransferPreapproval with
     dso = app.dso
@@ -44,9 +30,67 @@ testExternalPartySetup = script do
     provider = aliceValidator.primaryParty
     validFrom = now
     lastRenewedAt = now
-    expiresAt = preapprovalExpiresAt
+    expiresAt = proposal.preapprovalExpiresAt
   -- check validator right was granted
   [(rightCid, _)] <- queryFilter @ValidatorRight aliceValidator.primaryParty (\r -> r.user == externalUser.primaryParty)
   rightCid === validatorRightCid
 
   pure ()
+
+testExternalPartySetup_reject : Script ()
+testExternalPartySetup_reject = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  externalUser <- setupUserWithoutValidatorRight app "externalUser"
+  (proposalCid, proposal) <- createExternalPartySetupProposal app aliceValidator externalUser.primaryParty
+  [(_, proposalSeenByDso)] <- query @ExternalPartySetupProposal app.dso
+  proposal === proposalSeenByDso
+
+  submit externalUser.primaryParty $
+    exerciseCmd proposalCid ExternalPartySetupProposal_Reject with
+      reason = "test reject"
+
+  [] <- query @ExternalPartySetupProposal app.dso
+
+  pure ()
+
+testExternalPartySetup_withdraw : Script ()
+testExternalPartySetup_withdraw = script do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+  externalUser <- setupUserWithoutValidatorRight app "externalUser"
+  (proposalCid, proposal) <- createExternalPartySetupProposal app aliceValidator externalUser.primaryParty
+  [(_, proposalSeenByDso)] <- query @ExternalPartySetupProposal app.dso
+  proposal === proposalSeenByDso
+
+  submit aliceValidator.primaryParty $
+    exerciseCmd proposalCid ExternalPartySetupProposal_Withdraw with
+      reason = "test withdrawal"
+
+  [] <- query @ExternalPartySetupProposal app.dso
+
+  pure ()
+
+createExternalPartySetupProposal
+  : AmuletApp -> AmuletUser -> Party -> Script (ContractId ExternalPartySetupProposal, ExternalPartySetupProposal)
+createExternalPartySetupProposal app validator user = do
+  now <- getTime
+  let preapprovalExpiresAt = now `addRelTime` days 1
+
+  -- This would be submitted by the validator hosting the external party
+  -- As part of the creation of the proposal, the validator also pays for the creation of the
+  -- initial pre-approval contract to enable receiving amulets for the external party.
+  [(amuletRulesCid, _)] <- query @AmuletRules app.dso
+  context <- getPaymentTransferContext app validator
+  amuletCid <- tap app validator 50.0
+  AmuletRules_CreateExternalPartySetupProposalResult{..} <-
+    checkTxMetadata app TxKind_Burn validator.primaryParty $
+    submitMulti [validator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
+      context = context
+      inputs = [InputAmulet amuletCid]
+      user
+      validator = validator.primaryParty
+      preapprovalExpiresAt
+
+  Some proposal <- queryContractId app.dso proposalCid
+  pure (proposalCid, proposal)
