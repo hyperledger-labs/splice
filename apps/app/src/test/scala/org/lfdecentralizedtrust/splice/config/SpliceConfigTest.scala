@@ -1,14 +1,13 @@
 package org.lfdecentralizedtrust.splice.config
 
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.CantonConfig
 import com.typesafe.config.ConfigFactory
-import org.scalatest.*
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AsyncWordSpec
 
-class SpliceConfigTest extends AnyFunSuite with EitherValues with Matchers {
+class SpliceConfigTest extends AsyncWordSpec with BaseTest {
   private implicit val elc: com.digitalasset.canton.logging.ErrorLoggingContext = SpliceConfig.elc
-  test("Validator config is rejected when topup interval < pollingInterval") {
+  "Validator config is rejected when topup interval < pollingInterval" in {
     val config = ConfigFactory.parseFile(
       new java.io.File("apps/app/src/test/resources/simple-topology-1sv.conf")
     )
