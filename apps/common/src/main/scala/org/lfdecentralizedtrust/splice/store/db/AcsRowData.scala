@@ -32,6 +32,11 @@ object AcsRowData {
     override val createdEventBlob: ByteString = contract.createdEventBlob
     override val createdAt: Instant = contract.createdAt
   }
+
+  /** Meant to be used when an interface filter matches, but no template filters do.
+    * Therefore, it can only contain the "bare minimum" fields, but cannot include index columns.
+    * If both an interface filter and a template filter match, then the template filter's AcsRowData should be used instead.
+    */
   case class AcsRowDataFromInterface(
       identifier: Identifier,
       contractId: ContractId[?],

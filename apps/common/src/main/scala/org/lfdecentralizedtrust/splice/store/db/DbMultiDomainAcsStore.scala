@@ -1542,10 +1542,11 @@ final class DbMultiDomainAcsStore[TXE](
         contractFilter.matchingContractToRow(createdEvent),
       ) match {
         case (Some((fallbackRowData, interfaces, failedInterfaces)), rowData) =>
-          // when both a template filter and an interface filter are defined,
-          // the AcsRowData from the template filter takes priority,
-          // as that one defines any potential index columns,
-          // whereas the one from the interface filter can/does not.
+          // For the acs_table row:
+          // If only the interface filter matches, we use the "bare minimum" row data from the interface filter
+          // that does not contain any index columns, as the interface table needs to reference the acs_table.
+          // If both match, we want to use the row data from the template filter,
+          // as that one contains all the information.
           insertContract(rowData.getOrElse(fallbackRowData), createdEvent, stateData, summary)
             .flatMap { eventNumber =>
               DBIO.sequence(interfaces.map { interfaceRow =>
