@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   MultiDomainAcsStore,
   MultiDomainAcsStoreTest,
+  StoreTest,
   TestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -23,6 +24,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
+
 import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import slick.jdbc.JdbcProfile
@@ -137,8 +139,8 @@ class DbMultiDomainAcsStoreTest
         val store = mkStore(acsId = 0, txLogId = Some(0))
         for {
           _ <- store.ingestionSink.initialize()
-          _ <- acs(Seq((c(1), d1, 0L)))(store)
-          error <- acs(Seq((c(1), d1, 0L)))(store).failed
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store)
+          error <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store).failed
           _ = error.getMessage should include("already ingested")
         } yield succeed
       }
@@ -209,7 +211,7 @@ class DbMultiDomainAcsStoreTest
         val store1 = mkStore(acsId = 0, txLogId = Some(0))
         for {
           _ <- store0.ingestionSink.initialize()
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -231,7 +233,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           _ <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -254,7 +256,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -277,7 +279,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -299,7 +301,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           _ <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()

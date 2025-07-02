@@ -859,7 +859,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   )
 
   protected def acs(
-      acs: Seq[(Contract[?, ?], SynchronizerId, Long)] = Seq.empty,
+      acs: Seq[StoreTest.AcsImportEntry] = Seq.empty,
       incompleteOut: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] =
         Seq.empty,
       incompleteIn: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] = Seq.empty,
@@ -867,10 +867,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map { case (contract, domain, counter) =>
+      acs.map { case StoreTest.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
         ActiveContract(
           domain,
-          toCreatedEvent(contract, Seq(dsoParty)),
+          toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
           counter,
         )
       },
@@ -896,7 +896,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   } yield ()
 
   protected def initWithAcs(
-      activeContracts: Seq[(Contract[?, ?], SynchronizerId, Long)] = Seq.empty,
+      activeContracts: Seq[StoreTest.AcsImportEntry] = Seq.empty,
       incompleteOut: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] =
         Seq.empty,
       incompleteIn: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] = Seq.empty,
@@ -1385,4 +1385,11 @@ object StoreTest {
     override def encodeEntry = StoreTest.TxLogEntry.encode
     override def decodeEntry = StoreTest.TxLogEntry.decode
   }
+
+  case class AcsImportEntry(
+      contract: Contract[?, ?],
+      synchronizerId: SynchronizerId,
+      counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+  )
 }

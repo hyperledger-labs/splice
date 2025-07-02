@@ -361,7 +361,7 @@ abstract class MultiDomainAcsStoreTest[
     "ingestion can be restarted at any time" in {
       implicit val store = mkStore()
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
         _ <- store.ingestionSink.initialize()
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -390,7 +390,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(
-          activeContracts = Seq((c(1), d1, 0L))
+          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -404,7 +404,10 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(
-          Seq((c(1), d1, 0L), (cFeatured(2), d1, 0L))
+          Seq(
+            StoreTest.AcsImportEntry(c(1), d1, 0L),
+            StoreTest.AcsImportEntry(cFeatured(2), d1, 0L),
+          )
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -688,7 +691,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
@@ -708,7 +711,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -779,7 +782,7 @@ abstract class MultiDomainAcsStoreTest[
       }
       for {
         _ <- initWithAcs(
-          activeContracts = Seq((c(1), d1, 0L)),
+          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)),
           incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
         )
         _ = assertSize("Initial", 1)
@@ -812,7 +815,12 @@ abstract class MultiDomainAcsStoreTest[
     "reads return contracts from all package versions" in {
       implicit val store = mkStore()
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L), (cUpgraded(2), d1, 0L)))
+        _ <- initWithAcs(
+          Seq(
+            StoreTest.AcsImportEntry(c(1), d1, 0L),
+            StoreTest.AcsImportEntry(cUpgraded(2), d1, 0L),
+          )
+        )
         _ <- d1.create(c(3))
         _ <- d1.create(cUpgraded(4))
         results <- store.listContracts(AppRewardCoupon.COMPANION)
@@ -866,7 +874,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store: Store = mkStore(0, Some(0), 0L, sampleParticipantId, contractFilter)
       for {
         _ <- initWithAcs(coids.zipWithIndex.map { case (coid, ix) =>
-          (smallestContract(coid, ix), dummyDomain, 0L)
+          StoreTest.AcsImportEntry(smallestContract(coid, ix), dummyDomain, 0L)
         })
         contracts <- store.listAssignedContractsNotOnDomainN(
           dummy2Domain,
@@ -1082,6 +1090,95 @@ abstract class MultiDomainAcsStoreTest[
           )
         })
         resultByTemplate.map(_.contract) should be(items.map(_._1))
+      }
+    }
+
+    "ingest interface views as part of an ACS import" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val aHolding = (
+        amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty),
+        holdingView(owner, BigDecimal(10), dsoParty, "AMT"),
+      )
+      val aTwoInterfaces = (
+        twoInterfaces(
+          owner,
+          BigDecimal(10),
+          dsoParty,
+          Instant.EPOCH.plusSeconds(1L),
+        ),
+        holdingView(owner, BigDecimal(10), dsoParty, "AMT"),
+        allocationRequestView(dsoParty, Instant.EPOCH.plusSeconds(1L)),
+      )
+      val anExcludedHolding = (
+        amulet(
+          owner,
+          BigDecimal(10),
+          1L,
+          BigDecimal(0.00001),
+          dso = providerParty(42), // this is excluded in the interface filter
+        ),
+        holdingView(owner, BigDecimal(10), providerParty(42), "AMT"),
+      )
+      val acs = Seq(
+        StoreTest.AcsImportEntry(
+          aHolding._1,
+          d1,
+          0L,
+          Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> aHolding._2.toValue
+          ),
+        ),
+        StoreTest.AcsImportEntry(
+          aTwoInterfaces._1,
+          d1,
+          0L,
+          Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> aTwoInterfaces._2.toValue,
+            allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> aTwoInterfaces._3.toValue,
+          ),
+        ),
+        StoreTest.AcsImportEntry(
+          anExcludedHolding._1,
+          d1,
+          0L,
+          Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> anExcludedHolding._2.toValue
+          ),
+        ),
+      )
+      for {
+        _ <- initWithAcs(acs)
+        resultHolding <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        resultAllocationRequest <- store.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield {
+        resultHolding should be(Seq(aHolding, (aTwoInterfaces._1, aTwoInterfaces._2)).map {
+          case (contract, holdingView) =>
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contract.contractId.contractId),
+              holdingView,
+              contract.createdEventBlob,
+              contract.createdAt,
+            )
+        })
+        resultAllocationRequest should be(
+          Seq(
+            Contract(
+              allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID,
+              new allocationrequestv1.AllocationRequest.ContractId(
+                aTwoInterfaces._1.contractId.contractId
+              ),
+              aTwoInterfaces._3,
+              aTwoInterfaces._1.createdEventBlob,
+              aTwoInterfaces._1.createdAt,
+            )
+          )
+        )
       }
     }
   }
