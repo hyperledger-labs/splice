@@ -44,7 +44,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.{Storage, DbStorage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -2177,22 +2177,26 @@ object UpdateHistory {
 
   // Separate method so we can use this without a full UpdateHistory instance.
   def getHighestKnownMigrationId(
-      storage: DbStorage
+      storage: Storage
   )(implicit
       ec: ExecutionContext,
       closeContext: CloseContext,
       tc: TraceContext,
   ): Future[Option[Long]] = {
-    for {
-      queryResult <- storage.query(
-      sql"""
+    storage match {
+      case storage: DbStorage =>
+        for {
+          queryResult <- storage.query(
+            sql"""
         select max(migration_id)
         from update_history_transactions
       """.as[Option[Long]],
-      "getHighestKnownMigrationId",
-    )
-    } yield {
-      queryResult.headOption.flatten
+            "getHighestKnownMigrationId",
+          )
+        } yield {
+          queryResult.headOption.flatten
+        }
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
 
