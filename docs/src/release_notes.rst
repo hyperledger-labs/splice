@@ -41,6 +41,12 @@ Upcoming
         - enforcing a length limit of 280 characters on the ``trackingId`` of ``TransferOffer``
           as a prudent engineering measure
 
+      - S-3 (auditor suggestion): addressed by
+
+        - calling ``FeaturedAppRight_Withdraw`` in the implementation of ``DsoRules_RevokeFeaturedAppRight``
+        - calling ``Confirmation_Expire`` in the implementation of ``DsoRules_ExpireStaleConfirmation``
+
+
 
     These Daml changes requires an upgrade to the following Daml versions:
 
