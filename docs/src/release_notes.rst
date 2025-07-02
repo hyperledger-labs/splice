@@ -14,8 +14,30 @@ Upcoming
 - Daml
 
   - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
 
-    This requires an upgrade to the following Daml versions:
+      - CC-5 (low severity): addressed by
+
+        - requiring steps of a valid ``SteppedRate`` to be strictly ascending
+        - enforcing this validation on the ``transferFee`` in ``AmuletConfig``
+        - failing ``chargeSteppedRate`` if a negative step is found
+
+      - S-2 (auditor suggestion): addressed by
+
+        - adding basic validation for all fields of ``AmuletConfig`` to reduce the risk of misconfigurations
+        - restricting the choice ``AmuletRules_Mint`` to only be called in DevNet setups
+        - properly handling the edge case of amulet that expired when checking whether a lock expires before an amulet
+          in the ``doesLockExpireBeforeAmulet`` function
+        - checking that ``createdAt`` and ``ratePerRound`` of an ``ExpiringAmount`` are positive;
+          and enforcing that check in the ``expiringAmount`` smart constructor
+        - checking that the ``validatorRewardPercentage`` and the ``appRewardPercentage`` in a valid
+          ``IssuanceConfig`` are non-negative and do not exceed 100%
+        - changing the ``ensure`` clause of ``MemberTraffic`` to enforce non-empty ``memberId`` and ``synchronizerId`` fields
+        - enforcing a length limit of 280 characters on the ``trackingId`` of ``TransferOffer``
+          as a prudent engineering measure
+
+
+    These Daml changes requires an upgrade to the following Daml versions:
 
     ================== =======
     name               version

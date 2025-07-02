@@ -5,6 +5,7 @@
 module Splice.DecentralizedSynchronizer where
 
 import qualified DA.Set as Set
+import DA.Text as T
 import DA.Time
 
 import Splice.Types
@@ -71,6 +72,8 @@ template MemberTraffic with
       && amuletSpent >= 0.0
       && usdSpent >= 0.0
       && migrationId >= 0
+      && not (T.isEmpty memberId)
+      && not (T.isEmpty synchronizerId)
 
 
 initialMemberTraffic : Party -> Text -> Text -> Int -> MemberTraffic
