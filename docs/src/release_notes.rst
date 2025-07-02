@@ -16,6 +16,11 @@ Upcoming
   - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
   - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
 
+      - CC-4 (low severity): addressed by
+
+        - checking that ``expiresAt`` is in the future in the choice body of
+          ``DsoRules_ExecuteConfirmedAction``, ``DsoRules_AddConfirmedSv``, and ``ValidatorOnboarding_Match``.
+
       - CC-5 (low severity): addressed by
 
         - requiring steps of a valid ``SteppedRate`` to be strictly ascending
@@ -45,7 +50,7 @@ Upcoming
     amulet             0.1.9
     amuletNameService  0.1.9
     dsoGovernance      0.1.13
-    validatorLifecycle 0.1.3
+    validatorLifecycle 0.1.4
     wallet             0.1.9
     walletPayments     0.1.9
     ================== =======

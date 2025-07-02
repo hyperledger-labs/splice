@@ -538,6 +538,7 @@ template DsoRules with
       do
 
         svOnboardingConfirmed <- fetchAndArchive (ForOwner with dso; owner = sv) svOnboardingConfirmedCid
+        assertWithinDeadline "svOnboardingConfirmed.expiresAt" svOnboardingConfirmed.expiresAt
 
         let forDso = ForDso with dso
         earliestRound <- fetchReferenceData forDso earliestRoundCid
@@ -677,6 +678,7 @@ template DsoRules with
           confirmation <- fetchAndArchive forDso confirmationCid
           require "Confirmer is an SV" (confirmation.confirmer `Map.member` svs)
           require "Confirmed action matches" (confirmation.action == action)
+          assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
         executeActionRequiringConfirmation self amuletRulesCid action
