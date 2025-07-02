@@ -473,6 +473,12 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    additionalEnvVars: [
+      {
+        name: 'ADDITIONAL_CONFIG_FEATURED_APP_ACTIVITY_MARKER_AMOUNT',
+        value: 'canton.sv-apps.sv.onboarding.initial-featured-app-activity-marker-amount = 1.0',
+      },
+    ],
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
