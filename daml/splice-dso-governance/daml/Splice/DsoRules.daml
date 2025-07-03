@@ -116,7 +116,7 @@ data DsoRules_ActionRequiringConfirmation
   | SRARC_CreateTransferCommandCounter DsoRules_CreateTransferCommandCounter
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
-    -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract. 
+    -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -285,10 +285,10 @@ data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_Amu
   with
     result : AmuletRules_ConvertFeaturedAppActivityMarkersResult
 
-data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with 
+data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with
     unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
 
-data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with 
+data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with
     unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
     optUnclaimedRewardCid : Optional (ContractId UnclaimedReward)
 
@@ -342,8 +342,7 @@ template Confirmation with
 
     choice Confirmation_Expire : Confirmation_ExpireResult
       controller dso
-      do now <- getTime
-         require "Contract has expired" (expiresAt <= now)
+      do assertDeadlineExceeded "expiresAt" expiresAt
          return Confirmation_ExpireResult
 
 -- | A request for the other svs to vote on the execution of an action requiring confirmation.
@@ -423,7 +422,7 @@ data DsoRulesConfig = DsoRulesConfig with
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
   deriving (Eq, Show)
-  
+
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
       -- ^ The time at which the migration is scheduled to start.
@@ -960,7 +959,9 @@ template DsoRules with
         rightCid : ContractId FeaturedAppRight
       controller dso
       do
-        void $ fetchAndArchive (ForDso with dso) rightCid
+        void $ fetchChecked (ForDso with dso) rightCid
+        exercise rightCid FeaturedAppRight_Withdraw with
+          reason = "revoked by governance decision"
         return DsoRules_RevokeFeaturedAppRightResult
 
 
@@ -1299,9 +1300,8 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this sv
-        now <- getTime
-        staleConfirmation <- fetchAndArchive (ForDso with dso) staleConfirmationCid
-        require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
+        fetchChecked (ForDso with dso) staleConfirmationCid
+        exercise staleConfirmationCid Confirmation_Expire
         return DsoRules_ExpireStaleConfirmationResult
 
     -- Batch merge of member traffic contracts
@@ -1387,15 +1387,15 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
-    
-    
-    -- Unallocated unclaimed activity record 
+
+
+    -- Unallocated unclaimed activity record
     ----------------------------------------
 
     nonconsuming choice DsoRules_CreateUnallocatedUnclaimedActivityRecord : DsoRules_CreateUnallocatedUnclaimedActivityRecordResult
       with
-        beneficiary : Party 
-        amount : Decimal 
+        beneficiary : Party
+        amount : Decimal
         reason : Text
         expiresAt : Time
       controller dso
@@ -1403,8 +1403,8 @@ template DsoRules with
         now <- getTime
         -- Sanity check
         require "UnclaimedActivityRecord expires after current time" $ expiresAt > now
-        unallocatedUnclaimedActivityRecordCid <- 
-          create UnallocatedUnclaimedActivityRecord with 
+        unallocatedUnclaimedActivityRecordCid <-
+          create UnallocatedUnclaimedActivityRecord with
             dso
             beneficiary
             amount
@@ -1416,7 +1416,7 @@ template DsoRules with
       with
         unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
         amuletRulesCid : ContractId AmuletRules
-        unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
+        unclaimedRewardsToBurnCids : [ContractId UnclaimedReward]
           -- ^ A sufficient list of `UnclaimedReward` to be archived.
           -- It must cover at least the requested amount.
         sv : Party
@@ -1430,12 +1430,12 @@ template DsoRules with
           unclaimedReward <- fetchAndArchive (ForDso with dso) cid
           pure unclaimedReward.amount
         let leftover = totalUnclaimedRewards - amount
-        optUnclaimedRewardCid <- 
+        optUnclaimedRewardCid <-
           if | leftover < 0.0 -> abort $ "insufficient unclaimed rewards: " <> show (negate leftover)
              | leftover == 0.0 -> pure None
              | otherwise -> Some <$> create UnclaimedReward with dso; amount = leftover
 
-        unclaimedActivityRecordCid <- create UnclaimedActivityRecord with 
+        unclaimedActivityRecordCid <- create UnclaimedActivityRecord with
           dso
           beneficiary
           amount
@@ -1462,7 +1462,7 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <- 
+        UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <-
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
@@ -1741,10 +1741,10 @@ template UnallocatedUnclaimedActivityRecord
   with
     dso : Party
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted
-    amount : Decimal -- ^ The amount of `Amulet` to be minted 
+    amount : Decimal -- ^ The amount of `Amulet` to be minted
     reason : Text -- ^ A reason to mint the `Amulet`
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract. 
-  where 
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract.
+  where
     signatory dso
     ensure amount > 0.0
 
