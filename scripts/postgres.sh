@@ -79,6 +79,7 @@ function docker_wait() {
 
 function psql_wait() {
   export PGPASSWORD="$POSTGRES_PASSWORD"
+  # shellcheck disable=SC2153
   until psql -U "$POSTGRES_USER" -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -c "select 1" >> "$LOG_FILE" 2>&1 ; do
     echo "Waiting for PostgreSQL to start"
     sleep 1
