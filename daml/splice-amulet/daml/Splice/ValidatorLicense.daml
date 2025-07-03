@@ -175,7 +175,7 @@ validValidatorLicenseMetadata metadata =
   Text.length metadata.version <= maxIdentifierLength
 
 -- | __Deprecated__: use `ValidatorLicense_RecordValidatorLivenessActivity` instead, as that one
--- can be expired by the DSO  without requiring a confirmation from the validator node.
+-- can be expired without requiring a confirmation from the validator node.
 template ValidatorFaucetCoupon with
     dso : Party
     validator : Party
