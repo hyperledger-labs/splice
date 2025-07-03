@@ -19,7 +19,7 @@ class DbScanStoreMetrics(
     metricsFactory: LabeledMetricsFactory
 ) extends AutoCloseable {
 
-  private val createCachedConfigs = new ConcurrentLinkedQueue[CacheMetrics]()
+  private val createdCaches = new ConcurrentLinkedQueue[CacheMetrics]()
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "scan_store"
 
   val earliestAggregatedRound: Gauge[Long] =
@@ -48,7 +48,7 @@ class DbScanStoreMetrics(
       cacheName: String
   ): CacheMetrics = {
     val cacheMetrics = new CacheMetrics(cacheName, metricsFactory)
-    createCachedConfigs.add(cacheMetrics)
+    createdCaches.add(cacheMetrics)
     cacheMetrics
   }
 
@@ -57,7 +57,7 @@ class DbScanStoreMetrics(
   override def close() = {
     LifeCycle.close(
       (Seq(earliestAggregatedRound, latestAggregatedRound) ++
-        createCachedConfigs.asScala
+        createdCaches.asScala
           .map(cache =>
             new AutoCloseable {
               override def close(): Unit = cache.closeAcquired()

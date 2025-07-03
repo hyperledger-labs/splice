@@ -71,7 +71,7 @@ class CachingScanStore(
   override def getTotalAmuletBalance(
       asOfEndOfRound: Long
   )(implicit tc: TraceContext): Future[BigDecimal] = {
-    getcache(
+    getCache(
       "totalAmuletBalance",
       cacheConfig.totalAmuletBalanceCache,
       store.getTotalAmuletBalance _,
@@ -79,7 +79,7 @@ class CachingScanStore(
   }
 
   override def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] = {
-    getcache(
+    getCache(
       "svNodeStateCache",
       cacheConfig.svNodeState,
       (_: Unit) => store.listSvNodeStates(),
@@ -95,7 +95,7 @@ class CachingScanStore(
   override def lookupAmuletRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]] =
-    getcache(
+    getCache(
       "lookupAmuletRules",
       cacheConfig.amuletRules,
       (_: Unit) => store.lookupAmuletRules(),
@@ -104,7 +104,7 @@ class CachingScanStore(
   override def getExternalPartyAmuletRules()(implicit
       tc: TraceContext
   ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
-    getcache(
+    getCache(
       "externalPartyAmuletRules",
       cacheConfig.amuletRules,
       (_: Unit) => store.getExternalPartyAmuletRules(),
@@ -113,14 +113,14 @@ class CachingScanStore(
   override def lookupAnsRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AnsRules.ContractId, AnsRules]]] =
-    getcache(
+    getCache(
       "lookupAnsRules",
       cacheConfig.ansRules,
       (_: Unit) => store.lookupAnsRules(),
     ).get(())
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
-    getcache(
+    getCache(
       "totalRewardsCollected",
       cacheConfig.totalRewardsCollected,
       (_: Unit) => store.getTotalRewardsCollectedEver(),
@@ -129,7 +129,7 @@ class CachingScanStore(
   override def getRewardsCollectedInRound(round: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] = {
-    getcache(
+    getCache(
       "rewardsCollectedInRound",
       cacheConfig.rewardsCollectedInRound,
       store.getRewardsCollectedInRound,
@@ -139,7 +139,7 @@ class CachingScanStore(
   override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] = {
-    getcache(
+    getCache(
       "walletBalance",
       cacheConfig.walletBalance,
       (store.getWalletBalance _) tupled,
@@ -149,14 +149,14 @@ class CachingScanStore(
   override def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[OpenMiningRoundTxLogEntry] =
-    getcache(
+    getCache(
       "getAmuletConfigForRound",
       cacheConfig.amuletConfigForRound,
       store.getAmuletConfigForRound,
     ).get(round)
 
   override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
-    getcache(
+    getCache(
       "roundOfLatestData",
       cacheConfig.roundOfLatestData,
       (_: Unit) => store.getRoundOfLatestData(),
@@ -165,7 +165,7 @@ class CachingScanStore(
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] = {
-    getcache(
+    getCache(
       "topProvidersByAppRewards",
       cacheConfig.topProvidersByAppRewards,
       store.getTopProvidersByAppRewards _ tupled,
@@ -175,7 +175,7 @@ class CachingScanStore(
   override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] =
-    getcache(
+    getCache(
       "topValidatorsByValidatorRewards",
       cacheConfig.topValidators,
       store.getTopValidatorsByValidatorRewards _ tupled,
@@ -184,7 +184,7 @@ class CachingScanStore(
   override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] =
-    getcache(
+    getCache(
       "topValidatorsByPurchasedTraffic",
       cacheConfig.topValidators,
       store.getTopValidatorsByPurchasedTraffic _ tupled,
@@ -193,7 +193,7 @@ class CachingScanStore(
   override def getTopValidatorLicenses(limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
-    getcache(
+    getCache(
       "topValidatorLicenses",
       cacheConfig.topValidators,
       store.getTopValidatorLicenses,
@@ -202,7 +202,7 @@ class CachingScanStore(
   override def getValidatorLicenseByValidator(validator: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
-    getcache(
+    getCache(
       "validatorLicenseByValidator",
       cacheConfig.validatorLicenseByValidator,
       store.getValidatorLicenseByValidator,
@@ -211,7 +211,7 @@ class CachingScanStore(
   override def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(
       implicit tc: TraceContext
   ): Future[Long] =
-    getcache(
+    getCache(
       "totalPurchasedMemberTraffic",
       cacheConfig.totalPurchasedMemberTraffic,
       store.getTotalPurchasedMemberTraffic _ tupled,
@@ -220,7 +220,7 @@ class CachingScanStore(
   override def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    getcache(
+    getCache(
       "featuredAppRight",
       cacheConfig.cachedByParty,
       store.lookupFeaturedAppRight,
@@ -244,7 +244,7 @@ class CachingScanStore(
   override def lookupTransferPreapprovalByParty(partyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
-    getcache(
+    getCache(
       "lookupTransferPreapprovalByParty",
       cacheConfig.cachedByParty,
       store.lookupTransferPreapprovalByParty,
@@ -253,7 +253,7 @@ class CachingScanStore(
   override def lookupTransferCommandCounterByParty(partyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
-    getcache(
+    getCache(
       "lookupTransferCommandCounterByParty",
       cacheConfig.cachedByParty,
       store.lookupTransferCommandCounterByParty,
@@ -273,7 +273,7 @@ class CachingScanStore(
   override def getAggregatedRounds()(implicit
       tc: TraceContext
   ): Future[Option[ScanAggregator.RoundRange]] =
-    getcache(
+    getCache(
       "aggregatedRounds",
       cacheConfig.aggregatedRounds,
       (_: Unit) => store.getAggregatedRounds(),
@@ -282,7 +282,7 @@ class CachingScanStore(
   override def getRoundTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundTotals]] =
-    getcache(
+    getCache(
       "roundTotals",
       cacheConfig.roundTotals,
       store.getRoundTotals _ tupled,
@@ -291,7 +291,7 @@ class CachingScanStore(
   override def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]] =
-    getcache(
+    getCache(
       "roundPartyTotals",
       cacheConfig.roundTotals,
       store.getRoundPartyTotals _ tupled,
@@ -321,7 +321,7 @@ class CachingScanStore(
       effectiveTo: Option[String],
       limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] =
-    getcache(
+    getCache(
       "listVoteRequestResults",
       cacheConfig.voteRequests,
       store.listVoteRequestResults _ tupled,
@@ -340,7 +340,7 @@ class CachingScanStore(
       voteRequestCids: Seq[VoteRequest.ContractId],
       limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    getcache(
+    getCache(
       "listVoteRequestsByTrackingCid",
       cacheConfig.voteRequests,
       store.listVoteRequestsByTrackingCid _ tupled,
@@ -349,7 +349,7 @@ class CachingScanStore(
   override def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
       tc: TraceContext
   ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    getcache(
+    getCache(
       "lookupVoteRequest",
       cacheConfig.voteRequests,
       store.lookupVoteRequest,
@@ -358,7 +358,7 @@ class CachingScanStore(
   override def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
-    getcache(
+    getCache(
       "lookupSvNodeState",
       cacheConfig.svNodeState,
       store.lookupSvNodeState,
@@ -371,9 +371,9 @@ class CachingScanStore(
   override def updateHistory: UpdateHistory = store.updateHistory
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  private def getcache[Key, Value](
+  private def getCache[Key, Value](
       cacheName: String,
-      cacheConfig1: CacheConfig,
+      cacheConfig: CacheConfig,
       loader: Key => Future[Value],
   ) = {
     cacheOfCaches
@@ -381,8 +381,8 @@ class CachingScanStore(
         cacheName,
         ScaffeineCache.buildTracedAsync[Future, Key, Value](
           Scaffeine()
-            .expireAfterWrite(cacheConfig1.ttl.asFiniteApproximation)
-            .maximumSize(cacheConfig1.maxSize),
+            .expireAfterWrite(cacheConfig.ttl.asFiniteApproximation)
+            .maximumSize(cacheConfig.maxSize),
           _ => key => loader(key),
           metrics = Some(storeMetrics.registerNewCacheMetrics(cacheName)),
         )(logger, cacheName),
