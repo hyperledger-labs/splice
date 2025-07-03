@@ -39,10 +39,8 @@ class TimeBasedTestNetPreviewIntegrationTest
       "Wait for SV rewards for rounds 1&2 to be collected",
       _ => {
         sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
-        (1 to 2).foreach { _ =>
-          eventually() {
-            ensureNoSvRewardCouponExistsForRound(_, sv1WalletClient)
-          }
+        forAll(Seq(1,2)) { round =>
+            ensureNoSvRewardCouponExistsForRound(round, sv1WalletClient)
         }
       },
     )
