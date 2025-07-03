@@ -62,8 +62,7 @@ WITH daml_Transfer_jsons AS (
          AND e.template_id_entity_name = 'AmuletRules'
          AND (e.migration_id < migration_id
            OR (e.migration_id = migration_id
-               AND e.record_time <= UNIX_MICROS(as_of_record_time)))
-       LIMIT 100) -- TODO (DACH-NY/canton-network-internal#703) remove limit for full test
+               AND e.record_time <= UNIX_MICROS(as_of_record_time))))
   SELECT DISTINCT party_id
   FROM daml_Transfer_jsons src
        INNER JOIN UNNEST(
