@@ -674,6 +674,9 @@ object ConfigTransforms {
     }
   }
 
+  def withVoteCooldown(voteCooldown: NonNegativeFiniteDuration): ConfigTransform =
+    updateAllSvAppFoundDsoConfigs_(_.copy(voteCooldownTime = Some(voteCooldown)))
+
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 

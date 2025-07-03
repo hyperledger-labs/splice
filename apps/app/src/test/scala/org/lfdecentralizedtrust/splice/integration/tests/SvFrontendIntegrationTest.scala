@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -14,6 +15,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_SetConfig,
 }
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
@@ -40,6 +42,11 @@ class SvFrontendIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .addConfigTransforms(
+        // We deliberately change votes quickly in this test
+        (_, config) =>
+          ConfigTransforms.withVoteCooldown(NonNegativeFiniteDuration.ofSeconds(0))(config)
+      )
 
   "SV UIs" should {
     "have basic login functionality" in { implicit env =>

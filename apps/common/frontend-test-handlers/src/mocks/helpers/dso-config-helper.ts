@@ -141,6 +141,8 @@ export function getExpectedDsoRulesConfigDiffsHTML(
     '    "maxNodeIdLength": "50",\n' +
     '    "maxPubKeyLength": "256"\n' +
     '  }\n' +
+    '}</pre></div></li><li data-key="voteCooldownTime" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">voteCooldownTime</div><div class="jsondiffpatch-value"><pre>{\n' +
+    '  "microseconds": "60000000"\n' +
     '}</pre></div></li><li data-key="voteRequestTimeout" class="jsondiffpatch-unchanged"><div class="jsondiffpatch-property-name">voteRequestTimeout</div><div class="jsondiffpatch-value"><pre>{\n' +
     '  "microseconds": "604800000000"\n' +
     '}</pre></div></li></div>'.trim()

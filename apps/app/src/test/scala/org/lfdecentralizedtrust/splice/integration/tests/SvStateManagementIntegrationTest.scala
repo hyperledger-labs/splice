@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
@@ -63,10 +64,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .withNoVettedPackages(implicit env => Seq(sv1Backend.participantClient))
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialPackageConfig = initialPackageConfig)
-        )(config)
+      .addConfigTransforms(
+        (_, config) =>
+          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+            _.copy(initialPackageConfig = initialPackageConfig)
+          )(config),
+        // We deliberately change amulet conversion rate votes quickly in this test
+        (_, config) =>
+          ConfigTransforms.withVoteCooldown(NonNegativeFiniteDuration.ofSeconds(0))(config),
       )
 
   private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
