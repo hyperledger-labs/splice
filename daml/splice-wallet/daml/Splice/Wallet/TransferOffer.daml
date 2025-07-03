@@ -139,7 +139,7 @@ template AcceptedTransferOffer
                   receiverFeeRatio = 0.0
               ]
             beneficiaries = None -- no beneficiaries for p2p transfers
-        result <- exercisePaymentTransfer transferContext transfer
+        result <- exercisePaymentTransfer dso transferContext transfer
         pure AcceptedTransferOffer_CompleteResult with
           transferResult = result
           trackingInfo = TransferOfferTrackingInfo { .. }

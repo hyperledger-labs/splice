@@ -17,6 +17,7 @@ import Splice.Fees
 
 template Test
   with
+    dso : Party
     sender : Party
   where
     signatory sender
@@ -25,7 +26,7 @@ template Test
         context : PaymentTransferContext
         outputs : [TransferOutput]
       controller sender
-      do exerciseComputeFees context sender outputs
+      do exerciseComputeFees dso context sender outputs
 
 
 test = script do
@@ -33,6 +34,7 @@ test = script do
     now <- getTime
     context <- getPaymentTransferContext app alice
     test <- submitUser alice.userId $ createCmd Test with
+      dso = app.dso
       sender = alice.primaryParty
     let outputs =
           [ TransferOutput with

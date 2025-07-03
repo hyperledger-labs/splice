@@ -570,8 +570,10 @@ template AmuletRules
             futureValues = []
         return AmuletRules_SetConfigResult with ..
 
-    -- TODO(#16139): mark these choices as "deprecated"
+    -- TODO(#925): make the following three deprecated choices `abort` once all tests that depend on it are migrated.
+
     -- This inserts a new AmuletConfig Schedule into the future Schedules
+    -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
       with
         newScheduleItem : (Time, AmuletConfig Unit.USD)
@@ -583,6 +585,7 @@ template AmuletRules
         return AmuletRules_AddFutureAmuletConfigScheduleResult with ..
 
     -- This removes a AmuletConfig Schedule defined in the future Schedules
+    -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
     choice AmuletRules_RemoveFutureAmuletConfigSchedule: AmuletRules_RemoveFutureAmuletConfigScheduleResult
       with
         scheduleTime: Time
@@ -594,6 +597,7 @@ template AmuletRules
         return AmuletRules_RemoveFutureAmuletConfigScheduleResult with ..
 
     -- This updates a AmuletConfig Schedule defined in the future Schedules
+    -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
     choice AmuletRules_UpdateFutureAmuletConfigSchedule: AmuletRules_UpdateFutureAmuletConfigScheduleResult
       with
         scheduleItem: (Time, AmuletConfig Unit.USD)
@@ -1138,28 +1142,26 @@ data AppTransferContext = AppTransferContext
     featuredAppRight : Optional (ContractId FeaturedAppRight)
   deriving (Show, Eq)
 
-exerciseAppTransfer : AppTransferContext -> Transfer -> Update TransferResult
-exerciseAppTransfer AppTransferContext{..} transfer =
+exerciseAppTransfer : Party -> AppTransferContext -> Transfer -> Update TransferResult
+exerciseAppTransfer expectedDso AppTransferContext{..} transfer = do
+  -- prudent engineering: check that the expected DSO matches the one of the AmuletRules used for the transfer.
+  _ <- fetchPublicReferenceData (ForDso with dso = expectedDso) amuletRules (AmuletRules_Fetch with p = transfer.sender)
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context = amuletTransferContext openMiningRound featuredAppRight
 
--- TODO(#14942): replace usages of this function with `exerciseCheckedPaymentTransfer`
-exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
-exercisePaymentTransfer PaymentTransferContext{..} transfer =
+exercisePaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
+exercisePaymentTransfer expectedDso PaymentTransferContext{..} transfer = do
+  -- prudent engineering: check that the expected DSO matches the one of the AmuletRules used for the transfer.
+  _ <- fetchPublicReferenceData (ForDso with dso = expectedDso) amuletRules (AmuletRules_Fetch with p = transfer.sender)
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context
 
-exerciseCheckedPaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
-exerciseCheckedPaymentTransfer dso PaymentTransferContext{..} transfer = do
-  _ <- fetchChecked (ForDso with dso) amuletRules
-  exercise amuletRules AmuletRules_Transfer with
-    transfer
-    context
-
-exerciseComputeFees : PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-exerciseComputeFees PaymentTransferContext{..} sender outputs = do
+exerciseComputeFees : Party -> PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
+exerciseComputeFees expectedDso PaymentTransferContext{..} sender outputs = do
+  -- prudent engineering: check that the expected DSO matches the one of the AmuletRules used for the transfer.
+  _ <- fetchPublicReferenceData (ForDso with dso = expectedDso) amuletRules (AmuletRules_Fetch with p = sender)
   feesResult <- exercise amuletRules AmuletRules_ComputeFees with
         context
         sender
@@ -1446,8 +1448,7 @@ template TransferPreapproval
       controller sender
       do
          assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
-         _ <- fetchChecked (ForDso dso) context.amuletRules
-         transferResult <- exercisePaymentTransfer context Transfer with
+         transferResult <- exercisePaymentTransfer dso context Transfer with
            sender
            provider
            inputs
