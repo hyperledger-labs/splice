@@ -43,13 +43,7 @@ export function installGcpLoggingAlerts(
     description: 'Logs with a severity level of warning or above',
     filter: `resource.labels.cluster_name="${CLUSTER_NAME}"
 ${monitoringConfig.alerting.logAlerts.shared}
-${conditionalString(
-  isDevNet,
-  "-- TODO(DACH-NY/canton-network-internal#475): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3\n" +
-    '-(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")\n' +
-    '-- TODO(#979): Can happen due to random disconnects/reconnects but also in other contexts\n' +
-    '-(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")'
-)}
+${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}
 ${conditionalString(
   !isMainNet,
   '-- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection\n' +
