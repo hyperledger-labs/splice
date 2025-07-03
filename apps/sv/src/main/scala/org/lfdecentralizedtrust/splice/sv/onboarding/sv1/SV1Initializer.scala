@@ -39,7 +39,6 @@ import org.lfdecentralizedtrust.splice.sv.onboarding.{
   SynchronizerNodeReconciler,
 }
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
-import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer.bootstrapTransactionOrdering
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{
@@ -70,11 +69,11 @@ import com.digitalasset.canton.time.{
   PositiveSeconds,
 }
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransaction,
   StoredTopologyTransactions,
-  TopologyStoreId,
 }
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinition,
@@ -120,6 +119,8 @@ class SV1Initializer(
     mat: Materializer,
     tracer: Tracer,
 ) extends NodeInitializerUtil {
+
+  import SV1Initializer.bootstrapTransactionOrdering
 
   def bootstrapDso()(implicit
       tc: TraceContext
@@ -364,7 +365,7 @@ class SV1Initializer(
   ): Future[PartyId] =
     for {
       dso <- connection.ensurePartyAllocated(
-        TopologyStoreId.SynchronizerStore(domain),
+        TopologyStoreId.Synchronizer(domain),
         sv1Config.dsoPartyHint,
         Some(namespace),
         participantAdminConnection,
@@ -448,7 +449,7 @@ class SV1Initializer(
                 ).traverse { con =>
                   con
                     .getId()
-                    .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
+                    .flatMap(con.getIdentityTransactions(_, TopologyStoreId.Authorized))
                 }.map(_.flatten),
                 participantAdminConnection.proposeInitialDomainParameters(
                   synchronizerId,

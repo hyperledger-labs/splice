@@ -59,7 +59,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -316,10 +316,10 @@ class DomainMigrationInitializer(
         "mediator synced topology",
         for {
           sequencerTopology <- localSynchronizerNode.sequencerAdminConnection.listAllTransactions(
-            TopologyStoreId.SynchronizerStore(nodeIdentities.synchronizerId)
+            TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
           )
           mediatorTopology <- mediatorAdminConnection.listAllTransactions(
-            TopologyStoreId.SynchronizerStore(nodeIdentities.synchronizerId)
+            TopologyStoreId.Synchronizer(nodeIdentities.synchronizerId)
           )
         } yield {
           if (sequencerTopology.size != mediatorTopology.size) {

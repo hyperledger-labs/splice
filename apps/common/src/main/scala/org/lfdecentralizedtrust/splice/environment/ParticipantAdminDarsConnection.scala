@@ -15,7 +15,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
 import com.digitalasset.canton.topology.store.TimeQuery
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.transaction.{VettedPackage, VettedPackages}
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -77,7 +77,7 @@ trait ParticipantAdminDarsConnection {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
     ensureTopologyMapping[VettedPackages](
       // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
-      AuthorizedStore,
+      Authorized,
       s"dars ${dars.map(_.packageId)} are vetted in the authorized store with from $fromDate",
       EitherT(
         getVettingState(None).map { vettedPackages =>

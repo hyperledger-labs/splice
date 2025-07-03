@@ -110,7 +110,7 @@ sealed trait EnvironmentSetup[C <: SharedCantonConfig[C], E <: Environment[C]]
       runPlugins: EnvironmentSetupPlugin[C, E] => Boolean = _ => true,
       testConfigTransform: TestingConfigInternal => TestingConfigInternal = identity,
       testName: Option[String],
-  ): TestConsoleEnvironment[C, E] = TraceContext.withNewTraceContext { tc =>
+  ): TestConsoleEnvironment[C, E] = TraceContext.withNewTraceContext("manualCreateEnvironment") { tc =>
     logger.debug(
       s"Starting creating environment for $suiteName${testName.fold("")(n => s", test '$n'")}:"
     )(tc)

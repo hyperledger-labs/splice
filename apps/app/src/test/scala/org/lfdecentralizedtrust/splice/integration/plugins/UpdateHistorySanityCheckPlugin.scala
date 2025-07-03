@@ -11,8 +11,7 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, UpdateH
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
-import org.lfdecentralizedtrust.splice.util.{QualifiedName, TriggerTestUtil}
+import org.lfdecentralizedtrust.splice.util.QualifiedName
 import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin

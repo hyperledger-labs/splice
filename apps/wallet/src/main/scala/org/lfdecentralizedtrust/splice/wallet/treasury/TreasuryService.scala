@@ -78,7 +78,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
-import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.Done
 import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
@@ -112,7 +111,7 @@ class TreasuryService(
     override protected[this] val retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
     override protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
+)(implicit ec: ExecutionContext, mat: Materializer)
     extends NamedLogging
     with FlagCloseableAsync
     with RetryProvider.Has
@@ -410,13 +409,11 @@ class TreasuryService(
 
   private def filterAndExecuteBatch(
       unfilteredBatch: AmuletOperationBatch
-  ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
-    withSpan("executeBatch") { implicit tc => _ =>
+  ): Future[Done] = TraceContext.withNewTraceContext("executeBatch")(implicit tc => {
       for {
         filteredBatch <- filterBatch(unfilteredBatch)
         res <- executeBatch(filteredBatch)
       } yield res
-    }
   })
 
   private def executeBatch(
@@ -521,8 +518,7 @@ class TreasuryService(
   private def executeTokenStandardTransferOperation(
       operation: EnqueuedTokenStandardTransferOperation
   ): Future[Done] = {
-    TraceContext.withNewTraceContext(implicit tc => {
-      withSpan("executeTokenStandardTransferOperation") { implicit tc => _ =>
+    TraceContext.withNewTraceContext("executeTokenStandardTransferOperation")(implicit tc => {
         val now = clock.now.toInstant
         logger.debug(s"Executing token standard operation $operation")
         val sender = userStore.key.endUserParty
@@ -551,13 +547,12 @@ class TreasuryService(
               ) -> transferFactory.disclosedContracts
           }
         }
-      }
+
     })
   }
 
   private def executeAmuletAllocationOperation(operation: EnqueuedAmuletAllocationOperation) = {
-    TraceContext.withNewTraceContext(implicit tc => {
-      withSpan("executeAmuletAllocationOperation") { implicit tc => _ =>
+    TraceContext.withNewTraceContext("executeAmuletAllocationOperation")(implicit tc => {
         logger.debug(s"Executing Amulet Allocation operation $operation")
         exerciseTokenStandardChoice(operation) { holdings =>
           val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
@@ -573,7 +568,6 @@ class TreasuryService(
             ) -> allocationFactory.disclosedContracts
           }
         }
-      }
     })
   }
 

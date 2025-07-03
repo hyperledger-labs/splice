@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.{SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome}

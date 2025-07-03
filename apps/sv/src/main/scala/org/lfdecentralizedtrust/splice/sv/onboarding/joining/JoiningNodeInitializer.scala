@@ -4,9 +4,9 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 
 import cats.data.OptionT
+import cats.syntax.option.*
 import org.apache.pekko.stream.Materializer
 import cats.implicits.{
-  catsSyntaxOptionId,
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple4Semigroupal,
   toTraverseOps,
@@ -68,7 +68,7 @@ import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionCo
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -955,7 +955,7 @@ class JoiningNodeInitializer(
         // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
         // we are in the middle of an DSO party migration so don't reconnect to the domain.
         proposals <- participantAdminConnection.listPartyToParticipant(
-          TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
+          TopologyStoreId.Synchronizer(decentralizedSynchronizerId).some,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
           proposals = TopologyTransactionType.ProposalSignedByOwnKey,

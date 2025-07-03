@@ -54,7 +54,7 @@ class TokenStandardCliSanityCheckPlugin(
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
     try {
-      TraceContext.withNewTraceContext { implicit tc =>
+      TraceContext.withNewTraceContext("beforeEnvironmentDestroyed") { implicit tc =>
         val sv1 = environment.svs.local.find(_.name == "sv1").value
         val amuletVersion = inside(sv1.config.onboarding) {
           case Some(foundDso: SvOnboardingConfig.FoundDso) =>

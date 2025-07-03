@@ -447,7 +447,7 @@ class TxLogBackfillingStoreTest
   private def backfillOnce(
       store: DbMultiDomainAcsStore[TestTxLogEntry],
       history: UpdateHistory,
-  ): Future[HistoryBackfilling.Outcome] = TraceContext.withNewTraceContext {
+  ): Future[HistoryBackfilling.Outcome] = TraceContext.withNewTraceContext("backfillOnce") {
     implicit traceContext =>
       val backfilling = new TxLogBackfilling(
         store = store,
@@ -461,7 +461,7 @@ class TxLogBackfillingStoreTest
   private def backfillAll(
       store: DbMultiDomainAcsStore[TestTxLogEntry],
       history: UpdateHistory,
-  ): Future[Unit] = TraceContext.withNewTraceContext { implicit traceContext =>
+  ): Future[Unit] = TraceContext.withNewTraceContext("backfillAll") { implicit traceContext =>
     val backfilling = new TxLogBackfilling(
       store = store,
       updateHistory = history,

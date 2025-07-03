@@ -75,6 +75,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
@@ -211,6 +212,8 @@ class SvApp(
             .toStaticSynchronizerParameters(
               CryptoConfig(provider = CryptoProvider.Jce),
               ProtocolVersion.v34,
+              // TODO(#456) Use the proper serial
+              NonNegativeInt.zero,
             )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
