@@ -5,7 +5,28 @@
         "createdEvent" : {
           "contractId" : "0",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amulet" : {
+              "amount" : {
+                "createdAt" : {
+                  "number" : "1"
+                },
+                "initialAmount" : "1064.0304414400",
+                "ratePerRound" : {
+                  "rate" : "0.0038051800"
+                }
+              },
+              "dso" : "DSO-fc005169-fc005169::1220df482939985d5b97c432f33c42ec8f250b6f7143c98ba0472f9f4def5c149e5f",
+              "owner" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55"
+            },
+            "lock" : {
+              "expiresAt" : "1970-01-01T00:21:00Z",
+              "holders" : [
+                "DSO-fc005169-fc005169::1220df482939985d5b97c432f33c42ec8f250b6f7143c98ba0472f9f4def5c149e5f"
+              ],
+              "optContext" : "transfer to 'bobExternal::12205cd767213465b09bfa843ebacdb31fad9b4559ef1508f195e369c9f631711b33'"
+            }
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -67,7 +88,19 @@
         "createdEvent" : {
           "contractId" : "2",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "1.0000000000",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "DSO-fc005169-fc005169::1220df482939985d5b97c432f33c42ec8f250b6f7143c98ba0472f9f4def5c149e5f",
+            "owner" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -122,7 +155,19 @@
         "createdEvent" : {
           "contractId" : "3",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : {
+              "createdAt" : {
+                "number" : "1"
+              },
+              "initialAmount" : "4100.8695585600",
+              "ratePerRound" : {
+                "rate" : "0.0038051800"
+              }
+            },
+            "dso" : "DSO-fc005169-fc005169::1220df482939985d5b97c432f33c42ec8f250b6f7143c98ba0472f9f4def5c149e5f",
+            "owner" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -177,7 +222,11 @@
         "createdEvent" : {
           "contractId" : "4",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : "30.0000000000",
+            "issuer" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55",
+            "owner" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
@@ -230,7 +279,11 @@
         "createdEvent" : {
           "contractId" : "5",
           "contractKey" : null,
-          "createArgument" : null,
+          "createArgument" : {
+            "amount" : "40.0000000000",
+            "issuer" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55",
+            "owner" : "alice__wallet__user-fc005169__tc0::1220852f03e011b5daeb060275e38d6ab6e617cf683211a50ee5cb1d79c6f088ab55"
+          },
           "createdAt" : "1971-01-01T00:00:00Z",
           "createdEventBlob" : "",
           "interfaceViews" : [
