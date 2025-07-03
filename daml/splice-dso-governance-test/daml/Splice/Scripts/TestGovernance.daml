@@ -222,7 +222,9 @@ testVoteRequestRejectionWithoutEffectivity = do
   -- majority rejects the request
   requestCid <- castVote _app sv2 requestCid False
   requestCid <- castVote _app sv4 requestCid False
-  requestCid <- castVote _app sv1 requestCid False -- sv1 changes their opinion
+  -- sv1 changes their opinion and votes again after the cooldown of 1 minute
+  passTime (minutes 1)
+  requestCid <- castVote _app sv1 requestCid False
 
   -- the request is directly rejected
   now <- getTime
@@ -265,7 +267,9 @@ testVoteRequestRejectionWithEffectivityBeforeExpiration = do
   -- majority rejects the request
   requestCid <- castVote _app sv2 requestCid False
   requestCid <- castVote _app sv4 requestCid False
-  requestCid <- castVote _app sv1 requestCid False -- sv1 changes their opinion
+  -- sv1 changes their opinion and votes again after the cooldown of 1 minute
+  passTime (minutes 1)
+  requestCid <- castVote _app sv1 requestCid False
 
   -- even if an effective time is set, the majority rejected before the expiration date, so the request is rejected
   now <- getTime
@@ -399,6 +403,9 @@ testRacingSvRemoval = do
 
   let (req1, req2, req3, req4) = (result1.voteRequest, result2.voteRequest, result3.voteRequest, result4.voteRequest)
 
+  -- pass one minute to not hit the vote cooldown for the request creators
+  passTime (minutes 1)
+
   -- sv3 and sv4 are not happy with either of them, and accept both removal requests
   -- sv1 and sv2 accept both requests as well, so we can better test races
   [req1, req2, req3] <- forA [req1, req2, req3] $ \requestCid -> do
@@ -408,24 +415,28 @@ testRacingSvRemoval = do
         sv = sv1
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
+        optCastAt = None
     result2 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
       requestCid = result1.voteRequest
       vote = Vote with
         sv = sv2
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
+        optCastAt = None
     result3 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
       requestCid = result2.voteRequest
       vote = Vote with
         sv = sv3
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
+        optCastAt = None
     result4 <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
       requestCid = result3.voteRequest
       vote = Vote with
         sv = sv4
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
+        optCastAt = None
     pure result4.voteRequest
 
   -- sv1 attempts to immediatly accept the request to remove sv2
@@ -535,6 +546,7 @@ testRacingSvRemoval = do
       sv = sv4
       accept = True
       reason = Reason with url = ""; body = "yes, let me go please!"
+      optCastAt = None
   let req5 = castResult.voteRequest
 
   -- and actually early closing is possible, as everybody has voted and the outcome is definite
@@ -1003,6 +1015,14 @@ testAmuletPriceVoting = do
 
   [(voteCid, _)] <- queryFilter @AmuletPriceVote dso (\vote -> vote.sv == sv1)
 
+  -- check that price vote updates fail if the coolodwn period is not over
+  submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_UpdateAmuletPriceVote with
+    sv = sv1
+    amuletPrice = 5.0
+    voteCid
+
+  -- pass the cooldown and update the vote again
+  passTime (minutes 1)
   submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_UpdateAmuletPriceVote with
     sv = sv1
     amuletPrice = 5.0
@@ -1027,5 +1047,74 @@ testAmuletPriceVoting = do
   -- check that the most recent round has the median a amulet price of the votes
   (_, latestRound) <- (last . sortOn (._2.round)) <$> query @OpenMiningRound dso
   latestRound.amuletPrice === 3.5
+
+  pure ()
+
+testVoteCastingCooldown : Script ()
+testVoteCastingCooldown  = do
+  (_, dso, (sv1, sv2, _sv3, _sv4)) <- initMainNet
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  -- create vote request to use for testing
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+    requester = sv1
+    action = ARC_DsoRules with
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv2
+    reason = Reason with url = ""; body = "they are not good for us!"
+    targetEffectiveAt = None
+    voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
+  let requestCid = result.voteRequest
+
+  -- SV2 can immediately cast a vote
+  result <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+    requestCid
+    vote = Vote with
+      sv = sv2
+      accept = False
+      reason = Reason with url = ""; body = "noooo, let me stay on please!"
+      optCastAt = None
+  let requestCid = result.voteRequest
+
+  -- The second vote SV2 fails though
+  _ <- submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+        requestCid
+        vote = Vote with
+          sv = sv2
+          accept = False
+          reason = Reason with url = ""; body = "a better rebuttal"
+          optCastAt = None
+
+  -- And that same holds for SV1, as it voted as part of creating the request.
+  _ <- submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+        requestCid
+        vote = Vote with
+          sv = sv1
+          accept = True
+          reason = Reason with url = ""; body = "a better reason"
+          optCastAt = None
+
+  -- let the vote cooldown pass, so they can update their votes
+  passTime (minutes 1)
+
+  -- The second vote SV2 fails though
+  result <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+        requestCid
+        vote = Vote with
+          sv = sv2
+          accept = False
+          reason = Reason with url = ""; body = "a better rebuttal"
+          optCastAt = None
+  let requestCid = result.voteRequest
+
+  -- And that same holds for SV1, as it voted as part of creating the request.
+  _ <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+        requestCid
+        vote = Vote with
+          sv = sv1
+          accept = True
+          reason = Reason with url = ""; body = "a better reason"
+          optCastAt = None
 
   pure ()
