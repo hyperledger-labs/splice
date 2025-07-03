@@ -1979,12 +1979,14 @@ trait AmuletTransferUtil { self: StoreTest =>
     new splice.amuletrules.AmuletRules_Transfer(
       transfer,
       mkTransferContext(),
+      Optional.of(dsoParty.toProtoPrimitive)
     ).toValue
 
   def mkAmuletRulesTransfer(receiver: PartyId, amount: Double) =
     new splice.amuletrules.AmuletRules_Transfer(
       mkTransfer(receiver, amount),
       mkTransferContext(),
+      Optional.of(dsoParty.toProtoPrimitive)
     ).toValue
 
   def mkTransferSummary(

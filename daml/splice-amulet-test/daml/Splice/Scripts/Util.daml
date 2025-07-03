@@ -370,6 +370,7 @@ payWithTransferFeeRatio app sender recipient amuletAmount transferFeeRatio = do
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, recipient] readAs
     AmuletRules_Transfer with
       transfer, context = amuletTransferContext openRound featuredAppRight
+      expectedDso = Some app.dso
 
 -- | Locks a amulet of the given amount to the given lock holder
 -- for the given time starting at the current time
@@ -400,6 +401,7 @@ lockTo1 app sender lockHolder amuletAmount lockDuration = do
   void $ submitExerciseAmuletRulesByKey app [sender.primaryParty, lockHolder] readAs
     AmuletRules_Transfer with
       transfer, context = amuletTransferContext openRound featuredAppRight
+      expectedDso = Some app.dso
 
 -- | Draw on validator faucets for all open rounds.
 drawOnAllValidatorFaucets : AmuletApp -> Script ()
@@ -470,6 +472,7 @@ runAmuletDepositBots app = do
       submitExerciseAmuletRulesByKey app [user] readAs AmuletRules_Transfer with
         transfer
         context = mkContext validatorRights
+        expectedDso = Some app.dso
 
   -- sanity check: test that the amulet deposit bot merged all amulets
   amulets <- query @Amulet app.dso
@@ -694,7 +697,7 @@ genericCheckTxMetadata extractMeta extractSummary app expectedKind sender body =
       expectUnlessZero appRewardAmountMetaKey summary.inputAppRewardAmount
       expectUnlessZero validatorRewardAmountMetaKey summary.inputValidatorRewardAmount
       expectUnlessZero unclaimedActivityRecordAmountMetaKey inputUnclaimedActivityRecordAmount
-      pure $ summary.inputAppRewardAmount + summary.inputValidatorRewardAmount + summary.inputSvRewardAmount + 
+      pure $ summary.inputAppRewardAmount + summary.inputValidatorRewardAmount + summary.inputSvRewardAmount +
         inputUnclaimedActivityRecordAmount
   let expectedBurn = totalHoldingsBefore + mint - totalHoldingsAfter
   -- mints are inferred, and show here as a negative burn
