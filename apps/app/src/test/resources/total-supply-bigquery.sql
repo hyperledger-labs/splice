@@ -48,9 +48,17 @@ CREATE TEMP FUNCTION daml_record_path(
     prim_selector string
   ) RETURNS string AS (
   CONCAT('$',
-         (SELECT STRING_AGG(CONCAT('.record.fields[', CAST(i AS STRING), '].value'),
-                            '' ORDER BY offset)
-          FROM UNNEST(field_indices) AS i WITH OFFSET),
+         -- you cannot use SELECT in a BigQuery JSONPath, even indirectly
+         CASE ARRAY_LENGTH(field_indices)
+           WHEN 0 THEN ''
+           WHEN 1 THEN CONCAT('.record.fields[', CAST(field_indices[0] AS STRING), '].value')
+           WHEN 2 THEN CONCAT('.record.fields[', CAST(field_indices[0] AS STRING), '].value',
+                              '.record.fields[', CAST(field_indices[1] AS STRING), '].value')
+           WHEN 3 THEN CONCAT('.record.fields[', CAST(field_indices[0] AS STRING), '].value',
+                              '.record.fields[', CAST(field_indices[1] AS STRING), '].value',
+                              '.record.fields[', CAST(field_indices[2] AS STRING), '].value')
+           ELSE ERROR('Unsupported number of field indices: ' || ARRAY_LENGTH(field_indices))
+         END,
          daml_prim_path(prim_selector))
 );
 
