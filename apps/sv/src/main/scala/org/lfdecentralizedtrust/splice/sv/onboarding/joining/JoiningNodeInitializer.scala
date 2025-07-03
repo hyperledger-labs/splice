@@ -12,6 +12,7 @@ import cats.implicits.{
   toTraverseOps,
 }
 import cats.syntax.foldable.*
+import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{
   NetworkAppClientConfig,
@@ -195,6 +196,17 @@ class JoiningNodeInitializer(
           config,
           onboardingConfig.name,
         )
+      )
+      // We need to check that initialRound from SvAppConfig is well set to match the one of the first SV
+      // This is needed so that all scans can aggregate and backfill using the same initial round
+      // Note: sponsor SV could maliciously set a wrong initialRound
+      _ <- checkInitialRoundMatchesSponsorInitialRound(
+        config.initialRound.toString
+      )
+      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
+        svAutomation.connection,
+        config,
+        config.initialRound.toString,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // We need to first wait to ensure the CometBFT node is caught up
@@ -401,6 +413,25 @@ class JoiningNodeInitializer(
       )
     } yield {
       ()
+    }
+  }
+
+  private def checkInitialRoundMatchesSponsorInitialRound(
+      initialRound: String
+  ): Future[Boolean] = {
+    for {
+      initialRoundFromSponsor <- getInitialRoundFromSponsor
+    } yield {
+      if (initialRound == initialRoundFromSponsor) {
+        true
+      } else {
+        throw Status.FAILED_PRECONDITION
+          .withDescription(
+            s"The configured initial round does not match the initial round of your sponsor " +
+              s"(initialRound=$initialRound, initialRoundFromSponsor=$initialRoundFromSponsor)."
+          )
+          .asRuntimeException
+      }
     }
   }
 
@@ -910,6 +941,37 @@ class JoiningNodeInitializer(
       loggerFactory,
     ).flatMap { svConnection =>
       svConnection.getDsoInfo().map(_.dsoParty).andThen(_ => svConnection.close())
+    }
+
+  private def getInitialRoundFromSponsor: Future[String] =
+    for {
+      initialRound <- {
+        val sponsorConfig = joiningConfig
+          .getOrElse(
+            sys.error(
+              "An onboarding config is required to get the initial round from a sponsoring SV; exiting."
+            )
+          )
+          .svClient
+          .adminApi
+        retryProvider.getValueWithRetries(
+          RetryFor.WaitingOnInitDependency,
+          "initial_round_from_sponsor",
+          "Initial Round from sponsoring SV",
+          getInitialRoundFromSponsor(sponsorConfig),
+          logger,
+        )
+      }
+    } yield initialRound
+
+  private def getInitialRoundFromSponsor(sponsorConfig: NetworkAppClientConfig): Future[String] =
+    SvConnection(
+      sponsorConfig,
+      upgradesConfig,
+      retryProvider,
+      loggerFactory,
+    ).flatMap { svConnection =>
+      svConnection.getDsoInfo().map(_.initialRound).andThen(_ => svConnection.close())
     }
 
   private def waitForDsoSvRole(dsoStore: SvDsoStore): Future[Unit] = {

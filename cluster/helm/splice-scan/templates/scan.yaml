@@ -54,13 +54,6 @@ spec:
               name: {{ $.Values.persistence.secretName }}
               key: postgresPassword
         {{- end }}
-        {{- if .Values.initialRound }}
-        - name: ADDITIONAL_CONFIG_SPLICE_APP_SV_INITIAL_ROUND
-          value: |
-            canton.scan-apps.scan-app {
-              initial-round = {{ . }}
-            }
-        {{- end }}
         {{- if .Values.isFirstSv }}
         - name: ADDITIONAL_CONFIG_IS_SV1
           value: |

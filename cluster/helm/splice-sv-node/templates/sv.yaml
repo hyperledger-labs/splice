@@ -93,7 +93,7 @@ spec:
               value: {{ .Values.onboardingRoundZeroDuration | quote }}
             {{- end }}
             {{- if .Values.initialRound }}
-            - name: ADDITIONAL_CONFIG_SPLICE_APP_SV_INITIAL_ROUND
+            - name: SPLICE_APP_SV_INITIAL_ROUND
               value: {{ .Values.initialRound | quote }}
             {{- end }}
             {{- if .Values.initialTickDuration }}

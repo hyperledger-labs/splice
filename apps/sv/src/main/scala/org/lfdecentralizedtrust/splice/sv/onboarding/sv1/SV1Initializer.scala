@@ -251,6 +251,13 @@ class SV1Initializer(
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
+      // scan needs to know the initial round
+      _ = logger.debug(s"Started with initial round ${config.initialRound}")
+      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
+        svAutomation.connection,
+        config,
+        config.initialRound.toString,
+      )
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
       // is allocated, as a stand-in for all of these actions.
@@ -661,7 +668,7 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
-                        Optional.of(sv1Config.initialRound),
+                        Optional.of(config.initialRound),
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
