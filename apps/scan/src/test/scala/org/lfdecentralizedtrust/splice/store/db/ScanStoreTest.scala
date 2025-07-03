@@ -70,7 +70,6 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.noop.NoOpMetricsFactory
@@ -2350,7 +2349,6 @@ class DbScanStoreTest
         None,
       ),
       participantId = mkParticipantId("ScanStoreTest"),
-      svNodeStateCacheTtl = NonNegativeFiniteDuration.ofSeconds(30),
       enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory()),
     )(parallelExecutionContext, implicitly, implicitly)
