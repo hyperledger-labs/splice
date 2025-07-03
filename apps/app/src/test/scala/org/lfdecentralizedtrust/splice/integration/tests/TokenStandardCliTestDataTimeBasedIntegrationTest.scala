@@ -111,12 +111,22 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       holdingv1.Holding.TEMPLATE_ID,
     )
 
-  def replaceOrFail[R](targetPath: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
-    val path = Paths.get(targetPath)
+  val testDataPath = "token-standard/cli/__tests__/mocks/data/"
+  def replaceOrFail[R](targetFile: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
+    val path = Paths.get(testDataPath, targetFile)
     val prettyNormalizedContent = encoder(normalizedContent).spaces2SortKeys
     if (isCI) {
       val actual = Files.readString(path)
 
+      // Writing file for debugging
+      val debugPath = Paths.get("log", s"token-standard-cli-actual-test-data-$targetFile.json")
+      Files.writeString(debugPath, actual)
+      if (actual != prettyNormalizedContent) {
+        fail(
+          "Test data is not up-to-date. Please run the test locally to update it. " +
+            s"You can find the returned test data in $debugPath."
+        )
+      }
       actual should be(prettyNormalizedContent)
     } else {
       Files.writeString(path, prettyNormalizedContent)
@@ -729,7 +739,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       )
 
       replaceOrFail(
-        "token-standard/cli/__tests__/mocks/data/holdings.json",
+        "holdings.json",
         normalizedHoldings,
         io.circe.Encoder
           .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
@@ -782,7 +792,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         }
 
       replaceOrFail(
-        "token-standard/cli/__tests__/mocks/data/txs.json",
+        "txs.json",
         normalizedUpdates.map(JsGetUpdatesResponse(_)),
         io.circe.Encoder.encodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
       )
@@ -838,7 +848,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         }
       }
       replaceOrFail(
-        s"token-standard/cli/__tests__/mocks/data/eventsByContractIdResponses.json",
+        s"eventsByContractIdResponses.json",
         eventByIdResponses.flatten,
         io.circe.Encoder.encodeSeq(JsEventServiceCodecs.jsGetEventsByContractIdResponseRW),
       )

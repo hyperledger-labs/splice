@@ -10,6 +10,7 @@
               "CreatedEvent" : {
                 "contractId" : "6",
                 "contractKey" : null,
+                "oriol" :  "test",
                 "createArgument" : {
                   "dsoParty" : "dso::normalized",
                   "endUserName" : "the_user",
@@ -402,12 +403,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "10",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -551,12 +552,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "12",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -854,12 +855,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "15",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -1104,7 +1105,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -1120,7 +1121,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "aliceValidator::normalized",
@@ -1360,12 +1361,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "16",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -1841,12 +1842,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "23",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -2299,7 +2300,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -2316,7 +2317,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -2508,12 +2509,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "26",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -2537,12 +2538,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "30",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -2776,7 +2777,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -2798,14 +2799,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -2820,7 +2821,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "bob::normalized",
@@ -2887,7 +2888,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -2903,7 +2904,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -3091,12 +3092,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "32",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -3330,7 +3331,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -3352,14 +3353,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -3374,7 +3375,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "bob::normalized",
@@ -3441,7 +3442,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -3457,7 +3458,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -3645,12 +3646,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "37",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -3884,7 +3885,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -3906,14 +3907,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -3928,7 +3929,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "bob::normalized",
@@ -3995,7 +3996,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -4011,7 +4012,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -4199,12 +4200,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "42",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -4438,7 +4439,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -4460,14 +4461,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -4482,7 +4483,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "bob::normalized",
@@ -4549,7 +4550,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -4565,7 +4566,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -4753,12 +4754,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "47",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -4992,7 +4993,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "bob::normalized",
@@ -5014,14 +5015,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -5036,7 +5037,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "bob::normalized",
@@ -5106,7 +5107,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -5352,12 +5353,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "57",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -5601,7 +5602,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -5611,13 +5612,13 @@
                 "exerciseResult" : {
                   "meta" : {
                     "values" : {
-                      
+
                     }
                   },
                   "output" : {
                     "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      
+
                     }
                   },
                   "senderChangeCids" : [
@@ -5783,7 +5784,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -5793,13 +5794,13 @@
                 "exerciseResult" : {
                   "meta" : {
                     "values" : {
-                      
+
                     }
                   },
                   "output" : {
                     "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      
+
                     }
                   },
                   "senderChangeCids" : [
@@ -6000,7 +6001,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "alice::normalized",
@@ -6022,14 +6023,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -6044,7 +6045,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "alice::normalized",
@@ -6106,7 +6107,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "alice::normalized",
@@ -6128,14 +6129,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -6150,7 +6151,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "alice::normalized",
@@ -6212,7 +6213,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "alice::normalized",
@@ -6234,14 +6235,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -6256,7 +6257,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "alice::normalized",
@@ -6318,7 +6319,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "alice::normalized",
@@ -6340,14 +6341,14 @@
                     "viewValue" : {
                       "meta" : {
                         "values" : {
-                          
+
                         }
                       },
                       "originalInstructionCid" : null,
                       "status" : {
                         "tag" : "TransferPendingReceiverAcceptance",
                         "value" : {
-                          
+
                         }
                       },
                       "transfer" : {
@@ -6362,7 +6363,7 @@
                         },
                         "meta" : {
                           "values" : {
-                            
+
                           }
                         },
                         "receiver" : "alice::normalized",
@@ -6432,7 +6433,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -6678,12 +6679,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "72",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -6927,7 +6928,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -6937,13 +6938,13 @@
                 "exerciseResult" : {
                   "meta" : {
                     "values" : {
-                      
+
                     }
                   },
                   "output" : {
                     "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      
+
                     }
                   },
                   "senderChangeCids" : [
@@ -7109,7 +7110,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -7119,13 +7120,13 @@
                 "exerciseResult" : {
                   "meta" : {
                     "values" : {
-                      
+
                     }
                   },
                   "output" : {
                     "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      
+
                     }
                   },
                   "senderChangeCids" : [
@@ -7288,7 +7289,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   },
@@ -7309,7 +7310,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     },
                     "receiver" : "alice::normalized",
@@ -7567,12 +7568,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "77",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -7596,12 +7597,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "52",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -7625,12 +7626,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "56",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -7654,12 +7655,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "60",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -7683,12 +7684,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "61",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -7712,12 +7713,12 @@
                 ],
                 "choice" : "Archive",
                 "choiceArgument" : {
-                  
+
                 },
                 "consuming" : true,
                 "contractId" : "70",
                 "exerciseResult" : {
-                  
+
                 },
                 "implementedInterfaces" : [
                   "#package-name:Splice.Api.Token.HoldingV1:Holding"
@@ -7953,7 +7954,7 @@
                     },
                     "meta" : {
                       "values" : {
-                        
+
                       }
                     }
                   }
@@ -7963,13 +7964,13 @@
                 "exerciseResult" : {
                   "meta" : {
                     "values" : {
-                      
+
                     }
                   },
                   "output" : {
                     "tag" : "TransferInstructionResult_Failed",
                     "value" : {
-                      
+
                     }
                   },
                   "senderChangeCids" : [
