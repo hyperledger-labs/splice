@@ -45,7 +45,7 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
     UnallocatedUnclaimedActivityRecord,
   ]
 
-  private val UNCLAIMED_REWARDS_LIMIT = PageLimit.tryCreate(10)
+  private val UNCLAIMED_REWARDS_LIMIT = PageLimit.tryCreate(100)
 
   override def completeTaskAsDsoDelegate(
       unallocatedUnclaimedActivityRecord: UnallocatedUnclaimedActivityRecordContract,
@@ -88,53 +88,41 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = {
-    def loop(
-        acc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-        accAmount: BigDecimal,
-    ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] = {
-      if (accAmount >= requiredAmount) {
-        Future.successful(takeSufficientUnclaimedRewards(acc, requiredAmount))
+  ): Future[Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]]] =
+    store.listUnclaimedRewards(limit).flatMap { unclaimedRewards =>
+      val sortedUnclaimedRewards = unclaimedRewards.sortBy(_.payload.amount.negate())
+      val (collectedUnclaimedRewards, collectedAmount) =
+        takeSufficientUnclaimedRewards(sortedUnclaimedRewards, requiredAmount)
+      if (collectedAmount < requiredAmount) {
+        val errorMsg = s"Insufficient rewards: ${requiredAmount - collectedAmount}"
+        logger.warn(errorMsg)
+        Future.failed(
+          Status.INTERNAL
+            .withDescription(errorMsg)
+            .asRuntimeException()
+        )
       } else {
-        store.listUnclaimedRewards(limit).flatMap { newRewards =>
-          val errorMsg = s"Insufficient rewards: ${requiredAmount - accAmount}"
-          if (newRewards.isEmpty) {
-            logger.warn(errorMsg)
-            Future.failed(
-              Status.INTERNAL
-                .withDescription(errorMsg)
-                .asRuntimeException()
-            )
-          } else {
-            val updatedAcc = acc ++ newRewards
-            val updatedAmount =
-              accAmount + newRewards.map(r => scala.math.BigDecimal(r.payload.amount)).sum
-            loop(updatedAcc, updatedAmount)
-          }
-        }
+        Future.successful(collectedUnclaimedRewards)
       }
     }
-
-    loop(Seq.empty, BigDecimal(0))
-  }
 
   private def takeSufficientUnclaimedRewards(
       rewards: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
       target: BigDecimal,
-  ): Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]] = {
+  ): (Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]], BigDecimal) = {
     @annotation.tailrec
     def loop(
         remaining: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-        acc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
-        sum: BigDecimal,
-    ): Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]] = {
-      if (sum >= target) acc
+        unclaimedRewardsAcc: Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]],
+        amountAcc: BigDecimal,
+    ): (Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]], BigDecimal) = {
+      if (amountAcc >= target) (unclaimedRewardsAcc, amountAcc)
       else {
         remaining.toList match {
           case next :: remaining =>
-            loop(remaining, acc :+ next, sum + next.payload.amount)
+            loop(remaining, unclaimedRewardsAcc :+ next, amountAcc + next.payload.amount)
           case Nil =>
-            acc // no more elements to consume
+            (unclaimedRewardsAcc, amountAcc) // no more elements to consume
         }
       }
     }
