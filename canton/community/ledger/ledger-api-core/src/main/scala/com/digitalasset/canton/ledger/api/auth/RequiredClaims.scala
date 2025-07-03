@@ -56,8 +56,8 @@ object RequiredClaims {
   // TODO(#23504) remove this method once TransactionFilter is removed from the API
   @nowarn("cat=deprecation")
   def transactionFilterClaims[Req](transactionFilter: TransactionFilter): List[RequiredClaim[Req]] =
-    readAsForAllParties[Req](transactionFilter.filtersByParty.keys)
-      ::: transactionFilter.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
+    readAsForAllParties[Req](transactionFilter.filtersByParty.keys) :::
+      transactionFilter.filtersForAnyParty.map(_ => RequiredClaim.ReadAsAnyParty[Req]()).toList
 
   def idpAdminClaimsAndMatchingRequestIdpId[Req](
       identityProviderIdL: Lens[Req, String],

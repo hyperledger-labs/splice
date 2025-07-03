@@ -6,7 +6,9 @@ package com.digitalasset.canton.integration.util
 import com.daml.ledger.api.v2 as proto
 import com.daml.ledger.api.v2.completion.Completion
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService
+import com.digitalasset.canton.config.CantonConfig
 import com.digitalasset.canton.console.{ConsoleCommandResult, LocalParticipantReference}
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.TestConsoleEnvironment
 import com.digitalasset.canton.integration.util.GrpcAdminCommandSupport.ParticipantReferenceOps
 import com.digitalasset.canton.integration.util.GrpcServices.ReassignmentsService
