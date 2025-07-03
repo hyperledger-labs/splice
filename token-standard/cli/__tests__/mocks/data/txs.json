@@ -10,7 +10,6 @@
               "CreatedEvent" : {
                 "contractId" : "6",
                 "contractKey" : null,
-                "oriol" :  "test",
                 "createArgument" : {
                   "dsoParty" : "dso::normalized",
                   "endUserName" : "the_user",

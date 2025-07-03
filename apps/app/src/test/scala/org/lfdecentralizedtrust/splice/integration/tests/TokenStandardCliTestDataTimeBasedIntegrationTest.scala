@@ -119,8 +119,8 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       val actual = Files.readString(path)
 
       // Writing file for debugging
-      val debugPath = Paths.get("log", s"token-standard-cli-actual-test-data-$targetFile.json")
-      Files.writeString(debugPath, actual)
+      val debugPath = Paths.get("log", s"token-standard-cli-actual-test-data-$targetFile")
+      Files.writeString(debugPath, prettyNormalizedContent)
       if (actual != prettyNormalizedContent) {
         fail(
           "Test data is not up-to-date. Please run the test locally to update it. " +
