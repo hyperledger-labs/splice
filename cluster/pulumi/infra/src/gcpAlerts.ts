@@ -2,20 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import {
-  CLUSTER_BASENAME,
-  CLUSTER_NAME,
-  conditionalString,
-  config,
-  isDevNet,
-  isMainNet,
-} from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, CLUSTER_NAME, conditionalString, config } from 'splice-pulumi-common';
 
 import { slackToken } from './alertings';
 import { monitoringConfig } from './config';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
-const disableReplayWarnings = config.envFlag('DISABLE_REPLAY_WARNINGS');
 
 export function getNotificationChannel(
   name: string = `${CLUSTER_BASENAME} Slack Alert Notification Channel`
