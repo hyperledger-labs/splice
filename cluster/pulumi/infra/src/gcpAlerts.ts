@@ -43,14 +43,7 @@ export function installGcpLoggingAlerts(
     description: 'Logs with a severity level of warning or above',
     filter: `resource.labels.cluster_name="${CLUSTER_NAME}"
 ${monitoringConfig.alerting.logAlerts.shared}
-${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}
-${conditionalString(
-  // making this condition more complicated causes GCP to be unable to parse the query because there's too many filters
-  isDevNet,
-  `-- TODO(hyperledger-labs/splice#447): remove this once configured cardinality is respected
-  -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
-`
-)}`,
+${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}`,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
       namespace: 'EXTRACT(resource.labels.namespace_name)',
