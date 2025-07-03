@@ -44,7 +44,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.{Storage, DbStorage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -2174,6 +2174,33 @@ class UpdateHistory(
 }
 
 object UpdateHistory {
+
+  // Separate method so we can use this without a full UpdateHistory instance.
+  // Since we're interested in the highest known migration id, we don't need to filter by anything
+  // (store ID, participant ID, etc. are not even known at the time we want to call this).
+  def getHighestKnownMigrationId(
+      storage: Storage
+  )(implicit
+      ec: ExecutionContext,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[Option[Long]] = {
+    storage match {
+      case storage: DbStorage =>
+        for {
+          queryResult <- storage.query(
+            sql"""
+               select max(migration_id) from update_history_last_ingested_offsets
+            """.as[Option[Long]],
+            "getHighestKnownMigrationId",
+          )
+        } yield {
+          queryResult.headOption.flatten
+        }
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
+    }
+  }
+
   sealed trait BackfillingRequirement
   object BackfillingRequirement {
 
