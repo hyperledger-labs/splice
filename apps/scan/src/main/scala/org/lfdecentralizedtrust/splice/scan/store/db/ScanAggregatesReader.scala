@@ -131,7 +131,7 @@ object ScanAggregatesReader {
         decentralizedSynchronizerId <- store
           .getDecentralizedSynchronizerId()
           .map(_.unwrap.toProtoPrimitive)
-        scans <- store.listCachedDsoScans()
+        scans <- store.listDsoScans()
         scanUrls = scans
           .filter(_._1 == decentralizedSynchronizerId)
           .flatMap { case (_, scans) =>
