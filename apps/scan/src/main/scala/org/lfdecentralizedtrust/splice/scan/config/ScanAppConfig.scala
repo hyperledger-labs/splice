@@ -62,7 +62,7 @@ final case class ScanCacheConfig(
       ttl = NonNegativeFiniteDuration.ofSeconds(30),
       maxSize = 100,
     ),
-    totalAmuletBalanceCache: CacheConfig = CacheConfig(
+    totalAmuletBalance: CacheConfig = CacheConfig(
       ttl = NonNegativeFiniteDuration.ofMinutes(2),
       maxSize = 1000,
     ),

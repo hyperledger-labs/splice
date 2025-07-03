@@ -73,7 +73,7 @@ class CachingScanStore(
   )(implicit tc: TraceContext): Future[BigDecimal] = {
     getCache(
       "totalAmuletBalance",
-      cacheConfig.totalAmuletBalanceCache,
+      cacheConfig.totalAmuletBalance,
       store.getTotalAmuletBalance _,
     ).get(asOfEndOfRound)
   }
