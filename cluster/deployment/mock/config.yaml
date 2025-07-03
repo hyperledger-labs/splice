@@ -79,6 +79,9 @@ monitoring:
         -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")
         -- TODO(#979): Can happen due to random disconnects/reconnects but also in other contexts
         -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
+        -- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection
+        -(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))
+        -(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")
 operatorDeployment:
   reference:
     gitReference: refs/heads/main

@@ -45,12 +45,6 @@ export function installGcpLoggingAlerts(
 ${monitoringConfig.alerting.logAlerts.shared}
 ${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}
 ${conditionalString(
-  !isMainNet,
-  '-- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection\n' +
-    '-(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))\n' +
-    '-(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")'
-)}
-${conditionalString(
   enableChaosMesh,
   '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
 )}
