@@ -2176,6 +2176,8 @@ class UpdateHistory(
 object UpdateHistory {
 
   // Separate method so we can use this without a full UpdateHistory instance.
+  // Since we're interested in the highest known migration id, we don't need to filter by anything
+  // (store ID, participant ID, etc. are not even known at the time we want to call this).
   def getHighestKnownMigrationId(
       storage: Storage
   )(implicit
