@@ -696,6 +696,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           case active: JsContractEntry.JsActiveContract =>
             active.copy(
               createdEvent = active.createdEvent.copy(
+                createArgument = active.createdEvent.createArgument.map(replaceStringsInJson),
                 contractId =
                   replaceContractIdWithStableString(active.createdEvent.contractId).toString,
                 templateId = stableTemplateId(active.createdEvent.templateId),
