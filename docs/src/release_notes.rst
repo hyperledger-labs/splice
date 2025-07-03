@@ -8,18 +8,32 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.4
+-----
 
 - Daml
 
-  - Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
-  - Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_
+  This release contains two sets of Daml changes that build upon each other:
 
-    - Note: the corresponding backend and frontend changes are not yet implemented, so SV operators cannot yet
-      make use of this feature. These changes will be implemented in a future release.
+  1. Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
 
-  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.9
+     amuletNameService  0.1.9
+     dsoGovernance      0.1.13
+     validatorLifecycle 0.1.3
+     wallet             0.1.9
+     walletPayments     0.1.9
+     ================== =======
+
+  2. Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_ and fix security issues
+     and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_.
+     Note that the backend and frontend changes from CIP 66 are not yet implemented so we recommend holding off on upgrading to the new Daml models for now.
+
       - CC-1 (low severity): addressed by rate limiting every SV wrt casting votes on a ``VoteRequest`` and updating their ``AmuletPriceVote``
         to defend against them causing undue contention, which would block other SVs from
         voting, closing the vote, or advancing the mining rounds.
@@ -80,20 +94,20 @@ Upcoming
         - clarifying that the ``amuletRulesCid`` parameter of ``DsoRules_AddConfirmedSv`` is a historical artifact
 
 
-    These Daml changes requires an upgrade to the following Daml versions:
+        These Daml changes requires an upgrade to the following Daml versions:
 
-    ================== =======
-    name               version
-    ================== =======
-    amulet             0.1.9
-    amuletNameService  0.1.9
-    dsoGovernance      0.1.14
-    validatorLifecycle 0.1.4
-    wallet             0.1.9
-    walletPayments     0.1.9
-    ================== =======
+        ================== =======
+        name               version
+        ================== =======
+        amulet             0.1.10
+        amuletNameService  0.1.10
+        dsoGovernance      0.1.14
+        validatorLifecycle 0.1.4
+        wallet             0.1.10
+        walletPayments     0.1.10
+        ================== =======
 
-- Backend
+- SV
 
   - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
     the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.
