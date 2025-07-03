@@ -13,8 +13,20 @@ Upcoming
 
 - Daml
 
-  - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+  - Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+  - Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_
+
+    - Note: the corresponding backend and frontend changes are not yet implemented, so SV operators cannot yet
+      make use of this feature. These changes will be implemented in a future release.
+
   - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+
+      - CC-2 (low severity): addressed by enabling delegateless automation from CIP-0064 by default
+
+      - CC-4 (low severity): addressed by
+
+        - checking that ``expiresAt`` is in the future in the choice body of
+          ``DsoRules_ExecuteConfirmedAction``, ``DsoRules_AddConfirmedSv``, and ``ValidatorOnboarding_Match``.
 
       - CC-5 (low severity): addressed by
 
@@ -36,6 +48,14 @@ Upcoming
         - enforcing a length limit of 280 characters on the ``trackingId`` of ``TransferOffer``
           as a prudent engineering measure
 
+      - S-3 (auditor suggestion): addressed by
+
+        - calling ``FeaturedAppRight_Withdraw`` in the implementation of ``DsoRules_RevokeFeaturedAppRight``
+        - calling ``Confirmation_Expire`` in the implementation of ``DsoRules_ExpireStaleConfirmation``
+
+      - S-7 (auditor suggestion): addressed by checking the ``dso`` party whenever
+        executing a confirmed action.
+
 
     These Daml changes requires an upgrade to the following Daml versions:
 
@@ -44,8 +64,8 @@ Upcoming
     ================== =======
     amulet             0.1.9
     amuletNameService  0.1.9
-    dsoGovernance      0.1.13
-    validatorLifecycle 0.1.3
+    dsoGovernance      0.1.14
+    validatorLifecycle 0.1.4
     wallet             0.1.9
     walletPayments     0.1.9
     ================== =======

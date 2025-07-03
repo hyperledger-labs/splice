@@ -316,9 +316,9 @@ class SvTimeBasedRewardCouponIntegrationTest
           ForceFlags(ForceFlag.AllowUnvetPackage, ForceFlag.AllowUnvetPackageWithActiveContracts),
       ),
     )(
-      "Alice's participant has unvetted the latest amulet package",
+      "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",
       _ => {
-        aliceValidatorBackend.appState.participantAdminConnection
+        sv4ValidatorBackend.appState.participantAdminConnection
           .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
           .futureValue
           .flatMap(_.item.packages.map(_.packageId)) should not contain latestAmuletPackageId
