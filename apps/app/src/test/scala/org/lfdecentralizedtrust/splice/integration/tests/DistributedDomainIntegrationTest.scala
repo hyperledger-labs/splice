@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import cats.syntax.parallel.*
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.BracketSynchronous.bracket
@@ -24,6 +25,8 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
+      // We deliberately change amulet conversion rate votes quickly in this test
+      .addConfigTransform((_, config) => ConfigTransforms.withNoVoteCooldown(config))
       .withManualStart
 
   private val decentralizedSynchronizer = SynchronizerAlias.tryCreate("global")

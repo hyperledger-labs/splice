@@ -62,11 +62,21 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
-      .withNoVettedPackages(implicit env => Seq(sv1Backend.participantClient))
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialPackageConfig = initialPackageConfig)
-        )(config)
+      .withNoVettedPackages(implicit env =>
+        Seq(
+          sv1Backend.participantClient,
+          sv2Backend.participantClient,
+          sv3Backend.participantClient,
+          sv4Backend.participantClient,
+        )
+      )
+      .addConfigTransforms(
+        (_, config) =>
+          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+            _.copy(initialPackageConfig = initialPackageConfig)
+          )(config),
+        // We deliberately change amulet conversion rate votes quickly in this test
+        (_, config) => ConfigTransforms.withNoVoteCooldown(config),
       )
 
   private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
@@ -393,6 +403,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           sv1Backend.getDsoInfo().dsoRules.payload.config.maxTextLength,
           sv1Backend.getDsoInfo().dsoRules.payload.config.decentralizedSynchronizer,
           sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteCooldownTime,
         )
 
         val action: ActionRequiringConfirmation =

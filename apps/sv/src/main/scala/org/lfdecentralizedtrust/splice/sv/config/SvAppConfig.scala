@@ -93,6 +93,7 @@ object SvOnboardingConfig {
       initialPackageConfig: InitialPackageConfig = InitialPackageConfig.defaultInitialPackageConfig,
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
+      voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(

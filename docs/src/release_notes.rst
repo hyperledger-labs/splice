@@ -20,6 +20,13 @@ Upcoming
       make use of this feature. These changes will be implemented in a future release.
 
   - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+      - CC-1 (low severity): addressed by rate limiting every SV wrt casting votes on a ``VoteRequest`` and updating their ``AmuletPriceVote``
+        to defend against them causing undue contention, which would block other SVs from
+        voting, closing the vote, or advancing the mining rounds.
+
+        This change introduces a new config value ``voteCooldownTime`` in
+        the ``DsoRules`` configuration that defines the cooldown time between
+        votes of the same SV. If not set, then the default value is 1 minute.
 
       - CC-2 (low severity): addressed by enabling delegateless automation from CIP-0064 by default
 
@@ -70,7 +77,7 @@ Upcoming
     walletPayments     0.1.9
     ================== =======
 
-- SV
+- Backend
 
   - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
     the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.

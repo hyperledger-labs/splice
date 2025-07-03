@@ -1044,6 +1044,7 @@ object SvApp {
                     dsoStoreWithIngestion.store.key.svParty.toProtoPrimitive,
                     isAccepted,
                     reason,
+                    Optional.empty(), // optCastAt
                   ),
                 )
               )

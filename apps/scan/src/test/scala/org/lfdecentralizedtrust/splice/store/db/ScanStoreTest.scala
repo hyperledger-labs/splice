@@ -1219,7 +1219,14 @@ abstract class ScanStoreTest
             voteRequestContract1 = voteRequest(
               requester = userParty(1),
               votes = (1 to 4)
-                .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
+                .map(n =>
+                  new Vote(
+                    userParty(n).toProtoPrimitive,
+                    true,
+                    new Reason("", ""),
+                    Optional.empty(),
+                  )
+                ),
             )
             _ <- dummyDomain.create(voteRequestContract1)(store.multiDomainAcsStore)
             result1 = mkVoteRequestResult(
@@ -1239,7 +1246,14 @@ abstract class ScanStoreTest
             voteRequestContract2 = voteRequest(
               requester = userParty(2),
               votes = (1 to 4)
-                .map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
+                .map(n =>
+                  new Vote(
+                    userParty(n).toProtoPrimitive,
+                    true,
+                    new Reason("", ""),
+                    Optional.empty(),
+                  )
+                ),
             )
             _ <- dummyDomain.create(voteRequestContract2)(store.multiDomainAcsStore)
             result2 = mkVoteRequestResult(
@@ -1327,11 +1341,15 @@ abstract class ScanStoreTest
         "return all votes by their VoteRequest contract ids" in {
           val goodVotes = (1 to 3).map(n =>
             Seq(n, n + 3)
-              .map(i => new Vote(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+              .map(i =>
+                new Vote(userParty(i).toProtoPrimitive, true, new Reason("", ""), Optional.empty())
+              )
           )
           val badVotes = (1 to 3).map(n =>
             Seq(n)
-              .map(i => new Vote(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+              .map(i =>
+                new Vote(userParty(i).toProtoPrimitive, true, new Reason("", ""), Optional.empty())
+              )
           )
           val goodVoteRequests =
             (1 to 3).map(n =>
@@ -2237,6 +2255,7 @@ trait AmuletTransferUtil { self: StoreTest =>
           newSynchronizerId,
         ),
         Optional.empty(),
+        Optional.empty(), // voteCooldownTime
       ),
       Collections.emptyMap(),
       true,

@@ -1319,6 +1319,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           newSynchronizerId,
         ),
         Optional.empty(),
+        Optional.empty(), // voteCooldownTime`
       ),
       Collections.emptyMap(),
       true,
@@ -1542,9 +1543,13 @@ class DbSvDsoStoreTest
   "listVoteRequestsReadyToBeClosed" should {
 
     val votesAccept =
-      (1 to 4).map(n => new Vote(userParty(n).toProtoPrimitive, true, new Reason("", "")))
+      (1 to 4).map(n =>
+        new Vote(userParty(n).toProtoPrimitive, true, new Reason("", ""), Optional.empty())
+      )
     val votesRefuse =
-      (1 to 4).map(n => new Vote(userParty(n).toProtoPrimitive, false, new Reason("", "")))
+      (1 to 4).map(n =>
+        new Vote(userParty(n).toProtoPrimitive, false, new Reason("", ""), Optional.empty())
+      )
     val nowMinus2Hours = Instant.now.truncatedTo(ChronoUnit.MICROS).minusSeconds(7200)
     val nowMinus1Hour = Instant.now.truncatedTo(ChronoUnit.MICROS).minusSeconds(3600)
     val nowPlus1Hour = Instant.now.truncatedTo(ChronoUnit.MICROS).plusSeconds(3600)
@@ -1708,11 +1713,15 @@ class DbSvDsoStoreTest
     "return all votes by their VoteRequest contract ids" in {
       val goodVotes = (1 to 3).map(n =>
         Seq(n, n + 3)
-          .map(i => new Vote(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+          .map(i =>
+            new Vote(userParty(i).toProtoPrimitive, true, new Reason("", ""), Optional.empty())
+          )
       )
       val badVotes = (1 to 3).map(n =>
         Seq(n)
-          .map(i => new Vote(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+          .map(i =>
+            new Vote(userParty(i).toProtoPrimitive, true, new Reason("", ""), Optional.empty())
+          )
       )
       val goodVoteRequests =
         (1 to 3).map(n =>
@@ -1775,7 +1784,7 @@ class DbSvDsoStoreTest
 
     "find the vote by vote request done by this SV" in {
       val goodVote =
-        new Vote(storeSvParty.toProtoPrimitive, true, new Reason("", ""))
+        new Vote(storeSvParty.toProtoPrimitive, true, new Reason("", ""), Optional.empty())
       val goodRequest = voteRequest(
         requester = storeSvParty,
         votes = Seq(goodVote),

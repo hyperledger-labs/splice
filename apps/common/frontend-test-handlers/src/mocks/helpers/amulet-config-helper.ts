@@ -1,12 +1,12 @@
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
-import * as damlTypes from '@daml/types';
 import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import {
   ActionRequiringConfirmation,
   Vote,
   VoteRequest,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
+import * as damlTypes from '@daml/types';
 import { ContractId } from '@daml/types';
 
 export function mkVoteRequest(action: ActionRequiringConfirmation): Contract<VoteRequest> {
@@ -25,6 +25,7 @@ export function mkVoteRequest(action: ActionRequiringConfirmation): Contract<Vot
           url: '',
           body: 'I accept, as I requested the vote.',
         },
+        optCastAt: null,
       }),
       voteBefore: '2098-09-11T10:27:52.300591Z',
       requester: 'Digital-Asset-2',

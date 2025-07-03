@@ -79,5 +79,5 @@ template DsoBootstrap with
               joinedAsOfRound = Round 0
               newSvRewardWeight = sv1RewardWeight
         createPerSvContracts dsoRules addSvChoiceArgs
-        createPerSvPartyContracts dso sv1Party sv1Name sv1SynchronizerNodes (Some amuletPrice)
+        createPerSvPartyContracts dso sv1Party sv1Name sv1SynchronizerNodes (Some amuletPrice) (getVoteCooldownTime config)
         return DsoBootstrap_BootstrapResult
