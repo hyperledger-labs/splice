@@ -130,10 +130,10 @@ class AllocateUnallocatedUnclaimedActivityRecordTrigger(
     ): Seq[Contract[UnclaimedReward.ContractId, UnclaimedReward]] = {
       if (sum >= target) acc
       else {
-        remaining.headOption match {
-          case Some(next) =>
-            loop(remaining.drop(1), acc :+ next, sum + next.payload.amount)
-          case None =>
+        remaining.toList match {
+          case next :: remaining =>
+            loop(remaining, acc :+ next, sum + next.payload.amount)
+          case Nil =>
             acc // no more elements to consume
         }
       }
