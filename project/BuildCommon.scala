@@ -1085,7 +1085,7 @@ object BuildCommon {
       )
   }
 
- lazy val `canton-wartremover-annotations` =
+  lazy val `canton-wartremover-annotations` =
     sbt.Project
       .apply("canton-wartremover-annotations", file("canton/community/lib/wartremover-annotations"))
       .settings(sharedSettings)

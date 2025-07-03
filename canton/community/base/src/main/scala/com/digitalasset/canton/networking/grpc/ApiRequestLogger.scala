@@ -39,7 +39,8 @@ class ApiRequestLogger(
   ): ServerCall.Listener[ReqT] = {
     val method = call.getMethodDescriptor.getFullMethodName
     val shortMethod = show"${method.readableLoggerName(config.maxMethodLength)}"
-    val requestTraceContext: TraceContext = TraceContextGrpc.inferServerRequestTraceContext(shortMethod)
+    val requestTraceContext: TraceContext =
+      TraceContextGrpc.inferServerRequestTraceContext(shortMethod)
 
     val sender = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR).toString)
       .getOrElse("unknown sender")

@@ -186,7 +186,12 @@ class BaseLedgerConnection(
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
-        party <- ensurePartyAllocated(TopologyStoreId.Authorized, hint, None, participantAdminConnection)
+        party <- ensurePartyAllocated(
+          TopologyStoreId.Authorized,
+          hint,
+          None,
+          participantAdminConnection,
+        )
         _ <- setUserPrimaryParty(userId, party)
         _ <- grantUserRights(userId, actAsParties = Seq(party), readAsParties = Seq.empty)
       } yield (),

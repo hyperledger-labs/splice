@@ -675,7 +675,10 @@ private[canton] object CantonNodeParameterConverter {
       startupMemoryCheckConfig = parent.parameters.startupMemoryCheckConfig,
     )
 
-  def protocol(parent: SharedCantonConfig[_], config: ProtocolConfig): CantonNodeParameters.Protocol =
+  def protocol(
+      parent: SharedCantonConfig[_],
+      config: ProtocolConfig,
+  ): CantonNodeParameters.Protocol =
     CantonNodeParameters.Protocol.Impl(
       alphaVersionSupport = parent.parameters.alphaVersionSupport || config.alphaVersionSupport,
       betaVersionSupport = parent.parameters.betaVersionSupport || config.betaVersionSupport,

@@ -530,12 +530,11 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             GetActiveContractsRequest(
               eventFormat = Some(
                 EventFormat(
-                  filtersByParty =
-                    filtersByParty(
-                      alice.partyId,
-                      Seq(holdingv1.Holding.TEMPLATE_ID),
-                      includeWildcard = false,
-                    )
+                  filtersByParty = filtersByParty(
+                    alice.partyId,
+                    Seq(holdingv1.Holding.TEMPLATE_ID),
+                    includeWildcard = false,
+                  )
                 )
               ),
               activeAtOffset =

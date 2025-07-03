@@ -6,11 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding.joining
 import cats.data.OptionT
 import cats.syntax.option.*
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{
-  catsSyntaxTuple2Semigroupal,
-  catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
-}
+import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
 import cats.syntax.foldable.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import org.lfdecentralizedtrust.splice.config.{

@@ -410,10 +410,10 @@ class TreasuryService(
   private def filterAndExecuteBatch(
       unfilteredBatch: AmuletOperationBatch
   ): Future[Done] = TraceContext.withNewTraceContext("executeBatch")(implicit tc => {
-      for {
-        filteredBatch <- filterBatch(unfilteredBatch)
-        res <- executeBatch(filteredBatch)
-      } yield res
+    for {
+      filteredBatch <- filterBatch(unfilteredBatch)
+      res <- executeBatch(filteredBatch)
+    } yield res
   })
 
   private def executeBatch(
@@ -519,55 +519,55 @@ class TreasuryService(
       operation: EnqueuedTokenStandardTransferOperation
   ): Future[Done] = {
     TraceContext.withNewTraceContext("executeTokenStandardTransferOperation")(implicit tc => {
-        val now = clock.now.toInstant
-        logger.debug(s"Executing token standard operation $operation")
-        val sender = userStore.key.endUserParty
-        val dso = userStore.key.dsoParty.toProtoPrimitive
-        exerciseTokenStandardChoice(operation) { holdings =>
-          val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
-            dso,
-            new transferinstructionv1.Transfer(
-              sender.toProtoPrimitive,
-              operation.receiverPartyId.toProtoPrimitive,
-              operation.amount.bigDecimal,
-              new holdingv1.InstrumentId(dso, "Amulet"),
-              now,
-              operation.expiresAt.toInstant,
-              holdings,
-              new metadatav1.Metadata(
-                java.util.Map.of(TokenStandardMetadata.reasonMetaKey, operation.description)
-              ),
+      val now = clock.now.toInstant
+      logger.debug(s"Executing token standard operation $operation")
+      val sender = userStore.key.endUserParty
+      val dso = userStore.key.dsoParty.toProtoPrimitive
+      exerciseTokenStandardChoice(operation) { holdings =>
+        val choiceArgs = new transferinstructionv1.TransferFactory_Transfer(
+          dso,
+          new transferinstructionv1.Transfer(
+            sender.toProtoPrimitive,
+            operation.receiverPartyId.toProtoPrimitive,
+            operation.amount.bigDecimal,
+            new holdingv1.InstrumentId(dso, "Amulet"),
+            now,
+            operation.expiresAt.toInstant,
+            holdings,
+            new metadatav1.Metadata(
+              java.util.Map.of(TokenStandardMetadata.reasonMetaKey, operation.description)
             ),
-            emptyExtraArgs,
-          )
-          scanConnection.getTransferFactory(choiceArgs).map { case (transferFactory, _) =>
-            transferFactory.factoryId
-              .exerciseTransferFactory_Transfer(
-                transferFactory.args
-              ) -> transferFactory.disclosedContracts
-          }
+          ),
+          emptyExtraArgs,
+        )
+        scanConnection.getTransferFactory(choiceArgs).map { case (transferFactory, _) =>
+          transferFactory.factoryId
+            .exerciseTransferFactory_Transfer(
+              transferFactory.args
+            ) -> transferFactory.disclosedContracts
         }
+      }
 
     })
   }
 
   private def executeAmuletAllocationOperation(operation: EnqueuedAmuletAllocationOperation) = {
     TraceContext.withNewTraceContext("executeAmuletAllocationOperation")(implicit tc => {
-        logger.debug(s"Executing Amulet Allocation operation $operation")
-        exerciseTokenStandardChoice(operation) { holdings =>
-          val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
-            userStore.key.dsoParty.toProtoPrimitive,
-            operation.specification,
-            operation.requestedAt,
-            holdings,
-            emptyExtraArgs,
-          )
-          scanConnection.getAllocationFactory(choiceArgs).map { allocationFactory =>
-            allocationFactory.factoryId.exerciseAllocationFactory_Allocate(
-              allocationFactory.args
-            ) -> allocationFactory.disclosedContracts
-          }
+      logger.debug(s"Executing Amulet Allocation operation $operation")
+      exerciseTokenStandardChoice(operation) { holdings =>
+        val choiceArgs = new allocationinstructionv1.AllocationFactory_Allocate(
+          userStore.key.dsoParty.toProtoPrimitive,
+          operation.specification,
+          operation.requestedAt,
+          holdings,
+          emptyExtraArgs,
+        )
+        scanConnection.getAllocationFactory(choiceArgs).map { allocationFactory =>
+          allocationFactory.factoryId.exerciseAllocationFactory_Allocate(
+            allocationFactory.args
+          ) -> allocationFactory.disclosedContracts
         }
+      }
     })
   }
 
