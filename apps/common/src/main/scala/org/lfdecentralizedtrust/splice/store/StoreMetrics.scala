@@ -8,6 +8,8 @@ import com.daml.metrics.api.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
+import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
+
 import scala.collection.concurrent.TrieMap
 
 class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: MetricsContext)
@@ -65,14 +67,50 @@ class StoreMetrics(metricsFactory: LabeledMetricsFactory)(metricsContext: Metric
           name = prefix :+ "last-ingested-record-time-ms",
           summary = "The most recent record time ingested by this store",
           Traffic,
-          "The most recent record time ingested by this store for each synchronizer in milliseconds. Note that this only updates when the store processes a new transaction so if there is no activity the time won't update.",
+          "The most recent record time ingested by this store for each synchronizer in milliseconds. " +
+            "Note that this only updates when the store processes a new transaction so if there is no activity the time won't update.",
         ),
         0L,
       )(metricsContext.merge(MetricsContext((Map("synchronizer_id" -> synchronizerId.toString))))),
     )
 
+  private val perSynchronizerLastSeenRecordTimeMs: TrieMap[SynchronizerId, Gauge[Long]] =
+    TrieMap.empty
+
+  private def getLastSeenRecordTimeMsForSynchronizer(synchronizerId: SynchronizerId): Gauge[Long] =
+    perSynchronizerLastSeenRecordTimeMs.getOrElseUpdate(
+      synchronizerId,
+      metricsFactory.gauge(
+        MetricInfo(
+          name = prefix :+ "last-seen-record-time-ms",
+          summary =
+            "The most recent record time this store has seen from the ledger (but not necessarily ingested)",
+          Traffic,
+          "The most recent record time seen by this store for each synchronizer in milliseconds. " +
+            "This updates for every entry seen, regardless of whether it was ingested or filtered out.",
+        ),
+        0L,
+      )(metricsContext.merge(MetricsContext((Map("synchronizer_id" -> synchronizerId.toString))))),
+    )
+
+  def updateLastSeenMetrics(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint): Unit = {
+    updateOrCheckpoint match {
+      case TreeUpdateOrOffsetCheckpoint.Update(update, synchronizerId) =>
+        getLastSeenRecordTimeMsForSynchronizer(synchronizerId)
+          .updateValue(update.recordTime.toEpochMilli)
+      case TreeUpdateOrOffsetCheckpoint.Checkpoint(checkpoint) =>
+        checkpoint.getSynchronizerTimes.forEach(syncTime =>
+          getLastSeenRecordTimeMsForSynchronizer(
+            SynchronizerId.tryFromString(syncTime.getSynchronizerId)
+          )
+            .updateValue(syncTime.getRecordTime.toEpochMilli)
+        )
+    }
+  }
+
   override def close(): Unit = {
     acsSize.close()
     perSynchronizerLastIngestedRecordTimeMs.values.foreach(_.close())
+    perSynchronizerLastSeenRecordTimeMs.values.foreach(_.close())
   }
 }

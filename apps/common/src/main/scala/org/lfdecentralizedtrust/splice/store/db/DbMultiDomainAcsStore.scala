@@ -1232,6 +1232,8 @@ final class DbMultiDomainAcsStore[TXE](
     override def ingestUpdate(updateOrCheckpoint: TreeUpdateOrOffsetCheckpoint)(implicit
         traceContext: TraceContext
     ): Future[Unit] = {
+      metrics.updateLastSeenMetrics(updateOrCheckpoint)
+
       updateOrCheckpoint match {
         case TreeUpdateOrOffsetCheckpoint.Update(ReassignmentUpdate(reassignment), domain) =>
           ingestReassignment(reassignment.offset, reassignment).map { summaryState =>
