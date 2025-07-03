@@ -40,7 +40,7 @@ class TimeBasedTestNetPreviewIntegrationTest
       _ => {
         sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
         forAll(Seq(1,2)) { round =>
-            ensureNoSvRewardCouponExistsForRound(round, sv1WalletClient)
+            ensureNoSvRewardCouponExistsForRound(round.toLong, sv1WalletClient)
         }
       },
     )
