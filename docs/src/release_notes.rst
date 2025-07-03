@@ -13,9 +13,13 @@ Upcoming
 
 - Daml
 
-  - Implements `CIP 64 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
-  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+  - Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+  - Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_
 
+    - Note: the corresponding backend and frontend changes are not yet implemented, so SV operators cannot yet
+      make use of this feature. These changes will be implemented in a future release.
+
+  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
       - CC-1 (low severity): addressed by rate limiting every SV wrt casting votes on a ``VoteRequest`` and updating their ``AmuletPriceVote``
         to defend against them causing undue contention, which would block other SVs from
         voting, closing the vote, or advancing the mining rounds.
@@ -24,7 +28,7 @@ Upcoming
         the ``DsoRules`` configuration that defines the cooldown time between
         votes of the same SV. If not set, then the default value is 1 minute.
 
-      - CC-2 (low severity): addressed by enabling delegateless automation by default
+      - CC-2 (low severity): addressed by enabling delegateless automation from CIP-0064 by default
 
       - CC-4 (low severity): addressed by
 
