@@ -1,6 +1,5 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
@@ -44,8 +43,7 @@ class SvFrontendIntegrationTest
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .addConfigTransforms(
         // We deliberately change votes quickly in this test
-        (_, config) =>
-          ConfigTransforms.withVoteCooldown(NonNegativeFiniteDuration.ofSeconds(0))(config)
+        (_, config) => ConfigTransforms.withNoVoteCooldown(config)
       )
 
   "SV UIs" should {

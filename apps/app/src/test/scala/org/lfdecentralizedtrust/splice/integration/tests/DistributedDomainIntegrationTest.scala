@@ -26,9 +26,7 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       // We deliberately change amulet conversion rate votes quickly in this test
-      .addConfigTransform((_, config) =>
-        ConfigTransforms.withVoteCooldown(NonNegativeFiniteDuration.ofSeconds(0))(config)
-      )
+      .addConfigTransform((_, config) => ConfigTransforms.withNoVoteCooldown(config))
       .withManualStart
 
   private val decentralizedSynchronizer = SynchronizerAlias.tryCreate("global")
