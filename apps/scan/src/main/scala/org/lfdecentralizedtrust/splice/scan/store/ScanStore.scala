@@ -4,10 +4,31 @@
 package org.lfdecentralizedtrust.splice.scan.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import io.grpc.Status
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
+import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, RetryProvider}
+import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
+import org.lfdecentralizedtrust.splice.scan.config.ScanCacheConfig
+import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanAcsStoreRowData
+import org.lfdecentralizedtrust.splice.scan.store.db.{
+  DbScanStore,
+  DbScanStoreMetrics,
+  ScanAggregatesReader,
+  ScanAggregator,
+}
+import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
+import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   DsoRulesStore,
@@ -19,33 +40,12 @@ import org.lfdecentralizedtrust.splice.store.{
   TxLogAppStore,
   VotesStore,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
-import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletrules.TransferCommand
-import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.scan.store.db.{
-  DbScanStore,
-  DbScanStoreMetrics,
-  ScanAggregatesReader,
-  ScanAggregator,
-}
-import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanAcsStoreRowData
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
-import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import java.time.Instant
 
 final case class ScanInfo(publicUrl: String, svName: String)
 
@@ -255,9 +255,11 @@ trait ScanStore
   ): Future[Seq[TxLogEntry.TransactionTxLogEntry]]
 
   def getAggregatedRounds()(implicit tc: TraceContext): Future[Option[ScanAggregator.RoundRange]]
+
   def getRoundTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundTotals]]
+
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
@@ -299,7 +301,7 @@ object ScanStore {
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
       domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
-      svNodeStateCacheTtl: NonNegativeFiniteDuration,
+      cacheConfigs: ScanCacheConfig,
       enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
   )(implicit
@@ -324,7 +326,7 @@ object ScanStore {
             enableImportUpdateBackfill,
             metrics,
           ),
-          svNodeStateCacheTtl,
+          cacheConfigs,
           metrics,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
