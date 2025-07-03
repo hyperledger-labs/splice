@@ -71,8 +71,8 @@ trait ParticipantAdminDarsConnection {
       }
     } yield ()
 
-  def vetDars(domainId: SynchronizerId, dars: Seq[DarResource], fromDate: Option[Instant])(implicit
-      tc: TraceContext
+  def vetDars(synchronizerId: SynchronizerId, dars: Seq[DarResource], fromDate: Option[Instant])(
+      implicit tc: TraceContext
   ): Future[Unit] = {
     val cantonFromDate = fromDate.map(CantonTimestamp.assertFromInstant)
     ensureTopologyMapping[VettedPackages](
@@ -103,16 +103,16 @@ trait ParticipantAdminDarsConnection {
     ).flatMap(_ =>
       retryProvider.waitUntil(
         RetryFor.Automation,
-        s"vet_dars_on_domain",
-        s"Dars ${dars.map(_.packageId)} are vetted on domain $domainId",
-        getVettingState(domainId).map { vettingState =>
+        s"vet_dars_on_synchronizer",
+        s"Dars ${dars.map(_.packageId)} are vetted on synchronizer $synchronizerId",
+        getVettingState(synchronizerId).map { vettingState =>
           val packagesNotVetted = dars.filterNot(dar =>
             vettingState.mapping.packages.exists(_.packageId == dar.packageId)
           )
           if (packagesNotVetted.nonEmpty) {
             throw Status.NOT_FOUND
               .withDescription(
-                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on domain $domainId"
+                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on synchronizer $synchronizerId"
               )
               .asRuntimeException
           }
