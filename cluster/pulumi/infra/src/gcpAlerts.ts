@@ -45,10 +45,6 @@ export function installGcpLoggingAlerts(
 ${monitoringConfig.alerting.logAlerts.shared}
 ${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}
 ${conditionalString(
-  enableChaosMesh,
-  '-(resource.labels.namespace_name="multi-validator" AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST")'
-)}
-${conditionalString(
   disableReplayWarnings,
   '-(resource.labels.container_name=~"participant" AND (' +
     'jsonPayload.message=~"LOCAL_VERDICT_CREATES_EXISTING_CONTRACTS.*Rejected transaction would create contract\\(s\\) that already exist"' +
