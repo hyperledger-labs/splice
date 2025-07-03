@@ -17,6 +17,7 @@ import Splice.Fees
 
 template Test
   with
+    dso : Party
     sender : Party
   where
     signatory sender
@@ -25,7 +26,7 @@ template Test
         context : PaymentTransferContext
         outputs : [TransferOutput]
       controller sender
-      do exerciseComputeFees context sender outputs
+      do exerciseComputeFees dso context sender outputs
 
 
 test = script do
@@ -33,6 +34,7 @@ test = script do
     now <- getTime
     context <- getPaymentTransferContext app alice
     test <- submitUser alice.userId $ createCmd Test with
+      dso = app.dso
       sender = alice.primaryParty
     let outputs =
           [ TransferOutput with
@@ -131,6 +133,7 @@ testScaledHoldingFees = do
                       receiverFeeRatio = 1.0]
         beneficiaries = None
       context = context.context
+      expectedDso = Some app.dso
 
   -- Actual holding fee should be based on the amulet price when the amulet was created, not the current one
   transferResult.summary.holdingFees === scaledHoldingFee

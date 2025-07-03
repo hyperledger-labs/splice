@@ -8,6 +8,35 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Daml
+
+  Change ``AmuletRules_Transfer`` and ``AmuletRules_ComputeFees`` to take an explicit argument
+  ``expectedDso : Optional Party`` and check that against the ``dso`` party value in ``AmuletRules``.
+  This value must be provided, and thus protects people that delegate calls to these choices from
+  unintentionally allowing calls to ``AmuletRules`` contracts with a different ``dso`` party.
+
+  This addresses suggestion S-8 reported by Quantstamp in their security review.
+
+  Application developers that call these choices directly must adjust their call-sites to set the
+  the ``expectedDso`` value. All calls to these choices from within the splice codebase have been
+  adapted.
+
+  These Daml changes require an upgrade to the following Daml versions:
+
+   ================== =======
+   name               version
+   ================== =======
+   amulet             0.1.11
+   amuletNameService  0.1.11
+   dsoGovernance      0.1.15
+   wallet             0.1.11
+   walletPayments     0.1.11
+   ================== =======
+
+
 0.4.4
 -----
 

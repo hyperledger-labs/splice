@@ -71,7 +71,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       handleResultBuyTraffic resultE
     CO_MergeTransferInputs -> do
         let transfer = mkMergeAmuletAndRewardsTransfer executionContext.endUser inputs
-        result <- catchAll (exercisePaymentTransfer context transfer)
+        result <- catchAll (exercisePaymentTransfer executionContext.dso context transfer)
         handleResultMergeInputs result
     CO_Tap tapAmount -> do
       amuletsum <- catchAll (exercise context.amuletRules (AmuletRules_DevNet_Tap executionContext.endUser tapAmount context.context.openMiningRound))

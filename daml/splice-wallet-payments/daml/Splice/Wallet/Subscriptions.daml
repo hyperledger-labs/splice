@@ -366,7 +366,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
 
   targetAmount <- paymentAmountToAmulet dso contextRound paymentAmount
 
-  outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
+  outputFees <- exerciseComputeFees dso context sender [mkTransferOutput receiver targetAmount]
   let lockAmount = targetAmount + sum outputFees
   -- We know that the contextRound (=latest Round) won't be archived before
   -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
@@ -390,7 +390,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
          ]
        beneficiaries = None -- no beneficiaries for locking step
 
-  result <- exercisePaymentTransfer context transfer
+  result <- exercisePaymentTransfer dso context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
 
   pure(lockedAmulet, result.senderChangeAmulet, targetAmount, result.round)
@@ -408,7 +408,7 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
         inputs = [InputAmulet result.amuletSum.amulet]
         outputs = [mkTransferOutput receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
-  result <- exerciseAppTransfer transferContext transfer
+  result <- exerciseAppTransfer subscriptionData.dso transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultAmulet amuletCid] = result.createdAmulets
 

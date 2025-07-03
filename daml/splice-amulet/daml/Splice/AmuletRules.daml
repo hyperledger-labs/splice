@@ -5,7 +5,7 @@ module Splice.AmuletRules where
 
 import Prelude hiding (forA)
 
-import DA.Action (when, void, foldlA)
+import DA.Action (when, unless, void, foldlA)
 import DA.Assert
 import DA.Exception
 import DA.Foldable (forA_)
@@ -17,6 +17,7 @@ import DA.Set (Set)
 import qualified DA.Set as Set
 import qualified DA.TextMap as TextMap
 import DA.Traversable (forA)
+import qualified DA.Text as T
 import DA.Time
 
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
@@ -107,16 +108,26 @@ template AmuletRules
         context : TransferContext
         sender : Party
         outputs : [TransferOutput]
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
      controller sender
-     do fees <- computeFees dso context sender outputs
+     do checkExpectedDso dso expectedDso
+        fees <- computeFees dso context sender outputs
         return AmuletRules_ComputeFeesResult with fees
 
     nonconsuming choice AmuletRules_Transfer : TransferResult
       with
         transfer : Transfer
         context : TransferContext
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller Set.toList (transferControllers transfer)
       do
+        checkExpectedDso dso expectedDso
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
@@ -1142,32 +1153,35 @@ data AppTransferContext = AppTransferContext
     featuredAppRight : Optional (ContractId FeaturedAppRight)
   deriving (Show, Eq)
 
-exerciseAppTransfer : AppTransferContext -> Transfer -> Update TransferResult
-exerciseAppTransfer AppTransferContext{..} transfer =
+checkExpectedDso : Party -> Optional Party -> Update ()
+checkExpectedDso actualDso optExpectedDso =
+  case optExpectedDso of
+    None -> abort "Expected DSO party not set by caller. Please change your code to set it as a prudent security measure."
+    Some expectedDso ->
+      unless (actualDso == expectedDso) $
+         abort $ T.implode ["DSO party expected by caller ", show expectedDso, " does not match actual DSO party ", show actualDso]
+
+exerciseAppTransfer : Party -> AppTransferContext -> Transfer -> Update TransferResult
+exerciseAppTransfer expectedDso AppTransferContext{..} transfer = do
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context = amuletTransferContext openMiningRound featuredAppRight
+    expectedDso = Some expectedDso
 
--- TODO(#14942): replace usages of this function with `exerciseCheckedPaymentTransfer`
-exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
-exercisePaymentTransfer PaymentTransferContext{..} transfer =
+exercisePaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
+exercisePaymentTransfer expectedDso PaymentTransferContext{..} transfer = do
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context
+    expectedDso = Some expectedDso
 
-exerciseCheckedPaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
-exerciseCheckedPaymentTransfer dso PaymentTransferContext{..} transfer = do
-  _ <- fetchChecked (ForDso with dso) amuletRules
-  exercise amuletRules AmuletRules_Transfer with
-    transfer
-    context
-
-exerciseComputeFees : PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-exerciseComputeFees PaymentTransferContext{..} sender outputs = do
+exerciseComputeFees : Party -> PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
+exerciseComputeFees expectedDso PaymentTransferContext{..} sender outputs = do
   feesResult <- exercise amuletRules AmuletRules_ComputeFees with
         context
         sender
         outputs
+        expectedDso = Some expectedDso
   return feesResult.fees
 
 data PaymentTransferContext = PaymentTransferContext
@@ -1450,8 +1464,7 @@ template TransferPreapproval
       controller sender
       do
          assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
-         _ <- fetchChecked (ForDso dso) context.amuletRules
-         transferResult <- exercisePaymentTransfer context Transfer with
+         transferResult <- exercisePaymentTransfer dso context Transfer with
            sender
            provider
            inputs
