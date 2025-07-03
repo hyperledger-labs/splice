@@ -10,17 +10,24 @@ import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.sun.net.httpserver.HttpServer
 
-class UseJWKSServer(jwks: String)
+class UseJWKSServer(jwks: String, altJwks: String)
     extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
     with BaseTest {
 
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
   private[integration] var server: HttpServer = _
+  private[integration] var altServer: HttpServer = _
 
-  override def beforeTests(): Unit =
+  override def beforeTests(): Unit = {
     server = SimpleHttpServer.start(jwks)
+    altServer = SimpleHttpServer.start(altJwks)
+  }
 
   lazy val endpoint: String = SimpleHttpServer.responseUrl(server)
+  lazy val altEndpoint: String = SimpleHttpServer.responseUrl(altServer)
 
-  override def afterTests(): Unit = SimpleHttpServer.stop(server)
+  override def afterTests(): Unit = {
+    SimpleHttpServer.stop(server)
+    SimpleHttpServer.stop(altServer)
+  }
 }

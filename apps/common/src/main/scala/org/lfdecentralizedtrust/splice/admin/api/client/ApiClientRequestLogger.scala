@@ -42,13 +42,15 @@ class ApiClientRequestLogger(
       next: Channel,
   ): ClientCall[ReqT, RespT] = {
 
+    val methodName = method.getFullMethodName
+    val shortMethod = show"${methodName.readableLoggerName(config.maxMethodLength)}"
+
     val optCallerContext = TraceContextGrpc.inferCallerTraceContext(callOptions)
-    val requestTraceContext = TraceContext.withNewTraceContext(identity)
+    val requestTraceContext = TraceContext.withNewTraceContext(shortMethod)(identity)
     val callerTraceContext =
       optCallerContext.filter(_.traceId.isDefined).getOrElse(requestTraceContext)
 
     val receiver = next.authority()
-    val methodName = method.getFullMethodName
 
     val clientCall = next.newCall(method, callOptions)
 
@@ -73,7 +75,7 @@ class ApiClientRequestLogger(
         else requestTraceContext.showTraceId
 
       def createLogMessage(message: String): String = {
-        show"Request ($tidInfo) ${methodName.readableLoggerName(config.maxMethodLength)} to ${receiver.unquoted}: ${message.unquoted}"
+        show"Request ($tidInfo) $shortMethod to ${receiver.unquoted}: ${message.unquoted}"
       }
 
       new LoggingClientCall(

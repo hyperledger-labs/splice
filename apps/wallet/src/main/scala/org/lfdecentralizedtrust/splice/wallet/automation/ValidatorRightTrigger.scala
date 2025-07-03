@@ -19,7 +19,7 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.wallet.ExternalPartyWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
@@ -53,7 +53,7 @@ class ValidatorRightTrigger(
     val party = PartyId.tryFromProtoPrimitive(validatorRight.payload.user)
     for {
       partyToKeyMappings <- participantAdminConnection.listPartyToKey(
-        filterStore = TopologyStoreId.SynchronizerStore(validatorRight.domain),
+        filterStore = TopologyStoreId.Synchronizer(validatorRight.domain),
         filterParty = Some(party),
       )
       r <-

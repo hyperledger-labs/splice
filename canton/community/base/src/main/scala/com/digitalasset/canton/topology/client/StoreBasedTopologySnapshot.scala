@@ -147,7 +147,6 @@ class StoreBasedTopologySnapshot(
             mapping.parameters,
             storedTx.validFrom.value,
             storedTx.validUntil.map(_.value),
-            mapping.synchronizerId,
           )
         }
       } yield synchronizerParameters
@@ -199,7 +198,6 @@ class StoreBasedTopologySnapshot(
             dps.parameters,
             storedTx.validFrom.value,
             storedTx.validUntil.map(_.value),
-            dps.synchronizerId,
           )
         }
     }
@@ -793,14 +791,16 @@ class StoreBasedTopologySnapshot(
 
   override def isSynchronizerUpgradeOngoing()(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[PhysicalSynchronizerId]] =
+  ): FutureUnlessShutdown[Option[(PhysicalSynchronizerId, CantonTimestamp)]] =
     findTransactions(
       types = Seq(TopologyMapping.Code.SynchronizerUpgradeAnnouncement),
       filterUid = None,
       filterNamespace = None,
     ).map(_.collectOfMapping[SynchronizerUpgradeAnnouncement].result.toList match {
       case atMostOne @ (_ :: Nil | Nil) =>
-        atMostOne.map(_.mapping.successorSynchronizerId).headOption
+        atMostOne
+          .map(tx => (tx.mapping.successorSynchronizerId, tx.mapping.upgradeTime))
+          .headOption
       case _moreThanOne =>
         ErrorUtil.invalidState("Found more than one SynchronizerUpgradeAnnouncement mapping")
     })

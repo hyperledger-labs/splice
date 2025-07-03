@@ -16,7 +16,12 @@ import com.digitalasset.canton.synchronizer.block.BlockFormat
 import com.digitalasset.canton.synchronizer.block.BlockFormat.OrderedRequest
 import com.digitalasset.canton.synchronizer.block.LedgerBlockEvent.deserializeSignedOrderingRequest
 import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.crypto.CryptoProvider
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.integration.canton.topology.{
+  OrderingTopologyProvider,
+  TopologyActivationTime,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.HasDelayedInit
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.IssConsensusModule.DefaultDatabaseReadTimeout
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.consensus.iss.data.EpochStoreReader
@@ -35,11 +40,6 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders.LeaderSelectionPolicy
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.snapshot.SequencerSnapshotAdditionalInfoProvider
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.topology.{
-  CryptoProvider,
-  OrderingTopologyProvider,
-  TopologyActivationTime,
-}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BftNodeId,
   BlockNumber,
@@ -149,7 +149,7 @@ class OutputModule[E <: Env[E]](
   // We sequence NewEpochTopology messages because state transfer can process blocks from multiple epochs
   //  resulting in fetching multiple topologies concurrently.
   @VisibleForTesting
-  private[bftordering] val maybeNewEpochTopologyMessagePeanoQueue =
+  private[output] val maybeNewEpochTopologyMessagePeanoQueue =
     new SingleUseCell[PeanoQueue[EpochNumber, NewEpochTopology[E]]]
   private def newEpochTopologyMessagePeanoQueue: PeanoQueue[EpochNumber, NewEpochTopology[E]] =
     maybeNewEpochTopologyMessagePeanoQueue.getOrElse(
@@ -159,7 +159,7 @@ class OutputModule[E <: Env[E]](
     )
 
   @VisibleForTesting
-  private[bftordering] val previousStoredBlock = new PreviousStoredBlock
+  private[output] val previousStoredBlock = new PreviousStoredBlock
   startupState.previousBftTimeForOnboarding.foreach { time =>
     previousStoredBlock.update(
       BlockNumber(startupState.initialHeightToProvide - 1),
@@ -170,7 +170,7 @@ class OutputModule[E <: Env[E]](
   private var currentEpochOrderingTopology: OrderingTopology = startupState.initialOrderingTopology
   private var currentEpochCryptoProvider: CryptoProvider[E] = startupState.initialCryptoProvider
   @VisibleForTesting
-  private[bftordering] var currentEpochCouldAlterOrderingTopology =
+  private[output] var currentEpochCouldAlterOrderingTopology =
     startupState.onboardingEpochCouldAlterOrderingTopology
 
   // Storing metadata is idempotent but we try to avoid unnecessary writes
@@ -375,13 +375,7 @@ class OutputModule[E <: Env[E]](
             val blockNumber = orderedBlock.metadata.blockNumber
             blocksBeingFetched
               .remove(blockNumber)
-              .foreach(
-                metrics.performance.orderingStageLatency.emitOrderingStageLatency(
-                  metrics.performance.orderingStageLatency.labels.stage.values.output.Fetch,
-                  _,
-                  Instant.now(),
-                )
-              )
+              .foreach(emitFetchLatency)
             logger.debug(
               s"output received completed block; epoch: ${orderedBlock.metadata.epochNumber}, " +
                 s"blockID: $blockNumber, batchIDs: ${completedBlockData.batches.map(_._1)}"
@@ -400,11 +394,11 @@ class OutputModule[E <: Env[E]](
                 orderedBlockBftTime,
                 epochCouldAlterOrderingTopology,
               ) =>
+            emitRequestsOrderingStats(metrics, orderedBlockData, orderedBlockBftTime)
+
             // If the epoch could alter the ordering topology as a result of this block data,
             //  the epoch metadata was stored before sending this message.
             currentEpochMetadataStored = epochCouldAlterOrderingTopology
-
-            emitRequestsOrderingStats(metrics, orderedBlockData, orderedBlockBftTime)
 
             // Since consensus will wait for the topology before starting the new epoch, and we send it only when all
             //  blocks, including the last block of the previous epoch, are fully fetched, all blocks can always be read
@@ -650,9 +644,10 @@ class OutputModule[E <: Env[E]](
 
   private def potentiallyAltersSequencersTopology(
       orderedBlockData: CompleteBlockData
-  ): Boolean =
-    metrics.performance.orderingStageLatency.emitOrderingStageLatency(
-      metrics.performance.orderingStageLatency.labels.stage.values.output.Inspection,
+  ): Boolean = {
+    import metrics.performance.orderingStageLatency.*
+    emitOrderingStageLatency(
+      labels.stage.values.output.Inspection,
       () =>
         orderedBlockData.requestsView.toSeq.findLast {
           case tracedOrderingRequest @ Traced(orderingRequest) =>
@@ -664,6 +659,7 @@ class OutputModule[E <: Env[E]](
             )
         }.isDefined,
     )
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.IsInstanceOf"))
   private def fetchNewEpochTopologyIfNeeded(
@@ -829,6 +825,14 @@ class OutputModule[E <: Env[E]](
         val timestamp = BftTime.requestBftTime(blockBftTime, index)
         Traced(OrderedRequest(timestamp.toMicros, tag, body))(tracedRequest.traceContext)
     }.toSeq
+
+  private def emitFetchLatency(start: Instant): Unit = {
+    import metrics.performance.orderingStageLatency.*
+    emitOrderingStageLatency(
+      labels.stage.values.output.Fetch,
+      Some(start),
+    )
+  }
 }
 
 object OutputModule {
@@ -845,13 +849,13 @@ object OutputModule {
       initialLeaderSelectionPolicy: LeaderSelectionPolicy[E],
   )
   @VisibleForTesting
-  private[bftordering] final class PreviousStoredBlock {
+  private[output] final class PreviousStoredBlock {
 
     @SuppressWarnings(Array("org.wartremover.warts.Var"))
     private var blockNumberAndBftTime: Option[(BlockNumber, CantonTimestamp)] = None
 
     @VisibleForTesting
-    private[bftordering] def getBlockNumberAndBftTime =
+    private[output] def getBlockNumberAndBftTime =
       blockNumberAndBftTime
 
     override def toString: String =

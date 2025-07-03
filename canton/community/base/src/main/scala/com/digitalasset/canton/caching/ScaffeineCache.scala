@@ -29,7 +29,9 @@ object ScaffeineCache {
       context: String,
   ): TunnelledAsyncCache[K, V] = {
     val contextWithLoggerName = s"${tracedLogger.underlying.getName}:$context"
-    val asyncCache = cache.buildAsync[K, V]()
+    val cacheWithMetrics =
+      metrics.fold(cache)(m => cache.recordStats(() => new StatsCounterMetrics(m)))
+    val asyncCache = cacheWithMetrics.buildAsync[K, V]()
     metrics.foreach(CaffeineCache.installMetrics(_, asyncCache.underlying.synchronous()))
     new TunnelledAsyncCache[K, V](
       asyncCache,
@@ -51,7 +53,9 @@ object ScaffeineCache {
     // when the tunnelled effect gets logged by `com.github.benmanes.caffeine.cache.LocalAsyncCache.handleCompletion`,
     // which bypasses our logger factories.
     val contextWithLoggerName = s"${tracedLogger.underlying.getName}:$context"
-    val asyncLoadingCache = cache.buildAsyncFuture[K, V](
+    val cacheWithMetrics =
+      metrics.fold(cache)(m => cache.recordStats(() => new StatsCounterMetrics(m)))
+    val asyncLoadingCache = cacheWithMetrics.buildAsyncFuture[K, V](
       loader = key => tunnel.enter(loader(key), contextWithLoggerName),
       allLoader = allLoader.map(loader => keys => tunnel.enter(loader(keys), contextWithLoggerName)),
     )
@@ -86,7 +90,7 @@ object ScaffeineCache {
       tracedLogger: TracedLogger,
       allLoader: TraceContext => Iterable[K] => F[Map[K, V]],
   )(implicit F: Functor[F]): Iterable[Traced[K]] => F[Map[Traced[K], V]] = { tracedKeys =>
-    val traceContext = TraceContext.ofBatch(tracedKeys)(tracedLogger)
+    val traceContext = TraceContext.ofBatch("cache_batch_load")(tracedKeys)(tracedLogger)
     val keys = tracedKeys.map(_.unwrap)
     F.map(allLoader(traceContext)(keys))(_.map { case (key, value) =>
       Traced(key)(traceContext) -> value

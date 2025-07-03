@@ -16,7 +16,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnection,
   SubmissionRequestAmplification,
 }
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code.{
   NamespaceDelegation,
@@ -103,7 +103,7 @@ final class LocalSynchronizerNode(
     for {
       txs <- participantAdminConnection.getIdentityTransactions(
         uid,
-        TopologyStoreId.SynchronizerStore(synchronizerId),
+        TopologyStoreId.Synchronizer(synchronizerId),
       )
       _ <-
         if (containsIdentityTransactions(uid, txs)) {
@@ -112,7 +112,7 @@ final class LocalSynchronizerNode(
         } else
           for {
             _ <- participantAdminConnection.addTopologyTransactions(
-              TopologyStoreId.SynchronizerStore(synchronizerId),
+              TopologyStoreId.Synchronizer(synchronizerId),
               identityTransactions,
               ForceFlag.AlienMember,
             )
@@ -130,7 +130,7 @@ final class LocalSynchronizerNode(
       "identity_transaction",
       show"the identity transactions for $uid are visible",
       participantAdminConnection
-        .getIdentityTransactions(uid, TopologyStoreId.SynchronizerStore(synchronizerId))
+        .getIdentityTransactions(uid, TopologyStoreId.Synchronizer(synchronizerId))
         .map { txs =>
           if (!containsIdentityTransactions(uid, txs)) {
             throw Status.NOT_FOUND
@@ -201,7 +201,7 @@ final class LocalSynchronizerNode(
       mediatorId <- mediatorAdminConnection.getMediatorId
       identity <- mediatorAdminConnection.getIdentityTransactions(
         mediatorId.uid,
-        TopologyStoreId.AuthorizedStore,
+        TopologyStoreId.Authorized,
       )
       _ <- addIdentityTransactions(
         "mediator",
@@ -336,7 +336,7 @@ final class LocalSynchronizerNode(
       sequencerId <- sequencerAdminConnection.getSequencerId
       identity <- sequencerAdminConnection.getIdentityTransactions(
         sequencerId.uid,
-        TopologyStoreId.AuthorizedStore,
+        TopologyStoreId.Authorized,
       )
       _ <- addIdentityTransactions(
         "sequencer",

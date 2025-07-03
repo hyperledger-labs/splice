@@ -82,10 +82,13 @@ import com.daml.ledger.api.v2.interactive.interactive_submission_service.{
   ExecuteSubmissionResponse,
   GetPreferredPackageVersionRequest,
   GetPreferredPackageVersionResponse,
+  GetPreferredPackagesRequest,
+  GetPreferredPackagesResponse,
   HashingSchemeVersion,
   InteractiveSubmissionServiceGrpc,
   MinLedgerTime,
   PackagePreference,
+  PackageVettingRequirement,
   PartySignatures,
   PrepareSubmissionRequest,
   PrepareSubmissionResponse,
@@ -172,11 +175,10 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
 import com.digitalasset.canton.platform.apiserver.execution.CommandStatus
-import com.digitalasset.canton.protocol.{LfContractId, ReassignmentId}
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{LfPackageId, LfPackageName, LfPartyId}
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.field_mask.FieldMask
@@ -1013,7 +1015,7 @@ object LedgerApiCommands {
 
       // Fields shared by AssignedEvent and UnassignedEvent that must be invariant with a batch.
       private type ValidatableEvent = {
-        val source: String; val target: String; val unassignId: String
+        val source: String; val target: String; val reassignmentId: String
       }
 
       import scala.language.reflectiveCalls
@@ -1026,7 +1028,7 @@ object LedgerApiCommands {
           getEvent(hd) match {
             case Some(e) =>
               if (
-                e.unassignId != first.unassignId ||
+                e.reassignmentId != first.reassignmentId ||
                 e.source != first.source ||
                 e.target != first.target
               ) throw new IllegalStateException(s"Invalid event batch elements: $first vs $e")
@@ -1103,7 +1105,7 @@ object LedgerApiCommands {
       override def synchronizerId = target
       def source: String = head.source
       def target: String = head.target
-      def unassignId: String = head.unassignId
+      def reassignmentId: String = head.reassignmentId
     }
 
     final case class UnassignedWrapper(
@@ -1116,11 +1118,7 @@ object LedgerApiCommands {
       override def synchronizerId = source
       def source: String = head.source
       def target: String = head.target
-      def unassignId: String = head.unassignId
-      def reassignmentId: ReassignmentId = ReassignmentId(
-        Source(SynchronizerId.tryFromString(source)),
-        CantonTimestamp.assertFromLong(unassignId.toLong),
-      )
+      def reassignmentId: String = head.reassignmentId
     }
 
     final case class EmptyReassignmentWrapper(
@@ -1355,7 +1353,7 @@ object LedgerApiCommands {
         commandId: String,
         submitter: LfPartyId,
         submissionId: String,
-        unassignId: String,
+        reassignmentId: String,
         source: SynchronizerId,
         target: SynchronizerId,
     ) extends BaseCommand[SubmitReassignmentRequest, SubmitReassignmentResponse, Unit] {
@@ -1371,7 +1369,7 @@ object LedgerApiCommands {
                 ReassignmentCommand(
                   ReassignmentCommand.Command.AssignCommand(
                     AssignCommand(
-                      unassignId = unassignId,
+                      reassignmentId = reassignmentId,
                       source = source.toProtoPrimitive,
                       target = target.toProtoPrimitive,
                     )
@@ -1604,6 +1602,39 @@ object LedgerApiCommands {
           response: GetPreferredPackageVersionResponse
       ): Either[String, Option[PackagePreference]] = Right(response.packagePreference)
     }
+
+    final case class PreferredPackages(
+        packageVettingRequirements: Map[LfPackageName, Set[LfPartyId]],
+        synchronizerIdO: Option[SynchronizerId],
+        vettingValidAt: Option[CantonTimestamp],
+    ) extends BaseCommand[
+          GetPreferredPackagesRequest,
+          GetPreferredPackagesResponse,
+          GetPreferredPackagesResponse,
+        ] {
+
+      override protected def submitRequest(
+          service: InteractiveSubmissionServiceStub,
+          request: GetPreferredPackagesRequest,
+      ): Future[GetPreferredPackagesResponse] =
+        service.getPreferredPackages(request)
+
+      override protected def createRequest(): Either[String, GetPreferredPackagesRequest] =
+        Right(
+          GetPreferredPackagesRequest(
+            packageVettingRequirements =
+              packageVettingRequirements.view.map { case (packageName, parties) =>
+                PackageVettingRequirement(packageName = packageName, parties = parties.toSeq)
+              }.toSeq,
+            synchronizerId = synchronizerIdO.map(_.toProtoPrimitive).getOrElse(""),
+            vettingValidAt = vettingValidAt.map(_.toProtoTimestamp),
+          )
+        )
+
+      override protected def handleResponse(
+          response: GetPreferredPackagesResponse
+      ): Either[String, GetPreferredPackagesResponse] = Right(response)
+    }
   }
 
   object CommandService {
@@ -1679,7 +1710,7 @@ object LedgerApiCommands {
         commandId: String,
         submitter: LfPartyId,
         submissionId: String,
-        unassignId: String,
+        reassignmentId: String,
         source: SynchronizerId,
         target: SynchronizerId,
         eventFormat: Option[EventFormat],
@@ -1701,7 +1732,7 @@ object LedgerApiCommands {
                   ReassignmentCommand(
                     ReassignmentCommand.Command.AssignCommand(
                       AssignCommand(
-                        unassignId = unassignId,
+                        reassignmentId = reassignmentId,
                         source = source.toProtoPrimitive,
                         target = target.toProtoPrimitive,
                       )

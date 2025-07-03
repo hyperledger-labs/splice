@@ -6,7 +6,7 @@ package org.lfdecentralizedtrust.splice.environment
 import com.digitalasset.canton.admin.api.client.commands.SequencerBftAdminCommands
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.PeerEndpointHealthStatus
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 

@@ -48,14 +48,13 @@ import com.digitalasset.canton.ledger.api.validation.{StricterValueValidator, Va
 import com.digitalasset.canton.participant.admin.data.RepairContract
 import com.digitalasset.canton.participant.util.JavaCodegenUtil.ContractIdSyntax
 import com.digitalasset.canton.protocol.*
-import com.digitalasset.canton.protocol.SerializableContract.LedgerCreateTime
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
-import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import com.digitalasset.canton.topology.{PartyId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.{BaseTest, ReassignmentCounter, config, protocol}
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.transaction.Versioned
 import com.digitalasset.daml.lf.transaction.test.TestNodeBuilder
+import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
 import org.scalatest.Assertion
 
 import java.util.UUID
@@ -137,7 +136,7 @@ class ActiveContractsIntegrationTest
     )
 
   private def create(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       signatory: PartyId,
       observer: PartyId,
   )(implicit
@@ -145,7 +144,7 @@ class ActiveContractsIntegrationTest
   ): ContractData = {
     import env.*
     val (contract, createUpdate, _) =
-      IouSyntax.createIouComplete(participant1, Some(synchronizerId))(signatory, observer)
+      IouSyntax.createIouComplete(participant1, Some(psid))(signatory, observer)
 
     val createdEvent = createUpdate.events.head.getCreated
 
@@ -154,7 +153,7 @@ class ActiveContractsIntegrationTest
   }
 
   private def createViaRepair(
-      synchronizerId: SynchronizerId,
+      psid: PhysicalSynchronizerId,
       signatory: PartyId,
       observer: PartyId,
   )(implicit
@@ -197,13 +196,13 @@ class ActiveContractsIntegrationTest
 
     val ledgerCreateTime = env.environment.clock.now
     val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
-      synchronizerId = synchronizerId,
+      psid = psid,
       mediator = MediatorGroupRecipient(MediatorGroupIndex.one),
       transactionUuid = new UUID(1L, 1L),
       viewPosition = ViewPosition(List.empty),
       viewParticipantDataSalt = TestSalt.generateSalt(1),
       createIndex = 0,
-      ledgerCreateTime = LedgerCreateTime(ledgerCreateTime),
+      ledgerCreateTime = CreationTime.CreatedAt(ledgerCreateTime.toLf),
       metadata = contractMetadata,
       suffixedContractInstance = ExampleTransactionFactory.asSerializableRaw(contractInst),
       cantonContractIdVersion,
@@ -224,7 +223,7 @@ class ActiveContractsIntegrationTest
     )
 
     val repairContract = RepairContract(
-      synchronizerId,
+      psid,
       contract = SerializableContract(
         contractId = contractId,
         contractInstance = createNode.versionedCoinst,
@@ -244,7 +243,7 @@ class ActiveContractsIntegrationTest
     participant1.synchronizers.disconnect_all()
 
     participant1.repair.add(
-      synchronizerId,
+      psid,
       testedProtocolVersion,
       Seq(repairContract),
     )
@@ -271,7 +270,7 @@ class ActiveContractsIntegrationTest
       env: TestConsoleEnvironment
   ): (AssignedWrapper, Completion) =
     assign(
-      unassignId = out.unassignId,
+      reassignmentId = out.reassignmentId,
       source = SynchronizerId.tryFromString(out.source),
       target = SynchronizerId.tryFromString(out.target),
       submittingParty = submitter.toLf,
@@ -828,9 +827,9 @@ class ActiveContractsIntegrationTest
           StateService.getActiveContracts(
             proto.state_service.GetActiveContractsRequest(
               activeAtOffset = bigOffset,
-              filter = Some(getTransactionFilter(List(party1a.toLf))),
+              filter = None,
               verbose = false,
-              eventFormat = None,
+              eventFormat = Some(getEventFormat(List(party1a.toLf))),
             )
           )
         )
@@ -856,11 +855,11 @@ class ActiveContractsIntegrationTest
         resultFilter = _.isUnassignment,
       )
       .collect { case unassigned: UnassignedWrapper =>
-        (unassigned.source, unassigned.unassignId)
+        (unassigned.source, unassigned.reassignmentId)
       }
       .loneElement
 
-    unassignedUniqueId shouldBe (out.source, out.unassignId)
+    unassignedUniqueId shouldBe (out.source, out.reassignmentId)
   }
 }
 

@@ -42,7 +42,7 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerReader.ReadState
 import com.digitalasset.canton.synchronizer.sequencer.errors.CreateSubscriptionError
 import com.digitalasset.canton.synchronizer.sequencer.store.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
-import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
+import com.digitalasset.canton.topology.{Member, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil.WithKillSwitch
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
@@ -116,18 +116,19 @@ object SequencerReaderConfig {
 
 class SequencerReader(
     config: SequencerReaderConfig,
-    synchronizerId: PhysicalSynchronizerId,
     store: SequencerStore,
     syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
     eventSignaller: EventSignaller,
     topologyClientMember: Member,
-    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     override protected val timeouts: ProcessingTimeout,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging
     with FlagCloseable
     with HasCloseContext {
+
+  private val psid = syncCryptoApi.psid
+  private val protocolVersion: ProtocolVersion = psid.protocolVersion
 
   def readV2(member: Member, requestedTimestampInclusive: Option[CantonTimestamp])(implicit
       traceContext: TraceContext
@@ -264,21 +265,22 @@ class SequencerReader(
         registeredTopologyClientMember.memberId,
         loggerFactoryForMember,
       )
+      val initialReadState = ReadState(
+        member,
+        registeredMember.memberId,
+        // This is a "reading watermark" meaning that "we have read up to and including this timestamp",
+        // so if we want to grab the event exactly at timestampInclusive, we do -1 here
+        nextReadTimestamp = readFromTimestampInclusive
+          .map(_.immediatePredecessor)
+          .getOrElse(
+            memberOnboardingTxSequencingTime
+          ),
+        nextPreviousEventTimestamp = previousEventTimestamp,
+        latestTopologyClientRecipientTimestamp = latestTopologyClientRecipientTimestamp.some,
+      )
       reader.from(
         event => requestedTimestampInclusive.exists(event.unvalidatedEvent.timestamp < _),
-        ReadState(
-          member,
-          registeredMember.memberId,
-          // This is a "reading watermark" meaning that "we have read up to and including this timestamp",
-          // so if we want to grab the event exactly at timestampInclusive, we do -1 here
-          nextReadTimestamp = readFromTimestampInclusive
-            .map(_.immediatePredecessor)
-            .getOrElse(
-              memberOnboardingTxSequencingTime
-            ),
-          nextPreviousEventTimestamp = previousEventTimestamp,
-          latestTopologyClientRecipientTimestamp = latestTopologyClientRecipientTimestamp.some,
-        ),
+        initialReadState,
       )
     })
 
@@ -527,7 +529,7 @@ class SequencerReader(
             DeliverError.create(
               previousTimestamp,
               unvalidatedEvent.timestamp,
-              synchronizerId,
+              psid,
               unvalidatedEvent.event.messageId,
               error,
               protocolVersion,
@@ -540,7 +542,7 @@ class SequencerReader(
             Deliver.create(
               previousTimestamp,
               unvalidatedEvent.timestamp,
-              synchronizerId,
+              psid,
               None,
               emptyBatch,
               None,
@@ -740,6 +742,20 @@ class SequencerReader(
             x
           }
           for {
+            topologySnapshot <- topologySnapshotO.fold(
+              SyncCryptoClient
+                .getSnapshotForTimestamp(
+                  syncCryptoApi,
+                  timestamp,
+                  topologyClientTimestampBeforeO,
+                  protocolVersion,
+                )
+                .map(_.ipsSnapshot)
+            )(FutureUnlessShutdown.pure)
+            upgradeTimeO <- topologySnapshot.isSynchronizerUpgradeOngoing()
+            isEventBeforeUpgradeTime = upgradeTimeO.forall { case (_, upgradeTime) =>
+              timestamp < upgradeTime
+            }
             resolvedGroupAddresses <- {
               groupRecipients match {
                 case x if x.isEmpty =>
@@ -751,22 +767,10 @@ class SequencerReader(
                     Map[GroupRecipient, Set[Member]](AllMembersOfSynchronizer -> Set(member))
                   )
                 case _ =>
-                  for {
-                    topologySnapshot <- topologySnapshotO.fold(
-                      SyncCryptoClient
-                        .getSnapshotForTimestamp(
-                          syncCryptoApi,
-                          timestamp,
-                          topologyClientTimestampBeforeO,
-                          protocolVersion,
-                        )
-                        .map(_.ipsSnapshot)
-                    )(FutureUnlessShutdown.pure)
-                    resolvedGroupAddresses <- GroupAddressResolver.resolveGroupsToMembers(
-                      groupRecipients,
-                      topologySnapshot,
-                    )
-                  } yield resolvedGroupAddresses
+                  GroupAddressResolver.resolveGroupsToMembers(
+                    groupRecipients,
+                    topologySnapshot,
+                  )
               }
             }
             memberGroupRecipients = resolvedGroupAddresses.collect {
@@ -774,10 +778,10 @@ class SequencerReader(
             }.toSet
           } yield {
             val filteredBatch = Batch.filterClosedEnvelopesFor(batch, member, memberGroupRecipients)
-            Deliver.create[ClosedEnvelope](
+            val deliver = Deliver.create[ClosedEnvelope](
               previousTimestamp,
               timestamp,
-              synchronizerId,
+              psid,
               messageIdO,
               filteredBatch,
               topologyTimestampO,
@@ -785,6 +789,22 @@ class SequencerReader(
               // deliver events should only retain the traffic state for the sender's subscription
               trafficReceiptForNonSequencerSender(sender, trafficReceiptO),
             )
+            if (isEventBeforeUpgradeTime || TimeProof.isTimeProofDeliver(deliver)) deliver
+            else {
+              logger.info(
+                "Delivering an empty event instead of the original, because it was sequenced at or after the upgrade time."
+              )
+              Deliver.create[ClosedEnvelope](
+                previousTimestamp,
+                timestamp,
+                psid,
+                None,
+                emptyBatch,
+                None,
+                protocolVersion,
+                None,
+              )
+            }
           }
 
         case ReceiptStoreEvent(
@@ -798,7 +818,7 @@ class SequencerReader(
             Deliver.create[ClosedEnvelope](
               previousTimestamp,
               timestamp,
-              synchronizerId,
+              psid,
               Some(messageId),
               emptyBatch,
               topologyTimestampO,
@@ -814,7 +834,7 @@ class SequencerReader(
             DeliverError.create(
               previousTimestamp,
               timestamp,
-              synchronizerId,
+              psid,
               messageId,
               status,
               protocolVersion,

@@ -17,7 +17,7 @@ import org.lfdecentralizedtrust.splice.migration.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.SynchronizerId
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -88,7 +88,7 @@ class DomainMigrationDumpGenerator(
       participantId <- participantConnection.getId()
       parties <- participantConnection
         .listPartyToParticipant(
-          store = TopologyStoreId.SynchronizerStore(domain).some,
+          store = TopologyStoreId.Synchronizer(domain).some,
           filterParticipant = participantId.toProtoPrimitive,
         )
         .map(_.map(_.mapping.partyId))

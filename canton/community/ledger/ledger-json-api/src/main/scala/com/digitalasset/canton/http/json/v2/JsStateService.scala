@@ -19,8 +19,8 @@ import com.digitalasset.canton.http.json.v2.JsSchema.{JsCantonError, JsEvent}
 import com.digitalasset.canton.ledger.client.LedgerClient
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Codec
 import io.circe.generic.extras.semiauto.deriveConfiguredCodec
-import io.circe.{Codec, Decoder, Encoder}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.Flow
@@ -29,6 +29,7 @@ import sttp.tapir.generic.auto.*
 import sttp.tapir.json.circe.*
 import sttp.tapir.{AnyEndpoint, CodecFormat, Schema, query, webSocketBody}
 
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class JsStateService(
@@ -121,6 +122,8 @@ class JsStateService(
 
 }
 
+// TODO(#23504) remove deprecation suppression
+@nowarn("cat=deprecation")
 object JsStateService extends DocumentationEndpoints {
   import Endpoints.*
   import JsStateServiceCodecs.*
@@ -192,7 +195,7 @@ object JsContractEntry {
 final case class JsAssignedEvent(
     source: String,
     target: String,
-    unassignId: String,
+    reassignmentId: String,
     submitter: String,
     reassignmentCounter: Long,
     createdEvent: JsEvent.CreatedEvent,
@@ -203,6 +206,8 @@ final case class JsGetActiveContractsResponse(
     contractEntry: JsContractEntry,
 )
 
+// TODO(#23504) remove deprecation suppression
+@nowarn("cat=deprecation")
 object JsStateServiceCodecs {
 
   import JsSchema.*
@@ -230,11 +235,6 @@ object JsStateServiceCodecs {
   implicit val connectedSynchronizerRW
       : Codec[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
     deriveRelaxedCodec
-  implicit val participantPermissionEncoder: Encoder[state_service.ParticipantPermission] =
-    stringEncoderForEnum()
-
-  implicit val participantPermissionDecoder: Decoder[state_service.ParticipantPermission] =
-    stringDecoderForEnum()
 
   implicit val getLedgerEndRequestRW: Codec[state_service.GetLedgerEndRequest] = deriveRelaxedCodec
 
@@ -249,11 +249,10 @@ object JsStateServiceCodecs {
   @SuppressWarnings(Array("org.wartremover.warts.Product", "org.wartremover.warts.Serializable"))
   implicit val jsContractEntrySchema: Schema[JsContractEntry] = Schema.oneOfWrapped
 
-  implicit val participantPermissionRecognizedSchema
-      : Schema[state_service.ParticipantPermission.Recognized] =
-    Schema.oneOfWrapped
+  implicit val connectedSynchronizerSchema
+      : Schema[state_service.GetConnectedSynchronizersResponse.ConnectedSynchronizer] =
+    Schema.derived
 
-  implicit val participantPermissionSchema: Schema[state_service.ParticipantPermission] =
-    Schema.string
-
+  implicit val getConnectedSynchronizersRequestSchema
+      : Schema[state_service.GetConnectedSynchronizersRequest] = Schema.derived
 }

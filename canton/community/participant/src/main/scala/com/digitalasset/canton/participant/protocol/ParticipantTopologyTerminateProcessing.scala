@@ -15,10 +15,10 @@ import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminate
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.TopologyStore.EffectiveStateChange
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
+import com.digitalasset.canton.topology.transaction.TopologyMapping
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{SequencerCounter, topology}
 
 import scala.concurrent.ExecutionContext
@@ -34,7 +34,6 @@ object ParticipantTopologyTerminateProcessing {
 
 class ParticipantTopologyTerminateProcessing(
     synchronizerId: PhysicalSynchronizerId,
-    protocolVersion: ProtocolVersion, // TODO(#25482) Reduce duplication in parameters
     recordOrderPublisher: RecordOrderPublisher,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
     initialRecordTime: CantonTimestamp,
@@ -57,6 +56,12 @@ class ParticipantTopologyTerminateProcessing(
         effectiveStateChanges <- store.findEffectiveStateChanges(
           fromEffectiveInclusive = effectiveTime.value,
           onlyAtEffective = true,
+          filterTypes = Some(
+            Seq(
+              TopologyMapping.Code.PartyToParticipant,
+              TopologyMapping.Code.SynchronizerTrustCertificate,
+            )
+          ),
         )
         _ = if (effectiveStateChanges.sizeIs > 1)
           logger.error(
@@ -148,6 +153,12 @@ class ParticipantTopologyTerminateProcessing(
       outstandingEffectiveChanges <- store.findEffectiveStateChanges(
         fromEffectiveInclusive = initialRecordTime,
         onlyAtEffective = false,
+        filterTypes = Some(
+          Seq(
+            TopologyMapping.Code.PartyToParticipant,
+            TopologyMapping.Code.SynchronizerTrustCertificate,
+          )
+        ),
       )
       eventFromEffectiveChangeWithInitializationTraceContext =
         (effectiveChange: EffectiveStateChange) =>
@@ -248,11 +259,10 @@ class ParticipantTopologyTerminateProcessing(
       traceContext: TraceContext
   ): Option[EventInfo] =
     TopologyTransactionDiff(
-      synchronizerId = synchronizerId.logical,
+      synchronizerId = synchronizerId,
       oldRelevantState = effectiveStateChange.before.signedTransactions,
       currentRelevantState = effectiveStateChange.after.signedTransactions,
       localParticipantId = participantId,
-      protocolVersion = protocolVersion,
     ).map { case TopologyTransactionDiff(events, updateId, requiresLocalPartyReplication) =>
       EventInfo(
         Update.TopologyTransactionEffective(

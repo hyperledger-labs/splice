@@ -8,7 +8,6 @@ import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.Updat
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.examples.java.iou.Iou
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
@@ -34,7 +33,6 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 }
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
-import com.digitalasset.canton.util.ReassignmentTag.Source
 
 import scala.concurrent.Promise
 
@@ -84,7 +82,7 @@ sealed trait AssignmentBeforeUnassignmentIntegrationTest
     // we disconnect participant2 from the synchronizer in order to no process the unassignment
     participant2.synchronizers.disconnect(daName)
 
-    val unassignId = participant1.ledger_api.commands
+    val reassignmentId = participant1.ledger_api.commands
       .submit_unassign(
         aliceId,
         Seq(contract.id.toLf),
@@ -92,11 +90,11 @@ sealed trait AssignmentBeforeUnassignmentIntegrationTest
         acmeId,
         timeout = None, // not waiting for all the other participants to receive the unassignment
       )
-      .unassignId
+      .reassignmentId
 
     participant1.ledger_api.commands.submit_assign(
       aliceId,
-      unassignId,
+      reassignmentId,
       daId,
       acmeId,
       timeout = None, // not waiting for all the other participants to receive the unassignment
@@ -121,7 +119,7 @@ sealed trait AssignmentBeforeUnassignmentIntegrationTest
     // unassignment succeeded on participant2
     updates.headOption.value match {
       case unassigned: UpdateService.UnassignedWrapper =>
-        unassigned.unassignId shouldBe unassignId
+        unassigned.reassignmentId shouldBe reassignmentId
       case other =>
         fail(s"Expected a reassignment event but got $other")
     }
@@ -169,7 +167,7 @@ sealed trait AssignmentBeforeUnassignmentIntegrationTest
 
     val unassign1 = updates.headOption.value match {
       case unassigned: UpdateService.UnassignedWrapper =>
-        unassigned.unassignId
+        unassigned.reassignmentId
       case other =>
         fail(s"Expected an unassignment event but got $other")
     }
@@ -188,8 +186,7 @@ sealed trait AssignmentBeforeUnassignmentIntegrationTest
       .value
       .reassignmentStore
 
-    val reassignmentId =
-      ReassignmentId(Source(daId), CantonTimestamp.assertFromLong(unassign1.toLong))
+    val reassignmentId = ReassignmentId.tryCreate(unassign1)
 
     reassignmentStoreP2.findReassignmentEntry(reassignmentId).futureValueUS shouldBe Left(
       UnknownReassignmentId(reassignmentId)

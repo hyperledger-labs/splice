@@ -339,7 +339,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
 
   protected def appInitStepSync[T](
       description: String
-  )(f: => T): T = TraceContext.withNewTraceContext(implicit tc => {
+  )(f: => T): T = TraceContext.withNewTraceContext(description)(implicit tc => {
     logger.info(s"$appInitMessage: $description started")(tc)
     // See note about trace context in appInitStep
     Try(f) match {

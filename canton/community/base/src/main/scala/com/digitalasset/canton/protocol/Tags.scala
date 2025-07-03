@@ -4,16 +4,17 @@
 package com.digitalasset.canton.protocol
 
 import cats.Order
-import cats.syntax.bifunctor.*
-import com.digitalasset.canton.crypto.Hash
+import cats.syntax.either.*
+import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{DeserializationError, HasCryptographicEvidence}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.util.ByteStringUtil
-import com.digitalasset.canton.util.ReassignmentTag.Source
-import com.digitalasset.canton.{LedgerTransactionId, ProtoDeserializationError}
+import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
+import com.digitalasset.canton.{LedgerTransactionId, ProtoDeserializationError, ReassignmentCounter}
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import slick.jdbc.{GetResult, SetParameter}
@@ -184,36 +185,56 @@ object RequestId {
     CantonTimestamp.fromProtoPrimitive(requestIdP).map(RequestId(_))
 }
 
-/** A reassignment is identified by the source synchronizer and the sequencer timestamp on the
-  * unassignment request.
-  */
-final case class ReassignmentId(
-    // TODO(#25483) This should be physical
-    sourceSynchronizer: Source[SynchronizerId],
-    unassignmentTs: CantonTimestamp,
-) extends PrettyPrinting {
-  def toProtoV30: v30.ReassignmentId =
-    v30.ReassignmentId(
-      sourceSynchronizerId = sourceSynchronizer.unwrap.toProtoPrimitive,
-      timestamp = unassignmentTs.toProtoPrimitive,
-    )
+final case class ReassignmentId private (private val id: String) extends PrettyPrinting {
+  def toProtoV30: v30.ReassignmentId = v30.ReassignmentId(id = toProtoPrimitive)
 
-  override protected def pretty: Pretty[ReassignmentId] = prettyOfClass(
-    param("ts", _.unassignmentTs),
-    param("source", _.sourceSynchronizer),
-  )
+  @VisibleForTesting
+  override protected def pretty: Pretty[ReassignmentId] =
+    prettyOfClass(unnamedParam(_.id.doubleQuoted))
+
+  def toProtoPrimitive: String = id
 }
 
 object ReassignmentId {
-  def fromProtoV30(reassignmentIdP: v30.ReassignmentId): ParsingResult[ReassignmentId] =
-    reassignmentIdP match {
-      case v30.ReassignmentId(sourceSynchronizerP, requestTimestampP) =>
-        for {
-          sourceSynchronizerId <- SynchronizerId.fromProtoPrimitive(
-            sourceSynchronizerP,
-            "ReassignmentId.source_synchronizer_id",
-          )
-          requestTimestamp <- CantonTimestamp.fromProtoPrimitive(requestTimestampP)
-        } yield ReassignmentId(Source(sourceSynchronizerId), requestTimestamp)
+  val isHex = "0123456789abcdefABCDEF".toSet
+
+  // TODO(#25483) The two synchronizer IDs should be physical
+  def apply(
+      source: Source[SynchronizerId],
+      target: Target[SynchronizerId],
+      unassignmentTs: CantonTimestamp,
+      contractIdCounters: Iterable[(LfContractId, ReassignmentCounter)],
+  ): ReassignmentId = {
+    val builder = Hash.build(HashPurpose.ReassignmentId, HashAlgorithm.Sha256)
+    builder.add(source.unwrap.toProtoPrimitive)
+    builder.add(target.unwrap.toProtoPrimitive)
+    builder.add(unassignmentTs.toProtoPrimitive)
+    contractIdCounters.foreach { case (contractId, reassignmentCounter) =>
+      builder.add(contractId.coid)
+      builder.add(reassignmentCounter.toProtoPrimitive)
     }
+    ReassignmentId(builder.finish().toHexString)
+  }
+
+  def fromProtoV30(reassignmentIdP: v30.ReassignmentId): ParsingResult[ReassignmentId] =
+    fromProtoPrimitive(reassignmentIdP.id)
+
+  def fromProtoPrimitive(str: String): ParsingResult[ReassignmentId] =
+    fromString(str).leftMap(ProtoDeserializationError.StringConversionError(_))
+
+  def tryCreate(str: String): ReassignmentId =
+    fromString(str).valueOr(err => throw new IllegalArgumentException(err))
+
+  // Provides basic checking that the string is a valid reassignment id.
+  // Our reassignment ids are always built from a hex string.
+  // Validation of whether a particular reassignment id matches the corresponding reassignment data
+  // is done separately, by comparing the value created from `apply` with the data it comes with.
+  private def fromString(str: String): Either[String, ReassignmentId] =
+    if (str.forall(isHex)) Right(ReassignmentId(str))
+    else Left(s"invalid ReassignmentId: $str")
+
+  implicit val getResultReassignmentId: GetResult[ReassignmentId] =
+    GetResult(r => tryCreate(r.nextString()))
+  implicit val setResultReassignmentId: SetParameter[ReassignmentId] = (v, pp) =>
+    pp >> v.toProtoPrimitive
 }

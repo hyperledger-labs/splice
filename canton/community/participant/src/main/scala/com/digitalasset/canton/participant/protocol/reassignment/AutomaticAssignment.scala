@@ -75,7 +75,7 @@ private[participant] object AutomaticAssignment {
         )
         submissionResult <- reassignmentCoordination
           .assign(
-            targetSynchronizer.map(_.logical),
+            targetSynchronizer,
             ReassignmentSubmitterMetadata(
               assignmentSubmitter,
               participantId,
@@ -138,11 +138,11 @@ private[participant] object AutomaticAssignment {
             )
             for {
               _ <- reassignmentCoordination
-                .awaitSynchronizerTime(targetSynchronizer.map(_.logical), exclusivityLimit)
+                .awaitSynchronizerTime(targetSynchronizer, exclusivityLimit)
                 .mapK(FutureUnlessShutdown.outcomeK)
               _ <- reassignmentCoordination
                 .awaitTimestamp(
-                  targetSynchronizer.map(_.logical),
+                  targetSynchronizer,
                   targetStaticSynchronizerParameters,
                   exclusivityLimit,
                   FutureUnlessShutdown.pure(
@@ -155,9 +155,8 @@ private[participant] object AutomaticAssignment {
                 case NoReassignmentData(_, ReassignmentCompleted(_, _)) =>
                   Either.unit
                 // Filter out the case that the participant has disconnected from the target synchronizer in the meantime.
-                case UnknownSynchronizer(synchronizer, _)
-                    // TODO(#25483) Check this comparison (logical/physical)
-                    if synchronizer == targetSynchronizer.unwrap.logical =>
+                case UnknownPhysicalSynchronizer(synchronizer, _)
+                    if synchronizer == targetSynchronizer.unwrap =>
                   Either.unit
                 case SynchronizerNotReady(synchronizer, _)
                     if synchronizer == targetSynchronizer.unwrap =>
@@ -175,7 +174,7 @@ private[participant] object AutomaticAssignment {
     for {
       targetIps <- reassignmentCoordination
         .cryptoSnapshot(
-          targetSynchronizer.map(_.logical),
+          targetSynchronizer,
           targetStaticSynchronizerParameters,
           t0,
         )

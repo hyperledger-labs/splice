@@ -25,7 +25,7 @@ val domainParametersConfig = SynchronizerParametersConfig(
 
 def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
-    .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v34)
+    .toStaticSynchronizerParameters(sequencer.config.crypto, ProtocolVersion.v34, NonNegativeInt.zero)
     .map(StaticSynchronizerParameters(_))
     .getOrElse(sys.error("whatever"))
 

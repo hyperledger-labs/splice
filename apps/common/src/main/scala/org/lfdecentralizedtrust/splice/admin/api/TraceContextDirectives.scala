@@ -30,7 +30,7 @@ object TraceContextDirectives {
           withTraceResponseHeaders(inner, traceContext, ctx)
         }
         .getOrElse {
-          TraceContext.withNewTraceContext { traceContext =>
+          TraceContext.withNewTraceContext("no_w3c_trace_context") { traceContext =>
             withTraceResponseHeaders(inner, traceContext, ctx)
           }
         }

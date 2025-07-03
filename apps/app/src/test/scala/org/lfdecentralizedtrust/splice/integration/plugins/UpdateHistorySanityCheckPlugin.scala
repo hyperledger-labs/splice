@@ -58,7 +58,7 @@ class UpdateHistorySanityCheckPlugin(
       config: SpliceConfig,
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
-    TraceContext.withNewTraceContext { implicit tc =>
+    TraceContext.withNewTraceContext("beforeEnvironmentDestroyed") { implicit tc =>
       // A scan might not be initialized if the test uses `manualStart` and it wasn't ever started.
       val initializedScans = environment.scans.local.filter(scan => scan.is_initialized)
 

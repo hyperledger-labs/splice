@@ -44,7 +44,7 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
 
   private val synchronizerCrypto = TestingTopology(synchronizerParameters = List.empty)
     .build(loggerFactory)
-    .forOwnerAndSynchronizer(DefaultTestIdentities.sequencerId, synchronizerId.logical)
+    .forOwnerAndSynchronizer(DefaultTestIdentities.sequencerId, synchronizerId)
 
   private val dummySignature = SymbolicCrypto.emptySignature
 
@@ -54,18 +54,16 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
   private lazy val topoTx: TopologyTransactionsBroadcast = TopologyTransactionsBroadcast(
     synchronizerId,
     List(factory.ns1k1_k1),
-    testedProtocolVersion,
   )
 
   private def mkSetTrafficPurchased(
       signatureO: Option[Signature] = None
   ): SignedProtocolMessage[SetTrafficPurchasedMessage] = {
-    val setTrafficPurchased = SetTrafficPurchasedMessage(
+    val setTrafficPurchased: SetTrafficPurchasedMessage = SetTrafficPurchasedMessage(
       participantId,
       PositiveInt.one,
       NonNegativeLong.tryCreate(100),
       synchronizerId,
-      testedProtocolVersion,
     )
 
     signatureO match {

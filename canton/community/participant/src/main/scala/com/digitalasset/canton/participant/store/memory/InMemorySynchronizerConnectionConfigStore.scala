@@ -13,6 +13,7 @@ import com.digitalasset.canton.discard.Implicits.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigStore.{
+  Active,
   AtMostOnePhysicalActive,
   ConfigAlreadyExists,
   Error,
@@ -25,6 +26,7 @@ import com.digitalasset.canton.participant.store.SynchronizerConnectionConfigSto
 import com.digitalasset.canton.participant.store.{
   StoredSynchronizerConnectionConfig,
   SynchronizerConnectionConfigStore,
+  SynchronizerPredecessor,
 }
 import com.digitalasset.canton.participant.synchronizer.{
   SynchronizerAliasResolution,
@@ -58,6 +60,7 @@ class InMemorySynchronizerConnectionConfigStore(
       config: SynchronizerConnectionConfig,
       status: SynchronizerConnectionConfigStore.Status,
       configuredPSId: ConfiguredPhysicalSynchronizerId,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, Unit] = {
@@ -67,6 +70,8 @@ class InMemorySynchronizerConnectionConfigStore(
     val res = blocking {
       synchronized {
         for {
+          _ <- predecessorCompatibilityCheck(configuredPSId, synchronizerPredecessor)
+
           _ <- configuredPSId match {
             case KnownPhysicalSynchronizerId(psid) =>
               for {
@@ -77,10 +82,17 @@ class InMemorySynchronizerConnectionConfigStore(
             case UnknownPhysicalSynchronizerId => ().asRight
           }
 
+          _ <- checkStatusConsistent(configuredPSId, alias, status)
+
           _ <- configuredSynchronizerMap
             .putIfAbsent(
               (config.synchronizerAlias, configuredPSId),
-              StoredSynchronizerConnectionConfig(config, status, configuredPSId),
+              StoredSynchronizerConnectionConfig(
+                config,
+                status,
+                configuredPSId,
+                synchronizerPredecessor,
+              ),
             )
             .fold(Either.unit[ConfigAlreadyExists])(existingConfig =>
               Either.cond(
@@ -95,6 +107,27 @@ class InMemorySynchronizerConnectionConfigStore(
 
     EitherT.fromEither[FutureUnlessShutdown](res)
   }
+
+  // Ensure there is no other active configuration
+  private def checkStatusConsistent(
+      psid: ConfiguredPhysicalSynchronizerId,
+      alias: SynchronizerAlias,
+      status: SynchronizerConnectionConfigStore.Status,
+  ): Either[Error, Unit] =
+    if (!status.isActive) Either.right(())
+    else {
+      val existingPSId = configuredSynchronizerMap.collectFirst {
+        case ((`alias`, configuredPsid), config) if config.status == Active =>
+          configuredPsid
+      }
+      existingPSId match {
+        case Some(`psid`) | None => Either.right(())
+        case Some(otherConfiguredPSId) =>
+          Either.left(
+            AtMostOnePhysicalActive(alias, Set(otherConfiguredPSId, psid)): Error
+          )
+      }
+    }
 
   // Check that a new PSId is consistent with stored IDs for that alias
   private def checkLogicalIdConsistent(
@@ -139,7 +172,7 @@ class InMemorySynchronizerConnectionConfigStore(
       config: SynchronizerConnectionConfig,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, MissingConfigForSynchronizer, Unit] =
+  ): EitherT[FutureUnlessShutdown, Error, Unit] =
     EitherT.fromEither(
       replaceInternal(config.synchronizerAlias, configuredPSId, _.copy(config = config))
     )
@@ -207,29 +240,13 @@ class InMemorySynchronizerConnectionConfigStore(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, Error, Unit] = {
 
-    def ensureSinglePhysicalActive(): Either[Error, Unit] =
-      for {
-        configs <- getAllFor(alias)
-
-        _ <- configs
-          .find(_.configuredPSId == configuredPSId)
-          .toRight(MissingConfigForSynchronizer(alias, configuredPSId))
-
-        active = configs.collect {
-          case config if config.status.isActive => config.configuredPSId
-        }.toSet
-        activeNew = active + configuredPSId
-
-        _ <- Either.cond(activeNew.sizeIs == 1, (), AtMostOnePhysicalActive(alias, activeNew))
-      } yield ()
-
     val res = blocking {
       synchronized {
         for {
-          _ <-
-            if (status.isActive) ensureSinglePhysicalActive()
-            else ().asRight
-
+          // ensure that there is an existing config in the store
+          _ <- get(alias, configuredPSId)
+          // check that there isn't already a different active configuration
+          _ <- checkStatusConsistent(configuredPSId, alias, status)
           _ <- replaceInternal(alias, configuredPSId, _.copy(status = status)).leftWiden[Error]
         } yield ()
       }
@@ -275,6 +292,11 @@ class InMemorySynchronizerConnectionConfigStore(
 
             // Check that there exist one entry for this alias without psid
             config <- get(alias, UnknownPhysicalSynchronizerId)
+
+            _ <- predecessorCompatibilityCheck(
+              KnownPhysicalSynchronizerId(psid),
+              config.predecessor,
+            )
 
           } yield {
             configuredSynchronizerMap.addOne(

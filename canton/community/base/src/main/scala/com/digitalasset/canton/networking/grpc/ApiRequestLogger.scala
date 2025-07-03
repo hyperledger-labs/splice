@@ -37,14 +37,16 @@ class ApiRequestLogger(
       headers: Metadata,
       next: ServerCallHandler[ReqT, RespT],
   ): ServerCall.Listener[ReqT] = {
-    val requestTraceContext: TraceContext = TraceContextGrpc.inferServerRequestTraceContext
+    val method = call.getMethodDescriptor.getFullMethodName
+    val shortMethod = show"${method.readableLoggerName(config.maxMethodLength)}"
+    val requestTraceContext: TraceContext =
+      TraceContextGrpc.inferServerRequestTraceContext(shortMethod)
 
     val sender = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR).toString)
       .getOrElse("unknown sender")
-    val method = call.getMethodDescriptor.getFullMethodName
 
     def createLogMessage(message: String): String =
-      show"Request ${method.readableLoggerName(config.maxMethodLength)} by ${sender.unquoted}: ${message.unquoted}"
+      show"Request $shortMethod by ${sender.unquoted}: ${message.unquoted}"
 
     logger.trace(createLogMessage(s"received headers ${stringOfMetadata(headers)}"))(
       requestTraceContext
@@ -238,6 +240,15 @@ class ApiRequestLoggerBase(
     } else {
       status
     }
+
+  protected def inferRequestTraceContext: TraceContext = {
+    val grpcTraceContext = TraceContextGrpc.fromGrpcContext
+    if (grpcTraceContext.traceId.isDefined) {
+      grpcTraceContext
+    } else {
+      TraceContext.withNewTraceContext("logger")(identity)
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   protected def traceContextOfMessage[A](message: Any): Option[TraceContext] = {

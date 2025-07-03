@@ -39,12 +39,12 @@ object TraceContextGrpc {
     stub.withOption(TraceContextCallOptionKey, traceContext)
   }
 
-  def inferServerRequestTraceContext: TraceContext = {
+  def inferServerRequestTraceContext(span: String): TraceContext = {
     val grpcTraceContext = TraceContextGrpc.fromGrpcContext
     if (grpcTraceContext.traceId.isDefined) {
       grpcTraceContext
     } else {
-      TraceContext.withNewTraceContext(identity)
+      TraceContext.withNewTraceContext(span)(identity)
     }
   }
 
@@ -70,6 +70,9 @@ object TraceContextGrpc {
     ): ClientCall[ReqT, RespT] =
       new SimpleForwardingClientCall[ReqT, RespT](next.newCall(method, callOptions)) {
 
+        // We can't use ShowUtil.readableLoggerName as it introduces a circular dependency
+        val shortMethod = method.getFullMethodName.take(50)
+
         override def start(
             responseListener: ClientCall.Listener[RespT],
             headers: Metadata,
@@ -77,7 +80,7 @@ object TraceContextGrpc {
           // Do not create a fresh trace-context for the default clientInterceptor, as there is no log message
           // to communicate the new trace-id; and this matches how the interceptor has been used so far.
           val traceContext = inferCallerTraceContext(callOptions).getOrElse(
-            TraceContext.withNewTraceContext(identity)
+            TraceContext.withNewTraceContext(shortMethod)(identity)
           )
 
           W3CTraceContext.injectIntoGrpcMetadata(traceContext, headers)

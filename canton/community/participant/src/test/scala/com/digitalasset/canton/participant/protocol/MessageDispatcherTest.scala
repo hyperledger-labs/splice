@@ -82,7 +82,7 @@ trait MessageDispatcherTest {
 
   import MessageDispatcherTest.*
 
-  private val synchronizerId =
+  private val psid =
     SynchronizerId.tryFromString("messageDispatcher::synchronizer").toPhysical
   private val testTopologyTimestamp = CantonTimestamp.Epoch
   private val participantId =
@@ -118,7 +118,6 @@ trait MessageDispatcherTest {
   object Fixture {
     def mk(
         mkMd: (
-            ProtocolVersion,
             PhysicalSynchronizerId,
             ParticipantId,
             RequestTracker,
@@ -257,8 +256,7 @@ trait MessageDispatcherTest {
       val connectedSynchronizerMetrics = ParticipantTestMetrics.synchronizer
 
       val messageDispatcher = mkMd(
-        testedProtocolVersion,
-        synchronizerId,
+        psid,
         participantId,
         requestTracker,
         protocolProcessors,
@@ -298,7 +296,7 @@ trait MessageDispatcherTest {
     Deliver.create(
       None,
       ts,
-      synchronizerId,
+      psid,
       messageId,
       batch,
       topologyTimestampO,
@@ -325,7 +323,7 @@ trait MessageDispatcherTest {
       ViewHash(TestHash.digest(9000)),
       sessionKeys = sessionKeyMapTest,
       encryptedTestView,
-      synchronizerId,
+      psid,
       SymmetricKeyScheme.Aes128Gcm,
       testedProtocolVersion,
     )
@@ -337,7 +335,7 @@ trait MessageDispatcherTest {
       viewHash = ViewHash(TestHash.digest(9001)),
       sessionKeys = sessionKeyMapTest,
       encryptedView = encryptedOtherTestView,
-      synchronizerId = synchronizerId,
+      synchronizerId = psid,
       viewEncryptionScheme = SymmetricKeyScheme.Aes128Gcm,
       protocolVersion = testedProtocolVersion,
     )
@@ -346,12 +344,11 @@ trait MessageDispatcherTest {
   private val testMediatorResult =
     SignedProtocolMessage.from(
       ConfirmationResultMessage.create(
-        synchronizerId,
+        psid,
         TestViewType,
         requestId,
         TestHash.dummyRootHash,
         Verdict.Approve(testedProtocolVersion),
-        testedProtocolVersion,
       ),
       testedProtocolVersion,
       dummySignature,
@@ -359,12 +356,11 @@ trait MessageDispatcherTest {
   private val otherTestMediatorResult =
     SignedProtocolMessage.from(
       ConfirmationResultMessage.create(
-        synchronizerId,
+        psid,
         OtherTestViewType,
         requestId,
         TestHash.dummyRootHash,
         Verdict.Approve(testedProtocolVersion),
-        testedProtocolVersion,
       ),
       testedProtocolVersion,
       dummySignature,
@@ -372,7 +368,6 @@ trait MessageDispatcherTest {
 
   protected def messageDispatcher(
       mkMd: (
-          ProtocolVersion,
           PhysicalSynchronizerId,
           ParticipantId,
           RequestTracker,
@@ -401,13 +396,12 @@ trait MessageDispatcherTest {
     val factory =
       new TopologyTransactionTestFactory(loggerFactory, initEc = executionContext)
     val idTx = TopologyTransactionsBroadcast(
-      synchronizerId,
+      psid,
       List(factory.ns1k1_k1),
-      testedProtocolVersion,
     )
 
     val rawCommitment = mock[AcsCommitment]
-    when(rawCommitment.synchronizerId).thenReturn(synchronizerId)
+    when(rawCommitment.synchronizerId).thenReturn(psid)
     when(rawCommitment.representativeProtocolVersion).thenReturn(
       AcsCommitment.protocolVersionRepresentativeFor(testedProtocolVersion)
     )
@@ -427,12 +421,11 @@ trait MessageDispatcherTest {
     val MalformedMediatorConfirmationRequestResult =
       SignedProtocolMessage.from(
         ConfirmationResultMessage.create(
-          synchronizerId,
+          psid,
           TestViewType,
           RequestId(CantonTimestamp.MinValue),
           TestHash.dummyRootHash,
           reject,
-          testedProtocolVersion,
         ),
         testedProtocolVersion,
         dummySignature,
@@ -562,7 +555,7 @@ trait MessageDispatcherTest {
         val prefix = TimeProof.timeEventMessageIdPrefix
         val deliver = SequencerTestUtils.mockDeliver(
           timestamp = ts,
-          synchronizerId = synchronizerId,
+          synchronizerId = psid,
           messageId = Some(MessageId.tryCreate(s"$prefix testing")),
         )
         // Check that we're calling the topology manager before we're publishing the deliver event and ticking the
@@ -583,8 +576,7 @@ trait MessageDispatcherTest {
             participantId,
             PositiveInt.one,
             NonNegativeLong.tryCreate(1000),
-            synchronizerId,
-            testedProtocolVersion,
+            psid,
           ),
           testedProtocolVersion,
           dummySignature,
@@ -798,15 +790,14 @@ trait MessageDispatcherTest {
           ViewHash(TestHash.digest(9002)),
           sessionKeys = sessionKeyMapTest,
           encryptedUnknownTestView,
-          synchronizerId,
+          psid,
           SymmetricKeyScheme.Aes128Gcm,
           testedProtocolVersion,
         )
       val rootHashMessage =
         RootHashMessage(
           rootHash(1),
-          synchronizerId,
-          testedProtocolVersion,
+          psid,
           UnknownTestViewType,
           testTopologyTimestamp,
           SerializedRootHashMessagePayload.empty,
@@ -841,12 +832,11 @@ trait MessageDispatcherTest {
       val unknownTestMediatorResult =
         SignedProtocolMessage.from(
           ConfirmationResultMessage.create(
-            synchronizerId,
+            psid,
             UnknownTestViewType,
             requestId,
             TestHash.dummyRootHash,
             Verdict.Approve(testedProtocolVersion),
-            testedProtocolVersion,
           ),
           testedProtocolVersion,
           dummySignature,
@@ -883,7 +873,6 @@ trait MessageDispatcherTest {
       val txForeignSynchronizer = TopologyTransactionsBroadcast(
         SynchronizerId.tryFromString("foo::bar").toPhysical,
         List(factory.ns1k1_k1),
-        testedProtocolVersion,
       )
       val event =
         mkDeliver(
@@ -927,8 +916,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            synchronizerId,
-            testedProtocolVersion,
+            psid,
             viewType,
             testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
@@ -954,8 +942,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            synchronizerId,
-            testedProtocolVersion,
+            psid,
             viewType,
             testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
@@ -1068,8 +1055,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            synchronizerId,
-            testedProtocolVersion,
+            psid,
             viewType,
             testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
@@ -1125,8 +1111,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            synchronizerId,
-            testedProtocolVersion,
+            psid,
             viewType,
             testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
@@ -1208,8 +1193,7 @@ trait MessageDispatcherTest {
         val rootHashMessage =
           RootHashMessage(
             rootHash(1),
-            synchronizerId,
-            testedProtocolVersion,
+            psid,
             viewType,
             testTopologyTimestamp,
             SerializedRootHashMessagePayload.empty,
@@ -1308,7 +1292,7 @@ trait MessageDispatcherTest {
         val deliverError4 = SequencerCounter(3) -> DeliverError.create(
           None,
           CantonTimestamp.ofEpochSecond(3),
-          synchronizerId,
+          psid,
           messageId3,
           SequencerErrors.SubmissionRequestRefused("invalid batch"),
           testedProtocolVersion,

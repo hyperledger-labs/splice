@@ -35,6 +35,7 @@ import com.digitalasset.canton.synchronizer.block.update.{
 import com.digitalasset.canton.synchronizer.metrics.SequencerMetrics
 import com.digitalasset.canton.synchronizer.sequencer.Sequencer.SignedOrderingRequest
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
+import com.digitalasset.canton.synchronizer.sequencer.config.SequencerNodeParameterConfig
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.store.InMemorySequencerStore
 import com.digitalasset.canton.synchronizer.sequencer.{BlockSequencerConfig, SequencerIntegration}
@@ -94,7 +95,7 @@ class BlockSequencerTest
     private val sequencer1 = topologyTransactionFactory.sequencer1
     private val topologyStore =
       new InMemoryTopologyStore(
-        SynchronizerStore(synchronizerId.logical),
+        SynchronizerStore(synchronizerId),
         testedProtocolVersion,
         loggerFactory,
         timeouts,
@@ -117,7 +118,6 @@ class BlockSequencerTest
 
     private val topologyClient = new StoreBasedSynchronizerTopologyClient(
       mock[Clock],
-      synchronizerId,
       topologyStore,
       StoreBasedSynchronizerTopologyClient.NoPackageDependencies,
       DefaultProcessingTimeouts.testing,
@@ -167,7 +167,6 @@ class BlockSequencerTest
       new BlockSequencer(
         blockOrderer = fakeBlockOrderer,
         name = "test",
-        synchronizerId = synchronizerId,
         cryptoApi = cryptoApi,
         sequencerId = sequencer1,
         fakeBlockSequencerStateManager,
@@ -179,10 +178,9 @@ class BlockSequencerTest
         FutureSupervisor.Noop,
         health = None,
         clock = new SimClock(loggerFactory = loggerFactory),
-        protocolVersion = testedProtocolVersion,
         blockRateLimitManager = defaultRateLimiter,
         orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
-        minimumSequencingTime = CantonTimestamp.MinValue,
+        minimumSequencingTime = SequencerNodeParameterConfig.DefaultMinimumSequencingTime,
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(
@@ -260,8 +258,8 @@ class BlockSequencerTest
 
     override def getHeadState: BlockSequencerStateManager.HeadState =
       BlockSequencerStateManager.HeadState(
-        BlockInfo.initial,
-        ChunkState.initial(BlockEphemeralState.empty),
+        BlockInfo.initial(CantonTimestamp.Epoch),
+        ChunkState.initial(BlockEphemeralState.empty(CantonTimestamp.Epoch)),
       )
 
     override protected def timeouts: ProcessingTimeout = BlockSequencerTest.this.timeouts

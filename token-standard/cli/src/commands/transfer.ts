@@ -120,6 +120,7 @@ export async function transfer(
     disclosedContracts,
     verboseHashing: true,
     packageIdSelectionPreference: [],
+    prefetchContractKeys: [],
   });
 
   const signed = signTransaction(

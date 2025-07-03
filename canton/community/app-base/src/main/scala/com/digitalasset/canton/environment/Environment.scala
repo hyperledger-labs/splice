@@ -327,7 +327,7 @@ abstract class Environment[Config <: SharedCantonConfig[Config]](
     * started nodes will not be stopped.
     */
   def startAndReconnect(runner: => Unit = ()): Either[StartupError, Unit] =
-    withNewTraceContext { implicit traceContext =>
+    withNewTraceContext("env_start_reconnect") { implicit traceContext =>
       if (config.parameters.manualStart) {
         logger.info("Manual start requested.")
         Right(runner)

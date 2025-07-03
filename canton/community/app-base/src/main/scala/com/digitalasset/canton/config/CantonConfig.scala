@@ -82,10 +82,8 @@ import com.digitalasset.canton.synchronizer.sequencer.SequencerConfig.{
   SequencerHighAvailabilityConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.DriverBlockSequencerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.driver.{
-  BftBlockOrdererConfig,
-  BftSequencerFactory,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.sequencing.BftSequencerFactory
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.{
   RemoteSequencerConfig,
   SequencerNodeConfig,
@@ -316,7 +314,6 @@ final case class CantonParameters(
     startupParallelism: Option[PositiveInt] = None,
     // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
     nonStandardConfig: Boolean = true,
-    sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
     // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
     alphaVersionSupport: Boolean = true,
     betaVersionSupport: Boolean = false,
@@ -456,7 +453,6 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
           participantParameters.reassignmentTimeProofFreshnessProportion,
         protocolConfig = ParticipantProtocolConfig(
           minimumProtocolVersion = participantParameters.minimumProtocolVersion.map(_.unwrap),
-          sessionSigningKeys = participantParameters.sessionSigningKeys,
           alphaVersionSupport = participantParameters.alphaVersionSupport,
           betaVersionSupport = participantParameters.betaVersionSupport,
           dontWarnOnDeprecatedPV = participantParameters.dontWarnOnDeprecatedPV,
@@ -468,6 +464,8 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
         disableUpgradeValidation = participantParameters.disableUpgradeValidation,
         commandProgressTracking = participantParameters.commandProgressTracker,
         unsafeOnlinePartyReplication = participantParameters.unsafeOnlinePartyReplication,
+        automaticallyConnectToUpgradedSynchronizer =
+          participantParameters.automaticallyConnectToUpgradedSynchronizer,
       )
     }
 
@@ -682,7 +680,6 @@ private[canton] object CantonNodeParameterConverter {
       config: ProtocolConfig,
   ): CantonNodeParameters.Protocol =
     CantonNodeParameters.Protocol.Impl(
-      sessionSigningKeys = config.sessionSigningKeys,
       alphaVersionSupport = parent.parameters.alphaVersionSupport || config.alphaVersionSupport,
       betaVersionSupport = parent.parameters.betaVersionSupport || config.betaVersionSupport,
       dontWarnOnDeprecatedPV = config.dontWarnOnDeprecatedPV,

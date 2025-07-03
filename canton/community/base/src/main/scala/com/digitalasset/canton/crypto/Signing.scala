@@ -11,7 +11,11 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
-import com.digitalasset.canton.config.{CantonConfigValidator, UniformCantonConfigValidation}
+import com.digitalasset.canton.config.{
+  CantonConfigValidator,
+  PositiveFiniteDuration,
+  UniformCantonConfigValidation,
+}
 import com.digitalasset.canton.crypto.CryptoPureApiError.KeyParseAndValidateError
 import com.digitalasset.canton.crypto.SigningKeyUsage.encodeUsageForHash
 import com.digitalasset.canton.crypto.SigningPublicKey.getDataForFingerprint
@@ -28,7 +32,6 @@ import com.digitalasset.canton.serialization.{
   ProtoConverter,
 }
 import com.digitalasset.canton.store.db.DbDeserializationException
-import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{
@@ -185,7 +188,9 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
 
 }
 
-/** @param signingAlgorithmSpec
+/** @param signedBy
+  *   The fingerprint of the key that was used to generate the signature.
+  * @param signingAlgorithmSpec
   *   The signing algorithm scheme used to generate this signature. It is optional to ensure
   *   backwards compatibility.
   * @param signatureDelegation
@@ -196,13 +201,19 @@ trait SigningPrivateStoreOps extends SigningPrivateOps {
 final case class Signature private (
     format: SignatureFormat,
     private val signature: ByteString,
-    signedBy: Fingerprint,
+    private[crypto] val signedBy: Fingerprint,
     signingAlgorithmSpec: Option[SigningAlgorithmSpec],
     signatureDelegation: Option[SignatureDelegation],
 ) extends HasVersionedWrapper[Signature]
     with PrettyPrinting {
 
   override protected def companionObj: Signature.type = Signature
+
+  /** The long-term key used to authorize the signature. If a signature delegation is present, this
+    * key's fingerprint is stored inside `signatureDelegation.delegatingKeyId`.
+    */
+  def authorizingLongTermKey: Fingerprint =
+    signatureDelegation.map(_.delegatingKeyId).getOrElse(signedBy)
 
   def toProtoV30: v30.Signature =
     // The signature delegation protobuf does not contain a `signedBy` field. Because of this, if a signature
@@ -215,7 +226,7 @@ final case class Signature private (
       signature = signature,
       // In case of a signature delegation store the delegating key id as we do not ship the id as part of
       // the signature delegation message for message size reasons.
-      signedBy = signatureDelegation.map(_.delegatingKeyId).getOrElse(signedBy).toProtoPrimitive,
+      signedBy = authorizingLongTermKey.toProtoPrimitive,
       signingAlgorithmSpec = SigningAlgorithmSpec.toProtoEnumOption(signingAlgorithmSpec),
       signatureDelegation = signatureDelegation.map(_.toProtoV30),
     )
@@ -266,7 +277,13 @@ final case class Signature private (
   })
 
   override protected def pretty: Pretty[Signature] =
-    prettyOfClass(param("signature", _.signature), param("signedBy", _.signedBy))
+    prettyOfClass(
+      param("signature", _.signature),
+      param("format", _.format),
+      param("signedBy", _.signedBy),
+      param("signingAlgorithmSpec", _.signingAlgorithmSpec),
+      param("signatureDelegation", _.signatureDelegation, _.signatureDelegation.isDefined),
+    )
 
   /** Access to the raw signature, must NOT be used for serialization */
   private[crypto] def unwrap: ByteString = signature
@@ -355,18 +372,18 @@ object Signature
   * @param fromInclusive
   *   the inclusive timestamp, indicating when a delegation to the session key was created
   * @param periodLength
-  *   the validity duration of the session key delegation in seconds
+  *   the validity duration of the session key delegation
   */
 final case class SignatureDelegationValidityPeriod(
     fromInclusive: CantonTimestamp,
-    periodLength: PositiveSeconds,
+    periodLength: PositiveFiniteDuration,
 ) extends PrettyPrinting
     // we never deserialize this object from a byte string, so we don't need to define a fromByteString method in the companion object
     with HasCryptographicEvidence {
 
   val toExclusive: CantonTimestamp =
     Either
-      .catchOnly[IllegalArgumentException](fromInclusive + periodLength)
+      .catchOnly[IllegalArgumentException](fromInclusive.add(periodLength.asJava))
       .getOrElse(CantonTimestamp.MaxValue)
 
   def covers(timestamp: CantonTimestamp): Boolean =
@@ -388,8 +405,8 @@ final case class SignatureDelegationValidityPeriod(
         DeterministicEncoding.encodeLong(periodLength.duration.toSeconds)
       )
 
-  def computeCutOffTimestamp(cutOffDuration: PositiveSeconds): CantonTimestamp =
-    this.toExclusive.minus(cutOffDuration.duration)
+  def computeCutOffTimestamp(cutOffDuration: Duration): CantonTimestamp =
+    this.toExclusive.minus(cutOffDuration)
 }
 
 /** An extension to the signature to accommodate the necessary information to be able to use session
@@ -410,7 +427,8 @@ final case class SignatureDelegation private[crypto] (
     validityPeriod: SignatureDelegationValidityPeriod,
     signature: Signature,
 ) extends Product
-    with Serializable {
+    with Serializable
+    with PrettyPrinting {
 
   // All session signing keys must be an ASN.1 + DER-encoding of X.509 SubjectPublicKeyInfo structure and be
   // set to be used for protocol messages
@@ -420,8 +438,10 @@ final case class SignatureDelegation private[crypto] (
       signature.signatureDelegation.isEmpty // we don't support recursive delegations
   )
 
-  /** Returns the key id of the long-term key that authorized the delegation */
-  def delegatingKeyId: Fingerprint = signature.signedBy
+  /** Returns the key ID of the long-term key that authorized the delegation. Since nested signature
+    * delegations are not supported, `authorizingLongTermKey` == `signedBy`.
+    */
+  def delegatingKeyId: Fingerprint = signature.authorizingLongTermKey
 
   def isValidAt(timestamp: CantonTimestamp): Boolean =
     validityPeriod.covers(timestamp)
@@ -437,6 +457,13 @@ final case class SignatureDelegation private[crypto] (
       // already included in the v30.SignatureDelegation message (e.g. format).
       signature = signature.toProtoV30.signature,
       signingAlgorithmSpec = SigningAlgorithmSpec.toProtoEnumOption(signature.signingAlgorithmSpec),
+    )
+
+  override protected def pretty: Pretty[SignatureDelegation] =
+    prettyOfClass(
+      param("sessionKey", _.sessionKey),
+      param("validityPeriod", _.validityPeriod),
+      param("signature", _.signature),
     )
 }
 
@@ -531,9 +558,7 @@ object SignatureDelegation {
         )
       // Duration is already validated as positive and non-zero during parsing,
       // so calling Positive.create method here is unnecessary.
-      periodLength = PositiveSeconds.tryCreate(
-        Duration.ofSeconds(validityPeriodDurationSeconds.value.toLong)
-      )
+      periodLength = PositiveFiniteDuration.ofSeconds(validityPeriodDurationSeconds.value.toLong)
       signatureRaw = signatureP.signature
       signatureFormat <- SignatureFormat.fromProtoEnum("format", signatureP.format)
       signatureAlgorithmSpecO <- SigningAlgorithmSpec.fromProtoEnumOption(
@@ -1113,7 +1138,7 @@ final case class SigningKeyPair(publicKey: SigningPublicKey, privateKey: Signing
   )
 
   @VisibleForTesting
-  def replaceUsage(usage: NonEmpty[Set[SigningKeyUsage]]): SigningKeyPair =
+  private[canton] def replaceUsage(usage: NonEmpty[Set[SigningKeyUsage]]): SigningKeyPair =
     this.copy(
       publicKey = publicKey.replaceUsage(usage),
       privateKey = privateKey.replaceUsage(usage),
@@ -1152,8 +1177,13 @@ object SigningKeyPair {
             new IllegalStateException(s"Failed to create private signing key: $err")
           )
         )
-    } yield SigningKeyPair(publicKey, privateKey)
+    } yield SigningKeyPair.create(publicKey, privateKey)
   }
+
+  def create(
+      publicKey: SigningPublicKey,
+      privateKey: SigningPrivateKey,
+  ): SigningKeyPair = new SigningKeyPair(publicKey, privateKey)
 
   def fromProtoV30(
       signingKeyPairP: v30.SigningKeyPair
@@ -1169,15 +1199,15 @@ object SigningKeyPair {
         "private_key",
         signingKeyPairP.privateKey,
       )
-    } yield SigningKeyPair(publicKey, privateKey)
+    } yield SigningKeyPair.create(publicKey, privateKey)
 }
 
-final case class SigningPublicKey private[crypto] (
+final case class SigningPublicKey private (
     format: CryptoKeyFormat,
-    key: ByteString,
+    val key: ByteString,
     keySpec: SigningKeySpec,
     usage: NonEmpty[Set[SigningKeyUsage]],
-    override protected val dataForFingerprintO: Option[ByteString] = None,
+    override protected val dataForFingerprintO: Option[ByteString],
 )(
     override val migrated: Boolean = false
 ) extends PublicKey
@@ -1282,8 +1312,12 @@ final case class SigningPublicKey private[crypto] (
     }
 
   @VisibleForTesting
-  def replaceUsage(usage: NonEmpty[Set[SigningKeyUsage]]): SigningPublicKey =
+  private[crypto] def replaceUsage(usage: NonEmpty[Set[SigningKeyUsage]]): SigningPublicKey =
     this.copy(usage = usage)(migrated)
+
+  @VisibleForTesting
+  private[crypto] def replaceFormat(format: CryptoKeyFormat): SigningPublicKey =
+    this.copy(format = format)(migrated)
 }
 
 object SigningPublicKey
@@ -1349,7 +1383,8 @@ object SigningPublicKey
         )
       keyAfterMigration = keyAfterMigrationO match {
         case None => keyBeforeMigration
-        case Some(migratedKey) if migratedKey.id == keyBeforeMigration.id => migratedKey
+        case Some(migratedKey) if migratedKey.id == keyBeforeMigration.id =>
+          migratedKey
         case Some(migratedKey) =>
           throw new IllegalStateException(
             s"Key ID changed: ${keyBeforeMigration.id} -> ${migratedKey.id}"

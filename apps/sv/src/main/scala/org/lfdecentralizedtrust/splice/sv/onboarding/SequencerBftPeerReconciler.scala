@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.networking.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection

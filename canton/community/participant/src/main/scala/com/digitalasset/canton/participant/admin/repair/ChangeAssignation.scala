@@ -11,7 +11,7 @@ import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.digitalasset.canton.*
 import com.digitalasset.canton.crypto.SyncCryptoApiParticipantProvider
-import com.digitalasset.canton.data.ContractsReassignmentBatch
+import com.digitalasset.canton.data.{CantonTimestamp, ContractsReassignmentBatch}
 import com.digitalasset.canton.ledger.participant.state.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -41,10 +41,10 @@ private final class ChangeAssignation(
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
 
-  private val sourceSynchronizerId = repairSource.map(_.synchronizer.id)
+  private val sourceSynchronizerId = repairSource.map(_.synchronizer.psid.logical)
   private val sourceSynchronizerAlias = repairSource.map(_.synchronizer.alias)
   private val sourcePersistentState = repairSource.map(_.synchronizer.persistentState)
-  private val targetSynchronizerId = repairTarget.map(_.synchronizer.id)
+  private val targetSynchronizerId = repairTarget.map(_.synchronizer.psid.logical)
   private val targetPersistentState = repairTarget.map(_.synchronizer.persistentState)
 
   import com.digitalasset.canton.util.MonadUtil
@@ -82,15 +82,13 @@ private final class ChangeAssignation(
         .toEitherT
 
       _ <- persistAssignments(
-        unassignmentData.payload.contracts.contractIdCounters.map {
-          case (contractId, reassignmentCounter) =>
-            (contractId, unassignmentData.targetTimeOfRepair, reassignmentCounter)
-        }
+        unassignmentData.payload.contracts.contractIdCounters,
+        unassignmentData.targetTimeOfRepair,
       ).toEitherT
 
       _ <- EitherT.right(
         publishAssignmentEvent(
-          unassignmentData.payload.reassignmentId,
+          unassignmentData.payload.unassignmentTs,
           unassignmentData.map(_ => unassignedContracts),
         )
       )
@@ -133,7 +131,7 @@ private final class ChangeAssignation(
       _ <- persistContracts(changeBatch)
       newChanges = changes.map(_ => changeBatch)
       _ <- persistUnassignAndAssign(newChanges).toEitherT
-      _ <- EitherT.right(publishReassignmentEvents(newChanges))
+      _ <- EitherT.right(publishReassignmentEvents(repairSource.unwrap.timestamp, newChanges))
     } yield ()
   }
 
@@ -285,6 +283,9 @@ private final class ChangeAssignation(
   ): EitherT[FutureUnlessShutdown, String, List[SerializableContract]] =
     contractStore
       .lookupManyExistingUncached(contractIds)
+      .map(
+        _.map(_.serializable)
+      ) // TODO(#26348) - use fat contract downstream
       .leftMap(contractId =>
         s"Failed to look up contract $contractId in synchronizer $sourceSynchronizerAlias"
       )
@@ -298,7 +299,12 @@ private final class ChangeAssignation(
           val contractId = serializableContract.contractId
 
           for {
-            serializedTargetO <- EitherT.right(contractStore.lookupContract(contractId).value)
+            serializedTargetO <- EitherT.right(
+              contractStore
+                .lookupContract(contractId)
+                .map(_.serializable)
+                .value
+            ) // TODO(#26348) - use fat contract downstream
             _ <- serializedTargetO
               .map { serializedTarget =>
                 EitherTUtil.condUnitET[FutureUnlessShutdown](
@@ -326,28 +332,34 @@ private final class ChangeAssignation(
     */
   private def persistContracts(changes: Changes)(implicit
       traceContext: TraceContext
-  ): EitherT[FutureUnlessShutdown, String, Unit] =
-    EitherT.right {
-      changes.batches.parTraverse_ { case batch =>
-        contractStore.storeContracts(batch.contracts.collect {
-          case c if changes.isNew(c.contract.contractId) => c.contract
-        })
+  ): EitherT[FutureUnlessShutdown, String, Unit] = {
+
+    val batchesE = changes.batches.traverse { batch =>
+      val s = batch.contracts.collect {
+        case c if changes.isNew(c.contract.contractId) => c.contract
       }
+      s.traverse(ContractInstance.apply)
     }
+    batchesE match {
+      case Left(err) => EitherT.leftT(err)
+      case Right(batches) => EitherT.right(batches.parTraverse_(contractStore.storeContracts))
+    }
+  }
 
   private def persistAssignments(
-      contracts: Iterable[(LfContractId, Target[TimeOfRepair], ReassignmentCounter)]
+      contracts: Iterable[(LfContractId, ReassignmentCounter)],
+      timeOfRepair: Target[TimeOfRepair],
   )(implicit
       traceContext: TraceContext
   ): CheckedT[FutureUnlessShutdown, String, ActiveContractStore.AcsWarning, Unit] =
     targetPersistentState.unwrap.activeContractStore
       .assignContracts(
-        contracts.map { case (cid, tor, reassignmentCounter) =>
+        contracts.map { case (cid, reassignmentCounter) =>
           (
             cid,
             sourceSynchronizerId,
             reassignmentCounter,
-            tor.unwrap.toToc,
+            timeOfRepair.unwrap.toToc,
           )
         }.toSeq
       )
@@ -358,39 +370,29 @@ private final class ChangeAssignation(
   )(implicit
       traceContext: TraceContext
   ): CheckedT[FutureUnlessShutdown, String, ActiveContractStore.AcsWarning, Unit] = {
+    val contractIdCounters = changes.payload.batches.flatMap(_.contractIdCounters)
 
     val unassignF = sourcePersistentState.unwrap.activeContractStore
       .unassignContracts(
-        changes.payload.batches.flatMap { case batch =>
-          batch.contractIdCounters.map { case (contractId, reassignmentCounter) =>
-            (
-              contractId,
-              targetSynchronizerId,
-              reassignmentCounter,
-              changes.sourceTimeOfRepair.unwrap.toToc,
-            )
-          }
+        contractIdCounters.map { case (cid, reassignmentCounter) =>
+          (
+            cid,
+            targetSynchronizerId,
+            reassignmentCounter,
+            changes.sourceTimeOfRepair.unwrap.toToc,
+          )
         }
       )
       .mapAbort(e => s"Failed to mark contracts as unassigned: $e")
 
-    unassignF
-      .flatMap(_ =>
-        persistAssignments(
-          changes.payload.batches.flatMap { case batch =>
-            batch.contractIdCounters.map { case (contractId, reassignmentCounter) =>
-              (contractId, changes.targetTimeOfRepair, reassignmentCounter)
-            }
-          }
-        )
-      )
+    unassignF.flatMap(_ => persistAssignments(contractIdCounters, changes.targetTimeOfRepair))
   }
 
   private def publishAssignmentEvent(
-      reassignmentId: ReassignmentId,
+      unassignmentTs: CantonTimestamp,
       changes: ChangeAssignation.Data[Changes],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
-    val updates = assignment(reassignmentId, changes)
+    val updates = assignment(unassignmentTs, changes)
 
     for {
       _ <- FutureUnlessShutdown.outcomeF(
@@ -400,12 +402,12 @@ private final class ChangeAssignation(
   }
 
   private def publishReassignmentEvents(
-      changes: ChangeAssignation.Data[Changes]
+      unassignmentTs: CantonTimestamp,
+      changes: ChangeAssignation.Data[Changes],
   )(implicit
       traceContext: TraceContext
   ): FutureUnlessShutdown[Unit] = {
-    val reassignmentId = ReassignmentId(sourceSynchronizerId, repairSource.unwrap.timestamp)
-    val updates = unassignment(reassignmentId, changes) ++ assignment(reassignmentId, changes)
+    val updates = unassignment(unassignmentTs, changes) ++ assignment(unassignmentTs, changes)
     for {
       _ <- FutureUnlessShutdown.outcomeF(
         MonadUtil.sequentialTraverse(updates)(repairIndexer.offer(_))
@@ -414,12 +416,18 @@ private final class ChangeAssignation(
   }
 
   private def unassignment(
-      reassignmentId: ReassignmentId,
+      unassignmentTs: CantonTimestamp,
       changes: ChangeAssignation.Data[Changes],
   )(implicit
       traceContext: TraceContext
   ): Seq[RepairUpdate] =
     changes.payload.batches.map { case batch =>
+      val reassignmentId = ReassignmentId(
+        sourceSynchronizerId,
+        targetSynchronizerId,
+        unassignmentTs,
+        batch.contractIdCounters,
+      )
       Update.RepairReassignmentAccepted(
         workflowId = None,
         updateId = randomTransactionId(syncCrypto).tryAsLedgerTransactionId,
@@ -427,7 +435,7 @@ private final class ChangeAssignation(
           sourceSynchronizer = sourceSynchronizerId,
           targetSynchronizer = targetSynchronizerId,
           submitter = None,
-          unassignId = reassignmentId.unassignmentTs,
+          reassignmentId = reassignmentId,
           isReassigningParticipant = false,
         ),
         reassignment = Reassignment.Batch(batch.contracts.zipWithIndex.map { case (reassign, idx) =>
@@ -447,10 +455,16 @@ private final class ChangeAssignation(
       )
     }
 
-  private def assignment(reassignmentId: ReassignmentId, changes: ChangeAssignation.Data[Changes])(
+  private def assignment(unassignmentTs: CantonTimestamp, changes: ChangeAssignation.Data[Changes])(
       implicit traceContext: TraceContext
   ): Seq[RepairUpdate] =
     changes.payload.batches.map { case batch =>
+      val reassignmentId = ReassignmentId(
+        sourceSynchronizerId,
+        targetSynchronizerId,
+        unassignmentTs,
+        batch.contractIdCounters,
+      )
       Update.RepairReassignmentAccepted(
         workflowId = None,
         updateId = randomTransactionId(syncCrypto).tryAsLedgerTransactionId,
@@ -458,12 +472,12 @@ private final class ChangeAssignation(
           sourceSynchronizer = sourceSynchronizerId,
           targetSynchronizer = targetSynchronizerId,
           submitter = None,
-          unassignId = reassignmentId.unassignmentTs,
+          reassignmentId = reassignmentId,
           isReassigningParticipant = false,
         ),
         reassignment = Reassignment.Batch(batch.contracts.zipWithIndex.map { case (reassign, idx) =>
           Reassignment.Assign(
-            ledgerEffectiveTime = reassign.contract.ledgerCreateTime.toLf,
+            ledgerEffectiveTime = reassign.contract.ledgerCreateTime.time,
             createNode = reassign.contract.toLf,
             contractMetadata = Bytes.fromByteString(
               reassign.contract.metadata

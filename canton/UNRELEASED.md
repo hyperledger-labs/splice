@@ -8,12 +8,48 @@ below should all be Wednesdays to align with the weekly release
 schedule, i.e. if you add an entry effective at or after the first
 header, prepend the new date header that corresponds to the
 Wednesday after your change.
+
+## Until 2025-07-02 (Exclusive)
+- Adds new gRPC endpoint `GetHighestOffsetByTimestamp` (and console command `find_highest_offset_by_timestamp`) that
+  for a given timestamp, finds the highest ledger offset among all events that have record time <= timestamp. This is a
+  backward-compatible change, because it's an addition only. It's useful for party replication / major upgrade.
+
+## Until 2025-06-25 (Exclusive)
+- [Breaking Change] Updated the `key-validity-duration`, `cut-off-duration`, and `key-eviction-period` parameters in the `crypto.kms.session-signing-keys` configuration to accept only positive durations (e.g., 30m, 5s).
+- JSON Ledger API: `prefetchContractKeys` added to `JsCommands` and `JsPrepareSubmissionRequest`
+- JSON Ledger API: fixed openapi documentation for: `Completion/Completion1` (status property), `ParticipantAuthorizationAdded`, `ParticipantAuthorizationChanged`,`ParticipantAuthorizationRevoked`
+- Ledger API: the existing `InteractiveSubmissionService.GetPreferredPackageVersion` (gRPC) or `interactive-submission/preferred-package-version` (JSON) functionality is superseeded by a new endpoint pair:
+  - gRPC: `InteractiveSubmissionService.GetPackagePreferences`
+  - JSON: `interactive-submission/package-preferences`
+
+  The existing endpoints are deprecated but preserved for backwards compatibility.
+- Contract arguments for Created events are now always populated for both LedgerEffects and AcsDelta shaped events if
+    - there is a party in the filter that is in the witness parties of the event or
+    - a party-wildcard filter is defined.
+
+## Until 2025-06-18 (Exclusive)
+- Changed the protobuf definition of the admin API `StoreId.Synchronizer` from just having a `string id` field to the following:
+```
+    message Synchronizer {
+      oneof kind {
+        string logical = 1;
+        string physical = 2;
+      }
+    }
+```
+- Some console commands now take `TopologyStoreId.Synchronizer` instead of `SynchronizerId` as parameter.
+  This should be non-breaking,because there are implicit conversions from `SynchronizerId` and `PhysicalSynchronizerId` to `TopologyStoreId.Synchronizer`.
+
 ## Until 2025-06-11 (Exclusive)
-- JSON Ledger API added `authenticated-user` endpoint to get the current user.
+- JSON Ledger API: added `authenticated-user` endpoint to get the current user.
 
 ## Until 2025-05-21 (Exclusive)
 - The `PartyToParticipant` topology mapping's `HostingParticipant` now has an optional, empty `Onboarding` message
   for use with Online Party Replication and the `PartyManagementService.AddPartyAsync` endpoint.
+- Configuring session signing keys (`SessionSigningKeysConfig`) is now only possible through `KmsConfig`,
+  as this feature is supported exclusively by KMS providers
+  (`canton.participants.<participant>.crypto.kms.session-signing-keys`). Session signing keys are now enabled by
+  default.
 - Add configuration for the size of the inbound metadata on the Ledger API. Changing this value allows
   the server to accept larger JWT tokens.
 `canton.participants.participant.ledger-api.max-inbound-metadata-size=10240`
@@ -89,6 +125,7 @@ The authorized store can still be used to store `PartyToParticipant` topology tr
   - ledger_api.updates.subscribe_updates
   - ledger_api.javaapi.updates.transactions
   - ledger_api.javaapi.updates.transactions_with_tx_format
+- For more info on how to migrate follow the migration guide (console-commands-migration-guide.rst)
 
 ## Until 2025-04-23 (Exclusive)
 - The error code `ABORTED_DUE_TO_SHUTDOWN` is now used instead of the (duplicate) error code `SERVER_IS_SHUTTING_DOWN` that was previously used.

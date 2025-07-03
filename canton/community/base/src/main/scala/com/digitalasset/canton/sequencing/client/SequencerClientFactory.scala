@@ -68,7 +68,7 @@ trait SequencerClientFactory {
 
 object SequencerClientFactory {
   def apply(
-      synchronizerId: PhysicalSynchronizerId,
+      psid: PhysicalSynchronizerId,
       syncCryptoApi: SyncCryptoClient[SyncCryptoApi],
       crypto: SynchronizerCrypto,
       config: SequencerClientConfig,
@@ -261,7 +261,7 @@ object SequencerClientFactory {
             synchronizerParameters.protocolVersion,
             new EventCostCalculator(loggerFactory),
             metrics.trafficConsumption,
-            synchronizerId,
+            psid,
           )
           sendTracker = new SendTracker(
             initialPendingSends,
@@ -277,12 +277,12 @@ object SequencerClientFactory {
                 traceContext: TraceContext
             ): SequencedEventValidator =
               if (config.skipSequencedEventValidation) {
-                SequencedEventValidator.noValidation(synchronizerId)(
+                SequencedEventValidator.noValidation(psid)(
                   NamedLoggingContext(loggerFactory, traceContext)
                 )
               } else {
                 new SequencedEventValidatorImpl(
-                  synchronizerId,
+                  psid,
                   synchronizerParameters.protocolVersion,
                   syncCryptoApi,
                   loggerFactory,
@@ -291,13 +291,12 @@ object SequencerClientFactory {
               }
           }
         } yield new RichSequencerClientImpl(
-          synchronizerId,
+          psid,
           member,
           sequencerTransports,
           connectionPool,
           config,
           testingConfig,
-          synchronizerParameters.protocolVersion,
           sequencerSynchronizerParamsLookup,
           processingTimeout,
           validatorFactory,
@@ -413,7 +412,7 @@ object SequencerClientFactory {
           endpoint -> createChannel(subConnection)
         }.toMap
         new GrpcSequencerClientAuth(
-          synchronizerId,
+          psid,
           member,
           crypto,
           channelPerEndpoint,

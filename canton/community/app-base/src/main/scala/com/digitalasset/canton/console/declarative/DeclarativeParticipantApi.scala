@@ -29,7 +29,7 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnectionValidation}
-import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
+import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
@@ -163,7 +163,7 @@ class DeclarativeParticipantApi(
 
     def baseQuery(synchronizerId: SynchronizerId): BaseQuery =
       BaseQuery(
-        store = TopologyStoreId.Synchronizer(synchronizerId),
+        store = synchronizerId,
         proposals = false,
         timeQuery = TimeQuery.HeadState,
         ops = TopologyChangeOp.Replace.some,
@@ -196,7 +196,7 @@ class DeclarativeParticipantApi(
           TopologyAdminCommands.Write.Propose(
             mapping,
             signedBy = Seq.empty,
-            store = TopologyStoreId.Synchronizer(synchronizerId),
+            store = synchronizerId,
             mustFullyAuthorize = true,
             waitToBecomeEffective = Some(consistencyTimeout),
           )
@@ -211,7 +211,7 @@ class DeclarativeParticipantApi(
           TopologyAdminCommands.Write.Propose(
             current.item,
             signedBy = Seq.empty,
-            store = TopologyStoreId.Synchronizer(synchronizerId),
+            store = synchronizerId,
             mustFullyAuthorize = true,
             change = TopologyChangeOp.Remove,
             waitToBecomeEffective = Some(consistencyTimeout),

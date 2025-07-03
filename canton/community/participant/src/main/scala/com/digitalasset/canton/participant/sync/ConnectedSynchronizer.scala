@@ -148,7 +148,7 @@ class ConnectedSynchronizer(
     with CloseableHealthComponent
     with AtomicHealthComponent {
 
-  val synchronizerId: PhysicalSynchronizerId = synchronizerHandle.synchronizerId
+  val psid: PhysicalSynchronizerId = synchronizerHandle.psid
 
   val topologyClient: SynchronizerTopologyClientWithInit = synchronizerHandle.topologyClient
 
@@ -172,7 +172,7 @@ class ConnectedSynchronizer(
   private[canton] val requestGenerator =
     TransactionConfirmationRequestFactory(
       participantId,
-      synchronizerId,
+      psid,
     )(
       synchronizerCrypto.crypto.pureCrypto,
       seedGenerator,
@@ -194,7 +194,7 @@ class ConnectedSynchronizer(
   private val transactionProcessor: TransactionProcessor = new TransactionProcessor(
     participantId,
     requestGenerator,
-    synchronizerId,
+    psid,
     damle,
     staticSynchronizerParameters,
     synchronizerCrypto,
@@ -212,7 +212,7 @@ class ConnectedSynchronizer(
   )
 
   private val unassignmentProcessor: UnassignmentProcessor = new UnassignmentProcessor(
-    Source(synchronizerId),
+    Source(psid),
     participantId,
     Source(staticSynchronizerParameters),
     reassignmentCoordination,
@@ -230,7 +230,7 @@ class ConnectedSynchronizer(
   )
 
   private val assignmentProcessor: AssignmentProcessor = new AssignmentProcessor(
-    Target(synchronizerId),
+    Target(psid),
     participantId,
     Target(staticSynchronizerParameters),
     reassignmentCoordination,
@@ -250,7 +250,7 @@ class ConnectedSynchronizer(
   private val trafficProcessor =
     new TrafficControlProcessor(
       synchronizerCrypto,
-      synchronizerId,
+      psid,
       Option.empty[CantonTimestamp],
       loggerFactory,
     )
@@ -270,17 +270,13 @@ class ConnectedSynchronizer(
       ephemeral,
       synchronizerCrypto,
       sequencerClient,
-      synchronizerId,
       participantId,
-      staticSynchronizerParameters.protocolVersion,
       timeouts,
       loggerFactory,
     )
 
   private val registerIdentityTransactionHandle = identityPusher.createHandler(
     synchronizerHandle.synchronizerAlias,
-    synchronizerId,
-    staticSynchronizerParameters.protocolVersion,
     synchronizerHandle.topologyClient,
     sequencerClient,
     ephemeral.timeTracker,
@@ -288,8 +284,7 @@ class ConnectedSynchronizer(
 
   private val messageDispatcher: MessageDispatcher =
     messageDispatcherFactory.create(
-      staticSynchronizerParameters.protocolVersion,
-      synchronizerId,
+      psid,
       participantId,
       ephemeral.requestTracker,
       transactionProcessor,
@@ -335,6 +330,9 @@ class ConnectedSynchronizer(
     def withMetadataSeq(cids: Seq[LfContractId]): FutureUnlessShutdown[Seq[SerializableContract]] =
       participantNodePersistentState.value.contractStore
         .lookupManyExistingUncached(cids)
+        .map(
+          _.map(_.serializable)
+        ) // TODO(#26348) - use fat contract downstream
         .valueOr { missingContractId =>
           ErrorUtil.internalError(
             new IllegalStateException(
@@ -586,7 +584,7 @@ class ConnectedSynchronizer(
             Lambda[`+X <: Envelope[_]` => Traced[Seq[PossiblyIgnoredSequencedEvent[X]]]],
             ClosedEnvelope,
           ] {
-            override def name: String = s"connected-synchronizer-$synchronizerId"
+            override def name: String = s"connected-synchronizer-$psid"
 
             override def subscriptionStartsAt(
                 start: SubscriptionStart,
@@ -635,7 +633,7 @@ class ConnectedSynchronizer(
               ephemeral.timeTracker,
               tc =>
                 participantNodePersistentState.value.ledgerApiStore
-                  .cleanSynchronizerIndex(synchronizerId.logical)(tc, ec)
+                  .cleanSynchronizerIndex(psid.logical)(tc, ec)
                   .map(_.flatMap(_.sequencerIndex).map(_.sequencerTimestamp)),
             )(initializationTraceContext)
           )
@@ -650,7 +648,7 @@ class ConnectedSynchronizer(
               ParticipantTopologyHandshakeError.apply
             )
       } yield {
-        logger.debug(s"Started synchronizer for $synchronizerId")(initializationTraceContext)
+        logger.debug(s"Started synchronizer for $psid")(initializationTraceContext)
         ephemeral.markAsRecovered()
         logger.debug("Sync synchronizer is ready.")(initializationTraceContext)
         FutureUnlessShutdownUtil.doNotAwaitUnlessShutdown(
@@ -685,7 +683,7 @@ class ConnectedSynchronizer(
             val eitherF = synchronizeWithClosing(functionFullName)(
               AutomaticAssignment.perform(
                 data.reassignmentId,
-                Target(synchronizerId),
+                Target(psid),
                 Target(staticSynchronizerParameters),
                 reassignmentCoordination,
                 data.contracts.stakeholders.all,
@@ -708,7 +706,7 @@ class ConnectedSynchronizer(
         }
 
         pendingReassignments.lastOption.map(t =>
-          t.reassignmentId.unassignmentTs -> t.sourceSynchronizer.map(_.logical)
+          t.unassignmentTs -> t.sourceSynchronizer.map(_.logical)
         )
       }
 
@@ -810,15 +808,15 @@ class ConnectedSynchronizer(
       UnassignmentProcessingSteps.SubmissionResult,
     ](
       functionFullName,
-      SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down."),
+      SynchronizerNotReady(psid, "The synchronizer is shutting down."),
     ) {
       logger.debug(
-        s"Submitting unassignment of `$contractIds` from `$synchronizerId` to `$targetSynchronizer`"
+        s"Submitting unassignment of `$contractIds` from `$psid` to `$targetSynchronizer`"
       )
 
       if (!ready)
         EitherT.leftT(
-          SynchronizerNotReady(synchronizerId, "Cannot submit unassignment before recovery")
+          SynchronizerNotReady(psid, "Cannot submit unassignment before recovery")
         )
       else
         unassignmentProcessor
@@ -846,13 +844,13 @@ class ConnectedSynchronizer(
       AssignmentProcessingSteps.SubmissionResult,
     ](
       functionFullName,
-      SynchronizerNotReady(synchronizerId, "The synchronizer is shutting down."),
+      SynchronizerNotReady(psid, "The synchronizer is shutting down."),
     ) {
-      logger.debug(s"Submitting assignment of `$reassignmentId` to `$synchronizerId`")
+      logger.debug(s"Submitting assignment of `$reassignmentId` to `$psid`")
 
       if (!ready)
         EitherT.leftT(
-          SynchronizerNotReady(synchronizerId, "Cannot submit unassignment before recovery")
+          SynchronizerNotReady(psid, "Cannot submit unassignment before recovery")
         )
       else
         assignmentProcessor
@@ -900,7 +898,7 @@ class ConnectedSynchronizer(
     )
 
   override def toString: String =
-    s"ConnectedSynchronizer(synchronizerId=$synchronizerId, participantId=$participantId)"
+    s"ConnectedSynchronizer(synchronizerId=$psid, participantId=$participantId)"
 }
 
 object ConnectedSynchronizer {
@@ -1014,20 +1012,19 @@ object ConnectedSynchronizer {
         persistentState.requestJournalStore,
         tc =>
           ephemeralState.ledgerApiIndexer.ledgerApiStore.value
-            .cleanSynchronizerIndex(synchronizerHandle.synchronizerId.logical)(tc, ec),
+            .cleanSynchronizerIndex(synchronizerHandle.psid.logical)(tc, ec),
         sortedReconciliationIntervalsProvider,
         persistentState.acsCommitmentStore,
         persistentState.activeContractStore,
         persistentState.submissionTrackerStore,
         participantNodePersistentState.map(_.inFlightSubmissionStore),
-        synchronizerHandle.synchronizerId,
+        synchronizerHandle.psid,
         parameters.journalGarbageCollectionDelay,
         parameters.processingTimeouts,
         loggerFactory,
       )
       for {
         acsCommitmentProcessor <- AcsCommitmentProcessor(
-          synchronizerHandle.synchronizerId,
           participantId,
           synchronizerHandle.sequencerClient,
           synchronizerCrypto,
@@ -1035,7 +1032,6 @@ object ConnectedSynchronizer {
           persistentState.acsCommitmentStore,
           journalGarbageCollector.observer,
           connectedSynchronizerMetrics.commitments,
-          synchronizerHandle.staticParameters.protocolVersion,
           parameters.processingTimeouts,
           futureSupervisor,
           persistentState.activeContractStore,

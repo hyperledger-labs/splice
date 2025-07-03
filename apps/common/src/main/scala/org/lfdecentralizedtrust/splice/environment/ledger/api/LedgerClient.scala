@@ -826,13 +826,6 @@ object LedgerClient {
     com.daml.ledger.javaapi.data.Transaction.fromProto(treeProto)
   }
 
-  def lapiTreeToJavaTree(
-      tree: lapi.transaction.TransactionTree
-  ): com.daml.ledger.javaapi.data.TransactionTree = {
-    val treeProto = scalapbToJava(tree)(_.companion)
-    com.daml.ledger.javaapi.data.TransactionTree.fromProto(treeProto)
-  }
-
   object GetTreeUpdatesResponse {
 
     import lapi.update_service.GetUpdatesResponse.Update as TU
@@ -927,7 +920,7 @@ object LedgerClient {
     ) extends ReassignmentCommand {
       def toProto: lapi.reassignment_commands.AssignCommand =
         lapi.reassignment_commands.AssignCommand(
-          unassignId = unassignId,
+          reassignmentId = unassignId,
           source = source.toProtoPrimitive,
           target = target.toProtoPrimitive,
         )

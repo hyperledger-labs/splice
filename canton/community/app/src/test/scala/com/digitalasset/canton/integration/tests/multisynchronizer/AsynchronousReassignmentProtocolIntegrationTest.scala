@@ -7,7 +7,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.LocalSequencerReference
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.plugins.UseReferenceBlockSequencerBase.MultiSynchronizer
 import com.digitalasset.canton.integration.plugins.{
   UseCommunityReferenceBlockSequencer,
@@ -32,7 +31,6 @@ import com.digitalasset.canton.synchronizer.sequencer.{
 }
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
-import com.digitalasset.canton.util.ReassignmentTag.Source
 import com.digitalasset.canton.{BaseTest, SynchronizerAlias, config}
 
 import java.util.concurrent.atomic.AtomicLong
@@ -181,11 +179,11 @@ final class AsynchronousReassignmentProtocolIntegrationTest
         daId,
         acmeId,
       )
-      .unassignId
+      .reassignmentId
 
     val unassign2 = participant1.ledger_api.commands
       .submit_unassign(bobId, Seq(LfContractId.assertFromString(iou2.id.contractId)), daId, acmeId)
-      .unassignId
+      .reassignmentId
 
     val until: Promise[Unit] = Promise[Unit]()
     programmableSequencers(acmeName).setPolicy_("delay confirmation response from alice")(
@@ -208,10 +206,8 @@ final class AsynchronousReassignmentProtocolIntegrationTest
         acmeId,
       )
 
-    val aliceReassignmentId =
-      ReassignmentId(Source(daId), CantonTimestamp.assertFromLong(unassign1.toLong))
-    val bobReassignmentId =
-      ReassignmentId(Source(daId), CantonTimestamp.assertFromLong(unassign2.toLong))
+    val aliceReassignmentId = ReassignmentId.tryCreate(unassign1)
+    val bobReassignmentId = ReassignmentId.tryCreate(unassign2)
 
     val reassignmentStore = participant1.underlying.value.sync.syncPersistentStateManager
       .get(acmeId)

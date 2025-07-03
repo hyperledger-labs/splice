@@ -77,7 +77,7 @@ object ReassignmentEvent {
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = SynchronizerId.tryFromString(proto.source),
         target = SynchronizerId.tryFromString(proto.target),
-        unassignId = proto.unassignId,
+        unassignId = proto.reassignmentId,
         contractId = new ContractId(proto.contractId),
         counter = proto.reassignmentCounter,
       )
@@ -109,7 +109,7 @@ object ReassignmentEvent {
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = SynchronizerId.tryFromString(proto.source),
         target = SynchronizerId.tryFromString(proto.target),
-        unassignId = proto.unassignId,
+        unassignId = proto.reassignmentId,
         createdEvent =
           CreatedEvent.fromProto(scalaEvent.CreatedEvent.toJavaProto(proto.getCreatedEvent)),
         counter = proto.reassignmentCounter,

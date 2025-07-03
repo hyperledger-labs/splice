@@ -3,7 +3,7 @@
     "archived" : null,
     "created" : {
       "createdEvent" : {
-        "contractId" : "0",
+        "contractId" : "1",
         "contractKey" : null,
         "createArgument" : {
           "amulet" : {
@@ -2280,12 +2280,12 @@
         "contractId" : "51",
         "contractKey" : null,
         "createArgument" : {
-          "lockedAmulet" : "0",
+          "lockedAmulet" : "1",
           "transfer" : {
             "amount" : "1000.0000000000",
             "executeBefore" : "2025-06-18T00:00:00.000000Z",
             "inputHoldingCids" : [
-              "0"
+              "1"
             ],
             "instrumentId" : {
               "admin" : "dso::normalized",
@@ -2329,7 +2329,7 @@
                 "amount" : "1000.0000000000",
                 "executeBefore" : "2025-06-18T00:00:00.000000Z",
                 "inputHoldingCids" : [
-                  "0"
+                  "1"
                 ],
                 "instrumentId" : {
                   "admin" : "dso::normalized",

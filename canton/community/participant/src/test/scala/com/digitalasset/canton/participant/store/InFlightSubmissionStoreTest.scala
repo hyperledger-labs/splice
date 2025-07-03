@@ -38,14 +38,13 @@ trait InFlightSubmissionStoreTest extends AsyncWordSpec with BaseTest {
   private lazy val messageId2 = new UUID(0, 2)
   private lazy val messageId3 = new UUID(0, 3)
   private lazy val messageId4 = new UUID(0, 4)
-  private lazy val traceContext1 = TraceContext.withNewTraceContext(Predef.identity)
+  private lazy val traceContext1 = TraceContext.withNewTraceContext("test")(Predef.identity)
   private lazy val completionInfo = DefaultParticipantStateValues.completionInfo(List.empty)
   private lazy val trackingData1 =
     TransactionSubmissionTrackingData(
       completionInfo,
       TransactionSubmissionTrackingData.TimeoutCause,
       SynchronizerId.tryFromString("da::default").toPhysical,
-      testedProtocolVersion,
     )
   private lazy val trackingData3 = TransactionSubmissionTrackingData(
     completionInfo,
@@ -55,7 +54,6 @@ trait InFlightSubmissionStoreTest extends AsyncWordSpec with BaseTest {
         .rpcStatusWithoutLoggingContext()
     ),
     SynchronizerId.tryFromString("da::default").toPhysical,
-    testedProtocolVersion,
   )
   private lazy val submission1 = InFlightSubmission(
     changeId1,

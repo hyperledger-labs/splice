@@ -4,7 +4,8 @@
 package com.digitalasset.canton.synchronizer.config
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.config.{CryptoConfig, ProtocolConfig, SessionSigningKeysConfig}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
+import com.digitalasset.canton.config.{CryptoConfig, ProtocolConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticSynchronizerParameters
@@ -51,7 +52,6 @@ final case class SynchronizerParametersConfig(
     requiredHashAlgorithms: Option[NonEmpty[Set[HashAlgorithm]]] = None,
     requiredCryptoKeyFormats: Option[NonEmpty[Set[CryptoKeyFormat]]] = None,
     requiredSignatureFormats: Option[NonEmpty[Set[SignatureFormat]]] = None,
-    override val sessionSigningKeys: SessionSigningKeysConfig = SessionSigningKeysConfig.disabled,
     // TODO(i15561): Revert back to `false` once there is a stable Daml 3 protocol version
     override val alphaVersionSupport: Boolean = true,
     override val betaVersionSupport: Boolean = false,
@@ -68,7 +68,6 @@ final case class SynchronizerParametersConfig(
     param("requiredHashAlgorithms", _.requiredHashAlgorithms),
     param("requiredCryptoKeyFormats", _.requiredCryptoKeyFormats),
     param("requiredSignatureFormats", _.requiredSignatureFormats),
-    param("sessionSigningKeys", _.sessionSigningKeys),
     param("alphaVersionSupport", _.alphaVersionSupport),
     param("betaVersionSupport", _.betaVersionSupport),
     param("dontWarnOnDeprecatedPV", _.dontWarnOnDeprecatedPV),
@@ -82,6 +81,7 @@ final case class SynchronizerParametersConfig(
   def toStaticSynchronizerParameters(
       cryptoConfig: CryptoConfig = CryptoConfig(),
       protocolVersion: ProtocolVersion,
+      serial: NonNegativeInt,
   ): Either[String, StaticSynchronizerParameters] = {
 
     def selectSchemes[S](
@@ -147,6 +147,7 @@ final case class SynchronizerParametersConfig(
         requiredCryptoKeyFormats = newCryptoKeyFormats,
         requiredSignatureFormats = newSignatureFormats,
         protocolVersion = protocolVersion,
+        serial = serial,
       )
     }
   }

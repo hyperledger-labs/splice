@@ -4,8 +4,8 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.catsSyntaxOptionId
 import cats.syntax.either.*
+import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
   GrpcAdminCommand,
@@ -32,7 +32,7 @@ import com.digitalasset.canton.sequencing.{
   SequencerConnections,
 }
 import com.digitalasset.canton.sequencing.protocol.TrafficState
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
   ParticipantPermission,
@@ -565,7 +565,7 @@ class ParticipantAdminConnection(
       expectedSerial: PositiveInt,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
     ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.SynchronizerStore(synchronizerId),
+      TopologyStoreId.Synchronizer(synchronizerId),
       show"Party $party is authorized on $newParticipant",
       EitherT(
         getPartyToParticipant(synchronizerId, party)
@@ -615,7 +615,7 @@ class ParticipantAdminConnection(
         case transactionType @ (TopologyTransactionType.ProposalSignedByOwnKey |
             TopologyTransactionType.AllProposals) =>
           listPartyToParticipant(
-            store = TopologyStoreId.SynchronizerStore(synchronizerId).some,
+            store = TopologyStoreId.Synchronizer(synchronizerId).some,
             filterParty = party.filterString,
             proposals = transactionType,
             operation = None,
@@ -675,7 +675,7 @@ class ParticipantAdminConnection(
     }
 
     ensureTopologyProposal[PartyToParticipant](
-      TopologyStoreId.SynchronizerStore(synchronizerId),
+      TopologyStoreId.Synchronizer(synchronizerId),
       description,
       queryType => findPartyToParticipant(queryType),
       previous => {
@@ -707,7 +707,7 @@ class ParticipantAdminConnection(
     }
 
     ensureTopologyMapping[PartyToParticipant](
-      TopologyStoreId.SynchronizerStore(synchronizerId),
+      TopologyStoreId.Synchronizer(synchronizerId),
       s"Participant $participantId is promoted to have Submission permission for party $party",
       EitherT(getPartyToParticipant(synchronizerId, party).map(result => {
         Either.cond(

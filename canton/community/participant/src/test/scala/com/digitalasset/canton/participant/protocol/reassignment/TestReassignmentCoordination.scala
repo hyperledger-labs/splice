@@ -46,13 +46,12 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
 private[reassignment] object TestReassignmentCoordination {
-  import BaseTest.*
 
   private val pendingUnassignments: TrieMap[Source[SynchronizerId], ReassignmentSynchronizer] =
     TrieMap.empty[Source[SynchronizerId], ReassignmentSynchronizer]
 
   def apply(
-      synchronizers: Set[Target[SynchronizerId]],
+      synchronizers: Set[Target[PhysicalSynchronizerId]],
       timeProofTimestamp: CantonTimestamp,
       snapshotOverride: Option[SynchronizerSnapshotSyncCryptoApi] = None,
       awaitTimestampOverride: Option[Option[Future[Unit]]] = None,
@@ -74,10 +73,13 @@ private[reassignment] object TestReassignmentCoordination {
     val reassignmentStores =
       synchronizers
         .map(synchronizer =>
-          synchronizer -> new InMemoryReassignmentStore(synchronizer, loggerFactory)
+          synchronizer.map(_.logical) -> new InMemoryReassignmentStore(
+            synchronizer.map(_.logical),
+            loggerFactory,
+          )
         )
         .toMap
-    val assignmentBySubmission = { (_: SynchronizerId) => None }
+    val assignmentBySubmission = { (_: PhysicalSynchronizerId) => None }
 
     val staticSynchronizerParametersGetter = new StaticSynchronizerParametersGetter {
       override def staticSynchronizerParameters(
@@ -92,7 +94,7 @@ private[reassignment] object TestReassignmentCoordination {
       pendingUnassignments.getOrElse(
         id, {
           val reassignmentSynchronizer =
-            new ReassignmentSynchronizer(id.map(_.toPhysical), loggerFactory, new ProcessingTimeout)
+            new ReassignmentSynchronizer(loggerFactory, new ProcessingTimeout)
           pendingUnassignments.put(id, reassignmentSynchronizer)
           reassignmentSynchronizer
         },
@@ -112,7 +114,7 @@ private[reassignment] object TestReassignmentCoordination {
     ) {
 
       override def awaitTimestamp[T[X] <: ReassignmentTag[X]: SameReassignmentType](
-          synchronizerId: T[SynchronizerId],
+          synchronizerId: T[PhysicalSynchronizerId],
           staticSynchronizerParameters: T[StaticSynchronizerParameters],
           timestamp: CantonTimestamp,
       )(implicit
@@ -128,7 +130,7 @@ private[reassignment] object TestReassignmentCoordination {
       override def cryptoSnapshot[
           T[X] <: ReassignmentTag[X]: SameReassignmentType: SingletonTraverse
       ](
-          synchronizerId: T[SynchronizerId],
+          synchronizerId: T[PhysicalSynchronizerId],
           staticSynchronizerParameters: T[StaticSynchronizerParameters],
           timestamp: CantonTimestamp,
       )(implicit
@@ -147,7 +149,7 @@ private[reassignment] object TestReassignmentCoordination {
   }
 
   private def defaultSyncCryptoApi(
-      synchronizers: Seq[SynchronizerId],
+      synchronizers: Seq[PhysicalSynchronizerId],
       packages: Seq[LfPackageId],
       loggerFactory: NamedLoggerFactory,
   ): SyncCryptoApiParticipantProvider =

@@ -16,6 +16,7 @@ import com.digitalasset.canton.metrics.{
   DbStorageMetrics,
   DeclarativeApiMetrics,
 }
+import com.digitalasset.canton.synchronizer.metrics.BftOrderingMetrics.updateTimer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
   Env,
@@ -160,7 +161,8 @@ private[metrics] final class BftOrderingHistograms(val parent: MetricName)(impli
       private[metrics] val grpcLatency: Item = Item(
         prefix :+ "grpc-latency",
         summary = "Latency of a gRPC message send",
-        description = "Records the rate and latency of a gRPC message send.",
+        description =
+          "Records the rate of gRPC message sands and their latency (up to receiving them on the other side).",
         qualification = MetricQualification.Latency,
       )
     }
@@ -244,6 +246,29 @@ class BftOrderingMetrics private[metrics] (
               }
             }
 
+            object consensus {
+              // Time waited for a block proposal from availability
+              val BlockProposalWait = "consensus-block-proposal-wait"
+              // Time waited for a new epoch to complete
+              val EpochCompletionWait = "consensus-epoch-completion-wait"
+              // Time waited for a new epoch to start
+              val EpochStartWait = "consensus-epoch-start-wait"
+              // Time elapsed between sending a PrePrepare and seeing that the block has been ordered
+              val SegmentProposalToCommitLatency = "consensus-segment-proposal-to-commit-latency"
+              // Time elapsed between ordered blocks proposed by a segment
+              val SegmentBlockCommitLatency = "consensus-segment-block-commit-latency"
+
+              // Time spent by view messages in the postponed queue
+              val PostponedViewMessagesQueueLatency =
+                "consensus-postponed-view-messages-queue-latency"
+
+              object stateTransfer {
+                // Time spent by consensus messages in the postponed queue during state transfer
+                val PostponedMessagesQueueLatency =
+                  "state-transfer-postponed-consensus-messages-queue-latency"
+              }
+            }
+
             object output {
               val Fetch = "output-block-fetch-batches"
               val Inspection = "output-block-inspection"
@@ -295,7 +320,7 @@ class BftOrderingMetrics private[metrics] (
             Duration
               .between(sendInstant, Instant.now)
               .minus(maybeDelay.fold(Duration.ZERO)(_.toJava))
-          timer.update(latency)(
+          updateTimer(timer, latency)(
             metricsContext.withExtraLabels(labels.stage.Key -> s"module-queue-$moduleName")
           )
         }
@@ -318,15 +343,20 @@ class BftOrderingMetrics private[metrics] (
 
       def emitOrderingStageLatency(
           stage: String,
-          startInstant: Instant,
-          endInstant: Instant,
+          startInstant: Option[Instant],
+          endInstant: Instant = Instant.now(),
+          cleanup: () => Unit = () => (),
       )(implicit
           mc: MetricsContext
-      ): Unit =
-        emitOrderingStageLatency(
-          stage,
-          Duration.between(startInstant, endInstant),
+      ): Unit = {
+        startInstant.foreach(start =>
+          emitOrderingStageLatency(
+            stage,
+            Duration.between(start, endInstant),
+          )
         )
+        cleanup()
+      }
 
       def emitOrderingStageLatency(
           stage: String,
@@ -335,13 +365,12 @@ class BftOrderingMetrics private[metrics] (
           mc: MetricsContext
       ): Unit =
         if (enabled)
-          performance.orderingStageLatency.timer
-            .update(duration)(
-              mc.withExtraLabels(
-                performance.orderingStageLatency.labels.stage.Key ->
-                  stage
-              )
+          updateTimer(performance.orderingStageLatency.timer, duration)(
+            mc.withExtraLabels(
+              performance.orderingStageLatency.labels.stage.Key ->
+                stage
             )
+          )
     }
     val orderingStageLatency = new OrderingStageLatencyMetrics
   }
@@ -393,6 +422,7 @@ class BftOrderingMetrics private[metrics] (
           case object Success extends OutcomeValue
           case object QueueFull extends OutcomeValue
           case object RequestTooBig extends OutcomeValue
+          case object InvalidTag extends OutcomeValue
         }
       }
     }
@@ -609,6 +639,60 @@ class BftOrderingMetrics private[metrics] (
       0,
     )
 
+    val epochViewChanges: Gauge[Long] = openTelemetryMetricsFactory.gauge(
+      MetricInfo(
+        prefix :+ "epoch-view-changes",
+        summary = "Number of view changes occurred",
+        description = "Number of view changes occurred.",
+        qualification = MetricQualification.Latency,
+      ),
+      0,
+    )
+
+    val postponedViewMessagesQueueSize: Gauge[Int] =
+      openTelemetryMetricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-queue-size",
+          summary = "Size of the queue containing postponed view messages",
+          description = "Size of the queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        ),
+        0,
+      )
+
+    val postponedViewMessagesQueueMaxSize: Gauge[Int] =
+      openTelemetryMetricsFactory.gauge(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-queue-max-size",
+          summary = "Actual maximum size of the queue containing postponed view messages",
+          description = "Actual maximum size of the queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        ),
+        0,
+      )
+
+    val postponedViewMessagesQueueDuplicatesMeter: Meter =
+      openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-duplicates",
+          summary =
+            "Count of messages dropped as duplicates by queue containing postponed view messages",
+          description =
+            "Count of messages dropped as duplicates by queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        )
+      )
+
+    val postponedViewMessagesQueueDropMeter: Meter =
+      openTelemetryMetricsFactory.meter(
+        MetricInfo(
+          prefix :+ "postponed-view-messages-dropped",
+          summary = "Count of messages dropped by queue containing postponed view messages",
+          description = "Count of messages dropped by queue containing postponed view messages.",
+          qualification = MetricQualification.Saturation,
+        )
+      )
+
     val commitLatency: Timer =
       openTelemetryMetricsFactory.timer(histograms.consensus.consensusCommitLatency.info)
 
@@ -755,8 +839,53 @@ class BftOrderingMetrics private[metrics] (
           gaugesMap.remove(id).discard
         }
     }
+
+    // Private constructor to avoid being instantiated multiple times by accident
+    final class StateTransferMetrics private[BftOrderingMetrics] {
+      private val prefix = ConsensusMetrics.this.prefix :+ "state-transfer"
+
+      val postponedMessagesQueueSize: Gauge[Int] =
+        openTelemetryMetricsFactory.gauge(
+          MetricInfo(
+            prefix :+ "postponed-consensus-messages-queue-size",
+            summary =
+              "Size of the queue containing consensus messages postponed during state transfer",
+            description =
+              "Size of the queue containing consensus messages postponed during state transfer.",
+            qualification = MetricQualification.Saturation,
+          ),
+          0,
+        )
+
+      val postponedMessagesQueueMaxSize: Gauge[Int] =
+        openTelemetryMetricsFactory.gauge(
+          MetricInfo(
+            prefix :+ "postponed-consensus-messages-queue-max-size",
+            summary =
+              "Actual maximum size of the queue containing consensus messages postponed during state transfer",
+            description =
+              "Actual maximum size of the queue containing consensus messages postponed during state transfer.",
+            qualification = MetricQualification.Saturation,
+          ),
+          0,
+        )
+
+      val postponedMessagesQueueDropMeter: Meter =
+        openTelemetryMetricsFactory.meter(
+          MetricInfo(
+            prefix :+ "postponed-consensus-messages-dropped",
+            summary =
+              "Count of messages dropped by queue containing consensus messages postponed during state transfer",
+            description =
+              "Count of messages dropped by queue containing consensus messages postponed during state transfer.",
+            qualification = MetricQualification.Saturation,
+          )
+        )
+    }
+
     val votes = new VotesMetrics
     val retransmissions = new RetransmissionsMetrics
+    val stateTransfer = new StateTransferMetrics
   }
   val consensus = new ConsensusMetrics
 
@@ -942,5 +1071,17 @@ class BftOrderingMetrics private[metrics] (
 }
 
 object BftOrderingMetrics {
+
   val Prefix: MetricName = MetricName("bftordering")
+
+  def updateTimer(
+      timer: Timer,
+      duration: Duration,
+  )(implicit mc: MetricsContext): Unit =
+    // Java's `Instant` does not have to provide monotonically increasing times
+    //  (see the documentation for details: https://docs.oracle.com/javase/8/docs/api/java/time/Instant.html)
+    //  and emitting negative durations is generally disallowed by metrics infrastructure, as it can
+    //  result in warnings/errors and/or unexpected behavior.
+    if (!duration.isNegative)
+      timer.update(duration)
 }
