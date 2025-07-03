@@ -157,7 +157,7 @@ object SpliceUtil {
       logger,
     )
 
-  val defaultInitialTickDuration = NonNegativeFiniteDuration.ofMinutes(1)
+  val defaultInitialTickDuration = NonNegativeFiniteDuration.ofMinutes(10)
 
   private val decimalScale = Numeric.Scale.assertFromInt(10)
 

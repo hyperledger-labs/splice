@@ -211,7 +211,6 @@ class DbScanStore(
     for {
       a <- aggregator
       backFilledRound <- a.backFillAggregates()
-      _ = logger.debug(s"backFilledRound: $backFilledRound")
       _ = backFilledRound.foreach(r => storeMetrics.earliestAggregatedRound.updateValue(r))
     } yield backFilledRound
   }
