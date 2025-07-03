@@ -2188,8 +2188,8 @@ object UpdateHistory {
         for {
           queryResult <- storage.query(
             sql"""
-        select max(migration_id) from update_history_last_ingested_offsets
-      """.as[Option[Long]],
+               select max(migration_id) from update_history_last_ingested_offsets
+            """.as[Option[Long]],
             "getHighestKnownMigrationId",
           )
         } yield {
