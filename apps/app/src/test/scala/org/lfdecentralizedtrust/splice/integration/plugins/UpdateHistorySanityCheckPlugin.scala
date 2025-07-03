@@ -11,7 +11,8 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.{AcsResponse, UpdateH
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItemV2.members
 import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryReassignment.Event.members as reassignmentMembers
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.util.QualifiedName
+import org.lfdecentralizedtrust.splice.scan.automation.AcsSnapshotTrigger
+import org.lfdecentralizedtrust.splice.util.{QualifiedName, TriggerTestUtil}
 import com.digitalasset.canton.ScalaFuturesWithPatience
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -57,7 +58,7 @@ class UpdateHistorySanityCheckPlugin(
       config: SpliceConfig,
       environment: SpliceTestConsoleEnvironment,
   ): Unit = {
-    TraceContext.withNewTraceContext { implicit tc =>
+    TraceContext.withNewTraceContext("beforeEnvironmentDestroyed") { implicit tc =>
       // A scan might not be initialized if the test uses `manualStart` and it wasn't ever started.
       val initializedScans = environment.scans.local.filter(scan => scan.is_initialized)
 
