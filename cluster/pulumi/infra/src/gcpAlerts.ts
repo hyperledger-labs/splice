@@ -45,14 +45,6 @@ export function installGcpLoggingAlerts(
 ${monitoringConfig.alerting.logAlerts.shared}
 ${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}
 ${conditionalString(
-  disableReplayWarnings,
-  '-(resource.labels.container_name=~"participant" AND (' +
-    'jsonPayload.message=~"LOCAL_VERDICT_CREATES_EXISTING_CONTRACTS.*Rejected transaction would create contract\\(s\\) that already exist"' +
-    ' OR ' +
-    'jsonPayload.message=~"LOCAL_VERDICT_MALFORMED_REQUEST.*belongs to a replayed transaction"' +
-    '))'
-)}
-${conditionalString(
   isMainNet,
   `-- TODO(DACH-NY/cn-test-failures#4768): suppressed faulty validator warnings until timestamp
 -(resource.labels.container_name="participant-1"
