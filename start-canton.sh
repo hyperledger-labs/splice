@@ -249,7 +249,12 @@ fi
 tmux_cmd toxiproxy "toxiproxy-server 2>&1 | tee -a log/toxi.log"
 
 if [ $daemon -eq 0 ]; then
-  tmux attach -t ${tmux_session}
+  if [ -z "${TMUX-}" ]; then
+    tmux attach -t "${tmux_session}"
+  else
+    echo "Running inside tmux. To attach to canton terminal, type the following from a new terminal:"
+    echo "  tmux attach -t ${tmux_session}"
+  fi
 elif [ $daemon -eq 2 ]; then
   echo ""
   echo ""
