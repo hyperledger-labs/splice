@@ -63,6 +63,22 @@ Upcoming
       - S-7 (auditor suggestion): addressed by checking the ``dso`` party whenever
         executing a confirmed action.
 
+      - S-8 (auditor suggestion): addressed by
+
+        - checking the expected ``dso`` party on all calls to the helper methods
+          ``exerciseAppTransfer``, ``exercisePaymentTransfer``, and ``exerciseComputeFees``
+          to safe-guard against a delegee providing an unexpected ``AmuletRules`` contract from an ``AmuletRules`` contract
+          with a ``dso`` party under their control
+        - adding deprecation markers to the
+
+           - ``ValidatorFaucetCoupon`` template
+           - ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule``, ``AmuletRules_UpdateFutureAmuletConfigSchedule`` choices
+             that are deprecated in favor using a ``CRARC_SetConfig`` governance vote with effective dating
+           - ``DsoRules_RequestElection``, ``DsoRules_ElectDsoDelegate``, and ``DsoRules_ArchiveOutdatedElectionRequest`` choices
+             that are deprecated in favor of delegateless automation
+
+        - clarifying that the ``amuletRulesCid`` parameter of ``DsoRules_AddConfirmedSv`` is a historical artifact
+
 
     These Daml changes requires an upgrade to the following Daml versions:
 

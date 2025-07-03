@@ -87,11 +87,11 @@ data AmuletRules_ActionRequiringConfirmation
   | CRARC_MiningRound_Archive AmuletRules_MiningRound_Archive
     -- ^ Automated action to archive a closed mining round once no expired reward coupons are left.
   | CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule
-    -- ^ Voted action to add a config schedule to the `AmuletRules`.
+    -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to add a config schedule to the `AmuletRules`.
   | CRARC_RemoveFutureAmuletConfigSchedule AmuletRules_RemoveFutureAmuletConfigSchedule
-    -- ^ Voted action to remove a config schedule from the `AmuletRules`.
+    -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to remove a config schedule from the `AmuletRules`.
   | CRARC_UpdateFutureAmuletConfigSchedule AmuletRules_UpdateFutureAmuletConfigSchedule
-    -- ^ Voted action to update a config schedule in the `AmuletRules`.
+    -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to update a config schedule in the `AmuletRules`.
   | CRARC_SetConfig AmuletRules_SetConfig
     -- ^ Voted action to change the `AmuletConfig`. Not idempotent.
   deriving (Eq, Show)
@@ -301,18 +301,18 @@ data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActi
 -- Workflow templates
 ---------------------
 
--- TODO(#7649) revise and/or remove
+-- | __Deprecated__ in favor of delegateless automation.
 data ElectionRequestReason
   = ERR_DsoDelegateUnavailable
-  -- TODO(#7649): add case for DSO delegate asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   | ExtElectionRequestReason with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Ord, Show)
 
--- | A request to elect a new DSO delegate.
--- TODO(#7649) revise and/or remove
+-- | __Deprecated__ in favor of delegateless automation.
+--
+-- A request to elect a new DSO delegate.
 template ElectionRequest with
     dso : Party
     requester : Party
@@ -540,6 +540,8 @@ template DsoRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         amuletRulesCid: ContractId AmuletRules
+        -- No longer used, but must be kept for smart-contract upgrading compatibility.
+        -- (This was used when the current round number was tracked in the AmuletRules contract.)
       controller sv
       do
 
@@ -595,7 +597,8 @@ template DsoRules with
 
     -- Automation DSO delegate election
     ------------------------------
-    -- TODO(#7649) revise and/or remove
+
+    -- __Deprecated__ in favor of delegateless automation.
     nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
       with
         requester : Party
@@ -603,14 +606,14 @@ template DsoRules with
         ranking : [Party]
       controller requester
       do
-        -- TODO(#7649): consider interaction with concurrent SV changes
         require "Requester is an SV" (requester `Map.member` svs)
         require "All svs are ranked exactly once" (sort ranking == sort (Map.keys svs))
         electionRequestCid <- create ElectionRequest with
           ..
         return DsoRules_RequestElectionResult with ..
 
-    -- TODO(#7649) revise and/or remove
+    -- __Deprecated__ in favor of delegateless automation.
+    -- TODO(#607): make the choice abort once all SVs have switched to delegateless automation
     choice DsoRules_ElectDsoDelegate : DsoRules_ElectDsoDelegateResult
       with
         actor : Party
@@ -626,7 +629,6 @@ template DsoRules with
           pure req
         let numVotes = length reqs
             numVoters = numVotes
-            -- TODO(#7649): consider whether that is the right number of votes to require
             -- as there might be more votes being taken into consideration
             numVotesForMajority = (summary.requiredNumVotes + 1) / 2
         require "Requests are from different svs" (unique $ map (.requester) reqs)
@@ -637,6 +639,9 @@ template DsoRules with
         newDsoRules <- create newDsoRules
         return DsoRules_ElectDsoDelegateResult with ..
 
+    -- __Deprecated__ in favor of delegateless automation.
+    -- TODO(#607): make the choice abort once all SVs have switched to delegateless automation,
+    -- and checking that there are not too many outdated requests on long-term networks.
     nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : DsoRules_ArchiveOutdatedElectionRequestResult
       with
         requestCid : ContractId ElectionRequest

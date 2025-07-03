@@ -174,6 +174,8 @@ validValidatorLicenseMetadata metadata =
   Text.length metadata.contactPoint <= maxIdentifierLength &&
   Text.length metadata.version <= maxIdentifierLength
 
+-- | __Deprecated__: use `ValidatorLicense_RecordValidatorLivenessActivity` instead, as that one
+-- can be expired without requiring a confirmation from the validator node.
 template ValidatorFaucetCoupon with
     dso : Party
     validator : Party
@@ -190,7 +192,7 @@ template ValidatorFaucetCoupon with
          void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
          return ValidatorFaucetCoupon_DsoExpireResult
 
--- It is a copy of the ValidatorFaucetCoupon template with the only difference being that the validator is an observer instead of signatory.
+-- | A copy of the ValidatorFaucetCoupon template with the only difference being that the validator is an observer instead of signatory.
 -- This is to allow to expire the coupon without the validator's involvement.
 template ValidatorLivenessActivityRecord with
     dso : Party
