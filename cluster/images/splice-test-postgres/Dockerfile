@@ -1,4 +1,4 @@
-FROM postgres:14
+FROM postgres:17
 LABEL org.opencontainers.image.base.name="postgres:17"
 
 COPY cmd.sh /usr/local/bin/
