@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvCantonIdentifierConfig,
   SvOnboardingConfig,
 }
+import scala.jdk.OptionConverters.RichOption
 import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
@@ -668,7 +669,10 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
-                        Optional.of(config.initialRound),
+                        config.initialRound match {
+                          case round if round > 0L => Optional.of(round)
+                          case _ => Optional.empty()
+                        },
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(

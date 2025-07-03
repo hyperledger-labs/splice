@@ -420,7 +420,10 @@ class JoiningNodeInitializer(
       initialRound: String
   ): Future[Boolean] = {
     for {
-      initialRoundFromSponsor <- getInitialRoundFromSponsor
+      initialRoundFromSponsor <- joiningConfig match {
+        case Some(_) => getInitialRoundFromSponsor
+        case None => Future.successful(initialRound)
+      }
     } yield {
       if (initialRound == initialRoundFromSponsor) {
         true

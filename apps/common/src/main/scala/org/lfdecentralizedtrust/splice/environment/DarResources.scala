@@ -40,7 +40,7 @@ object DarResources {
     )
     val tokenStandardTest = PackageResource(
       DarResource(s"splice-token-standard-test-current.dar"),
-      Seq(DarResource(s"splice-token-standard-test-1.0.1.dar")),
+      Seq(DarResource(s"splice-token-standard-test-1.0.2.dar")),
     )
     val allPackageResources = Seq(
       tokenMetadata,
