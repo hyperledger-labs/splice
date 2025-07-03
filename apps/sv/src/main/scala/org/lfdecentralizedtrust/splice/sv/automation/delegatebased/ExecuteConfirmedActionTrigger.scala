@@ -78,13 +78,22 @@ class ExecuteConfirmedActionTrigger(
           svs = dsoRules.payload.svs.keySet.asScala
           requiredNumConfirmations = Thresholds.requiredNumVotes(dsoRules)
           allConfirmations <- store.listConfirmations(action)
-          (confirmationsOfMembers, confirmationsOfNonMembers) = allConfirmations.partition(c =>
-            svs.contains(c.payload.confirmer)
+          now = context.clock.now
+          (unexpiredConfirmations, expiredConfirmations) = allConfirmations.partition(c =>
+            now.toInstant.isBefore(c.payload.expiresAt)
           )
-
-          _ = if (!confirmationsOfNonMembers.isEmpty) {
+          _ = if (expiredConfirmations.nonEmpty) {
             logger.info(
-              s"Ignoring confirmations from ${confirmationsOfNonMembers.map(_.payload.confirmer)} as they are no longer an SV"
+              show"Ignoring expired confirmations from ${expiredConfirmations.map(_.payload.confirmer)}"
+            )
+          }
+
+          (confirmationsOfMembers, confirmationsOfNonMembers) = unexpiredConfirmations.partition(
+            c => svs.contains(c.payload.confirmer)
+          )
+          _ = if (confirmationsOfNonMembers.nonEmpty) {
+            logger.info(
+              show"Ignoring confirmations from ${confirmationsOfNonMembers.map(_.payload.confirmer)} as they are no longer an SV"
             )
           }
           uniqueConfirmations = confirmationsOfMembers.distinctBy(_.payload.confirmer)

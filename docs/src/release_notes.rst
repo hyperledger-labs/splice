@@ -8,13 +8,46 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.4
+-----
 
 - Daml
 
-  - Implements `CIP 64 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
-  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+  This release contains two sets of Daml changes that build upon each other:
+
+  1. Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.9
+     amuletNameService  0.1.9
+     dsoGovernance      0.1.13
+     validatorLifecycle 0.1.3
+     wallet             0.1.9
+     walletPayments     0.1.9
+     ================== =======
+
+  2. Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_ and fix security issues
+     and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_.
+     Note that the backend and frontend changes from CIP 66 are not yet implemented so we recommend holding off on upgrading to the new Daml models for now.
+
+      - CC-1 (low severity): addressed by rate limiting every SV wrt casting votes on a ``VoteRequest`` and updating their ``AmuletPriceVote``
+        to defend against them causing undue contention, which would block other SVs from
+        voting, closing the vote, or advancing the mining rounds.
+
+        This change introduces a new config value ``voteCooldownTime`` in
+        the ``DsoRules`` configuration that defines the cooldown time between
+        votes of the same SV. If not set, then the default value is 1 minute.
+
+      - CC-2 (low severity): addressed by enabling delegateless automation from CIP-0064 by default
+
+      - CC-4 (low severity): addressed by
+
+        - checking that ``expiresAt`` is in the future in the choice body of
+          ``DsoRules_ExecuteConfirmedAction``, ``DsoRules_AddConfirmedSv``, and ``ValidatorOnboarding_Match``.
 
       - CC-5 (low severity): addressed by
 
@@ -36,30 +69,65 @@ Upcoming
         - enforcing a length limit of 280 characters on the ``trackingId`` of ``TransferOffer``
           as a prudent engineering measure
 
+      - S-3 (auditor suggestion): addressed by
 
-    These Daml changes requires an upgrade to the following Daml versions:
+        - calling ``FeaturedAppRight_Withdraw`` in the implementation of ``DsoRules_RevokeFeaturedAppRight``
+        - calling ``Confirmation_Expire`` in the implementation of ``DsoRules_ExpireStaleConfirmation``
 
-    ================== =======
-    name               version
-    ================== =======
-    amulet             0.1.9
-    amuletNameService  0.1.9
-    dsoGovernance      0.1.13
-    validatorLifecycle 0.1.3
-    wallet             0.1.9
-    walletPayments     0.1.9
-    ================== =======
+      - S-7 (auditor suggestion): addressed by checking the ``dso`` party whenever
+        executing a confirmed action.
 
-- Backend
+      - S-8 (auditor suggestion): addressed by
+
+        - checking the expected ``dso`` party on all calls to the helper methods
+          ``exerciseAppTransfer``, ``exercisePaymentTransfer``, and ``exerciseComputeFees``
+          to safe-guard against a delegee providing an unexpected ``AmuletRules`` contract from an ``AmuletRules`` contract
+          with a ``dso`` party under their control
+        - adding deprecation markers to the
+
+           - ``ValidatorFaucetCoupon`` template
+           - ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule``, ``AmuletRules_UpdateFutureAmuletConfigSchedule`` choices
+             that are deprecated in favor using a ``CRARC_SetConfig`` governance vote with effective dating
+           - ``DsoRules_RequestElection``, ``DsoRules_ElectDsoDelegate``, and ``DsoRules_ArchiveOutdatedElectionRequest`` choices
+             that are deprecated in favor of delegateless automation
+
+        - clarifying that the ``amuletRulesCid`` parameter of ``DsoRules_AddConfirmedSv`` is a historical artifact
+
+
+        These Daml changes requires an upgrade to the following Daml versions:
+
+        ================== =======
+        name               version
+        ================== =======
+        amulet             0.1.10
+        amuletNameService  0.1.10
+        dsoGovernance      0.1.14
+        validatorLifecycle 0.1.4
+        wallet             0.1.10
+        walletPayments     0.1.10
+        ================== =======
+
+- SV
 
   - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
     the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.
+  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+
+- Scan
+
   - Fix a `bug (#1254) <https://github.com/hyperledger-labs/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
     based on the ``splice-instance-names`` config.
 
-- UI
+- Validator
 
-  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+  - **Breaking**: The validator app now enforces that the traffic
+    topup interval is >= the automation polling interval (30s by
+    default). Previously it implicitly rounded up if the topup
+    interval was smaller which caused confusion on how much traffic is
+    purchased each time. If your topup interval was >= 30s you are not
+    affected. If you are affected, set the topup interval to the
+    polling interval (30s unless changed) to recover the prior
+    behavior.
 
 - Docs
 
@@ -70,6 +138,7 @@ Upcoming
     an authenticated validator. A complete wipe of the validator database is not required, as
     opposed to what the docs previously stated. See the relevant section on :ref:`authenticated
     docker-compose validators <compose_validator_auth>`.
+
 
 
 

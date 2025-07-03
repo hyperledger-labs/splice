@@ -239,6 +239,7 @@ object DarResources {
   val validatorLifecycle_0_1_1 = DarResource("splice-validator-lifecycle-0.1.1.dar")
   val validatorLifecycle_0_1_2 = DarResource("splice-validator-lifecycle-0.1.2.dar")
   val validatorLifecycle_0_1_3 = DarResource("splice-validator-lifecycle-0.1.3.dar")
+  val validatorLifecycle_0_1_4 = DarResource("splice-validator-lifecycle-0.1.4.dar")
   val validatorLifecycle_current = DarResource("splice-validator-lifecycle-current.dar")
   val validatorLifecycle = PackageResource(
     validatorLifecycle_current,
@@ -247,6 +248,7 @@ object DarResources {
       validatorLifecycle_0_1_1,
       validatorLifecycle_0_1_2,
       validatorLifecycle_0_1_3,
+      validatorLifecycle_0_1_4,
     ),
   )
 

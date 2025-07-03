@@ -226,7 +226,12 @@ else
 fi
 
 if [ $daemon -eq 0 ]; then
-  tmux attach -t ${tmux_session}
+  if [ -z "${TMUX-}" ]; then
+    tmux attach -t "${tmux_session}"
+  else
+    echo "Running inside tmux. To attach to frontends terminal, type the following from a new terminal:"
+    echo "  tmux attach -t ${tmux_session}"
+  fi
 else
   echo ""
   echo ""

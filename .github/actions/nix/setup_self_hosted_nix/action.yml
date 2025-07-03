@@ -8,6 +8,10 @@ inputs:
   artifactory_password:
     description: 'The Artifactory password'
     required: true
+  oss_only:
+    description: 'Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)'
+    default: 'false'
+    required: false
   cache_version:
     description: 'The cache version'
     required: true
@@ -26,6 +30,11 @@ runs:
         git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
+        if [ "${{ inputs.oss_only }}" == true ]; then
+          echo "Using OSS only dependencies"
+          echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
+          touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
+        fi
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
         cat /tmp/nix-cache-key
@@ -77,15 +86,24 @@ runs:
             sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
             sudo mkdir -p /etc/nix
             sudo chmod a+rw /etc/nix
-            cat <<EOF > /etc/nix/netrc
-            machine digitalasset.jfrog.io
-            login ${{ inputs.artifactory_user }}
-            password ${{ inputs.artifactory_password }}
+            if [[ "${{ inputs.oss_only }}" == true ]]; then
+              echo "Using OSS only dependencies, not setting up Artifactory credentials"
+            else
+              cat <<EOF > /etc/nix/netrc
+              machine digitalasset.jfrog.io
+              login ${{ inputs.artifactory_user }}
+              password ${{ inputs.artifactory_password }}
           EOF
+            fi
             export USER=$(whoami)
             echo "Running nix.sh"
             . ~/.nix-profile/etc/profile.d/nix.sh
-            nix develop path:nix -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
+            if [[ "${{ inputs.oss_only }}" == true ]]; then
+              target="oss"
+            else
+              target="default"
+            fi
+            nix develop path:nix#${target} -v --profile "$HOME/.nix-shell" --command echo "Done loading packages"
             echo "Garbage collecting to reduce cache size"
             nix-store --gc
           fi

@@ -618,7 +618,7 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listDsoSequencers") { _ => _ =>
       store
-        .listFromCachedSvNodeStates { nodeState =>
+        .listFromSvNodeStates { nodeState =>
           for {
             (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
             sequencers = for {
@@ -671,7 +671,7 @@ class HttpScanHandler(
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.listDsoScans") { _ => _ =>
       store
-        .listCachedDsoScans()
+        .listDsoScans()
         .map(list =>
           definitions.ListDsoScansResponse(list.map { case (synchronizerId, scans) =>
             definitions.DomainScans(

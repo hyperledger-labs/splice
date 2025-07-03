@@ -27,5 +27,5 @@ trait AppStore extends NamedLogging with AutoCloseable with StoreErrors {
 trait TxLogAppStore[TXE] extends AppStore {
 
   /** Defines how to parse and serialize TxLog entries. */
-  protected def txLogConfig: TxLogStore.Config[TXE]
+  def txLogConfig: TxLogStore.Config[TXE]
 }
