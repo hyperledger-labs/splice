@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import com.daml.ledger.javaapi.data.OffsetCheckpoint
+import com.daml.ledger.javaapi.data.{DamlRecord, Identifier, OffsetCheckpoint}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
@@ -28,12 +28,18 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationrequestv1,
+  holdingv1,
+}
 
 import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
 import org.slf4j.event.Level
 import slick.jdbc.JdbcProfile
+
+import java.time.Instant
+import scala.concurrent.Future
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -347,7 +353,7 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
-    "log view failures" in { // see override of `additionalExpectedWarnings` below for log assertion
+    "log view failures" in {
       implicit val store = mkStore()
       val contractsToFailedViews = (1 to 3).map { n =>
         val contract = dummyHolding(providerParty(n), BigDecimal(n), dsoParty)
@@ -362,26 +368,16 @@ class DbMultiDomainAcsStoreTest
       for {
         _ <- initWithAcs()
         _ <- MonadUtil.sequentialTraverse(contractsToFailedViews) { case (contract, failedView) =>
-          loggerFactory.assertLogs(SuppressionRule.Level(Level.ERROR))(
-            // using `d1.create` has an inner log assertion that breaks the one above
-            store.testIngestionSink.underlying.ingestUpdate(
-              d1,
-              TransactionTreeUpdate(
-                mkCreateTx(
-                  nextOffset(),
-                  Seq(contract),
-                  defaultEffectiveAt,
-                  Seq(dsoParty),
-                  d1,
-                  "",
-                  failedInterfaces = Map(
-                    holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
-                  ),
-                )
-              ),
-            ),
-            _.message should include(
-              "Found failed interface views that match an interface id in a filter"
+          ingestExpectingFailedInterfacesLog(
+            store,
+            Seq(
+              (
+                contract,
+                Map.empty[Identifier, DamlRecord],
+                Map(
+                  holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+                ),
+              )
             ),
           )
         }
@@ -392,6 +388,183 @@ class DbMultiDomainAcsStoreTest
       } yield expectedEmpty shouldBe empty
     }
 
+    "ingest successful interface views and ignore failed ones" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val contract = twoInterfaces(owner, BigDecimal(10.0), dsoParty, Instant.now())
+      val successfulView = holdingView(owner, BigDecimal(10.0), dsoParty, "id")
+      val failedView = com.google.rpc.Status
+        .newBuilder()
+        .setCode(500)
+        .setMessage("Failed view")
+        .build()
+
+      for {
+        _ <- initWithAcs()
+        _ <- ingestExpectingFailedInterfacesLog(
+          store,
+          Seq(
+            (
+              contract,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> successfulView.toValue
+              ),
+              Map(
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+              ),
+            )
+          ),
+        )
+        result1 <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        result2 <- store.listInterfaceViews(allocationrequestv1.AllocationRequest.INTERFACE)
+      } yield {
+        result1 should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contract.contractId.contractId),
+              successfulView,
+              contract.createdEventBlob,
+              contract.createdAt,
+            )
+          )
+        )
+        result2 shouldBe empty
+      }
+    }
+
+    "ingest several contracts in a single transaction with mixed successful / failed interface views" in {
+      implicit val store = mkStore()
+      val contract1 = twoInterfaces(providerParty(1), BigDecimal(10.0), dsoParty, Instant.now())
+      val contract2 = twoInterfaces(providerParty(2), BigDecimal(20.0), dsoParty, Instant.now())
+      val contract3 = twoInterfaces(providerParty(3), BigDecimal(30.0), dsoParty, Instant.now())
+      val contract4 = twoInterfaces(providerParty(4), BigDecimal(40.0), dsoParty, Instant.now())
+
+      for {
+        _ <- initWithAcs()
+        // 1 -> all good; 2 -> holding failed; 3 -> allocation request failed; 4 -> both failed
+        _ <- ingestExpectingFailedInterfacesLog(
+          store,
+          Seq[
+            (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
+          ](
+            (
+              contract1,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView(
+                  providerParty(1),
+                  BigDecimal(10.0),
+                  dsoParty,
+                  "1",
+                ).toValue,
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> allocationRequestView(
+                  dsoParty,
+                  Instant.now(),
+                ).toValue,
+              ),
+              Map(
+              ),
+            ),
+            (
+              contract2,
+              Map(
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> allocationRequestView(
+                  dsoParty,
+                  Instant.now(),
+                ).toValue
+              ),
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed holding view"
+                )
+              ),
+            ),
+            (
+              contract3,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView(
+                  providerParty(3),
+                  BigDecimal(30.0),
+                  dsoParty,
+                  "3",
+                ).toValue
+              ),
+              Map(
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed allocation request view"
+                )
+              ),
+            ),
+            (
+              contract4,
+              Map(
+              ),
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed holding view"
+                ),
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed allocation request view"
+                ),
+              ),
+            ),
+          ),
+        )
+        resultHolding <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        resultAllocationRequest <- store.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield {
+        resultHolding.map(_.contractId.contractId) should be(
+          Seq(contract1.contractId.contractId, contract3.contractId.contractId)
+        )
+        resultAllocationRequest.map(_.contractId.contractId) should be(
+          Seq(contract1.contractId.contractId, contract2.contractId.contractId)
+        )
+      }
+    }
+
+  }
+
+  private def failedViewStatus(msg: String) = {
+    com.google.rpc.Status
+      .newBuilder()
+      .setCode(500)
+      .setMessage(msg)
+      .build()
+  }
+
+  private def ingestExpectingFailedInterfacesLog(
+      store: DbMultiDomainAcsStore[?],
+      contracts: Seq[
+        (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
+      ],
+  ): Future[Unit] = {
+    loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
+      // using `d1.create` has an inner log assertion that breaks the one above
+      store.testIngestionSink.underlying.ingestUpdate(
+        d1,
+        TransactionTreeUpdate(
+          mkCreateTxWithInterfaces(
+            nextOffset(),
+            contracts,
+            defaultEffectiveAt,
+            Seq(dsoParty),
+            d1,
+            "",
+          )
+        ),
+      ),
+      entries => {
+        val entriesWithFailures = contracts.count(_._3.nonEmpty)
+        entries should have size entriesWithFailures.toLong
+        forAll(entries)(
+          _.message should include(
+            "Found failed interface views that match an interface id in a filter"
+          )
+        )
+      },
+    )
   }
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =

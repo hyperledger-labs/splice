@@ -186,7 +186,12 @@ abstract class MultiDomainAcsStoreTest[
     )
   }
 
-  private def twoInterfaces(owner: PartyId, amount: BigDecimal, issuer: PartyId, date: Instant) = {
+  protected def twoInterfaces(
+      owner: PartyId,
+      amount: BigDecimal,
+      issuer: PartyId,
+      date: Instant,
+  ) = {
     val templateId = DummyTwoInterfaces.TEMPLATE_ID
     val payload =
       new DummyTwoInterfaces(owner.toProtoPrimitive, issuer.toProtoPrimitive, numeric(amount), date)
@@ -197,8 +202,8 @@ abstract class MultiDomainAcsStoreTest[
     )
   }
 
-  private val emptyMetadata = new metadatav1.Metadata(java.util.Map.of())
-  private def holdingView(owner: PartyId, amount: BigDecimal, admin: PartyId, id: String) = {
+  protected val emptyMetadata = new metadatav1.Metadata(java.util.Map.of())
+  protected def holdingView(owner: PartyId, amount: BigDecimal, admin: PartyId, id: String) = {
     new holdingv1.HoldingView(
       owner.toProtoPrimitive,
       new holdingv1.InstrumentId(admin.toProtoPrimitive, id),
@@ -208,7 +213,7 @@ abstract class MultiDomainAcsStoreTest[
     )
   }
 
-  private def allocationRequestView(executor: PartyId, date: Instant) = {
+  protected def allocationRequestView(executor: PartyId, date: Instant) = {
     new allocationrequestv1.AllocationRequestView(
       new allocationv1.SettlementInfo(
         executor.toProtoPrimitive,

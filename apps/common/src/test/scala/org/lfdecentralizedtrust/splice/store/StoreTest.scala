@@ -847,20 +847,44 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       recordTime: Instant = defaultEffectiveAt,
       packageName: String = dummyPackageName,
       createdEventObservers: Seq[PartyId] = Seq.empty,
-      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
-      failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
-  ) = mkTx(
+  ): TransactionTree = mkCreateTxWithInterfaces(
     offset,
-    createRequests.map[TreeEvent](
+    createRequests.map(cr =>
+      (cr, Map.empty[Identifier, DamlRecord], Map.empty[Identifier, com.google.rpc.Status])
+    ),
+    effectiveAt,
+    createdEventSignatories,
+    synchronizerId,
+    workflowId,
+    recordTime,
+    packageName,
+    createdEventObservers,
+  )
+
+  protected def mkCreateTxWithInterfaces(
+      offset: Long,
+      createRequests: Seq[
+        (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
+      ],
+      effectiveAt: Instant,
+      createdEventSignatories: Seq[PartyId],
+      synchronizerId: SynchronizerId,
+      workflowId: String,
+      recordTime: Instant = defaultEffectiveAt,
+      packageName: String = dummyPackageName,
+      createdEventObservers: Seq[PartyId] = Seq.empty,
+  ): TransactionTree = mkTx(
+    offset,
+    createRequests.map[TreeEvent] { case (contract, implementedInterfaces, failedInterfaces) =>
       toCreatedEvent(
-        _,
+        contract,
         createdEventSignatories,
         packageName,
         createdEventObservers,
         implementedInterfaces,
         failedInterfaces,
       )
-    ),
+    },
     synchronizerId,
     effectiveAt,
     workflowId,
@@ -1007,9 +1031,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
         failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
-      val tx = mkCreateTx(
+      val tx = mkCreateTxWithInterfaces(
         offset,
-        Seq(c),
+        Seq((c, implementedInterfaces, failedInterfaces)),
         txEffectiveAt,
         createdEventSignatories,
         domain,
@@ -1017,8 +1041,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         recordTime,
         packageName,
         createdEventObservers,
-        implementedInterfaces,
-        failedInterfaces,
       )
 
       store.testIngestionSink
