@@ -76,6 +76,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 
 import java.security.interfaces.ECPrivateKey
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -425,9 +426,12 @@ class JoiningNodeInitializer(
       initialRoundFromSponsor <- joiningConfig match {
         case Some(_) =>
           connection
-            // if simply restarting use the user metadata initial round
-            .getInitialRoundFromUserMetadata(config.ledgerApiUser)
-            .fallbackTo(getInitialRoundFromSponsor)
+            // if simply restarting use the user metadata's initial round
+            .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
+            .flatMap {
+              case Some(round) => Future.successful(round)
+              case None => getInitialRoundFromSponsor
+            }
         case None => Future.successful(initialRound)
       }
     } yield {

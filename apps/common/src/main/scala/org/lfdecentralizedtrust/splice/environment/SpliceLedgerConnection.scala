@@ -402,10 +402,9 @@ class BaseLedgerConnection(
       userId: String,
       key: String,
       identityProviderId: Option[String] = None,
-      retryFor: RetryFor = RetryFor.WaitingOnInitDependency,
   )(implicit traceContext: TraceContext): Future[String] =
     retryProvider.getValueWithRetriesNoPretty(
-      retryFor,
+      RetryFor.WaitingOnInitDependency,
       "wait_user_metadata",
       s"metadata field $key of user $userId",
       client.getUserProto(userId, identityProviderId).map { user =>
@@ -536,7 +535,6 @@ class BaseLedgerConnection(
     waitForUserMetadata(
       userId,
       INITIAL_ROUND_USER_METADATA_KEY,
-      retryFor = RetryFor.ClientCalls,
     )
 
   // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
