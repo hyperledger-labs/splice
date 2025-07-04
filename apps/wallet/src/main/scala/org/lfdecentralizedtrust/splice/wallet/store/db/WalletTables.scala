@@ -86,5 +86,5 @@ object WalletTables extends AcsTables {
   val acsTableName: String = "user_wallet_acs_store"
   val externalPartyAcsTableName: String = "external_party_wallet_acs_store"
   val txLogTableName: String = "user_wallet_txlog_store"
-  val internfaceViewsTableName: String = "user_wallet_acs_interface_views"
+  val interfaceViewsTableName: String = "user_wallet_acs_interface_views"
 }
