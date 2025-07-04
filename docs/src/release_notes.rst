@@ -42,6 +42,8 @@ Upcoming
   - prudent engineering: enforce on calls to ``ExternalPartyAmuletRules_CreateTransferCommand`` that ``expiresAt``
     is in the future
 
+  - prudent engineering: change all splice Daml code to fetch all reference data
+    using checked fetches where the caller specifies the expected ``dso`` party
 
   These Daml changes require an upgrade to the following Daml versions:
 

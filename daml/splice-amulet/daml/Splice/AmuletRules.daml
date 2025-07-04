@@ -219,7 +219,7 @@ template AmuletRules
           Right _ -> pure ()
         openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
         let transferConfigAmulet = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
-        (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
+        (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
         -- We want to burn exactly trafficCostAmulet, and createFee is already burnt by the self-transfer itself, so we subtract the createFee from the amount we split off and burn explicitly.
         (transferResult, meta) <- splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase"
         -- create a new MemberTraffic contract for the purchased traffic
@@ -1150,14 +1150,14 @@ validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
   | otherwise = Right ()
 
 -- | Computing synchronizer fees
-computeSynchronizerFees : Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
-computeSynchronizerFees validator trafficAmount amuletRules context = do
+computeSynchronizerFees : Party -> Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
+computeSynchronizerFees dso validator trafficAmount amuletRules context = do
   -- compute traffic cost in USD
   configUsd <- getValueAsOfLedgerTime amuletRules.configSchedule
   let extraTrafficPrice = configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
   -- compute traffic cost in Amulet
-  contextMiningRound <- exercise context.openMiningRound (OpenMiningRound_Fetch validator)
+  contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch validator)
   let trafficCostAmulet = trafficCostUsd / contextMiningRound.amuletPrice
   pure (trafficCostAmulet, trafficCostUsd)
 

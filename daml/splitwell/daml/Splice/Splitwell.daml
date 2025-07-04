@@ -13,6 +13,7 @@ import DA.Set qualified as Set
 import Splice.AmuletRules (AppTransferContext(..))
 import Splice.Round
 import Splice.Util
+import Splice.Types (ForDso(..))
 import Splice.Wallet.Payment
 
 -- Stable identifier for a group. We avoid contract keys
@@ -292,7 +293,7 @@ template TransferInProgress
          acceptedPayment <- fetchUncheckedButArchiveLater acceptedPaymentCid
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
-         openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
+         openMiningRound <- fetchPublicReferenceData (ForDso with dso = group.dso) transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
          -- TODO(#9464): we should check that the DSO party matches here!
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender

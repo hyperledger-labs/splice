@@ -110,7 +110,7 @@ template AppPaymentRequest
         walletProvider : Party
       controller sender, walletProvider
       do now <- getTime
-         contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
+         contextRound <- fetchPublicReferenceData (ForDso with dso) context.context.openMiningRound (OpenMiningRound_Fetch provider)
 
          -- Convert from USD to Amulet amounts
          amuletReceiverAmounts <- forA receiverAmounts $ \rq ->
@@ -213,7 +213,7 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller signatory this
       do
-        contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
+        contextRound <- fetchPublicReferenceData (ForDso with dso) context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock amulet and transfer the remainder to the receiver
         result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)

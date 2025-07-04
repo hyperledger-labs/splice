@@ -195,7 +195,8 @@ template SubscriptionInitialPayment
         transferContext : AppTransferContext
       controller signatory this
       do
-        contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
+        contextRound <- fetchPublicReferenceData (ForDso with dso = subscriptionData.dso)
+          transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
         require ("Round at subscription request " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
 
         now <- getTime
@@ -312,7 +313,8 @@ template SubscriptionPayment
         transferContext : AppTransferContext
       controller signatory this
       do
-        contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
+        contextRound <- fetchPublicReferenceData (ForDso with dso = subscriptionData.dso)
+          transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
         require ("Round at subscription payment " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- TODO(#9465): look into why we even need the separate subscription contract given that we duplicate all its data
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
@@ -362,7 +364,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
   let SubscriptionPayData { paymentAmount; .. } = payData
 
 
-  contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
+  contextRound <- fetchPublicReferenceData (ForDso with dso) context.context.openMiningRound (OpenMiningRound_Fetch sender)
 
   targetAmount <- paymentAmountToAmulet dso contextRound paymentAmount
 
