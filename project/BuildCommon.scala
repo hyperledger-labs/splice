@@ -782,6 +782,13 @@ object BuildCommon {
         `canton-ledger-common` % "compile->compile;test->test",
       )
       .settings(
+        removeTestSources,
+        // We only need 3 files out of a lot of test files so add them explicitly
+        Test / managedSources := Seq(
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/HasActorSystem.scala",
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbTest.scala",
+          (Test / sourceDirectory).value / "scala/com/digitalasset/canton/store/db/DbStorageIdempotency.scala",
+        ),
         disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
@@ -1181,6 +1188,7 @@ object BuildCommon {
         `canton-ledger-api`,
       )
       .settings(
+        removeTestSources,
         sharedCantonSettings,
         disableTests,
         sharedSettings,
@@ -1255,6 +1263,7 @@ object BuildCommon {
         ScalafmtPlugin,
       ) // to accommodate different daml repo coding style
       .settings(
+        removeTestSources,
         sharedCantonSettings,
         sharedSettings,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
@@ -1410,6 +1419,10 @@ object BuildCommon {
         `canton-ledger-api`
       )
       .settings(
+        removeTestSources,
+        Test / managedSources := Seq(
+          (Test / sourceDirectory).value / "scala/com/daml/ledger/javaapi/data/Generators.scala"
+        ),
         sharedCantonSettings,
         Test / unmanagedSources :=
           (Test / unmanagedSources).value.filter(_.getName == "Generators.scala"),
