@@ -16,36 +16,21 @@ import {
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
-import { YourVoteStatus } from '../../routes/governance';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { ContractId } from '@daml/types';
+import { Link as RouterLink } from 'react-router-dom';
+import { ProposalListingData, ProposalListingStatus, YourVoteStatus } from '../../utils/types';
 
-interface VotesListingSectionProps {
+interface ProposalListingSectionProps {
   sectionTitle: string;
-  data: VoteListingData[];
+  data: ProposalListingData[];
   uniqueId: string;
   showVoteStats?: boolean;
   showAcceptanceThreshold?: boolean;
   showStatus?: boolean;
 }
 
-export type VoteListingStatus =
-  | 'Accepted'
-  | 'In Progress'
-  | 'Implemented'
-  | 'Rejected'
-  | 'Expired'
-  | 'Unknown';
-
-export interface VoteListingData {
-  actionName: string;
-  votingCloses: string;
-  voteTakesEffect: string;
-  yourVote: YourVoteStatus;
-  status: VoteListingStatus;
-  voteStats: Record<YourVoteStatus, number>;
-  acceptanceThreshold: bigint;
-}
-
-export const VotesListingSection: React.FC<VotesListingSectionProps> = props => {
+export const ProposalListingSection: React.FC<ProposalListingSectionProps> = props => {
   const { sectionTitle, data, uniqueId, showVoteStats, showAcceptanceThreshold, showStatus } =
     props;
 
@@ -83,6 +68,7 @@ export const VotesListingSection: React.FC<VotesListingSectionProps> = props => 
                 <VoteRow
                   key={index}
                   actionName={vote.actionName}
+                  contractId={vote.contractId}
                   uniqueId={uniqueId}
                   votingCloses={vote.votingCloses}
                   voteTakesEffect={vote.voteTakesEffect}
@@ -106,7 +92,8 @@ export const VotesListingSection: React.FC<VotesListingSectionProps> = props => 
 interface VoteRowProps {
   acceptanceThreshold: bigint;
   actionName: string;
-  status: VoteListingStatus;
+  contractId: ContractId<VoteRequest>;
+  status: ProposalListingStatus;
   uniqueId: string;
   voteStats: Record<YourVoteStatus, number>;
   voteTakesEffect: string;
@@ -121,6 +108,7 @@ const VoteRow: React.FC<VoteRowProps> = props => {
   const {
     acceptanceThreshold,
     actionName,
+    contractId,
     status,
     uniqueId,
     voteStats,
@@ -175,8 +163,13 @@ const VoteRow: React.FC<VoteRowProps> = props => {
       </TableCell>
 
       <TableCell align="right" data-testid={`${uniqueId}-row-view-details`}>
-        <Button endIcon={<ArrowForward fontSize="small" />} size="small">
-          View Details
+        <Button
+          component={RouterLink}
+          to={`/governance-beta/proposals/${contractId}`}
+          size="small"
+          endIcon={<ArrowForward fontSize="small" />}
+        >
+          Details
         </Button>
       </TableCell>
     </TableRow>
