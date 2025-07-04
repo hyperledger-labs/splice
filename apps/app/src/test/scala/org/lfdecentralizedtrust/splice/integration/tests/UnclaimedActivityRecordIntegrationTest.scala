@@ -108,14 +108,10 @@ class UnclaimedActivityRecordIntegrationTest
         )
       }
 
-      setTriggersWithin(
-        triggersToResumeAtStart = Seq.empty
-      ) {
-        clue("UnallocatedUnclaimedActivityRecord gets archived") {
-          eventually() {
-            sv1Backend.participantClient.ledger_api_extensions.acs
-              .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
-          }
+      clue("UnallocatedUnclaimedActivityRecord gets archived") {
+        eventually() {
+          sv1Backend.participantClient.ledger_api_extensions.acs
+            .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
         }
       }
     }
