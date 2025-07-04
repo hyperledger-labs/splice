@@ -31,7 +31,6 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvCantonIdentifierConfig,
   SvOnboardingConfig,
 }
-import scala.jdk.OptionConverters.RichOption
 import org.lfdecentralizedtrust.splice.sv.onboarding.{
   DsoPartyHosting,
   NodeInitializerUtil,
