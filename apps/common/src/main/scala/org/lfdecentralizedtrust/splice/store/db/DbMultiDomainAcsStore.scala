@@ -1409,10 +1409,7 @@ final class DbMultiDomainAcsStore[TXE](
             }
           },
           onExercise = (st, ev, _) => {
-            if (
-              ev.isConsuming && contractFilter
-                .mightContain(ev.getTemplateId, ev.getImplementedInterfaces.asScala.toSeq)
-            ) {
+            if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
               // optimization: a delete on a contract cancels-out with the corresponding insert
               if (st.contains(ev.getContractId)) {
                 st - ev.getContractId

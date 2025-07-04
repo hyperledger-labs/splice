@@ -10,7 +10,7 @@ import com.daml.ledger.api.v2.transaction_filter.{
   TransactionFilter as LapiTransactionFilter,
 }
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, ExercisedEvent}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -291,8 +291,12 @@ object MultiDomainAcsStore {
     /** Whether the event is in scope. */
     def contains(ev: CreatedEvent): Boolean
 
-    /** Whether the scope might contain an event of the given template and/or implemented interfaces. */
-    def mightContain(templateId: Identifier, implementedInterfaces: Seq[Identifier]): Boolean
+    /** Whether the contract referenced by the (archive)-ExercisedEvent should be archived.
+      * Since the payload is not included in the event, this will be best-effort,
+      * meaning that `true` might be returned for contracts that were never ingested.
+      * This is fine, as removing something that doesn't exist is a noop.
+      */
+    def shouldArchive(exercisedEvent: ExercisedEvent): Boolean
 
     def matchingContractToRow(
         ev: CreatedEvent
@@ -397,13 +401,12 @@ object MultiDomainAcsStore {
       matchesTemplate || successfulInterfaces.nonEmpty || failedInterfaces.nonEmpty
     }
 
-    override def mightContain(
-        templateId: Identifier,
-        implementedInterfaces: Seq[Identifier],
+    override def shouldArchive(
+        exercisedEvent: ExercisedEvent
     ): Boolean = {
       templateFiltersWithoutPackageNames.contains(
-        QualifiedName(templateId)
-      ) || implementedInterfaces.exists(interfaceId =>
+        QualifiedName(exercisedEvent.getTemplateId)
+      ) || exercisedEvent.getImplementedInterfaces.asScala.exists(interfaceId =>
         interfaceFiltersWithoutPackageNames.contains(QualifiedName(interfaceId))
       )
     }
