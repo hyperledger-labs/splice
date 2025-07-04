@@ -22,12 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
-import org.lfdecentralizedtrust.splice.store.db.{
-  AcsInterfaceViewRowData,
-  AcsJdbcTypes,
-  AcsRowData,
-  FailedInterfaceComputationRow,
-}
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes, AcsRowData}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
@@ -289,7 +284,7 @@ object MultiDomainAcsStore {
     def ingestionFilter: IngestionFilter
 
     /** Whether the event is in scope. */
-    def contains(ev: CreatedEvent): Boolean
+    def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean
 
     /** Whether the contract referenced by the (archive)-ExercisedEvent should be archived.
       * Since the payload is not included in the event, this will be best-effort,
@@ -306,7 +301,7 @@ object MultiDomainAcsStore {
         ev: CreatedEvent
     )(implicit
         elc: ErrorLoggingContext
-    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR], Seq[FailedInterfaceComputationRow])]
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])]
 
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
@@ -386,19 +381,24 @@ object MultiDomainAcsStore {
         interfaceFilters.values.map(_.interfaceId).toSeq,
       )
 
-    override def contains(ev: CreatedEvent): Boolean = {
+    override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
       val matchesTemplate = templateFiltersWithoutPackageNames
         .get(QualifiedName(ev.getTemplateId))
         .exists(_.evPredicate(ev))
-      lazy val successfulInterfaces = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
+      lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
         interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier)).exists(_.evPredicate(ev))
       }
       lazy val failedInterfaces = ev.getFailedInterfaceViews.asScala.filter {
         case (identifier, _) =>
-          // for failed interfaces we cannot check the `evPredicate` yet we still must store the row
           interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier))
       }
-      matchesTemplate || successfulInterfaces.nonEmpty || failedInterfaces.nonEmpty
+      if (failedInterfaces.nonEmpty) {
+        elc.error(
+          s"Found failed interface views that match an interface id in a filter: $failedInterfaces. " +
+            s"This might be a bug in the daml definition of the interface's view."
+        )
+      }
+      matchesTemplate || interfaceViews.nonEmpty
     }
 
     override def shouldArchive(
@@ -424,7 +424,7 @@ object MultiDomainAcsStore {
         ev: CreatedEvent
     )(implicit
         elc: ErrorLoggingContext
-    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR], Seq[FailedInterfaceComputationRow])] = {
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])] = {
       val acsRowData = AcsRowData.AcsRowDataFromInterface(
         ev.getTemplateId,
         new ContractId[DamlRecord[?]](ev.getContractId),
@@ -437,18 +437,11 @@ object MultiDomainAcsStore {
         interfaceFilter <- interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier))
         result <- interfaceFilter.matchingContractToRow(ev)
       } yield result
-      val failedInterfaces = ev.getFailedInterfaceViews.asScala.collect {
-        case (identifier, status)
-            if interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier)) &&
-              // this filter should ideally not be necessary, but it's better than getting CHECK constraint violations
-              !ev.getInterfaceViews.containsKey(identifier) =>
-          FailedInterfaceComputationRow(identifier, status)
-      }
 
-      if (interfaceRowDatas.isEmpty && failedInterfaces.isEmpty) {
+      if (interfaceRowDatas.isEmpty) {
         None
       } else {
-        Some((acsRowData, interfaceRowDatas.toSeq, failedInterfaces.toSeq))
+        Some((acsRowData, interfaceRowDatas.toSeq))
       }
     }
 

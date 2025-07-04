@@ -5,7 +5,10 @@ import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.StoreTest.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
@@ -20,16 +23,16 @@ import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
-import com.google.protobuf.util.JsonFormat
-import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1
 
 import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
+import org.slf4j.event.Level
 import slick.jdbc.JdbcProfile
 
 class DbMultiDomainAcsStoreTest
@@ -344,7 +347,7 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
-    "ingest view failures" in {
+    "log view failures" in { // see override of `additionalExpectedWarnings` below for log assertion
       implicit val store = mkStore()
       val contractsToFailedViews = (1 to 3).map { n =>
         val contract = dummyHolding(providerParty(n), BigDecimal(n), dsoParty)
@@ -359,46 +362,37 @@ class DbMultiDomainAcsStoreTest
       for {
         _ <- initWithAcs()
         _ <- MonadUtil.sequentialTraverse(contractsToFailedViews) { case (contract, failedView) =>
-          d1.create(
-            contract,
-            failedInterfaces = Map(
-              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+          loggerFactory.assertLogs(SuppressionRule.Level(Level.ERROR))(
+            // using `d1.create` has an inner log assertion that breaks the one above
+            store.testIngestionSink.underlying.ingestUpdate(
+              d1,
+              TransactionTreeUpdate(
+                mkCreateTx(
+                  nextOffset(),
+                  Seq(contract),
+                  defaultEffectiveAt,
+                  Seq(dsoParty),
+                  d1,
+                  "",
+                  failedInterfaces = Map(
+                    holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+                  ),
+                )
+              ),
+            ),
+            _.message should include(
+              "Found failed interface views that match an interface id in a filter"
             ),
           )
         }
-        storedResult <- {
-          // this is not meant to be exposed, so we have to check the DB directly
-          import storage.api.jdbcProfile.api.*
-          storage
-            .query(
-              sql"select view_compute_error from interface_views_template where view_compute_error is not null order by acs_event_number"
-                .as[Json],
-              "queryViewComputeErrors",
-            )
-            .failOnShutdown
-        }
-        // they shouldn't be returned since they can't be parsed
+        // nothing should be returned since they can't be parsed
         expectedEmpty <- store.listInterfaceViews(
           holdingv1.Holding.INTERFACE
         )
-      } yield {
-        // Use grpc JsonFormat to parse the error details
-        val parsed = storedResult.map { json =>
-          val builder = com.google.rpc.Status.newBuilder()
-          JsonFormat.parser().ignoringUnknownFields().merge(json.noSpaces, builder)
-          builder.build()
-        }
-        parsed should be(contractsToFailedViews.map(_._2))
-
-        expectedEmpty shouldBe empty
-      }
+      } yield expectedEmpty shouldBe empty
     }
 
   }
-
-  override protected def additionalExpectedWarnings: Set[String] = Set(
-    "Storing failed interface computation" // for test "ingest view failures"
-  )
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
     DbMultiDomainAcsStore.StoreDescriptor(

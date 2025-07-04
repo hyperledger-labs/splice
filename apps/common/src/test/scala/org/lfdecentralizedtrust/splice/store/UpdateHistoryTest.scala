@@ -247,7 +247,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                 )
               )
             },
-            maxCountRepeated = 199, // 10 stores x 10 updates x up to 2 retries per update
+            maxCount = 199, // 10 stores x 10 updates x up to 2 retries per update
           )
           // Query all stores in parallel
           updatesList <- Future.traverse(stores)(s => updates(s))
@@ -457,7 +457,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   update,
                 )
             },
-            maxCountRepeated = updates.size,
+            maxCount = updates.size,
           )
           _ <- initStore(storeMigrationId2)
           // insert the same transactions but in migration id 2,
@@ -469,7 +469,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   update,
                 )
             },
-            maxCountRepeated = updates.size,
+            maxCount = updates.size,
           )
           all <- storeMigrationId1.getAllUpdates(
             None,

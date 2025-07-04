@@ -63,7 +63,6 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.google.protobuf.ByteString
-import com.google.protobuf.util.JsonFormat
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
@@ -1537,7 +1536,7 @@ final class DbMultiDomainAcsStore[TXE](
         contractFilter.matchingInterfaceRows(createdEvent),
         contractFilter.matchingContractToRow(createdEvent),
       ) match {
-        case (Some((fallbackRowData, interfaces, failedInterfaces)), rowData) =>
+        case (Some((fallbackRowData, interfaces)), rowData) =>
           // For the acs_table row:
           // If only the interface filter matches, we use the "bare minimum" row data from the interface filter
           // that does not contain any index columns, as the interface table needs to reference the acs_table.
@@ -1554,18 +1553,8 @@ final class DbMultiDomainAcsStore[TXE](
                 val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
                 val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
                 (sql"""
-                insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error #$indexColumnNames)
-                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson, null """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
-              } ++ failedInterfaces.map {
-                case row @ FailedInterfaceComputationRow(interfaceId, viewStatus) =>
-                  logger.warn(
-                    s"Storing failed interface computation for ${createdEvent.getContractId}: $row"
-                  )
-                  val interfaceIdQualifiedName = QualifiedName(interfaceId)
-                  val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
-                  val viewStatusJson = JsonFormat.printer.print(viewStatus)
-                  (sql"""insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view, view_compute_error)
-                         values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, null, ($viewStatusJson)::jsonb)""").toActionBuilder.asUpdate
+                insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$indexColumnNames)
+                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
               })
             }
         case (None, Some(rowData)) =>

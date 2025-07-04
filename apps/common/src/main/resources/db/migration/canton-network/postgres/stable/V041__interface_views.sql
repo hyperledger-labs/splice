@@ -4,12 +4,8 @@ create table interface_views_template
     interface_id_package_id     text   not null,
     interface_id_qualified_name text   not null,
 
-    -- the DamlRecord corresponding to the interface's view (if available)
-    interface_view              jsonb,
-    -- if the view computation failed, this will contain the error for debugging purposes
-    view_compute_error          jsonb,
-    constraint interface_views_template_has_view_or_error check ((interface_view is null and view_compute_error is not null) or
-                                        (view_compute_error is null and interface_view is not null)),
+    -- the DamlRecord corresponding to the interface's view
+    interface_view              jsonb not null,
 
     -- the index will allow querying `WHERE interface_id_qualified_name = some_qualified_interface_id ORDER BY acs_event_number`.
     -- At time of writing, interfaces cannot really be upgraded (therefore the qualified name would change on every upgrade).
