@@ -18,7 +18,7 @@ object ValidatorTables extends AcsTables {
       providerParty: Option[PartyId] = None,
       validatorParty: Option[PartyId] = None,
       trafficSynchronizerId: Option[SynchronizerId] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] =
       Seq[(String, IndexColumnValue[?])](
         "user_party" -> userParty,

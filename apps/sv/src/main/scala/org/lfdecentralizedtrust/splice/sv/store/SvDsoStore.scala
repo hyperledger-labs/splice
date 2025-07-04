@@ -37,7 +37,7 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{QueryResult, TemplateFilter}
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
@@ -47,7 +47,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -70,7 +70,8 @@ trait SvDsoStore
 
   override lazy val acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
+        org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] =
     SvDsoStore.contractFilter(key.dsoParty, domainMigrationId)
 
@@ -1002,7 +1003,10 @@ object SvDsoStore {
   def contractFilter(
       dsoParty: PartyId,
       domainMigrationId: Long,
-  ): MultiDomainAcsStore.ContractFilter[DsoAcsStoreRowData] = {
+  ): MultiDomainAcsStore.ContractFilter[
+    DsoAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
     val dso = dsoParty.toProtoPrimitive
 

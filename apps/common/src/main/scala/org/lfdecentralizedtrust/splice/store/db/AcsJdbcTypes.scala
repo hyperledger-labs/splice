@@ -3,26 +3,30 @@
 
 package org.lfdecentralizedtrust.splice.store.db
 
+import com.daml.ledger.javaapi
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier}
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
+import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.topology.{Member, PartyId, SynchronizerId}
 import com.digitalasset.daml.lf.data.Ref.HexString
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.parser.parse as circeParse
+import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
+import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{Contract, LegacyOffset, QualifiedName}
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
+import com.digitalasset.canton.LfValue
+import com.digitalasset.canton.logging.ErrorLoggingContext
+import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
 
 import java.sql.{JDBCType, PreparedStatement, ResultSet}
-import com.google.protobuf.ByteString
-import org.lfdecentralizedtrust.splice.store.db.AcsQueries.AcsStoreId
-import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
-
 import java.io.StringWriter
 
 trait AcsJdbcTypes {
@@ -309,8 +313,26 @@ object AcsJdbcTypes {
   // this output relies on a *big* invariant: comparing the raw JSON data
   // with the built-in SQL operators <, >, &c, yields equal results to
   // comparing the same data in a data-aware way. That's why we *must* use
-  // numbers-as-numbers in this codec, and why ISO-8601 strings
+  // numbers-as-numbers in both codecs, and why ISO-8601 strings
   // for dates and timestamps are so important.
+
+  private val javaapiDamlRecordCodec = {
+    // copied from JsonContractIdFormat
+    implicit val ContractIdFormat: JsonFormat[LfValue.ContractId] =
+      new JsonFormat[LfValue.ContractId] {
+        override def write(obj: LfValue.ContractId): JsValue =
+          JsString(obj.coid)
+
+        override def read(json: JsValue): LfValue.ContractId = json match {
+          case JsString(s) =>
+            LfValue.ContractId.fromString(s).fold(deserializationError(_), identity)
+          case _ => deserializationError("ContractId must be a string")
+        }
+      }
+
+    new ApiCodecCompressed(encodeDecimalAsString = false, encodeInt64AsString = false)
+  }
+
   @throws[io.circe.ParsingFailure]
   def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]
@@ -322,5 +344,13 @@ object AcsJdbcTypes {
     )
     data.jsonEncoder.encode(jw)
     circeParse(sw.toString).fold(throw _, identity)
+  }
+
+  def payloadJsonFromJavaApiDamlRecord(
+      record: javaapi.data.DamlRecord
+  )(implicit elc: ErrorLoggingContext): Json = {
+    circeParse(
+      javaapiDamlRecordCodec.apiValueToJsValue(Contract.javaValueToLfValue(record)).compactPrint
+    ).fold(throw _, identity)
   }
 }

@@ -40,6 +40,7 @@ import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
@@ -507,7 +508,7 @@ object UserWalletStore {
   def contractFilter(
       key: Key,
       domainMigrationId: Long,
-  ): ContractFilter[UserWalletAcsStoreRowData] = {
+  ): ContractFilter[UserWalletAcsStoreRowData, AcsInterfaceViewRowData.NoInterfacesIngested] = {
     val endUser = key.endUserParty.toProtoPrimitive
     val validator = key.validatorParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive

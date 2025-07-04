@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompan
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
   AcsQueries,
   AcsTables,
   DbTxLogAppStore,
@@ -66,6 +67,7 @@ class DbUserWalletStore(
       storage = storage,
       acsTableName = WalletTables.acsTableName,
       txLogTableName = WalletTables.txLogTableName,
+      interfaceViewsTableNameOpt = Some(WalletTables.interfaceViewsTableName),
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
@@ -117,7 +119,8 @@ class DbUserWalletStore(
 
   override protected def acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
+        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] = UserWalletStore.contractFilter(key, domainMigrationId)
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[

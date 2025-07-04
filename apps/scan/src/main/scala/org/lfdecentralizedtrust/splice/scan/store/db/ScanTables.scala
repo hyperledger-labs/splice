@@ -65,7 +65,7 @@ object ScanTables extends AcsTables {
       transferPreapprovalReceiver: Option[PartyId] = None,
       transferPreapprovalValidFrom: Option[Timestamp] = None,
       walletParty: Option[PartyId] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
       "validator" -> validator,

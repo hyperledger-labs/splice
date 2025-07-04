@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHisto
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement.NeedsBackfilling
 import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
   AcsJdbcTypes,
   AcsRowData,
   DbMultiDomainAcsStore,
@@ -501,13 +502,16 @@ class TxLogBackfillingStoreTest
       ),
     )
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData {
+  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
 
-  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
+  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
+    GenericAcsRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -563,7 +567,7 @@ class TxLogBackfillingStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[R],
+      filter: MultiDomainAcsStore.ContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested],
       acsTableName: String,
       txLogTableName: Option[String],
   ) = {
@@ -576,6 +580,7 @@ class TxLogBackfillingStoreTest
       storage,
       acsTableName,
       txLogTableName,
+      None,
       storeDescriptor(acsId, participantId),
       txLogId.map(storeDescriptor(_, participantId)),
       loggerFactory,

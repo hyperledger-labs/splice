@@ -63,6 +63,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
           _ <- debugPrintPgActivity()
           _ <- sql"""TRUNCATE
                 user_wallet_acs_store,
+                user_wallet_acs_interface_views,
                 user_wallet_txlog_store,
                 scan_acs_store,
                 scan_txlog_store,
@@ -71,6 +72,7 @@ trait SpliceDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 dso_txlog_store,
                 acs_store_template,
                 txlog_store_template,
+                interface_views_template,
                 incomplete_reassignments,
                 store_descriptors,
                 store_last_ingested_offsets,

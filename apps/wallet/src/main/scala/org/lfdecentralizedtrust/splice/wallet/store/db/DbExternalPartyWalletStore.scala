@@ -6,7 +6,12 @@ package org.lfdecentralizedtrust.splice.wallet.store.db
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsQueries,
+  AcsTables,
+  DbAppStore,
+}
 import org.lfdecentralizedtrust.splice.store.LimitHelpers
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import org.lfdecentralizedtrust.splice.wallet.store.ExternalPartyWalletStore
@@ -33,6 +38,7 @@ class DbExternalPartyWalletStore(
 ) extends DbAppStore(
       storage = storage,
       acsTableName = WalletTables.externalPartyAcsTableName,
+      interfaceViewsTableNameOpt = None,
       acsStoreDescriptor = StoreDescriptor(
         version = 1,
         name = "DbExternalPartyWalletStore",
@@ -60,7 +66,8 @@ class DbExternalPartyWalletStore(
 
   override protected def acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPartyWalletAcsStoreRowData
+        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.ExternalPartyWalletAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] = ExternalPartyWalletStore.contractFilter(key)
 
 }
