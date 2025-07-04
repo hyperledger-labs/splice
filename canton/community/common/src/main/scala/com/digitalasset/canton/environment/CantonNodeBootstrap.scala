@@ -177,7 +177,7 @@ trait BaseMetrics {
   def grpcMetrics: GrpcServerMetrics
   def healthMetrics: HealthMetrics
   def storageMetrics: DbStorageMetrics
-  val declarativeApiMetrics: DeclarativeApiMetrics
+  def declarativeApiMetrics: DeclarativeApiMetrics
 
 }
 
