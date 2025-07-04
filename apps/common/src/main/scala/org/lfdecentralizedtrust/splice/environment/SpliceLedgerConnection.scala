@@ -604,17 +604,15 @@ class BaseLedgerConnection(
 
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,
-      parties: Seq[PartyId],
-      packageName: String,
+      packageRequirements: Seq[(String, Seq[PartyId])],
       vettingAsOfTime: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
+  )(implicit tc: TraceContext): Future[Seq[PackageReference]] = {
     retryProvider.retryForClientCalls(
       "get_supported_package_version",
-      s"Get the supported package version for package $packageName on synchronizer $synchronizerId and parties $parties with vetting time ${vettingAsOfTime}",
+      s"Get the supported package version for packageRequirements $packageRequirements on synchronizer $synchronizerId with vetting time ${vettingAsOfTime}",
       client.getSupportedPackageVersion(
         synchronizerId,
-        parties,
-        packageName,
+        packageRequirements,
         vettingAsOfTime,
       ),
       logger,

@@ -668,22 +668,25 @@ private[environment] class LedgerClient(
 
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,
-      involvedParties: Seq[PartyId],
-      packageName: String,
+      packageRequirements: Seq[(String, Seq[PartyId])],
       vettingAsOfTime: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
+  )(implicit tc: TraceContext): Future[Seq[PackageReference]] = {
     for {
       stub <- withCredentialsAndTraceContext(interactiveSubmissionServiceStub)
-      response <- stub.getPreferredPackageVersion(
-        lapi.interactive.interactive_submission_service.GetPreferredPackageVersionRequest(
-          parties = involvedParties.map(_.toProtoPrimitive),
-          packageName = packageName,
+      response <- stub.getPreferredPackages(
+        lapi.interactive.interactive_submission_service.GetPreferredPackagesRequest(
+          packageVettingRequirements = packageRequirements.map { case (pkg, parties) =>
+            lapi.interactive.interactive_submission_service.PackageVettingRequirement(
+              parties = parties.map(_.toProtoPrimitive),
+              packageName = pkg,
+            )
+          },
           synchronizerId = synchronizerId.toProtoPrimitive,
           vettingValidAt = Some(vettingAsOfTime.toProtoTimestamp),
         )
       )
     } yield {
-      response.packagePreference.flatMap(_.packageReference)
+      response.packageReferences
     }
   }
 }

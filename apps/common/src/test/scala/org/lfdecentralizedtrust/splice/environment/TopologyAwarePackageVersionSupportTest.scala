@@ -26,13 +26,12 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
 
   private def mockGetSupportedPackageVersion(
       packageName: String,
-      result: Option[PackageReference],
+      result: Seq[PackageReference],
   ): Unit =
     when(
       connectionMock.getSupportedPackageVersion(
         eqTo(synchronizerId),
-        eqTo(parties),
-        eqTo(packageName),
+        eqTo(Seq((packageName -> parties))),
         eqTo(now),
       )(anyTraceContext)
     )
@@ -50,7 +49,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
     s"support $featureName when topology reports version >= $requiredVersion" in {
       mockGetSupportedPackageVersion(
         requiredPackageName,
-        Some(PackageReference(reportedPackageId, requiredPackageName, requiredVersion.toString())),
+        Seq(PackageReference(reportedPackageId, requiredPackageName, requiredVersion.toString())),
       )
       whenReady(featureCheck(parties, now)) { result =>
         result shouldBe FeatureSupport(supported = true, Seq(reportedPackageId))
@@ -58,7 +57,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
 
       mockGetSupportedPackageVersion(
         requiredPackageName,
-        Some(
+        Seq(
           PackageReference(
             reportedPackageId,
             requiredPackageName,
@@ -78,7 +77,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
     s"not support $featureName when topology reports version < $requiredVersion" in {
       mockGetSupportedPackageVersion(
         requiredPackageName,
-        Some(
+        Seq(
           PackageReference(
             reportedPackageId,
             requiredPackageName, {
@@ -100,9 +99,19 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
     }
 
     s"not support $featureName when topology reports no version" in {
-      mockGetSupportedPackageVersion(requiredPackageName, None)
+      mockGetSupportedPackageVersion(requiredPackageName, Seq.empty)
       whenReady(featureCheck(parties, now)) { result =>
         result shouldBe FeatureSupport(supported = false, Seq.empty)
+      }
+    }
+
+    s"not support $featureName when topology reports different package" in {
+      mockGetSupportedPackageVersion(
+        requiredPackageName,
+        Seq(PackageReference(reportedPackageId, "differentPackage", requiredVersion.toString())),
+      )
+      whenReady(featureCheck(parties, now)) { result =>
+        result shouldBe FeatureSupport(supported = false, Seq(reportedPackageId))
       }
     }
   }
@@ -124,7 +133,11 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
     testFeatureSupport(
       "MergeDuplicatedValidatorLicense",
       DarResources.dsoGovernance_0_1_8,
-      packageVersionSupport.supportsMergeDuplicatedValidatorLicense,
+      // We use the same parties for amulet and dso governance. The interesting part about using different parties is the response from the
+      // participant but we mock that here so this doesn't add anything.
+      { case (parties, at) =>
+        packageVersionSupport.supportsMergeDuplicatedValidatorLicense(parties, parties, at)
+      },
     )
 
     testFeatureSupport(
