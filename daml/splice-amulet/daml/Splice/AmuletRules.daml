@@ -55,7 +55,7 @@ data AmuletRules_DevNet_FeatureAppResult = AmuletRules_DevNet_FeatureAppResult w
 
 data AmuletRules_Bootstrap_RoundsResult = AmuletRules_Bootstrap_RoundsResult with
     openMiningRoundCid : ContractId OpenMiningRound
-    initialRound : Round
+    initialRound : Optional Round
 
 data AmuletRules_AdvanceOpenMiningRoundsResult = AmuletRules_AdvanceOpenMiningRoundsResult with
     summarizingRoundCid : ContractId SummarizingMiningRound
@@ -353,7 +353,7 @@ template AmuletRules
           dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
         return AmuletRules_Bootstrap_RoundsResult with
           openMiningRoundCid = last
-          initialRound = Round nr0
+          initialRound = Some (Round nr0)
 
     nonconsuming choice AmuletRules_AdvanceOpenMiningRounds : AmuletRules_AdvanceOpenMiningRoundsResult
       with
