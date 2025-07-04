@@ -201,7 +201,8 @@ class JoiningNodeInitializer(
       // This is needed so that all scans can aggregate and backfill using the same initial round
       // Note: sponsor SV could maliciously set a wrong initialRound
       _ <- checkInitialRoundMatchesSponsorInitialRound(
-        config.initialRound.toString
+        svAutomation.connection,
+        config.initialRound.toString,
       )
       _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
         svAutomation.connection,
@@ -417,11 +418,16 @@ class JoiningNodeInitializer(
   }
 
   private def checkInitialRoundMatchesSponsorInitialRound(
-      initialRound: String
+      connection: BaseLedgerConnection,
+      initialRound: String,
   ): Future[Boolean] = {
     for {
       initialRoundFromSponsor <- joiningConfig match {
-        case Some(_) => getInitialRoundFromSponsor
+        case Some(_) =>
+          connection
+            // if simply restarting use the user metadata initial round
+            .getInitialRoundFromUserMetadata(config.ledgerApiUser)
+            .fallbackTo(getInitialRoundFromSponsor)
         case None => Future.successful(initialRound)
       }
     } yield {
@@ -958,7 +964,7 @@ class JoiningNodeInitializer(
           .svClient
           .adminApi
         retryProvider.getValueWithRetries(
-          RetryFor.WaitingOnInitDependency,
+          RetryFor.InitializingClientCalls,
           "initial_round_from_sponsor",
           "Initial Round from sponsoring SV",
           getInitialRoundFromSponsor(sponsorConfig),
