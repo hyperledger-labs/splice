@@ -6,13 +6,15 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
-import org.lfdecentralizedtrust.splice.sv.config.BeneficiaryConfig
+import org.lfdecentralizedtrust.splice.sv.config.{BeneficiaryConfig, SvOnboardingConfig}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultIssuanceCurve
 import org.lfdecentralizedtrust.splice.util.{TriggerTestUtil, WalletTestUtil}
@@ -29,6 +31,7 @@ import com.digitalasset.canton.topology.{ForceFlag, ForceFlags, PartyId}
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import monocle.macros.syntax.lens.*
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.slf4j.event.Level
@@ -99,9 +102,7 @@ class SvTimeBasedRewardCouponIntegrationTest
     "receive and claim SvRewardCoupons" in { implicit env =>
       // ensure alice has vetted the latest packages
       val expectedVettedPackages = ReceiveSvRewardCouponTrigger.svLatestVettedPackages(
-        inside(sv1Backend.config.onboarding.value) { case founder: FoundDso =>
-          founder.initialPackageConfig.toPackageConfig
-        }
+        initialPackageConfig.toPackageConfig
       )
       eventually() {
         val vettedByAlice =
@@ -293,7 +294,8 @@ class SvTimeBasedRewardCouponIntegrationTest
         )
         .filter(_.data.beneficiary.contains(party))
 
-    val latestAmuletPackageId = DarResources.amulet_current.packageId
+    val latestAmuletPackageId =
+      DarResources.amulet.getPackageIdWithVersion(initialPackageConfig.amuletVersion).value
     val aliceParticipantId =
       aliceValidatorBackend.appState.participantAdminConnection.getParticipantId().futureValue
 
@@ -376,6 +378,14 @@ class SvTimeBasedRewardCouponIntegrationTest
       },
     )
 
+  }
+
+  private def initialPackageConfig(implicit
+      env: SpliceTestConsoleEnvironment
+  ): SvOnboardingConfig.InitialPackageConfig = {
+    inside(sv1Backend.config.onboarding.value) { case founder: FoundDso =>
+      founder.initialPackageConfig
+    }
   }
 
 }
