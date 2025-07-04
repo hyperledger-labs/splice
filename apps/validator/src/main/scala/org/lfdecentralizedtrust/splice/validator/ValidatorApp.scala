@@ -152,7 +152,8 @@ class ValidatorApp(
           )
         case None =>
           UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
-            case Some(migrationId) if migrationId < config.domainMigrationId =>
+            case Some(migrationId)
+                if !config.svValidator && migrationId < config.domainMigrationId =>
               throw Status.INVALID_ARGUMENT
                 .withDescription(
                   s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
