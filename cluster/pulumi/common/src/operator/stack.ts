@@ -289,6 +289,7 @@ function createStackCRV2(
   // required because the docker images are broken
   // TODO(#15978): remove this once pulumi is upgraded
   const minimumPulumiVersionRequired = '3.147.0';
+  const [nodejsVersion] = process.versions.node.split('.');
   return new k8s.apiextensions.CustomResource(
     name,
     {
@@ -363,7 +364,7 @@ function createStackCRV2(
               deletionGracePeriodSeconds: PulumiOperatorGracePeriod,
             },
             spec: {
-              image: `pulumi/pulumi:${semver.gt(pulumiVersion, minimumPulumiVersionRequired) ? pulumiVersion : minimumPulumiVersionRequired}-nonroot`,
+              image: `pulumi/pulumi-nodejs-${nodejsVersion}:${semver.gt(pulumiVersion, minimumPulumiVersionRequired) ? pulumiVersion : minimumPulumiVersionRequired}-nonroot`,
               env: [
                 {
                   name: 'CN_PULUMI_LOAD_ENV_CONFIG_FILE',
