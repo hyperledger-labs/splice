@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { screen } from '@testing-library/react';
 import { expect } from 'vitest';
+import format from 'html-format';
 
 export async function checkAmuletRulesExpectedConfigDiffsHTML(
   mockHtmlContent: string,
@@ -13,9 +14,12 @@ export async function checkAmuletRulesExpectedConfigDiffsHTML(
       expectedNumberOfInFlightDiffs
     );
   } else {
-    expect(await screen.queryByTestId('folded-accordion')).toBeNull();
+    expect(screen.queryByTestId('folded-accordion')).toBeNull();
   }
-  expect(htmlContents[0].innerHTML).toBe(mockHtmlContent);
+  const formattedMockHtml = format(mockHtmlContent).trim();
+  const formattedActualHtml = format(htmlContents[0].innerHTML).trim();
+
+  expect(formattedActualHtml).toBe(formattedMockHtml);
 }
 
 export async function checkDsoRulesExpectedConfigDiffsHTML(
@@ -33,5 +37,9 @@ export async function checkDsoRulesExpectedConfigDiffsHTML(
   } else {
     expect(screen.queryByTestId('folded-accordion')).toBeNull();
   }
-  expect(htmlContents[0].innerHTML).toBe(mockHtmlContent);
+
+  const formattedMockHtml = format(mockHtmlContent).trim();
+  const formattedActualHtml = format(htmlContents[0].innerHTML).trim();
+
+  expect(formattedActualHtml).toBe(formattedMockHtml);
 }
