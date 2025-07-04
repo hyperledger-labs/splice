@@ -252,44 +252,42 @@ function buildIssuanceCurveChanges(
 }
 
 function buildDecentralizedSynchronizerChanges(
-  decentralizedSynchronizer: AmuletDecentralizedSynchronizerConfig | undefined,
-  decentralizedSynchronizer1: AmuletDecentralizedSynchronizerConfig | undefined
+  before: AmuletDecentralizedSynchronizerConfig | undefined,
+  after: AmuletDecentralizedSynchronizerConfig | undefined
 ) {
-  if (!decentralizedSynchronizer && !decentralizedSynchronizer1) return [];
+  if (!before && !after) return [];
 
   return [
     {
       fieldName: 'Decentralized Synchronizer (Active Synchronizer)',
-      currentValue: decentralizedSynchronizer?.activeSynchronizer || '',
-      newValue: decentralizedSynchronizer1?.activeSynchronizer || '',
+      currentValue: before?.activeSynchronizer || '',
+      newValue: after?.activeSynchronizer || '',
       isId: true,
     },
     {
       fieldName: 'Decentralized Synchronizer Fees (Base rate Traffic Limits Burst Amount)',
-      currentValue: decentralizedSynchronizer?.fees.baseRateTrafficLimits.burstAmount || '',
-      newValue: decentralizedSynchronizer1?.fees.baseRateTrafficLimits.burstAmount || '',
+      currentValue: before?.fees.baseRateTrafficLimits.burstAmount || '',
+      newValue: after?.fees.baseRateTrafficLimits.burstAmount || '',
     },
     {
       fieldName: 'Decentralized Synchronizer Fees (Base rate Traffic Limits Burst Window)',
-      currentValue:
-        decentralizedSynchronizer?.fees.baseRateTrafficLimits.burstWindow.microseconds || '',
-      newValue:
-        decentralizedSynchronizer1?.fees.baseRateTrafficLimits.burstWindow.microseconds || '',
+      currentValue: before?.fees.baseRateTrafficLimits.burstWindow.microseconds || '',
+      newValue: after?.fees.baseRateTrafficLimits.burstWindow.microseconds || '',
     },
     {
       fieldName: 'Decentralized Synchronizer Fees (Extra Traffic Price)',
-      currentValue: decentralizedSynchronizer?.fees.extraTrafficPrice || '',
-      newValue: decentralizedSynchronizer1?.fees.extraTrafficPrice || '',
+      currentValue: before?.fees.extraTrafficPrice || '',
+      newValue: after?.fees.extraTrafficPrice || '',
     },
     {
       fieldName: 'Decentralized Synchronizer Fees (Read/Write Scaling Factor)',
-      currentValue: decentralizedSynchronizer?.fees.readVsWriteScalingFactor || '',
-      newValue: decentralizedSynchronizer1?.fees.readVsWriteScalingFactor || '',
+      currentValue: before?.fees.readVsWriteScalingFactor || '',
+      newValue: after?.fees.readVsWriteScalingFactor || '',
     },
     {
       fieldName: 'Decentralized Synchronizer Fees (Min Topup Amount)',
-      currentValue: decentralizedSynchronizer?.fees.minTopupAmount || '',
-      newValue: decentralizedSynchronizer1?.fees.minTopupAmount || '',
+      currentValue: before?.fees.minTopupAmount || '',
+      newValue: after?.fees.minTopupAmount || '',
     },
   ] as ConfigChange[];
 }

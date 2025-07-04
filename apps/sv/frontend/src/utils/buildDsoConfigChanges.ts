@@ -13,31 +13,29 @@ export function buildSynchronizerMap(
   const currentSynchronizers = currentConfig?.synchronizers.entriesArray();
 
   const res = baseSynchronizers
-    ?.map(base => {
+    ?.map(baseSynchronizer => {
+      const currentSynchronizer = currentSynchronizers?.find(c => c[0] === baseSynchronizer[0]);
       return [
         {
           fieldName: `Decentralized Synchronizer`,
-          currentValue: base[0] || '',
-          newValue: base[0] || '', // TODO: confirm that this doesn't change here
+          currentValue: baseSynchronizer[0] || '',
+          newValue: currentSynchronizer?.[0] || '',
           isId: true,
         },
         {
           fieldName: `Decentralized Synchronizer (state)`,
-          currentValue: base[1].state || '',
-          newValue: currentSynchronizers?.find(c => c[0] === base[0])?.[1].state || '',
+          currentValue: baseSynchronizer[1].state || '',
+          newValue: currentSynchronizer?.[1].state || '',
         },
         {
           fieldName: `Decentralized Synchronizer (cometBftGenesisJson)`,
-          currentValue: base[1].cometBftGenesisJson || '',
-          newValue:
-            currentSynchronizers?.find(c => c[0] === base[0])?.[1].cometBftGenesisJson || '',
+          currentValue: baseSynchronizer[1].cometBftGenesisJson || '',
+          newValue: currentSynchronizer?.[1].cometBftGenesisJson || '',
         },
         {
           fieldName: `Decentralized Synchronizer (ACS Commitment Reconciliation Interval)`,
-          currentValue: base[1].acsCommitmentReconciliationInterval || '',
-          newValue:
-            currentSynchronizers?.find(c => c[0] === base[0])?.[1]
-              .acsCommitmentReconciliationInterval || '',
+          currentValue: baseSynchronizer[1].acsCommitmentReconciliationInterval || '',
+          newValue: currentSynchronizer?.[1].acsCommitmentReconciliationInterval || '',
         },
       ];
     })
