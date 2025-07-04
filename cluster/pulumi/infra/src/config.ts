@@ -38,6 +38,10 @@ const MonitoringConfigSchema = z.object({
         minRate: z.number(),
       }),
     }),
+    logAlerts: z.object({
+      shared: z.string(),
+      clusterSpecific: z.string().optional(),
+    }),
   }),
 });
 export const InfraConfigSchema = z.object({
