@@ -29,7 +29,7 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
-import com.digitalasset.canton.{SynchronizerAlias, HasExecutionContext}
+import com.digitalasset.canton.{HasExecutionContext, SynchronizerAlias}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.typesafe.config.ConfigFactory
 import org.apache.pekko.http.scaladsl.Http
@@ -38,12 +38,13 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import org.slf4j.event.Level
 
 import java.time.Duration
-import java.util.UUID
+import java.util.{Optional, UUID}
 import scala.concurrent.Future
 import scala.util.Try
 import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_11
 class WalletIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
@@ -797,7 +798,11 @@ class WalletIntegrationTest
             actAs = Seq(aliceUserParty),
             readAs = Seq(aliceUserParty),
             update = TransferPreapprovalProposal
-              .create(aliceUserParty.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive),
+              .create(
+                aliceUserParty.toProtoPrimitive,
+                aliceValidatorParty.toProtoPrimitive,
+                Optional.of(dsoParty.toProtoPrimitive),
+              ),
           )
           .contractId
 

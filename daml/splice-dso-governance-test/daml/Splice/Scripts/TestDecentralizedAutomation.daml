@@ -453,6 +453,7 @@ testTransferPreapprovalSend = do
       nonce = 0
       delegate = validator
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   let action = ARC_DsoRules with
         dsoAction = SRARC_CreateTransferCommandCounter (DsoRules_CreateTransferCommandCounter alice.primaryParty)

@@ -401,6 +401,7 @@
         "contractId" : "8",
         "contractKey" : null,
         "createArgument" : {
+          "expectedDso" : "dso::normalized",
           "provider" : "aliceValidator::normalized",
           "receiver" : "alice::normalized"
         },

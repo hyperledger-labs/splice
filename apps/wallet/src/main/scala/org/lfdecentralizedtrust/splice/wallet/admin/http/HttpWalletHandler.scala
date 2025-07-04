@@ -764,28 +764,37 @@ class HttpWalletHandler(
       dedupOffset: Long,
   )(implicit tc: TraceContext) = {
     val store = wallet.store
-    wallet.connection
-      .submit(
-        Seq(store.key.validatorParty, store.key.endUserParty),
-        Seq.empty,
-        new TransferPreapprovalProposal(
-          store.key.endUserParty.toProtoPrimitive,
-          store.key.validatorParty.toProtoPrimitive,
-        ).create,
-      )
-      .withDedup(
-        SpliceLedgerConnection.CommandId(
-          "org.lfdecentralizedtrust.splice.wallet.createTransferPreapprovalProposal",
-          Seq(
-            store.key.endUserParty,
-            store.key.validatorParty,
+    for {
+      supportsExpectedDsoParty <- packageVersionSupport
+        .supportsExpectedDsoParty(
+          Seq(store.key.validatorParty, store.key.endUserParty, store.key.dsoParty),
+          walletManager.clock.now,
+        )
+        .map(_.supported)
+      _ <- wallet.connection
+        .submit(
+          Seq(store.key.validatorParty, store.key.endUserParty),
+          Seq.empty,
+          new TransferPreapprovalProposal(
+            store.key.endUserParty.toProtoPrimitive,
+            store.key.validatorParty.toProtoPrimitive,
+            Option.when(supportsExpectedDsoParty)(store.key.dsoParty.toProtoPrimitive).toJava,
+          ).create,
+        )
+        .withDedup(
+          SpliceLedgerConnection.CommandId(
+            "org.lfdecentralizedtrust.splice.wallet.createTransferPreapprovalProposal",
+            Seq(
+              store.key.endUserParty,
+              store.key.validatorParty,
+            ),
           ),
-        ),
-        deduplicationOffset = dedupOffset,
-      )
-      .withSynchronizerId(domain)
-      .yieldResult()
-      .map(_.contractId)
+          deduplicationOffset = dedupOffset,
+        )
+        .withSynchronizerId(domain)
+        .yieldResult()
+        .map(_.contractId)
+    } yield ()
   }
 
   def transferPreapprovalSend(respond: r0.TransferPreapprovalSendResponse.type)(
