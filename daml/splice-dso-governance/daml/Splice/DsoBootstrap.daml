@@ -10,7 +10,7 @@ import Splice.AmuletConfig
 import Splice.AmuletRules
 import Splice.ExternalPartyAmuletRules
 import Splice.Schedule
-import Splice.Types
+import Splice.Types()
 
 import Splice.Ans
 import Splice.DSO.DecentralizedSynchronizer
