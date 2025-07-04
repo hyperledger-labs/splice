@@ -674,6 +674,7 @@ testTransferPreapproval = script do
   preapprovalProposalCid <- submit bob.primaryParty $ createCmd TransferPreapprovalProposal with
     receiver = bob.primaryParty
     provider = bobValidator.primaryParty
+    expectedDso = Some app.dso
 
   bobValidatorInstall <- submitMulti [bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = bobValidator.primaryParty

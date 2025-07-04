@@ -104,6 +104,7 @@
                 "contractId" : "8",
                 "contractKey" : null,
                 "createArgument" : {
+                  "expectedDso" : "dso::normalized",
                   "provider" : "aliceValidator::normalized",
                   "receiver" : "alice::normalized"
                 },
@@ -242,6 +243,7 @@
                       ]
                     }
                   },
+                  "expectedDso" : "dso::normalized",
                   "expiresAt" : "2025-06-18T00:00:00.000000Z",
                   "inputs" : [
                     {

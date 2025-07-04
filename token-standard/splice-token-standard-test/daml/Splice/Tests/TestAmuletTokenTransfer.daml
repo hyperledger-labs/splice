@@ -143,7 +143,7 @@ setupTwoStepTransfer = do
   Map.size enrichedChoice.disclosures.disclosures === 3
 
   -- Trigger a two-step transfer
-  -- TODO(DACH-NY/canton-network-node#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
+  -- TODO(tech-debt): test here and for all steps that the expected ledger time bounds are present on the submissions
   result <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
   TransferInstructionResult_Pending aliceInstrCid <- pure result.output
 

@@ -53,7 +53,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll as scForAll
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.UUID
+import java.util.{Optional, UUID}
 import scala.concurrent.Future
 
 abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecutionContext {
@@ -1336,7 +1336,11 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
   protected def transferPreapprovalProposal(receiver: PartyId, provider: PartyId) = {
     val templateId = preapprovalCodegen.TransferPreapprovalProposal.TEMPLATE_ID
     val template =
-      new TransferPreapprovalProposal(receiver.toProtoPrimitive, provider.toProtoPrimitive)
+      new TransferPreapprovalProposal(
+        receiver.toProtoPrimitive,
+        provider.toProtoPrimitive,
+        Optional.of(dsoParty.toProtoPrimitive),
+      )
     contract(
       identifier = templateId,
       contractId = new preapprovalCodegen.TransferPreapprovalProposal.ContractId(nextCid()),

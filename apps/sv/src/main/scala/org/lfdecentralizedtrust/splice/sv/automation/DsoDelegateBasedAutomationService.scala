@@ -101,6 +101,25 @@ class DsoDelegateBasedAutomationService(
         svTaskContext,
       )
     )
+
+    registerTrigger(
+      new AllocateUnallocatedUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+    registerTrigger(
+      new ExpiredUnallocatedUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+    registerTrigger(
+      new ExpiredUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
   }
 
 }
@@ -133,5 +152,8 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[PruneAmuletConfigScheduleTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
     aTrigger[FeaturedAppActivityMarkerTrigger],
+    aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],
+    aTrigger[ExpiredUnallocatedUnclaimedActivityRecordTrigger],
+    aTrigger[ExpiredUnclaimedActivityRecordTrigger],
   )
 }
