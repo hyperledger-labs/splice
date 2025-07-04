@@ -15,7 +15,7 @@ const Transactions: React.FC = () => {
       <DevNetOnly>
         <Tap />
       </DevNetOnly>
-      <TransferOffers mode="sent" />
+      <TransferOffers mode="received" />
       <TransactionHistory />
     </Box>
   );

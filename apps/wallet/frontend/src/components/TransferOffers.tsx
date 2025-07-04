@@ -53,7 +53,7 @@ export const TransferOffers: React.FC<TransferOffersListProps> = ({ mode }) => {
     ): Promise<WalletTransferOffer[]> => {
       return items
         .filter(item =>
-          mode === 'received' ? item.sender === primaryPartyId : item.sender !== primaryPartyId
+          mode === 'sent' ? item.sender === primaryPartyId : item.sender !== primaryPartyId
         )
         .map(item => {
           return {
@@ -121,7 +121,7 @@ export const TransferOffers: React.FC<TransferOffersListProps> = ({ mode }) => {
     amuletPriceQuery.isError ||
     transferOfferContractsQuery.isError ||
     tokenStandardTransfersQuery.isError;
-  const heading = mode === 'received' ? 'Pending Offers ' : 'Action Needed ';
+  const heading = mode === 'sent' ? 'Pending Offers ' : 'Action Needed ';
 
   return (
     <Stack spacing={4} direction="column" justifyContent="center" id="transfer-offers">
@@ -166,7 +166,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const reject = offer.isTokenStandard ? rejectTokenStandardTransfer : rejectTransferOffer;
 
   return (
-    <Card className="transfer-offer" variant="outlined">
+    <Card className={mode === 'sent' ? 'pending-offer' : 'transfer-offer'} variant="outlined">
       <CardContent
         sx={{
           display: 'flex',
@@ -178,7 +178,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            {mode === 'sent' ? (
+            {mode === 'received' ? (
               <BftAnsEntry
                 partyId={offer.senderId}
                 variant="h5"
@@ -188,7 +188,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
               <BftAnsEntry
                 partyId={offer.receiverId}
                 variant="h5"
-                className={'transfer-offer-received'}
+                className={'transfer-offer-receiver'}
               />
             )}
           </Stack>
@@ -209,7 +209,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
           </Typography>
         </Stack>
         <Stack direction="row" alignItems="center" spacing={2}>
-          {mode === 'sent' ? (
+          {mode !== 'sent' ? (
             <>
               <Button
                 variant="pill"
@@ -229,11 +229,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
                 Reject
               </Button>
             </>
-          ) : (
-            <Typography variant="pill" className="pending-offer">
-              Pending acceptance
-            </Typography>
-          )}
+          ) : null}
         </Stack>
         <Typography variant="caption" className="transfer-offer-expiry">
           Expires <DateDisplay datetime={offer.expiry} />
