@@ -24,9 +24,14 @@ Global Synchronizer for the Canton Network
 
 .. toctree::
    :maxdepth: 2
+   :caption: Overview
+
+   overview.rst
+
+.. toctree::
+   :maxdepth: 2
    :caption: Deployment and Operations
 
-   deployment.rst
    validator_operator/index.rst
    sv_operator/index.rst
    deployment/index.rst
