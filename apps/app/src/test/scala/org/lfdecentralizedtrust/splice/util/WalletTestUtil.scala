@@ -1017,7 +1017,6 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     created.contractId
   }
 
-
   protected def retryCommandSubmission[T](f: => T) = {
     eventually() {
       try {

@@ -3269,7 +3269,7 @@ class State:
             case _:
                 self._fail(transaction, f"Unexpected action: {action}")
 
-    def handle_merge_unclaimed_rewards(self, transaction, event):
+    def handle_unclaimed_reward_create_archive(self, transaction, event):
         for event_id in transaction.events_by_id:
             event = transaction.events_by_id[event_id]
             match event.template_id.qualified_name:
@@ -3280,9 +3280,6 @@ class State:
                         del self.active_contracts[event.contract_id]
 
         return HandleTransactionResult.empty()
-
-    def handle_allocate_unallocated_unclaimed_activity_record(self, transaction, event):
-        return self.handle_merge_unclaimed_rewards(transaction, event)
 
     def handle_claim_expired_rewards(self, transaction, event):
         assert len(event.child_event_ids) == 1
@@ -3754,7 +3751,7 @@ class State:
             case "DsoRules_ClaimExpiredRewards":
                 return self.handle_claim_expired_rewards(transaction, event)
             case "DsoRules_MergeUnclaimedRewards":
-                return self.handle_merge_unclaimed_rewards(transaction, event)
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "DsoRules_AdvanceOpenMiningRounds":
                 return self.handle_advance_open_mining_rounds(transaction, event)
             case "DsoRules_ExecuteConfirmedAction":
@@ -3784,7 +3781,7 @@ class State:
             case "DsoRules_UpdateAmuletPriceVote":
                 return HandleTransactionResult.empty()
             case "DsoRules_AllocateUnallocatedUnclaimedActivityRecord":
-                return self.handle_allocate_unallocated_unclaimed_activity_record(transaction, event)
+                return self.handle_unclaimed_reward_create_archive(transaction, event)
             case "DsoRules_ExpireUnallocatedUnclaimedActivityRecord":
                 return HandleTransactionResult.empty()
             case "DsoRules_ExpireUnclaimedActivityRecord":

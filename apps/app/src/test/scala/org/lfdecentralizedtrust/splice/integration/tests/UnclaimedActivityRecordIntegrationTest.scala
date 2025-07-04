@@ -132,10 +132,8 @@ class UnclaimedActivityRecordIntegrationTest
           amount,
         )
       }
-      eventually() {
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
-      }
+      sv1Backend.participantClient.ledger_api_extensions.acs
+        .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
     }
 
     setTriggersWithin(
@@ -208,10 +206,8 @@ class UnclaimedActivityRecordIntegrationTest
           amount,
         )
       }
-      eventually() {
-        sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
-      }
+      sv1Backend.participantClient.ledger_api_extensions.acs
+        .filterJava(UnclaimedReward.COMPANION)(dsoParty) should not be empty
     }
 
     setTriggersWithin(
