@@ -11,6 +11,13 @@ Release Notes
 Upcoming
 --------
 
+- Scan
+
+  - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
+    populate the token metadata total supply using the aggregates used for closed rounds.
+    The data used corresponds to the data served by the ``/v0/total-amulet-balance``
+    endpoint in :ref:`app_dev_scan_api` for the latest closed round.
+
 - Validator
 
   - Fix a bug where sweeps through transfer preapprovals failed with a

@@ -276,7 +276,7 @@ class ScanApp(
         store,
         config.spliceInstanceNames,
         loggerFactory,
-      )()
+      )
 
       tokenStandardAllocationInstructionHandler = new HttpTokenStandardAllocationInstructionHandler(
         store,
