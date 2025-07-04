@@ -42,10 +42,6 @@ export const VoteRequestDetails: React.FC = () => {
     return <Loading />;
   }
 
-  // if (!isComplete) {
-  //   return <Typography variant="body1">Error, something went wrong.</Typography>;
-  // }
-
   const request = hasVoteRequest
     ? voteRequest?.payload
     : hasVoteResult
@@ -55,7 +51,7 @@ export const VoteRequestDetails: React.FC = () => {
   if (!request) {
     return (
       <Typography variant="body1">
-        Error, something went wrong. Unable to find the vote request with Contract ID {contractId}.
+        Error, something went wrong. Unable to find the proposal with Contract ID {contractId}.
       </Typography>
     );
   }
@@ -74,10 +70,8 @@ export const VoteRequestDetails: React.FC = () => {
 
   const action = amuletOrDsoAction.tag as SupportedActionTag;
   const actionName = actionTagToTitle(amuletName)[action];
-  // TODO: There doesn't seem to be a way to fetch the createdAt date of a vote result as it's not a contract.
   const createdAt = voteRequest ? dayjs(voteRequest.createdAt).format(dateTimeFormatISO) : '';
 
-  // build the object for the vote request details props
   const proposalDetails: ProposalDetails = {
     actionName,
     action: action,
@@ -88,7 +82,6 @@ export const VoteRequestDetails: React.FC = () => {
     proposal: buildProposal(request.action),
   } as ProposalDetails;
 
-  console.log('yaya effectiveAt', request.targetEffectiveAt);
   const votingInformation: ProposalVotingInformation = {
     requester: request.requester,
     requesterIsYou: request.requester === svPartyId,

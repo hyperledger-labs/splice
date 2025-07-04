@@ -1,6 +1,6 @@
 import { sanitizeUrl as sanitize } from '@braintree/sanitize-url';
 
-export const sanitizeUrl = (url: string) => {
+export const sanitizeUrl: (url: string) => string = (url: string) => {
   if (isStringEmptyOrUndefined(url)) return '';
 
   return sanitize(url);
