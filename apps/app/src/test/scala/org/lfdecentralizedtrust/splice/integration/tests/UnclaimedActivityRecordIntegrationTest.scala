@@ -70,49 +70,52 @@ class UnclaimedActivityRecordIntegrationTest
     val amountToMint = 15.0
 
     setTriggersWithin(
-      triggersToPauseAtStart = allocateTriggers ++ expiredUnallocatedTriggers,
-      triggersToResumeAtStart = Seq.empty,
+      triggersToPauseAtStart = allocateTriggers
     ) {
-      actAndCheck(
-        "Creating vote request", {
-          val action = new ARC_DsoRules(
-            new SRARC_CreateUnallocatedUnclaimedActivityRecord(
-              new DsoRules_CreateUnallocatedUnclaimedActivityRecord(
-                aliceParty.toProtoPrimitive,
-                BigDecimal(amountToMint).bigDecimal,
-                "alice is doing great - vote",
-                Instant.now().plus(5, ChronoUnit.SECONDS),
+      setTriggersWithin(
+        triggersToPauseAtStart = expiredUnallocatedTriggers,
+        triggersToResumeAtStart = Seq.empty,
+      ) {
+        actAndCheck(
+          "Creating vote request", {
+            val action = new ARC_DsoRules(
+              new SRARC_CreateUnallocatedUnclaimedActivityRecord(
+                new DsoRules_CreateUnallocatedUnclaimedActivityRecord(
+                  aliceParty.toProtoPrimitive,
+                  BigDecimal(amountToMint).bigDecimal,
+                  "alice is doing great - vote",
+                  Instant.now().plus(5, ChronoUnit.SECONDS),
+                )
               )
             )
-          )
-          sv1Backend.createVoteRequest(
-            sv1Party.toProtoPrimitive,
-            action,
-            "url",
-            "alice is doing great",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-            None,
-          )
-        },
-      )(
-        "vote request and UnallocatedUnclaimedActivityRecord have been created",
-        _ => {
-          sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(
-              dsoParty
-            ) should not be empty
-        },
-      )
-    }
+            sv1Backend.createVoteRequest(
+              sv1Party.toProtoPrimitive,
+              action,
+              "url",
+              "alice is doing great",
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
+            )
+          },
+        )(
+          "vote request and UnallocatedUnclaimedActivityRecord have been created",
+          _ => {
+            sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(
+                dsoParty
+              ) should not be empty
+          },
+        )
+      }
 
-    setTriggersWithin(
-      triggersToPauseAtStart = allocateTriggers,
-      triggersToResumeAtStart = Seq.empty,
-    ) {
-      clue("UnallocatedUnclaimedActivityRecord gets archived") {
-        eventually() {
-          sv1Backend.participantClient.ledger_api_extensions.acs
-            .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
+      setTriggersWithin(
+        triggersToResumeAtStart = Seq.empty
+      ) {
+        clue("UnallocatedUnclaimedActivityRecord gets archived") {
+          eventually() {
+            sv1Backend.participantClient.ledger_api_extensions.acs
+              .filterJava(UnallocatedUnclaimedActivityRecord.COMPANION)(dsoParty) shouldBe empty
+          }
         }
       }
     }
