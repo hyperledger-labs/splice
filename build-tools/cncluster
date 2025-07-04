@@ -1422,10 +1422,13 @@ subcommand_whitelist[debug_shell]='Spin up a debug container on the cluster, and
 function subcmd_debug_shell() {
   _cluster_must_exist
 
-  VERSION_NUMBER=$(get-snapshot-version)
+  VERSION_NUMBER=${OVERRIDE_VERSION:-$(yq ".synchronizerMigration.active.version" < config.yaml)}
+  if [ -z "$VERSION_NUMBER" ] || [ "$VERSION_NUMBER" = "null" ]; then
+    VERSION_NUMBER=$(get-snapshot-version)
+  fi
   repo="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker"
 
-  _info "Deploying debug pod"
+  _info "Deploying debug pod on version $VERSION_NUMBER"
   kubectl apply --wait -f - <<EOF
 apiVersion: v1
 kind: Pod
