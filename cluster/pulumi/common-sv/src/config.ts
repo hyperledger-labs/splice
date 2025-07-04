@@ -80,6 +80,7 @@ export interface SvConfig extends StaticSvConfig {
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
+  initialRound?: string;
 }
 
 export const SvConfigSchema = z.object({
@@ -95,6 +96,7 @@ export const SvConfigSchema = z.object({
           enableImportUpdatesBackfill: z.boolean().optional(),
         })
         .optional(),
+      initialRound: z.string().optional(),
     })
     .optional(),
 });

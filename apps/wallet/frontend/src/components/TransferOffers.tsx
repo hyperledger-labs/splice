@@ -14,7 +14,7 @@ import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Box, Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { AmuletTransferInstruction } from '@daml.js/splice-amulet-0.1.10/lib/Splice/AmuletTransferInstruction';
+import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';
 import { Unit } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import { TransferOffer } from '@daml.js/splice-wallet/lib/Splice/Wallet/TransferOffer/module';
 import { ContractId } from '@daml/types';

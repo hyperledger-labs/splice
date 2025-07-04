@@ -91,6 +91,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -250,6 +251,13 @@ class SV1Initializer(
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
+      // scan needs to know the initial round
+      _ = logger.debug(s"Started with initial round ${config.initialRound}")
+      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
+        svAutomation.connection,
+        config,
+        config.initialRound.toString,
+      )
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
       // is allocated, as a stand-in for all of these actions.
@@ -660,6 +668,10 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
+                        config.initialRound match {
+                          case round if round > 0L => Optional.of(round)
+                          case _ => Optional.empty()
+                        },
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(

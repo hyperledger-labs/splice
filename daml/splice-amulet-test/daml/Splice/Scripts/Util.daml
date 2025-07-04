@@ -79,6 +79,7 @@ genericSetupApp dsoPrefix = do
   submitExerciseAmuletRulesByKey app [dso] [] AmuletRules_Bootstrap_Rounds with
       amuletPrice = 1.0
       round0Duration = hours 24 -- extra time for all initial svs to join
+      initialRound = None
 
   -- return the off-ledger reference to the app for later script steps
   return app

@@ -309,12 +309,15 @@ template AmuletRules
         amuletPrice : Decimal
         round0Duration : RelTime
         -- Duration of the very first round, typically set to a number large enough for all initial svs to complete joining and grab their SvReward coupon.
+        initialRound : Optional Int
       controller dso
       do
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let nr0 = 0
+        let nr0 = case initialRound of
+                    Some(round) -> round
+                    None -> 0
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
 

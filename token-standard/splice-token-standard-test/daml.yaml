@@ -15,7 +15,7 @@ description: |
   Must be consumed by copying the source-code into the downstream project,
   as Daml script code can currently not be shared via .dars across SDKs.
   (TODO(#594): remove this limitation)
-version: 1.0.1
+version: 1.0.2
 source: daml
 dependencies:
   - daml-prim

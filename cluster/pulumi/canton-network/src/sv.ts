@@ -473,6 +473,7 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    initialRound: config.initialRound,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
