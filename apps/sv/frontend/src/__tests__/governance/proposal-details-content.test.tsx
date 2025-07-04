@@ -95,13 +95,14 @@ const voteResult = {
     },
   ],
 } as ProposalDetailsContentProps;
-function Wrapper({ children }: { children: React.ReactNode }) {
+
+const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <ThemeProvider theme={theme}>
       <MemoryRouter>{children}</MemoryRouter>
     </ThemeProvider>
   );
-}
+};
 
 describe('Proposal Details Content', () => {
   test('should render proposal details page', async () => {

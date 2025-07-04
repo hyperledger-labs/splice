@@ -58,10 +58,27 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
     setVoteTabValue(newValue);
   };
 
-  //TODO: Use reduce to do this on one pass or keep this for readability?
-  const acceptedVotes = votes.filter(vote => vote.vote === 'accepted');
-  const rejectedVotes = votes.filter(vote => vote.vote === 'rejected');
-  const awaitingVotes = votes.filter(vote => vote.vote === 'no-vote');
+  const { acceptedVotes, rejectedVotes, awaitingVotes } = votes.reduce(
+    (acc, vote) => {
+      switch (vote.vote) {
+        case 'accepted':
+          acc.acceptedVotes.push(vote);
+          break;
+        case 'rejected':
+          acc.rejectedVotes.push(vote);
+          break;
+        case 'no-vote':
+          acc.awaitingVotes.push(vote);
+          break;
+      }
+      return acc;
+    },
+    {
+      acceptedVotes: [] as typeof votes,
+      rejectedVotes: [] as typeof votes,
+      awaitingVotes: [] as typeof votes,
+    }
+  );
 
   // Filter votes based on selected tab
   const getFilteredVotes = () => {
@@ -406,8 +423,6 @@ const VoteItem = ({ voter, url, comment, status, isClosed, isYou = false }: Vote
         return 'Rejected';
       case 'no-vote':
         return isClosed ? 'No Vote' : 'Awaiting Response';
-      default:
-        return 'Unknown';
     }
   };
 
@@ -515,10 +530,6 @@ const FeatureAppSection = ({ provider }: FeatureAppSectionProps) => {
       id="proposal-details-feature-app-section"
       data-testid="proposal-details-feature-app-section"
     >
-      {/* <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ mb: 2 }}> */}
-      {/*   Feature Application */}
-      {/* </Typography> */}
-
       <Box sx={{ display: 'flex', flexDirection: 'column' }}>
         <DetailItem
           label="Provider ID"
@@ -686,8 +697,6 @@ const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
           </Box>
         ))}
       </Box>
-
-      {/* TODO: Add the json View here but only if we have changes */}
     </Box>
   );
 };
