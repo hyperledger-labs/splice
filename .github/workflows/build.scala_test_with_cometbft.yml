@@ -64,7 +64,7 @@ jobs:
 
     services:
       postgres:
-        image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.3.12
+        image: ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/splice-test-postgres:0.4.4-snapshot.20250703.311.0.v2838ff00
         env:
           POSTGRES_PASSWORD: postgres
 
