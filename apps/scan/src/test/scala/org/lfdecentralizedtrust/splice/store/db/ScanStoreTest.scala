@@ -1399,6 +1399,7 @@ abstract class ScanStoreTest
             transferCmd.payload.expiresAt,
             transferCmd.payload.nonce,
             transferCmd.payload.description,
+            Optional.of(dsoParty.toProtoPrimitive),
           ).toValue,
           new splice.externalpartyamuletrules.ExternalPartyAmuletRules_CreateTransferCommandResult(
             transferCmd.contractId
@@ -2122,6 +2123,7 @@ trait AmuletTransferUtil { self: StoreTest =>
           dummyDomain.toProtoPrimitive,
           domainMigrationId,
           extraTraffic,
+          Optional.of(dsoParty.toProtoPrimitive),
         ).toValue,
         mkAmuletRules_BuyMemberTrafficResult(
           round = round,

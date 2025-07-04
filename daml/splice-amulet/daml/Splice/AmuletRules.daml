@@ -143,8 +143,13 @@ template AmuletRules
         user : Party
         validator : Party
         preapprovalExpiresAt : Time
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller validator
       do
+        checkExpectedDso dso expectedDso
         now <- getTime
         require "preapprovalExpiresAt is not in the past" (preapprovalExpiresAt > now)
         let configUsd = getValueAsOf now configSchedule
@@ -166,8 +171,13 @@ template AmuletRules
         receiver : Party
         provider : Party
         expiresAt : Time
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller provider, receiver
       do
+        checkExpectedDso dso expectedDso
         now <- getTime
         require "expiresAt is not in the past" (expiresAt > now)
         let configUsd = getValueAsOf now configSchedule
@@ -195,8 +205,13 @@ template AmuletRules
         synchronizerId : Text
         migrationId : Int
         trafficAmount : Int
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller provider
       do
+        checkExpectedDso dso expectedDso
         -- validate choice parameters
         configUsd <- getValueAsOfLedgerTime configSchedule
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of

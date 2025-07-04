@@ -44,8 +44,13 @@ template ExternalPartyAmuletRules
         expiresAt : Time
         nonce : Int
         description : Optional Text
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the ExternalAmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the ExternalAmuletRules contract out for
+        -- one under their control.
       controller sender
       do
+         checkExpectedDso dso expectedDso
          assertWithinDeadline "ExternalPartyAmuletRules_CreateTransferCommand.expiresAt" expiresAt
          cmd <- create TransferCommand with
            dso

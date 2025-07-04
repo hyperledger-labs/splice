@@ -119,6 +119,18 @@ trait PackageVersionSupport {
     )
   }
 
+  def supportsExpectedDsoParty(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      // this is when the expectedDsoParty was added to all choices granted to users on AmuletRules and ExternalAmuletRules
+      DarResources.amulet_0_1_11,
+    )
+  }
+
   private def isDarSupported(
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,

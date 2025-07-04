@@ -79,7 +79,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
     ExtAmuletOperation _dummyUnitField -> error "ExtAmuletOperation: bare extension constructors are not allowed at runtime"
     CO_CreateExternalPartySetupProposal externalParty preapprovalExpiresAt -> do
       -- creates ExternalPartySetupProposal for externally hosted parties
-      resultE <- catchAll $ handleCreateExternalPartySetupProposal externalParty preapprovalExpiresAt
+      resultE <- catchAll $ handleCreateExternalPartySetupProposal executionContext externalParty preapprovalExpiresAt
       handleResult COO_CreateExternalPartySetupProposal resultE
     CO_AcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt -> do
       -- creates TransferPreapproval via the wallet
@@ -206,12 +206,19 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
           else
             pure inputs
       -- purchase extra traffic for sequencer member
-      result <- exercise amuletRulesCid
-        (AmuletRules_BuyMemberTraffic newInputs context.context executionContext.validator memberId synchronizerId migrationId trafficAmount)
+      result <- exercise amuletRulesCid AmuletRules_BuyMemberTraffic with
+        inputs = newInputs
+        context = context.context
+        provider = executionContext.validator
+        memberId
+        synchronizerId
+        migrationId
+        trafficAmount
+        expectedDso = Some executionContext.dso
       pure (result.purchasedTraffic, result.senderChangeAmulet)
 
-    handleCreateExternalPartySetupProposal : Party -> Time -> Update (ContractId ExternalPartySetupProposal, Optional (ContractId Amulet))
-    handleCreateExternalPartySetupProposal externalParty preapprovalExpiresAt = do
+    handleCreateExternalPartySetupProposal : ExecutionContext -> Party -> Time -> Update (ContractId ExternalPartySetupProposal, Optional (ContractId Amulet))
+    handleCreateExternalPartySetupProposal executionContext externalParty preapprovalExpiresAt = do
       require "Only a validator can create a proposal to host an external party" (executionContext.endUser == executionContext.validator)
       AmuletRules_CreateExternalPartySetupProposalResult{..} <- exercise context.amuletRules AmuletRules_CreateExternalPartySetupProposal with
         context = executionContext.paymentContext
@@ -219,6 +226,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         user = externalParty
         validator = executionContext.validator
         preapprovalExpiresAt
+        expectedDso = Some executionContext.dso
       pure (proposalCid, transferResult.senderChangeAmulet)
 
     handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval, Optional (ContractId Amulet))

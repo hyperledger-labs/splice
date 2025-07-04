@@ -46,6 +46,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_11
 class SvOffboardingIntegrationTest
     extends IntegrationTest
     with ProcessTestUtil
@@ -119,6 +120,7 @@ class SvOffboardingIntegrationTest
               Instant.now().plus(5, ChronoUnit.MINUTES),
               0L,
               java.util.Optional.empty(),
+              java.util.Optional.of(dsoParty.toProtoPrimitive),
             )
             .commands
             .asScala
