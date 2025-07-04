@@ -42,7 +42,7 @@ import org.lfdecentralizedtrust.splice.setup.{
   ParticipantInitializer,
   ParticipantPartyMigrator,
 }
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
+import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.util.{
   AmuletConfigSchedule,
@@ -151,18 +151,27 @@ class ValidatorApp(
             migrationDump.participant
           )
         case None =>
-          logger.info(
-            "Ensuring participant is initialized"
-          )
-          val cantonIdentifierConfig =
-            ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
-          ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-            cantonIdentifierConfig.participant,
-            participantAdminConnection,
-            config.participantBootstrappingDump,
-            loggerFactory,
-            retryProvider,
-          )
+          UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
+            case Some(migrationId) if migrationId < config.domainMigrationId =>
+              throw Status.INVALID_ARGUMENT
+                .withDescription(
+                  s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
+                )
+                .asRuntimeException()
+            case _ =>
+              logger.info(
+                "Ensuring participant is initialized"
+              )
+              val cantonIdentifierConfig =
+                ValidatorCantonIdentifierConfig.resolvedNodeIdentifierConfig(config)
+              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                cantonIdentifierConfig.participant,
+                participantAdminConnection,
+                config.participantBootstrappingDump,
+                loggerFactory,
+                retryProvider,
+              )
+          }
       }
     }
   } yield ()
@@ -226,8 +235,6 @@ class ValidatorApp(
                       loggerFactory,
                     )
                     decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
-                      connection,
-                      config.ledgerApiUser,
                       config.domains.global.alias,
                       migrationDump.domainId,
                       sequencerConnections,
@@ -870,7 +877,12 @@ class ValidatorApp(
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
-        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+        case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
+          new RSAVerifier(
+            audience,
+            jwksUrl,
+            RSAVerifier.TimeoutsConfig(connectionTimeout, readTimeout),
+          )
       }
 
       handler =

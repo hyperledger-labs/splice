@@ -1143,7 +1143,11 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       ledgerTime: CantonTimestamp,
   )(implicit env: SpliceTestConsoleEnvironment): Unit =
     clue(s"Locking $amount amulets for $userParty") {
-      val amulet = amulets.find(_.effectiveAmount >= amount).value
+      val amulet = amulets
+        .find(_.effectiveAmount >= amount)
+        .valueOrFail(
+          s"No amulet found with enough effective amount. Amulet effectiveAmounts: ${amulets.map(_.effectiveAmount)}"
+        )
       val amuletRules = scan.getAmuletRules()
       val transferContext = scan.getUnfeaturedAppTransferContext(ledgerTime)
       val openRound = scan.getLatestOpenMiningRound(ledgerTime)

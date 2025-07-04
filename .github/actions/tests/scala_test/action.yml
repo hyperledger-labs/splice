@@ -85,8 +85,12 @@ inputs:
     required: true
   daml_base_version:
     description: "Splice version from which the initial-package-config should be chosen"
-    type: string
     required: true
+  oss_only:
+    description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
+    required: false
+    default: "false"
+
 
 runs:
   using: "composite"
@@ -99,6 +103,7 @@ runs:
         with_sbt: false # we setup SBT later while canton is starting up
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
+        oss_only: ${{ inputs.oss_only }}
 
     - name: Wait for postgres
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -279,7 +284,7 @@ runs:
         name: "logs-${{ inputs.test_suite_name }}-${{ inputs.runner_index }}"
 
     - name: Report Failures on Slack & Github
-      if: failure() && github.event_name == 'push'
+      if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./.github/actions/tests/failure_notifications
       with:
         workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'

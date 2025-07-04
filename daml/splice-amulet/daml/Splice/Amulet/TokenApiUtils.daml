@@ -41,6 +41,12 @@ nonZeroMetadata k n m
   | n == aunit = m
   | otherwise = TextMap.insert k (show n) m
 
+-- | Add an metadata entry for an optional value if it is non-zero number.
+optionalNonZeroMetadata : (Eq a, Additive a, Show a) => Text -> Optional a -> TextMap Text -> TextMap Text
+optionalNonZeroMetadata k optN m = 
+  case optN of
+    None -> m
+    Some n -> nonZeroMetadata k n m
 
 -- Amulet Metadata keys
 -----------------------
@@ -56,6 +62,9 @@ svRewardAmountMetaKey = amuletPrefix <> "sv-rewards"
 
 appRewardAmountMetaKey : Text
 appRewardAmountMetaKey = amuletPrefix <> "app-rewards"
+
+unclaimedActivityRecordAmountMetaKey : Text
+unclaimedActivityRecordAmountMetaKey = amuletPrefix <> "unclaimed-activity-records"
 
 validatorRewardAmountMetaKey : Text
 validatorRewardAmountMetaKey = amuletPrefix <> "validator-rewards"

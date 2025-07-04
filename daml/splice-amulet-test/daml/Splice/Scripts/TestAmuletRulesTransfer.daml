@@ -106,6 +106,7 @@ testUsageFees = do
   ignoreBalanceChanges === TransferSummary with
     inputAppRewardAmount = 0.0
     inputValidatorRewardAmount = 0.0
+    inputUnclaimedActivityRecordAmount = Some 0.0
     inputValidatorFaucetAmount = Some 0.0
     inputSvRewardAmount = 0.0
     inputAmuletAmount = 100.0
@@ -516,3 +517,54 @@ testAppRewardBeneficiaries = do
 
     aliceAppRewardCouponUnfeaturedBeneficiary.amount === 0.2 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
     bobAppRewardCouponUnfeaturedBeneficiary.amount   === 0.8 * aliceAppRewardCouponUnfeaturedNoBeneficiary.amount
+
+testUnclaimedActivityRecordTransferInput : Script ()
+testUnclaimedActivityRecordTransferInput = do
+  defaultAppWithUsers@DefaultAppWithUsers{..}  <- setupDefaultAppWithUsers
+  now <- getTime
+  let 
+    amountToMint = 10.0
+    expiresAt = addRelTime now (days 2)
+    unclaimedActivityRecord = UnclaimedActivityRecord with 
+      dso = app.dso
+      beneficiary = alice.primaryParty
+      amount = amountToMint
+      reason = "Alice is doing great"
+      expiresAt
+
+  runNextIssuance app
+  context <- getPaymentTransferContext app alice
+  runNextIssuance app
+
+  -- Unhappy path - UnclaimedActivityRecord has expired
+  expiredUnclaimedActivityRecordCid <- submit app.dso $ 
+    createCmd unclaimedActivityRecord with expiresAt = addRelTime now (- hours 1)
+  submitMultiMustFail [alice.primaryParty] [app.dso] $ 
+    exerciseCmd context.amuletRules AmuletRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputUnclaimedActivityRecord expiredUnclaimedActivityRecordCid]
+        outputs = []
+        beneficiaries = None 
+      context = context.context
+
+  -- Happy path 
+  unclaimedActivityRecordCid <- submit app.dso $ 
+    createCmd unclaimedActivityRecord
+  transferResult <-
+    checkTransferMetadata app TxKind_MergeSplit alice.primaryParty $
+    checkBalanceChanges defaultAppWithUsers $ 
+      submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
+          outputs = []
+          beneficiaries = None 
+        context = context.context
+  (_, openRound) <- getLatestActiveOpenRound app
+  let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
+  transferResult.summary.senderChangeAmount === amountToMint - createFee
+
+  pure ()

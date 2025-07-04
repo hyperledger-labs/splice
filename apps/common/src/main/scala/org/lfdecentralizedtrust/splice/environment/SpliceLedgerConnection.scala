@@ -1244,8 +1244,6 @@ object BaseLedgerConnection {
 
   val SV_NAME_USER_METADATA_KEY: String = "sv.app.network.canton.global/sv_name"
 
-  val INITIAL_ACS_IMPORT_METADATA_KEY: String = "network.canton.global/initial_acs_import"
-
   val SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY: String =
     "network.canton.global/sv1_initial_package_upload"
 

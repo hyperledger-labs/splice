@@ -3,7 +3,9 @@
 
 package org.lfdecentralizedtrust.splice.config
 
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.scan.config.{BftSequencerConfig, ScanAppBackendConfig}
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -194,6 +196,7 @@ object ConfigTransforms {
       disableOnboardingParticipantPromotionDelay(),
       setDefaultGrpcDeadlineForBuyExtraTraffic(),
       setDefaultGrpcDeadlineForTreasuryService(),
+      enableImportUpdateBackfilling(),
     )
   }
 
@@ -673,6 +676,18 @@ object ConfigTransforms {
     }
   }
 
+  def withNoVoteCooldown: ConfigTransform = {
+    updateAllSvAppFoundDsoConfigs_ { c =>
+      val dsoGovernanceVersion =
+        PackageVersion.assertFromString(c.initialPackageConfig.dsoGovernanceVersion)
+      val supportsVoteCooldown =
+        dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_14.metadata.version
+      c.copy(voteCooldownTime =
+        Some(NonNegativeFiniteDuration.ofSeconds(0)).filter(_ => supportsVoteCooldown)
+      )
+    }
+  }
+
   private def portTransform(bump: Int, c: AdminServerConfig): AdminServerConfig =
     c.copy(internalPort = c.internalPort.map(_ + bump))
 
@@ -860,5 +875,11 @@ object ConfigTransforms {
 
     rows.toMap
   }
+
+  def enableImportUpdateBackfilling(): ConfigTransform =
+    updateAllScanAppConfigs((_, config) =>
+      config
+        .copy(updateHistoryBackfillImportUpdatesEnabled = true)
+    )
 
 }

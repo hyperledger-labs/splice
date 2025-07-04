@@ -30,13 +30,15 @@ class SvMergeDuplicatedValidatorLicenseIntegrationTest
   "Duplicated validator licenses for the same validator get merged" in { implicit env =>
     val dso = sv1Backend.getDsoInfo().dsoParty
 
+    val aliceValidator = aliceValidatorBackend.getValidatorPartyId()
+
     def getValidatorLicenses() =
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(ValidatorLicense.COMPANION)(
           dso,
           _ => true,
         )
-        .filter(_.data.validator.contains("digital-asset-2"))
+        .filter(_.data.validator == aliceValidator.toProtoPrimitive)
 
     val validatorLicenses = getValidatorLicenses()
     validatorLicenses should have size 1

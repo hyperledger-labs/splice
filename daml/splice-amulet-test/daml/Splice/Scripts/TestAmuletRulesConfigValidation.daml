@@ -1,0 +1,45 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletRulesConfigValidation where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.AmuletRules
+import Splice.AmuletConfig
+import Splice.Fees
+import Splice.Testing.Registries.AmuletRegistry.Parameters
+import Splice.Scripts.Util
+
+
+testAmuletRulesConfigValidation: Script ()
+testAmuletRulesConfigValidation = do
+  DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
+
+
+  -- tick duration can be changed
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
+  submitMulti [app.dso] [app.dso] $
+    exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+      newConfig = makeAmuletConfig (minutes 20) (RatePerRound 0.000020)
+      baseConfig = amuletRules.configSchedule.initialValue
+
+  -- validate the change
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
+  amuletRules.configSchedule.initialValue.tickDuration === minutes 20
+
+  -- the change of the tick duration fails if the duration is negative
+  submitMultiMustFail [app.dso] [app.dso] $
+    exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+      newConfig = makeAmuletConfig (negate (minutes 20)) (RatePerRound 0.000020)
+      baseConfig = amuletRules.configSchedule.initialValue
+
+  pure ()
+
+
+makeAmuletConfig : RelTime -> RatePerRound -> AmuletConfig USD
+makeAmuletConfig tickDuration holdingFee = defaultAmuletConfig with
+    transferConfig = defaultTransferConfig with holdingFee
+    tickDuration

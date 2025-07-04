@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   BftSequencerConfig,
   ScanAppBackendConfig,
   ScanAppClientConfig,
+  ScanCacheConfig,
   ScanSynchronizerConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
@@ -427,6 +428,8 @@ object SpliceConfig {
       ConfigReader.forProduct3("migration-id", "sequencer-admin-client", "p2p-url")(
         BftSequencerConfig(_, _, _)
       )
+    implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
+      deriveReader[ScanCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -689,6 +692,16 @@ object SpliceConfig {
               s"Pruning retention period ${conf.participantPruningSchedule.map(_.retention)} must be bigger than the deduplication duration ${conf.deduplicationDuration}"
             ),
           )
+          _ <- Either.cond(
+            {
+              val traffic = conf.domains.global.buyExtraTraffic
+              traffic.targetThroughput.value <= 0 || traffic.minTopupInterval.duration >= conf.automation.pollingInterval.duration
+            },
+            (),
+            ConfigValidationFailed(
+              s"topup interval ${conf.domains.global.buyExtraTraffic.minTopupInterval} must not be smaller than the polling interval ${conf.automation.pollingInterval}"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
@@ -794,6 +807,8 @@ object SpliceConfig {
       )
     implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
       deriveWriter[ScanAppBackendConfig]
+    implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
+      deriveWriter[ScanCacheConfig]
 
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]

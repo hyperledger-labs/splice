@@ -53,6 +53,11 @@ on:
         description: "Splice version from which the initial-package-config should be chosen"
         type: string
         required: true
+      oss_only:
+        description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
 
@@ -134,3 +139,4 @@ jobs:
           failure_notifications_invoker_url: ${{ secrets.FAILURE_NOTIFICATIONS_INVOKER_URL }}
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
           daml_base_version: ${{ inputs.daml_base_version }}
+          oss_only: ${{ inputs.oss_only }}

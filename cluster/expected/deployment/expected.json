@@ -175,6 +175,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "canton-network",
             "namespace": "operator"
           },
@@ -250,6 +251,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -502,6 +504,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "infra",
             "namespace": "operator"
           },
@@ -577,6 +580,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -779,6 +783,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "multi-validator",
             "namespace": "operator"
           },
@@ -854,6 +859,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -1471,6 +1477,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "splitwell",
             "namespace": "operator"
           },
@@ -1546,6 +1553,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -1748,6 +1756,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-1-migration-1",
             "namespace": "operator"
           },
@@ -1823,6 +1832,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -2025,6 +2035,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-1-migration-2",
             "namespace": "operator"
           },
@@ -2100,6 +2111,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -2314,6 +2326,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-1-migration-3",
             "namespace": "operator"
           },
@@ -2389,6 +2402,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -2603,6 +2617,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-1-migration-4",
             "namespace": "operator"
           },
@@ -2678,6 +2693,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -2882,6 +2898,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-migration-1",
             "namespace": "operator"
           },
@@ -2957,6 +2974,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -3161,6 +3179,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-migration-2",
             "namespace": "operator"
           },
@@ -3236,6 +3255,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -3452,6 +3472,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-migration-3",
             "namespace": "operator"
           },
@@ -3527,6 +3548,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -3743,6 +3765,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-canton-sv-migration-4",
             "namespace": "operator"
           },
@@ -3818,6 +3841,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -4022,6 +4046,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "sv-runbook",
             "namespace": "operator"
           },
@@ -4097,6 +4122,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -4301,6 +4327,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "validator-runbook",
             "namespace": "operator"
           },
@@ -4376,6 +4403,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",
@@ -4578,6 +4606,7 @@
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
+            "deletionGracePeriodSeconds": 1800,
             "name": "validator1",
             "namespace": "operator"
           },
@@ -4653,6 +4682,7 @@
                     ]
                   }
                 ],
+                "terminationGracePeriodSeconds": 1800,
                 "tolerations": [
                   {
                     "effect": "NoSchedule",

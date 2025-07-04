@@ -125,6 +125,9 @@
       "enabled": {
         "type": "boolean"
       },
+      "importUpdatesEnabled": {
+        "type": "boolean"
+      },
       "batchSize": {
         "type": "integer"
       }

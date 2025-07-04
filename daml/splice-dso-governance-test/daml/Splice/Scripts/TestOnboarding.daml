@@ -154,9 +154,6 @@ testSvOnboarding = do
   -- once svX becomes able to read as DSO party (e.g., after party migration to svX's participant)...
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
-  -- run one issuance so we svX joins in a round after round 0
-  runNextIssuance app
-
   -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
   [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
 
@@ -177,6 +174,21 @@ testSvOnboarding = do
     middleRoundCid = earliestRoundCid
     latestRoundCid = earliestRoundCid
     amuletRulesCid
+
+  -- onboarding fails if the time expired
+  now <- getTime
+  setTime svOnboardingConfirmed.expiresAt
+
+  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
+    sv = svX
+    svOnboardingConfirmedCid
+    earliestRoundCid
+    middleRoundCid
+    latestRoundCid
+    amuletRulesCid
+
+  -- reset the time to now
+  setTime now
 
   -- svX completes its own onboarding by adding itself to the DsoRules
   submitMulti [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with

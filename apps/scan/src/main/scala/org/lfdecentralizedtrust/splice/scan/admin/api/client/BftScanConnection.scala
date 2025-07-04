@@ -132,21 +132,14 @@ class BftScanConnection(
           retryProvider.timeouts,
           "refresh_scan_list",
         )({ tc =>
-          // This retry makes sure any partial or complete failures are immediately retried with a backoff.
+          // refresh will throw if we're in a state where there's no BFT guarantees, in which case
+          // this will retry faster than the regular `bft.scansRefreshInterval`
           FutureUnlessShutdown.outcomeF(
             retryProvider.retry(
               RetryFor.LongRunningAutomation,
               "refresh_scan_list",
               "refresh_scan_list",
-              bft.refresh(this)(tc).flatMap { connections =>
-                if (connections.failed > 0)
-                  Future.failed(
-                    io.grpc.Status.UNAVAILABLE
-                      .withDescription("Deliberately enforcing a retry on failed scans.")
-                      .asRuntimeException()
-                  )
-                else Future.unit
-              },
+              bft.refresh(this)(tc),
               logger,
             )(implicitly, TraceContext.empty, implicitly)
           )
@@ -367,27 +360,6 @@ class BftScanConnection(
       tc: TraceContext,
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
     bftCall(_.lookupTransferPreapprovalByParty(receiver))
-
-  override def listDsoRulesVoteRequests()(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    bftCall(_.listDsoRulesVoteRequests())
-
-  override def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[VoteRequest.ContractId]
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[
-    Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-  ] = bftCall(_.listVoteRequestsByTrackingCid(voteRequestCids))
-
-  def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    bftCall(_.lookupVoteRequest(contractId))
 
   override def listVoteRequestResults(
       actionName: Option[String],
@@ -891,75 +863,88 @@ object BftScanConnection {
     )(implicit tc: TraceContext): Future[ScanConnections] = {
       val currentState @ BftState(currentScanConnections, currentFailed) =
         currentScanConnectionsRef.get()
-      val currentScans = (currentScanConnections.keys ++ currentFailed.keys).toSet
       logger.info(s"Started refreshing scan list from $currentState")
-      getScans(connection).flatMap { scansInDsoRules =>
-        val newScans = scansInDsoRules.filter(scan => !currentScans.contains(scan.publicUrl))
-        val removedScans = currentScans.filter(url => !scansInDsoRules.exists(_.publicUrl == url))
-        if (scansInDsoRules.isEmpty) {
-          // This is expected on app init, and is retried when building the BftScanConnection
-          Future.failed(
-            io.grpc.Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Scan list in DsoRules is empty. Last known list: $currentState"
-              )
-              .asRuntimeException()
-          )
-        } else if (newScans.isEmpty && removedScans.isEmpty && currentFailed.isEmpty) {
-          logger.debug("Not updating scan list as there are no changes.")
-          Future.successful(currentState.scanConnections)
+
+      for {
+        // if the previous state had too many failed scans, we cannot fetch the new list of scans.
+        // thus, we retry all failed connections first.
+        (retriedScansFailedConnections, retriedScansSuccessfulConnections) <- attemptConnections(
+          currentFailed.map { case (uri, (_, svName)) =>
+            DsoScan(uri, svName)
+          }.toSeq
+        )
+        retriedCurrentState = BftState(
+          currentScanConnections ++ retriedScansSuccessfulConnections,
+          retriedScansFailedConnections.toMap,
+        )
+        // this state will be used to fetch the scans in the next call
+        _ = currentScanConnectionsRef.set(retriedCurrentState)
+        // these will be BFT-read, failing if there's no consensus
+        scansInDsoRules <- getScans(connection)
+        newState <- computeNewState(retriedCurrentState, scansInDsoRules)
+      } yield {
+        currentScanConnectionsRef.set(newState)
+        logger.info(s"Updated scan list to $newState")
+
+        val connections = newState.scanConnections
+        val defaultCallConfig = BftCallConfig.default(connections)
+        // Most but not all calls will use the default config.
+        // Fail early if there are not enough Scans for the default config
+        if (!defaultCallConfig.enoughAvailableScans) {
+          throw io.grpc.Status.FAILED_PRECONDITION
+            .withDescription(
+              s"There are not enough Scans to satisfy f=${connections.f}. Will be retried. State: $newState"
+            )
+            .asRuntimeException()
         } else {
-          for {
-            (newScansFailedConnections, newScansSuccessfulConnections) <- attemptConnections(
-              newScans
+          connections
+        }
+      }
+    }
+
+    private def computeNewState(
+        currentState: BftState,
+        scansInDsoRules: Seq[DsoScan],
+    )(implicit tc: TraceContext): Future[BftState] = {
+      val BftState(currentScanConnections, currentFailed) = currentState
+      val currentScans = (currentScanConnections.keys ++ currentFailed.keys).toSet
+
+      val newScans = scansInDsoRules.filter(scan => !currentScans.contains(scan.publicUrl))
+      val removedScans = currentScans.filter(url => !scansInDsoRules.exists(_.publicUrl == url))
+      if (scansInDsoRules.isEmpty) {
+        // This is expected on app init, and is retried when building the BftScanConnection
+        Future.failed(
+          io.grpc.Status.FAILED_PRECONDITION
+            .withDescription(
+              s"Scan list in DsoRules is empty. Last known list: $currentState"
             )
-            toRetry = currentFailed -- removedScans
-            (retriedScansFailedConnections, retriedScansSuccessfulConnections) <-
-              attemptConnections(
-                toRetry.map { case (url, (_, svName)) => DsoScan(url, svName) }.toSeq
+            .asRuntimeException()
+        )
+      } else {
+        for {
+          (newScansFailedConnections, newScansSuccessfulConnections) <- attemptConnections(
+            newScans
+          )
+        } yield {
+          logger.info(
+            s"New successful scans: ${newScansSuccessfulConnections.map(_._1)}, " +
+              s"new failed scans: ${newScansFailedConnections.map(_._1)}, " +
+              s"removed scans: $removedScans"
+          )
+
+          removedScans.foreach { url =>
+            currentScanConnections.get(url).foreach { case (connection, svName) =>
+              logger.info(
+                s"Closing connection to scan of $svName ($url) as it's been removed from the DsoRules scan list."
               )
-          } yield {
-            removedScans.foreach { url =>
-              currentScanConnections.get(url).foreach { case (connection, svName) =>
-                logger.info(
-                  s"Closing connection to scan of $svName ($url) as it's been removed from the DsoRules scan list."
-                )
-                attemptToClose(connection)
-              }
-            }
-            (newScansFailedConnections ++ retriedScansFailedConnections).foreach {
-              case (url, (err, svName)) =>
-                // TODO(#815): abstract this pattern into the RetryProvider
-                if (retryProvider.isClosing)
-                  logger.info(
-                    s"Suppressed warning, as we're shutting down: Failed to connect to scan of $svName ($url).",
-                    err,
-                  )
-                else
-                  logger.warn(s"Failed to connect to scan of $svName ($url).", err)
-            }
-
-            val newState = BftState(
-              currentScanConnections -- removedScans ++ newScansSuccessfulConnections ++ retriedScansSuccessfulConnections,
-              (retriedScansFailedConnections ++ newScansFailedConnections).toMap,
-            )
-            currentScanConnectionsRef.set(newState)
-            logger.info(s"Updated scan list to $newState")
-
-            val connections = newState.scanConnections
-            val defaultCallConfig = BftCallConfig.default(connections)
-            // Most but not all calls will use the default config.
-            // Fail early if there are not enough Scans for the default config
-            if (!defaultCallConfig.enoughAvailableScans) {
-              throw io.grpc.Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"There are not enough Scans to satisfy f=${connections.f}. Will be retried. State: $newState"
-                )
-                .asRuntimeException()
-            } else {
-              connections
+              attemptToClose(connection)
             }
           }
+
+          BftState(
+            (currentScanConnections -- removedScans) ++ newScansSuccessfulConnections,
+            (currentFailed -- removedScans) ++ newScansFailedConnections,
+          )
         }
       }
     }
@@ -976,12 +961,27 @@ object BftScanConnection {
         .traverse { scan =>
           logger.info(s"Attempting to connect to Scan: $scan.")
           connectionBuilder(scan.publicUrl)
-            .transformWith(result =>
+            .transformWith { result =>
+              // logging
+              result.failed.foreach { err =>
+                // TODO(#815): abstract this pattern into the RetryProvider
+                if (retryProvider.isClosing)
+                  logger.info(
+                    s"Suppressed warning, as we're shutting down: Failed to connect to scan of ${scan.svName} (${scan.publicUrl}).",
+                    err,
+                  )
+                else
+                  logger.warn(
+                    s"Failed to connect to scan of ${scan.svName} (${scan.publicUrl}).",
+                    err,
+                  )
+              }
+              // actual result
               Future.successful(
                 result.toEither
                   .bimap(scan.publicUrl -> (_, scan.svName), scan.publicUrl -> (_, scan.svName))
               )
-            )
+            }
         }
         .map(_.partitionEither(identity))
     }

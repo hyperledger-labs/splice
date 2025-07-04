@@ -171,6 +171,8 @@ class ScanApp(
         },
         migrationInfo,
         participantId,
+        config.cache.svNodeStateTtl,
+        config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
       )
       acsSnapshotStore = AcsSnapshotStore(
@@ -271,6 +273,7 @@ class ScanApp(
 
       tokenStandardMetadataHandler = new HttpTokenStandardMetadataHandler(
         store,
+        config.spliceInstanceNames,
         loggerFactory,
       )()
 

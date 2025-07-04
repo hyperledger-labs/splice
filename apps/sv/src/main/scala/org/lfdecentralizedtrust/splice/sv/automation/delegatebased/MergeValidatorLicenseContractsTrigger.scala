@@ -12,7 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeValidatorLicense
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.store.PageLimit
-import org.lfdecentralizedtrust.splice.util.{AssignedContract, Codec, Contract}
+import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -50,7 +50,6 @@ class MergeValidatorLicenseContractsTrigger(
           Seq(
             store.key.svParty,
             store.key.dsoParty,
-            Codec.tryDecode(Codec.Party)(validator),
           ),
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )

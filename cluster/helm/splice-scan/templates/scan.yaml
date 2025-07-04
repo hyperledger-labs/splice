@@ -66,6 +66,7 @@ spec:
           value: |
             canton.scan-apps.scan-app {
               update-history-backfill-enabled = {{ .enabled }}
+              update-history-backfill-import-updates-enabled = {{ .importUpdatesEnabled }}
               update-history-backfill-batch-size = "{{ .batchSize }}"
             }
         {{- end }}

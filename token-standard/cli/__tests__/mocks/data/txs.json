@@ -200,6 +200,7 @@
                       "inputAmuletAmount" : "200000.0000000000",
                       "inputAppRewardAmount" : "0.0000000000",
                       "inputSvRewardAmount" : "0.0000000000",
+                      "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                       "inputValidatorFaucetAmount" : "0.0000000000",
                       "inputValidatorRewardAmount" : "0.0000000000",
                       "outputFees" : [
@@ -289,6 +290,7 @@
                       "inputAmuletAmount" : "200000.0000000000",
                       "inputAppRewardAmount" : "0.0000000000",
                       "inputSvRewardAmount" : "0.0000000000",
+                      "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                       "inputValidatorFaucetAmount" : "0.0000000000",
                       "inputValidatorRewardAmount" : "0.0000000000",
                       "outputFees" : [
@@ -722,6 +724,7 @@
                       "inputAmuletAmount" : "199877.3600000000",
                       "inputAppRewardAmount" : "0.0000000000",
                       "inputSvRewardAmount" : "0.0000000000",
+                      "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                       "inputValidatorFaucetAmount" : "0.0000000000",
                       "inputValidatorRewardAmount" : "0.0000000000",
                       "outputFees" : [
@@ -820,6 +823,7 @@
                     "inputAmuletAmount" : "199877.3600000000",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -1226,6 +1230,7 @@
                       "inputAmuletAmount" : "200.0000000000",
                       "inputAppRewardAmount" : "0.0000000000",
                       "inputSvRewardAmount" : "0.0000000000",
+                      "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                       "inputValidatorFaucetAmount" : "0.0000000000",
                       "inputValidatorRewardAmount" : "0.0000000000",
                       "outputFees" : [
@@ -1324,6 +1329,7 @@
                     "inputAmuletAmount" : "200.0000000000",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -1705,6 +1711,7 @@
                       "inputAmuletAmount" : "87.0000000000",
                       "inputAppRewardAmount" : "0.0000000000",
                       "inputSvRewardAmount" : "0.0000000000",
+                      "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                       "inputValidatorFaucetAmount" : "0.0000000000",
                       "inputValidatorRewardAmount" : "0.0000000000",
                       "outputFees" : [
@@ -1803,6 +1810,7 @@
                     "inputAmuletAmount" : "87.0000000000",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -2469,6 +2477,7 @@
                     "inputAmuletAmount" : "6064.9000000000",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -3051,6 +3060,7 @@
                     "inputAmuletAmount" : "4987.8984779200",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -3604,6 +3614,7 @@
                     "inputAmuletAmount" : "3910.8969558400",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -4157,6 +4168,7 @@
                     "inputAmuletAmount" : "2833.8954337600",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -4710,6 +4722,7 @@
                     "inputAmuletAmount" : "1756.8939116800",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -5308,6 +5321,7 @@
                     "inputAmuletAmount" : "1064.0015220800",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -6633,6 +6647,7 @@
                     "inputAmuletAmount" : "232.0152207200",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [
@@ -7521,6 +7536,7 @@
                     "inputAmuletAmount" : "4113.8695585600",
                     "inputAppRewardAmount" : "0.0000000000",
                     "inputSvRewardAmount" : "0.0000000000",
+                    "inputUnclaimedActivityRecordAmount" : "0.0000000000",
                     "inputValidatorFaucetAmount" : "0.0000000000",
                     "inputValidatorRewardAmount" : "0.0000000000",
                     "outputFees" : [

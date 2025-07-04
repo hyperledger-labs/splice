@@ -9,6 +9,7 @@ import {
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
 
+import { PulumiOperatorGracePeriod } from '../../common/src/operator/config';
 import { namespace } from './namespace';
 
 export const imagePullDeps = imagePullSecret(namespace);
@@ -38,7 +39,7 @@ export const operator = new k8s.helm.v3.Release(
         },
       },
       imagePullSecrets: [{ name: secretName }],
-      terminationGracePeriodSeconds: 1800,
+      terminationGracePeriodSeconds: PulumiOperatorGracePeriod,
       image: {
         pullPolicy: 'Always',
       },

@@ -265,8 +265,6 @@ class DomainMigrationInitializer(
         ),
       )
       _ <- domainDataRestorer.connectDomainAndRestoreData(
-        readOnlyConnection,
-        config.ledgerApiUser,
         synchronizerAlias,
         domainMigrationDump.nodeIdentities.synchronizerId,
         SequencerConnections.single(localSynchronizerNode.sequencerConnection),

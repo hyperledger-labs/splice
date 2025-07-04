@@ -5,7 +5,6 @@ import * as pulumi from '@pulumi/pulumi';
 import _ from 'lodash';
 import {
   appsAffinityAndTolerations,
-  config,
   DOCKER_REPO,
   imagePullPolicy,
   jmxOptions,
@@ -13,6 +12,7 @@ import {
 } from 'splice-pulumi-common';
 import { ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
+import { Version } from '../version';
 import { EnvironmentVariable, multiValidatorConfig } from './config';
 
 export interface BaseMultiNodeArgs {
@@ -53,8 +53,6 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
 
     const newOpts = { ...opts, parent: this, dependsOn: [args.namespace] };
     const zeroPad = (num: number, places: number) => String(num).padStart(places, '0');
-    const version =
-      config.optionalEnv('MULTI_VALIDATOR_IMAGE_VERSION') || config.requireEnv('CHARTS_VERSION');
     this.deployment = new k8s.apps.v1.Deployment(
       name,
       {
@@ -84,7 +82,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
               containers: [
                 {
                   name: args.imageName,
-                  image: `${DOCKER_REPO}/${args.imageName}:${version}`,
+                  image: `${DOCKER_REPO}/${args.imageName}:${Version}`,
                   ...imagePullPolicy,
                   ...args.container,
                   ports: args.container.ports.concat([

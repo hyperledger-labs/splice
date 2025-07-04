@@ -1,22 +1,33 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.tokenstandard.metadata.v1
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_9
 class TokenStandardMetadataIntegrationTest extends IntegrationTestWithSharedEnvironment {
 
   override def environmentDefinition: EnvironmentDefinition =
-    EnvironmentDefinition.simpleTopology1Sv(this.getClass.getSimpleName)
+    EnvironmentDefinition
+      .simpleTopology1Sv(this.getClass.getSimpleName)
+      .addConfigTransform((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(config =>
+          config.copy(
+            spliceInstanceNames = config.spliceInstanceNames.copy(
+              amuletName = "MyAmulet",
+              amuletNameAcronym = "MyA",
+            )
+          )
+        )(config)
+      )
 
   "Scan implements token metadata API" in { implicit env =>
     val dso = sv1ScanBackend.getDsoPartyId().toProtoPrimitive
 
     val amuletInstrument = v1.definitions.Instrument(
       id = "Amulet",
-      name = "Amulet",
-      symbol = "Amulet",
+      name = "MyAmulet",
+      symbol = "MyA",
       decimals = 10,
       supportedApis = Map(
         "splice-api-token-metadata-v1" -> 1,

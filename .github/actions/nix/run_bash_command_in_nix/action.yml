@@ -29,6 +29,11 @@ runs:
         echo "sourcing nix profile"
         export USER=$(whoami)
         . ~/.nix-profile/etc/profile.d/nix.sh
+        if [ -f /tmp/oss-only ]; then
+          target="oss"
+        else
+          target="default"
+        fi
 
         # Attempt to build the nix env with retries to work around transient download failures
         echo "building nix env"
@@ -42,7 +47,7 @@ runs:
             sleep $SLEEP_DURATION
           fi
           nix develop \
-            path:nix \
+            path:nix#$target \
             --ignore-environment \
             --keep USER \
             --keep HOME \
@@ -136,7 +141,7 @@ runs:
         echo "Running actual command"
         # Run the command for real within the nix environment
         nix develop \
-          path:nix \
+          path:nix#$target \
           --ignore-environment \
           --keep USER \
           --keep HOME \
