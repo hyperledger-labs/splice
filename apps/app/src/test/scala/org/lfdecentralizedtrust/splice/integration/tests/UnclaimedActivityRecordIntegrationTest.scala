@@ -25,6 +25,8 @@ import com.daml.ledger.javaapi.data.Identifier
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceDsoGovernance_0_1_14
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_10
 class UnclaimedActivityRecordIntegrationTest
     extends SvIntegrationTestBase
     with TriggerTestUtil
