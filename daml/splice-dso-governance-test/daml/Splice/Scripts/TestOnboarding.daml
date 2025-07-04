@@ -535,3 +535,21 @@ test_MergeValidatorLicense = do
   submitMultiMustFail [sv1] [dso] $ exerciseCmd rulesCid (DsoRules_MergeValidatorLicense [validatorLicenseCid3, validatorLicenseSv2Cid] (Some sv1))
 
   pure()
+
+testBootstrapDevNetWithNonZeroRound : Script ()
+testBootstrapDevNetWithNonZeroRound = do
+  (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound True 34
+  [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app
+  earliestRound.round === Round 34
+  middleRound.round === Round 35
+  latestRound.round === Round 36
+  pure ()
+
+testBootstrapMainNetWithNonZeroRound : Script ()
+testBootstrapMainNetWithNonZeroRound = do
+  (app, _, _) <- initDecentralizedSynchronizerWithNonZeroRound False 34
+  [(_, earliestRound), (_, middleRound), (_, latestRound)] <- getActiveOpenRoundsSorted app
+  earliestRound.round === Round 34
+  middleRound.round === Round 35
+  latestRound.round === Round 36
+  pure ()

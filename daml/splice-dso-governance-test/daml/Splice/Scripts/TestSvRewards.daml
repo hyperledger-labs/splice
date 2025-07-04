@@ -20,10 +20,10 @@ import Splice.DSO.SvState
 import Splice.Scripts.DsoTestUtils
 import Splice.Util
 
-test_SvRewards : Script ()
-test_SvRewards = do
+test_SvRewards_Per_InitialRound : Int -> Script ()
+test_SvRewards_Per_InitialRound initialRound = do
 
-    (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
+    (app, dso, (sv1, sv2, sv3, sv4)) <- initDecentralizedSynchronizerWithNonZeroRound False initialRound
 
     -- extra party to represent beneficiary
     extraBeneficiary <- allocateParty "beneficiary"
@@ -145,14 +145,14 @@ test_SvRewards = do
     sv1State.state === RewardState with
       numRoundsMissed = 2
       numRoundsCollected = 3
-      lastRoundCollected = Round 4
+      lastRoundCollected = Round (initialRound + 4)
       numCouponsIssued = 6
 
     [(_, sv2State)] <- queryFilter @SvRewardState dso (\s -> s.svName == "sv2")
     sv2State.state === RewardState with
       numRoundsMissed = 3
       numRoundsCollected = 2
-      lastRoundCollected = Round 4
+      lastRoundCollected = Round (initialRound + 4)
       numCouponsIssued = 4
 
     -- round2 can no longer be received
@@ -160,6 +160,12 @@ test_SvRewards = do
     receiveSvRewardCouponFails sv2 round2 rulesCid
 
     return ()
+
+test_SvRewards : Script ()
+test_SvRewards = do
+  test_SvRewards_Per_InitialRound 0
+  test_SvRewards_Per_InitialRound 4444
+  pure ()
 
 test_SvRewardStateMerge = do
   (_, dso, (sv1, _, _, _)) <- initMainNet
