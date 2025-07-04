@@ -1,3 +1,4 @@
+{ use_enterprise }:
 [(self: super: {
   openapi-generator-cli = (super.openapi-generator-cli.override { jre = super.openjdk21; }).overrideAttrs(oldAttrs: rec {
     # 7.0.1 causes some issues in the generated package.json which break module resolution.
@@ -10,9 +11,9 @@
   });
   jre = super.openjdk21;
   lnav = super.callPackage ./lnav.nix {};
-  canton = super.callPackage ./canton.nix {};
+  canton = super.callPackage ./canton.nix {inherit use_enterprise;};
   cometbft_driver = super.callPackage ./cometbft-driver.nix {};
-  daml2js = super.callPackage ./daml2js.nix {};
+  daml2js = super.callPackage ./daml2js.nix {inherit use_enterprise;};
   python3 = super.python3.override {
     packageOverrides = pySelf : pySuper : rec {
       sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };

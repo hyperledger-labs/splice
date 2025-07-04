@@ -4,8 +4,7 @@
 package org.lfdecentralizedtrust.splice.scan.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.digitalasset.canton.caching.ScaffeineCache
-import com.digitalasset.canton.config.{NonNegativeDuration, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.{NonNegativeDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -19,7 +18,6 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.github.blemale.scaffeine.Scaffeine
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
@@ -98,7 +96,6 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
-    svNodeStateCacheTtl: NonNegativeFiniteDuration,
     enableImportUpdateBackfill: Boolean,
     storeMetrics: DbScanStoreMetrics,
 )(implicit
@@ -582,39 +579,7 @@ class DbScanStore(
       } yield result
     }
 
-  private val totalAmuletBalanceCache: ScaffeineCache.TunnelledAsyncLoadingCache[
-    Future,
-    DbScanStore.CacheKey,
-    DbScanStore.CacheValue,
-  ] = {
-    implicit val tc = TraceContext.empty
-    ScaffeineCache.buildAsync[Future, DbScanStore.CacheKey, DbScanStore.CacheValue](
-      Scaffeine()
-        .maximumSize(1000),
-      key => getUncachedTotalAmuletBalance(key),
-      metrics = Some(storeMetrics.totalAmuletBalanceCache),
-    )(logger, "amuletBalanceCache")
-  }
-  // TODO(#800) remove when amulet expiry works again
-  def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal] = {
-    totalAmuletBalanceCache.get(asOfEndOfRound)
-  }
-
-  private val svNodeStateCache: ScaffeineCache.TunnelledAsyncLoadingCache[
-    Future,
-    Unit,
-    Seq[SvNodeState],
-  ] = {
-    implicit val tc = TraceContext.empty
-    ScaffeineCache.buildAsync[Future, Unit, Seq[SvNodeState]](
-      Scaffeine()
-        .expireAfterWrite(svNodeStateCacheTtl.asFiniteApproximation),
-      _ => this.listSvNodeStates(),
-      metrics = Some(storeMetrics.svNodeStateCache),
-    )(logger, "svNodeStateCache")
-  }
-
-  private def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] =
+  override def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] =
     for {
       dsoRules <- getDsoRulesWithState()
       nodeStates <- Future.traverse(dsoRules.payload.svs.asScala.keys) { svPartyId =>
@@ -622,11 +587,7 @@ class DbScanStore(
       }
     } yield nodeStates.map(_.contract.payload).toVector
 
-  protected override def listCachedSvNodeStates()(implicit
-      tc: TraceContext
-  ): Future[Seq[SvNodeState]] = svNodeStateCache.get(())
-
-  protected override def getUncachedTotalAmuletBalance(asOfEndOfRound: Long)(implicit
+  override def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] =
     waitUntilAcsIngested {

@@ -78,6 +78,7 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet amuletPrice = do
         maxTextLength = 1024
         decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
         nextScheduledSynchronizerUpgrade = None
+        voteCooldownTime = None -- use default value of 1 minute
   let amuletConfig = defaultAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
@@ -344,6 +345,7 @@ initiateAndAcceptVote app (initiator::others) action = do
             sv
             accept = True
             reason = Reason with url = ""; body = "✓"
+            optCastAt = None
       return result.voteRequest
 
 -- cast a vote on a request
@@ -358,6 +360,7 @@ castVote app sv requestCid vote = do
             reason = Reason with
                 url = ""
                 body = ""
+            optCastAt = None
     return result.voteRequest
 
 -- | Update all currently desired prices to the target price

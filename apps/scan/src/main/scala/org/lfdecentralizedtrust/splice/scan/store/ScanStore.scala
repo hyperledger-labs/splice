@@ -30,12 +30,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
 }
 import org.lfdecentralizedtrust.splice.scan.store.db.ScanTables.ScanAcsStoreRowData
 import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
-import org.lfdecentralizedtrust.splice.util.{
-  AmuletConfigSchedule,
-  Contract,
-  ContractWithState,
-  TemplateJsonDecoder,
-}
+import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -72,7 +67,7 @@ trait ScanStore
 
   def key: ScanStore.Key
 
-  def domainMigrationId: Long
+  protected[store] def domainMigrationId: Long
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
     ScanAcsStoreRowData,
@@ -101,18 +96,18 @@ trait ScanStore
       )
     )
 
-  protected def listCachedSvNodeStates()(implicit
+  protected[store] def listSvNodeStates()(implicit
       tc: TraceContext
   ): Future[Seq[splice.dso.svstate.SvNodeState]]
 
   /** Returns all items extracted by `f` from the DsoRules ensuring that they're sorted by synchronizerId,
     * so that the order is deterministic.
     */
-  def listFromCachedSvNodeStates[T](
+  def listFromSvNodeStates[T](
       f: splice.dso.svstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
-      nodeStates <- listCachedSvNodeStates()
+      nodeStates <- listSvNodeStates()
     } yield {
       val items = nodeStates.toVector.flatMap(nodeState => f(nodeState))
       val itemsByDomain = items.groupBy(_._1).view.mapValues(_.map(_._2))
@@ -120,10 +115,10 @@ trait ScanStore
     }
   }
 
-  def listCachedDsoScans()(implicit
+  def listDsoScans()(implicit
       tc: TraceContext
   ): Future[Vector[(String, Vector[ScanInfo])]] = {
-    listFromCachedSvNodeStates { nodeState =>
+    listFromSvNodeStates { nodeState =>
       for {
         (synchronizerId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
         scan <- domainConfig.scan.toScala
@@ -159,10 +154,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
 
-  def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal]
-  protected def getUncachedTotalAmuletBalance(asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal]
+  def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
@@ -213,17 +205,6 @@ trait ScanStore
       splice.validatorlicense.ValidatorLicense,
     ]
   ]]
-
-  def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[splice.decentralizedsynchronizer.BaseRateTrafficLimits] =
-    getAmuletRulesWithState().map(cr =>
-      AmuletConfigSchedule(cr)
-        .getConfigAsOf(t)
-        .decentralizedSynchronizer
-        .fees
-        .baseRateTrafficLimits
-    )
 
   def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(implicit
       tc: TraceContext
@@ -331,17 +312,22 @@ object ScanStore {
   ): ScanStore = {
     storage match {
       case db: DbStorage =>
-        new DbScanStore(
-          key = key,
-          db,
-          isFirstSv,
+        new CachingScanStore(
           loggerFactory,
           retryProvider,
-          createScanAggregatesReader,
-          domainMigrationInfo,
-          participantId,
+          new DbScanStore(
+            key = key,
+            db,
+            isFirstSv,
+            loggerFactory,
+            retryProvider,
+            createScanAggregatesReader,
+            domainMigrationInfo,
+            participantId,
+            enableImportUpdateBackfill,
+            metrics,
+          ),
           svNodeStateCacheTtl,
-          enableImportUpdateBackfill,
           metrics,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")

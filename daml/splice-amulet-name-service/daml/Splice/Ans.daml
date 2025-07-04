@@ -321,3 +321,7 @@ validAnsConfig AnsRulesConfig{..} =
     renewalDuration > days 0
     && entryLifetime > days 0
     && entryFee > 0.0
+
+
+instance HasCheckedFetch AnsEntryContext ForDso where
+  contractGroupId AnsEntryContext with .. = ForDso with ..

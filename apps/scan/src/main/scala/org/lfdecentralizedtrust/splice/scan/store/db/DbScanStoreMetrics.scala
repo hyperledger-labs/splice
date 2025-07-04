@@ -3,14 +3,16 @@
 
 package org.lfdecentralizedtrust.splice.scan.store.db
 
-import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.api.MetricQualification.Latency
+import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
 import com.digitalasset.canton.metrics.CacheMetrics
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.store.HistoryMetrics
 
-class DbScanStoreMetrics(metricsFactory: LabeledMetricsFactory) extends AutoCloseable {
+class DbScanStoreMetrics(
+    metricsFactory: LabeledMetricsFactory
+) extends AutoCloseable {
 
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "scan_store"
 

@@ -35,17 +35,19 @@ object ExtraTrafficTopupParameters {
       minTopupAmount: Long,
       topupTriggerPollingInterval: NonNegativeFiniteDuration,
   ): ExtraTrafficTopupParameters = {
+    if (minTopupInterval.duration < topupTriggerPollingInterval.duration) {
+      throw new IllegalArgumentException(
+        s"minTopupInterval $minTopupInterval must be bigger than topupTriggerPollingInterval $topupTriggerPollingInterval"
+      )
+    }
     val targetRateBytesPerSecond = targetThroughput.value
     if (targetRateBytesPerSecond <= 0L) {
       // the topup interval in this case is irrelevant
       ExtraTrafficTopupParameters(0L, NonNegativeFiniteDuration.ofSeconds(0))
     } else {
-      // ensure minTopupInterval is at least equal to the polling interval
-      val minTopupInterval_ =
-        maximumOfDuration(minTopupInterval, topupTriggerPollingInterval)
       val expectedTopupParameters = roundUpIntervalAndCalculateAmount(
         targetRateBytesPerSecond,
-        minTopupInterval_,
+        minTopupInterval,
         topupTriggerPollingInterval,
       )
       if (expectedTopupParameters.topupAmount >= minTopupAmount)
@@ -76,12 +78,6 @@ object ExtraTrafficTopupParameters {
       minTopupAmount,
       validatorTopupConfig.topupTriggerPollingInterval,
     )
-
-  private def maximumOfDuration(
-      duration1: NonNegativeFiniteDuration,
-      duration2: NonNegativeFiniteDuration,
-  ) =
-    if (duration1.duration >= duration2.duration) duration1 else duration2
 
   private def roundUpIntervalAndCalculateAmount(
       targetRateBytesPerSecond: BigDecimal,

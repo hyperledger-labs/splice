@@ -30,7 +30,7 @@ import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.slf4j.event.Level
 
 import scala.math.Ordering.Implicits.*
@@ -99,7 +99,9 @@ class SvTimeBasedRewardCouponIntegrationTest
     "receive and claim SvRewardCoupons" in { implicit env =>
       // ensure alice has vetted the latest packages
       val expectedVettedPackages = ReceiveSvRewardCouponTrigger.svLatestVettedPackages(
-        InitialPackageConfig.defaultInitialPackageConfig.toPackageConfig
+        inside(sv1Backend.config.onboarding.value) { case founder: FoundDso =>
+          founder.initialPackageConfig.toPackageConfig
+        }
       )
       eventually() {
         val vettedByAlice =
@@ -316,9 +318,9 @@ class SvTimeBasedRewardCouponIntegrationTest
           ForceFlags(ForceFlag.AllowUnvetPackage, ForceFlag.AllowUnvetPackageWithActiveContracts),
       ),
     )(
-      "Alice's participant has unvetted the latest amulet package",
+      "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",
       _ => {
-        aliceValidatorBackend.appState.participantAdminConnection
+        sv4ValidatorBackend.appState.participantAdminConnection
           .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
           .futureValue
           .flatMap(_.item.packages.map(_.packageId)) should not contain latestAmuletPackageId

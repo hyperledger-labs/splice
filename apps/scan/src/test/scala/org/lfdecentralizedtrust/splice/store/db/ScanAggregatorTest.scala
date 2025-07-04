@@ -18,7 +18,6 @@ import org.lfdecentralizedtrust.splice.util.ResourceTemplateDecoder
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -918,7 +917,6 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
-      svNodeStateCacheTtl = NonNegativeFiniteDuration.ofSeconds(30),
       enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory()),
     )(parallelExecutionContext, implicitly, implicitly)

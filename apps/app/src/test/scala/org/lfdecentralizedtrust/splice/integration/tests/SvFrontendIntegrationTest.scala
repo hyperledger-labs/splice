@@ -14,6 +14,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_SetConfig,
 }
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
@@ -40,6 +41,10 @@ class SvFrontendIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
+      .addConfigTransforms(
+        // We deliberately change votes quickly in this test
+        (_, config) => ConfigTransforms.withNoVoteCooldown(config)
+      )
 
   "SV UIs" should {
     "have basic login functionality" in { implicit env =>

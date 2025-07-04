@@ -1033,7 +1033,7 @@ object BftScanConnection {
     ): Future[Seq[DsoScan]] = {
       for {
         decentralizedSynchronizerId <- store.getDecentralizedSynchronizerId()
-        scans <- store.listCachedDsoScans()
+        scans <- store.listDsoScans()
         domainScans <- scans
           .find(_._1 == decentralizedSynchronizerId.toProtoPrimitive)
           .map(e => Future.successful(e._2.filter(_.svName != ownSvName)))

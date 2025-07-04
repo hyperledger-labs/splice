@@ -87,11 +87,11 @@ data AmuletRules_ActionRequiringConfirmation
   | CRARC_MiningRound_Archive AmuletRules_MiningRound_Archive
     -- ^ Automated action to archive a closed mining round once no expired reward coupons are left.
   | CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule
-    -- ^ Voted action to add a config schedule to the `AmuletRules`.
+    -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to add a config schedule to the `AmuletRules`.
   | CRARC_RemoveFutureAmuletConfigSchedule AmuletRules_RemoveFutureAmuletConfigSchedule
-    -- ^ Voted action to remove a config schedule from the `AmuletRules`.
+    -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to remove a config schedule from the `AmuletRules`.
   | CRARC_UpdateFutureAmuletConfigSchedule AmuletRules_UpdateFutureAmuletConfigSchedule
-    -- ^ Voted action to update a config schedule in the `AmuletRules`.
+    -- ^ **Deprecated, use CRARC_SetConfig instead**: Voted action to update a config schedule in the `AmuletRules`.
   | CRARC_SetConfig AmuletRules_SetConfig
     -- ^ Voted action to change the `AmuletConfig`. Not idempotent.
   deriving (Eq, Show)
@@ -116,7 +116,7 @@ data DsoRules_ActionRequiringConfirmation
   | SRARC_CreateTransferCommandCounter DsoRules_CreateTransferCommandCounter
     -- ^ Create TransferCommandCounter contract for the given sender if it does not already exist
   | SRARC_CreateUnallocatedUnclaimedActivityRecord DsoRules_CreateUnallocatedUnclaimedActivityRecord
-    -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract. 
+    -- ^ Voted action to create an UnallocatedUnclaimedActivityRecord contract.
   deriving (Eq, Show)
 
 data AnsEntryContext_ActionRequiringConfirmation
@@ -285,10 +285,10 @@ data DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult = DsoRules_Amu
   with
     result : AmuletRules_ConvertFeaturedAppActivityMarkersResult
 
-data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with 
+data DsoRules_CreateUnallocatedUnclaimedActivityRecordResult = DsoRules_CreateUnallocatedUnclaimedActivityRecordResult with
     unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
 
-data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with 
+data DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult = DsoRules_AllocateUnallocatedUnclaimedActivityRecordResult with
     unclaimedActivityRecordCid : ContractId UnclaimedActivityRecord
     optUnclaimedRewardCid : Optional (ContractId UnclaimedReward)
 
@@ -301,18 +301,18 @@ data DsoRules_ExpireUnclaimedActivityRecordResult = DsoRules_ExpireUnclaimedActi
 -- Workflow templates
 ---------------------
 
--- TODO(#7649) revise and/or remove
+-- | __Deprecated__ in favor of delegateless automation.
 data ElectionRequestReason
   = ERR_DsoDelegateUnavailable
-  -- TODO(#7649): add case for DSO delegate asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   | ExtElectionRequestReason with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Ord, Show)
 
--- | A request to elect a new DSO delegate.
--- TODO(#7649) revise and/or remove
+-- | __Deprecated__ in favor of delegateless automation.
+--
+-- A request to elect a new DSO delegate.
 template ElectionRequest with
     dso : Party
     requester : Party
@@ -342,8 +342,7 @@ template Confirmation with
 
     choice Confirmation_Expire : Confirmation_ExpireResult
       controller dso
-      do now <- getTime
-         require "Contract has expired" (expiresAt <= now)
+      do assertDeadlineExceeded "expiresAt" expiresAt
          return Confirmation_ExpireResult
 
 -- | A request for the other svs to vote on the execution of an action requiring confirmation.
@@ -402,6 +401,8 @@ data Vote = Vote with
       -- ^ Whether the responder accepted the request to execute the action or not.
     reason : Reason
       -- ^ The reason for voting this way.
+    optCastAt : Optional Time
+      -- ^ The time when the vote was cast. Used to rate-limit the casting of votes.
   deriving(Eq, Show)
 
 data Reason = Reason with
@@ -422,8 +423,13 @@ data DsoRulesConfig = DsoRulesConfig with
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
     nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
+    voteCooldownTime : Optional RelTime -- ^ The minimum time between two votes by the same SV.
   deriving (Eq, Show)
-  
+
+-- | Read the `voteCooldownTime` from the `DsoRulesConfig` with a default value of 1 minute.
+getVoteCooldownTime : DsoRulesConfig -> RelTime
+getVoteCooldownTime config = fromOptional (minutes 1) config.voteCooldownTime
+
 data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
       -- ^ The time at which the migration is scheduled to start.
@@ -534,10 +540,13 @@ template DsoRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         amuletRulesCid: ContractId AmuletRules
+        -- No longer used, but must be kept for smart-contract upgrading compatibility.
+        -- (This was used when the current round number was tracked in the AmuletRules contract.)
       controller sv
       do
 
         svOnboardingConfirmed <- fetchAndArchive (ForOwner with dso; owner = sv) svOnboardingConfirmedCid
+        assertWithinDeadline "svOnboardingConfirmed.expiresAt" svOnboardingConfirmed.expiresAt
 
         let forDso = ForDso with dso
         earliestRound <- fetchReferenceData forDso earliestRoundCid
@@ -588,7 +597,8 @@ template DsoRules with
 
     -- Automation DSO delegate election
     ------------------------------
-    -- TODO(#7649) revise and/or remove
+
+    -- __Deprecated__ in favor of delegateless automation.
     nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
       with
         requester : Party
@@ -596,14 +606,14 @@ template DsoRules with
         ranking : [Party]
       controller requester
       do
-        -- TODO(#7649): consider interaction with concurrent SV changes
         require "Requester is an SV" (requester `Map.member` svs)
         require "All svs are ranked exactly once" (sort ranking == sort (Map.keys svs))
         electionRequestCid <- create ElectionRequest with
           ..
         return DsoRules_RequestElectionResult with ..
 
-    -- TODO(#7649) revise and/or remove
+    -- __Deprecated__ in favor of delegateless automation.
+    -- TODO(#607): make the choice abort once all SVs have switched to delegateless automation
     choice DsoRules_ElectDsoDelegate : DsoRules_ElectDsoDelegateResult
       with
         actor : Party
@@ -619,7 +629,6 @@ template DsoRules with
           pure req
         let numVotes = length reqs
             numVoters = numVotes
-            -- TODO(#7649): consider whether that is the right number of votes to require
             -- as there might be more votes being taken into consideration
             numVotesForMajority = (summary.requiredNumVotes + 1) / 2
         require "Requests are from different svs" (unique $ map (.requester) reqs)
@@ -630,6 +639,9 @@ template DsoRules with
         newDsoRules <- create newDsoRules
         return DsoRules_ElectDsoDelegateResult with ..
 
+    -- __Deprecated__ in favor of delegateless automation.
+    -- TODO(#607): make the choice abort once all SVs have switched to delegateless automation,
+    -- and checking that there are not too many outdated requests on long-term networks.
     nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : DsoRules_ArchiveOutdatedElectionRequestResult
       with
         requestCid : ContractId ElectionRequest
@@ -677,9 +689,10 @@ template DsoRules with
           confirmation <- fetchAndArchive forDso confirmationCid
           require "Confirmer is an SV" (confirmation.confirmer `Map.member` svs)
           require "Confirmed action matches" (confirmation.action == action)
+          assertWithinDeadline "confirmation.expiresAt" confirmation.expiresAt
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation self amuletRulesCid action
+        executeActionRequiringConfirmation dso self amuletRulesCid action
         return DsoRules_ExecuteConfirmedActionResult
 
 
@@ -711,6 +724,7 @@ template DsoRules with
               sv = requester
               accept = True
               reason = Reason with url = ""; body = "I accept, as I requested the vote."
+              optCastAt = Some now
         voteRequest <- create VoteRequest with
           dso
           requester = requesterName
@@ -724,7 +738,6 @@ template DsoRules with
 
 
     -- Note that this choice can be used to both cast the initial vote, and update a vote.
-    -- TODO(#9319): rate limit SVs wrt updating their votes
     nonconsuming choice DsoRules_CastVote : DsoRules_CastVoteResult
       with
         requestCid : ContractId VoteRequest
@@ -738,9 +751,17 @@ template DsoRules with
           Some info -> pure info.name
         -- validate and archive request
         request <- fetchAndArchive (ForDso with dso) requestCid
+        -- rate limit casting of votes by the same SV to avoid them blocking others from making progress
+        -- Note: we currently ignore the optional self-declared vote casting time
+        -- `vote.optCastAt`. We'll use that in the future when adding support for larger
+        -- prepare-submission delays for external parties.
+        enforceCooldown ("voteCooldownTime for " <> partyToText vote.sv) (getVoteCooldownTime config) $ do
+          pastVote <- Map.lookup voterName request.votes
+          pastVote.optCastAt
         -- store vote
+        now <- getTime
         voteRequest <- create request with
-          votes = Map.insert voterName vote request.votes
+          votes = Map.insert voterName (vote with optCastAt = Some now) request.votes
           trackingCid = Some (fromOptional requestCid request.trackingCid)
         return DsoRules_CastVoteResult with ..
 
@@ -802,7 +823,7 @@ template DsoRules with
 
                     Some effectiveTime | now >= effectiveTime && numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         pure $ VRO_Accepted with
                           effectiveAt = effectiveTime
                       catch
@@ -820,7 +841,7 @@ template DsoRules with
 
                     None | numYays >= s.requiredNumVotes ->
                       try do
-                        executeActionRequiringConfirmation self amuletRulesCid request.action
+                        executeActionRequiringConfirmation dso self amuletRulesCid request.action
                         -- TODO(#16139): Remove Config Schedule from AmuletConfig
                         -- TODO(#16137): Implement effectivity on all actions
                         pure $ VRO_Accepted with
@@ -854,7 +875,9 @@ template DsoRules with
         amuletPrice : Decimal
       controller sv
       do
-        void $ fetchAndArchive (ForOwner with dso; owner = sv) voteCid
+        pastVote <- fetchAndArchive (ForOwner with dso; owner = sv) voteCid
+        -- rate limit, so that an SV cannot block round advancement by changing their price vote too often
+        enforceCooldown ("voteCooldownTime for " <> partyToText sv) (getVoteCooldownTime config) (Some pastVote.lastUpdatedAt)
         now <- getTime
         -- create new vote
         amuletPriceVote <- create AmuletPriceVote with
@@ -958,7 +981,9 @@ template DsoRules with
         rightCid : ContractId FeaturedAppRight
       controller dso
       do
-        void $ fetchAndArchive (ForDso with dso) rightCid
+        void $ fetchChecked (ForDso with dso) rightCid
+        exercise rightCid FeaturedAppRight_Withdraw with
+          reason = "revoked by governance decision"
         return DsoRules_RevokeFeaturedAppRightResult
 
 
@@ -1297,9 +1322,8 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this sv
-        now <- getTime
-        staleConfirmation <- fetchAndArchive (ForDso with dso) staleConfirmationCid
-        require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
+        fetchChecked (ForDso with dso) staleConfirmationCid
+        exercise staleConfirmationCid Confirmation_Expire
         return DsoRules_ExpireStaleConfirmationResult
 
     -- Batch merge of member traffic contracts
@@ -1385,15 +1409,15 @@ template DsoRules with
         _ <- getAndValidateSvParty this sv
         result <- exercise amuletRulesCid argument
         pure DsoRules_AmuletRules_ConvertFeaturedAppActivityMarkersResult with result
-    
-    
-    -- Unallocated unclaimed activity record 
+
+
+    -- Unallocated unclaimed activity record
     ----------------------------------------
 
     nonconsuming choice DsoRules_CreateUnallocatedUnclaimedActivityRecord : DsoRules_CreateUnallocatedUnclaimedActivityRecordResult
       with
-        beneficiary : Party 
-        amount : Decimal 
+        beneficiary : Party
+        amount : Decimal
         reason : Text
         expiresAt : Time
       controller dso
@@ -1401,8 +1425,8 @@ template DsoRules with
         now <- getTime
         -- Sanity check
         require "UnclaimedActivityRecord expires after current time" $ expiresAt > now
-        unallocatedUnclaimedActivityRecordCid <- 
-          create UnallocatedUnclaimedActivityRecord with 
+        unallocatedUnclaimedActivityRecordCid <-
+          create UnallocatedUnclaimedActivityRecord with
             dso
             beneficiary
             amount
@@ -1414,7 +1438,7 @@ template DsoRules with
       with
         unallocatedUnclaimedActivityRecordCid : ContractId UnallocatedUnclaimedActivityRecord
         amuletRulesCid : ContractId AmuletRules
-        unclaimedRewardsToBurnCids : [ContractId UnclaimedReward] 
+        unclaimedRewardsToBurnCids : [ContractId UnclaimedReward]
           -- ^ A sufficient list of `UnclaimedReward` to be archived.
           -- It must cover at least the requested amount.
         sv : Party
@@ -1428,12 +1452,12 @@ template DsoRules with
           unclaimedReward <- fetchAndArchive (ForDso with dso) cid
           pure unclaimedReward.amount
         let leftover = totalUnclaimedRewards - amount
-        optUnclaimedRewardCid <- 
+        optUnclaimedRewardCid <-
           if | leftover < 0.0 -> abort $ "insufficient unclaimed rewards: " <> show (negate leftover)
              | leftover == 0.0 -> pure None
              | otherwise -> Some <$> create UnclaimedReward with dso; amount = leftover
 
-        unclaimedActivityRecordCid <- create UnclaimedActivityRecord with 
+        unclaimedActivityRecordCid <- create UnclaimedActivityRecord with
           dso
           beneficiary
           amount
@@ -1460,7 +1484,7 @@ template DsoRules with
       controller sv
       do
         _ <- getAndValidateSvParty this (Some sv)
-        UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <- 
+        UnclaimedActivityRecord_DsoExpireResult unclaimedRewardCid <-
           exercise unclaimedActivityRecordCid UnclaimedActivityRecord_DsoExpire
         pure DsoRules_ExpireUnclaimedActivityRecordResult with unclaimedRewardCid
 
@@ -1495,12 +1519,14 @@ summarizeDso dsoRules = DsoSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
+executeActionRequiringConfirmation: Party -> ContractId DsoRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act of
   ARC_AmuletRules with .. ->
     case amuletRulesCid of
       None -> error "amuletRulesCid was not defined."
       Some amuletRulesCid -> do
+        -- prudent engineering: check that the DSO party is as expected
+        void $ fetchChecked (ForDso with dso) amuletRulesCid
         case amuletRulesAction of
           CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_MiningRound_Archive choiceArg -> void $ exercise amuletRulesCid choiceArg
@@ -1508,7 +1534,8 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
           CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
           CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
-  ARC_DsoRules with .. ->
+  ARC_DsoRules with .. -> do
+    void $ fetchChecked (ForDso with dso) dsoRulesCid
     case dsoAction of
       SRARC_AddSv choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_OffboardSv choiceArg -> void $ exercise dsoRulesCid choiceArg
@@ -1520,7 +1547,8 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_CreateExternalPartyAmuletRules choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateTransferCommandCounter choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_CreateUnallocatedUnclaimedActivityRecord choiceArg -> void $ exercise dsoRulesCid choiceArg
-  ARC_AnsEntryContext with .. ->
+  ARC_AnsEntryContext with .. -> do
+    void $ fetchChecked (ForDso with dso) ansEntryContextCid
     case ansEntryContextAction of
       ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
       ANSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
@@ -1678,7 +1706,7 @@ dsoRules_addSv this0 arg@DsoRules_AddSv{..} = do
     createPerSvContracts this arg
   -- create per SV party contracts
   let initialAmuletPriceVote = None
-  createPerSvPartyContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote
+  createPerSvPartyContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote (getVoteCooldownTime config)
   -- register the new operator in the DsoRules
   let svInfo = SvInfo with
         name = newSvName
@@ -1699,16 +1727,18 @@ createPerSvContracts DsoRules{..} DsoRules_AddSv{..} = do
       numRoundsCollected = 0
       numCouponsIssued = 0
 
-createPerSvPartyContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> Update ()
-createPerSvPartyContracts dso newSvParty newSvName synchronizerNodes amuletPrice = do
-  now <- getTime
+createPerSvPartyContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> RelTime -> Update ()
+createPerSvPartyContracts dso newSvParty newSvName synchronizerNodes amuletPrice voteCooldownTime = do
   -- Note: we currently track the amulet-price vote on a per operator basis.
   -- This implies it will be reset when an operator is offboarded and re-onboarded.
+  now <- getTime
   void $ create AmuletPriceVote with
     dso
     sv = newSvParty
     amuletPrice
-    lastUpdatedAt = now
+    lastUpdatedAt =
+      -- allow casting a vote immediately after onboarding
+      now `addRelTime` negate voteCooldownTime
   void $ create SvStatusReport with
     dso
     sv = newSvParty
@@ -1729,6 +1759,19 @@ getAndValidateSvParty rules (Some sv) = do
   pure sv
 
 
+-- Rate limiting
+----------------
+
+-- | Enforce that an action is not performed again before a cooldown period has passed.
+enforceCooldown : Text -> RelTime -> Optional Time -> Update ()
+enforceCooldown cooldownName cooldown lastActionTime = do
+  case lastActionTime of
+    Some lastTime -> do
+      let nextAllowedTime = lastTime `addRelTime` cooldown
+      assertDeadlineExceeded cooldownName nextAllowedTime
+    None -> pure () -- no last action time, so no enforcement needed
+
+
 -- Unallocated unclaimed activity record
 ----------------------------------------
 
@@ -1739,16 +1782,19 @@ template UnallocatedUnclaimedActivityRecord
   with
     dso : Party
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted
-    amount : Decimal -- ^ The amount of `Amulet` to be minted 
+    amount : Decimal -- ^ The amount of `Amulet` to be minted
     reason : Text -- ^ A reason to mint the `Amulet`
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract. 
-  where 
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the UnclaimedActivityRecord contract.
+  where
     signatory dso
     ensure amount > 0.0
 
 
 -- instances
 ------------
+
+instance HasCheckedFetch DsoRules ForDso where
+  contractGroupId DsoRules {..} = ForDso with dso
 
 instance HasCheckedFetch ElectionRequest ForDso where
   contractGroupId ElectionRequest {..} = ForDso with dso
@@ -1778,6 +1824,7 @@ instance Patchable DsoRulesConfig where
     maxTextLength = patch new.maxTextLength base.maxTextLength current.maxTextLength
     decentralizedSynchronizer = patch new.decentralizedSynchronizer base.decentralizedSynchronizer current.decentralizedSynchronizer
     nextScheduledSynchronizerUpgrade = patch new.nextScheduledSynchronizerUpgrade base.nextScheduledSynchronizerUpgrade current.nextScheduledSynchronizerUpgrade
+    voteCooldownTime = patch new.voteCooldownTime base.voteCooldownTime current.voteCooldownTime
 
 instance Patchable SynchronizerUpgradeSchedule where
   patch new base current = SynchronizerUpgradeSchedule with

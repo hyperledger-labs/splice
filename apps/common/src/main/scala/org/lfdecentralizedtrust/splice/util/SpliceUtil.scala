@@ -285,6 +285,7 @@ object SpliceUtil {
   // Roughly equal to $1/year expressed as a daily rate.
   lazy val defaultTransferPreapprovalFee = damlDecimal(0.00274)
 
+  // TODO(#1271): deduplicate with the definition in SvUtil
   def defaultDsoRulesConfig(
       numUnclaimedRewardsThreshold: Int,
       numMemberTrafficContractsThreshold: Int,
@@ -321,6 +322,7 @@ object SpliceUtil {
       dummyDomain.toProtoPrimitive, // activeSynchronizer
     ), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
+    Optional.empty(), // voteCooldownTime
   )
 
   def defaultAmuletConfig(
