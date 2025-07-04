@@ -133,6 +133,7 @@ testTransferPreapprovalCancelExpire = script do
 
   pure ()
 
+testTransferCommand : Script ()
 testTransferCommand = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
@@ -242,6 +243,17 @@ testTransferCommand = script do
       delegate = aliceValidator.primaryParty
       amount = 42.0
       expiresAt = now `addRelTime` hours 1
+      nonce = 1
+      description = Some "test-transfer-command"
+
+  -- submission fails if expiresAt is not in the future
+  submitMultiMustFail [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+    with
+      sender = alice.primaryParty
+      receiver = externalParty
+      delegate = aliceValidator.primaryParty
+      amount = 42.0
+      expiresAt = now
       nonce = 1
       description = Some "test-transfer-command"
 
