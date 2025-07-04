@@ -38,7 +38,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.resource.{Storage, DbStorage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -71,6 +71,7 @@ class UpdateHistory(
     val backfillingRequired: BackfillingRequirement,
     override protected val loggerFactory: NamedLoggerFactory,
     enableissue12777Workaround: Boolean,
+    enableImportUpdateBackfill: Boolean,
     val oMetrics: Option[HistoryMetrics] = None,
 )(implicit
     ec: ExecutionContext,
@@ -239,7 +240,13 @@ class UpdateHistory(
 
           _ <- cleanUpDataAfterDomainMigration(newHistoryId)
 
-          _ <- deleteInvalidAcsSnapshots(newHistoryId)
+          _ <-
+            if (enableImportUpdateBackfill) {
+              deleteInvalidAcsSnapshots(newHistoryId)
+            } else {
+              logger.info(s"Not deleting invalid ACS snapshots for history $newHistoryId")
+              Future.unit
+            }
         } yield {
           state.updateAndGet(
             _.copy(
@@ -643,6 +650,7 @@ class UpdateHistory(
   private[this] def deleteInvalidAcsSnapshots(
       historyId: Long
   )(implicit tc: TraceContext): Future[Unit] = {
+    assert(enableImportUpdateBackfill)
     def migrationsWithCorruptSnapshots(): Future[Set[Long]] = {
       for {
         migrationsWithImportUpdates <- storage
@@ -1824,7 +1832,8 @@ class UpdateHistory(
 
   def getBackfillingState()(implicit
       tc: TraceContext
-  ): Future[BackfillingState] = getBackfillingStateForHistory(historyId)
+  ): Future[BackfillingState] =
+    getBackfillingStateForHistory(historyId)
 
   private[this] def getBackfillingStateForHistory(historyId: Long)(implicit
       tc: TraceContext
@@ -1845,6 +1854,9 @@ class UpdateHistory(
           .map {
             case Some((updatesComplete, importUpdatesComplete)) =>
               if (updatesComplete && importUpdatesComplete) {
+                BackfillingState.Complete
+              } else if (updatesComplete && !enableImportUpdateBackfill) {
+                // If import update backfilling is disabled, behave as if it was not implemented
                 BackfillingState.Complete
               } else {
                 BackfillingState.InProgress(
@@ -2152,6 +2164,33 @@ class UpdateHistory(
 }
 
 object UpdateHistory {
+
+  // Separate method so we can use this without a full UpdateHistory instance.
+  // Since we're interested in the highest known migration id, we don't need to filter by anything
+  // (store ID, participant ID, etc. are not even known at the time we want to call this).
+  def getHighestKnownMigrationId(
+      storage: Storage
+  )(implicit
+      ec: ExecutionContext,
+      closeContext: CloseContext,
+      tc: TraceContext,
+  ): Future[Option[Long]] = {
+    storage match {
+      case storage: DbStorage =>
+        for {
+          queryResult <- storage.query(
+            sql"""
+               select max(migration_id) from update_history_last_ingested_offsets
+            """.as[Option[Long]],
+            "getHighestKnownMigrationId",
+          )
+        } yield {
+          queryResult.headOption.flatten
+        }
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
+    }
+  }
+
   sealed trait BackfillingRequirement
   object BackfillingRequirement {
 

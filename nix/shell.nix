@@ -1,4 +1,4 @@
-{ pkgs, x86Pkgs, npmPkgs }:
+{ pkgs, x86Pkgs, npmPkgs, use_enterprise }:
 let
   inherit (pkgs) stdenv fetchzip;
   sources = builtins.fromJSON (builtins.readFile ./canton-sources.json);
@@ -88,6 +88,7 @@ in pkgs.mkShell {
     python3Packages.sphinxcontrib-openapi
     python3Packages.sphinx-autobuild
     python3Packages.waitress
+    python3.pkgs.pip  # TODO(DACH-NY/canton-network-internal#565): Remove this once we switch to poetry
     python3.pkgs.sphinx-reredirects
     redocly
     ripgrep
@@ -113,8 +114,9 @@ in pkgs.mkShell {
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
-  COMETBFT_DRIVER = "${pkgs.cometbft_driver}";
+  COMETBFT_DRIVER = if use_enterprise then "${pkgs.cometbft_driver}" else "";
   PULUMI_HOME = "${pkgs.pulumi-bin}";
+  IS_ENTERPRISE = if use_enterprise then "true" else "false";
   # Avoid sbt-assembly falling over. See https://github.com/sbt/sbt-assembly/issues/496
   LC_ALL = if stdenv.isDarwin then "" else "C.UTF-8";
   # Avoid "warning: setlocale: LC_ALL: cannot change locale (C.UTF-8)"

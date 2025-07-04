@@ -35,7 +35,7 @@ import scala.concurrent.ExecutionContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.topology.ParticipantId
 import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
-import slick.jdbc.JdbcProfile
+import slick.jdbc.{GetResult, JdbcProfile}
 
 class ScanAggregatorTest
     extends StoreTest
@@ -389,123 +389,163 @@ class ScanAggregatorTest
       }
     }
 
-    "append round party totals from round zero to last closed round (inclusive)" in {
+    "Aggregate round_party_totals from round zero to last closed round (inclusive)" in {
+      cleanup()
       val (aggr, store) = mkAggregator(dsoParty).futureValue
-      val lastRound = 10L
+      val lastRound = 4L
 
       for {
-        expectedRoundPartyRewardTotals <- MonadUtil
-          .sequentialTraverse((0 to lastRound.toInt)) { i =>
-            val round = i.toLong
-            MonadUtil
-              .sequentialTraverse((0 to 10)) { j =>
-                val party = mkPartyId(s"party-$j")
-                val member = mkParticipantId(s"party-$j")
-                val appAmount = j.toDouble
-                val validatorAmount = (j + 1).toDouble
-                val trafficPurchasedCcSpent = BigDecimal(j + 2)
-                val trafficPurchased = j.toLong + 100
-                for {
-                  _ <- addAppReward(
-                    store,
-                    round,
-                    appAmount,
-                    party,
-                  )
-                  _ <- addValidatorReward(
-                    store,
-                    round,
-                    validatorAmount,
-                    party,
-                  )
-                  _ <- addTrafficPurchase(
-                    store,
-                    round,
-                    party,
-                    member,
-                    trafficPurchased,
-                    trafficPurchasedCcSpent,
-                  )
-                  _ <- addClosedRound(
-                    store,
-                    round,
-                  )
-                } yield {
-                  RoundPartyTotals(
-                    closedRound = round,
-                    party = party.toProtoPrimitive,
-                    appRewards = appAmount,
-                    validatorRewards = validatorAmount,
-                    trafficPurchased = trafficPurchased,
-                    trafficPurchasedCcSpent = trafficPurchasedCcSpent,
-                    trafficNumPurchases = 1,
-                  )
-                }
-              }
-          }
-          .map(_.flatten)
+        expectedRoundPartyRewardTotals <- generateRoundPartyTotals(store, lastRound)
           .map(sumRoundPartyTotalsPerRound)
       } yield {
-        val _ = MonadUtil
-          .sequentialTraverse(0 to lastRound.toInt) { i =>
-            storage
-              .update(
-                aggr
-                  .aggregateRoundTotals(None, i.toLong)
-                  .andThen(aggr.aggregateRoundPartyTotals(i.toLong)),
-                "aggregate",
-              )
-          }
-          .futureValueUS
-        val limit = 10
-        for (i <- 0 to lastRound.toInt) {
-          val round = i.toLong
-          val roundPartyTotals = aggr.getRoundPartyTotals(round).futureValue
-          roundPartyTotals should contain theSameElementsAs expectedRoundPartyRewardTotals(round)
-          val topProviders =
-            getTopProvidersByAppRewardsFromTxLog(round, limit, aggr.txLogStoreId).futureValueUS
-          topProviders should not be empty
-          store.getTopProvidersByAppRewards(round, limit).futureValue shouldBe topProviders
-          val topValidatorsByValidatorRewards =
-            getTopValidatorsByValidatorRewardsFromTxLog(
-              round,
-              limit,
-              aggr.txLogStoreId,
-            ).futureValueUS
-          store
-            .getTopValidatorsByValidatorRewards(round, limit)
-            .futureValue shouldBe topValidatorsByValidatorRewards
-          val topValidatorsByPurchasedTraffic =
-            getTopValidatorsByPurchasedTrafficFromTxLog(
-              round,
-              limit,
-              aggr.txLogStoreId,
-            ).futureValue
-          store
-            .getTopValidatorsByPurchasedTraffic(round, limit)
-            .futureValue shouldBe topValidatorsByPurchasedTraffic
-        }
+        aggregateRounds(aggr, 0, lastRound)
+        val limit = 4
 
-        val topProviders =
-          getTopProvidersByAppRewardsFromTxLog(lastRound, limit, aggr.txLogStoreId).futureValueUS
-        store.getTopProvidersByAppRewards(lastRound, limit).futureValue shouldBe topProviders
+        assertRoundPartyTotalsWithLeaderBoards(
+          expectedRoundPartyRewardTotals,
+          aggr,
+          store,
+          lastRound,
+          limit,
+        )
 
-        val topValidatorsByPurchasedTraffic =
-          getTopValidatorsByPurchasedTrafficFromTxLog(
-            lastRound,
-            limit,
-            aggr.txLogStoreId,
-          ).futureValue
-        store
-          .getTopValidatorsByPurchasedTraffic(lastRound, limit)
-          .futureValue shouldBe topValidatorsByPurchasedTraffic
-        store
-          .getRoundPartyTotals(0L, lastRound)
-          .futureValue should contain theSameElementsAs expectedRoundPartyRewardTotals.values.flatten
         store.getAggregatedRounds().futureValue.value shouldBe ScanAggregator.RoundRange(
           0L,
           lastRound,
         )
+      }
+    }
+
+    "Continue to aggregate round_party_totals on an empty active_parties table" in {
+      cleanup()
+      val (aggr, store) = mkAggregator(dsoParty).futureValue
+      val lastRound = 2L
+      val restartRound = 1L
+      val nrParties = 2L
+      for {
+        expectedRoundPartyRewardTotals <- generateRoundPartyTotals(store, lastRound, nrParties)
+          .map(sumRoundPartyTotalsPerRound)
+      } yield {
+        def countActiveParties() = storage
+          .query(sql"""select count(1) from active_parties""".as[Int].head, "count active parties")
+          .futureValueUS
+        clue("aggregate up to restartRound") {
+          // aggregate round party totals until restartRound
+          aggregateRounds(aggr, 0, restartRound)
+          assertActiveParties(store, nrParties, restartRound)
+          assertRoundPartyTotalsWithLeaderBoards(
+            expectedRoundPartyRewardTotals.filter { case (round, _) => round <= restartRound },
+            aggr,
+            store,
+            restartRound,
+            lastRound.toInt,
+          )
+        }
+        // simulate migration, no active_parties exist
+        storage.update(sqlu"delete from active_parties", "delete active_parties").futureValueUS;
+        countActiveParties() shouldBe 0
+
+        clue("Continue aggregation to lastRound with empty active_parties table") {
+          aggregateRounds(aggr, restartRound, lastRound)
+          assertRoundPartyTotalsWithLeaderBoards(
+            expectedRoundPartyRewardTotals,
+            aggr,
+            store,
+            lastRound,
+            lastRound.toInt,
+          )
+          assertActiveParties(store, nrParties, lastRound)
+        }
+      }
+    }
+
+    "Aggregate round_party_totals where some parties are not active in all rounds" in {
+      cleanup()
+      val (aggr, store) = mkAggregator(dsoParty).futureValue
+      val lastRound = 5L
+      val firstParties = Seq(1, 2)
+      val firstRounds = Seq(0L, 1L, 2L)
+      val lastParties = Seq(3, 4, 5)
+      val lastRounds = Seq(3L, 4L, 5L)
+      for {
+        first <- generateRoundPartyTotalsRange(store, firstRounds, firstParties)
+        last <- generateRoundPartyTotalsRange(store, lastRounds, lastParties)
+        expectedRoundPartyRewardTotals = sumRoundPartyTotalsPerRound(first ++ last)
+      } yield {
+        aggregateRounds(aggr, 0, lastRound)
+        assertRoundPartyTotalsWithLeaderBoards(
+          expectedRoundPartyRewardTotals,
+          aggr,
+          store,
+          lastRound,
+          lastRound.toInt,
+        )
+        val activeParties = queryActiveParties()
+
+        forAll(firstParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(firstRounds.last)
+        }
+        forAll(lastParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(lastRounds.last)
+        }
+      }
+    }
+
+    "Aggregate round_party_totals where some parties are not active in some rounds, then active again in other rounds" in {
+      cleanup()
+      val (aggr, store) = mkAggregator(dsoParty).futureValue
+      val lastRound = 9L
+      val middleRound = 5L
+      val firstParties = Seq(1, 2)
+      val firstRounds = Seq(0L, 1L, 2L)
+      val middleParties = Seq(3, 4, 5)
+      val middleRounds = Seq(3L, 4L, 5L)
+      // new parties start to get active after the middle rounds, not active in the last rounds
+      val newParties = Seq(6, 7, 8)
+      val newPartyRounds = Seq(6L, 7L)
+      // first parties are active in the first and last rounds, not in the middle or 'new party rounds'
+      val lastParties = firstParties
+      val lastRounds = Seq(8L, 9L)
+
+      for {
+        first <- generateRoundPartyTotalsRange(store, firstRounds, firstParties)
+        middle <- generateRoundPartyTotalsRange(store, middleRounds, middleParties)
+        newOnes <- generateRoundPartyTotalsRange(store, newPartyRounds, newParties)
+        last <- generateRoundPartyTotalsRange(store, lastRounds, lastParties)
+        expectedRoundPartyRewardTotals = sumRoundPartyTotalsPerRound(
+          first ++ middle ++ newOnes ++ last
+        )
+      } yield {
+        aggregateRounds(aggr, 0, middleRound - 1)
+        aggregateRounds(aggr, middleRound, lastRound)
+        assertRoundPartyTotalsWithLeaderBoards(
+          expectedRoundPartyRewardTotals,
+          aggr,
+          store,
+          lastRound,
+          lastRound.toInt,
+        )
+        val activeParties = queryActiveParties()
+
+        forAll(firstParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(lastRounds.last)
+        }
+        forAll(middleParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(middleRounds.last)
+        }
+        forAll(newParties) { party =>
+          activeParties
+            .filter(_.party == mkPartyId(s"party-$party").toProtoPrimitive)
+            .map(_.closedRound) should contain theSameElementsAs Seq(newPartyRounds.last)
+        }
       }
     }
 
@@ -582,6 +622,188 @@ class ScanAggregatorTest
         res shouldBe None
       }
     }
+  }
+
+  private def cleanup() = {
+    storage
+      .update(
+        sqlu"""
+        truncate table active_parties;
+        truncate table round_totals;
+        truncate table round_party_totals;
+        """,
+        "truncate",
+      )
+      .futureValueUS;
+  }
+
+  private def aggregateRounds(aggr: ScanAggregator, start: Long, end: Long): Unit = {
+    MonadUtil
+      .sequentialTraverse(start.toInt to end.toInt) { i =>
+        storage
+          .update(
+            aggr
+              .aggregateRoundTotals(None, i.toLong)
+              .andThen(aggr.aggregateRoundPartyTotals(i.toLong)),
+            "aggregate",
+          )
+      }
+      .futureValueUS
+  }
+  case class ActiveParty(
+      storeId: Int,
+      party: Party,
+      closedRound: Long,
+  )
+  implicit val GetResultActiveParty: GetResult[ActiveParty] =
+    GetResult { prs =>
+      import prs.*
+      (ActiveParty.apply _).tupled(
+        (
+          <<[Int],
+          <<[String],
+          <<[Long],
+        )
+      )
+    }
+
+  private def queryActiveParties(): Vector[ActiveParty] = storage
+    .query(
+      sql"""select store_id, party, closed_round from active_parties order by store_id, party"""
+        .as[ActiveParty],
+      "count active parties",
+    )
+    .futureValueUS
+
+  private def assertActiveParties(
+      store: DbScanStore,
+      nrParties: Long,
+      expectedClosedRound: Long,
+  ) = {
+    val activeParties = queryActiveParties()
+    activeParties should have size (nrParties)
+    activeParties.map(_.party).distinct should have size (nrParties)
+    forAll(activeParties) { ap =>
+      ap.storeId shouldBe store.txLogStoreId
+      ap.closedRound should be(expectedClosedRound)
+    }
+  }
+
+  private def assertRoundPartyTotalsWithLeaderBoards(
+      expectedRoundPartyRewardTotals: Map[Long, List[RoundPartyTotals]],
+      aggr: ScanAggregator,
+      store: DbScanStore,
+      lastRound: Long,
+      limit: Int,
+  ) = {
+    for (i <- 0 to lastRound.toInt) {
+      val round = i.toLong
+      val roundPartyTotals = aggr.getRoundPartyTotals(round).futureValue
+      roundPartyTotals should contain theSameElementsAs expectedRoundPartyRewardTotals(round)
+      val topProviders =
+        getTopProvidersByAppRewardsFromTxLog(round, limit, aggr.txLogStoreId).futureValueUS
+      topProviders should not be empty
+      store.getTopProvidersByAppRewards(round, limit).futureValue shouldBe topProviders
+      val topValidatorsByValidatorRewards =
+        getTopValidatorsByValidatorRewardsFromTxLog(
+          round,
+          limit,
+          aggr.txLogStoreId,
+        ).futureValueUS
+      store
+        .getTopValidatorsByValidatorRewards(round, limit)
+        .futureValue shouldBe topValidatorsByValidatorRewards
+      val topValidatorsByPurchasedTraffic =
+        getTopValidatorsByPurchasedTrafficFromTxLog(
+          round,
+          limit,
+          aggr.txLogStoreId,
+        ).futureValue
+      store
+        .getTopValidatorsByPurchasedTraffic(round, limit)
+        .futureValue shouldBe topValidatorsByPurchasedTraffic
+    }
+    val topProviders =
+      getTopProvidersByAppRewardsFromTxLog(lastRound, limit, aggr.txLogStoreId).futureValueUS
+    store.getTopProvidersByAppRewards(lastRound, limit).futureValue shouldBe topProviders
+
+    val topValidatorsByPurchasedTraffic =
+      getTopValidatorsByPurchasedTrafficFromTxLog(
+        lastRound,
+        limit,
+        aggr.txLogStoreId,
+      ).futureValue
+    store
+      .getTopValidatorsByPurchasedTraffic(lastRound, limit)
+      .futureValue shouldBe topValidatorsByPurchasedTraffic
+    store
+      .getRoundPartyTotals(0L, lastRound)
+      .futureValue should contain theSameElementsAs expectedRoundPartyRewardTotals.values.flatten
+  }
+
+  private def generateRoundPartyTotalsRange(
+      store: DbScanStore,
+      rounds: Seq[Long],
+      parties: Seq[Int],
+  ) = {
+    MonadUtil
+      .sequentialTraverse(rounds) { round =>
+        MonadUtil
+          .sequentialTraverse(parties) { j =>
+            val party = mkPartyId(s"party-$j")
+            val member = mkParticipantId(s"party-$j")
+            val appAmount = j.toDouble
+            val validatorAmount = (j + 1).toDouble
+            val trafficPurchasedCcSpent = BigDecimal(j + 2)
+            val trafficPurchased = j.toLong + 100
+            for {
+              _ <- addAppReward(
+                store,
+                round,
+                appAmount,
+                party,
+              )
+              _ <- addValidatorReward(
+                store,
+                round,
+                validatorAmount,
+                party,
+              )
+              _ <- addTrafficPurchase(
+                store,
+                round,
+                party,
+                member,
+                trafficPurchased,
+                trafficPurchasedCcSpent,
+              )
+              _ <- addClosedRound(
+                store,
+                round,
+              )
+            } yield {
+              RoundPartyTotals(
+                closedRound = round,
+                party = party.toProtoPrimitive,
+                appRewards = appAmount,
+                validatorRewards = validatorAmount,
+                trafficPurchased = trafficPurchased,
+                trafficPurchasedCcSpent = trafficPurchasedCcSpent,
+                trafficNumPurchases = 1,
+              )
+            }
+          }
+      }
+      .map(_.flatten)
+  }
+
+  private def generateRoundPartyTotals(
+      store: DbScanStore,
+      lastRound: Long,
+      nrParties: Long = 10L,
+  ) = {
+    val partiesRange = (0 until nrParties.toInt).toList
+    generateRoundPartyTotalsRange(store, (0L to lastRound).toList, partiesRange)
   }
 
   private def mkRoundAggregates(firstRound: Long, lastRound: Long) = {
@@ -695,6 +917,7 @@ class ScanAggregatorTest
         None,
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
+      enableImportUpdateBackfill = true,
       new DbScanStoreMetrics(new NoOpMetricsFactory()),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

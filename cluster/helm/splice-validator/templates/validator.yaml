@@ -93,6 +93,14 @@ spec:
           value: {{ .Values.auth.audience | quote }}
         - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_URL
           value: {{ .Values.auth.jwksUrl | quote }}
+        {{ if (.Values.auth.jwks).connectionTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_CONNECTION_TIMEOUT
+          value: {{ .Values.auth.jwks.connectionTimeout | quote }}
+        {{ end }}
+        {{ if (.Values.auth.jwks).readTimeout }}
+        - name: SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT
+          value: {{ .Values.auth.jwks.readTimeout | quote }}
+        {{ end }}
         {{ if .Values.svValidator }}
         - name: SPLICE_APP_VALIDATOR_SV_VALIDATOR
           value: "true"

@@ -690,5 +690,43 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
         }
       }
     }
+
+    "getHighestKnownMigrationId" should {
+
+      "return None if there is no store" in {
+        UpdateHistory.getHighestKnownMigrationId(storage).futureValue shouldBe None
+      }
+
+      "return None if the store is not initialized" in {
+        mkStore()
+        for {
+          migrationId <- UpdateHistory.getHighestKnownMigrationId(storage)
+        } yield {
+          migrationId shouldBe None
+        }
+      }
+
+      "return a migration id if there is an initialized store" in {
+        val store = mkStore()
+        for {
+          _ <- initStore(store)
+          migrationId <- UpdateHistory.getHighestKnownMigrationId(storage)
+        } yield {
+          migrationId shouldBe Some(migration1)
+        }
+      }
+
+      "return the highest migration id if there are multiple initialized stores" in {
+        val store1 = mkStore(party1, migration1, participant1)
+        val store2 = mkStore(party1, migration2, participant1)
+        for {
+          _ <- initStore(store1)
+          _ <- initStore(store2)
+          migrationId <- UpdateHistory.getHighestKnownMigrationId(storage)
+        } yield {
+          migrationId shouldBe Some(migration2)
+        }
+      }
+    }
   }
 }

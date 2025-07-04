@@ -3,11 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.migration
 
-import org.lfdecentralizedtrust.splice.environment.{
-  BaseLedgerConnection,
-  ParticipantAdminConnection,
-  RetryFor,
-}
+import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
 import com.digitalasset.canton.config.{SynchronizerTimeTrackerConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -32,8 +28,6 @@ class DomainDataRestorer(
     */
   @nowarn("cat=unused&msg=synchronizerId")
   def connectDomainAndRestoreData(
-      ledgerConnection: BaseLedgerConnection,
-      userId: String,
       synchronizerAlias: SynchronizerAlias,
       synchronizerId: SynchronizerId,
       sequencerConnections: SequencerConnections,
@@ -42,54 +36,55 @@ class DomainDataRestorer(
   )(implicit
       tc: TraceContext
   ): Future[Unit] = {
-    logger.info("Registering and connecting to new domain")
+    def restoreData() = {
+      val domainConnectionConfig = SynchronizerConnectionConfig(
+        synchronizerAlias,
+        synchronizerId = None,
+        // TODO(#19804) Consider whether we can add back the safeguard here.
+        // synchronizerId = Some(synchronizerId),
+        sequencerConnections = sequencerConnections,
+        manualConnect = true,
+        initializeFromTrustedSynchronizer = true,
+        timeTracker = SynchronizerTimeTrackerConfig(
+          timeTrackerMinObservationDuration
+        ),
+      )
+      // We rely on the calls here being idempotent
+      for {
+        // Disconnect
+        _ <- participantAdminConnection.disconnectFromAllDomains()
+        _ <- importDars(dars)
+        _ = logger.info("Imported all the dars.")
+        _ <-
+          participantAdminConnection
+            .ensureDomainRegistered(
+              domainConnectionConfig,
+              RetryFor.ClientCalls,
+            )
+        _ = logger.info("Importing the ACS")
+        _ <- importAcs(acsSnapshot)
+        _ = logger.info("Imported the ACS")
+        _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
+          synchronizerAlias,
+          config => Some(config.copy(manualConnect = false)),
+        )
+      } yield ()
+    }
 
     // We use user metadata as a dumb storage to track whether we already imported the ACS.
-    ledgerConnection
-      .lookupUserMetadata(
-        userId,
-        BaseLedgerConnection.INITIAL_ACS_IMPORT_METADATA_KEY,
+    participantAdminConnection
+      .lookupSynchronizerConnectionConfig(
+        synchronizerAlias
       )
       .flatMap {
         case None =>
-          val domainConnectionConfig = SynchronizerConnectionConfig(
-            synchronizerAlias,
-            synchronizerId = None,
-            // TODO(#19804) Consider whether we can add back the safeguard here.
-            // synchronizerId = Some(synchronizerId),
-            sequencerConnections = sequencerConnections,
-            manualConnect = true,
-            initializeFromTrustedSynchronizer = true,
-            timeTracker = SynchronizerTimeTrackerConfig(
-              timeTrackerMinObservationDuration
-            ),
+          logger.info("Synchronizer not yet registered, registering and restoring data")
+          restoreData()
+        case Some(conf) if conf.manualConnect == true =>
+          logger.info(
+            "Synchronizer registered but manualConnect=true, assuming we crashed during a prior attempt and trying again"
           )
-          // We rely on the calls here being idempotent
-          for {
-            // Disconnect
-            _ <- participantAdminConnection.disconnectFromAllDomains()
-            _ <- importDars(dars)
-            _ = logger.info("Imported all the dars.")
-            _ <-
-              participantAdminConnection
-                .ensureDomainRegistered(
-                  domainConnectionConfig,
-                  RetryFor.ClientCalls,
-                )
-            _ = logger.info("Importing the ACS")
-            _ <- importAcs(acsSnapshot)
-            _ = logger.info("Imported the ACS")
-            _ <- participantAdminConnection.modifySynchronizerConnectionConfigAndReconnect(
-              synchronizerAlias,
-              config => Some(config.copy(manualConnect = false)),
-            )
-            _ <- ledgerConnection.ensureUserMetadataAnnotation(
-              userId,
-              BaseLedgerConnection.INITIAL_ACS_IMPORT_METADATA_KEY,
-              "true",
-              RetryFor.ClientCalls,
-            )
-          } yield ()
+          restoreData()
         case Some(_) =>
           logger.info("Domain is already registered and ACS is imported")
           participantAdminConnection.connectDomain(synchronizerAlias)

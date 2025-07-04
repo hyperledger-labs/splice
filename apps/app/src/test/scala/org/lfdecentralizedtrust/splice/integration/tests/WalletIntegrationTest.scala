@@ -28,7 +28,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.SynchronizerId
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.{SynchronizerAlias, HasExecutionContext}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.typesafe.config.ConfigFactory
@@ -613,6 +613,29 @@ class WalletIntegrationTest
           _.errorMessage should include("409 Conflict"),
         )
 
+        clue("Preapproval sends work if provider has a featured app right") {
+          // Feature alice validator to test a transfer with a featured preapproval provider
+          actAndCheck(
+            "Feature alice validator operator",
+            aliceValidatorWalletClient.selfGrantFeaturedAppRight(),
+          )(
+            "Featured app right is observed on scan",
+            cid =>
+              sv1ScanBackend
+                .lookupFeaturedAppRight(
+                  PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)
+                )
+                .map(_.contractId) shouldBe Some(cid),
+          )
+
+          bobWalletClient.transferPreapprovalSend(
+            aliceUserParty,
+            10.0,
+            UUID.randomUUID.toString,
+            description = Some("featured-transfer"),
+          )
+        }
+
         actAndCheck(
           "Alice validator cancels TransferPreapproval",
           aliceValidatorBackend.cancelTransferPreapprovalByParty(aliceUserParty),
@@ -627,6 +650,16 @@ class WalletIntegrationTest
         checkTxHistory(
           bobWalletClient,
           Seq(
+            { case logEntry: TransferTxLogEntry =>
+              logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
+              logEntry.description shouldBe "featured-transfer"
+              val receiver = logEntry.receivers.loneElement
+              receiver.party shouldBe aliceUserParty.toProtoPrimitive
+              receiver.amount should beAround(10.0)
+              val sender = logEntry.sender.value
+              sender.party shouldBe bobUserParty.toProtoPrimitive
+              sender.amount should beAround(-22)
+            },
             { case logEntry: TransferTxLogEntry =>
               logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
               logEntry.description shouldBe "test-description"
@@ -648,6 +681,16 @@ class WalletIntegrationTest
           Seq(
             { case logEntry: TransferTxLogEntry =>
               logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
+              logEntry.description shouldBe "featured-transfer"
+              val receiver = logEntry.receivers.loneElement
+              receiver.party shouldBe aliceUserParty.toProtoPrimitive
+              receiver.amount should beAround(10.0)
+              val sender = logEntry.sender.value
+              sender.party shouldBe bobUserParty.toProtoPrimitive
+              sender.amount should beAround(-22)
+            },
+            { case logEntry: TransferTxLogEntry =>
+              logEntry.subtype.value shouldBe TxLogEntry.TransferTransactionSubtype.TransferPreapprovalSend.toProto
               logEntry.description shouldBe "test-description"
               val receiver = logEntry.receivers.loneElement
               receiver.party shouldBe aliceUserParty.toProtoPrimitive
@@ -655,8 +698,15 @@ class WalletIntegrationTest
               val sender = logEntry.sender.value
               sender.party shouldBe bobUserParty.toProtoPrimitive
               sender.amount should beAround(-52)
-            }
+            },
           ),
+          ignore = {
+            case transfer: TransferTxLogEntry =>
+              // ignore merges
+              transfer.receivers.loneElement.party == aliceUserParty.toProtoPrimitive &&
+              transfer.sender.value.party == aliceUserParty.toProtoPrimitive
+            case _ => false
+          },
         )
     }
 

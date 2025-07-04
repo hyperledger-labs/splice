@@ -154,7 +154,7 @@ to set up an OAuth provider for your validator. The URLs to configure for callba
 ``http://wallet.localhost`` and ``http://ans.localhost``.
 
 Once you have set up your OAuth provider,
-you need to configure it by seting the following environment variables in the ``.env`` file:
+you need to configure it by setting the following environment variables in the ``.env`` file:
 
 ============================= ===========================================================================
 Name                          Value
@@ -173,16 +173,25 @@ WALLET_UI_CLIENT_ID           The client id of the OAuth app for the wallet UI.
 ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
 ============================= ===========================================================================
 
-If you have already deployed a validator on your machine, you will first need to irrecoverably destroy
-it and wipe its data, as that cannot be migrated to an authenticated validator on the same machine.
-To do that, first stop the validator with `./stop.sh` and wipe out all its data with
-`docker volume rm compose_postgres-splice`. You can now deploy a new validator with the
-new configuration. In order to enable auth in the deployment, add the `-a` flag to the `start.sh`
+In order to enable auth in the deployment, add the `-a` flag to the `start.sh`
 command, as follows:
 
 .. code-block:: bash
 
     ./start.sh -s "<SPONSOR_SV_URL>" -o "<ONBOARDING_SECRET>" -p "<party_hint>" -m "<MIGRATION_ID>" -w -a
+
+If you have already deployed a non-authenticated validator on your machine, you can migrate it to an
+authenticated one by stopping the validator with `./stop.sh` and restarting it with the `-a` flag
+as above. The validator operator user will be automatically migrated, and the user indicated by the
+`WALLET_ADMIN_USER` variable will be associated with the validator operator party. If you have also
+onboarded other users onto your validator, those will not be automatically migrated, and you need
+to manually associate the OAuth users with their corresponding parties. In order to do that,
+first take note of the party IDs of all relevant users (do this before stopping the unauthenticated
+validator), e.g. by copying them from the top-right corner of their wallet UIs. Now for every user that
+you wish to migrate, follow the instructions for associating a user with a party in the
+:ref:`Users, Parties and Wallets in the Splice Wallet section <validator-users>`, but replace
+the admin party ID with the party ID which you wish to associate with each user.
+
 
 Integration with systemd and other init systems
 +++++++++++++++++++++++++++++++++++++++++++++++

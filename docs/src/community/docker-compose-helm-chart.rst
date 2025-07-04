@@ -17,8 +17,8 @@ For the officially supported docker-compose deployment, refer to :ref:`Docker Co
 Thanks to Mario Delgado for sharing this solution in a community discussion.
 For more details and future updates, see the `CryptoManufaktur-io/canton-docker <https://github.com/CryptoManufaktur-io/canton-docker>`_ repository.
 
-Key Features of This Solution
------------------------------
+Key Features of the Solution
+----------------------------
 
 - Custom Docker Compose setup for Canton, aligning with ``x-docker`` standards.
 - Validator migration support via ``validator-migration.yaml`` for upgrades.

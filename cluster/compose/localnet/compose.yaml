@@ -135,21 +135,18 @@ services:
     image: "${IMAGE_REPO}splice-app:${IMAGE_TAG}"
     container_name: splice
     env_file:
-      - ${LOCALNET_ENV_DIR}/${ENV}.env
       - ${LOCALNET_ENV_DIR}/common.env
       - ${LOCALNET_ENV_DIR}/splice.env
       - *app-provider-auth-env
       - *app-user-auth-env
       - *sv-auth-env
     volumes:
-      - ${LOCALNET_DIR}/docker/splice/entrypoint.sh:/splice-entrypoint.sh
       - ${LOCALNET_DIR}/docker/splice/health-check.sh:/app/health-check.sh
       - ${LOCALNET_DIR}/conf/splice/app.conf:/app/app.conf
       - ${LOCALNET_DIR}/conf/splice/app-provider:/app/app-provider/${APP_PROVIDER_PROFILE}
       - ${LOCALNET_DIR}/conf/splice/app-user:/app/app-user/${APP_USER_PROFILE}
       - ${LOCALNET_DIR}/conf/splice/sv:/app/sv/${SV_PROFILE}
       - domain-upgrade-dump:/domain-upgrade-dump
-    entrypoint: /splice-entrypoint.sh
     healthcheck:
       test: ["CMD", "bash", "/app/health-check.sh"]
       interval: 20s

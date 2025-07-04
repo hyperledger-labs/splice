@@ -51,10 +51,6 @@ function _resolve_pulumi_stack() {
 }
 
 function _cluster_reset() {
-    # not used but required to pass config validation
-    if [ -z "${CHARTS_VERSION:-}" ]; then
-        export CHARTS_VERSION="local"
-    fi
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
     _pulumi_automation_run_down

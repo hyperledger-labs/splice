@@ -32,7 +32,7 @@ import org.lfdecentralizedtrust.splice.http.v0.sv.SvResource
 import org.lfdecentralizedtrust.splice.http.v0.sv_admin.SvAdminResource
 import org.lfdecentralizedtrust.splice.migration.AcsExporter
 import org.lfdecentralizedtrust.splice.setup.{NodeInitializer, ParticipantInitializer}
-import org.lfdecentralizedtrust.splice.store.AppStoreWithIngestion
+import org.lfdecentralizedtrust.splice.store.{AppStoreWithIngestion, UpdateHistory}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import org.lfdecentralizedtrust.splice.sv.automation.{
@@ -161,19 +161,28 @@ class SvApp(
               )
 
             case _ =>
-              logger.info(
-                "Ensuring participant is initialized"
-              )
-              val cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
-                SvCantonIdentifierConfig.default(config)
-              )
-              ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-                cantonIdentifierConfig.participant,
-                participantAdminConnection,
-                config.participantBootstrappingDump,
-                loggerFactory,
-                retryProvider,
-              )
+              UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
+                case Some(migrationId) if migrationId < config.domainMigrationId =>
+                  throw Status.INVALID_ARGUMENT
+                    .withDescription(
+                      s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
+                    )
+                    .asRuntimeException()
+                case _ =>
+                  logger.info(
+                    "Ensuring participant is initialized"
+                  )
+                  val cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
+                    SvCantonIdentifierConfig.default(config)
+                  )
+                  ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                    cantonIdentifierConfig.participant,
+                    participantAdminConnection,
+                    config.participantBootstrappingDump,
+                    loggerFactory,
+                    retryProvider,
+                  )
+              }
           }
         }
     } yield ()).andThen { case _ => participantAdminConnection.close() }
@@ -429,8 +438,6 @@ class SvApp(
             config,
             retryProvider,
             logger,
-            clock,
-            packageVersionSupport,
           )
         },
         // Ensure Daml-level invariants for the SV
@@ -499,7 +506,12 @@ class SvApp(
 
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
-        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+        case AuthConfig.Rs256(audience, jwksUrl, connectionTimeout, readTimeout) =>
+          new RSAVerifier(
+            audience,
+            jwksUrl,
+            RSAVerifier.TimeoutsConfig(connectionTimeout, readTimeout),
+          )
       }
 
       // Start the servers for the SvApp's APIs
@@ -526,7 +538,6 @@ class SvApp(
         cometBftClient,
         loggerFactory,
         config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
-        packageVersionSupport,
       )
 
       adminHandler = new HttpSvAdminHandler(
@@ -1045,6 +1056,7 @@ object SvApp {
                     dsoStoreWithIngestion.store.key.svParty.toProtoPrimitive,
                     isAccepted,
                     reason,
+                    Optional.empty(), // optCastAt
                   ),
                 )
               )
@@ -1185,8 +1197,6 @@ object SvApp {
       config: SvAppBackendConfig,
       retryProvider: RetryProvider,
       logger: TracedLogger,
-      clock: Clock,
-      packageVersionSupport: PackageVersionSupport,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
     val store = dsoStoreWithIngestion.store
     val svParty = store.key.svParty
@@ -1208,31 +1218,22 @@ object SvApp {
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
               val dsoParty = store.key.dsoParty
-              for {
-                validatorLicenseMetadataFeatureSupport <- packageVersionSupport
-                  .supportsValidatorLicenseMetadata(
-                    Seq(dsoParty, svParty),
-                    clock.now,
-                  )
-                cmd = dsoRules.exercise(
-                  _.exerciseDsoRules_OnboardValidator(
-                    svParty.toProtoPrimitive,
-                    svParty.toProtoPrimitive,
-                    Some(BuildInfo.compiledVersion)
-                      .filter(_ => validatorLicenseMetadataFeatureSupport.supported)
-                      .toJava,
-                    Some(config.contactPoint)
-                      .filter(_ => validatorLicenseMetadataFeatureSupport.supported)
-                      .toJava,
-                  )
+              val cmd = dsoRules.exercise(
+                _.exerciseDsoRules_OnboardValidator(
+                  svParty.toProtoPrimitive,
+                  svParty.toProtoPrimitive,
+                  Some(BuildInfo.compiledVersion).toJava,
+                  Some(config.contactPoint).toJava,
                 )
+              )
+
+              for {
                 _ <- dsoStoreWithIngestion.connection
                   .submit(
                     actAs = Seq(svParty),
                     readAs = Seq(dsoParty),
                     cmd,
                   )
-                  .withPreferredPackage(validatorLicenseMetadataFeatureSupport.packageIds)
                   .withDedup(
                     commandId = SpliceLedgerConnection.CommandId(
                       "org.lfdecentralizedtrust.splice.sv.createSvValidatorLicense",

@@ -8,8 +8,159 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.4
+-----
+
+- Daml
+
+  This release contains two sets of Daml changes that build upon each other:
+
+  1. Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.9
+     amuletNameService  0.1.9
+     dsoGovernance      0.1.13
+     validatorLifecycle 0.1.3
+     wallet             0.1.9
+     walletPayments     0.1.9
+     ================== =======
+
+  2. Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_ and fix security issues
+     and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_.
+     Note that the backend and frontend changes from CIP 66 are not yet implemented so we recommend holding off on upgrading to the new Daml models for now.
+
+      - CC-1 (low severity): addressed by rate limiting every SV wrt casting votes on a ``VoteRequest`` and updating their ``AmuletPriceVote``
+        to defend against them causing undue contention, which would block other SVs from
+        voting, closing the vote, or advancing the mining rounds.
+
+        This change introduces a new config value ``voteCooldownTime`` in
+        the ``DsoRules`` configuration that defines the cooldown time between
+        votes of the same SV. If not set, then the default value is 1 minute.
+
+      - CC-2 (low severity): addressed by enabling delegateless automation from CIP-0064 by default
+
+      - CC-4 (low severity): addressed by
+
+        - checking that ``expiresAt`` is in the future in the choice body of
+          ``DsoRules_ExecuteConfirmedAction``, ``DsoRules_AddConfirmedSv``, and ``ValidatorOnboarding_Match``.
+
+      - CC-5 (low severity): addressed by
+
+        - requiring steps of a valid ``SteppedRate`` to be strictly ascending
+        - enforcing this validation on the ``transferFee`` in ``AmuletConfig``
+        - failing ``chargeSteppedRate`` if a negative step is found
+
+      - S-2 (auditor suggestion): addressed by
+
+        - adding basic validation for all fields of ``AmuletConfig`` to reduce the risk of misconfigurations
+        - restricting the choice ``AmuletRules_Mint`` to only be called in DevNet setups
+        - properly handling the edge case of amulet that expired when checking whether a lock expires before an amulet
+          in the ``doesLockExpireBeforeAmulet`` function
+        - checking that ``createdAt`` and ``ratePerRound`` of an ``ExpiringAmount`` are positive;
+          and enforcing that check in the ``expiringAmount`` smart constructor
+        - checking that the ``validatorRewardPercentage`` and the ``appRewardPercentage`` in a valid
+          ``IssuanceConfig`` are non-negative and do not exceed 100%
+        - changing the ``ensure`` clause of ``MemberTraffic`` to enforce non-empty ``memberId`` and ``synchronizerId`` fields
+        - enforcing a length limit of 280 characters on the ``trackingId`` of ``TransferOffer``
+          as a prudent engineering measure
+
+      - S-3 (auditor suggestion): addressed by
+
+        - calling ``FeaturedAppRight_Withdraw`` in the implementation of ``DsoRules_RevokeFeaturedAppRight``
+        - calling ``Confirmation_Expire`` in the implementation of ``DsoRules_ExpireStaleConfirmation``
+
+      - S-7 (auditor suggestion): addressed by checking the ``dso`` party whenever
+        executing a confirmed action.
+
+      - S-8 (auditor suggestion): addressed by
+
+        - checking the expected ``dso`` party on all calls to the helper methods
+          ``exerciseAppTransfer``, ``exercisePaymentTransfer``, and ``exerciseComputeFees``
+          to safe-guard against a delegee providing an unexpected ``AmuletRules`` contract from an ``AmuletRules`` contract
+          with a ``dso`` party under their control
+        - adding deprecation markers to the
+
+           - ``ValidatorFaucetCoupon`` template
+           - ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule``, ``AmuletRules_UpdateFutureAmuletConfigSchedule`` choices
+             that are deprecated in favor using a ``CRARC_SetConfig`` governance vote with effective dating
+           - ``DsoRules_RequestElection``, ``DsoRules_ElectDsoDelegate``, and ``DsoRules_ArchiveOutdatedElectionRequest`` choices
+             that are deprecated in favor of delegateless automation
+
+        - clarifying that the ``amuletRulesCid`` parameter of ``DsoRules_AddConfirmedSv`` is a historical artifact
+
+
+        These Daml changes requires an upgrade to the following Daml versions:
+
+        ================== =======
+        name               version
+        ================== =======
+        amulet             0.1.10
+        amuletNameService  0.1.10
+        dsoGovernance      0.1.14
+        validatorLifecycle 0.1.4
+        wallet             0.1.10
+        walletPayments     0.1.10
+        ================== =======
+
+- SV
+
+  - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
+    the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.
+  - The Delegate Election page in the SV UI is removed automatically once the new dsoGovernance DAR implementing the delegateless automation CIP is vetted.
+
+- Scan
+
+  - Fix a `bug (#1254) <https://github.com/hyperledger-labs/splice/issues/1254>`_ where the token metadata name and acronym for Amulet were not populated
+    based on the ``splice-instance-names`` config.
+
+- Validator
+
+  - **Breaking**: The validator app now enforces that the traffic
+    topup interval is >= the automation polling interval (30s by
+    default). Previously it implicitly rounded up if the topup
+    interval was smaller which caused confusion on how much traffic is
+    purchased each time. If your topup interval was >= 30s you are not
+    affected. If you are affected, set the topup interval to the
+    polling interval (30s unless changed) to recover the prior
+    behavior.
+
+- Docs
+
+  - Improve the :ref:`application development documentation <app_dev_overview>` to better explain the available APIs and how to use them.
+  - Add relevant links to the new application developer documentation pages published by Digital Asset at
+    https://docs.digitalasset.com/build/3.3/.
+  - Fixed docker-compose docs around migrating from a non-authenticated validator to
+    an authenticated validator. A complete wipe of the validator database is not required, as
+    opposed to what the docs previously stated. See the relevant section on :ref:`authenticated
+    docker-compose validators <compose_validator_auth>`.
+
+
+
+
+
+0.4.3
+-----
+
+- Validator
+
+  - Fix a `bug (#1216) <https://github.com/hyperledger-labs/splice/issues/1216>`_ where sends through transfer preapprovals failed with a ``CONTRACT_NOT_FOUND`` ERROR
+    if the receiver's provider party was featured.
+  - Fix a bug where uploading dars would not immediately vet the dependencies that had a vetting entry effective in the future.
+  - Fix a `bug (#1215)  <https://github.com/hyperledger-labs/splice/issues/1215>`_ where wallet transaction could get stuck when creating transfer offers from the wallet UI.
+
+- Synchronizer Migrations
+
+  - Fix a rare bug where a crash of the validator or SV while trying
+    to restore the data after a migration could result in an
+    inconsistent state being restore.
+
+0.4.2
+-----
 
 - SV
 
@@ -19,14 +170,14 @@ Upcoming
 
   - Fix a typo in the `splice-participant` Helm chart that caused the participant container to be named `participant-1` instead of `participant`.
   - Java 21 replaces Java 17 in all Docker images and as the base JDK for building Splice apps.
-  - `/v2/updates` endpoints are now available on the Scan app, `/v1/updates` endpoints are deprecated.
-    The `/v2/updates` endpoints no longer return the `offset` field in responses,
-    and `events_by_id` are now lexicographically ordered by ID for conveniently viewing JSON results.
 
 - Scan
 
   - Fix a bug where the ``/v0/holdings/summary`` endpoint would return incomplete results when the requested parties had more than 1000 holdings.
     Additionally, that endpoint and ``/v0/holdings/state`` will now fail if an empty list of parties is provided.
+  - ``/v2/updates`` endpoints are now available on the Scan app, ``/v1/updates`` endpoints are deprecated.
+    The ``/v2/updates`` endpoints no longer return the ``offset`` field in responses,
+    and ``events_by_id`` are now lexicographically ordered by ID for conveniently viewing JSON results.
 
 - Mediator
 
@@ -39,6 +190,10 @@ Upcoming
     consistent with the :ref:`documented
     <validator_disaster_recovery-docker-compose-deployment>` behavior.  See
     `#387 <https://github.com/hyperledger-labs/splice/pull/387>`_
+
+- Auth
+
+  - Added an option to override the default connection and read timeouts for the JWKS URL when using ``auth.algorithm="rs-256"``.
 
 0.4.1
 -----

@@ -825,7 +825,10 @@ class HttpWalletHandler(
               (_: amuletoperationoutcome.COO_TransferPreapprovalSend) =>
                 r0.TransferPreapprovalSendResponse.OK,
               extraDisclosedContracts = wallet.connection.disclosedContracts(
-                preapproval
+                preapproval,
+                // Approximating the state of featured app right to be the same as the preapproval
+                // as scan currently does not return a ContractWithState.
+                featuredAppRight.map(c => ContractWithState(c, preapproval.state)).toList*
               ),
               dedupConfig = Some(
                 AmuletOperationDedupConfig(

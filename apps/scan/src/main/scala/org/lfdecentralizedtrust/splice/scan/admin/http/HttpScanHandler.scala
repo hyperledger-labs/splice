@@ -610,7 +610,6 @@ class HttpScanHandler(
       .map(ScanResource.ListValidatorLicensesResponse.OK)
   }
 
-  // TODO: (#7809) Add caching for sequencers per domain
   override def listDsoSequencers(
       respond: v0.ScanResource.ListDsoSequencersResponse.type
   )()(extracted: TraceContext): Future[v0.ScanResource.ListDsoSequencersResponse] = {
