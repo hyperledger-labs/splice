@@ -15,9 +15,10 @@ import Splice.Schedule
 
 template CheckError
   with
+    dso : Party
     actors : [Party]
   where
-    signatory actors
+    signatory dso, actors
     choice Test_Transfer : ()
       with
         context : PaymentTransferContext
@@ -27,7 +28,7 @@ template CheckError
       do
         isThrown <-
           try do
-            exercisePaymentTransfer context transfer
+            exercisePaymentTransfer dso context transfer
             pure False
           catch (e : AnyException) -> if expectedError `Text.isInfixOf` message e then pure True else abort ("UnexpectedException" <> message e)
         unless isThrown (abort "expected exception but didn't get one")
@@ -40,8 +41,8 @@ testTransferExceedsMaxInputs = do
       pure $ InputAmulet amulet
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of inputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.dso] $
-      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
+      createAndExerciseCmd (CheckError app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
           provider = alice.primaryParty
@@ -60,8 +61,8 @@ testTransferExceedsMaxOutputs = do
         outputAmulets = map (const outputAmulet) [1..101]
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.dso] $
-      createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty, app.dso] [] $
+      createAndExerciseCmd (CheckError app.dso [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
           provider = alice.primaryParty
@@ -84,8 +85,8 @@ testTransferExceedsMaxLockHolders = do
     now <- getTime
     let bobParties = map (.primaryParty) bobs
     -- More than the allowed number of lock holders
-    submitMulti ([alice.primaryParty, charlie.primaryParty] ++ bobParties) [app.dso] $
-      createAndExerciseCmd (CheckError ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
+    submitMulti ([alice.primaryParty, charlie.primaryParty, app.dso] ++ bobParties) [] $
+      createAndExerciseCmd (CheckError app.dso ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty

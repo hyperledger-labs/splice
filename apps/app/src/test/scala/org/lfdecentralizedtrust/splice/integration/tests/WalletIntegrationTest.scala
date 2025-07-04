@@ -702,9 +702,11 @@ class WalletIntegrationTest
           ),
           ignore = {
             case transfer: TransferTxLogEntry =>
-              // ignore merges
-              transfer.receivers.loneElement.party == aliceUserParty.toProtoPrimitive &&
-              transfer.sender.value.party == aliceUserParty.toProtoPrimitive
+              inside(transfer) { _ =>
+                // ignore merges
+                transfer.receivers.isEmpty &&
+                transfer.sender.value.party == aliceUserParty.toProtoPrimitive
+              }
             case _ => false
           },
         )

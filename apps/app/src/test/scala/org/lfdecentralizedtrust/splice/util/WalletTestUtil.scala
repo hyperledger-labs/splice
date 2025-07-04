@@ -1182,6 +1182,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
               // note: we don't provide a featured app right as sender == provider
               None.toJava,
             ),
+            Some(amuletRules.payload.dso).toJava,
           )
           .commands
           .asScala
