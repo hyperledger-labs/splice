@@ -72,7 +72,6 @@ import org.lfdecentralizedtrust.splice.store.db.TxLogQueries.TxLogStoreId
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
-import scala.jdk.CollectionConverters.*
 import org.lfdecentralizedtrust.splice.util.FutureUnlessShutdownUtil.futureUnlessShutdownToFuture
 
 final class DbMultiDomainAcsStore[TXE](

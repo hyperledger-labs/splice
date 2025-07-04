@@ -171,7 +171,7 @@ class ScanApp(
         },
         migrationInfo,
         participantId,
-        config.cache.svNodeStateTtl,
+        config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
       )
