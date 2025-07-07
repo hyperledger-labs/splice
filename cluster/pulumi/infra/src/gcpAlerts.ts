@@ -124,6 +124,7 @@ ${conditionalString(
   AND (
     jsonPayload.remote=~"sender = PAR::tw-cn-mainnet-participant-1::1220bc64ba15"
     OR jsonPayload.remote=~"sender = PAR::northisland-prod1::12204ef1928f"
+    OR jsonPayload.remote=~"sender = PAR::Lukka-Inc-prod-2::1220728cfb80"
   )
   AND timestamp <= "2025-07-14T00:00:00.000Z")
 `
