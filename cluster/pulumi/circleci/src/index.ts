@@ -106,11 +106,9 @@ function resourceClass(
   resources: k8s.types.input.core.v1.ResourceRequirements
 ): ChartValues {
   // Read token from gcp secret manager
-  const token = gcp.secretmanager
-    .getSecretVersion({
-      secret: tokenSecretName,
-    })
-    .then(secret => secret.secretData);
+  const token = gcp.secretmanager.getSecretVersionOutput({
+    secret: tokenSecretName,
+  }).secretData;
   return {
     token: token,
     metadata: {
@@ -182,6 +180,12 @@ new k8s.helm.v3.Release('container-agent', {
       replicaCount: 3,
       maxConcurrentTasks: 100,
       resourceClasses: {
+        'dach_ny/cn-runner-for-deployments': resourceClass('circleci_runner_token_for-deployments', {
+          requests: {
+            cpu: '2',
+            memory: '8Gi',
+          },
+        }),
         'dach_ny/cn-runner-for-testing': resourceClass('circleci_runner_token_for-testing', {
           requests: {
             cpu: '2',
