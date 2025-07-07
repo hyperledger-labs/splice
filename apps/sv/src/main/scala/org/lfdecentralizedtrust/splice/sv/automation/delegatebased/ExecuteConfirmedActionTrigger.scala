@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
+  OpenMiningRound,
   SummarizingMiningRound,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -222,16 +223,25 @@ class ExecuteConfirmedActionTrigger(
         }
       case arcAnsEntryContext: ARC_AnsEntryContext =>
         arcAnsEntryContext.ansEntryContextAction match {
-          case _: ANSRARC_CollectInitialEntryPayment =>
-            store.lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid).flatMap {
-              case Some(ansContext) =>
-                store
-                  .lookupAnsEntryByName(ansContext.payload.name, context.clock.now)
-                  .map(_.isDefined)
-              case None =>
-                // The ans context no longer exists, it doesn't make sense to retry collecting the payment.
-                Future.successful(true)
-            }
+          case collectPaymentAction: ANSRARC_CollectInitialEntryPayment =>
+            for {
+              isRoundFromTransferContextClosed <- store.multiDomainAcsStore
+                .lookupContractById(OpenMiningRound.COMPANION)(
+                  collectPaymentAction.ansEntryContext_CollectInitialEntryPaymentValue.transferContext.openMiningRound
+                )
+                .map(_.isEmpty)
+              isAnsContextDefined <- store
+                .lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid)
+                .flatMap {
+                  case Some(ansContext) =>
+                    store
+                      .lookupAnsEntryByName(ansContext.payload.name, context.clock.now)
+                      .map(_.isDefined)
+                  case None =>
+                    // The ans context no longer exists, it doesn't make sense to retry collecting the payment.
+                    Future.successful(true)
+                }
+            } yield isAnsContextDefined || isRoundFromTransferContextClosed
           case rejectPaymentAction: ANSRARC_RejectEntryInitialPayment =>
             store
               .lookupSubscriptionInitialPayment(
