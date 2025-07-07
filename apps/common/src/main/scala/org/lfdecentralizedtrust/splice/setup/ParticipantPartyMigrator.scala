@@ -17,6 +17,7 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.{
@@ -342,7 +343,8 @@ class ParticipantPartyMigrator(
   ): Future[Unit] = {
     for {
       _ <- participantAdminConnection.disconnectFromAllDomains()
-      _ <- Future.traverse(partyIds) { partyId =>
+      // ACS exports are expensive so do not change this to be parallel.
+      _ <- MonadUtil.sequentialTraverse(partyIds) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
           _ <- participantAdminConnection.uploadAcsSnapshot(acsSnapshot)
