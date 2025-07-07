@@ -101,11 +101,17 @@ const persistentVolumeClaim = new k8s.core.v1.PersistentVolumeClaim(cachePvc, {
 });
 
 function resourceClass(
-  tokenVar: string,
+  tokenSecretName: string,
   resources: k8s.types.input.core.v1.ResourceRequirements
 ): Object {
+  // Read token from gcp secret manager
+  const token = gcp.secretmanager
+    .getSecretVersion({
+      secret: tokenSecretName,
+    })
+    .then(secret => secret.secretData);
   return {
-    token: spliceEnvConfig.requireEnv(tokenVar),
+    token: token,
     metadata: {
       // prevent eviction by the gke autoscaler
       annotations: {
@@ -175,13 +181,13 @@ new k8s.helm.v3.Release('container-agent', {
       replicaCount: 3,
       maxConcurrentTasks: 100,
       resourceClasses: {
-        'dach_ny/cn-runner-for-testing': resourceClass('SPLICE_PULUMI_CCI_RUNNER_TOKEN', {
+        'dach_ny/cn-runner-for-testing': resourceClass('circleci_runner_token_for-testing', {
           requests: {
             cpu: '2',
             memory: '8Gi',
           },
         }),
-        'dach_ny/cn-runner-large': resourceClass('SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN', {
+        'dach_ny/cn-runner-large': resourceClass('circleci_runner_token_large', {
           requests: {
             cpu: '5',
             memory: '24Gi',
