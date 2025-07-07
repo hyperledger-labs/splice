@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding.sponsor
 
 import cats.data.EitherT
-import cats.syntax.foldable.*
 import com.digitalasset.base.error.utils.ErrorDetails
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRight
 import org.lfdecentralizedtrust.splice.environment.{
@@ -20,6 +19,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.repair.RepairServiceError
 import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
@@ -108,7 +108,7 @@ class DsoPartyMigration(
               val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
               for {
                 // Special case some exceptions
-                _ <- errorDetails.traverse_ {
+                _ <- MonadUtil.sequentialTraverse_(errorDetails) {
                   case ErrorDetails
                         .ErrorInfoDetail(RepairServiceError.UnavailableAcsSnapshot.id, metadata) =>
                     val msg =

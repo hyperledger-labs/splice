@@ -1,5 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import cats.syntax.parallel.*
+import com.digitalasset.canton.util.FutureInstances.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
@@ -14,7 +16,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.console.AppBackendReference
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.SvOnboardingRequestTrigger
-import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
@@ -52,7 +53,7 @@ class SvTimeBasedOnboardingIntegrationTest
         val sv2and3OnboardingRequestTriggers =
           Seq(sv2Backend, sv3Backend).map(_.dsoAutomation.trigger[SvOnboardingRequestTrigger])
 
-        sv2and3OnboardingRequestTriggers.traverse(_.pause()).futureValue
+        sv2and3OnboardingRequestTriggers.parTraverse_(_.pause()).futureValue
         // We now need 2 confirmations to execute an action, but only sv1 will confirm to onboard sv4.
         clue("SV4 starts") {
           sv4ValidatorBackend.start()

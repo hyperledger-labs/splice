@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import cats.syntax.traverse.*
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
@@ -32,6 +31,7 @@ import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
 import com.digitalasset.daml.lf.data.Ref
@@ -552,8 +552,10 @@ class BaseLedgerConnection(
       identityProviderIds: Seq[Option[String]] = Seq(None) ++ identityProviderConfigs.map(
         (c: IdentityProviderConfig) => Some(c.identityProviderId)
       )
-      allUsers <- identityProviderIds.traverse(listAllUsersProto(None, 1000, _)).map(_.flatten)
-      allUserData <- allUsers.traverse { user =>
+      allUsers <- MonadUtil
+        .sequentialTraverse(identityProviderIds)(listAllUsersProto(None, 1000, _))
+        .map(_.flatten)
+      allUserData <- MonadUtil.sequentialTraverse(allUsers) { user =>
         for {
           rights <- client.listUserRights(
             user.getId,

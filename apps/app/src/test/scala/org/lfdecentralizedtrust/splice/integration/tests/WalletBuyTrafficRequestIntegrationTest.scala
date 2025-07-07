@@ -1,6 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import org.lfdecentralizedtrust.splice.console.{
   ValidatorAppBackendReference,
   WalletAppClientReference,
@@ -19,6 +19,7 @@ import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{SynchronizerId, Member, PartyId}
+import com.digitalasset.canton.util.FutureInstances.*
 
 import java.time.Duration
 import scala.concurrent.Future
@@ -272,7 +273,7 @@ class WalletBuyTrafficRequestIntegrationTest
       val successes = loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
           (1 to 10).toList
-            .traverse(_ =>
+            .parTraverse(_ =>
               Future {
                 try {
                   createValidTrafficRequest(

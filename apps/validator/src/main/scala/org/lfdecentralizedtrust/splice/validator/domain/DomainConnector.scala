@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.domain
 
-import cats.implicits.{catsSyntaxApplicativeId, toFoldableOps}
+import cats.implicits.{catsSyntaxApplicativeId}
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.{
   ParticipantAdminConnection,
@@ -25,6 +25,7 @@ import com.digitalasset.canton.sequencing.{
   SubmissionRequestAmplification,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -71,8 +72,8 @@ class DomainConnector(
   def ensureDecentralizedSynchronizerRegisteredAndConnectedWithCurrentConfig(time: CantonTimestamp)(
       implicit tc: TraceContext
   ): Future[Unit] = {
-    getDecentralizedSynchronizerSequencerConnections(time).flatMap(
-      _.toList.traverse_ { case (alias, connections) =>
+    getDecentralizedSynchronizerSequencerConnections(time).flatMap(x =>
+      MonadUtil.sequentialTraverse_(x.toList) { case (alias, connections) =>
         ensureDomainRegistered(alias, connections)
       }
     )
@@ -93,7 +94,7 @@ class DomainConnector(
   }
 
   def ensureExtraDomainsRegistered()(implicit tc: TraceContext): Future[Unit] =
-    config.domains.extra.traverse_(domain =>
+    MonadUtil.sequentialTraverse_(config.domains.extra)(domain =>
       ensureDomainRegistered(
         domain.alias,
         SequencerConnections.single(GrpcSequencerConnection.tryCreate(domain.url)),

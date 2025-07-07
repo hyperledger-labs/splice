@@ -90,6 +90,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -394,12 +395,13 @@ class ValidatorApp(
                 }
               }
             }
-            _ <- config.participantPruningSchedule.traverse_ { pruningConfig =>
-              participantAdminConnection.ensurePruningSchedule(
-                pruningConfig.cron,
-                pruningConfig.maxDuration,
-                pruningConfig.retention,
-              )
+            _ <- MonadUtil.sequentialTraverse_(config.participantPruningSchedule.toList) {
+              pruningConfig =>
+                participantAdminConnection.ensurePruningSchedule(
+                  pruningConfig.cron,
+                  pruningConfig.maxDuration,
+                  pruningConfig.retention,
+                )
             }
           } yield initialSynchronizerTime
         }
@@ -461,7 +463,7 @@ class ValidatorApp(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
-      _ <- instance.dars.traverse_(dar =>
+      _ <- MonadUtil.sequentialTraverse_(instance.dars)(dar =>
         participantAdminConnection.uploadDarFileWithVettingOnAllConnectedSynchronizers(
           dar,
           RetryFor.WaitingOnInitDependency,
@@ -837,7 +839,7 @@ class ValidatorApp(
         loggerFactory,
         packageVersionSupport,
       )
-      _ <- config.appInstances.toList.traverse({ case (name, instance) =>
+      _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
           setupAppInstance(
             name,
@@ -856,7 +858,7 @@ class ValidatorApp(
         } else {
           config.validatorWalletUsers
         }
-        users.traverse_ { user =>
+        MonadUtil.sequentialTraverse_(users) { user =>
           ValidatorUtil.onboard(
             endUserName = user,
             knownParty = Some(validatorParty),
