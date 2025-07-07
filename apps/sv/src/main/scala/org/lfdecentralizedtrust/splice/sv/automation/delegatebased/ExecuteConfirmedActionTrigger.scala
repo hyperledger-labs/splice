@@ -222,16 +222,26 @@ class ExecuteConfirmedActionTrigger(
         }
       case arcAnsEntryContext: ARC_AnsEntryContext =>
         arcAnsEntryContext.ansEntryContextAction match {
-          case _: ANSRARC_CollectInitialEntryPayment =>
-            store.lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid).flatMap {
-              case Some(ansContext) =>
-                store
-                  .lookupAnsEntryByName(ansContext.payload.name, context.clock.now)
-                  .map(_.isDefined)
-              case None =>
-                // The ans context no longer exists, it doesn't make sense to retry collecting the payment.
-                Future.successful(true)
-            }
+          case collectPaymentAction: ANSRARC_CollectInitialEntryPayment =>
+            for {
+              newest <- store.getOpenMiningRoundTriple().map(_.newest.contractId)
+              middle <- store.getOpenMiningRoundTriple().map(_.middle.contractId)
+              oldest <- store.getOpenMiningRoundTriple().map(_.oldest.contractId)
+              isRoundFromTransferContextClosed = !Seq(newest, middle, oldest).contains(
+                collectPaymentAction.ansEntryContext_CollectInitialEntryPaymentValue.transferContext.openMiningRound
+              )
+              isAnsContextDefined <- store
+                .lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid)
+                .flatMap {
+                  case Some(ansContext) =>
+                    store
+                      .lookupAnsEntryByName(ansContext.payload.name, context.clock.now)
+                      .map(_.isDefined)
+                  case None =>
+                    // The ans context no longer exists, it doesn't make sense to retry collecting the payment.
+                    Future.successful(true)
+                }
+            } yield isAnsContextDefined || isRoundFromTransferContextClosed
           case rejectPaymentAction: ANSRARC_RejectEntryInitialPayment =>
             store
               .lookupSubscriptionInitialPayment(
