@@ -33,14 +33,11 @@ const cciK8sServiceAccount = new k8s.core.v1.ServiceAccount('cci-k8s-service-acc
   },
 });
 // Grant the CCI GCP SA the necessary roles to use use workload identity via the CCI KSA.
-new gcp.projects.IAMMember(
-  'cci-gcp-service-account-workload-identity-role',
-  {
-    project: cciGcpServiceAccount.project,
-    member: pulumi.interpolate`serviceAccount:${cciK8sServiceAccount.metadata.namespace}.svc.id.goog[${circleCiNamespace.metadata.name}/${cciK8sServiceAccount.metadata.name}]`,
-    role: 'roles/iam.workloadIdentityUser',
-  },
-);
+new gcp.projects.IAMMember('cci-gcp-service-account-workload-identity-role', {
+  project: cciGcpServiceAccount.project,
+  member: pulumi.interpolate`serviceAccount:${cciK8sServiceAccount.metadata.namespace}.svc.id.goog[${circleCiNamespace.metadata.name}/${cciK8sServiceAccount.metadata.name}]`,
+  role: 'roles/iam.workloadIdentityUser',
+});
 // Grant the CCI GCP SA the necessary roles to access GCP resources.
 // => via infra Pulumi project as it affects other GCP projects
 
@@ -105,7 +102,7 @@ const persistentVolumeClaim = new k8s.core.v1.PersistentVolumeClaim(cachePvc, {
 
 function resourceClass(
   tokenVar: string,
-  resources: k8s.types.input.core.v1.ResourceRequirements,
+  resources: k8s.types.input.core.v1.ResourceRequirements
 ): Object {
   return {
     token: spliceEnvConfig.requireEnv(tokenVar),
@@ -178,28 +175,21 @@ new k8s.helm.v3.Release('container-agent', {
       replicaCount: 3,
       maxConcurrentTasks: 100,
       resourceClasses: {
-        'dach_ny/cn-runner-for-testing': resourceClass(
-          'SPLICE_PULUMI_CCI_RUNNER_TOKEN',
-          {
-            requests: {
-              cpu: '2',
-              memory: '8Gi',
-            },
+        'dach_ny/cn-runner-for-testing': resourceClass('SPLICE_PULUMI_CCI_RUNNER_TOKEN', {
+          requests: {
+            cpu: '2',
+            memory: '8Gi',
           },
-        ),
-        'dach_ny/cn-runner-large':
-          resourceClass(
-            'SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN',
-            {
-              requests: {
-                cpu: '5',
-                memory: '24Gi',
-              },
-              limits: {
-                memory: '40Gi', // the high resource tests really use lots all of this
-              },
-            },
-          ),
+        }),
+        'dach_ny/cn-runner-large': resourceClass('SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN', {
+          requests: {
+            cpu: '5',
+            memory: '24Gi',
+          },
+          limits: {
+            memory: '40Gi', // the high resource tests really use lots all of this
+          },
+        }),
       },
       terminationGracePeriodSeconds: 18300, // 5h5m
       maxRunTime: '5h',
