@@ -171,8 +171,10 @@ function installDockerRunnerScaleSet(
                 // the runner itself, thus forcing GHA to wait for the docker daemon to be ready.
                 name: 'wait-for-docker',
                 image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.1`,
-                command: ['while ! docker version; do echo "Waiting for Docker to be ready..."; sleep 5; done'],
-              }
+                command: [
+                  'while ! docker version; do echo "Waiting for Docker to be ready..."; sleep 5; done',
+                ],
+              },
             ],
             containers: [
               {
