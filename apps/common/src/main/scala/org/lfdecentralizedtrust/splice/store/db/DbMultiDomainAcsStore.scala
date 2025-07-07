@@ -775,7 +775,7 @@ final class DbMultiDomainAcsStore[TXE](
           .fold(
             err =>
               throw new IllegalStateException(
-                s"Stored a contract that cannot be decoded as interface view $interfaceId: $err"
+                s"Contract $contractId cannot be decoded as interface view $interfaceId: $err. Payload: $viewJson"
               ),
             identity,
           )

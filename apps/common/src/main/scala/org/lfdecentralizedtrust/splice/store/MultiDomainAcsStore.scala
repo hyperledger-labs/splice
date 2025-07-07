@@ -388,14 +388,15 @@ object MultiDomainAcsStore {
       lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
         interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier)).exists(_.evPredicate(ev))
       }
-      lazy val failedInterfaces = ev.getFailedInterfaceViews.asScala.filter {
+      lazy val interfaceToFailureMap = ev.getFailedInterfaceViews.asScala.filter {
         case (identifier, _) =>
           interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier))
       }
-      if (failedInterfaces.nonEmpty) {
+      if (interfaceToFailureMap.nonEmpty) {
         elc.error(
-          s"Found failed interface views that match an interface id in a filter: $failedInterfaces. " +
-            s"This might be a bug in the daml definition of the interface's view."
+          s"Found failed interface views that match an interface id in a filter: $interfaceToFailureMap. " +
+            s"This might be a bug in the daml definition of the interface's view. " +
+            s"Resolve the error, and if required, reingest the data."
         )
       }
       matchesTemplate || interfaceViews.nonEmpty
