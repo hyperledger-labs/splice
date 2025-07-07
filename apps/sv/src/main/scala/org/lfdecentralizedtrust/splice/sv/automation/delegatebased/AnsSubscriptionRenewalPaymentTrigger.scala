@@ -112,7 +112,10 @@ class AnsSubscriptionRenewalPaymentTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
-    controllerArgument <- getSvControllerArgument(controller)
+    (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+      controller,
+      context.clock.now,
+    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_CollectEntryRenewalPayment(
         ansContextCId,
@@ -132,6 +135,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
         update = cmd,
       )
       .noDedup
+      .withPreferredPackage(preferredPackageIds)
       .yieldUnit()
       .map { _ =>
         TaskSuccess(s"renewed ans entry ${entry.payload.name} by collecting payment $paymentCid")

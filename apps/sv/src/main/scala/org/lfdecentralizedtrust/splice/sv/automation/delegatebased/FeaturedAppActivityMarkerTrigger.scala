@@ -59,7 +59,10 @@ class FeaturedAppActivityMarkerTrigger(
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
       openMiningRound <- store.getLatestUsableOpenMiningRound(context.clock.now)
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
       update = dsoRules.exercise(
@@ -79,6 +82,7 @@ class FeaturedAppActivityMarkerTrigger(
           update = update,
         )
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess(
       s"Converted featured app activity markers with contract ids: ${task.markers.map(_.contractId)}"

@@ -119,8 +119,4 @@ Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 # Log suppression doesn't seem to work here as the tests use a different logger
 topup interval 1 second must not be smaller than the polling interval 30 seconds.*SpliceConfigTest
 
-# TODO(#925): remove ignore when retiring PruneAmuletConfigScheduleTrigger
-# Ignore cases where PruneAmuletConfigScheduleTrigger kicks in before SvPackageVettingTrigger and reports downgrading daml issues
-.*PruneAmuletConfigScheduleTrigger.*INVALID_ARGUMENT: COMMAND_PREPROCESSING_FAILED.*An optional contract field .* with a value of Some may not be dropped during downgrading.*
-
 # Make sure to have a trailing newline

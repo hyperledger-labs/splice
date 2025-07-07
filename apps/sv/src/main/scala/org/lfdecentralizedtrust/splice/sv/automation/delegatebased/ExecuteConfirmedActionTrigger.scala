@@ -101,7 +101,10 @@ class ExecuteConfirmedActionTrigger(
             if (uniqueConfirmations.size >= requiredNumConfirmations) {
               for {
                 amuletRules <- store.getAmuletRules()
-                controllerArgument <- getSvControllerArgument(controller)
+                (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+                  controller,
+                  context.clock.now,
+                )
                 amuletRulesId = amuletRules.contractId
                 cmd = dsoRules.exercise(
                   _.exerciseDsoRules_ExecuteConfirmedAction(
@@ -123,6 +126,7 @@ class ExecuteConfirmedActionTrigger(
                       cmd,
                     )
                     .noDedup
+                    .withPreferredPackage(preferredPackageIds)
                     .yieldResult()
                 } yield Some(outcome)
               } yield {
