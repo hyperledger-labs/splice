@@ -8,6 +8,7 @@ import DA.Text
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Round
+import Splice.Types
 import Splice.Util
 import Splice.Wallet.Payment
 
@@ -123,7 +124,7 @@ template AcceptedTransferOffer
       do
         now <- getTime
         require "Offer has not expired" (now < expiresAt)
-        contextRound <- exercise @OpenMiningRound transferContext.context.openMiningRound (OpenMiningRound_Fetch sender)
+        contextRound <- fetchPublicReferenceData (ForDso with dso) transferContext.context.openMiningRound (OpenMiningRound_Fetch sender)
         amuletAmount <- paymentAmountToAmulet dso contextRound amount
         let
           transfer = Transfer with
