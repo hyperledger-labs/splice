@@ -6,6 +6,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 import {
   appsAffinityAndTolerations,
+  ChartValues,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
@@ -103,7 +104,7 @@ const persistentVolumeClaim = new k8s.core.v1.PersistentVolumeClaim(cachePvc, {
 function resourceClass(
   tokenSecretName: string,
   resources: k8s.types.input.core.v1.ResourceRequirements
-): Object {
+): ChartValues {
   // Read token from gcp secret manager
   const token = gcp.secretmanager
     .getSecretVersion({
