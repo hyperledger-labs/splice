@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   ClosedMiningRound,
+  OpenMiningRound,
   SummarizingMiningRound,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
@@ -224,12 +225,11 @@ class ExecuteConfirmedActionTrigger(
         arcAnsEntryContext.ansEntryContextAction match {
           case collectPaymentAction: ANSRARC_CollectInitialEntryPayment =>
             for {
-              rounds <- store
-                .getOpenMiningRoundTriple()
-                .map(r => Seq(r.newest.contractId, r.middle.contractId, r.oldest.contractId))
-              isRoundFromTransferContextClosed = !rounds.contains(
-                collectPaymentAction.ansEntryContext_CollectInitialEntryPaymentValue.transferContext.openMiningRound
-              )
+              isRoundFromTransferContextClosed <- store.multiDomainAcsStore
+                .lookupContractById(OpenMiningRound.COMPANION)(
+                  collectPaymentAction.ansEntryContext_CollectInitialEntryPaymentValue.transferContext.openMiningRound
+                )
+                .map(_.isEmpty)
               isAnsContextDefined <- store
                 .lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid)
                 .flatMap {
