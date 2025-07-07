@@ -126,6 +126,18 @@ ${conditionalString(
 `
 )}
 ${conditionalString(
+  isMainNet,
+  `-- TODO(DACH-NY/cn-test-failures#4768): suppressed faulty validator warnings until timestamp
+-(resource.labels.container_name="participant"
+  AND (
+    jsonPayload.remote=~"sender = PAR::tw-cn-mainnet-participant-1::1220bc64ba15"
+    OR jsonPayload.remote=~"sender = PAR::northisland-prod1::12204ef1928f"
+    OR jsonPayload.remote=~"sender = PAR::Lukka-Inc-prod-2::1220728cfb80"
+  )
+  AND timestamp <= "2025-07-14T00:00:00.000Z")
+`
+)}
+${conditionalString(
   // making this condition more complicated causes GCP to be unable to parse the query because there's too many filters
   isDevNet,
   `-- TODO(hyperledger-labs/splice#447): remove this once configured cardinality is respected
