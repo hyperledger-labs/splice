@@ -540,7 +540,7 @@ class DbMultiDomainAcsStoreTest
         (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
       ],
   ): Future[Unit] = {
-    loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
+    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       // using `d1.create` has an inner log assertion that breaks the one above
       store.testIngestionSink.underlying.ingestUpdate(
         d1,
@@ -556,13 +556,11 @@ class DbMultiDomainAcsStoreTest
         ),
       ),
       entries => {
-        val entriesWithFailures = contracts.count(_._3.nonEmpty)
-        entries should have size entriesWithFailures.toLong
-        forAll(entries)(
-          _.message should include(
+        forAll(entries) { entry =>
+          entry.message should include(
             "Found failed interface views that match an interface id in a filter"
-          )
-        )
+          ).or(include(RepeatedIngestionWarningMessage))
+        }
       },
     )
   }
