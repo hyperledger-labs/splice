@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.http.v0.wallet.{
   CreateTokenStandardTransferResponse,
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
+  ListAllocationRequestsResponse,
   ListTokenStandardTransfersResponse,
   WalletClient,
 }
@@ -43,6 +44,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
+  allocationrequestv1,
   transferinstructionv1,
 }
 
@@ -1228,5 +1230,52 @@ object HttpWalletAppClient {
         Right(value)
       }
     }
+
+    final case object ListAllocationRequests
+        extends InternalBaseCommand[
+          http.ListAllocationRequestsResponse,
+          Seq[
+            (
+                Contract[
+                  allocationrequestv1.AllocationRequest.ContractId,
+                  allocationrequestv1.AllocationRequestView,
+                ],
+                Boolean,
+            )
+          ],
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAllocationRequestsResponse] =
+        client.listAllocationRequests(headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.ListAllocationRequestsResponse, Either[
+        String,
+        Seq[
+          (
+              Contract[
+                allocationrequestv1.AllocationRequest.ContractId,
+                allocationrequestv1.AllocationRequestView,
+              ],
+              Boolean,
+          )
+        ],
+      ]] = { case ListAllocationRequestsResponse.OK(allocationRequestsResponse) =>
+        allocationRequestsResponse.allocationRequests
+          .traverse(ar =>
+            Contract
+              .fromHttp(allocationrequestv1.AllocationRequest.INTERFACE)(
+                ar.contract
+              )
+              .map(_ -> ar.allocationCreated)
+          )
+          .leftMap(_.toString)
+      }
+    }
+
   }
+
 }

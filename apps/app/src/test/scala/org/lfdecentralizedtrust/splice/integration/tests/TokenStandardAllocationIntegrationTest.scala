@@ -1,8 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2.value.Identifier
-import com.daml.ledger.api.v2
-import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
@@ -35,7 +33,11 @@ import scala.util.Random
 import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequestView
-import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
+import org.lfdecentralizedtrust.splice.console.{
+  ParticipantClientReference,
+  WalletAppClientReference,
+}
+import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 //TODO(#1304) - re-enable
@@ -56,9 +58,21 @@ class TokenStandardAllocationIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
-        splitwellValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+        Seq(
+          sv1ValidatorBackend,
+          aliceValidatorBackend,
+          bobValidatorBackend,
+          splitwellValidatorBackend,
+        ).foreach { backend =>
+          backend.participantClient.upload_dar_unless_exists(darPath)
+          DarResources.TokenStandard.tokenAllocationRequest.all
+            .map(_.path)
+            .foreach(path =>
+              backend.participantClient.upload_dar_unless_exists(
+                s"token-standard/splice-api-token-allocation-request-v1/.daml/dist/$path"
+              )
+            )
+        }
       })
   }
 
@@ -202,33 +216,10 @@ class TokenStandardAllocationIntegrationTest
   }
 
   def listAllocationRequests(
-      participantClient: ParticipantClientReference,
-      senderParty: PartyId,
+      walletClient: WalletAppClientReference
   ): Seq[AllocationRequestView] = {
-    clue(show"Retrieves allocation requests for $senderParty") {
-      val allocationRequests =
-        participantClient.ledger_api.state.acs.of_party(
-          party = senderParty,
-          filterInterfaces =
-            Seq(allocationrequestv1.AllocationRequest.TEMPLATE_ID).map(templateId =>
-              Identifier(
-                templateId.getPackageId,
-                templateId.getModuleName,
-                templateId.getEntityName,
-              )
-            ),
-        )
-      allocationRequests.map(allocationRequest => {
-        val requestViewRaw = (allocationRequest.event.interfaceViews.head.viewValue
-          .getOrElse(throw new RuntimeException("expected an interface view to be present")))
-        allocationrequestv1.AllocationRequestView
-          .valueDecoder()
-          .decode(
-            javaapi.data.DamlRecord.fromProto(
-              v2.value.Record.toJavaProto(requestViewRaw)
-            )
-          )
-      })
+    clue(show"Retrieves allocation requests for ${walletClient.name}") {
+      walletClient.listAllocationRequests().map(_._1.payload)
     }
   }
 
@@ -571,19 +562,13 @@ class TokenStandardAllocationIntegrationTest
                   venueParty
                 )
             val aliceRequest = clue("Alice sees the allocation request") {
-              val requests = listAllocationRequests(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                aliceParty,
-              )
+              val requests = listAllocationRequests(aliceWalletClient)
               val request = requests.loneElement
               request.transferLegs.asScala should have size (2)
               request
             }
             val bobRequest = clue("Bob sees the allocation request") {
-              val requests = listAllocationRequests(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bobParty,
-              )
+              val requests = listAllocationRequests(aliceWalletClient)
               val request = requests.loneElement
               request.transferLegs.asScala should have size (2)
               request

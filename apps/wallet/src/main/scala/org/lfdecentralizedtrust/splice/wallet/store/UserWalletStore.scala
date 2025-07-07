@@ -667,7 +667,9 @@ object UserWalletStore {
       ),
       Map(
         mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE)(co =>
-          co.payload.transferLegs.asScala.get(endUser).exists(_.instrumentId.admin == dso)
+          co.payload.transferLegs.asScala.exists { case (_, transferLeg) =>
+            transferLeg.instrumentId.admin == dso && transferLeg.sender == endUser
+          }
         )(contract => UserWalletAcsInterfaceViewRowData(contract))
       ),
     )

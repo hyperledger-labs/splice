@@ -558,6 +558,16 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.TokenStandard.AllocateAmulet(spec))
     }
   }
+
+  @Help.Summary("List AllocationRequests")
+  @Help.Description(
+    "List all contracts that implement the AllocationRequest interface from the Token Standard."
+  )
+  def listAllocationRequests() = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.ListAllocationRequests)
+    }
+  }
 }
 
 /** Client (aka remote) reference to a wallet app in the style of ParticipantClientReference, i.e.,

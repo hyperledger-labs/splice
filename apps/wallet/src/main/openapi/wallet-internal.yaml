@@ -699,6 +699,23 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/wallet/token-standard/allocation-requests:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "listAllocationRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAllocationRequestsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/feature-support:
     get:
       tags: [ wallet ]
@@ -762,23 +779,6 @@ paths:
             application/json:
               schema:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-        "500":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-
-  /v0/allocation-requests:
-    get:
-      tags: [ wallet ]
-      x-jvm-package: wallet
-      operationId: "listAllocationRequests"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListAllocationRequestsResponse"
-        "404":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
