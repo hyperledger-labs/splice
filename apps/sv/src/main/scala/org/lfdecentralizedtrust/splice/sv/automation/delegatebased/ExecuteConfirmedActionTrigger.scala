@@ -224,10 +224,10 @@ class ExecuteConfirmedActionTrigger(
         arcAnsEntryContext.ansEntryContextAction match {
           case collectPaymentAction: ANSRARC_CollectInitialEntryPayment =>
             for {
-              newest <- store.getOpenMiningRoundTriple().map(_.newest.contractId)
-              middle <- store.getOpenMiningRoundTriple().map(_.middle.contractId)
-              oldest <- store.getOpenMiningRoundTriple().map(_.oldest.contractId)
-              isRoundFromTransferContextClosed = !Seq(newest, middle, oldest).contains(
+              rounds <- store
+                .getOpenMiningRoundTriple()
+                .map(r => Seq(r.newest.contractId, r.middle.contractId, r.oldest.contractId))
+              isRoundFromTransferContextClosed = !rounds.contains(
                 collectPaymentAction.ansEntryContext_CollectInitialEntryPaymentValue.transferContext.openMiningRound
               )
               isAnsContextDefined <- store
