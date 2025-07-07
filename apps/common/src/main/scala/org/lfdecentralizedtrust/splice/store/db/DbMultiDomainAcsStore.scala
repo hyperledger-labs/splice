@@ -755,7 +755,8 @@ final class DbMultiDomainAcsStore[TXE](
              SELECT contract_id, interface_view, acs.created_at, acs.created_event_blob
              FROM #$interfaceViewsTableName interface
                JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
-             WHERE interface_id_qualified_name = ${QualifiedName(interfaceId)}
+             WHERE interface_id_package_id = ${interfaceId.getPackageId}
+               AND interface_id_qualified_name = ${QualifiedName(interfaceId)}
                AND interface_view IS NOT NULL
              ORDER BY interface.acs_event_number
            """.as[(String, Json, Timestamp, Array[Byte])],

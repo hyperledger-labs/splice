@@ -272,7 +272,8 @@ object Contract {
       .map(contract =>
         fromCodegenContract(
           contract,
-          contract.getContractTypeId,
+//          contract.getContractTypeId, // contains #package-name
+          companion.getTemplateIdWithPackageId,
           ev.getCreatedEventBlob,
           ev.createdAt,
         )

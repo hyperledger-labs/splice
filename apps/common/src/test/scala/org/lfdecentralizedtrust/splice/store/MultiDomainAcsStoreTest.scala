@@ -956,6 +956,36 @@ abstract class MultiDomainAcsStoreTest[
       }
     }
 
+    "filter interfaces by package-id" in {
+      implicit val store = mkStore()
+      val contract = amulet(providerParty(1), BigDecimal(1), 1.toLong, BigDecimal(0.00001))
+      val view = holdingView(
+        providerParty(1),
+        BigDecimal(1),
+        dsoParty,
+        "AMT",
+      )
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          contract,
+          implementedInterfaces = Map(
+            new Identifier(
+              "a package id that is totally different from the original",
+              holdingv1.Holding.INTERFACE_ID.getModuleName,
+              holdingv1.Holding.INTERFACE_ID.getEntityName,
+            ) -> view.toValue
+          ),
+        )
+        result <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        result should be(Seq.empty)
+      }
+    }
+
     "ingest and return interface views for 2 interfaces 1 implementor" in {
       implicit val store = mkStore()
       val aDifferentIssuer = providerParty(42)

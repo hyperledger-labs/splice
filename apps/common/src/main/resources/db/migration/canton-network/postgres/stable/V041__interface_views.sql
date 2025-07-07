@@ -11,8 +11,8 @@ create table interface_views_template
     -- the DamlRecord corresponding to the interface's view
     interface_view              jsonb not null,
 
-    -- the index will allow querying `WHERE interface_id_qualified_name = some_qualified_interface_id ORDER BY acs_event_number`.
-    constraint interface_views_template_pkey primary key (interface_id_qualified_name, acs_event_number, interface_id_package_id),
+    -- the index will allow querying `WHERE interface_id_package_id = ? AND interface_id_qualified_name = ? ORDER BY acs_event_number`.
+    constraint interface_views_template_pkey primary key (interface_id_package_id, interface_id_qualified_name, acs_event_number),
     constraint interface_views_template_acs_evt_num_fkey foreign key (acs_event_number) references acs_store_template (event_number) on delete cascade
 );
 

@@ -28,8 +28,7 @@ object JavaDecodeUtil {
       event.getInterfaceViews
         .keySet()
         .asScala
-        .map(QualifiedName(_))
-        .contains(QualifiedName(companion.getTemplateIdWithPackageId))
+        .contains(companion.getTemplateIdWithPackageId)
     ) {
       val result = Some(companion.fromCreatedEvent(event))
       result
