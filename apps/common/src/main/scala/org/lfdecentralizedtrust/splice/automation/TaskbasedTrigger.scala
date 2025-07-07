@@ -81,7 +81,6 @@ abstract class TaskbasedTrigger[T: Pretty](
         metrics.latency
           .timeFuture(completeTask(task))
           .recoverWith { case ex =>
-            logger.info(s"my expectee $ex")
             logger.info("Checking whether the task is stale, as its processing failed with ", ex)
             isStaleTask(task)
               .transform {
