@@ -8,7 +8,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import cats.syntax.traverse.*
-import com.digitalasset.base.error.ErrorResource
+import com.digitalasset.base.error.{ErrorCode, ErrorResource}
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
@@ -63,6 +63,7 @@ import scala.util.{Failure, Success, Try}
 import shapeless.<:!<
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.daml.lf.data.Ref
 
@@ -610,11 +611,20 @@ class BaseLedgerConnection(
     retryProvider.retryForClientCalls(
       "get_supported_package_version",
       s"Get the supported package version for packageRequirements $packageRequirements on synchronizer $synchronizerId with vetting time ${vettingAsOfTime}",
-      client.getSupportedPackageVersion(
-        synchronizerId,
-        packageRequirements,
-        vettingAsOfTime,
-      ),
+      client
+        .getSupportedPackageVersion(
+          synchronizerId,
+          packageRequirements,
+          vettingAsOfTime,
+        )
+        .recover {
+          case ex: StatusRuntimeException
+              if ErrorDetails.matches(ex, LedgerApiErrors.NoPreferredPackagesFound) =>
+            logger.info(
+              s"No preferred packages found for packageRequirements $packageRequirements on synchronizer $synchronizerId with vetting time $vettingAsOfTime"
+            )
+            Seq.empty
+        },
       logger,
     )
   }
