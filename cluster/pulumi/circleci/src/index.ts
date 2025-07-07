@@ -19,14 +19,14 @@ const circleCiNamespace = new Namespace('circleci-runner', {
 });
 
 // Create a GCP SA for CCI (CCI SA) and a k8s service account (CCI KSA) that is connected to the GCP SA.
-const cciGcpServiceAccount = new gcp.serviceaccount.Account('cci-gcp-service-account', {
-  accountId: 'cci-gcp-service-account',
-  displayName: 'CircleCI GCP Service Account',
+const cciGcpServiceAccount = new gcp.serviceaccount.Account('cci-deployments-gcp-sa', {
+  accountId: 'cci-deployments-gcp-sa',
+  displayName: 'CircleCI GCP Service Account for Cluster Deployments',
   description: 'Service account for CircleCI to access GCP resources.',
 });
-const cciK8sServiceAccount = new k8s.core.v1.ServiceAccount('cci-k8s-service-account', {
+const cciK8sServiceAccount = new k8s.core.v1.ServiceAccount('cci-deployments-k8s-sa', {
   metadata: {
-    name: 'cci-k8s-service-account',
+    name: 'cci-deployments-k8s-sa',
     namespace: circleCiNamespace.metadata.name,
     annotations: {
       'iam.gke.io/gcp-service-account': cciGcpServiceAccount.email,
@@ -103,7 +103,8 @@ const persistentVolumeClaim = new k8s.core.v1.PersistentVolumeClaim(cachePvc, {
 
 function resourceClass(
   tokenSecretName: string,
-  resources: k8s.types.input.core.v1.ResourceRequirements
+  resources: k8s.types.input.core.v1.ResourceRequirements,
+  k8sServiceAccountName?: pulumi.Output<string>
 ): ChartValues {
   // Read token from gcp secret manager
   const token = gcp.secretmanager.getSecretVersionOutput({
@@ -118,6 +119,7 @@ function resourceClass(
       },
     },
     spec: {
+      serviceAccountName: k8sServiceAccountName,
       containers: [
         {
           resources: resources,
@@ -180,12 +182,17 @@ new k8s.helm.v3.Release('container-agent', {
       replicaCount: 3,
       maxConcurrentTasks: 100,
       resourceClasses: {
-        'dach_ny/cn-runner-for-deployments': resourceClass('circleci_runner_token_for-deployments', {
-          requests: {
-            cpu: '2',
-            memory: '8Gi',
+        'dach_ny/cn-runner-for-deployments': resourceClass(
+          'circleci_runner_token_for-deployments',
+          {
+            requests: {
+              cpu: '2',
+              memory: '8Gi',
+            },
           },
-        }),
+          // distingushing feature: runs as the special service account we created
+          cciK8sServiceAccount.metadata.name
+        ),
         'dach_ny/cn-runner-for-testing': resourceClass('circleci_runner_token_for-testing', {
           requests: {
             cpu: '2',
