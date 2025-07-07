@@ -343,6 +343,7 @@ class ParticipantPartyMigrator(
   ): Future[Unit] = {
     for {
       _ <- participantAdminConnection.disconnectFromAllDomains()
+      // ACS exports are expensive so do not change this to be parallel.
       _ <- MonadUtil.sequentialTraverse(partyIds) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
