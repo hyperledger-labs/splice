@@ -1260,46 +1260,21 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "PodMonitor",
       "metadata": {
-        "name": "istio-gateway-monitor-public",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "namespaceSelector": {
-          "any": true
+        "labels": {
+          "monitoring": "istio-proxies",
+          "release": "prometheus-grafana-monitoring"
         },
-        "podMetricsEndpoints": [
-          {
-            "path": "/stats/prometheus",
-            "port": "http-envoy-prom"
-          }
-        ],
-        "selector": {
-          "matchLabels": {
-            "istio": "ingress"
-          }
-        }
-      }
-    },
-    "name": "istio-gateway-monitor-public",
-    "provider": "",
-    "type": "kubernetes:monitoring.coreos.com/v1:PodMonitor"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "monitoring.coreos.com/v1",
-      "kind": "PodMonitor",
-      "metadata": {
         "name": "istio-gateway-monitor",
         "namespace": "cluster-ingress"
       },
       "spec": {
+        "jobLabel": "app",
         "namespaceSelector": {
           "any": true
         },
         "podMetricsEndpoints": [
           {
+            "honorLabels": true,
             "path": "/stats/prometheus",
             "port": "http-envoy-prom"
           }
@@ -1708,48 +1683,76 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "PodMonitor",
       "metadata": {
-        "name": "istio-sidecar-monitor-public",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "namespaceSelector": {
-          "any": true
+        "labels": {
+          "monitoring": "istio-proxies",
+          "release": "prometheus-grafana-monitoring"
         },
-        "podMetricsEndpoints": [
-          {
-            "path": "/stats/prometheus",
-            "port": "http-envoy-prom"
-          }
-        ],
-        "selector": {
-          "matchLabels": {
-            "security.istio.io/tlsMode": "istio"
-          }
-        }
-      }
-    },
-    "name": "istio-sidecar-monitor-public",
-    "provider": "",
-    "type": "kubernetes:monitoring.coreos.com/v1:PodMonitor"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "monitoring.coreos.com/v1",
-      "kind": "PodMonitor",
-      "metadata": {
         "name": "istio-sidecar-monitor",
         "namespace": "cluster-ingress"
       },
       "spec": {
+        "jobLabel": "app",
         "namespaceSelector": {
           "any": true
         },
         "podMetricsEndpoints": [
           {
+            "honorLabels": true,
             "path": "/stats/prometheus",
-            "port": "http-envoy-prom"
+            "port": "http-envoy-prom",
+            "relabelings": [
+              {
+                "action": "keep",
+                "regex": "istio-proxy",
+                "sourceLabels": [
+                  "__meta_kubernetes_pod_container_name"
+                ]
+              },
+              {
+                "action": "keep",
+                "sourceLabels": [
+                  "__meta_kubernetes_pod_annotationpresent_prometheus_io_scrape"
+                ]
+              },
+              {
+                "action": "replace",
+                "regex": "(\\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})",
+                "replacement": "[$2]:$1",
+                "sourceLabels": [
+                  "__meta_kubernetes_pod_annotation_prometheus_io_port",
+                  "__meta_kubernetes_pod_ip"
+                ],
+                "targetLabel": "__address__"
+              },
+              {
+                "action": "replace",
+                "regex": "(\\d+);((([0-9]+?)(\\.|$)){4})",
+                "replacement": "$2:$1",
+                "sourceLabels": [
+                  "__meta_kubernetes_pod_annotation_prometheus_io_port",
+                  "__meta_kubernetes_pod_ip"
+                ],
+                "targetLabel": "__address__"
+              },
+              {
+                "action": "labeldrop",
+                "regex": "__meta_kubernetes_pod_label_(.+)"
+              },
+              {
+                "action": "replace",
+                "sourceLabels": [
+                  "__meta_kubernetes_namespace"
+                ],
+                "targetLabel": "namespace"
+              },
+              {
+                "action": "replace",
+                "sourceLabels": [
+                  "__meta_kubernetes_pod_name"
+                ],
+                "targetLabel": "pod"
+              }
+            ]
           }
         ],
         "selector": {
@@ -1784,12 +1787,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "istiod-service-monitor",
         "namespace": "cluster-ingress"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "http-monitoring"
           }
         ],

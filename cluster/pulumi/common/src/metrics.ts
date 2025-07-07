@@ -4,11 +4,17 @@ import * as pulumi from '@pulumi/pulumi';
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import { Input, Inputs } from '@pulumi/pulumi';
 
+import { ObservabilityReleaseName } from './utils';
+
 export class PodMonitor extends CustomResource {
   constructor(
     name: string,
     matchLabels: Inputs,
-    podMetricsEndpoints: Array<{ port: string; path: string }>,
+    podMetricsEndpoints: Array<{
+      port: string;
+      path: string;
+      relabelings?: Array<unknown>;
+    }>,
     namespace: Input<string>,
     opts?: pulumi.CustomResourceOptions
   ) {
@@ -20,15 +26,25 @@ export class PodMonitor extends CustomResource {
         metadata: {
           name: name,
           namespace: namespace,
+          labels: {
+            monitoring: 'istio-proxies',
+            release: ObservabilityReleaseName,
+          },
         },
         spec: {
+          jobLabel: 'app',
           selector: {
             matchLabels: matchLabels,
           },
           namespaceSelector: {
             any: true,
           },
-          podMetricsEndpoints: podMetricsEndpoints,
+          podMetricsEndpoints: podMetricsEndpoints.map(endpoint => {
+            return {
+              honorLabels: true,
+              ...endpoint,
+            };
+          }),
         },
       },
       opts
@@ -52,6 +68,9 @@ export class ServiceMonitor extends CustomResource {
         metadata: {
           name: name,
           namespace: namespace,
+          labels: {
+            release: ObservabilityReleaseName,
+          },
         },
         spec: {
           selector: {
@@ -63,6 +82,7 @@ export class ServiceMonitor extends CustomResource {
           endpoints: [
             {
               port: port,
+              honorLabels: true,
             },
           ],
         },
