@@ -90,7 +90,24 @@ abstract class TaskbasedTrigger[T: Pretty](
                   logger.debug(
                     s"Task that failed with following exception is not stale: ${ex.getLocalizedMessage} "
                   )
-                  Failure(ex)
+                  ex match {
+                    case GrpcException(status @ GrpcStatus(_, _), trailers) =>
+                      val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+                      ErrorDetails
+                        .from(statusProto)
+                        .flatMap {
+                          case ed: ErrorDetails.ErrorInfoDetail =>
+                            Some(ed.errorCodeId)
+                          case _ => None
+                        }
+                        .headOption match {
+                        case Some(ContractNotFound.id) | Some(LockedContracts.id) |
+                            Some(InactiveContracts.id) =>
+                          Success(TaskStale)
+                        case _ => Failure(ex)
+                      }
+                    case _ => Failure(ex)
+                  }
                 case Failure(staleCheckEx) =>
                   logger.info("Encountered exception when checking task staleness", staleCheckEx)
                   Failure(ex)
