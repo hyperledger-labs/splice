@@ -198,7 +198,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         if (amuletRules.isDevNet && isSome topupStateCidO)
           then do
             -- Calculate Amulet required to buy extra traffic
-            (trafficCostAmulet, _) <- computeSynchronizerFees executionContext.validator trafficAmount amuletRules context.context
+            (trafficCostAmulet, _) <- computeSynchronizerFees executionContext.dso executionContext.validator trafficAmount amuletRules context.context
             -- Tap enough Amulet to cover extra traffic purchase
             result <- exercise amuletRulesCid (AmuletRules_DevNet_Tap executionContext.validator trafficCostAmulet context.context.openMiningRound)
             -- Use only the newly created amulet as input to avoid amulet merges and having to pay for a new change amulet

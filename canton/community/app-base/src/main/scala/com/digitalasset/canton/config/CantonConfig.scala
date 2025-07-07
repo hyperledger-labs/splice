@@ -489,6 +489,8 @@ trait SharedCantonConfig[Self] extends ConfigDefaults[DefaultPorts, Self] { self
           sequencerNodeConfig.parameters.maxConfirmationRequestsBurstFactor,
         unsafeEnableOnlinePartyReplication =
           sequencerNodeConfig.parameters.unsafeEnableOnlinePartyReplication,
+        sequencerApiLimits = sequencerNodeConfig.parameters.sequencerApiLimits,
+        warnOnUndefinedLimits = sequencerNodeConfig.parameters.warnOnUndefinedLimits,
       )
     }
 

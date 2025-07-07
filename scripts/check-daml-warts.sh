@@ -17,9 +17,7 @@ ignored_files=(
   'token-standard/splice-token-standard-test/daml/Splice/Testing/Apps/TradingApp.daml'
   'canton/')
 
-# TODO(DACH-NY/canton-network-internal#490): also check for naked `Xyz_Fetch` choices
-
-command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml')
+command=('git' 'grep' '-n' -E '(exercise.*_Fetch|fetch|archive)\b' '--' '*.daml')
 echo "${command[@]}"
 for ignored_file in "${ignored_files[@]}"; do
   command+=(":!$ignored_file")
