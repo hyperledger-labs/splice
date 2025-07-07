@@ -6,7 +6,6 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.tracing.TraceContext
@@ -14,7 +13,7 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{FutureHelpers, HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTrigger.IndexAction
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
-import org.slf4j.event.Level
+import slick.dbio.DBIOAction
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.Future
@@ -31,55 +30,49 @@ class SqlIndexInitializationTriggerStoreTest
 
   "SqlIndexInitializationTrigger" should {
 
-    "create custom indexes with default settings" in {
-      val trigger = new SqlIndexInitializationTrigger(
+    "run with default settings" in {
+      val trigger = SqlIndexInitializationTrigger(
         storage = storage,
-        context = triggerContext,
+        triggerContext = triggerContext,
       )
-      trigger.run(paused = false)
       for {
-        _ <- trigger.finished.failOnShutdown
+        _ <- runTriggerUntilAllTasksDone(trigger)
         indexNames <- listIndexNames()
-        _ <- dropIndexes(SqlIndexInitializationTrigger.customIndexes.keySet.toSeq).failOnShutdown
       } yield {
-        indexNames should contain allElementsOf SqlIndexInitializationTrigger.customIndexes.keySet
-        trigger.isHealthy shouldBe true
+        indexNames should contain allElementsOf Seq("updt_hist_crea_hi_mi_ci_import_updates")
       }
     }
 
-    "warn about unknown indexes" in {
-      val trigger = new SqlIndexInitializationTrigger(
+    "create an index" in {
+      val trigger = SqlIndexInitializationTrigger(
         storage = storage,
-        context = triggerContext,
-        expectedIndexes = Map.empty,
-      )
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        within = {
-          trigger.run(paused = false)
-          trigger.finished.failOnShutdown.map(_ => succeed)
-        },
-        assertion = entries => {
-          entries should have size 1
-          entries.loneElement.message should include("Found unexpected SQL indexes")
-          SqlIndexInitializationTrigger.flywayIndexes.keySet.foreach(flywayIndexName =>
-            entries.loneElement.message should include(flywayIndexName)
+        triggerContext = triggerContext,
+        indexActions = List(
+          IndexAction.Create(
+            "test_index",
+            sqlu"create index if not exists test_index on update_history_creates (record_time)",
           )
-          trigger.isHealthy shouldBe true
-        },
+        ),
       )
+
+      for {
+        _ <- runTriggerUntilAllTasksDone(trigger)
+        indexNames <- listIndexNames()
+      } yield {
+        indexNames should contain allElementsOf List("test_index")
+        trigger.isHealthy shouldBe true
+      }
     }
 
     "drop index" in {
       val trigger = new SqlIndexInitializationTrigger(
         storage = storage,
         context = triggerContext,
-        expectedIndexes = SqlIndexInitializationTrigger.flywayIndexes ++ Map(
-          "test_index" -> IndexAction.Drop
+        indexActions = List(
+          IndexAction.Drop("test_index")
         ),
       )
       for {
-        // Note: this is changing the schema. Schema changes are not automatically rolled back
-        // between tests (see DbTest.cleanDb). If this test fails, it may leave the index in place.
         _ <- storage.underlying
           .update(
             sqlu"create index test_index on update_history_creates (record_time)",
@@ -88,34 +81,134 @@ class SqlIndexInitializationTriggerStoreTest
           .failOnShutdown
         indexNamesBefore <- listIndexNames()
         _ = indexNamesBefore should contain("test_index")
-        _ = trigger.run(paused = false)
-        _ <- trigger.finished.failOnShutdown
+        _ <- runTriggerUntilAllTasksDone(trigger)
         indexNamesAfter <- listIndexNames()
         _ = indexNamesAfter should not contain ("test_index")
       } yield succeed
     }
 
-    "become unhealthy if index creation fails" in {
-      val trigger = new SqlIndexInitializationTrigger(
+    "do not create an index if it already exists" in {
+      val trigger = SqlIndexInitializationTrigger(
         storage = storage,
-        context = triggerContext,
-        expectedIndexes = SqlIndexInitializationTrigger.flywayIndexes ++ Map(
-          "invalid_index_definition" -> IndexAction.Create(
-            sqlu"create index invalid_index on non_existent_table (column_name)"
+        triggerContext = triggerContext,
+        indexActions = List(
+          IndexAction.Create(
+            "test_index",
+            sqlu"create index if not exists test_index on update_history_creates (record_time)",
           )
         ),
       )
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
-        within = {
-          trigger.run(paused = false)
-          trigger.finished.failOnShutdown.map(_ => succeed)
-        },
-        assertion = entries => {
-          entries should have size 1
-          entries.loneElement.message should include("Initialization task failed")
-          trigger.isHealthy shouldBe false
-        },
+
+      for {
+        _ <- storage.underlying
+          .update(
+            sqlu"create index test_index on update_history_creates (record_time)",
+            "create test index",
+          )
+          .failOnShutdown
+        tasks <- trigger.retrieveTasks()
+        _ = tasks.loneElement shouldBe a[SqlIndexInitializationTrigger.Task.ConfirmActionCompleted]
+        _ <- runTriggerUntilAllTasksDone(trigger)
+        indexNames <- listIndexNames()
+      } yield {
+        indexNames should contain allElementsOf List("test_index")
+        trigger.isHealthy shouldBe true
+      }
+    }
+
+    "do not drop an index if it does not exists" in {
+      val trigger = SqlIndexInitializationTrigger(
+        storage = storage,
+        triggerContext = triggerContext,
+        indexActions = List(
+          IndexAction.Drop("test_index")
+        ),
       )
+
+      for {
+        tasks <- trigger.retrieveTasks()
+        _ = tasks.loneElement shouldBe a[SqlIndexInitializationTrigger.Task.ConfirmActionCompleted]
+        _ <- runTriggerUntilAllTasksDone(trigger)
+        indexNames <- listIndexNames()
+      } yield {
+        indexNames should not contain "test_index"
+        trigger.isHealthy shouldBe true
+      }
+    }
+
+    "delete invalid index" in {
+      val trigger = new SqlIndexInitializationTrigger(
+        storage = storage,
+        context = triggerContext,
+        indexActions = List(
+          IndexAction.Create(
+            "test_index",
+            sqlu"create index concurrently if not exists test_index on active_parties (closed_round)",
+          )
+        ),
+      )
+      for {
+        _ <- Future.unit
+        _ <- storage.underlying
+          .update(
+            DBIOAction
+              .seq(
+                sqlu"""
+                  insert into active_parties (store_id, party, closed_round)
+                  values (1, 'test_party', 1)
+                """,
+                sqlu"""
+                  insert into active_parties (store_id, party, closed_round)
+                  values (2, 'test_party2', 1)
+                """,
+              ),
+            "insert test data",
+          )
+          .failOnShutdown
+        _ <- storage.underlying
+          .update(
+            sqlu"""
+              create or replace function slow_function(text) returns text as $$$$
+              begin
+                  perform pg_sleep(5); -- simulate a long-running operation
+                  return $$1;
+              end;
+              $$$$ language plpgsql immutable;
+              """,
+            "insert test data",
+          )
+          .failOnShutdown
+        _ <- storage.underlying
+          .update(
+            DBIOAction
+              .seq(
+                sqlu"set statement_timeout to '1s'",
+                sqlu"create index concurrently if not exists test_index on active_parties (slow_function(party))",
+              )
+              .asTry,
+            "insert test data",
+          )
+          .failOnShutdown
+
+        indexNamesBefore <- listIndexNames()
+        _ = indexNamesBefore should contain("test_index")
+
+        tasks <- trigger.retrieveTasks()
+        _ = tasks.loneElement match {
+          case SqlIndexInitializationTrigger.Task.ExecuteAction(IndexAction.Drop("test_index")) =>
+            succeed
+          case other =>
+            fail(s"Expected Drop for test_index, got $other")
+        }
+        _ <- trigger.runOnce()
+        indexNamesAfterDrop <- listIndexNames()
+        _ = indexNamesAfterDrop should not contain ("test_index")
+
+        _ <- runTriggerUntilAllTasksDone(trigger)
+        indexNamesAfter <- listIndexNames()
+      } yield {
+        indexNamesAfter should contain("test_index")
+      }
     }
   }
 
@@ -134,11 +227,17 @@ class SqlIndexInitializationTriggerStoreTest
         storage
           .update(
             sqlu"drop index if exists #${indexName}",
-            s"drop $indexName index",
+            s"drop index $indexName",
           )
       }
       .map(_ => ())
   }
+
+  private def runTriggerUntilAllTasksDone(trigger: SqlIndexInitializationTrigger): Future[Unit] = {
+    trigger.run(paused = false)
+    trigger.remainingActionsEmpty.future
+  }
+
   private lazy val clock = new SimClock(loggerFactory = loggerFactory)
   private lazy val triggerContext: TriggerContext = TriggerContext(
     AutomationConfig(),
@@ -151,5 +250,10 @@ class SqlIndexInitializationTriggerStoreTest
   )
   override protected def cleanDb(
       storage: DbStorage
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = resetAllAppTables(storage)
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[?] = for {
+    _ <- resetAllAppTables(storage)
+    _ <- dropIndexes(
+      SqlIndexInitializationTrigger.defaultIndexActions.map(_.indexName) ++ Seq("test_index")
+    )
+  } yield ()
 }
