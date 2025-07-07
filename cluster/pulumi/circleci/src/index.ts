@@ -103,6 +103,68 @@ const persistentVolumeClaim = new k8s.core.v1.PersistentVolumeClaim(cachePvc, {
   },
 });
 
+function resourceClass(
+  tokenVar: string,
+  resources: k8s.types.input.core.v1.ResourceRequirements,
+): Object {
+  return {
+    token: spliceEnvConfig.requireEnv(tokenVar),
+    metadata: {
+      // prevent eviction by the gke autoscaler
+      annotations: {
+        'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+      },
+    },
+    spec: {
+      containers: [
+        {
+          resources: resources,
+          // required to mount the nix store inside the container from the NFS
+          securityContext: {
+            privileged: true,
+          },
+          volumeMounts: [
+            {
+              name: 'cache',
+              mountPath: '/cache',
+            },
+            {
+              name: 'nix',
+              mountPath: '/nix',
+            },
+          ],
+        },
+      ],
+      volumes: [
+        {
+          name: 'cache',
+          persistentVolumeClaim: {
+            claimName: persistentVolumeClaim.metadata.name,
+          },
+        },
+        {
+          name: 'nix',
+          ephemeral: {
+            volumeClaimTemplate: {
+              spec: {
+                accessModes: ['ReadWriteOnce'],
+                // only hyperdisks are supported on c4 nodes
+                storageClassName: 'hyperdisk-balanced-rwo',
+                resources: {
+                  requests: {
+                    storage: '24Gi',
+                  },
+                },
+              },
+            },
+          },
+        },
+      ],
+      ...appsAffinityAndTolerations,
+    },
+  };
+}
+
 new k8s.helm.v3.Release('container-agent', {
   name: 'container-agent',
   chart: 'container-agent',
@@ -116,131 +178,28 @@ new k8s.helm.v3.Release('container-agent', {
       replicaCount: 3,
       maxConcurrentTasks: 100,
       resourceClasses: {
-        'dach_ny/cn-runner-for-testing': {
-          token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_TOKEN'),
-          metadata: {
-            // prevent eviction by the gke autoscaler
-            annotations: {
-              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
+        'dach_ny/cn-runner-for-testing': resourceClass(
+          'SPLICE_PULUMI_CCI_RUNNER_TOKEN',
+          {
+            requests: {
+              cpu: '2',
+              memory: '8Gi',
             },
           },
-          spec: {
-            containers: [
-              {
-                resources: {
-                  requests: {
-                    cpu: '2',
-                    memory: '8Gi',
-                  },
-                },
-                // required to mount the nix store inside the container from the NFS
-                securityContext: {
-                  privileged: true,
-                },
-                volumeMounts: [
-                  {
-                    name: 'cache',
-                    mountPath: '/cache',
-                  },
-                  {
-                    name: 'nix',
-                    mountPath: '/nix',
-                  },
-                ],
+        ),
+        'dach_ny/cn-runner-large':
+          resourceClass(
+            'SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN',
+            {
+              requests: {
+                cpu: '5',
+                memory: '24Gi',
               },
-            ],
-            volumes: [
-              {
-                name: 'cache',
-                persistentVolumeClaim: {
-                  claimName: persistentVolumeClaim.metadata.name,
-                },
+              limits: {
+                memory: '40Gi', // the high resource tests really use lots all of this
               },
-              {
-                name: 'nix',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '24Gi',
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-            ...appsAffinityAndTolerations,
-          },
-        },
-        'dach_ny/cn-runner-large': {
-          token: spliceEnvConfig.requireEnv('SPLICE_PULUMI_CCI_RUNNER_LARGE_TOKEN'),
-          metadata: {
-            // prevent eviction by the gke autoscaler
-            annotations: {
-              'cluster-autoscaler.kubernetes.io/safe-to-evict': 'false',
             },
-          },
-          spec: {
-            containers: [
-              {
-                resources: {
-                  requests: {
-                    cpu: '5',
-                    memory: '24Gi',
-                  },
-                  limits: {
-                    memory: '40Gi', // the high resource tests really use lots all of this
-                  },
-                },
-                // required to mount the nix store inside the container from the NFS
-                securityContext: {
-                  privileged: true,
-                },
-                volumeMounts: [
-                  {
-                    name: 'cache',
-                    mountPath: '/cache',
-                  },
-                  {
-                    name: 'nix',
-                    mountPath: '/nix',
-                  },
-                ],
-              },
-            ],
-            volumes: [
-              {
-                name: 'cache',
-                persistentVolumeClaim: {
-                  claimName: persistentVolumeClaim.metadata.name,
-                },
-              },
-              {
-                name: 'nix',
-                ephemeral: {
-                  volumeClaimTemplate: {
-                    spec: {
-                      accessModes: ['ReadWriteOnce'],
-                      // only hyperdisks are supported on c4 nodes
-                      storageClassName: 'hyperdisk-balanced-rwo',
-                      resources: {
-                        requests: {
-                          storage: '24Gi',
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-            ...appsAffinityAndTolerations,
-          },
-        },
+          ),
       },
       terminationGracePeriodSeconds: 18300, // 5h5m
       maxRunTime: '5h',
