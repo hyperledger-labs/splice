@@ -64,6 +64,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
+  allocationrequestv1,
   holdingv1,
   metadatav1,
   transferinstructionv1,
@@ -1193,6 +1194,25 @@ class HttpWalletHandler(
           tokenStandard = tokenStandard.supported,
           transferPreapprovalDescription = preapprovalDescription.supported,
         )
+      )
+    }
+  }
+
+  override def listAllocationRequests(
+      respond: WalletResource.ListAllocationRequestsResponse.type
+  )()(tuser: TracedUser): Future[WalletResource.ListAllocationRequestsResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.listInterfaces") { _ => _ =>
+      for {
+        userStore <- getUserStore(user)
+        contracts <- userStore.multiDomainAcsStore.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield d0.ListAllocationRequestsResponse(
+        contracts
+          .map(_.toHttp)
+          .toVector
+          .map(contract => d0.AllocationRequest(contract, allocationCreated = false))
       )
     }
   }

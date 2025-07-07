@@ -765,6 +765,23 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/allocation-requests:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "listAllocationRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAllocationRequestsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 components:
   schemas:
     UserStatusResponse:
@@ -1431,3 +1448,29 @@ components:
       properties:
         dummy: # cannot define an empty object for some reason
           type: object
+
+    ListAllocationRequestsResponse:
+      type: object
+      description:
+        Includes all AllocationRequest views where the user is in one of the transferLegs and where
+        the involved instrument's admin is the DSO party.
+      required:
+        - allocation_requests
+      properties:
+        allocation_requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/AllocationRequest"
+
+    AllocationRequest:
+      type: object
+      required:
+        - contract
+        - allocation_created
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        allocation_created:
+          description:
+            Whether the wallet party already created a matching allocation or not.
+          type: boolean
