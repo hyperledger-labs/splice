@@ -16,6 +16,34 @@ const circleCiNamespace = new Namespace('circleci-runner', {
     name: 'circleci-runner',
   },
 });
+
+// Create a GCP SA for CCI (CCI SA) and a k8s service account (CCI KSA) that is connected to the GCP SA.
+const cciGcpServiceAccount = new gcp.serviceaccount.Account('cci-gcp-service-account', {
+  accountId: 'cci-gcp-service-account',
+  displayName: 'CircleCI GCP Service Account',
+  description: 'Service account for CircleCI to access GCP resources.',
+});
+const cciK8sServiceAccount = new k8s.core.v1.ServiceAccount('cci-k8s-service-account', {
+  metadata: {
+    name: 'cci-k8s-service-account',
+    namespace: circleCiNamespace.metadata.name,
+    annotations: {
+      'iam.gke.io/gcp-service-account': cciGcpServiceAccount.email,
+    },
+  },
+});
+// Grant the CCI GCP SA the necessary roles to use use workload identity via the CCI KSA.
+new gcp.projects.IAMMember(
+  'cci-gcp-service-account-workload-identity-role',
+  {
+    project: cciGcpServiceAccount.project,
+    member: pulumi.interpolate`serviceAccount:${cciK8sServiceAccount.metadata.namespace}.svc.id.goog[${circleCiNamespace.metadata.name}/${cciK8sServiceAccount.metadata.name}]`,
+    role: 'roles/iam.workloadIdentityUser',
+  },
+);
+// Grant the CCI GCP SA the necessary roles to access GCP resources.
+// => via infra Pulumi project as it affects other GCP projects
+
 // filestore minimum capacity to provision a hdd instance is 1TB
 const capacityGb = 1024;
 const filestore = new gcp.filestore.Instance(`cci-filestore`, {
