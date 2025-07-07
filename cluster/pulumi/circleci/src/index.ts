@@ -18,6 +18,9 @@ const circleCiNamespace = new Namespace('circleci-runner', {
   },
 });
 
+// Below logic assumes that the cluster has workload identity enabled.
+// You can enforce this via `cncluster cluster_enable_workload_identity`.
+
 // Create a GCP SA for CCI (CCI SA) and a k8s service account (CCI KSA) that is connected to the GCP SA.
 const cciGcpServiceAccount = new gcp.serviceaccount.Account('cci-deployments-gcp-sa', {
   accountId: 'cci-deployments-gcp-sa',
