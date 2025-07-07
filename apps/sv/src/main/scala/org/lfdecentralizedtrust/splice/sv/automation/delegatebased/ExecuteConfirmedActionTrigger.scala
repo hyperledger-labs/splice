@@ -103,7 +103,7 @@ class ExecuteConfirmedActionTrigger(
                 amuletRules <- store.getAmuletRules()
                 (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
                   controller,
-                  context.clock.now,
+                  now,
                 )
                 amuletRulesId = amuletRules.contractId
                 cmd = dsoRules.exercise(

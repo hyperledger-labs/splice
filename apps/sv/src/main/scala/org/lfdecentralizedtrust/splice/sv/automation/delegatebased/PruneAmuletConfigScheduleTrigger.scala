@@ -16,7 +16,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.PruneAmuletConfigScheduleTrigger.implicitPrettyString
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -50,21 +49,21 @@ class PruneAmuletConfigScheduleTrigger(
       pruneAmuletConfigScheduleFeatureSupport.supported && amuletRules.payload.configSchedule.futureValues.asScala
         .exists(futureValue => CantonTimestamp.assertFromInstant(futureValue._1) <= now)
     ) {
-      Seq(amuletRules -> pruneAmuletConfigScheduleFeatureSupport.packageIds)
+      Seq(amuletRules)
     } else {
       Seq.empty
     }
   }
 
   override def completeTaskAsDsoDelegate(
-      rulesWithPreferredPackages: (
+      rules: (
         ScheduledTaskTrigger.ReadyTask[
           PruneAmuletConfigScheduleTrigger.Task
         ],
       ),
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val (amuletRules, _) = rulesWithPreferredPackages.work
+    val amuletRules = rules.work
     for {
       dsoRules <- store.getDsoRules()
       (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
@@ -93,8 +92,8 @@ class PruneAmuletConfigScheduleTrigger(
   )(implicit tc: TraceContext): Future[Boolean] =
     store.multiDomainAcsStore
       .lookupContractByIdOnDomain(AmuletRules.COMPANION)(
-        task.work._1.domain,
-        task.work._1.contractId,
+        task.work.domain,
+        task.work.contractId,
       )
       .map(_.isEmpty)
 
@@ -102,6 +101,6 @@ class PruneAmuletConfigScheduleTrigger(
 
 object PruneAmuletConfigScheduleTrigger {
 
-  private type Task = (AssignedContract[AmuletRules.ContractId, AmuletRules], Seq[String])
+  private type Task = AssignedContract[AmuletRules.ContractId, AmuletRules]
   implicit val implicitPrettyString: Pretty[String] = PrettyInstances.prettyString
 }

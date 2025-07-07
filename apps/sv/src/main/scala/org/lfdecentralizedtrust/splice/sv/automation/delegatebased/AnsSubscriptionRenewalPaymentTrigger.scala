@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import org.apache.pekko.stream.Materializer
 import cats.implicits.catsSyntaxApplicativeId
+import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
@@ -65,9 +66,10 @@ class AnsSubscriptionRenewalPaymentTrigger(
       case Some(ansContext) =>
         for {
           transferContextOpt <- dsoStore.getDsoTransferContextForRound(payment.payload.round)
+          now = context.clock.now
           result <- transferContextOpt match {
             case Some(transferContext) =>
-              dsoStore.lookupAnsEntryByName(ansContext.payload.name, context.clock.now).flatMap {
+              dsoStore.lookupAnsEntryByName(ansContext.payload.name, now).flatMap {
                 case Some(entry) =>
                   collectPayment(
                     ansContext.contract.contractId,
@@ -75,9 +77,10 @@ class AnsSubscriptionRenewalPaymentTrigger(
                     entry,
                     transferContext,
                     controller,
+                    now,
                   )
                 case None =>
-                  if (context.clock.now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
+                  if (now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
                     val msg =
                       s"skipping as entry doesn't exists ${ansContext.payload.name} which is not expected."
                     logger.warn(msg)
@@ -109,12 +112,13 @@ class AnsSubscriptionRenewalPaymentTrigger(
       entry: AssignedContract[AnsEntry.ContractId, AnsEntry],
       transferContext: AppTransferContext,
       controller: String,
+      time: CantonTimestamp,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
     (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
       controller,
-      context.clock.now,
+      time,
     )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_CollectEntryRenewalPayment(

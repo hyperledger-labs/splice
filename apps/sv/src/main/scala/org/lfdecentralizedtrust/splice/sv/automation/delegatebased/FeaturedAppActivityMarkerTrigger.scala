@@ -58,10 +58,11 @@ class FeaturedAppActivityMarkerTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      openMiningRound <- store.getLatestUsableOpenMiningRound(context.clock.now)
+      now = context.clock.now
+      openMiningRound <- store.getLatestUsableOpenMiningRound(now)
       (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
         controller,
-        context.clock.now,
+        now,
       )
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to

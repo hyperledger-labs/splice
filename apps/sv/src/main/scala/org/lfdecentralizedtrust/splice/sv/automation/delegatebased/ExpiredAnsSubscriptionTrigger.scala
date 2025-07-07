@@ -62,6 +62,7 @@ class ExpiredAnsSubscriptionTrigger(
         cmd,
       )
       .noDedup
+      .withPreferredPackage(preferredPackageIds)
       .yieldUnit()
       .map(_ => TaskSuccess(s"archived expired ans subscription"))
 
