@@ -394,9 +394,9 @@ object MultiDomainAcsStore {
       }
       if (interfaceToFailureMap.nonEmpty) {
         elc.error(
-          s"Found failed interface views that match an interface id in a filter: $interfaceToFailureMap. " +
-            s"This might be a bug in the daml definition of the interface's view. " +
-            s"Resolve the error, and if required, reingest the data."
+          show"Found failed interface views that match an interface id in a filter: $interfaceToFailureMap. " +
+            show"This might be a bug in the daml definition of the interface's view. " +
+            show"Resolve the error, and if required, reingest the data."
         )
       }
       matchesTemplate || interfaceViews.nonEmpty
