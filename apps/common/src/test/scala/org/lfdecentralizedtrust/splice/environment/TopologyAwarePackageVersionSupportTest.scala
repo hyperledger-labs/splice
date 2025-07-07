@@ -25,22 +25,24 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
   private val now = CantonTimestamp.Epoch
 
   private def mockGetSupportedPackageVersion(
-      packageName: String,
+      packageNames: Seq[String],
       result: Seq[PackageReference],
-  ): Unit =
+  ): Unit = {
     when(
       connectionMock.getSupportedPackageVersion(
         eqTo(synchronizerId),
-        eqTo(Seq((packageName -> parties))),
+        eqTo(packageNames.map(_ -> parties)),
         eqTo(now),
       )(anyTraceContext)
     )
       .thenReturn(Future.successful(result))
+  }
 
   private def testFeatureSupport(
       featureName: String,
       requiredDar: DarResource,
       featureCheck: (Seq[PartyId], CantonTimestamp) => Future[FeatureSupport],
+      extraPackageNames: Seq[String] = Seq.empty,
   ): Unit = {
     val requiredPackageName = requiredDar.metadata.name
     val requiredVersion = requiredDar.metadata.version
@@ -48,7 +50,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
 
     s"support $featureName when topology reports version >= $requiredVersion" in {
       mockGetSupportedPackageVersion(
-        requiredPackageName,
+        requiredPackageName +: extraPackageNames,
         Seq(PackageReference(reportedPackageId, requiredPackageName, requiredVersion.toString())),
       )
       whenReady(featureCheck(parties, now)) { result =>
@@ -56,7 +58,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
       }
 
       mockGetSupportedPackageVersion(
-        requiredPackageName,
+        requiredPackageName +: extraPackageNames,
         Seq(
           PackageReference(
             reportedPackageId,
@@ -76,7 +78,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
 
     s"not support $featureName when topology reports version < $requiredVersion" in {
       mockGetSupportedPackageVersion(
-        requiredPackageName,
+        requiredPackageName +: extraPackageNames,
         Seq(
           PackageReference(
             reportedPackageId,
@@ -99,7 +101,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
     }
 
     s"not support $featureName when topology reports no version" in {
-      mockGetSupportedPackageVersion(requiredPackageName, Seq.empty)
+      mockGetSupportedPackageVersion(requiredPackageName +: extraPackageNames, Seq.empty)
       whenReady(featureCheck(parties, now)) { result =>
         result shouldBe FeatureSupport(supported = false, Seq.empty)
       }
@@ -107,7 +109,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
 
     s"not support $featureName when topology reports different package" in {
       mockGetSupportedPackageVersion(
-        requiredPackageName,
+        requiredPackageName +: extraPackageNames,
         Seq(PackageReference(reportedPackageId, "differentPackage", requiredVersion.toString())),
       )
       whenReady(featureCheck(parties, now)) { result =>
@@ -138,6 +140,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
       { case (parties, at) =>
         packageVersionSupport.supportsMergeDuplicatedValidatorLicense(parties, parties, at)
       },
+      extraPackageNames = Seq(DarResources.amulet_0_1_8.metadata.name),
     )
 
     testFeatureSupport(
