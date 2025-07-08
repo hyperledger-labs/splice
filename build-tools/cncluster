@@ -881,6 +881,7 @@ function subcmd_cluster_set_all_maintenance_windows() {
     fi
 }
 
+# TODO(DACH-NY/canton-network-internal#417) Move this into `cluster` pulumi project
 subcommand_whitelist[cluster_enable_workload_identity]='Enable workload identity for the cluster.'
 
 function subcmd_cluster_enable_workload_identity() {
