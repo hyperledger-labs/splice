@@ -12,7 +12,7 @@ import aiohttp
 import asyncio
 import argparse
 from decimal import *
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
 import logging
@@ -414,13 +414,10 @@ class LfValueParseException(Exception):
 class RewardSummary:
     reward_expired_count: int
     reward_claimed_count: int
-    reward_unclaimed_count: int
     reward_expired_total_amount: DamlDecimal
     reward_claimed_total_amount: DamlDecimal
-    reward_unclaimed_total_ammount: DamlDecimal
 
 class RewardStatus(Enum):
-    UNCLAIMED = "unclaimed"
     CLAIMED = "claimed"
     EXPIRED = "expired"
 
@@ -431,7 +428,6 @@ class Reward:
     sv: str
     beneficiary: str
     contract_id: str
-    status: RewardStatus = field(default=RewardStatus.UNCLAIMED)
 
 @dataclass
 class IssuingRound:
@@ -442,13 +438,14 @@ class IssuingRound:
 @dataclass
 class State:
     beneficiary: str
-    rewards: dict[str, Reward]
-    issuing_rounds: dict[int, IssuingRound]
+    active_rewards: dict[str, Reward]
+    active_issuing_rounds: dict[int, IssuingRound]
     begin_record_time: datetime
     end_record_time: datetime
     grace_period_for_mining_rounds_in_minutes: datetime
     create_sv_reward_end_record_time: datetime
     pagination_key: PaginationKey
+    reward_summary: RewardSummary
 
     @classmethod
     def from_args(cls, args: argparse.Namespace):
@@ -461,56 +458,23 @@ class State:
             + timedelta(minutes=grace_period_for_mining_rounds_in_minutes)
         )
         pagination_key = PaginationKey(args.begin_migration_id, begin_record_time.isoformat())
+        reward_summary = RewardSummary(
+            reward_expired_count=0,
+            reward_claimed_count=0,
+            reward_expired_total_amount=DamlDecimal(0),
+            reward_claimed_total_amount=DamlDecimal(0),
+        )
         return cls(
             beneficiary=args.beneficiary,
-            rewards={},
-            issuing_rounds={},
+            active_rewards={},
+            active_issuing_rounds={},
             begin_record_time=begin_record_time,
             end_record_time=end_record_time,
             grace_period_for_mining_rounds_in_minutes = grace_period_for_mining_rounds_in_minutes,
             create_sv_reward_end_record_time = datetime.fromisoformat(args.end_record_time),
             pagination_key=pagination_key,
+            reward_summary = reward_summary,
         )
-
-    def summary(self) -> RewardSummary:
-        reward_summary = RewardSummary(
-            reward_expired_count=0,
-            reward_claimed_count=0,
-            reward_unclaimed_count=0,
-            reward_expired_total_amount=DamlDecimal(0),
-            reward_claimed_total_amount=DamlDecimal(0),
-            reward_unclaimed_total_ammount=DamlDecimal(0),
-        )
-        for reward in self.rewards.values():
-            mining_round_info = self.issuing_rounds.get(reward.round)
-            # If the mining round for a reward is not found, it means that a `SvRewardCoupon` was
-            # created, but the corresponding mining round was created after the end-record-time + grace period.
-            # This should not happen, as the additional grace period should be sufficient to ensure
-            # we capture the complete set of mining rounds for the collected rewards.
-            if not mining_round_info:
-                self._fail(
-                    f"Fatal: missing issuing round {reward.round} for reward {reward.contract_id}\n"
-                    f"Consider increase input: grace-period-for-mining-rounds-in-minutes.\n"
-                    f"Currently it is set to {self.grace_period_for_mining_rounds_in_minutes}"
-                )
-
-            amount = reward.weight * mining_round_info.issuance_per_sv_reward
-            match reward.status:
-                case RewardStatus.EXPIRED:
-                    reward_summary.reward_expired_count += 1
-                    reward_summary.reward_expired_total_amount += amount
-                case RewardStatus.CLAIMED:
-                    reward_summary.reward_claimed_count += 1
-                    reward_summary.reward_claimed_total_amount += amount
-                case RewardStatus.UNCLAIMED:
-                    LOG.warning(
-                        f"{reward} remains unclaimed, even after applying a grace period of "
-                        f"{self.grace_period_for_mining_rounds_in_minutes} minutes."
-                    )
-                    reward_summary.reward_unclaimed_count += 1
-                    reward_summary.reward_unclaimed_total_ammount += amount
-
-        return reward_summary
 
     def should_process(self, tx: dict):
         return datetime.fromisoformat(tx["record_time"]) < self.end_record_time
@@ -540,8 +504,8 @@ class State:
                     reward.beneficiary == self.beneficiary
                     and transaction.record_time <= self.create_sv_reward_end_record_time
                 ):
-                    LOG.debug(f"Adding reward {reward} to rewards")
-                    self.rewards[event.contract_id] = reward
+                    LOG.debug(f"Adding reward {reward} to active_rewards")
+                    self.active_rewards[event.contract_id] = reward
                 elif reward.beneficiary == self.beneficiary:
                     LOG.debug(
                         f"Ignoring {reward} since record_time >= {self.create_sv_reward_end_record_time}"
@@ -553,8 +517,8 @@ class State:
                     record_time=transaction.record_time,
                     issuance_per_sv_reward=event.payload.get_issuing_mining_round_issuance_per_sv_reward(),
                 )
-                self.issuing_rounds[round_number] = issuing_round
-                LOG.debug(f"Adding issuing round {issuing_round} to issuing_rounds")
+                LOG.debug(f"Adding issuing round {issuing_round} to active_issuing_rounds")
+                self.active_issuing_rounds[round_number] = issuing_round
 
 
     def process_exercised_event(self, transaction: TransactionTree, event: ExercisedEvent):
@@ -577,24 +541,45 @@ class State:
 
 
     def handle_sv_reward_coupon_exercise(self, transaction, event, status):
-        contract_id = event.contract_id
         # Only handle SvRewardCoupons created within the configured time range for the given beneficiary
-        match self.rewards.get(contract_id):
+        match self.active_rewards.pop(event.contract_id, None):
             # None means either:
             # - The reward was created outside the time range, or
             # - The exercise event is for a different beneficiary
             case None:
                 pass
-            case _:
-                LOG.debug(f"Changing status {status} for: {event.contract_id}")
-                self.rewards[contract_id].status = status
+            case reward:
+                match self.active_issuing_rounds.pop(reward.round, None):
+                    # If the mining round for a reward is not found, it means that a `SvRewardCoupon` was
+                    # created, but the corresponding mining round was created after the end-record-time + grace period.
+                    # This should not happen, as the additional grace period should be sufficient to ensure
+                    # we capture the complete set of mining rounds for the collected rewards.
+                    case None:
+                        self._fail(
+                            f"Fatal: missing issuing round {reward.round} for reward {reward.contract_id}\n"
+                            f"Consider increase input: grace-period-for-mining-rounds-in-minutes.\n"
+                            f"Currently it is set to {self.grace_period_for_mining_rounds_in_minutes}"
+                        )
+                    case mining_round_info:
+                        amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                        LOG.debug(
+                            f"Updating {status} summary with amount {amount}, corresponding to contract {event.contract_id}"
+                        )
+                        match status:
+                            case RewardStatus.EXPIRED:
+                                self.reward_summary.reward_expired_count += 1
+                                self.reward_summary.reward_expired_total_amount += amount
+                            case RewardStatus.CLAIMED:
+                                self.reward_summary.reward_claimed_count += 1
+                                self.reward_summary.reward_claimed_total_amount += amount
 
         self.process_events(transaction, event.child_event_ids)
+
 
     def _fail(self, message, cause=None):
         LOG.error(message)
         raise Exception(
-            f"Stopping export (error: {message})"
+            f"Stopping script (error: {message})"
         ) from cause
 
 
@@ -634,23 +619,21 @@ async def main():
                 LOG.debug(f"Reached end of stream at {app_state.pagination_key}")
                 break
 
-    LOG.debug(
-        f"Total tracked: {len(app_state.issuing_rounds)} mining rounds, {len(app_state.rewards)} rewards"
-    )
-
-    summary = app_state.summary()
-
     duration = time.time() - begin_t
     LOG.info(
         f"End run. ({duration:.2f} sec., {tx_count} transaction(s), {scan_client.call_count} Scan API call(s))"
     )
+    LOG.debug(
+        f"active_mining_rounds count: {len(app_state.active_issuing_rounds)}"
+    )
 
-    LOG.info(f"reward_expired_count = {summary.reward_expired_count}")
-    LOG.info(f"reward_expired_total_amount = {summary.reward_expired_total_amount.decimal:.10f}")
-    LOG.info(f"reward_claimed_count = {summary.reward_claimed_count}")
-    LOG.info(f"reward_claimed_total_amount = {summary.reward_claimed_total_amount.decimal:.10f}")
-    LOG.info(f"reward_unclaimed_count = {summary.reward_unclaimed_count}")
-    LOG.info(f"reward_unclaimed_total_ammount = {summary.reward_unclaimed_total_ammount.decimal:.10f}")
+    reward_summary = app_state.reward_summary
+
+    LOG.info(f"reward_expired_count = {reward_summary.reward_expired_count}")
+    LOG.info(f"reward_expired_total_amount = {reward_summary.reward_expired_total_amount.decimal:.10f}")
+    LOG.info(f"reward_claimed_count = {reward_summary.reward_claimed_count}")
+    LOG.info(f"reward_claimed_total_amount = {reward_summary.reward_claimed_total_amount.decimal:.10f}")
+    LOG.info(f"reward_unclaimed_count = {len(app_state.active_rewards)}")
 
 
 if __name__ == "__main__":
