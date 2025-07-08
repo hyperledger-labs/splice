@@ -250,7 +250,7 @@ function installDockerRunnerScaleSet(
                 ],
                 startupProbe: {
                   exec: {
-                    command: 'docker version',
+                    command: ['docker', 'version']
                   },
                   initialDelaySeconds: 3,
                   periodSeconds: 2,
