@@ -761,6 +761,7 @@ final class DbMultiDomainAcsStore[TXE](
                AND store_id = $acsStoreId
                AND migration_id = $domainMigrationId
              ORDER BY interface.acs_event_number
+             LIMIT ${sqlLimit(limit)}
            """.as[(String, Json, Timestamp, Array[Byte])],
         opName,
       )
