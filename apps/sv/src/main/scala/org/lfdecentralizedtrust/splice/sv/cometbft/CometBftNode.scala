@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.cometbft
 
 import cats.Show.Shown
-import cats.implicits.toTraverseOps
 import org.lfdecentralizedtrust.splice.codegen.java.splice as daml
 import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider}
 import org.lfdecentralizedtrust.splice.sv.config.SvCometBftConfig
@@ -24,6 +23,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import scalapb.TimestampConverters
 
@@ -219,7 +219,7 @@ class CometBftNode(
                 logger.debug(
                   show"Reconciling difference in CometBft network configuration: $summary"
                 )
-                networkConfigChanges.requests.traverse(
+                MonadUtil.sequentialTraverse(networkConfigChanges.requests)(
                   submitChangeRequest(_, cometBftRequestSigner)
                 )
               }

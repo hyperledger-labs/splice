@@ -13,10 +13,9 @@ import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.wallet.UserWalletManager
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-
-import cats.syntax.traverseFilter.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -34,8 +33,13 @@ class OffboardUserPartyTrigger(
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[PartyId]] = {
-    walletManager.listEndUserParties
-      .filterA(userParty => walletManager.store.lookupInstallByParty(userParty).map(_.isEmpty))
+    MonadUtil
+      .sequentialTraverse(walletManager.listEndUserParties)(userParty =>
+        walletManager.store
+          .lookupInstallByParty(userParty)
+          .map(x => if (x.isEmpty) Some(userParty) else None)
+      )
+      .map(_.flatten)
   }
 
   override protected def completeTask(userParty: PartyId)(implicit

@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
-import cats.syntax.traverse.*
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
@@ -16,6 +15,7 @@ import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -92,7 +92,7 @@ class FeaturedAppActivityMarkerTrigger(
 
   override protected def isStaleTask(task: Task)(implicit tc: TraceContext): Future[Boolean] =
     for {
-      markers <- task.markers.toList.traverse(m =>
+      markers <- MonadUtil.sequentialTraverse(task.markers.toList)(m =>
         store.multiDomainAcsStore.lookupContractById(amulet.FeaturedAppActivityMarker.COMPANION)(
           m.contractId
         )

@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.{catsSyntaxParallelTraverse_, toTraverseOps}
+import cats.implicits.{catsSyntaxParallelTraverse_}
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
@@ -20,6 +20,7 @@ import com.digitalasset.canton.topology.transaction.{VettedPackage, VettedPackag
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
 import io.grpc.Status
@@ -66,7 +67,7 @@ trait ParticipantAdminDarsConnection {
       )
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
-      _ <- domains.traverse { domainId =>
+      _ <- MonadUtil.sequentialTraverse(domains) { domainId =>
         vetDars(domainId, Seq(darResource), None)
       }
     } yield ()

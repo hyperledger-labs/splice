@@ -73,6 +73,7 @@ import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
@@ -957,8 +958,8 @@ object BftScanConnection {
     )(implicit
         tc: TraceContext
     ): Future[(Seq[(Uri, (Throwable, SvName))], Seq[(Uri, (SingleScanConnection, SvName))])] = {
-      scans
-        .traverse { scan =>
+      MonadUtil
+        .sequentialTraverse(scans) { scan =>
           logger.info(s"Attempting to connect to Scan: $scan.")
           connectionBuilder(scan.publicUrl)
             .transformWith { result =>
@@ -1166,8 +1167,8 @@ object BftScanConnection {
           },
         loggerFactory.getTracedLogger(classOf[BftScanConnection]),
       )
-      bft <- scans
-        .traverse(scan =>
+      bft <- MonadUtil
+        .sequentialTraverse(scans)(scan =>
           builder(scan.publicUrl, amuletRulesCacheTimeToLive).transformWith {
             case Success(conn) => Future.successful(Right(conn))
             case Failure(err) => Future.successful(Left(scan.publicUrl -> err))
