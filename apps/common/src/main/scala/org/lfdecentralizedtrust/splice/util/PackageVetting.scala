@@ -41,7 +41,9 @@ class PackageVetting(
         .lookupAllPackageVersions(pkg.packageName)
         .filter(_.metadata.version <= packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
-    }
+    } ++ DarResources.TokenStandard.tokenAllocationRequest.all.map(darResource =>
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1 -> darResource.metadata.version
+    )
     vetPackages(
       domainId,
       packagesToVet,

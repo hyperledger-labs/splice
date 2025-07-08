@@ -65,13 +65,6 @@ class TokenStandardAllocationIntegrationTest
           splitwellValidatorBackend,
         ).foreach { backend =>
           backend.participantClient.upload_dar_unless_exists(darPath)
-          DarResources.TokenStandard.tokenAllocationRequest.all
-            .map(_.path)
-            .foreach(path =>
-              backend.participantClient.upload_dar_unless_exists(
-                s"token-standard/splice-api-token-allocation-request-v1/.daml/dist/$path"
-              )
-            )
         }
       })
   }
