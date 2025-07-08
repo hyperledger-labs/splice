@@ -291,22 +291,45 @@ class ScanApp(
             requestLogger(traceContext) {
               HttpErrorHandler(loggerFactory)(traceContext) {
                 concat(
-                  ScanResource.routes(scanHandler, _ => provide(traceContext)),
+                  ScanResource.routes(
+                    scanHandler,
+                    operation => {
+                      nodeMetrics.httpServerMetrics
+                        .withMetrics("scan")(operation)
+                        .tflatMap(_ => provide(traceContext))
+                    },
+                  ),
                   TokenStandardTransferInstructionResource.routes(
                     tokenStandardTransferInstructionHandler,
-                    _ => provide(traceContext),
+                    operation => {
+                      nodeMetrics.httpServerMetrics
+                        .withMetrics("token_standard_transfer")(operation)
+                        .tflatMap(_ => provide(traceContext))
+                    },
                   ),
                   TokenStandardAllocationInstructionResource.routes(
                     tokenStandardAllocationInstructionHandler,
-                    _ => provide(traceContext),
+                    operation => {
+                      nodeMetrics.httpServerMetrics
+                        .withMetrics("token_standard_allocation_instruction")(operation)
+                        .tflatMap(_ => provide(traceContext))
+                    },
                   ),
                   TokenStandardMetadataResource.routes(
                     tokenStandardMetadataHandler,
-                    _ => provide(traceContext),
+                    operation => {
+                      nodeMetrics.httpServerMetrics
+                        .withMetrics("token_standard_metadata")(operation)
+                        .tflatMap(_ => provide(traceContext))
+                    },
                   ),
                   TokenStandardAllocationResource.routes(
                     tokenStandardAllocationHandler,
-                    _ => provide(traceContext),
+                    operation => {
+                      nodeMetrics.httpServerMetrics
+                        .withMetrics("token_standard_allocation")(operation)
+                        .tflatMap(_ => provide(traceContext))
+                    },
                   ),
                 )
               }
