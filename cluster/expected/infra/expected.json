@@ -1271,7 +1271,9 @@
       "spec": {
         "jobLabel": "app",
         "namespaceSelector": {
-          "any": true
+          "matchNames": [
+            "cluster-ingress"
+          ]
         },
         "podMetricsEndpoints": [
           {
@@ -1694,11 +1696,45 @@
       "spec": {
         "jobLabel": "app",
         "namespaceSelector": {
-          "any": true
+          "matchNames": [
+            "sv-1",
+            "sv-2",
+            "sv-3",
+            "sv-4",
+            "sv-5",
+            "sv-6",
+            "sv-7",
+            "sv-8",
+            "sv-9",
+            "sv-10",
+            "sv-11",
+            "sv-12",
+            "sv-13",
+            "sv-14",
+            "sv-15",
+            "sv-16",
+            "sv",
+            "splitwell",
+            "validator1",
+            "validator"
+          ]
         },
         "podMetricsEndpoints": [
           {
             "honorLabels": true,
+            "metricRelabelings": [
+              {
+                "action": "keep",
+                "regex": "istio_.*",
+                "sourceLabels": [
+                  "__name__"
+                ]
+              },
+              {
+                "action": "labeldrop",
+                "regex": "instance"
+              }
+            ],
             "path": "/stats/prometheus",
             "port": "http-envoy-prom",
             "relabelings": [
@@ -1732,10 +1768,6 @@
               {
                 "action": "labeldrop",
                 "regex": "__meta_kubernetes_pod_label_(.+)"
-              },
-              {
-                "action": "labeldrop",
-                "regex": "instance"
               },
               {
                 "action": "replace",
@@ -1842,13 +1874,6 @@
           },
           "defaultHttpRetryPolicy": {
             "attempts": 0
-          },
-          "defaultProviders": {
-            "metrics": [
-              {
-                "name": "prometheus"
-              }
-            ]
           },
           "enablePrometheusMerge": false
         },
