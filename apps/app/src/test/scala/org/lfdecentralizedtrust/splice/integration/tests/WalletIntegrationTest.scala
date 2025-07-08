@@ -38,13 +38,13 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import org.slf4j.event.Level
 
 import java.time.Duration
-import java.util.{Optional, UUID}
+import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
 import cats.syntax.parallel.*
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import scala.jdk.OptionConverters.*
 
-@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceAmulet_0_1_11
 class WalletIntegrationTest
     extends IntegrationTestWithSharedEnvironment
     with HasExecutionContext
@@ -791,6 +791,12 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       aliceValidatorWalletClient.tap(10.0)
 
+      val supportsExpectedDsoParty = validatorSupportsExpectedDsoParty(
+        sv1ScanBackend.getAmuletRules(),
+        aliceValidatorBackend,
+        env.environment.clock.now,
+      )
+
       def createTransferPreapprovalProposal =
         aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
@@ -801,7 +807,7 @@ class WalletIntegrationTest
               .create(
                 aliceUserParty.toProtoPrimitive,
                 aliceValidatorParty.toProtoPrimitive,
-                Optional.of(dsoParty.toProtoPrimitive),
+                Option.when(supportsExpectedDsoParty)(dsoParty.toProtoPrimitive).toJava,
               ),
           )
           .contractId
