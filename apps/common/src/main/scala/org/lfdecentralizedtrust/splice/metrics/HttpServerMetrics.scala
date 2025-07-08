@@ -41,7 +41,8 @@ class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
   // We need to pass the operation explicitly, which represents the OpenAPI operation ID.
   def withMetrics(service: String)(operation: String): Directive0 = {
     import org.apache.pekko.http.scaladsl.server.Directives.*
-    implicit val mc: MetricsContext = MetricsContext("operation" -> operation, "service" -> service)
+    implicit val mc: MetricsContext =
+      MetricsContext("operation" -> operation, "http_service" -> service)
 
     extractExecutionContext.flatMap { implicit ec =>
       extractRequest.flatMap { _ =>
