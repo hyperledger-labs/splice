@@ -375,7 +375,8 @@ class CachingScanStore(
       cacheName: String,
       cacheConfig: CacheConfig,
       loader: Key => Future[Value],
-  ) = {
+  )(implicit tc: TraceContext) = {
+    val cacheMetrics = storeMetrics.registerNewCacheMetrics(cacheName)
     cacheOfCaches
       .getOrElseUpdate(
         cacheName,
@@ -384,7 +385,7 @@ class CachingScanStore(
             .expireAfterWrite(cacheConfig.ttl.asFiniteApproximation)
             .maximumSize(cacheConfig.maxSize),
           _ => key => loader(key),
-          metrics = Some(storeMetrics.registerNewCacheMetrics(cacheName)),
+          metrics = cacheMetrics.map(Some(_)).onShutdown(None),
         )(logger, cacheName),
       )
       .asInstanceOf[ScaffeineCache.TracedAsyncLoadingCache[Future, Key, Value]]

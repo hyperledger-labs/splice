@@ -4,17 +4,21 @@
 package org.lfdecentralizedtrust.splice.metrics
 
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.metrics.{DbStorageHistograms, MetricsFactoryProvider}
 import org.lfdecentralizedtrust.splice.scan.metrics.ScanAppMetrics
 import org.lfdecentralizedtrust.splice.splitwell.metrics.SplitwellAppMetrics
 import org.lfdecentralizedtrust.splice.sv.metrics.SvAppMetrics
 import org.lfdecentralizedtrust.splice.validator.metrics.ValidatorAppMetrics
-import com.digitalasset.canton.metrics.{DbStorageHistograms, MetricsFactoryProvider}
 
 import scala.collection.concurrent.TrieMap
 
 case class SpliceMetricsFactory(
     metricsFactoryProvider: MetricsFactoryProvider,
     storageHistograms: DbStorageHistograms,
+    loggerFactory: NamedLoggerFactory,
+    timeouts: ProcessingTimeout,
 ) {
 
   private val validators = TrieMap[String, ValidatorAppMetrics]()
@@ -53,6 +57,8 @@ case class SpliceMetricsFactory(
         new ScanAppMetrics(
           metricsFactoryProvider.generateMetricsFactory(metricsContext),
           storageHistograms,
+          loggerFactory.getTracedLogger(getClass),
+          timeouts,
         )
       },
     )

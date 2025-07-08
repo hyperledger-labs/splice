@@ -24,6 +24,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -918,7 +919,7 @@ class ScanAggregatorTest
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
       enableImportUpdateBackfill = true,
-      new DbScanStoreMetrics(new NoOpMetricsFactory()),
+      new DbScanStoreMetrics(new NoOpMetricsFactory(), logger, ProcessingTimeout()),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
