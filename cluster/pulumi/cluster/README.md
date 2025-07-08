@@ -1,5 +1,5 @@
 # cluster (Pulumi project)
 
-Used for setting up fresh GCP clusters for Splice-related deployments.
+Manages aspects of GCP clusters, such as node pools and storage classes.
 
-S.a. `cncluster create`.
+Part of `cncluster create`.
