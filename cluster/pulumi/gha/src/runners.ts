@@ -165,16 +165,6 @@ function installDockerRunnerScaleSet(
                   },
                 ],
               },
-              {
-                // We've seen race conditions in which the runner starts before the docker daemon, thus failing
-                // very early on in GHA. This init container waits for the docker daemon to be ready before starting
-                // the runner itself, thus forcing GHA to wait for the docker daemon to be ready.
-                name: 'wait-for-docker',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.1`,
-                command: [
-                  'while ! docker version; do echo "Waiting for Docker to be ready..."; sleep 5; done',
-                ],
-              },
             ],
             containers: [
               {
@@ -258,6 +248,14 @@ function installDockerRunnerScaleSet(
                     subPath: 'daemon.json',
                   },
                 ],
+                startupProbe: {
+                  exec: {
+                    command: ['/bin/bash', '-c', 'docker version'],
+                  },
+                  initialDelaySeconds: 3,
+                  periodSeconds: 2,
+                  failureThreshold: 20,
+                },
               },
             ],
             volumes: [
