@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.wallet.admin.http
 
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
@@ -1086,6 +1087,17 @@ class HttpWalletHandler(
     )
   }
 
+  override def listAmuletAllocations(
+      respond: WalletResource.ListAmuletAllocationsResponse.type
+  )()(tUser: TracedUser): Future[WalletResource.ListAmuletAllocationsResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    listContracts(
+      amuletAllocationCodegen.AmuletAllocation.COMPANION,
+      user,
+      contracts => d0.ListAllocationsResponse(contracts.map(d0.Allocation(_))),
+    )
+  }
+
   private def amuletToAmuletPosition(
       amulet: ContractWithState[Amulet.ContractId, Amulet],
       round: Long,
@@ -1212,7 +1224,7 @@ class HttpWalletHandler(
         contracts
           .map(_.toHttp)
           .toVector
-          .map(contract => d0.AllocationRequest(contract, allocationCreated = false))
+          .map(d0.AllocationRequest(_))
       )
     }
   }

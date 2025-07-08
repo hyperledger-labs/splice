@@ -664,6 +664,12 @@ object UserWalletStore {
         mkFilter(amuletTransferInstructionCodegen.AmuletTransferInstruction.COMPANION)(co =>
           co.payload.transfer.instrumentId.admin == dso && (co.payload.transfer.sender == endUser || co.payload.transfer.receiver == endUser)
         )(contract => UserWalletAcsStoreRowData(contract)),
+        mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION) { co =>
+          val transferLeg = co.payload.allocation.transferLeg
+          transferLeg.instrumentId.admin == dso && (transferLeg.sender == endUser || transferLeg.receiver == endUser)
+        } { contract =>
+          UserWalletAcsStoreRowData(contract)
+        },
       ),
       Map(
         mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE)(co =>
