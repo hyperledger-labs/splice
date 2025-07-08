@@ -9,13 +9,17 @@ import { ObservabilityReleaseName } from './utils';
 export class PodMonitor extends CustomResource {
   constructor(
     name: string,
-    matchLabels: Inputs,
-    podMetricsEndpoints: Array<{
-      port: string;
-      path: string;
-      relabelings?: Array<unknown>;
-    }>,
     namespace: Input<string>,
+    spec: {
+      matchLabels: Inputs;
+      podMetricsEndpoints: Array<{
+        port: string;
+        path: string;
+        relabelings?: Array<unknown>;
+        metricRelabelings?: Array<unknown>;
+      }>;
+      namespaces?: Array<Input<string>>;
+    },
     opts?: pulumi.CustomResourceOptions
   ) {
     super(
@@ -34,12 +38,16 @@ export class PodMonitor extends CustomResource {
         spec: {
           jobLabel: 'app',
           selector: {
-            matchLabels: matchLabels,
+            matchLabels: spec.matchLabels,
           },
-          namespaceSelector: {
-            any: true,
-          },
-          podMetricsEndpoints: podMetricsEndpoints.map(endpoint => {
+          namespaceSelector: spec.namespaces
+            ? {
+                matchNames: spec.namespaces,
+              }
+            : {
+                any: true,
+              },
+          podMetricsEndpoints: spec.podMetricsEndpoints.map(endpoint => {
             return {
               honorLabels: true,
               ...endpoint,
