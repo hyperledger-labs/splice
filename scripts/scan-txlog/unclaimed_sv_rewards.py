@@ -18,7 +18,6 @@ from enum import Enum
 import logging
 import colorlog
 from typing import Optional, TextIO, Self, Any
-import csv
 import time
 import sys
 
@@ -84,10 +83,6 @@ def _parse_cli_args() -> argparse.Namespace:
             "Used to ensure all relevant mining rounds are included for rewards created near "
             "the end of the time range."
         ),
-    )
-    parser.add_argument(
-        "--report-output",
-        help="The name of a file to which a CSV report should be written.",
     )
     parser.add_argument(
         "--beneficiary",
@@ -593,34 +588,6 @@ class State:
         ) from cause
 
 
-class CSVReport:
-    filename: str
-    fieldnames: list[str]
-    csv_writer: Optional[csv.DictWriter]
-    report_stream: any
-
-    def __init__(self, args: argparse.Namespace, fieldnames: list[str]):
-        self.filename = args.report_output
-        self.fieldnames = fieldnames
-        self.report_stream = None
-        self.csv_writer = None
-
-    # Called when entering a context block ("with ... as ...")
-    def __enter__(self):
-        self.report_stream = open(self.filename, "w", buffering=1)
-        self.csv_writer = csv.writer(self.report_stream)
-        self.csv_writer.writerow(self.fieldnames)
-        return self
-
-    # Called when exiting a context block, including when an exception is raised
-    def __exit__(self, exc_type, exc_value, traceback):
-        if self.report_stream:
-            self.report_stream.close()
-
-    def report_line(self, line_info: list[Any]):
-        self.csv_writer.writerow(line_info)
-
-
 async def main():
     args = _parse_cli_args()
 
@@ -674,28 +641,6 @@ async def main():
     LOG.info(f"reward_claimed_total_amount = {summary.reward_claimed_total_amount.decimal:.10f}")
     LOG.info(f"reward_unclaimed_count = {summary.reward_unclaimed_count}")
     LOG.info(f"reward_unclaimed_total_ammount = {summary.reward_unclaimed_total_ammount.decimal:.10f}")
-
-
-    if args.report_output:
-        fieldnames = [
-            "reward_expired_count",
-            "reward_expired_total_amount",
-            "reward_claimed_count",
-            "reward_claimed_total_amount",
-            "reward_unclaimed_count",
-            "reward_unclaimed_total_amount",
-        ]
-
-        with CSVReport(args, fieldnames) as csv_report:
-            report_line = [
-                summary.reward_expired_count,
-                f"{summary.reward_expired_total_amount.decimal:.10f}",
-                summary.reward_claimed_count,
-                f"{summary.reward_claimed_total_amount.decimal:.10f}",
-                summary.reward_unclaimed_count,
-                f"{summary.reward_unclaimed_total_ammount.decimal:.10f}",
-            ]
-            csv_report.report_line(report_line)
 
 
 if __name__ == "__main__":
