@@ -749,7 +749,6 @@ final class DbMultiDomainAcsStore[TXE](
     val interfaceId = companionClass.typeId(companion)
     val opName = s"listInterfaceViews:${interfaceId.getEntityName}"
     for {
-      // assumption: most rows will satisfy `AND interface_view IS NOT NULL`, so we don't need to index for it
       rows <- storage.query(
         sql"""
              SELECT contract_id, interface_view, acs.created_at, acs.created_event_blob
@@ -757,7 +756,6 @@ final class DbMultiDomainAcsStore[TXE](
                JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
              WHERE interface_id_package_id = ${interfaceId.getPackageId}
                AND interface_id_qualified_name = ${QualifiedName(interfaceId)}
-               AND interface_view IS NOT NULL
                AND store_id = $acsStoreId
                AND migration_id = $domainMigrationId
              ORDER BY interface.acs_event_number
