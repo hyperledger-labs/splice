@@ -123,27 +123,6 @@ function configureIstiod(
             attempts: 0,
           },
         },
-        telemetry: {
-          enabled: true,
-          v2: {
-            enabled: true,
-            prometheus: {
-              enabled: true,
-              //Prometheus goes brrrr https://github.com/istio/istio/issues/35414
-              configOverride: {
-                inboundSidecar: {
-                  disable_host_header_fallback: true,
-                },
-                outboundSidecar: {
-                  disable_host_header_fallback: true,
-                },
-                gateway: {
-                  disable_host_header_fallback: true,
-                },
-              },
-            },
-          },
-        },
       },
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
@@ -545,6 +524,10 @@ export function istioMonitoring(
             regex: 'istio-proxy',
           },
           {
+            action: 'keep',
+            sourceLabels: ['__meta_kubernetes_pod_annotationpresent_prometheus_io_scrape'],
+          },
+          {
             action: 'replace',
             regex: '(\\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})',
             replacement: '[$2]:$1',
@@ -569,13 +552,14 @@ export function istioMonitoring(
             regex: '__meta_kubernetes_pod_label_(.+)',
           },
           {
-            action: 'labeldrop',
-            regex: 'instance',
-          },
-          {
             sourceLabels: ['__meta_kubernetes_namespace'],
             action: 'replace',
             targetLabel: 'namespace',
+          },
+          {
+            sourceLabels: ['__meta_kubernetes_pod_name'],
+            action: 'replace',
+            targetLabel: 'pod',
           },
         ],
       },
