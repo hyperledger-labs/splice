@@ -122,6 +122,9 @@ function configureIstiod(
           defaultHttpRetryPolicy: {
             attempts: 0,
           },
+          defaultProviders: {
+            metrics: [{ name: 'prometheus' }],
+          },
         },
         telemetry: {
           enabled: true,
@@ -129,18 +132,6 @@ function configureIstiod(
             enabled: true,
             prometheus: {
               enabled: true,
-              //Prometheus goes brrrr https://github.com/istio/istio/issues/35414
-              configOverride: {
-                inboundSidecar: {
-                  disable_host_header_fallback: true,
-                },
-                outboundSidecar: {
-                  disable_host_header_fallback: true,
-                },
-                gateway: {
-                  disable_host_header_fallback: true,
-                },
-              },
             },
           },
         },

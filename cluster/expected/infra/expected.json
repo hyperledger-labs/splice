@@ -1843,6 +1843,13 @@
           "defaultHttpRetryPolicy": {
             "attempts": 0
           },
+          "defaultProviders": {
+            "metrics": [
+              {
+                "name": "prometheus"
+              }
+            ]
+          },
           "enablePrometheusMerge": false
         },
         "pilot": {
@@ -1876,17 +1883,6 @@
           "v2": {
             "enabled": true,
             "prometheus": {
-              "configOverride": {
-                "gateway": {
-                  "disable_host_header_fallback": true
-                },
-                "inboundSidecar": {
-                  "disable_host_header_fallback": true
-                },
-                "outboundSidecar": {
-                  "disable_host_header_fallback": true
-                }
-              },
               "enabled": true
             }
           }
