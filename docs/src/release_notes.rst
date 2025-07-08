@@ -11,6 +11,17 @@ Release Notes
 Upcoming
 --------
 
+- SV
+
+  - *breaking* SV participants now enable sequencer BFT connections
+    for the SV participant by default.  You must remove the
+    ``useSequencerConnectionsFromScan: false`` config and the
+    ``decentralizedSynchronizerUrl`` config from your SV helm values.
+    If needed, the previous behavior can be restore by setting those two variables again
+    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator and SV respectively:
+    ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
+    ``canton.sv-apps.sv.bft-sequencer-connection = false``
+
 - Daml
 
   - security: change ``AmuletRules_Transfer`` and ``AmuletRules_ComputeFees`` to take an explicit argument
@@ -58,7 +69,6 @@ Upcoming
    wallet             0.1.11
    walletPayments     0.1.11
    ================== =======
-
 
 0.4.4
 -----
