@@ -42,12 +42,14 @@ class PackageVetting(
         .filter(_.metadata.version <= packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
-    // This request will fail if the package is not present.
+    // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
     // Since interfaces are not upgradeable, there's no gain in coordinating it via package config.
     // An interface itself also does nothing, only the implementations do, so it's OK from a vetting perspective.
-    } ++ DarResources.TokenStandard.tokenAllocationRequest.all.map(darResource =>
-      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1 -> darResource.metadata.version
-    )
+    } ++ DarResources.TokenStandard.allProductionPackageResources
+      .flatMap(_.all)
+      .map(darResource =>
+        PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1 -> darResource.metadata.version
+      )
     vetPackages(
       domainId,
       packagesToVet,
