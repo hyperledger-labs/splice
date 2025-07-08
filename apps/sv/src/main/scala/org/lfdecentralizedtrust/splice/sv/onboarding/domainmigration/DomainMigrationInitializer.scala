@@ -161,6 +161,11 @@ class DomainMigrationInitializer(
         config,
         domainMigrationConfig.name,
       )
+      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
+        readOnlyConnection,
+        config,
+        config.initialRound.toString,
+      )
       migrationInfo =
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId,
