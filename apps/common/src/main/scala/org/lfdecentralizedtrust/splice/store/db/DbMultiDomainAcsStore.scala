@@ -758,6 +758,8 @@ final class DbMultiDomainAcsStore[TXE](
              WHERE interface_id_package_id = ${interfaceId.getPackageId}
                AND interface_id_qualified_name = ${QualifiedName(interfaceId)}
                AND interface_view IS NOT NULL
+               AND store_id = $acsStoreId
+               AND migration_id = $domainMigrationId
              ORDER BY interface.acs_event_number
            """.as[(String, Json, Timestamp, Array[Byte])],
         opName,
