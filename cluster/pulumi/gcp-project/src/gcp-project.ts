@@ -6,6 +6,11 @@ import * as fs from 'fs';
 import { Secret } from '@pulumi/gcp/secretmanager';
 import { config, loadYamlFromFile } from 'splice-pulumi-common';
 
+import {
+  authorizeServiceAccount,
+  ServiceAccountAuthorizationConfig,
+} from './authorizeServiceAccount';
+
 export class GcpProject extends pulumi.ComponentResource {
   gcpProjectId: string;
 
@@ -68,7 +73,7 @@ export class GcpProject extends pulumi.ComponentResource {
     return this.secretAndVersion('lets-encrypt-email', val);
   }
 
-  constructor(gcpProjectId: string) {
+  constructor(gcpProjectId: string, authorizedServiceAccount?: ServiceAccountAuthorizationConfig) {
     super(
       'cn:gcp:project',
       'gcp-project',
@@ -83,5 +88,8 @@ export class GcpProject extends pulumi.ComponentResource {
     this.internalWhitelists();
     this.userConfigs();
     this.letsEncryptEmail();
+    authorizedServiceAccount
+      ? authorizeServiceAccount(gcpProjectId, authorizedServiceAccount)
+      : undefined;
   }
 }
