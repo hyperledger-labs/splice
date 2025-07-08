@@ -42,7 +42,7 @@ class AdvanceOpenMiningRoundTrigger(
       if (rounds.readyToAdvanceAt.isBefore(now.toInstant))
       // NOTE: we store the amulet-rules reference in the task, as otherwise its tickDuration and the one that is
       // actually used in the choice might go out of sync
-    } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)
+    } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds, now)).value.map(_.toList)
 
   /** How to process a task. */
   override protected def completeTaskAsDsoDelegate(
@@ -55,7 +55,10 @@ class AdvanceOpenMiningRoundTrigger(
       _ = logger.debug(
         s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
       )
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        task.work.time,
+      )
       amuletPriceVotes <- store.listSvAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(
@@ -77,6 +80,7 @@ class AdvanceOpenMiningRoundTrigger(
         // as the target domain here.
         .withSynchronizerId(task.work.openRounds.domain)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
@@ -118,6 +122,7 @@ object AdvanceOpenMiningRoundTrigger {
   case class Task(
       amuletRulesId: splice.amuletrules.AmuletRules.ContractId,
       openRounds: MiningRoundsStore.OpenMiningRoundTriple,
+      time: CantonTimestamp,
   ) extends PrettyPrinting {
 
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*

@@ -45,7 +45,10 @@ class ExpireTransferPreapprovalsTrigger(
   ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireTransferPreapproval(
           co.work.contractId,
@@ -55,6 +58,7 @@ class ExpireTransferPreapprovalsTrigger(
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess(
       s"Archived expired TransferPreapproval with contractId ${co.work.contractId}"

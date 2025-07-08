@@ -75,7 +75,6 @@ class MergeValidatorLicenseContractsTrigger(
             validator,
             validatorLicenses,
             controller,
-            pruneAmuletConfigScheduleFeatureSupport.packageIds,
           )
         } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
           Future.successful(
@@ -95,11 +94,13 @@ class MergeValidatorLicenseContractsTrigger(
       validator: String,
       validatorLicenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]],
       controller: String,
-      preferredPackages: Seq[String],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       arg = new DsoRules_MergeValidatorLicense(
         validatorLicenses.map(_.contractId).asJava,
         controllerArgument,
@@ -108,7 +109,7 @@ class MergeValidatorLicenseContractsTrigger(
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackages)
+        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${validatorLicenses.length} ValidatorLicense contracts for $validator"

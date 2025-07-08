@@ -43,7 +43,10 @@ class ExpiredAnsSubscriptionTrigger(
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
-    controllerArgument <- getSvControllerArgument(controller)
+    (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+      controller,
+      context.clock.now,
+    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ExpireSubscription(
         task.work.context.contractId,
@@ -59,6 +62,7 @@ class ExpiredAnsSubscriptionTrigger(
         cmd,
       )
       .noDedup
+      .withPreferredPackage(preferredPackageIds)
       .yieldUnit()
       .map(_ => TaskSuccess(s"archived expired ans subscription"))
 

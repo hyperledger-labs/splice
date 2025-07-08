@@ -64,7 +64,10 @@ class MergeUnclaimedRewardsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       arg = new DsoRules_MergeUnclaimedRewards(
         amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
@@ -79,6 +82,7 @@ class MergeUnclaimedRewardsTrigger(
             cmd,
           )
           .noDedup
+          .withPreferredPackage(preferredPackageIds)
           .yieldResult()
       } yield Some(outcome)
     } yield {
