@@ -23,8 +23,9 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.time.{Instant, LocalDateTime, ZoneOffset}
+import java.time.{LocalDateTime, ZoneOffset}
 import java.util.Optional
 
 class AllocationsFrontendIntegrationTest
@@ -48,13 +49,13 @@ class AllocationsFrontendIntegrationTest
     val receiver = validatorPartyId
     val now = LocalDateTime
       .now()
-      // FE only supports minute precision, so we truncate
-      .truncatedTo(ChronoUnit.MINUTES)
+      .truncatedTo(ChronoUnit.MICROS)
       .toInstant(ZoneOffset.UTC)
+    val requestedAt = now.minusSeconds(1800)
     val allocateBefore = now.plusSeconds(3600)
     val settleBefore = now.plusSeconds(3600 * 2)
 
-    def wantedAllocation(requestedAt: Instant) = new AllocationSpecification(
+    val wantedAllocation = new AllocationSpecification(
       new SettlementInfo(
         validatorPartyId.toProtoPrimitive,
         new SettlementReference("some_reference", Optional.empty),
@@ -72,8 +73,6 @@ class AllocationsFrontendIntegrationTest
         new Metadata(java.util.Map.of("k3", "v3")),
       ),
     )
-    // use the data here to create, but ignore the requestedAt field
-    val create = wantedAllocation(Instant.now())
 
     actAndCheck(
       "go to allocations page", {
@@ -89,9 +88,9 @@ class AllocationsFrontendIntegrationTest
     actAndCheck(
       "create allocation", {
         textField("create-allocation-transfer-leg-id").underlying
-          .sendKeys(create.transferLegId)
+          .sendKeys(wantedAllocation.transferLegId)
         textField("create-allocation-settlement-ref-id").underlying
-          .sendKeys(create.settlement.settlementRef.id)
+          .sendKeys(wantedAllocation.settlement.settlementRef.id)
         click on "create-allocation-transfer-leg-receiver"
         setAnsField(
           textField("create-allocation-transfer-leg-receiver"),
@@ -107,22 +106,32 @@ class AllocationsFrontendIntegrationTest
         click on "create-allocation-amulet-amount"
         numberField("create-allocation-amulet-amount").value = ""
         numberField("create-allocation-amulet-amount").underlying.sendKeys(
-          create.transferLeg.amount.toString
+          wantedAllocation.transferLeg.amount.toString
         )
 
-        setDateTime(
-          "alice",
-          "create-allocation-settlement-settle-before",
-          create.settlement.settleBefore,
-        )
-        setDateTime(
-          "alice",
-          "create-allocation-settlement-allocate-before",
-          create.settlement.allocateBefore,
-        )
+        val allocationTimestampFormat =
+          DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+        textField("create-allocation-settlement-requested-at").underlying
+          .sendKeys(
+            allocationTimestampFormat.format(
+              wantedAllocation.settlement.requestedAt.atOffset(ZoneOffset.UTC)
+            )
+          )
+        textField("create-allocation-settlement-settle-before").underlying
+          .sendKeys(
+            allocationTimestampFormat.format(
+              wantedAllocation.settlement.settleBefore.atOffset(ZoneOffset.UTC)
+            )
+          )
+        textField("create-allocation-settlement-allocate-before").underlying
+          .sendKeys(
+            allocationTimestampFormat.format(
+              wantedAllocation.settlement.allocateBefore.atOffset(ZoneOffset.UTC)
+            )
+          )
 
-        setMeta(create.settlement.meta, "settlement")
-        setMeta(create.transferLeg.meta, "transfer-leg")
+        setMeta(wantedAllocation.settlement.meta, "settlement")
+        setMeta(wantedAllocation.transferLeg.meta, "transfer-leg")
 
         click on "create-allocation-submit-button"
       },
@@ -146,7 +155,7 @@ class AllocationsFrontendIntegrationTest
           .payload
           .allocation
 
-        specification should be(wantedAllocation(specification.settlement.requestedAt))
+        specification should be(wantedAllocation)
       },
     )
   }
