@@ -13,5 +13,6 @@ SELECT DISTINCT
   JSON_VALUE(create_arguments, '$.record.fields[1].value.party') as owner
   FROM `da-cn-mainnet.mainnet_da2_scan.scan_sv_1_update_history_creates` c
   WHERE c.package_name = "splice-amulet"
+    AND c.template_id_module_name = "Splice.Amulet"
     AND c.template_id_entity_name = "Amulet"
     AND (c.migration_id < migration_id OR (c.migration_id = migration_id AND c.created_at <= UNIX_MICROS(as_of_record_time)));
