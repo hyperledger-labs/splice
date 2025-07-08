@@ -488,12 +488,11 @@ class State:
             # This should not happen, as the additional grace period should be sufficient to ensure
             # we capture the complete set of mining rounds for the collected rewards.
             if not mining_round_info:
-                LOG.error(
+                self._fail(
                     f"Fatal: missing issuing round {reward.round} for reward {reward.contract_id}\n"
                     f"Consider increase input: grace-period-for-mining-rounds-in-minutes.\n"
                     f"Currently it is set to {self.grace_period_for_mining_rounds_in_minutes}"
                 )
-                raise RuntimeError("Issuing round not found — aborting.")
 
             amount = reward.weight * mining_round_info.issuance_per_sv_reward
             match reward.status:
@@ -557,14 +556,25 @@ class State:
                 self.issuing_rounds[round_number] = issuing_round
                 LOG.debug(f"Adding issuing round {issuing_round} to issuing_rounds")
 
+
     def process_exercised_event(self, transaction: TransactionTree, event: ExercisedEvent):
-        match event.choice_name:
-            case "SvRewardCoupon_DsoExpire":
-                self.handle_sv_reward_coupon_exercise(transaction, event, RewardStatus.EXPIRED)
-            case "SvRewardCoupon_ArchiveAsBeneficiary":
-                self.handle_sv_reward_coupon_exercise(transaction, event, RewardStatus.CLAIMED)
+        match event.template_id.qualified_name:
+            case TemplateQualifiedNames.sv_reward_coupon:
+                match event.choice_name:
+                    case "SvRewardCoupon_DsoExpire":
+                        self.handle_sv_reward_coupon_exercise(transaction, event, RewardStatus.EXPIRED)
+                    case "SvRewardCoupon_ArchiveAsBeneficiary":
+                        self.handle_sv_reward_coupon_exercise(transaction, event, RewardStatus.CLAIMED)
+                    case choice if event.is_consuming:
+                        self._fail(
+                            f"Unexpected consuming choice {choice} on "
+                            f"{TemplateQualifiedNames.sv_reward_coupon} — aborting."
+                        )
+                    case _:
+                        self.process_events(transaction, event.child_event_ids)
             case _:
                 self.process_events(transaction, event.child_event_ids)
+
 
     def handle_sv_reward_coupon_exercise(self, transaction, event, status):
         contract_id = event.contract_id
@@ -646,6 +656,6 @@ async def main():
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-    except RuntimeError as e:
+    except Exception as e:
         LOG.error(f"{e}")
         sys.exit(1)
