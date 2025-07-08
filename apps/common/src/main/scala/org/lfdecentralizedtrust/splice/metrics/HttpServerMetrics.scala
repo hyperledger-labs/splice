@@ -28,7 +28,7 @@ class HttpServerMetrics(metricsFactory: LabeledMetricsFactory) {
 
   private val inFlightRequests = metricsFactory.counter(
     MetricInfo(
-      name = prefix :+ "requests" :+ "duration",
+      name = prefix :+ "requests" :+ "inflight",
       summary = "Histogram for http request durations",
       qualification = Latency,
       labelsWithDescription = Map(
