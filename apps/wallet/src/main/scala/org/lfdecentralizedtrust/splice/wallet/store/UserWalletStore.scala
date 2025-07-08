@@ -666,7 +666,7 @@ object UserWalletStore {
         )(contract => UserWalletAcsStoreRowData(contract)),
         mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION) { co =>
           val transferLeg = co.payload.allocation.transferLeg
-          transferLeg.instrumentId.admin == dso && (transferLeg.sender == endUser || transferLeg.receiver == endUser)
+          transferLeg.instrumentId.admin == dso && transferLeg.sender == endUser
         } { contract =>
           UserWalletAcsStoreRowData(contract)
         },

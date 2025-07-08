@@ -703,7 +703,7 @@ paths:
     get:
       tags: [ wallet ]
       x-jvm-package: wallet
-      # no limit, under the assumption that the number of allocations is small
+      # no limit, under the assumption that the number of allocation requests is small
       operationId: "listAllocationRequests"
       responses:
         "200":
@@ -1473,7 +1473,7 @@ components:
     ListAllocationsResponse:
       type: object
       description:
-        Includes all Allocation views where the user is in one of the transferLegs and where
+        Includes all Allocation views where the user is a sender of one of the transferLegs and where
         the involved instrument's admin is the DSO party.
       required:
         - allocations
