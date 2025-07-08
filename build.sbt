@@ -875,7 +875,7 @@ lazy val `apps-sv` =
         pekko_http_cors,
         scalapb_runtime,
       ),
-      unmanagedJars := ("/nix/store/8mbn324qx6d8jk5jbks5w3w1bakhmii0-cometbft-driver/driver.jar").classpath,
+      Compile / unmanagedJars := Attributed.blankSeq(Seq(file("/nix/store/8mbn324qx6d8jk5jbks5w3w1bakhmii0-cometbft-driver/driver.jar"))),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
