@@ -10,7 +10,7 @@ import {
 import { useVotesHooks } from '@lfdecentralizedtrust/splice-common-frontend';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
-const QUERY_LIMIT = 50;
+const QUERY_LIMIT = 500;
 
 interface UseVoteRequestResultByCidResult {
   voteRequest: Contract<VoteRequest> | undefined;

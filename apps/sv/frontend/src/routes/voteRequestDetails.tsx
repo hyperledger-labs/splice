@@ -65,7 +65,11 @@ export const VoteRequestDetails: React.FC = () => {
     !amuletOrDsoAction ||
     Object.keys(actionTagToTitle(amuletName)).indexOf(amuletOrDsoAction.tag) === -1
   ) {
-    return <Typography variant="body1">Error, something went wrong. Unsupported Action</Typography>;
+    return (
+      <Typography variant="body1">
+        Error, something went wrong. Unsupported Action: {amuletOrDsoAction?.tag}
+      </Typography>
+    );
   }
 
   const action = amuletOrDsoAction.tag as SupportedActionTag;

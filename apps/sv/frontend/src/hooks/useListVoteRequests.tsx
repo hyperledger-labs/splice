@@ -59,6 +59,5 @@ export const useListVoteRequestResult = (
       return List(DsoRules_CloseVoteRequestResult).decoder.runWithException(dso_rules_vote_results);
     },
     retry,
-    staleTime: Infinity, // These never change so no need refetching them
   });
 };
