@@ -869,7 +869,6 @@
           "name": "cn-mocknet"
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -924,7 +923,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
-        "useSequencerConnectionsFromScan": false,
+        "useSequencerConnectionsFromScan": true,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64529b128448ded6aa68048f"
