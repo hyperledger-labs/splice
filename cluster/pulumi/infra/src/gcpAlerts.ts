@@ -9,6 +9,10 @@ import { monitoringConfig } from './config';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
 
+function ensureTrailingNewline(s: string): string {
+  return s.endsWith('\n') ? s : `${s}\n`;
+}
+
 export function getNotificationChannel(
   name: string = `${CLUSTER_BASENAME} Slack Alert Notification Channel`
 ): gcp.monitoring.NotificationChannel {
@@ -30,12 +34,23 @@ export function getNotificationChannel(
 export function installGcpLoggingAlerts(
   notificationChannel: gcp.monitoring.NotificationChannel
 ): void {
+  const logAlerts = monitoringConfig.alerting.logAlerts;
+  const logAlertsString = `resource.labels.cluster_name="${CLUSTER_NAME}"
+${Object.keys(logAlerts)
+  .sort()
+  .map(k => ensureTrailingNewline(logAlerts[k]))
+  .join('')}`;
+  if (logAlertsString.length > 20000) {
+    // LQL limited to 20k: https://cloud.google.com/logging/quotas#log-based-metrics
+    throw new Error(
+      `${CLUSTER_BASENAME} log alerts string is ${logAlertsString.length} chars; >20000 char limit`
+    );
+  }
+
   const logWarningsMetric = new gcp.logging.Metric('log_warnings', {
     name: `log_warnings_${CLUSTER_BASENAME}`,
     description: 'Logs with a severity level of warning or above',
-    filter: `resource.labels.cluster_name="${CLUSTER_NAME}"
-${monitoringConfig.alerting.logAlerts.shared}
-${monitoringConfig.alerting.logAlerts.clusterSpecific || ''}`,
+    filter: logAlertsString,
     labelExtractors: {
       cluster: 'EXTRACT(resource.labels.cluster_name)',
       namespace: 'EXTRACT(resource.labels.namespace_name)',

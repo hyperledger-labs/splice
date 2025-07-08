@@ -50,7 +50,7 @@ monitoring:
       loadTester:
         minRate: 0.95
     logAlerts:
-      shared: |
+      common: |
         severity>=WARNING
         resource.type="k8s_container"
         -- Note that we ignore the validator runbook. This is because we reset it periodically, which sometimes produces noise.
