@@ -874,8 +874,8 @@ lazy val `apps-sv` =
       libraryDependencies ++= Seq(
         pekko_http_cors,
         scalapb_runtime,
-        comet_bft_proto,
       ),
+      unmanagedJars := ("/nix/store/8mbn324qx6d8jk5jbks5w3w1bakhmii0-cometbft-driver/driver.jar").classpath,
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
