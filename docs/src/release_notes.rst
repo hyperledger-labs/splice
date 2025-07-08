@@ -39,6 +39,8 @@ Upcoming
     workflow was started with. All calls to these choices from within the splice codebase have been
     adapted.
 
+  - security: add a missing check that the actor is a current SV party to ``DsoRules_ExpireSubscription``
+
   - prudent engineering: enforce on calls to ``ExternalPartyAmuletRules_CreateTransferCommand`` that ``expiresAt``
     is in the future
 
