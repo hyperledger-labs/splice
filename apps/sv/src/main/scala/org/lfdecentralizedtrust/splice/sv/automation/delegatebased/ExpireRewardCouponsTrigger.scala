@@ -65,12 +65,16 @@ class ExpireRewardCouponsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       numCoupons <- expireRewardCouponsForRound(
         expiredRewardsTask,
         dsoRules,
         amuletRules,
         controllerArgument,
+        preferredPackageIds,
       )
     } yield TaskSuccess(
       show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
@@ -82,6 +86,7 @@ class ExpireRewardCouponsTrigger(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       controller: Optional[String],
+      preferredPackageIds: Seq[String],
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
@@ -182,6 +187,7 @@ class ExpireRewardCouponsTrigger(
               cmd,
             )
             .noDedup
+            .withPreferredPackage(preferredPackageIds)
             .yieldResult()
         )
       )

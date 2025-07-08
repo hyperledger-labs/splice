@@ -12,14 +12,17 @@ import com.digitalasset.canton.metrics.CacheMetrics
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.store.HistoryMetrics
 
-import java.util.concurrent.ConcurrentLinkedQueue
-import scala.jdk.CollectionConverters.CollectionHasAsScala
-
 class DbScanStoreMetrics(
     metricsFactory: LabeledMetricsFactory
 ) extends AutoCloseable {
 
-  private val createdCaches = new ConcurrentLinkedQueue[CacheMetrics]()
+  /** Storing all the created cache metrics to ensure we always have just one instance per name
+    * This is done because creating the same gauge with teh same name is not safe
+    * Eventually we might want to move this all the way into the metrics factory to always return the same gauge
+    */
+  private val cacheOfMetrics = scala.collection.concurrent
+    .TrieMap[String, CacheMetrics]()
+
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "scan_store"
 
   val earliestAggregatedRound: Gauge[Long] =
@@ -47,17 +50,15 @@ class DbScanStoreMetrics(
   def registerNewCacheMetrics(
       cacheName: String
   ): CacheMetrics = {
-    val cacheMetrics = new CacheMetrics(cacheName, metricsFactory)
-    createdCaches.add(cacheMetrics)
-    cacheMetrics
+    cacheOfMetrics.getOrElseUpdate(cacheName, new CacheMetrics(cacheName, metricsFactory))
   }
 
   val history = new HistoryMetrics(metricsFactory)(MetricsContext.Empty)
 
-  override def close() = {
+  override def close(): Unit = {
     LifeCycle.close(
       (Seq(earliestAggregatedRound, latestAggregatedRound) ++
-        createdCaches.asScala
+        cacheOfMetrics.values
           .map(cache =>
             new AutoCloseable {
               override def close(): Unit = cache.closeAcquired()
@@ -65,5 +66,6 @@ class DbScanStoreMetrics(
           )
           .toSeq)*
     )(NamedLoggerFactory.root.getTracedLogger(getClass))
+    cacheOfMetrics.clear()
   }
 }

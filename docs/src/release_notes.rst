@@ -8,6 +8,56 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Daml
+
+  - security: change ``AmuletRules_Transfer`` and ``AmuletRules_ComputeFees`` to take an explicit argument
+    ``expectedDso : Optional Party`` and check that against the ``dso`` party value in ``AmuletRules``.
+    This value must be provided, and thus protects people that delegate calls to these choices from
+    unintentionally allowing calls to ``AmuletRules`` contracts with a different ``dso`` party.
+
+    This addresses suggestion S-8 reported by Quantstamp in their security review.
+
+    Application developers that call these choices directly must adjust their call-sites to set the
+    the ``expectedDso`` value. All calls to these choices from within the splice codebase have been
+    adapted.
+
+  - security: apply the spirit of suggestion S-8 to all non-DevNet choices on ``AmuletRules`` and ``ExternalAmuletRules``
+    granted to users. Concretely, we added the ``expectedDso`` party as a required argument to
+    ``AmuletRules_BuyMemberTraffic``,
+    ``AmuletRules_CreateExternalPartySetupProposal``,
+    ``AmuletRules_CreateTransferPreapproval``, and
+    ``ExternalPartyAmuletRules_CreateTransferCommand``.
+
+    Ledger API clients calling these choices should set that value to the ``dso`` party-id of
+    the network they are operating on. They can retrieve that with BFT by calling ``GET /v0/scan-proxy/dso-party-id``
+    on their validator's :ref:`validator-api-scan-proxy`.
+
+    Third-party Daml code calling these choices should set it based on the ``dso`` party that the third-party
+    workflow was started with. All calls to these choices from within the splice codebase have been
+    adapted.
+
+  - prudent engineering: enforce on calls to ``ExternalPartyAmuletRules_CreateTransferCommand`` that ``expiresAt``
+    is in the future
+
+  - prudent engineering: change all splice Daml code to fetch all reference data
+    using checked fetches where the caller specifies the expected ``dso`` party
+
+  These Daml changes require an upgrade to the following Daml versions:
+
+   ================== =======
+   name               version
+   ================== =======
+   amulet             0.1.11
+   amuletNameService  0.1.11
+   dsoGovernance      0.1.15
+   wallet             0.1.11
+   walletPayments     0.1.11
+   ================== =======
+
+
 0.4.4
 -----
 

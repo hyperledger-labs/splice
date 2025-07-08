@@ -40,7 +40,7 @@ object DarResources {
     )
     val tokenStandardTest = PackageResource(
       DarResource(s"splice-token-standard-test-current.dar"),
-      Seq(DarResource(s"splice-token-standard-test-1.0.1.dar")),
+      Seq(DarResource(s"splice-token-standard-test-1.0.2.dar")),
     )
     val allPackageResources = Seq(
       tokenMetadata,
@@ -64,6 +64,7 @@ object DarResources {
   val amulet_0_1_8 = DarResource("splice-amulet-0.1.8.dar")
   val amulet_0_1_9 = DarResource("splice-amulet-0.1.9.dar")
   val amulet_0_1_10 = DarResource("splice-amulet-0.1.10.dar")
+  val amulet_0_1_11 = DarResource("splice-amulet-0.1.11.dar")
   val amulet_current = DarResource("splice-amulet-current.dar")
   val amulet = PackageResource(
     amulet_current,
@@ -79,6 +80,7 @@ object DarResources {
       amulet_0_1_8,
       amulet_0_1_9,
       amulet_0_1_10,
+      amulet_0_1_11,
     ),
   )
 
@@ -97,6 +99,7 @@ object DarResources {
   val dsoGovernance_0_1_12 = DarResource("splice-dso-governance-0.1.12.dar")
   val dsoGovernance_0_1_13 = DarResource("splice-dso-governance-0.1.13.dar")
   val dsoGovernance_0_1_14 = DarResource("splice-dso-governance-0.1.14.dar")
+  val dsoGovernance_0_1_15 = DarResource("splice-dso-governance-0.1.15.dar")
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
@@ -116,6 +119,7 @@ object DarResources {
       dsoGovernance_0_1_12,
       dsoGovernance_0_1_13,
       dsoGovernance_0_1_14,
+      dsoGovernance_0_1_15,
     ),
   )
 
@@ -130,6 +134,7 @@ object DarResources {
   val amuletNameService_0_1_8 = DarResource("splice-amulet-name-service-0.1.8.dar")
   val amuletNameService_0_1_9 = DarResource("splice-amulet-name-service-0.1.9.dar")
   val amuletNameService_0_1_10 = DarResource("splice-amulet-name-service-0.1.10.dar")
+  val amuletNameService_0_1_11 = DarResource("splice-amulet-name-service-0.1.11.dar")
   val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val amuletNameService = PackageResource(
     amuletNameService_current,
@@ -145,6 +150,7 @@ object DarResources {
       amuletNameService_0_1_8,
       amuletNameService_0_1_9,
       amuletNameService_0_1_10,
+      amuletNameService_0_1_11,
     ),
   )
 
@@ -159,6 +165,7 @@ object DarResources {
   val splitwell_0_1_8 = DarResource("splitwell-0.1.8.dar")
   val splitwell_0_1_9 = DarResource("splitwell-0.1.9.dar")
   val splitwell_0_1_10 = DarResource("splitwell-0.1.10.dar")
+  val splitwell_0_1_11 = DarResource("splitwell-0.1.11.dar")
   val splitwell_current = DarResource("splitwell-current.dar")
   val splitwell = PackageResource(
     splitwell_current,
@@ -174,6 +181,7 @@ object DarResources {
       splitwell_0_1_8,
       splitwell_0_1_9,
       splitwell_0_1_10,
+      splitwell_0_1_11,
     ),
   )
 
@@ -188,6 +196,7 @@ object DarResources {
   val wallet_0_1_8 = DarResource("splice-wallet-0.1.8.dar")
   val wallet_0_1_9 = DarResource("splice-wallet-0.1.9.dar")
   val wallet_0_1_10 = DarResource("splice-wallet-0.1.10.dar")
+  val wallet_0_1_11 = DarResource("splice-wallet-0.1.11.dar")
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
@@ -203,6 +212,7 @@ object DarResources {
       wallet_0_1_8,
       wallet_0_1_9,
       wallet_0_1_10,
+      wallet_0_1_11,
     ),
   )
 
@@ -217,6 +227,7 @@ object DarResources {
   val walletPayments_0_1_8 = DarResource("splice-wallet-payments-0.1.8.dar")
   val walletPayments_0_1_9 = DarResource("splice-wallet-payments-0.1.9.dar")
   val walletPayments_0_1_10 = DarResource("splice-wallet-payments-0.1.10.dar")
+  val walletPayments_0_1_11 = DarResource("splice-wallet-payments-0.1.11.dar")
   val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   val walletPayments = PackageResource(
     walletPayments_current,
@@ -232,6 +243,7 @@ object DarResources {
       walletPayments_0_1_8,
       walletPayments_0_1_9,
       walletPayments_0_1_10,
+      walletPayments_0_1_11,
     ),
   )
 

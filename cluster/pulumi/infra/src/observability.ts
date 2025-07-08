@@ -21,6 +21,7 @@ import {
   isMainNet,
   loadTesterConfig,
   MOCK_SPLICE_ROOT,
+  ObservabilityReleaseName,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
@@ -148,7 +149,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
     {
-      name: 'prometheus-grafana-monitoring',
+      name: ObservabilityReleaseName,
       chart: 'kube-prometheus-stack',
       version: stackVersion,
       namespace: namespaceName,

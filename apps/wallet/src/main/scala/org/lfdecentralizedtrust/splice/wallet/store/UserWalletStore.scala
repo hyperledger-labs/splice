@@ -254,6 +254,27 @@ trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore 
     )
   ]]
 
+  /** Returns the list of unclaimed activity record. */
+  def listUnclaimedActivityRecords(
+      limit: Limit = Limit.DefaultLimit
+  )(implicit tc: TraceContext): Future[Seq[
+    Contract[
+      amuletCodegen.UnclaimedActivityRecord.ContractId,
+      amuletCodegen.UnclaimedActivityRecord,
+    ]
+  ]] =
+    for {
+      rewards <- multiDomainAcsStore.listContracts(
+        amuletCodegen.UnclaimedActivityRecord.COMPANION
+      )
+    } yield applyLimit(
+      "listUnclaimedActivityRecords",
+      limit,
+      rewards.view
+        .map(_.contract)
+        .toSeq,
+    )
+
   final def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
     Option[Contract[amuletCodegen.FeaturedAppRight.ContractId, amuletCodegen.FeaturedAppRight]]
   ] =
@@ -544,6 +565,15 @@ object UserWalletStore {
             None,
             rewardCouponRound = Some(co.payload.round.number),
             rewardCouponWeight = Some(co.payload.weight),
+          )
+        ),
+        mkFilter(amuletCodegen.UnclaimedActivityRecord.COMPANION)(co =>
+          co.payload.dso == dso &&
+            co.payload.beneficiary == endUser
+        )(co =>
+          UserWalletAcsStoreRowData(
+            co,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(co.payload.expiresAt)),
           )
         ),
         mkFilter(amuletCodegen.ValidatorRight.COMPANION)(co =>

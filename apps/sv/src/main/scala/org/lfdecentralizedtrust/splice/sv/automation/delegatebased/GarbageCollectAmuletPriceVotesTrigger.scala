@@ -52,7 +52,10 @@ class GarbageCollectAmuletPriceVotesTrigger(
       (svVotes, nonSvVotes) = amuletPriceVotes.partition(v =>
         dsoRules.payload.svs.asScala.contains(v.payload.sv)
       )
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       nonSvVoteCids = nonSvVotes.map(_.contractId)
       svDuplicatedVoteCids =
         svVotes
@@ -77,6 +80,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
               cmd,
             )
             .noDedup
+            .withPreferredPackage(preferredPackageIds)
             .yieldUnit()
         } else Future.successful(())
     } yield TaskSuccess(

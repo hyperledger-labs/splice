@@ -1714,8 +1714,9 @@ class UpdateHistory(
   def getLastImportUpdateId(
       migrationId: Long
   )(implicit tc: TraceContext): Future[Option[String]] = {
-    storage.query(
-      sql"""
+    if (enableImportUpdateBackfill) {
+      storage.query(
+        sql"""
         select
           -- Note: to make update ids consistent across SVs, we use the contract id as the update id.
           max(c.contract_id)
@@ -1726,8 +1727,11 @@ class UpdateHistory(
           migration_id = $migrationId and
           record_time = ${CantonTimestamp.MinValue}
       """.as[Option[String]].head,
-      s"getLastImportUpdateId",
-    )
+        s"getLastImportUpdateId",
+      )
+    } else {
+      Future.successful(None)
+    }
   }
 
   def getPreviousMigrationId(migrationId: Long)(implicit

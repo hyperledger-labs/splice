@@ -42,7 +42,10 @@ class CloseVoteRequestTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       amuletRulesId = amuletRules.contractId
       res <- for {
         outcome <- svTaskContext.connection
@@ -60,6 +63,7 @@ class CloseVoteRequestTrigger(
             ),
           )
           .noDedup
+          .withPreferredPackage(preferredPackageIds)
           .yieldResult()
       } yield Some(outcome)
     } yield {
