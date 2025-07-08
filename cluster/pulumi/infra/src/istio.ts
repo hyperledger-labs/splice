@@ -103,7 +103,7 @@ function configureIstiod(
           // accessLogFile: '/dev/stdout',
           // taken from https://github.com/istio/istio/issues/37682
           accessLogEncoding: 'JSON',
-          // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
+          // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging disable as we don't use annotations
           enablePrometheusMerge: false,
           defaultConfig: {
             // It is expected that a single load balancer (GCP NLB) is used in front of K8s.
@@ -507,78 +507,31 @@ export function istioMonitoring(
     { dependsOn }
   );
 
-  const sidecar = new PodMonitor(
-    `istio-sidecar-monitor`,
-    {
-      'security.istio.io/tlsMode': 'istio',
-    },
-    //https://github.com/istio/istio/blob/master/samples/addons/extras/prometheus-operator.yaml#L16
-    [
+  const pods = ['', '-public'].flatMap(suffix => {
+    const sidecar = new PodMonitor(
+      `istio-sidecar-monitor${suffix}`,
       {
-        port: 'http-envoy-prom',
-        path: '/stats/prometheus',
-        relabelings: [
-          {
-            action: 'keep',
-            sourceLabels: ['__meta_kubernetes_pod_container_name'],
-            regex: 'istio-proxy',
-          },
-          {
-            action: 'keep',
-            sourceLabels: ['__meta_kubernetes_pod_annotationpresent_prometheus_io_scrape'],
-          },
-          {
-            action: 'replace',
-            regex: '(\\d+);(([A-Fa-f0-9]{1,4}::?){1,7}[A-Fa-f0-9]{1,4})',
-            replacement: '[$2]:$1',
-            sourceLabels: [
-              '__meta_kubernetes_pod_annotation_prometheus_io_port',
-              '__meta_kubernetes_pod_ip',
-            ],
-            targetLabel: '__address__',
-          },
-          {
-            action: 'replace',
-            regex: '(\\d+);((([0-9]+?)(\\.|$)){4})',
-            replacement: '$2:$1',
-            sourceLabels: [
-              '__meta_kubernetes_pod_annotation_prometheus_io_port',
-              '__meta_kubernetes_pod_ip',
-            ],
-            targetLabel: '__address__',
-          },
-          {
-            action: 'labeldrop',
-            regex: '__meta_kubernetes_pod_label_(.+)',
-          },
-          {
-            sourceLabels: ['__meta_kubernetes_namespace'],
-            action: 'replace',
-            targetLabel: 'namespace',
-          },
-          {
-            sourceLabels: ['__meta_kubernetes_pod_name'],
-            action: 'replace',
-            targetLabel: 'pod',
-          },
-        ],
+        'security.istio.io/tlsMode': 'istio',
       },
-    ],
-    ingressNs.ns.metadata.name,
-    {
-      dependsOn,
-    }
-  );
-  const gateway = new PodMonitor(
-    `istio-gateway-monitor`,
-    {
-      istio: 'ingress',
-    },
-    [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
-    ingressNs.ns.metadata.name,
-    {
-      dependsOn,
-    }
-  );
-  return [svc, sidecar, gateway];
+      [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+      ingressNs.ns.metadata.name,
+      {
+        dependsOn,
+      }
+    );
+    const gateway = new PodMonitor(
+      `istio-gateway-monitor${suffix}`,
+      {
+        istio: 'ingress',
+      },
+      [{ port: 'http-envoy-prom', path: '/stats/prometheus' }],
+      ingressNs.ns.metadata.name,
+      {
+        dependsOn,
+      }
+    );
+    return [sidecar, gateway];
+  });
+
+  return pods.concat([svc]);
 }
