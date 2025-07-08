@@ -11,33 +11,36 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+
+# Things we need just to pass the schema
+set:
+  domain:
+    sequencerPublicUrl: "https://sequencer.mock.com"
+    sequencerAddress: "sequencer-address"
+    mediatorAddress: "mediator-address"
+    sequencerPruningConfig:
+      enabled: false
+  scan:
+    publicUrl: "https://scan.mock.com"
+    internalUrl: "https://scan-internal.mock.com"
+  nodeIdentifier: "helm-mock-1-validator"
+  onboardingName: "some-sv"
+  participantAddress: "mock-address"
+  spliceInstanceNames:
+    networkName: MockNet
+    networkFaviconUrl: https://mock.net/favicon.ico
+    amuletName: Mocklet
+    amuletNameAcronym: MCK
+    nameServiceName: Mock Name Service
+    nameServiceNameAcronym: MNS
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    audience: "mock_audience"
+
 tests:
   - it: "sets JWKS timeouts"
     set:
-      # Things we need just to pass the schema
-      domain:
-        sequencerPublicUrl: "https://sequencer.mock.com"
-        sequencerAddress: "sequencer-address"
-        mediatorAddress: "mediator-address"
-        sequencerPruningConfig:
-          enabled: false
-      scan:
-        publicUrl: "https://scan.mock.com"
-        internalUrl: "https://scan-internal.mock.com"
-      nodeIdentifier: "helm-mock-1-validator"
-      onboardingName: "some-sv"
-      participantAddress: "mock-address"
-      spliceInstanceNames:
-        networkName: MockNet
-        networkFaviconUrl: https://mock.net/favicon.ico
-        amuletName: Mocklet
-        amuletNameAcronym: MCK
-        nameServiceName: Mock Name Service
-        nameServiceNameAcronym: MNS
       auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        audience: "mock_audience"
-        # actual test
         jwks:
           connectionTimeout: "33s"
           readTimeout: "44s"
@@ -51,3 +54,29 @@ tests:
       - equal:
           path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='SPLICE_APP_VALIDATOR_AUTH_JWKS_READ_TIMEOUT')].value
           value: "44s"
+
+  - it: "sets extra-beneficiaries"
+    set:
+      extraBeneficiaries:
+        - beneficiary: "beneficiary1"
+          weight: 10
+        - beneficiary: "beneficiary2"
+          weight: 25
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_BENEFICIARIES_0')].value
+          value: |
+            canton.sv-apps.sv.extra-beneficiaries.0 = {
+              beneficiary = "beneficiary1"
+              weight = 10
+            }
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_BENEFICIARIES_1')].value
+          value: |
+            canton.sv-apps.sv.extra-beneficiaries.1 = {
+              beneficiary = "beneficiary2"
+              weight = 25
+            }
