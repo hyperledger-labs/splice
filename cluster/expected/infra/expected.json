@@ -2762,7 +2762,7 @@
       "kind": "Namespace",
       "metadata": {
         "labels": {
-          "istio-injection": "enabled"
+          "istio-injection": "disabled"
         },
         "name": "observability"
       }

@@ -136,7 +136,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     {
       metadata: {
         name: 'observability',
-        labels: { 'istio-injection': 'enabled' },
+        // istio really doesn't play well with prometheus
+        // it seems to  modify the scraping calls from prometheus and change labels/include extra time series that make no sense
+        labels: { 'istio-injection': 'disabled' },
       },
     },
     { dependsOn }
