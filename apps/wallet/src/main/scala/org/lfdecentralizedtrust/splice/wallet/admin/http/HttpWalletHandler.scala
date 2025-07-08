@@ -1037,7 +1037,7 @@ class HttpWalletHandler(
               body.settlement.settlementRef.id,
               body.settlement.settlementRef.cid.map(cid => new AnyContract.ContractId(cid)).toJava,
             ),
-            now,
+            Codec.tryDecode(Codec.Timestamp)(body.settlement.requestedAt).toInstant,
             Codec.tryDecode(Codec.Timestamp)(body.settlement.allocateBefore).toInstant,
             Codec.tryDecode(Codec.Timestamp)(body.settlement.settleBefore).toInstant,
             new metadatav1.Metadata(body.settlement.meta.getOrElse(Map.empty).asJava),

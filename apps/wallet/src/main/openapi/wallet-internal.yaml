@@ -1379,6 +1379,7 @@ components:
           required:
             - executor
             - settlement_ref
+            - requested_at
             - allocate_before
             - settle_before
           properties:
@@ -1393,6 +1394,9 @@ components:
                   type: string
                 cid:
                   type: string
+            requested_at:
+              type: integer
+              format: int64
             allocate_before:
               type: integer
               format: int64

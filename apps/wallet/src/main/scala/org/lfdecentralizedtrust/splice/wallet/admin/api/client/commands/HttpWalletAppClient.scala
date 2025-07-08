@@ -1203,14 +1203,18 @@ object HttpWalletAppClient {
         client.allocateAmulet(
           definitions.AllocateAmuletRequest(
             definitions.AllocateAmuletRequest.Settlement(
-              spec.settlement.executor,
-              definitions.AllocateAmuletRequest.Settlement.SettlementRef(
+              executor = spec.settlement.executor,
+              settlementRef = definitions.AllocateAmuletRequest.Settlement.SettlementRef(
                 spec.settlement.settlementRef.id,
                 spec.settlement.settlementRef.cid.map(_.contractId).toScala,
               ),
-              Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.allocateBefore)),
-              Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.settleBefore)),
-              Some(spec.settlement.meta.values.asScala.toMap),
+              requestedAt =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.requestedAt)),
+              allocateBefore =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.allocateBefore)),
+              settleBefore =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.settleBefore)),
+              meta = Some(spec.settlement.meta.values.asScala.toMap),
             ),
             spec.transferLegId,
             definitions.AllocateAmuletRequest.TransferLeg(
