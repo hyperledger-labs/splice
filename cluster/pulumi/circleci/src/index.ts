@@ -39,7 +39,7 @@ const cciK8sServiceAccount = new k8s.core.v1.ServiceAccount('cci-deployments-k8s
 // Grant the CCI GCP SA the necessary roles to use use workload identity via the CCI KSA.
 new gcp.projects.IAMMember('cci-gcp-service-account-workload-identity-role', {
   project: cciGcpServiceAccount.project,
-  member: pulumi.interpolate`serviceAccount:${cciK8sServiceAccount.metadata.namespace}.svc.id.goog[${circleCiNamespace.metadata.name}/${cciK8sServiceAccount.metadata.name}]`,
+  member: pulumi.interpolate`serviceAccount:${cciGcpServiceAccount.project}.svc.id.goog[${circleCiNamespace.metadata.name}/${cciK8sServiceAccount.metadata.name}]`,
   role: 'roles/iam.workloadIdentityUser',
 });
 // Grant the CCI GCP SA the necessary roles to access GCP resources.
