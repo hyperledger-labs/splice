@@ -37,7 +37,6 @@ import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   WalletAppClientReference,
 }
-import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
 //TODO(#1304) - re-enable
