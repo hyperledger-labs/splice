@@ -335,7 +335,7 @@ template AmuletRules
         let opensAt1 = now -- opens at the same time as round0, so there are always two rounds open at the same time
         let opensAt2 = targetClosesAt0 -- by default, at most two rounds are open at the same time, so round 2 opens when round 0 closes
 
-        let issuingFor0 = seconds (nr0 * truncate(relTimeToSeconds tickDuration))
+        let issuingFor0 = microseconds (nr0 * convertRelTimeToMicroseconds tickDuration)
         let issuingFor1 = issuingFor0 + tickDuration
         let issuingFor2 = issuingFor1 + tickDuration
 
