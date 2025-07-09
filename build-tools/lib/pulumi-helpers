@@ -147,28 +147,28 @@ function _remove_pulumi_finalizers() {
 
 function _pulumi_automation_run_down() {
     if [ $# -eq 1 ]; then
-        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi/$1\" run down
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run down
     else
-        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi\" run down
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run down
     fi
 }
 
 function _pulumi_automation_run_refresh() {
-  _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi\" run refresh
+  _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run refresh
 }
 
 function _pulumi_automation_run_cancel() {
     if [ $# -eq 1 ]; then
-        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi/$1\" run cancel
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run cancel
     else
-        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi\" run cancel
+        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run cancel
     fi
 }
 
 # If we run npm [...] pulumi in the same process group as us, then when we ctrl-c,
 # it will signal pulumi at least twice, sometimes even three: once through the ctrl-c
 # signalling the whole process group, and once through pulumiXX.ts catching the signal
-# (and if we"re not careful, it will catch it twice). Signaling pulumi twice is like hitting
+# (and if we're not careful, it will catch it twice). Signaling pulumi twice is like hitting
 # ctrl-c twice, thus telling pulumi to exit immediately and not cleanup after itself, thus
 # ending with locked and/or polluted stacks.
 # Similarly, in CCI's run_bash_command_in_nix, we signal the whole process group, which is equivalend
