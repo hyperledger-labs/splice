@@ -227,7 +227,7 @@
                 "type": "string"
               },
               "weight": {
-                "type": "string"
+                "type": ["integer", "string"]
               }
             }
           }

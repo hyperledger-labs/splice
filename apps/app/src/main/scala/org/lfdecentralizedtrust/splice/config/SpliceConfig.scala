@@ -705,6 +705,29 @@ object SpliceConfig {
               s"topup interval ${conf.domains.global.buyExtraTraffic.minTopupInterval} must not be smaller than the polling interval ${conf.automation.pollingInterval}"
             ),
           )
+
+          _ <- Either.cond(
+            !conf.disableSvValidatorBftSequencerConnection || conf.svValidator,
+            (),
+            ConfigValidationFailed(
+              s"disableSvValidatorBftSequencerConnection must not be set for non-sv validators"
+            ),
+          )
+
+          _ <- Either.cond(
+            !(conf.disableSvValidatorBftSequencerConnection && conf.domains.global.url.isEmpty),
+            (),
+            ConfigValidationFailed(
+              s"disableSvValidatorBftSequencerConnection must be set together with domains.global.url"
+            ),
+          )
+          _ <- Either.cond(
+            !(!conf.disableSvValidatorBftSequencerConnection && conf.svValidator && conf.domains.global.url.isDefined),
+            (),
+            ConfigValidationFailed(
+              s"domains.global.url must not be set for an SV unless disableSvValidatorBftSequencerConnection is also set"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
