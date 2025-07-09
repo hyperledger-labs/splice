@@ -80,3 +80,29 @@ tests:
               beneficiary = "beneficiary2"
               weight = 25
             }
+
+  - it: "accepts string values for extra-beneficiaries weight, to maintain backward compatibility till string values are disallowed"
+    set:
+      extraBeneficiaries:
+        - beneficiary: "beneficiary1"
+          weight: "10"
+        - beneficiary: "beneficiary2"
+          weight: "25"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_BENEFICIARIES_0')].value
+          value: |
+            canton.sv-apps.sv.extra-beneficiaries.0 = {
+              beneficiary = "beneficiary1"
+              weight = 10
+            }
+      - equal:
+          path: spec.template.spec.containers[?(@.name=='sv-app')].env[?(@.name=='ADDITIONAL_CONFIG_BENEFICIARIES_1')].value
+          value: |
+            canton.sv-apps.sv.extra-beneficiaries.1 = {
+              beneficiary = "beneficiary2"
+              weight = 25
+            }
