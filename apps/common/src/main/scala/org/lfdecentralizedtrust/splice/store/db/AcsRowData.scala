@@ -70,6 +70,12 @@ object AcsInterfaceViewRowData {
   /** Just a helper trait for when a store doesn't care about interfaces.
     */
   trait NoInterfacesIngested extends AcsInterfaceViewRowData
+
+  trait AcsInterfaceViewRowDataFromContract extends AcsInterfaceViewRowData {
+    val contract: Contract[?, ?]
+    override val interfaceId: Identifier = contract.identifier
+    override val interfaceView: DamlRecord[_] = contract.payload
+  }
 }
 
 case class FailedInterfaceComputationRow(interfaceId: Identifier, viewStatus: com.google.rpc.Status)

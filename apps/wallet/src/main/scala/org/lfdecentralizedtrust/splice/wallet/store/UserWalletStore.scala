@@ -7,6 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
@@ -31,7 +32,10 @@ import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit, TransferInputSto
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore.*
 import org.lfdecentralizedtrust.splice.wallet.store.db.DbUserWalletStore
-import org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
+import org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.{
+  UserWalletAcsInterfaceViewRowData,
+  UserWalletAcsStoreRowData,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
@@ -40,10 +44,10 @@ import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore extends TxLogAppStore[TxLogEntry] with TransferInputStore with NamedLogging {
@@ -508,7 +512,7 @@ object UserWalletStore {
   def contractFilter(
       key: Key,
       domainMigrationId: Long,
-  ): ContractFilter[UserWalletAcsStoreRowData, AcsInterfaceViewRowData.NoInterfacesIngested] = {
+  ): ContractFilter[UserWalletAcsStoreRowData, UserWalletAcsInterfaceViewRowData] = {
     val endUser = key.endUserParty.toProtoPrimitive
     val validator = key.validatorParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive
@@ -690,6 +694,19 @@ object UserWalletStore {
         mkFilter(amuletTransferInstructionCodegen.AmuletTransferInstruction.COMPANION)(co =>
           co.payload.transfer.instrumentId.admin == dso && (co.payload.transfer.sender == endUser || co.payload.transfer.receiver == endUser)
         )(contract => UserWalletAcsStoreRowData(contract)),
+        mkFilter(splice.amuletallocation.AmuletAllocation.COMPANION) { co =>
+          val transferLeg = co.payload.allocation.transferLeg
+          transferLeg.instrumentId.admin == dso && transferLeg.sender == endUser
+        } { contract =>
+          UserWalletAcsStoreRowData(contract)
+        },
+      ),
+      Map(
+        mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE)(co =>
+          co.payload.transferLegs.asScala.exists { case (_, transferLeg) =>
+            transferLeg.instrumentId.admin == dso && transferLeg.sender == endUser
+          }
+        )(contract => UserWalletAcsInterfaceViewRowData(contract))
       ),
     )
   }

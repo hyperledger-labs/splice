@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.wallet.store.db
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
   AcsRowData,
   AcsTables,
   IndexColumnValue,
@@ -33,6 +34,11 @@ object WalletTables extends AcsTables {
       "reward_coupon_weight" -> IndexColumnValue(rewardCouponWeight),
       "transfer_preapproval_receiver" -> IndexColumnValue(transferPreapprovalReceiver),
     )
+  }
+
+  case class UserWalletAcsInterfaceViewRowData(contract: Contract[?, ?])
+      extends AcsInterfaceViewRowData.AcsInterfaceViewRowDataFromContract {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
   }
 
   case class ExternalPartyWalletAcsStoreRowData(

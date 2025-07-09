@@ -19,7 +19,6 @@ import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{ContractCompan
 import org.lfdecentralizedtrust.splice.store.db.AcsQueries.{AcsStoreId, SelectFromAcsTableResult}
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.db.{
-  AcsInterfaceViewRowData,
   AcsQueries,
   AcsTables,
   DbTxLogAppStore,
@@ -120,7 +119,7 @@ class DbUserWalletStore(
   override protected def acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
         org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsStoreRowData,
-        AcsInterfaceViewRowData.NoInterfacesIngested,
+        org.lfdecentralizedtrust.splice.wallet.store.db.WalletTables.UserWalletAcsInterfaceViewRowData,
       ] = UserWalletStore.contractFilter(key, domainMigrationId)
 
   override lazy val txLogConfig: org.lfdecentralizedtrust.splice.store.TxLogStore.Config[
