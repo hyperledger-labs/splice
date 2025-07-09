@@ -31,7 +31,6 @@ in pkgs.mkShell {
     git
     # Required for the runner-container-hooks submodule
     git-lfs
-    git-search-replace
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
     daml2js
