@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Role } from '@pulumi/kubernetes/rbac/v1';
@@ -13,7 +14,6 @@ import {
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
-import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
 
 import { createCachePvc } from './cache';
@@ -765,7 +765,9 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         // for registration, and this endpoint seems to require admin rights.
         // TODO(DACH-NY/canton-network-node#17842): The recommended thing to do is use a GitHub App. See here for a guide
         // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
-        github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
+        github_token: getSecretVersionOutput({ secret: 'gh-runners-access-token' }).apply(
+          k => k.secretData
+        ),
       },
     },
     {
