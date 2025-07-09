@@ -147,6 +147,12 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             )
           }
         }
+        clue("SV2 is connected to the global synchronizer") {
+          eventually() {
+            sv2Backend.participantClient.synchronizers
+              .is_connected(decentralizedSynchronizerAlias) shouldBe true
+          }
+        }
         actAndCheck(
           "SV2 creates a request to offboard SV1",
           sv2Backend.createVoteRequest(
