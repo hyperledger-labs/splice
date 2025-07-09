@@ -5,24 +5,26 @@ set -euo pipefail
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
-if [ -z "${1:-}" ]; then
-    _error "Usage: $0 <image-reference>"
-else
-    imageReference=$1
-fi
-
-# FIXME: do we really want to do the tagging here? Maybe move it out of docker-push into docker-build?!
-imageId="$(<target/docker.id)"
-if ! _set_x docker tag "${imageId}" "${imageReference}"; then
-    _error "Could not tag image '${imageId}."
-    exit 1
-fi
+image="$(<target/local-image-tag)"
 
 bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --blackduck.url=https://digitalasset.blackducksoftware.com/ \
   --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
-  --detect.docker.image="$imageReference" \
+  --detect.docker.image="$image" \
   --detect.tools=DOCKER,SIGNATURE_SCAN \
   --detect.tools.excluded=BINARY_SCAN \
-  --detect.project.name=itai-test \
-  --detect.version.name="$imageReference"
+  --detect.project.name=DACH-NY_canton-network-internal_images \
+  --detect.project.version.name="$image"
+
+
+#bash <(curl -s -L https://detect.synopsys.com/detect8.sh)   \
+#  --blackduck.url=https://digitalasset.blackducksoftware.com/   \
+#  --blackduck.trust.cert=true   \
+#  --blackduck.api.token=$BLACKDUCK_HUBDETECT_TOKEN   \
+#  --detect.project.name=DACH-NY_canton-network-internal_images   \
+#  --detect.tools=DOCKER,SIGNATURE_SCAN   \
+#  --detect.docker.passthrough.cleanup.inspector.container=true    \
+#  --detect.docker.image=wallet-web-ui   \
+#  --detect.project.version.name=0.4.4-itai-dirty    \
+#  --detect.project.version.notes="wallet-web-ui@sha256:83e581666b7f1ed33b2bd22a1ad41ddfd4cfe35674656b09caccedf79ade3a92"   \
+#  --detect.docker.platform.top.layer.id=sha256:b22c35a89de1dd863e6768b69f60c88cc09d3167a047452fafd14fe370d70176

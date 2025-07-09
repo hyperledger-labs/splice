@@ -132,7 +132,7 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))
 
 %/$(docker-scan):  %/$(docker-image-tag) %/$(docker-build)
-	docker-scan $$(cat $(abspath $<))
+	cd $(@D) && docker-scan $$(cat $(abspath $<))
 
 
 #########
