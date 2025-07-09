@@ -128,7 +128,7 @@ function _pulumi_automation_run_up() {
 }
 
 function _remove_pulumi_finalizers() {
-    for resource in stack crd; do
+    for resource in stack update; do
       kubectl get "$resource" --all-namespaces -o json | jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' | while read -r namespace name; do
         finalizers=$(kubectl get "$resource" -n "$namespace" "$name" -o json | jq -r '.metadata.finalizers')
         if [[ "$finalizers" == "null" ]]; then
