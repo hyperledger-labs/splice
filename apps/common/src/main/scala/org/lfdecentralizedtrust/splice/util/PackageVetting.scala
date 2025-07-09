@@ -45,11 +45,15 @@ class PackageVetting(
     // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
     // Since interfaces are not upgradeable, there's no gain in coordinating it via package config.
     // An interface itself also does nothing, only the implementations do, so it's OK from a vetting perspective.
-    } ++ DarResources.TokenStandard.allProductionPackageResources
-      .flatMap(_.all)
-      .map(darResource =>
-        PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1 -> darResource.metadata.version
-      )
+    } ++ Seq(
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenMetadataV1,
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenHoldingV1,
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenTransferInstructionV1,
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationV1,
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationRequestV1,
+      PackageIdResolver.Package.TokenStandard.SpliceApiTokenAllocationInstructionV1,
+    ).map(pkg => pkg -> PackageIdResolver.readPackageVersion(currentPackageConfig, pkg))
+
     vetPackages(
       domainId,
       packagesToVet,
