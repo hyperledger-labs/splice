@@ -875,7 +875,8 @@ lazy val `apps-sv` =
         pekko_http_cors,
         scalapb_runtime,
       ),
-      Compile / unmanagedJars := Attributed.blankSeq(Seq(file(s"${sys.env("COMETBFT_PROTO")}/canton-drivers-proto.jar"))),
+      Compile / unmanagedJars := Attributed
+        .blankSeq(Seq(file(s"${sys.env("COMETBFT_PROTO")}/canton-drivers-proto.jar"))),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(

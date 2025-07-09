@@ -2,7 +2,14 @@
 
 ## Bumping CometBFT
 
-Update the version in the `nix/cometbft-driver-sources.json` file
+1. Update the version in the `nix/cometbft-driver-sources.json` file
+2. Download the corresponding `canton-drivers-proto-<version>.jar` file from
+   JFrog, at `https://digitalasset.jfrog.io/ui/native/canton-drivers/com/digitalasset/canton/drivers/canton-drivers-proto/<version>/canton-drivers-proto-<version>.jar`,
+   and save it under `nix/vendored`.
+3. Update the symlink from `nix/vendored/canton-drivers-proto.jar` to point to the newly downloaded jar.
+4. Delete the older `canton-drivers-proto-<old-version>.jar` file from `nix/vendored`.
+
+// TODO(#1296): once we pull the file from s3 in nix instead of vendoring it in this repo, update the section above (should be just step 1).
 
 ## Bumping Canton
 
