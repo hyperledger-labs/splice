@@ -127,7 +127,12 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Requested at</Typography>
+            {/*For these timestamp fields: a date picker doesn't work because
+            daml Time has microsecond precision, while javascript only millisecond precision.
+            Furthermore, the timestamps need to match that of an original allocation request,
+            so they will either be copy-pasted or (in the near future) auto-filled.
+            Therefore, a TextField where we validate the timestamp is correctly formatted makes more sense.*/}
+            <Typography variant="h6">Requested at ({ALLOCATION_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-requested-at"
               placeholder={ALLOCATION_TIMESTAMP_FORMAT}
@@ -140,7 +145,7 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Settle before</Typography>
+            <Typography variant="h6">Settle before ({ALLOCATION_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-settle-before"
               placeholder={ALLOCATION_TIMESTAMP_FORMAT}
@@ -153,7 +158,7 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Allocate before</Typography>
+            <Typography variant="h6">Allocate before ({ALLOCATION_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-allocate-before"
               placeholder={ALLOCATION_TIMESTAMP_FORMAT}
