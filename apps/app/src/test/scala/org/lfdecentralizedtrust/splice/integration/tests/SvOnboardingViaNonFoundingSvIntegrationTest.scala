@@ -124,7 +124,9 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             )
           },
         )
-        clue("sv2 uses it's own sequencer to handle offboarding sv1") {
+        clue(
+          "sv2 uses its own sequencer to handle offboarding sv1 and is connected to the global synchronizer"
+        ) {
           eventually(timeUntilSuccess = 2.minutes) {
             val endpoints = sv2Backend.participantClient.synchronizers
               .config(decentralizedSynchronizerAlias)
@@ -145,28 +147,27 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
                 sv2Backend.config.localSynchronizerNode.value.sequencer.internalApi
               ),
             )
-          }
-        }
-        clue("SV2 is connected to the global synchronizer") {
-          eventually() {
-            sv2Backend.participantClient.synchronizers
-              .is_connected(decentralizedSynchronizerAlias) shouldBe true
+            sv2Backend.participantClient.synchronizers.is_connected(
+              decentralizedSynchronizerAlias
+            ) shouldBe true
           }
         }
         actAndCheck(
           "SV2 creates a request to offboard SV1",
-          sv2Backend.createVoteRequest(
-            sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
-            new ARC_DsoRules(
-              new SRARC_OffboardSv(
-                new DsoRules_OffboardSv(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
-              )
-            ),
-            "url",
-            "description",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-            None,
-          ),
+          eventuallySucceeds() {
+            sv2Backend.createVoteRequest(
+              sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
+              new ARC_DsoRules(
+                new SRARC_OffboardSv(
+                  new DsoRules_OffboardSv(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
+                )
+              ),
+              "url",
+              "description",
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
+            )
+          },
         )("the request is created", _ => sv1Backend.listVoteRequests() should not be empty)
         actAndCheck(
           "SV1 accepts the request as it requires two votes",
