@@ -27,12 +27,17 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.time.{LocalDateTime, ZoneOffset}
 import java.util.Optional
+import scala.util.Random
 
 class AllocationsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
-    with FrontendLoginUtil {
+    with FrontendLoginUtil
+    with TokenStandardTest {
+
+  private val tokenStandardTestDarPath =
+    "token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar"
 
   private val amuletPrice = 2
   override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
@@ -40,6 +45,16 @@ class AllocationsFrontendIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
+      .withAdditionalSetup(implicit env => {
+        Seq(
+          sv1ValidatorBackend,
+          aliceValidatorBackend,
+          bobValidatorBackend,
+          splitwellValidatorBackend,
+        ).foreach { backend =>
+          backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
+        }
+      })
 
   private def createAllocation(sender: PartyId)(implicit
       ev: SpliceTestConsoleEnvironment,
@@ -74,16 +89,7 @@ class AllocationsFrontendIntegrationTest
       ),
     )
 
-    actAndCheck(
-      "go to allocations page", {
-        click on "navlink-allocations"
-      },
-    )(
-      "allocations page is shown",
-      _ => {
-        currentUrl should endWith("/allocations")
-      },
-    )
+    browseToAllocationsPage()
 
     actAndCheck(
       "create allocation", {
@@ -172,7 +178,69 @@ class AllocationsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    "create a token standard allocation" in { implicit env =>
+    "see allocation requests" in { implicit env =>
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceTransferAmount = BigDecimal(5)
+
+      val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      val bobAnsName = perTestCaseName("bob")
+      val bobAnsDisplay = expectedAns(bobParty, bobAnsName)
+      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient)
+      val bobTransferAmount = BigDecimal(6)
+
+      val venuePartyHint = s"venue-party-${Random.nextInt()}"
+      val venueParty = splitwellValidatorBackend.onboardUser(
+        splitwellWalletClient.config.ledgerApiUser,
+        Some(
+          PartyId.tryFromProtoPrimitive(
+            s"$venuePartyHint::${splitwellValidatorBackend.participantClient.id.namespace.toProtoPrimitive}"
+          )
+        ),
+      )
+
+      aliceWalletClient.tap(1000)
+      bobWalletClient.tap(1000)
+
+      val otcTrade = createAllocationRequestViaOTCTrade(
+        aliceParty,
+        aliceTransferAmount,
+        bobParty,
+        bobTransferAmount,
+        venueParty,
+      )
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        browseToAllocationsPage()
+
+        clue("check that the allocation request is shown") {
+          eventually() {
+            val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
+
+            seleniumText(
+              allocationRequest.childElement(className("allocation-request-id"))
+            ) should be(
+              // first part is hardcoded in daml
+              s"OTCTradeProposal - ${otcTrade.trade.data.tradeCid.contractId}"
+            )
+            allocationRequest
+              .childElement(className("allocation-request-amount-to"))
+              .text should be(
+              "5 AMT to"
+            )
+            seleniumText(
+              allocationRequest.childElement(className("allocation-receiver"))
+            ) should matchText(bobAnsDisplay)
+            seleniumText(
+              allocationRequest.childElement(className("allocation-executor"))
+            ) should matchText(venueParty.toProtoPrimitive)
+          }
+        }
+      }
+    }
+
+    "create a token standard allocation manually" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(1000)
@@ -184,5 +252,18 @@ class AllocationsFrontendIntegrationTest
       }
     }
 
+  }
+
+  private def browseToAllocationsPage()(implicit driver: WebDriverType) = {
+    actAndCheck(
+      "go to allocations page", {
+        click on "navlink-allocations"
+      },
+    )(
+      "allocations page is shown",
+      _ => {
+        currentUrl should endWith("/allocations")
+      },
+    )
   }
 }

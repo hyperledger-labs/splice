@@ -50,6 +50,7 @@ import {
   Notification,
   ListTokenStandardTransfersResponse,
 } from '../models/models';
+import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
@@ -97,6 +98,7 @@ export interface WalletClient {
   rejectTokenStandardTransfer: (transferContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
+  listAllocationRequests: () => Promise<Contract<AllocationRequest>[]>;
   createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
 
   getAppPaymentRequest: (contractId: string) => Promise<ContractWithState<AppPaymentRequest>>;
@@ -315,6 +317,12 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             Contract.decodeOpenAPI(c, AcceptedTransferOffer)
           ),
         };
+      },
+      listAllocationRequests: async () => {
+        const res = await walletClient.listAllocationRequests();
+        return res.allocation_requests.map(ar =>
+          Contract.decodeOpenAPI(ar.contract, AllocationRequest)
+        );
       },
       createAllocation: async allocateAmuletRequest => {
         await walletClient.allocateAmulet(allocateAmuletRequest);
