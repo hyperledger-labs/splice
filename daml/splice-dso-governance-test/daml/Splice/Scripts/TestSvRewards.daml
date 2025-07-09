@@ -20,8 +20,8 @@ import Splice.DSO.SvState
 import Splice.Scripts.DsoTestUtils
 import Splice.Util
 
-test_SvRewards_Per_InitialRound : Int -> Script ()
-test_SvRewards_Per_InitialRound initialRound = do
+test_SvRewards_Per_InitialRound : Int -> Decimal -> Script ()
+test_SvRewards_Per_InitialRound initialRound expectedIssuancePerSvRewardCoupon = do
 
     (app, dso, (sv1, sv2, sv3, sv4)) <- initDecentralizedSynchronizerWithNonZeroRound False initialRound
 
@@ -111,22 +111,6 @@ test_SvRewards_Per_InitialRound initialRound = do
     checkBalance sv1 sv1Balance0
     checkBalance sv2 sv2Balance
 
-    let currentTime = minutes (initialRound * 10)
-    let hoursPerHalfYear = 12 * 365
-    let hoursPerYear = 24 * 365
-
-    let expectedIssuancePerSvRewardCoupon =
-          if (currentTime < (hours hoursPerHalfYear)) then -- Less than 0.5 year
-            4.6832923545
-          else if (currentTime < (hours (3 * hoursPerHalfYear))) then -- Between 0.5 and 1.5 years
-            1.4049877064
-          else if (currentTime < (hours (5 * hoursPerYear))) then -- Between 3 and 5 years
-            0.2927057722
-          else if (currentTime < (hours (10 * hoursPerYear))) then -- Between 0.5 and 1.5 years
-            0.073176443
-          else
-            0.0182941108
-
     require (show round.issuancePerSvRewardCoupon <> " initIssuancePerSvRewardCoupon: expected ") (round.issuancePerSvRewardCoupon == expectedIssuancePerSvRewardCoupon)
 
     -- also collect the round 1
@@ -180,9 +164,9 @@ test_SvRewards_Per_InitialRound initialRound = do
 
 test_SvRewards : Script ()
 test_SvRewards = do
-  test_SvRewards_Per_InitialRound 0
+  test_SvRewards_Per_InitialRound 0 4.6832923545
   -- The 50k's round is falling in the second issuance curve (approx. 1 year after bootstrap)
-  test_SvRewards_Per_InitialRound 50000
+  test_SvRewards_Per_InitialRound 50000 1.4049877064
   pure ()
 
 test_SvRewardStateMerge = do
