@@ -22,6 +22,23 @@ Upcoming
     ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
     ``canton.sv-apps.sv.bft-sequencer-connection = false``
 
+  - The extra beneficiaries weight config has been fixed to accept integer values.
+    The string values for weight have been deprecated and will be removed in future releases.
+    It is recommended to fix the config as per this example, the previous config::
+
+        extraBeneficiaries:
+          - beneficiary: "BENEFICIARY_1_PARTY_ID"
+            weight: "1000"
+
+    changes to::
+
+        extraBeneficiaries:
+          - beneficiary: "BENEFICIARY_1_PARTY_ID"
+            weight: 1000
+
+    Thanks to Divam Narula for contributing this change
+    in https://github.com/hyperledger-labs/splice/pull/1371
+
 - Daml
 
   - security: change ``AmuletRules_Transfer`` and ``AmuletRules_ComputeFees`` to take an explicit argument
