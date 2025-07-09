@@ -248,6 +248,14 @@ function installDockerRunnerScaleSet(
                     subPath: 'daemon.json',
                   },
                 ],
+                startupProbe: {
+                  exec: {
+                    command: ['docker', 'version'],
+                  },
+                  initialDelaySeconds: 3,
+                  periodSeconds: 2,
+                  failureThreshold: 20,
+                },
               },
             ],
             volumes: [

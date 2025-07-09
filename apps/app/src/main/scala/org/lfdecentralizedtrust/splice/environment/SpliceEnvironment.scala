@@ -44,6 +44,8 @@ class SpliceEnvironment(
   private lazy val metrics = SpliceMetricsFactory(
     metricsRegistry,
     dbStorageHistograms,
+    loggerFactory,
+    config.parameters.timeouts.processing,
   )
 
   protected def createValidator(

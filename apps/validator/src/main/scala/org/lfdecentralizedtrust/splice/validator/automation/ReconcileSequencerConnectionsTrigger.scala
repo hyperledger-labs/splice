@@ -24,11 +24,11 @@ import com.digitalasset.canton.sequencing.{
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import cats.syntax.foldable.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class ReconcileSequencerConnectionsTrigger(
@@ -78,34 +78,37 @@ class ReconcileSequencerConnectionsTrigger(
           }
           for {
             sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(maxDomainTime)
-            _ <- sequencerConnections.toList.traverse_ { case (alias, connections) =>
-              val sequencerConnectionConfig = NonEmpty.from(connections) match {
-                case None =>
-                  // We warn on repeated failures of a polling trigger so
-                  // it's safe to just treat it as a transient exception and retry without logging warnings.
-                  throw Status.NOT_FOUND
-                    .withDescription(
-                      "Dso Sequencer list from Scan is empty, not modifying sequencers connections. This can happen during initialization when domain time is lagging behind."
+            _ <- MonadUtil.sequentialTraverse_(sequencerConnections.toList) {
+              case (alias, connections) =>
+                val sequencerConnectionConfig = NonEmpty.from(connections) match {
+                  case None =>
+                    // We warn on repeated failures of a polling trigger so
+                    // it's safe to just treat it as a transient exception and retry without logging warnings.
+                    throw Status.NOT_FOUND
+                      .withDescription(
+                        "Dso Sequencer list from Scan is empty, not modifying sequencers connections. This can happen during initialization when domain time is lagging behind."
+                      )
+                      .asRuntimeException()
+                  case Some(nonEmptyConnections) =>
+                    SequencerConnections.tryMany(
+                      nonEmptyConnections.forgetNE,
+                      Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                      submissionRequestAmplification = SubmissionRequestAmplification(
+                        Thresholds.sequencerSubmissionRequestAmplification(
+                          nonEmptyConnections.size
+                        ),
+                        patience,
+                      ),
                     )
-                    .asRuntimeException()
-                case Some(nonEmptyConnections) =>
-                  SequencerConnections.tryMany(
-                    nonEmptyConnections.forgetNE,
-                    Thresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-                    submissionRequestAmplification = SubmissionRequestAmplification(
-                      Thresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
-                      patience,
-                    ),
-                  )
-              }
-              participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
-                SynchronizerConnectionConfig(
-                  alias,
-                  sequencerConnectionConfig,
-                ),
-                modifySequencerConnections(sequencerConnectionConfig),
-                RetryFor.Automation,
-              )
+                }
+                participantAdminConnection.modifyOrRegisterSynchronizerConnectionConfigAndReconnect(
+                  SynchronizerConnectionConfig(
+                    alias,
+                    sequencerConnectionConfig,
+                  ),
+                  modifySequencerConnections(sequencerConnectionConfig),
+                  RetryFor.Automation,
+                )
             }
           } yield ()
         case None =>

@@ -9,8 +9,8 @@ dependencies:
 - daml-prim
 - daml-stdlib
 data-dependencies:
-- ../splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
-- ../splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
+- ../../token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
+- ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
 build-options:
   - --target=2.1
 codegen:

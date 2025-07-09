@@ -41,6 +41,7 @@ testLocking = do
         outputs = [lockOutput, lockOutput]
         beneficiaries = None
       context = context.context
+      expectedDso = Some app.dso
 
   [(lockedCid1, _), (lockedCid2, _)] <- query @LockedAmulet alice.primaryParty
 

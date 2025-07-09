@@ -284,6 +284,7 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
   return $ exerciseCmd rules
     AmuletRules_Transfer with
       transfer, context = amuletTransferContext openRound featuredAppRight
+      expectedDso = Some app.dso
 
 getLockedAmulet : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedAmulet)
 getLockedAmulet app owner lockHolder amount lockDuration = do

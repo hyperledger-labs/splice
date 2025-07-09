@@ -79,7 +79,10 @@ class MergeMemberTrafficContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       amuletRules <- store.getAmuletRules()
       arg = new DsoRules_MergeMemberTrafficContracts(
         amuletRules.contractId,
@@ -90,6 +93,7 @@ class MergeMemberTrafficContractsTrigger(
       outcome <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain ${dsoRules.domain} " +

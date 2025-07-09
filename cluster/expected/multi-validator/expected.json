@@ -174,12 +174,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-0-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -603,12 +607,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-1-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -1032,12 +1040,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-2-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -1461,12 +1473,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -1890,12 +1906,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-4-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -2319,12 +2339,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-0-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -2697,12 +2721,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-1-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -3075,12 +3103,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-2-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -3453,12 +3485,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -3831,12 +3867,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-4-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],

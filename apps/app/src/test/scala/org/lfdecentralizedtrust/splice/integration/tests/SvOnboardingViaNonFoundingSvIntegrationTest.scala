@@ -108,6 +108,8 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             sv2ScanBackend,
             sv1Backend,
             sv2Backend,
+            // We need the validator backend for sequencer url reconciliation
+            sv2ValidatorBackend,
           ),
         )(
           "SV1 and SV2 are part of the DSO",
@@ -122,36 +124,50 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             )
           },
         )
-        clue("sv2 uses it's own sequencer to handle offboarding sv1") {
+        clue(
+          "sv2 uses its own sequencer to handle offboarding sv1 and is connected to the global synchronizer"
+        ) {
           eventually(timeUntilSuccess = 2.minutes) {
-            sv2Backend.participantClient.synchronizers
+            val endpoints = sv2Backend.participantClient.synchronizers
               .config(decentralizedSynchronizerAlias)
               .value
               .sequencerConnections
               .connections
-              .toIndexedSeq
-              .loneElement match {
-              case GrpcSequencerConnection(endpoints, _, _, _) =>
-                endpoints.toIndexedSeq.loneElement shouldBe LocalSynchronizerNode.toEndpoint(
-                  sv2Backend.config.localSynchronizerNode.value.sequencer.internalApi
-                )
-            }
+              .forgetNE
+              .map {
+                inside(_) { case GrpcSequencerConnection(endpoints, _, _, _) =>
+                  endpoints.forgetNE.loneElement
+                }
+              }
+            endpoints.toSet shouldBe Set(
+              LocalSynchronizerNode.toEndpoint(
+                sv1Backend.config.localSynchronizerNode.value.sequencer.internalApi
+              ),
+              LocalSynchronizerNode.toEndpoint(
+                sv2Backend.config.localSynchronizerNode.value.sequencer.internalApi
+              ),
+            )
+            sv2Backend.participantClient.synchronizers.is_connected(
+              decentralizedSynchronizerAlias
+            ) shouldBe true
           }
         }
         actAndCheck(
           "SV2 creates a request to offboard SV1",
-          sv2Backend.createVoteRequest(
-            sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
-            new ARC_DsoRules(
-              new SRARC_OffboardSv(
-                new DsoRules_OffboardSv(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
-              )
-            ),
-            "url",
-            "description",
-            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-            None,
-          ),
+          eventuallySucceeds() {
+            sv2Backend.createVoteRequest(
+              sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
+              new ARC_DsoRules(
+                new SRARC_OffboardSv(
+                  new DsoRules_OffboardSv(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
+                )
+              ),
+              "url",
+              "description",
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              None,
+            )
+          },
         )("the request is created", _ => sv1Backend.listVoteRequests() should not be empty)
         actAndCheck(
           "SV1 accepts the request as it requires two votes",

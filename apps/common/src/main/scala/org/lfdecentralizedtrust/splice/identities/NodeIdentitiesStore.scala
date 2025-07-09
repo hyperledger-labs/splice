@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.identities
 
-import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.config.PeriodicBackupDumpConfig
 import org.lfdecentralizedtrust.splice.environment.{BuildInfo, TopologyAdminConnection}
 import org.lfdecentralizedtrust.splice.identities.NodeIdentitiesDump.NodeKey
@@ -13,6 +12,7 @@ import com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 
 import java.nio.file.{Path, Paths}
 import java.time.Instant
@@ -33,7 +33,7 @@ class NodeIdentitiesStore(
     for {
       id <- adminConnection.identity()
       keysMetadata <- adminConnection.listMyKeys()
-      keys <- keysMetadata.traverse {
+      keys <- MonadUtil.sequentialTraverse(keysMetadata) {
         case PrivateKeyMetadata(publicKeyWithName, _, None) =>
           adminConnection
             .exportKeyPair(publicKeyWithName.publicKey.id)

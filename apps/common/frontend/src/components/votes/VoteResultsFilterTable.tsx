@@ -66,7 +66,7 @@ type VoteResultQueryOptions = {
   requester?: string;
 };
 
-const QUERY_LIMIT = 50;
+const QUERY_LIMIT = 500;
 
 export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   getAction,

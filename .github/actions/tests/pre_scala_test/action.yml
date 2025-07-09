@@ -19,6 +19,9 @@ inputs:
     description: "Skip the test if any of the given files was changed since the last release"
     required: false
     default: ""
+  gh_token:
+    type: string
+    required: true
 
 outputs:
   indices:
@@ -34,6 +37,8 @@ runs:
     - name: Check if static only
       uses: ./.github/actions/tests/skip_on_static
       id: check
+      with:
+        gh_token: ${{ inputs.gh_token }}
 
     - name: Skip if static only
       if: steps.check.outputs.skip == 'true'

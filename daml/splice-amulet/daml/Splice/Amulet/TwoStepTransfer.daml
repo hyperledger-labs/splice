@@ -82,7 +82,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
         amount
         receiverFeeRatio = 0.0  -- all fees are paid by the sender
         lock = None
-  [expectedTransferFees] <- exerciseComputeFees paymentContext sender [receiverOutputForActualTransfer]
+  [expectedTransferFees] <- exerciseComputeFees dso paymentContext sender [receiverOutputForActualTransfer]
   openRound <- fetchChecked (ForDso with dso) paymentContext.context.openMiningRound
   let lockDuration = transferBefore `subTime` requestedAt
   let approximateHoldingFees = holdingFeesForDuration lockDuration openRound
@@ -106,7 +106,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
         inputs = transferInputs
         beneficiaries = None
 
-  result <- exerciseCheckedPaymentTransfer dso paymentContext transfer
+  result <- exercisePaymentTransfer dso paymentContext transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   pure
     ( lockedAmulet
@@ -145,7 +145,7 @@ executeTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
         inputs = [InputAmulet amuletCid]
         outputs = [receiverOutput]
         beneficiaries
-  result <- exerciseCheckedPaymentTransfer dso paymentContext amuletRulesTransfer
+  result <- exercisePaymentTransfer dso paymentContext amuletRulesTransfer
   pure
     ( optionalToList (toInterfaceContractId <$> result.senderChangeAmulet)
     , createdAmuletToHolding <$> result.createdAmulets

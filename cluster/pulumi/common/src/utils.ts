@@ -27,6 +27,8 @@ export const PRIVATE_CONFIGS_PATH = config.optionalEnv('PRIVATE_CONFIGS_PATH');
 export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
 export const DOCKER_REPO = spliceEnvConfig.requireEnv('CACHE_DEV_DOCKER_REGISTRY');
 
+export const ObservabilityReleaseName = 'prometheus-grafana-monitoring';
+
 export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   const daUrlScheme = 'global.canton.network.digitalasset.com';
   const cantonUrlScheme = 'network.canton.global';

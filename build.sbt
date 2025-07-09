@@ -30,6 +30,7 @@ lazy val `canton-community-testing` = BuildCommon.`canton-community-testing`
 lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
 lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
 lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
+lazy val `canton-wartremover-annotations` = BuildCommon.`canton-wartremover-annotations`
 lazy val `canton-util-external` = BuildCommon.`canton-util-external`
 lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
 lazy val `canton-util-logging` = BuildCommon.`canton-util-logging`
@@ -387,7 +388,7 @@ lazy val `splice-api-token-allocation-instruction-v1-daml` =
 
 lazy val `splice-api-token-burn-mint-v1-daml` =
   project
-    .in(file("token-standard/splice-api-token-burn-mint-v1"))
+    .in(file("daml/splice-api-token-burn-mint-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -873,8 +874,9 @@ lazy val `apps-sv` =
       libraryDependencies ++= Seq(
         pekko_http_cors,
         scalapb_runtime,
-        comet_bft_proto,
       ),
+      Compile / unmanagedJars := Attributed
+        .blankSeq(Seq(file(s"${sys.env("COMETBFT_PROTO")}/canton-drivers-proto.jar"))),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(

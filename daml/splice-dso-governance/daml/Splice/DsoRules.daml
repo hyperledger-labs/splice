@@ -1202,6 +1202,7 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
+        _ <- getAndValidateSvParty this sv
         result <- exercise subscriptionIdleStateCid choiceArg
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso result.terminatedSubscription)
         pure DsoRules_ExpireSubscriptionResult

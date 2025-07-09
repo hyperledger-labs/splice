@@ -4,6 +4,8 @@
 package org.lfdecentralizedtrust.splice.scan.metrics
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.logging.TracedLogger
 import org.lfdecentralizedtrust.splice.BaseSpliceMetrics
 import com.digitalasset.canton.metrics.DbStorageHistograms
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
@@ -15,6 +17,8 @@ import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
 class ScanAppMetrics(
     metricsFactory: LabeledMetricsFactory,
     storageHistograms: DbStorageHistograms,
+    logger: TracedLogger,
+    timeouts: ProcessingTimeout,
 ) extends BaseSpliceMetrics("scan", metricsFactory, storageHistograms) {
-  val dbScanStore = new DbScanStoreMetrics(metricsFactory)
+  val dbScanStore = new DbScanStoreMetrics(metricsFactory, logger, timeouts)
 }

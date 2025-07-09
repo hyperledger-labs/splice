@@ -24,7 +24,8 @@ export interface BaseVotesHooks {
     requester?: string,
     effectiveFrom?: string,
     effectiveTo?: string,
-    accepted?: boolean
+    accepted?: boolean,
+    retry?: boolean
   ) => UseQueryResult<DsoRules_CloseVoteRequestResult[]>;
   useListVotes: (contractIds: ContractId<VoteRequest>[]) => UseQueryResult<SvVote[]>;
   useAmuletPriceVotes: () => UseQueryResult<AmuletPriceVote[]>;

@@ -44,7 +44,7 @@ Synchronizer upgrades with downtime effectively clone the state of the existing 
   This is realized through exporting and importing a :ref:`migration dump <sv-upgrades-dumps>`.
 - Active ledger state is preserved.
   This is also realized through exporting and importing a :ref:`migration dump <sv-upgrades-dumps>`.
-- Historical app state (such as transaction history) is preserved.
+- Historical app state in SV, validator and scan (such as transaction history) is preserved. Note however, that the transaction history exposed by the participant is not preserved and the participant will only serve history going forward.
   This is realized through persisting and reusing the (PostgreSQL) databases of the SV node apps (``sv``, ``scan``, ``validator``).
 - The CometBFT blockchain is **not** preserved.
   The upgraded synchronizer starts with a fresh CometBFT chain.

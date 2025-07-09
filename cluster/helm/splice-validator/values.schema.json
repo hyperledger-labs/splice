@@ -42,11 +42,8 @@
         }
       },
       "else": {
-        "required": ["decentralizedSynchronizerUrl"],
+        "required": [],
         "properties": {
-          "decentralizedSynchronizerUrl": {
-            "type": "string"
-          }
         }
       }
     },

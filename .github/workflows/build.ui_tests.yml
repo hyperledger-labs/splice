@@ -23,6 +23,8 @@ jobs:
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: skip
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check out repository code
         uses: actions/checkout@v4

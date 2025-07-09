@@ -260,6 +260,7 @@ object BuildCommon {
   lazy val cantonWarts = Seq(
     wartremoverErrors += Wart.custom("com.digitalasset.canton.DiscardedFuture"),
     wartremoverErrors += Wart.custom("com.digitalasset.canton.RequireBlocking"),
+    wartremoverErrors += Wart.custom("com.digitalasset.canton.FutureTraverse"),
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `canton-wartremover-extension`
     ),
@@ -1064,7 +1065,7 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
-      .dependsOn(`canton-slick-fork`)
+      .dependsOn(`canton-wartremover-annotations`, `canton-slick-fork`)
       .settings(
         disableTests,
         sharedSettings,
@@ -1084,6 +1085,11 @@ object BuildCommon {
         //      coverageEnabled := false,
       )
   }
+
+  lazy val `canton-wartremover-annotations` =
+    sbt.Project
+      .apply("canton-wartremover-annotations", file("canton/community/lib/wartremover-annotations"))
+      .settings(sharedSettings)
 
   // https://github.com/DACH-NY/canton/issues/10617: remove when no longer needed
   lazy val `canton-pekko-fork` = {

@@ -51,6 +51,8 @@ jobs:
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: static_only
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Cancel if not opted in
         shell: bash
         run: |
@@ -311,6 +313,8 @@ jobs:
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: static_only
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Handle [force] and [static] labels
         shell: bash
         run: |

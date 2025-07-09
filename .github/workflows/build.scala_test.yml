@@ -85,6 +85,7 @@ jobs:
           skip_if_regex: ${{ inputs.skip_if_regex }}
           skip_if_files_changed: ${{ inputs.skip_if_files_changed }}
           run_if_commit_tag: ${{ inputs.run_if_commit_tag }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
   scala_test:
     runs-on: ${{ inputs.runs_on }}
