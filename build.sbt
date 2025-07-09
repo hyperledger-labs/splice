@@ -874,8 +874,9 @@ lazy val `apps-sv` =
       libraryDependencies ++= Seq(
         pekko_http_cors,
         scalapb_runtime,
-        comet_bft_proto,
       ),
+      Compile / unmanagedJars := Attributed
+        .blankSeq(Seq(file(s"${sys.env("COMETBFT_PROTO")}/canton-drivers-proto.jar"))),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
