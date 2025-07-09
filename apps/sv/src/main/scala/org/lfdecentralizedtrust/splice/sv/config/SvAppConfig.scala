@@ -264,6 +264,7 @@ case class SvAppBackendConfig(
     delegatelessAutomation: Boolean = true,
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
+    initialRound: Long = 0L,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

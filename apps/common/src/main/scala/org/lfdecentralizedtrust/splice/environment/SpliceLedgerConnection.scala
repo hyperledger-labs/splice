@@ -529,6 +529,14 @@ class BaseLedgerConnection(
       PartyId.tryFromProtoPrimitive(_)
     )
 
+  def getInitialRoundFromUserMetadata(userId: String)(implicit
+      traceContext: TraceContext
+  ): Future[String] =
+    waitForUserMetadata(
+      userId,
+      INITIAL_ROUND_USER_METADATA_KEY,
+    )
+
   // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
   def lookupDsoPartyFromUserMetadata(userId: String)(implicit
       tc: TraceContext
@@ -1239,6 +1247,8 @@ object BaseLedgerConnection {
   val DSO_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/dso_party"
 
   val SV_NAME_USER_METADATA_KEY: String = "sv.app.network.canton.global/sv_name"
+
+  val INITIAL_ROUND_USER_METADATA_KEY: String = "sv.app.network.canton.global/initial_round"
 
   val SV1_INITIAL_PACKAGE_UPLOAD_METADATA_KEY: String =
     "network.canton.global/sv1_initial_package_upload"
