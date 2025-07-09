@@ -9,9 +9,6 @@ participantAddress: "participant-MIGRATION_ID"
 nodeIdentifier: YOUR_SV_NAME
 
 svValidator: true
-useSequencerConnectionsFromScan: false
-# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
-decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_HOSTNAME"
 
 persistence:
   host: apps-pg

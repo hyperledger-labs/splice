@@ -116,9 +116,6 @@ services:
             canton.validator-apps.validator_backend.scan-client.type = "trust-single"
             canton.validator-apps.validator_backend.scan-client.url = "http://scan:5012"
       - |
-        ADDITIONAL_CONFIG_TRUST_SINGLE_SEQUENCER=
-            canton.validator-apps.validator_backend.domains.global.url = "http://sequencer-mediator:5008"
-      - |
         ADDITIONAL_CONFIG_MIGRATION_ID=
             canton.validator-apps.validator_backend {
               domain-migration-id = 0
