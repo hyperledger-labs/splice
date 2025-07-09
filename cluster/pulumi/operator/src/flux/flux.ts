@@ -8,7 +8,7 @@ import { namespace } from '../namespace';
 export const flux = new k8s.helm.v3.Release('flux', {
   name: 'flux',
   chart: 'flux2',
-  version: '2.16.2',
+  version: '2.14.1',
   namespace: namespace.ns.metadata.name,
   repositoryOpts: {
     repo: 'https://fluxcd-community.github.io/helm-charts',
