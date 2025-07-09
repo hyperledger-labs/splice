@@ -246,7 +246,7 @@ async function installSvAndValidator(
     ? [
         {
           beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
-          weight: '3333',
+          weight: 3333,
         },
       ]
     : [];

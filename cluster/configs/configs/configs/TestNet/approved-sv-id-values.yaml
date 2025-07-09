@@ -10,6 +10,6 @@ approvedSvIdentities:
     rewardWeightBps: 150000
     extraBeneficiaries:
       - beneficiary: "mock-validator-1::123456789012345678901234567890123456789012234567890123456789012345678"
-        weight: "100000"
+        weight: 100000
       - beneficiary: "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5"
-        weight: "50000"
+        weight: 50000

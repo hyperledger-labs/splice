@@ -1,11 +1,9 @@
 package org.lfdecentralizedtrust.splice.util
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.console.*
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   TestCommon,
@@ -20,9 +18,6 @@ import org.scalatest.Assertion
 
 import java.time.Duration
 import scala.annotation.nowarn
-import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
-import com.digitalasset.canton.data.CantonTimestamp
 
 trait TimeTestUtil extends TestCommon {
   this: CommonAppInstanceReferences & WalletTestUtil =>
@@ -86,61 +81,6 @@ trait TimeTestUtil extends TestCommon {
         }
       }
     }
-  }
-
-  /** Directly exercises the AmuletRules_Transfer choice.
-    * Note that all parties participating in the transfer need to be hosted on the same participant
-    */
-  def rawTransfer(
-      userValidator: ValidatorAppBackendReference,
-      userId: String,
-      userParty: PartyId,
-      validatorParty: PartyId,
-      amulet: HttpWalletAppClient.AmuletPosition,
-      outputs: Seq[splice.amuletrules.TransferOutput],
-      now: CantonTimestamp,
-  )(implicit env: SpliceTestConsoleEnvironment) = {
-    val amuletRules = sv1ScanBackend.getAmuletRules()
-    val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
-    val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
-
-    val authorizers =
-      Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
-
-    val disclosure = DisclosedContracts.forTesting(amuletRules, openRound)
-
-    userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-      userId = userId,
-      actAs = authorizers.distinct,
-      readAs = Seq.empty,
-      commands = transferContext.amuletRules
-        .exerciseAmuletRules_Transfer(
-          new splice.amuletrules.Transfer(
-            userParty.toProtoPrimitive,
-            userParty.toProtoPrimitive,
-            Seq[splice.amuletrules.TransferInput](
-              new splice.amuletrules.transferinput.InputAmulet(
-                amulet.contract.contractId
-              )
-            ).asJava,
-            outputs.asJava,
-            java.util.Optional.empty(),
-          ),
-          new splice.amuletrules.TransferContext(
-            transferContext.openMiningRound,
-            Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-            Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
-            // note: we don't provide a featured app right as sender == provider
-            None.toJava,
-          ),
-          Some(amuletRules.payload.dso).toJava,
-        )
-        .commands
-        .asScala
-        .toSeq,
-      synchronizerId = Some(disclosure.assignedDomain),
-      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
-    )
   }
 
   /** This function advances time by ~one tick and waits for the DSO round management automation for open, summarizing

@@ -49,6 +49,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
@@ -493,7 +494,7 @@ trait SvDsoStore
         domain,
         limit,
       )
-      archivableClosedRounds <- closedRounds.traverse(round => {
+      archivableClosedRounds <- MonadUtil.sequentialTraverse(closedRounds)(round => {
         for {
           appRewardCoupons <- listAppRewardCouponsOnDomain(
             round.payload.round.number,

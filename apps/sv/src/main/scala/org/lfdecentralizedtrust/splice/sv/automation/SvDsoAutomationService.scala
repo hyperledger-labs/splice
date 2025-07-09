@@ -394,18 +394,20 @@ class SvDsoAutomationService(
       )
     )
 
-  localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
-    registerTrigger(
-      new LocalSequencerConnectionsTrigger(
-        triggerContext,
-        participantAdminConnection,
-        internalClientConfig.decentralizedSynchronizerAlias,
-        dsoStore,
-        internalClientConfig.sequencerInternalConfig,
-        config.participantClient.sequencerRequestAmplification,
-        config.domainMigrationId,
+  if (!config.bftSequencerConnection) {
+    localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
+      registerTrigger(
+        new LocalSequencerConnectionsTrigger(
+          triggerContext,
+          participantAdminConnection,
+          internalClientConfig.decentralizedSynchronizerAlias,
+          dsoStore,
+          internalClientConfig.sequencerInternalConfig,
+          config.participantClient.sequencerRequestAmplification,
+          config.domainMigrationId,
+        )
       )
-    )
+    }
   }
 
   localSequencerClientContext.foreach { sequencerContext =>

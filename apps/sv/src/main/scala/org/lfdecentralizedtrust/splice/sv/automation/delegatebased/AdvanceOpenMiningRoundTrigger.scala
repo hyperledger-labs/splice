@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.store.MiningRoundsStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -91,7 +92,6 @@ class AdvanceOpenMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[Boolean] = {
     import cats.instances.future.*
-    import cats.syntax.traverse.*
 
     val synchronizerId = task.work.openRounds.domain
     (for {
@@ -105,7 +105,7 @@ class AdvanceOpenMiningRoundTrigger(
             task.work.amuletRulesId,
           )
       )
-      _ <- task.work.openRounds.toSeq.traverse(co =>
+      _ <- MonadUtil.sequentialTraverse(task.work.openRounds.toSeq)(co =>
         OptionT(
           store.multiDomainAcsStore
             .lookupContractByIdOnDomain(splice.round.OpenMiningRound.COMPANION)(

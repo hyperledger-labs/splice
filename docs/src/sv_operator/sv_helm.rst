@@ -386,6 +386,16 @@ The secret is created as follows, with the `node_key.json` and `priv_validator_k
 Configuring CometBFT state sync
 +++++++++++++++++++++++++++++++
 
+.. warning::
+
+   CometBFT state sync introduces a dependency on the sponsoring node
+   for fetching the state snapshot on startup and therefore a single
+   point of failure. It should only be enabled when joining a new node
+   to a chain that has already been running for a while.  In all other
+   cases including for a new node after it has completed
+   initialization and after network resets, state sync should be
+   disabled.
+
 CometBFT has a feature called state sync that allows a new peer to catch up quickly by reading a snapshot of data at or near the head of
 the chain and verifying it instead of fetching and replaying every block. (See `CometBFT documentation <https://docs.cometbft.com/v0.34/core/state-sync>`_).
 This leads to drastically shorter times to onboard new nodes at the cost of new nodes having a truncated block history.

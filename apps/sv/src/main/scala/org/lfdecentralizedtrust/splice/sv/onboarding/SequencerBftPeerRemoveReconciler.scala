@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 import cats.implicits.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome, TaskSuccess}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
@@ -32,7 +33,9 @@ class SequencerBftPeerRemoveReconciler(
         s"Current peers [${task.currentPeers}]. Removing: [${task.toRemove}]."
       )
       for {
-        _ <- task.toRemove.toList.traverse(sequencerAdminConnection.removePeerEndpoint)
+        _ <- MonadUtil.sequentialTraverse(task.toRemove.toList)(
+          sequencerAdminConnection.removePeerEndpoint
+        )
       } yield TaskSuccess(s"Finished bft peer removal: $task")
     }
   }
