@@ -51,6 +51,10 @@ function _resolve_pulumi_stack() {
 }
 
 function _cluster_reset() {
+    _info "Removing Pulumi finalizers that block reset"
+
+    _remove_pulumi_finalizers
+
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
     _pulumi_automation_run_down
@@ -123,30 +127,46 @@ function _pulumi_automation_run_up() {
     fi
 }
 
+function _remove_pulumi_finalizers() {
+    for resource in stack crd; do
+      kubectl get "$resource" --all-namespaces -o json | jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' | while read -r namespace name; do
+        finalizers=$(kubectl get "$resource" -n "$namespace" "$name" -o json | jq -r '.metadata.finalizers')
+        if [[ "$finalizers" == "null" ]]; then
+          echo "$resource $name in namespace $namespace has no finalizers, skipping"
+        else
+          echo "$resource $name in namespace $namespace has finalizers $finalizers"
+          new_finalizers=$(jq 'del(.[] | select(. == "finalizer.stack.pulumi.com"))' <<< "$finalizers")
+          patch_payload="{\"metadata\":{\"finalizers\": $new_finalizers}}"
+          echo "Patch payload for $resource $name in namespace $namespace: $patch_payload"
+        fi
+      done
+    done
+}
+
 function _pulumi_automation_run_down() {
     if [ $# -eq 1 ]; then
-        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run down
+        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi/$1\" run down
     else
-        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run down
+        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi\" run down
     fi
 }
 
 function _pulumi_automation_run_refresh() {
-  _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run refresh
+  _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi\" run refresh
 }
 
 function _pulumi_automation_run_cancel() {
     if [ $# -eq 1 ]; then
-        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi/$1" run cancel
+        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi/$1\" run cancel
     else
-        _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run cancel
+        _killable_pulumi_automation_run --prefix \"${SPLICE_ROOT}/cluster/pulumi\" run cancel
     fi
 }
 
 # If we run npm [...] pulumi in the same process group as us, then when we ctrl-c,
 # it will signal pulumi at least twice, sometimes even three: once through the ctrl-c
 # signalling the whole process group, and once through pulumiXX.ts catching the signal
-# (and if we're not careful, it will catch it twice). Signaling pulumi twice is like hitting
+# (and if we"re not careful, it will catch it twice). Signaling pulumi twice is like hitting
 # ctrl-c twice, thus telling pulumi to exit immediately and not cleanup after itself, thus
 # ending with locked and/or polluted stacks.
 # Similarly, in CCI's run_bash_command_in_nix, we signal the whole process group, which is equivalend
