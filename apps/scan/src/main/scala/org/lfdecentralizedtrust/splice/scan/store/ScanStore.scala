@@ -28,7 +28,7 @@ import org.lfdecentralizedtrust.splice.scan.store.db.{
   ScanAggregator,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractCompanion
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.store.{
   AppStore,
   DsoRulesStore,
@@ -69,7 +69,10 @@ trait ScanStore
 
   protected[store] def domainMigrationId: Long
 
-  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
+  override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[
+    ScanAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] =
     ScanStore.contractFilter(key, domainMigrationId)
 
   def lookupAmuletRules()(implicit
@@ -336,7 +339,10 @@ object ScanStore {
   def contractFilter(
       key: ScanStore.Key,
       domainMigrationId: Long,
-  ): MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] = {
+  ): MultiDomainAcsStore.ContractFilter[
+    ScanAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
     val dso = key.dsoParty.toProtoPrimitive
 

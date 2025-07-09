@@ -237,21 +237,22 @@ object Contract {
   }
 
   /** This method is private on purpose because we only want to allow the construction of a
-    * [[org.lfdecentralizedtrust.splice.util.Contract]] instance through passing a [[com.daml.ledger.javaapi.data.CreatedEvent]]
-    * instance and not through a [[com.daml.ledger.javaapi.data.Contract]] because
-    * the [[com.daml.ledger.javaapi.data.Contract]] doesn't have the `metadata`
-    * argument we need.
+    * [[org.lfdecentralizedtrust.splice.util.Contract]] instance through passing:
+    * - the `createdEventBlob` from the corresponding CreatedEvent
+    * - the `identifier` of the interface if being parsed as interface view, and the one of the template otherwise
     */
   private def fromCodegenContract[TCid <: ContractId[?], T <: DamlRecord[?]](
       contract: CodegenContract[TCid, T],
-      ev: CreatedEvent,
+      identifier: Identifier,
+      createdEventBlob: ByteString,
+      createdAt: Instant,
   ): Contract[TCid, T] = {
     Contract(
-      identifier = ev.getTemplateId,
+      identifier = identifier,
       contractId = contract.id,
       payload = contract.data,
-      createdEventBlob = ev.getCreatedEventBlob(),
-      createdAt = ev.createdAt,
+      createdEventBlob = createdEventBlob,
+      createdAt = createdAt,
     )
   }
 
@@ -260,6 +261,22 @@ object Contract {
   )(ev: CreatedEvent): Option[Contract[TCid, T]] = {
     JavaDecodeUtil
       .decodeCreated(companion)(ev)
-      .map(fromCodegenContract(_, ev))
+      .map(fromCodegenContract(_, ev.getTemplateId, ev.getCreatedEventBlob, ev.createdAt))
+  }
+
+  def fromCreatedEvent[ICid <: ContractId[Marker], Marker, View <: DamlRecord[View]](
+      companion: Companion.Interface[ICid, Marker, View]
+  )(ev: CreatedEvent): Option[Contract[ICid, View]] = {
+    JavaDecodeUtil
+      .decodeCreated(companion)(ev)
+      .map(contract =>
+        fromCodegenContract(
+          contract,
+//          contract.getContractTypeId, // contains #package-name
+          companion.getTemplateIdWithPackageId,
+          ev.getCreatedEventBlob,
+          ev.createdAt,
+        )
+      )
   }
 }
