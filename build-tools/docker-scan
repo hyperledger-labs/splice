@@ -11,9 +11,18 @@ else
     imageReference=$1
 fi
 
+# FIXME: do we really want to do the tagging here? Maybe move it out of docker-push into docker-build?!
+imageId="$(<target/docker.id)"
+if ! _set_x docker tag "${imageId}" "${imageReference}"; then
+    _error "Could not tag image '${imageId}."
+    exit 1
+fi
+
 bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --blackduck.url=https://digitalasset.blackducksoftware.com/ \
   --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
   --detect.docker.image="$imageReference" \
+  --detect.tools=DOCKER,SIGNATURE_SCAN \
   --detect.tools.excluded=BINARY_SCAN \
-  --detect.project.name=itai-test
+  --detect.project.name=itai-test \
+  --detect.version.name="$imageReference"
