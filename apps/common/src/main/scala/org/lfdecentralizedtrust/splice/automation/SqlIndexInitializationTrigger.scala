@@ -18,7 +18,6 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
-import scala.util.Try
 
 /** A trigger that asynchronously creates or drops SQL indexes at application startup.
   *
@@ -43,7 +42,7 @@ class SqlIndexInitializationTrigger(
   )
   private[automation] val remainingActionsEmpty: Promise[Unit] = Promise()
 
-  private def nextTask(actions: List[IndexAction], schemaName: String)(implicit
+  private def nextTask(actions: List[IndexAction])(implicit
       tc: TraceContext
   ): FutureUnlessShutdown[Seq[Task]] =
     actions.headOption match {
@@ -52,7 +51,7 @@ class SqlIndexInitializationTrigger(
       case Some(head) =>
         for {
           headStatus <- storage.query(
-            getIndexStatusAction(head.indexName, schemaName),
+            getIndexStatusAction(head.indexName),
             "getIndexStatusAction",
           )
         } yield (head, headStatus) match {
@@ -95,8 +94,7 @@ class SqlIndexInitializationTrigger(
   ): Future[Seq[SqlIndexInitializationTrigger.Task]] = {
     storage.dbConfig match {
       case postgresConfig: DbConfig.Postgres =>
-        val schemaName = getPostgresSchema(postgresConfig)
-        nextTask(remainingActions.get(), schemaName)
+        nextTask(remainingActions.get())
           .failOnShutdownToAbortException("Retrieve SqlIndexInitializationTrigger tasks")
       case _ =>
         // We only really support Postgres in our apps.
@@ -146,10 +144,6 @@ class SqlIndexInitializationTrigger(
       logger.info(s"Confirmed action completed for index ${action.indexName}")
       Future.successful(TaskSuccess(s"Confirmed action completed for index ${action.indexName}"))
   }
-
-  private def getPostgresSchema(config: DbConfig.Postgres): String =
-    Try(config.config.getString("properties.currentSchema")).toOption.getOrElse("public")
-
 }
 
 object SqlIndexInitializationTrigger {
@@ -191,8 +185,7 @@ object SqlIndexInitializationTrigger {
   }
 
   def getIndexStatusAction(
-      indexName: String,
-      schemaName: String,
+      indexName: String
   )(implicit
       ec: ExecutionContext
   ): DBIOAction[IndexStatus, NoStream, Effect.Read] = {
@@ -209,7 +202,7 @@ object SqlIndexInitializationTrigger {
         pg_stat_progress_create_index pspci on pspci.index_relid = c.oid
       where
         c.relname = $indexName
-        and n.nspname = $schemaName
+        and n.nspname = current_schema
         and c.relkind = 'i'
     """.as[(Boolean, Option[Long])].headOption.map {
       // The status is "in progress" if a backend process exists that is actively building the index
