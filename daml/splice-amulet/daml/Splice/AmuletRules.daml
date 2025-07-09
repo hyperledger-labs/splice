@@ -605,10 +605,7 @@ template AmuletRules
         newScheduleItem : (Time, AmuletConfig Unit.USD)
       controller dso
       do
-        now <- getTime
-        require "The insertion is scheduled in the future" (now < newScheduleItem._1)
-        newAmuletRules <- create this with configSchedule = prune now (insert newScheduleItem this.configSchedule)
-        return AmuletRules_AddFutureAmuletConfigScheduleResult with ..
+        deprecatedChoice "splice-amulet" "0.1.12" "AmuletRules_AddFutureAmuletConfigSchedule"
 
     -- This removes a AmuletConfig Schedule defined in the future Schedules
     -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
@@ -617,10 +614,7 @@ template AmuletRules
         scheduleTime: Time
       controller dso
       do
-        now <- getTime
-        require "The removal is scheduled in the future" (now < scheduleTime)
-        newAmuletRules <- create this with configSchedule = prune now (remove scheduleTime this.configSchedule)
-        return AmuletRules_RemoveFutureAmuletConfigScheduleResult with ..
+        deprecatedChoice "splice-amulet" "0.1.12" "AmuletRules_RemoveFutureAmuletConfigSchedule"
 
     -- This updates a AmuletConfig Schedule defined in the future Schedules
     -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
@@ -629,10 +623,7 @@ template AmuletRules
         scheduleItem: (Time, AmuletConfig Unit.USD)
       controller dso
       do
-        now <- getTime
-        require "The update is scheduled in the future" (now < scheduleItem._1)
-        newAmuletRules <- create this with configSchedule = prune now (update scheduleItem this.configSchedule)
-        return AmuletRules_UpdateFutureAmuletConfigScheduleResult with ..
+        deprecatedChoice "splice-amulet" "0.1.12" "AmuletRules_UpdateFutureAmuletConfigSchedule"
 
     nonconsuming choice AmuletRules_ConvertFeaturedAppActivityMarkers : AmuletRules_ConvertFeaturedAppActivityMarkersResult
       with
