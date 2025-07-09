@@ -14,6 +14,7 @@
     ]
   },
   "dependencies": {
+    "@daml.js/splice-api-token-transfer-instruction": "file:../../common/frontend/daml.js/splice-api-token-allocation-request-v1-1.0.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "5.11.9",
