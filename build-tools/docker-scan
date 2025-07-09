@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+if [ -z "${1:-}" ]; then
+    _error "Usage: $0 <image-reference>"
+else
+    imageReference=$1
+fi
+
+bash <(curl -s https://detect.blackduck.com/detect10.sh) \
+  --blackduck.url=https://digitalasset.blackducksoftware.com/ \
+  --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
+  --detect.docker.image="$imageReference" \
+  --detect.tools.excluded=BINARY_SCAN \
+  --detect.project.name=itai-test
