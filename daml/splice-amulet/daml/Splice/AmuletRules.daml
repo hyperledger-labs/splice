@@ -55,6 +55,7 @@ data AmuletRules_DevNet_FeatureAppResult = AmuletRules_DevNet_FeatureAppResult w
 
 data AmuletRules_Bootstrap_RoundsResult = AmuletRules_Bootstrap_RoundsResult with
     openMiningRoundCid : ContractId OpenMiningRound
+    initialRound : Optional Round
 
 data AmuletRules_AdvanceOpenMiningRoundsResult = AmuletRules_AdvanceOpenMiningRoundsResult with
     summarizingRoundCid : ContractId SummarizingMiningRound
@@ -309,12 +310,15 @@ template AmuletRules
         amuletPrice : Decimal
         round0Duration : RelTime
         -- Duration of the very first round, typically set to a number large enough for all initial svs to complete joining and grab their SvReward coupon.
+        initialRound : Optional Int
       controller dso
       do
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let nr0 = 0
+        let nr0 = case initialRound of
+                    Some round -> round
+                    None -> 0
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
 
@@ -331,7 +335,7 @@ template AmuletRules
         let opensAt1 = now -- opens at the same time as round0, so there are always two rounds open at the same time
         let opensAt2 = targetClosesAt0 -- by default, at most two rounds are open at the same time, so round 2 opens when round 0 closes
 
-        let issuingFor0 = days 0
+        let issuingFor0 = microseconds (nr0 * convertRelTimeToMicroseconds tickDuration)
         let issuingFor1 = issuingFor0 + tickDuration
         let issuingFor2 = issuingFor1 + tickDuration
 
@@ -349,6 +353,7 @@ template AmuletRules
           dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
         return AmuletRules_Bootstrap_RoundsResult with
           openMiningRoundCid = last
+          initialRound = Some (Round nr0)
 
     nonconsuming choice AmuletRules_AdvanceOpenMiningRounds : AmuletRules_AdvanceOpenMiningRoundsResult
       with
