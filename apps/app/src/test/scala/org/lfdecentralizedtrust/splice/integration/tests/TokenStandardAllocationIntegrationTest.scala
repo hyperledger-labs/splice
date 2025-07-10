@@ -499,7 +499,8 @@ class TokenStandardAllocationIntegrationTest
         _ => {
           splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
-              bobParty
+              venueParty,
+              predicate = c => c.data.approvers.size == 2,
             )
         },
       )
