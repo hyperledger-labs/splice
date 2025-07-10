@@ -259,7 +259,7 @@ final class LocalSynchronizerNode(
         "mediator_topology_transaction_active",
         "Mediator observes itself as onboarded",
         participantAdminConnection
-          .getDomainTimeLowerBound(synchronizerId, NonNegativeFiniteDuration.ofSeconds(1))
+          .getDomainTimeLowerBound(synchronizerId, NonNegativeFiniteDuration.Zero)
           .map { response =>
             if (
               response.timestamp
