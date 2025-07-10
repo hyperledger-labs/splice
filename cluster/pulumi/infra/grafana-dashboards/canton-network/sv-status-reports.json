@@ -151,7 +151,9 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "linear"
+              "type": "symlog",
+              "log": 2,
+              "linearThreshold": 180
             },
             "showPoints": "auto",
             "spanNulls": false,
