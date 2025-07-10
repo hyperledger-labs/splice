@@ -370,6 +370,7 @@ async function installValidator(
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
+    additionalConfig: 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
   });
 
   return validator;
@@ -473,6 +474,12 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    additionalEnvVars: [
+      {
+        name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+        value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
+      }
+    ]
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
