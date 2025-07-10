@@ -12,6 +12,7 @@ data-dependencies:
 - ../splice-util/.daml/dist/splice-util-current.dar
 - ../splice-wallet-payments/.daml/dist/splice-wallet-payments-current.dar
 - ../splice-wallet/.daml/dist/splice-wallet-current.dar
+- ../../token-standard/examples/splice-token-test-trading-app/.daml/dist/splice-token-test-trading-app-current.dar
 - ../../token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar
 - ../../token-standard/splice-api-token-transfer-instruction-v1/.daml/dist/splice-api-token-transfer-instruction-v1-current.dar
 - ../../token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar

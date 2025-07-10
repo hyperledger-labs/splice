@@ -39,8 +39,7 @@ import org.lfdecentralizedtrust.splice.console.{
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
-//TODO(#1304) - re-enable
-@org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class TokenStandardAllocationIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
@@ -50,8 +49,12 @@ class TokenStandardAllocationIntegrationTest
 
   import TokenStandardAllocationIntegrationTest.*
 
+  // We upload the current file w/o respecting the initial package config used for Daml compatibility tests,
+  // as we don't want to check upgrade compatibility for splice-token-test-trading-app. This does not conflict
+  // with checking upgrade compatibility for splice-amulet, as the splice-token-test-trading-app does
+  // not statically link with splice-amulet.
   private val darPath =
-    "token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar"
+    "token-standard/examples/splice-token-test-trading-app/.daml/dist/splice-token-test-trading-app-current.dar"
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
