@@ -71,7 +71,9 @@ class ErrorBoundary extends React.Component<IProps, IState> {
       event.reason.toString(),
       '(details:',
       JSON.stringify(event.reason),
-      ')'
+      ')',
+      'Stack trace: ',
+      event.reason?.stack || 'Not available'
     );
     this.setError(event.reason.toString());
   };
