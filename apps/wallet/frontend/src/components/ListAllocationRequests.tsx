@@ -99,11 +99,11 @@ const AllocationRequestDisplay: React.FC<{
             <Typography variant="body2">{dayjs(allocateBefore).fromNow(true)} left</Typography>
           </Stack>
           {/*TODO (#1100): uncomment and implement callback*/}
-          {/*<Button variant="pill" size="small" className="transfer-offer-accept">*/}
+          {/*<Button variant="pill" size="small" className="allocation-request-accept">*/}
           {/*  Accept*/}
           {/*</Button>*/}
           {/*TODO (#1413): uncomment and implement callback*/}
-          {/*<Button variant="pill" color="warning" size="small" className="transfer-offer-accept">*/}
+          {/*<Button variant="pill" color="warning" size="small" className="allocation-request-reject">*/}
           {/*  Reject*/}
           {/*</Button>*/}
         </Stack>
