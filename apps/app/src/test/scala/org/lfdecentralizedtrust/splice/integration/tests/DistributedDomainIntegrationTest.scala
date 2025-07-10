@@ -10,9 +10,13 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnection}
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnection,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.*
 
@@ -45,13 +49,16 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
       eventually(60.seconds) {
         forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
           clue(s"sv ${sv.name} is connected to all sequencers") {
-            val synchronizerConfig: Seq[SequencerConnection] = sv.participantClient.synchronizers
+            val synchronizerConfig = sv.participantClient.synchronizers
               .config(decentralizedSynchronizer)
               .value
               .sequencerConnections
-              .connections
-              .forgetNE
-            val endpoints = synchronizerConfig.map { s =>
+            val connections: Seq[SequencerConnection] = synchronizerConfig.connections.forgetNE
+            synchronizerConfig.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(2),
+              NonNegativeFiniteDuration.ofSeconds(10),
+            )
+            val endpoints = connections.map { s =>
               inside(s) { case GrpcSequencerConnection(endpoint, _, _, _) =>
                 endpoint
               }
