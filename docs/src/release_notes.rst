@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.5
+-----
 
 - SV
 
@@ -17,8 +17,8 @@ Upcoming
     for the SV participant by default.  You must remove the
     ``useSequencerConnectionsFromScan: false`` config and the
     ``decentralizedSynchronizerUrl`` config from your SV helm values.
-    If needed, the previous behavior can be restore by setting those two variables again
-    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator and SV respectively:
+    If needed, the previous behavior can be restored by setting those two variables again
+    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator app and SV app respectively:
     ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
     ``canton.sv-apps.sv.bft-sequencer-connection = false``
 
