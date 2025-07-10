@@ -93,6 +93,7 @@ in pkgs.mkShell {
     redocly
     ripgrep
     rsync
+    rust-parallel
     sbt
     scala_2_13
     selenium-server-standalone

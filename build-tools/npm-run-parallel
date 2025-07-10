@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# This is essentially npm run --workspace --if-present SCRIPT but in parallel
+if [ $# -ne 1 ]; then
+    echo "Usage: npm-run-parallel NPM_SCRIPT_NAME"
+    exit 1
+fi
+SCRIPT=$1
+npm query .workspace --json | jq -r '.[].location' | xargs -I {} sh -c "if jq -e .scripts.$SCRIPT {}/package.json > /dev/null; then echo {}; fi" | rust-parallel npm run "$SCRIPT" --workspace
