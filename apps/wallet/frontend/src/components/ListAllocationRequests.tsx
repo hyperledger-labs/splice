@@ -174,16 +174,22 @@ const TransferLegsDisplay: React.FC<{
           const { meta, sender, receiver, instrumentId, amount } = transferLegs[transferLegId];
           const id = `transfer-leg-${allocationRequest.contractId}-${transferLegId}`;
           return (
-            <TableRow key={transferLegId} id={id}>
-              <TableCell>{transferLegId}</TableCell>
+            <TableRow key={transferLegId} id={id} className="allocation-row">
               <TableCell>
-                <BftAnsEntry partyId={sender} />
+                <Typography variant="body2" className="allocation-legid">
+                  {transferLegId}
+                </Typography>
               </TableCell>
               <TableCell>
-                <BftAnsEntry partyId={receiver} />
+                <BftAnsEntry partyId={sender} className="allocation-sender" />
               </TableCell>
               <TableCell>
-                {amount} {instrumentId.id}
+                <BftAnsEntry partyId={receiver} className="allocation-receiver" />
+              </TableCell>
+              <TableCell>
+                <Typography variant="body2" className="allocation-amount-instrument">
+                  {amount} {instrumentId.id}
+                </Typography>
               </TableCell>
               <TableCell>
                 <MetaDisplay id={id} meta={meta.values} />

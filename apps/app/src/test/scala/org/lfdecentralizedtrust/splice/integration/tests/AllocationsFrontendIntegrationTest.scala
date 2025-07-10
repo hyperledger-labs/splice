@@ -28,6 +28,7 @@ import java.time.temporal.ChronoUnit
 import java.time.{LocalDateTime, ZoneOffset}
 import java.util.Optional
 import scala.util.Random
+import scala.jdk.CollectionConverters.*
 
 class AllocationsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
@@ -184,9 +185,6 @@ class AllocationsFrontendIntegrationTest
       val aliceTransferAmount = BigDecimal(5)
 
       val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val bobAnsName = perTestCaseName("bob")
-      val bobAnsDisplay = expectedAns(bobParty, bobAnsName)
-      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient)
       val bobTransferAmount = BigDecimal(6)
 
       val venuePartyHint = s"venue-party-${Random.nextInt()}"
@@ -222,22 +220,34 @@ class AllocationsFrontendIntegrationTest
               allocationRequest.childElement(className("allocation-request-id"))
             ) should be(
               // hardcoded in daml
-              "id: OTCTradeProposal"
+              "SettlementRef id: OTCTradeProposal"
             )
             seleniumText(
               allocationRequest.childElement(className("allocation-request-cid"))
-            ) should be(s"cid: ${otcTrade.trade.data.tradeCid.contractId}")
-            allocationRequest
-              .childElement(className("allocation-request-amount-to"))
-              .text should be(
-              "5 AMT to"
-            )
-            seleniumText(
-              allocationRequest.childElement(className("allocation-receiver"))
-            ) should matchText(bobAnsDisplay)
+            ) should be(s"SettlementRef cid: ${otcTrade.trade.data.tradeCid.contractId}")
             seleniumText(
               allocationRequest.childElement(className("allocation-executor"))
             ) should matchText(venueParty.toProtoPrimitive)
+
+            val rows =
+              allocationRequest.findAllChildElements(className("allocation-request-row")).toSeq
+            rows.zip(otcTrade.trade.data.transferLegs.asScala.toSeq.sortBy(_._1)).foreach {
+              case (row, (legId, transferLeg)) =>
+                seleniumText(
+                  row.childElement(className("allocation-legid"))
+                ) should matchText(legId)
+                seleniumText(
+                  row.childElement(className("allocation-amount-instrument"))
+                ) should matchText(
+                  s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
+                )
+                seleniumText(
+                  row.childElement(className("allocation-sender"))
+                ) should matchText(transferLeg.sender)
+                seleniumText(
+                  row.childElement(className("allocation-receiver"))
+                ) should matchText(transferLeg.receiver)
+            }
           }
         }
       }
