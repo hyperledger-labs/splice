@@ -59,7 +59,6 @@ const AllocationRequestDisplay: React.FC<{
 
   const { amount, receiver } = transferLeg;
   const { allocateBefore, settlementRef, executor } = settlement;
-  const id = [settlementRef.id, settlementRef.cid].filter(x => !!x).join(' - ');
   return (
     <Card className="allocation-request" variant="outlined">
       <CardContent
@@ -73,11 +72,20 @@ const AllocationRequestDisplay: React.FC<{
         <Stack direction="row" alignItems="center" spacing={4}>
           <ArrowCircleLeftOutlined fontSize="large" width="10%" />
           <Stack width="60%">
-            <Stack maxWidth="md">
-              <Typography className="allocation-request-id" variant="body1" noWrap>
-                {id}
-              </Typography>
-            </Stack>
+            {settlementRef.id ? (
+              <Stack maxWidth="md">
+                <Typography className="allocation-request-id" variant="body2" noWrap>
+                  id: {settlementRef.id}
+                </Typography>
+              </Stack>
+            ) : null}
+            {settlementRef.cid ? (
+              <Stack maxWidth="md">
+                <Typography className="allocation-request-cid" variant="body2" noWrap>
+                  cid: {settlementRef.cid}
+                </Typography>
+              </Stack>
+            ) : null}
             <Stack direction="row" alignItems="center" spacing={1}>
               <Typography className="allocation-request-amount-to" variant="body2">
                 <AmountDisplay amount={BigNumber(amount)} currency="AmuletUnit" /> to

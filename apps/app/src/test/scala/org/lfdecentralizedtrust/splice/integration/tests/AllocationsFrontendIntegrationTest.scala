@@ -221,9 +221,12 @@ class AllocationsFrontendIntegrationTest
             seleniumText(
               allocationRequest.childElement(className("allocation-request-id"))
             ) should be(
-              // first part is hardcoded in daml
-              s"OTCTradeProposal - ${otcTrade.trade.data.tradeCid.contractId}"
+              // hardcoded in daml
+              "id: OTCTradeProposal"
             )
+            seleniumText(
+              allocationRequest.childElement(className("allocation-request-cid"))
+            ) should be(s"cid: ${otcTrade.trade.data.tradeCid.contractId}")
             allocationRequest
               .childElement(className("allocation-request-amount-to"))
               .text should be(
