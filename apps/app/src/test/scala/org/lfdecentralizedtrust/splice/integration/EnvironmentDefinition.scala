@@ -178,6 +178,10 @@ case class EnvironmentDefinition(
             ),
           )
         }
+        participants(env).foreach { p =>
+          logger.info(s"Ensuring vetting topology is effective for ${p.name}")(TraceContext.empty)
+          p.topology.synchronisation.await_idle()
+        }
       }
     )
   }

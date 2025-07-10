@@ -242,13 +242,17 @@ final class LocalSynchronizerNode(
         sequencerAdminConnection
           .getMediatorSynchronizerState(synchronizerId)
           .map { state =>
-            if (
-              state.base.validFrom.isBefore(Instant.now()) && !state.mapping.active
-                .contains(mediatorId)
-            ) {
+            if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
                   s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
+                )
+                .asRuntimeException()
+            }
+            if (state.base.validFrom.isAfter(Instant.now())) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Mediator $mediatorId in active mediators ${state.mapping.active.forgetNE} but will be valid only after ${state.base.validFrom}"
                 )
                 .asRuntimeException()
             }
