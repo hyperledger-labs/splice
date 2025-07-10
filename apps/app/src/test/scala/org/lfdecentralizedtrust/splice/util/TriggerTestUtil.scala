@@ -46,13 +46,13 @@ object TriggerTestUtil extends ScalaFuturesWithPatience with LazyLogging {
   )(codeBlock: => T): T = {
     try {
       logger.info(s"Pausing triggers for block: $triggersToPauseAtStart")
-      logger.info(s"Resuming triggers for block: $triggersToPauseAtStart")
+      logger.info(s"Resuming triggers for block: $triggersToResumeAtStart")
       triggersToPauseAtStart.foreach(_.pause().futureValue)
       triggersToResumeAtStart.foreach(_.resume())
       codeBlock
     } finally {
       logger.info(s"Resuming triggers after block: $triggersToPauseAtStart")
-      logger.info(s"Pausing triggers after block: $triggersToPauseAtStart")
+      logger.info(s"Pausing triggers after block: $triggersToResumeAtStart")
       triggersToPauseAtStart.foreach(_.resume())
       triggersToResumeAtStart.foreach(_.pause().futureValue)
     }
