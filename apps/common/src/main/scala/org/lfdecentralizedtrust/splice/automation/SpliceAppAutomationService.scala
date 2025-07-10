@@ -6,9 +6,9 @@ package org.lfdecentralizedtrust.splice.automation
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.AutomationConfig
 import org.lfdecentralizedtrust.splice.environment.{
+  RetryProvider,
   SpliceLedgerClient,
   SpliceLedgerConnection,
-  RetryProvider,
 }
 import org.lfdecentralizedtrust.splice.store.{
   AppStore,

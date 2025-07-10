@@ -8,8 +8,9 @@ import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+  SqlIndexInitializationTrigger,
 }
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
@@ -18,6 +19,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnb
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.SvSvStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
@@ -29,6 +31,7 @@ class SvSvAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
+    storage: Storage,
     ledgerClient: SpliceLedgerClient,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -51,6 +54,13 @@ class SvSvAutomationService(
     SvSvAutomationService
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
   registerTrigger(new AssignTrigger(triggerContext, svStore, connection, store.key.svParty))
+
+  registerTrigger(
+    SqlIndexInitializationTrigger(
+      storage,
+      triggerContext,
+    )
+  )
 }
 
 object SvSvAutomationService extends AutomationServiceCompanion {

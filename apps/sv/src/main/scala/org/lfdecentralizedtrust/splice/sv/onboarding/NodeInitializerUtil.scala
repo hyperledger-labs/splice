@@ -81,6 +81,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       domainUnpausedSync,
       config,
       svStore,
+      storage,
       ledgerClient,
       retryProvider,
       loggerFactory,

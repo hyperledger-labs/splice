@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+  SqlIndexInitializationTrigger,
   TransferFollowTrigger,
   UnassignTrigger,
 }
@@ -31,6 +32,7 @@ import org.lfdecentralizedtrust.splice.util.QualifiedName
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
@@ -41,6 +43,7 @@ class SplitwellAutomationService(
     automationConfig: AutomationConfig,
     clock: Clock,
     store: SplitwellStore,
+    storage: Storage,
     ledgerClient: SpliceLedgerClient,
     scanConnection: ScanConnection,
     retryProvider: RetryProvider,
@@ -128,6 +131,13 @@ class SplitwellAutomationService(
           store.listLaggingGroupInvites(),
           store.listLaggingAcceptedGroupInvites(),
         ).mapN(_ ++ _ ++ _),
+    )
+  )
+
+  registerTrigger(
+    SqlIndexInitializationTrigger(
+      storage,
+      triggerContext,
     )
   )
 }
