@@ -5,7 +5,8 @@ package org.lfdecentralizedtrust.splice.sv
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -234,7 +235,7 @@ final class LocalSynchronizerNode(
           ),
         logger,
       )
-      _ <- retryProvider.waitUntil(
+      mediatorSyncState <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "sequencer_observes_mediator_onboarded",
         "local sequencer observes mediator as onboarded",
@@ -249,10 +250,24 @@ final class LocalSynchronizerNode(
                 )
                 .asRuntimeException()
             }
-            if (state.base.validFrom.isAfter(Instant.now())) {
+            state
+          },
+        logger,
+      )
+      _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
+        "mediator_topology_transaction_active",
+        "Mediator observes itself as onboarded",
+        participantAdminConnection
+          .getDomainTimeLowerBound(synchronizerId, NonNegativeFiniteDuration.ofSeconds(1))
+          .map { response =>
+            if (
+              response.timestamp
+                .isBefore(CantonTimestamp.tryFromInstant(mediatorSyncState.base.validFrom))
+            ) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  s"Mediator $mediatorId in active mediators ${state.mapping.active.forgetNE} but will be valid only after ${state.base.validFrom}"
+                  s"Mediator $mediatorId not onboarded yet, current domain time lower bound is ${response.timestamp} but should be at least ${mediatorSyncState.base.validFrom}"
                 )
                 .asRuntimeException()
             }
