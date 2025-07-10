@@ -57,7 +57,7 @@ case class SpliceMetricsFactory(
         new ScanAppMetrics(
           metricsFactoryProvider.generateMetricsFactory(metricsContext),
           storageHistograms,
-          loggerFactory.getTracedLogger(getClass),
+          loggerFactory,
           timeouts,
         )
       },
