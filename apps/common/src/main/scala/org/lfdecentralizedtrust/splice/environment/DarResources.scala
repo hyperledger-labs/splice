@@ -38,9 +38,9 @@ object DarResources {
       DarResource(s"splice-api-token-allocation-instruction-v1-current.dar"),
       Seq(DarResource(s"splice-api-token-allocation-instruction-v1-1.0.0.dar")),
     )
-    val tokenStandardTest = PackageResource(
-      DarResource(s"splice-token-standard-test-current.dar"),
-      Seq(DarResource(s"splice-token-standard-test-1.0.2.dar")),
+    val tokenTestTradingApp = PackageResource(
+      DarResource(s"splice-token-test-trading-app-current.dar"),
+      Seq(DarResource(s"splice-token-test-trading-app-1.0.0.dar")),
     )
     val allProductionPackageResources = Seq(
       tokenMetadata,
@@ -50,7 +50,7 @@ object DarResources {
       tokenAllocationRequest,
       tokenAllocationInstruction,
     )
-    val allPackageResources = allProductionPackageResources :+ tokenStandardTest
+    val allPackageResources = allProductionPackageResources :+ tokenTestTradingApp
   }
 
   val amulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")
