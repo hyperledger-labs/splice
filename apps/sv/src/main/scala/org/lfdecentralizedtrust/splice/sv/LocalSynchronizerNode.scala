@@ -38,7 +38,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboa
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
-import java.time.{Duration, Instant}
+import java.time.Duration
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
