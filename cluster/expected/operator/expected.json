@@ -254,7 +254,7 @@
                 }
               }
             ],
-            "image": "pulumi/pulumi:3.147.0-nonroot",
+            "image": "pulumi/pulumi-nodejs-22:3.147.0-nonroot",
             "podTemplate": {
               "spec": {
                 "affinity": {
