@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
+import java.util.UUID
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -435,7 +436,7 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
       receiver.toProtoPrimitive,
       amount.bigDecimal,
       new holdingv1.InstrumentId(dso.toProtoPrimitive, "Amulet"),
-      new metadatav1.Metadata(java.util.Map.of()),
+      new metadatav1.Metadata(java.util.Map.of("some_leg_meta", UUID.randomUUID().toString)),
     )
 }
 
