@@ -9,6 +9,8 @@ participantAddress: "participant-MIGRATION_ID"
 nodeIdentifier: YOUR_SV_NAME
 
 svValidator: true
+useSequencerConnectionsFromScan: false
+decentralizedSynchronizerUrl: "https://sequencer-MIGRATION_ID.sv-2.TARGET_HOSTNAME"
 
 persistence:
   host: apps-pg

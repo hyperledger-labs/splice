@@ -181,7 +181,7 @@ export async function installValidatorApp(
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      decentralizedSynchronizerUrl: undefined,
+      decentralizedSynchronizerUrl: config.svValidator ? config.decentralizedSynchronizerUrl : undefined,
       scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
       validatorWalletUsers: config.validatorWalletUsers,
@@ -206,7 +206,7 @@ export async function installValidatorApp(
           ? { secretName: participantBootstrapDumpSecretName }
           : undefined,
       svValidator: config.svValidator,
-      useSequencerConnectionsFromScan: true,
+      useSequencerConnectionsFromScan: !config.svValidator,
       metrics: {
         enable: true,
       },

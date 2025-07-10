@@ -281,6 +281,12 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice,
+    additionalEnvVars: [
+      {
+        name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+        value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
+      }
+    ]
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -390,6 +396,7 @@ async function installSvAndValidator(
     validatorWalletUsers: svUserIds(auth0Config).apply(ids =>
       ids.concat([validatorWalletUserName])
     ),
+    additionalConfig: 'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
     ...spliceInstanceNames,
   };
 
