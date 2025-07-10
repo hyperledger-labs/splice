@@ -173,7 +173,9 @@ class SV1Initializer(
             minObservationDuration = config.timeTrackerMinObservationDuration
           ),
         ),
-        RetryFor.WaitingOnInitDependency,
+        overwriteExistingConnection =
+          false, // The validator will manage sequencer connections after initial setup
+        retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
       (dsoParty, svParty, _) <- (
