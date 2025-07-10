@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.store.{StoreErrors, StoreTest}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.tracing.TraceContext
@@ -13,6 +14,7 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{FutureHelpers, HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTrigger.IndexAction
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
+import org.slf4j.event.Level
 import slick.dbio.DBIOAction
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
@@ -183,6 +185,10 @@ class SqlIndexInitializationTriggerStoreTest
             DBIOAction
               .seq(
                 sqlu"set statement_timeout to '1s'",
+                // This statement will be aborted, because slow_function() takes 5 seconds to execute per row,
+                // and the statement timeout is set to 1 second above.
+                // 'create index concurrently' internally consists of 3 transactions: one to register the index as invalid,
+                // and two table scans to build the index. Aborting the statement will leave the index in an invalid state.
                 sqlu"create index concurrently if not exists test_index on active_parties (slow_function(party))",
               )
               .asTry,
@@ -193,14 +199,32 @@ class SqlIndexInitializationTriggerStoreTest
         indexNamesBefore <- listIndexNames()
         _ = indexNamesBefore should contain("test_index")
 
-        tasks <- trigger.retrieveTasks()
+        tasks <- loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          within = { trigger.retrieveTasks() },
+          assertion = { entries =>
+            forExactly(1, entries) {
+              _.message should include(
+                "Index test_index should be created and is invalid, dropping it"
+              )
+            }
+          },
+        )
         _ = tasks.loneElement match {
           case SqlIndexInitializationTrigger.Task.ExecuteAction(IndexAction.Drop("test_index")) =>
             succeed
           case other =>
             fail(s"Expected Drop for test_index, got $other")
         }
-        _ <- trigger.runOnce()
+        _ <- loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          within = { trigger.runOnce() },
+          assertion = { entries =>
+            forExactly(1, entries) {
+              _.message should include(
+                "Index test_index should be created and is invalid, dropping it"
+              )
+            }
+          },
+        )
         indexNamesAfterDrop <- listIndexNames()
         _ = indexNamesAfterDrop should not contain ("test_index")
 
