@@ -29,4 +29,4 @@ runs:
         path: |
           /tmp/daml
           apps/common/frontend/daml.js
-        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }} rev:${{ github.sha }}
+        key: daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }} rev:${{ github.sha }}
