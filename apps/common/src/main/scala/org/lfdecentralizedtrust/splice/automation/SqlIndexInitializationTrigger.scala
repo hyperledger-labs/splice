@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import com.digitalasset.canton.config.DbConfig
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, *}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -230,14 +231,18 @@ object SqlIndexInitializationTrigger {
 
   /** Indexes managed by this trigger class */
   val defaultIndexActions: List[IndexAction] = List(
-    IndexAction.Create(
-      indexName = "updt_hist_crea_hi_mi_ci_import_updates",
-      createAction = sqlu"""
-        create index concurrently if not exists updt_hist_crea_hi_mi_ci_import_updates
-        on update_history_creates (history_id, migration_id, contract_id)
-        where record_time = -62135596800000000
-      """,
-    )
+    IndexAction
+      .Create(
+        indexName = "updt_hist_crea_hi_mi_ci_import_updates",
+        // -62135596800000000 is the value of CantonTimestamp.MinValue.
+        // Create index statements do not seem to support parameters, so we use the literal value instead.
+        // See also the partial index defined in `V036__backfilling_import_updates.sql`.
+        createAction = sqlu"""
+          create index concurrently if not exists updt_hist_crea_hi_mi_ci_import_updates
+          on update_history_creates (history_id, migration_id, contract_id)
+          where record_time = -62135596800000000
+        """,
+      )
   )
 
   sealed trait Task extends Product with Serializable with PrettyPrinting

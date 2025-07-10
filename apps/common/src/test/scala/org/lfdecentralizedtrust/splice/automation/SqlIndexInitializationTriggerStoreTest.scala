@@ -32,6 +32,19 @@ class SqlIndexInitializationTriggerStoreTest
 
   "SqlIndexInitializationTrigger" should {
 
+    "use if not exists concurrently" in {
+      SqlIndexInitializationTrigger.defaultIndexActions.foreach {
+        case IndexAction.Create(_, statement) =>
+          // "if not exists" is already enforced by DbStorageIdempotency retrying all statements in tests,
+          // but a check here gives better feedback.
+          // "concurrently" is not strictly required for the trigger to work, but a non-concurrent index creation
+          // would be suspicious.
+          statement.getDumpInfo.mainInfo should include("create index concurrently if not exists")
+        case IndexAction.Drop(_) => succeed
+      }
+      succeed
+    }
+
     "run with default settings" in {
       val trigger = SqlIndexInitializationTrigger(
         storage = storage,
