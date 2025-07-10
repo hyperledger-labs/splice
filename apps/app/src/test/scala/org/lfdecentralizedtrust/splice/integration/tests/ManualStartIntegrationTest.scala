@@ -182,7 +182,7 @@ class ManualStartIntegrationTest
                 .value
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_MEDIATOR_SEQUENCER_REQUEST_AMPLIFICATION
+            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
             // otherwise we get log warnings
             mediatorConnection.close()
           }
