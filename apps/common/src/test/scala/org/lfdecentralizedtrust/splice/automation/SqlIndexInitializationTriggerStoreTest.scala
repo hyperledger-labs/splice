@@ -16,6 +16,7 @@ import org.lfdecentralizedtrust.splice.automation.SqlIndexInitializationTrigger.
 import org.lfdecentralizedtrust.splice.store.db.{AcsJdbcTypes, AcsTables, SplicePostgresTest}
 import org.slf4j.event.Level
 import slick.dbio.DBIOAction
+import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.Future
@@ -53,6 +54,7 @@ class SqlIndexInitializationTriggerStoreTest
       for {
         _ <- runTriggerUntilAllTasksDone(trigger)
         indexNames <- listIndexNames()
+        _ <- dumpIndexes()
       } yield {
         indexNames should contain allElementsOf Seq("updt_hist_crea_hi_mi_ci_import_updates")
       }
@@ -255,6 +257,42 @@ class SqlIndexInitializationTriggerStoreTest
         sql"select indexname from pg_indexes where schemaname = 'public'".as[String],
         "listIndexes",
       )
+      .failOnShutdown
+  }
+
+  // One row in pg_indexes
+  private case class IndexesEntry(
+      schemaName: String,
+      tableName: String,
+      indexName: String,
+      indexDefinition: String,
+  )
+
+  private implicit val GetResultIndexesEntry: GetResult[IndexesEntry] = { (pp: PositionedResult) =>
+    IndexesEntry(
+      pp.<<,
+      pp.<<,
+      pp.<<,
+      pp.<<,
+    )
+  }
+
+  // Dumps information about all indexes in the database to the log.
+  // Used during development to verify that the indexes are created correctly.
+  private def dumpIndexes(): Future[Unit] = {
+    storage.underlying
+      .query(
+        sql"""
+      select
+        i.schemaname, i.tablename, i.indexname, i.indexdef
+      from
+        pg_indexes i
+    """.as[IndexesEntry],
+        "dumpIndexes",
+      )
+      .map { indexes =>
+        logger.info(s"Indexes: ${indexes.mkString("\n  ", "\n  ", "\n")}")
+      }
       .failOnShutdown
   }
 

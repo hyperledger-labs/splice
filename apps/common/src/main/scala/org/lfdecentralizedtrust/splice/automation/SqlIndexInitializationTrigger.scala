@@ -234,13 +234,11 @@ object SqlIndexInitializationTrigger {
     IndexAction
       .Create(
         indexName = "updt_hist_crea_hi_mi_ci_import_updates",
-        // -62135596800000000 is the value of CantonTimestamp.MinValue.
-        // Create index statements do not seem to support parameters, so we use the literal value instead.
-        // See also the partial index defined in `V036__backfilling_import_updates.sql`.
+        // Create index statements do not seem to support parameters, so we use the literal value interpolation instead.
         createAction = sqlu"""
           create index concurrently if not exists updt_hist_crea_hi_mi_ci_import_updates
           on update_history_creates (history_id, migration_id, contract_id)
-          where record_time = -62135596800000000
+          where record_time = #${CantonTimestamp.MinValue.toMicros}
         """,
       )
   )
