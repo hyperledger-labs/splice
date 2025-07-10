@@ -9,9 +9,18 @@ let
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
   helm-unittest = import ./helm-unittest.nix;
 
-  # Override google-cloud-sdk to use a compatible OpenSSL version
+  # Create a dedicated python environment for google-cloud-sdk to resolve OpenSSL issues.
+  # This ensures all its crypto libraries are built against openssl_1_1.
+  pythonForGcloud = pkgs.python3.withPackages (ps: with ps; [
+    (pyopenssl.override { openssl = pkgs.openssl_1_1; })
+    (cryptography.override { openssl = pkgs.openssl_1_1; })
+    ps.crcmod
+    ps.numpy
+  ]);
+
+  # Override google-cloud-sdk to use the dedicated python environment.
   google-cloud-sdk-patched = (pkgs.google-cloud-sdk.override {
-    openssl = pkgs.openssl_1_1;
+    python3 = pythonForGcloud;
   }).withExtraComponents [ pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin ];
 
 in pkgs.mkShell {
@@ -69,9 +78,9 @@ in pkgs.mkShell {
     python3Packages.colorlog
     python3Packages.pycryptodome
     (python3Packages.datadog.overrideAttrs (old: {
-                                             doCheck = false;
-                                             doInstallCheck = false;
-                                     }))
+                                              doCheck = false;
+                                              doInstallCheck = false;
+                                            }))
     python3Packages.flask
     python3Packages.GitPython
     python3Packages.gql
