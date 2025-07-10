@@ -53,6 +53,10 @@ function _resolve_pulumi_stack() {
 function _cluster_reset() {
     _info "Removing Pulumi finalizers that block reset"
 
+    # See https://github.com/DACH-NY/cn-test-failures/issues/4655 for why this is necessary.
+    # Yhe issue seems to be that the workspace pods get deleted before the stacks are deleted,
+    # and the workspace pods should handle the finalizers. This is controlled by Pulumi,
+    # so until we have an upstream fix we need this workaround.
     _remove_pulumi_finalizers
 
     _info "Uninstalling Pulumi canton-network and runbook stacks"
