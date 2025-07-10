@@ -73,6 +73,21 @@ monitoring:
     alerts:
       cloudSql:
         maintenance: true
+    logAlerts:
+      forCometBft: |
+        -- TODO(DACH-NY/canton-network-internal#475): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3
+        -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")
+      forNonTAPS: |
+        -- TODO(#979): Can happen due to random disconnects/reconnects but also in other contexts
+        -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
+        -- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection
+        -(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))
+        -(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")
+      # making this condition more complicated causes GCP to be unable to parse
+      # the query because there's too many filters
+      missingConfiguredCardinality: |
+        -- TODO(#447): remove this once configured cardinality is respected
+        -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
 operatorDeployment:
   reference:
     gitReference: refs/heads/main
