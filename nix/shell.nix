@@ -7,6 +7,7 @@ let
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
+  helm-unittest = import ./helm-unittest.nix;
 
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
@@ -31,7 +32,6 @@ in pkgs.mkShell {
     git
     # Required for the runner-container-hooks submodule
     git-lfs
-    git-search-replace
     (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
     daml2js
@@ -41,7 +41,7 @@ in pkgs.mkShell {
     k6
     k9s
     kubectl
-    (wrapHelm kubernetes-helm { plugins = with pkgs.kubernetes-helmPlugins; [ helm-unittest ]; })
+    (wrapHelm kubernetes-helm { plugins =[ (callPackage helm-unittest { }) ]; })
     lnav
     nix
     nodejs

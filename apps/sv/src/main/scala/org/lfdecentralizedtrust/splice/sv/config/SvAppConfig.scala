@@ -205,7 +205,7 @@ final case class SvParticipantClientConfig(
     override val adminApi: FullClientConfig,
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
-      SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
+      SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 case class SvAppBackendConfig(
@@ -284,7 +284,12 @@ case class SvAppBackendConfig(
 }
 
 object SvAppBackendConfig {
-  val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION = SubmissionRequestAmplification(
+  // This is consistent with what the validator sets for a single sequencer connection
+  val DefaultParticipantSequencerRequestAmplification = SubmissionRequestAmplification(
+    PositiveInt.tryCreate(1),
+    NonNegativeFiniteDuration.ofSeconds(10),
+  )
+  val DefaultMediatorSequencerRequestAmplification = SubmissionRequestAmplification(
     PositiveInt.tryCreate(5),
     NonNegativeFiniteDuration.ofSeconds(10),
   )
@@ -343,7 +348,7 @@ final case class SvSequencerConfig(
 final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
-      SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
+      SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

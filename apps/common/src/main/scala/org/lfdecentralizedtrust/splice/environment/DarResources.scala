@@ -42,15 +42,15 @@ object DarResources {
       DarResource(s"splice-token-standard-test-current.dar"),
       Seq(DarResource(s"splice-token-standard-test-1.0.2.dar")),
     )
-    val allPackageResources = Seq(
+    val allProductionPackageResources = Seq(
       tokenMetadata,
       tokenHolding,
       tokenTransferInstruction,
       tokenAllocation,
       tokenAllocationRequest,
       tokenAllocationInstruction,
-      tokenStandardTest,
     )
+    val allPackageResources = allProductionPackageResources :+ tokenStandardTest
   }
 
   val amulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")

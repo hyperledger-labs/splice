@@ -699,6 +699,24 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/wallet/token-standard/allocation-requests:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      # no limit, under the assumption that the number of allocation requests is small
+      operationId: "listAllocationRequests"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAllocationRequestsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/feature-support:
     get:
       tags: [ wallet ]
@@ -715,6 +733,22 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
   /v0/allocations:
+    get:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      # no limit, under the assumption that the number of allocations is small
+      operationId: "listAmuletAllocations"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAllocationsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
     post:
       tags: [ wallet ]
       x-jvm-package: wallet
@@ -1345,6 +1379,7 @@ components:
           required:
             - executor
             - settlement_ref
+            - requested_at
             - allocate_before
             - settle_before
           properties:
@@ -1359,6 +1394,9 @@ components:
                   type: string
                 cid:
                   type: string
+            requested_at:
+              type: integer
+              format: int64
             allocate_before:
               type: integer
               format: int64
@@ -1431,3 +1469,45 @@ components:
       properties:
         dummy: # cannot define an empty object for some reason
           type: object
+
+    ListAllocationsResponse:
+      type: object
+      description:
+        Includes all Allocation views where the user is a sender of one of the transferLegs and where
+        the involved instrument's admin is the DSO party.
+      required:
+        - allocations
+      properties:
+        allocations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Allocation"
+
+    Allocation:
+      type: object
+      required:
+        - contract
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListAllocationRequestsResponse:
+      type: object
+      description:
+        Includes all AllocationRequest views where the user is in one of the transferLegs and where
+        the involved instrument's admin is the DSO party.
+      required:
+        - allocation_requests
+      properties:
+        allocation_requests:
+          type: array
+          items:
+            $ref: "#/components/schemas/AllocationRequest"
+
+    AllocationRequest:
+      type: object
+      required:
+        - contract
+      properties:
+        contract:
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
