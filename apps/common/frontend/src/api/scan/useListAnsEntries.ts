@@ -24,6 +24,7 @@ export function useListAnsEntriesFromResponse(
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupAnsEntryByName', pageSize, namePrefix],
     queryFn: async () => {
+      console.error(`List ANS entries`);
       const response = await getResponse(pageSize, namePrefix);
       return response.entries;
     },

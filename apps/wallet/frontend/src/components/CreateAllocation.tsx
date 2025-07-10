@@ -105,18 +105,18 @@ const CreateAllocation: React.FC = () => {
               }
             />
             <Typography variant="h6">Executor</Typography>
-            <BftAnsField
-              name="Executor"
-              label="Executor"
-              aria-label="Executor"
-              id="create-allocation-settlement-executor"
-              onPartyChanged={party =>
-                setAllocation({
-                  ...allocation,
-                  settlement: { ...allocation.settlement, executor: party },
-                })
-              }
-            />
+            {/*<BftAnsField*/}
+            {/*  name="Executor"*/}
+            {/*  label="Executor"*/}
+            {/*  aria-label="Executor"*/}
+            {/*  id="create-allocation-settlement-executor"*/}
+            {/*  onPartyChanged={party =>*/}
+            {/*    setAllocation({*/}
+            {/*      ...allocation,*/}
+            {/*      settlement: { ...allocation.settlement, executor: party },*/}
+            {/*    })*/}
+            {/*  }*/}
+            {/*/>*/}
             <AmountInput
               idPrefix="create-allocation"
               ccAmountText={allocation.transfer_leg.amount || ''}

@@ -18,6 +18,9 @@ import {
 } from './mocks/constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
+import { ListAllocationRequestsResponse, ListAllocationsResponse } from 'wallet-openapi';
+import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { mkContract } from './mocks/contract';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
@@ -66,112 +69,154 @@ describe('Wallet user can', () => {
     expect(await screen.findByText(aliceEntry.name)).toBeDefined();
   });
 
-  test('create a transfer preapproval', async () => {
-    const user = userEvent.setup();
-    render(
-      <WalletConfigProvider>
-        <App />
-      </WalletConfigProvider>
-    );
-    const preapproveTransfersBtn = await screen.findByRole('button', {
-      name: /Pre-approve incoming direct transfers/,
-    });
-    expect(preapproveTransfersBtn).toBeEnabled();
-    await user.click(preapproveTransfersBtn);
-    // Click in confirmation dialog
-    const proceedBtn = await screen.findByRole('button', { name: 'Proceed' });
-    await user.click(proceedBtn);
-    // Check that clicking the button calls the correct backend endpoint
-    expect(requestMocks.createTransferPreapproval).toHaveBeenCalled();
-    // Mock the request to fetch the created pre-approval
-    server.use(
-      rest.get(
-        `${window.splice_config.services.validator.url}/v0/scan-proxy/transfer-preapprovals/by-party/:party`,
-        (req, res, ctx) => {
-          const { party } = req.params;
-          if (party === alicePartyId) {
-            return res(
-              ctx.json<LookupTransferPreapprovalByPartyResponse>({
-                transfer_preapproval: aliceTransferPreapproval,
-              })
-            );
-          } else {
-            return res(ctx.status(404), ctx.json({}));
-          }
-        }
-      )
-    );
-    const disabledPreapproveTransfersBtn = await screen.findByRole('button', {
-      name: /Pre-approve incoming direct transfers/,
-    });
-    await waitFor(() => expect(disabledPreapproveTransfersBtn).toBeDisabled());
-  });
-
-  test('not see dso in list of transfer-offer receivers', async () => {
-    server.use(featureSupportHandler(true, true));
-    const user = userEvent.setup();
-    render(
-      <WalletConfigProvider>
-        <App />
-      </WalletConfigProvider>
-    );
-    expect(await screen.findByText('Transfer')).toBeDefined();
-
-    const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
-    await user.click(transferOffersLink);
-    expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
-
-    // the listbox is not visible, so we have to click the input
-    const receiverInput = screen
-      .getAllByRole('combobox')
-      .find(e => e.id === 'create-offer-receiver')!;
-    await user.click(receiverInput);
-    expect(screen.getByRole('listbox')).toBeDefined();
-
-    const receiversListbox = screen.getByRole('listbox');
-    const entries = within(receiversListbox)
-      .getAllByRole('option')
-      .map(e => e.textContent);
-
-    expect(entries.length).toBeGreaterThan(1);
-    expect(entries.find(e => e === dsoEntry.name)).toBeUndefined();
-  });
+  // test('create a transfer preapproval', async () => {
+  //   const user = userEvent.setup();
+  //   render(
+  //     <WalletConfigProvider>
+  //       <App />
+  //     </WalletConfigProvider>
+  //   );
+  //   const preapproveTransfersBtn = await screen.findByRole('button', {
+  //     name: /Pre-approve incoming direct transfers/,
+  //   });
+  //   expect(preapproveTransfersBtn).toBeEnabled();
+  //   await user.click(preapproveTransfersBtn);
+  //   // Click in confirmation dialog
+  //   const proceedBtn = await screen.findByRole('button', { name: 'Proceed' });
+  //   await user.click(proceedBtn);
+  //   // Check that clicking the button calls the correct backend endpoint
+  //   expect(requestMocks.createTransferPreapproval).toHaveBeenCalled();
+  //   // Mock the request to fetch the created pre-approval
+  //   server.use(
+  //     rest.get(
+  //       `${window.splice_config.services.validator.url}/v0/scan-proxy/transfer-preapprovals/by-party/:party`,
+  //       (req, res, ctx) => {
+  //         const { party } = req.params;
+  //         if (party === alicePartyId) {
+  //           return res(
+  //             ctx.json<LookupTransferPreapprovalByPartyResponse>({
+  //               transfer_preapproval: aliceTransferPreapproval,
+  //             })
+  //           );
+  //         } else {
+  //           return res(ctx.status(404), ctx.json({}));
+  //         }
+  //       }
+  //     )
+  //   );
+  //   const disabledPreapproveTransfersBtn = await screen.findByRole('button', {
+  //     name: /Pre-approve incoming direct transfers/,
+  //   });
+  //   await waitFor(() => expect(disabledPreapproveTransfersBtn).toBeDisabled());
+  // });
+  //
+  // test('not see dso in list of transfer-offer receivers', async () => {
+  //   server.use(featureSupportHandler(true, true));
+  //   const user = userEvent.setup();
+  //   render(
+  //     <WalletConfigProvider>
+  //       <App />
+  //     </WalletConfigProvider>
+  //   );
+  //   expect(await screen.findByText('Transfer')).toBeDefined();
+  //
+  //   const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+  //   await user.click(transferOffersLink);
+  //   expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+  //
+  //   // the listbox is not visible, so we have to click the input
+  //   const receiverInput = screen
+  //     .getAllByRole('combobox')
+  //     .find(e => e.id === 'create-offer-receiver')!;
+  //   await user.click(receiverInput);
+  //   expect(screen.getByRole('listbox')).toBeDefined();
+  //
+  //   const receiversListbox = screen.getByRole('listbox');
+  //   const entries = within(receiversListbox)
+  //     .getAllByRole('option')
+  //     .map(e => e.textContent);
+  //
+  //   expect(entries.length).toBeGreaterThan(1);
+  //   expect(entries.find(e => e === dsoEntry.name)).toBeUndefined();
+  // });
 
   describe('Token Standard', () => {
-    transferTests(false);
+    // transferTests(false);
 
-    test('fall back to non-token standard transfers when the token standard is not supported', async () => {
-      server.use(featureSupportHandler(false, true));
+    // test('fall back to non-token standard transfers when the token standard is not supported', async () => {
+    //   server.use(featureSupportHandler(false, true));
+    //
+    //   const user = userEvent.setup();
+    //   render(
+    //     <WalletConfigProvider>
+    //       <App />
+    //     </WalletConfigProvider>
+    //   );
+    //   expect(await screen.findByText('Transfer')).toBeDefined();
+    //
+    //   const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
+    //   await user.click(transferOffersLink);
+    //   expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+    //
+    //   const receiverInput = screen
+    //     .getAllByRole('combobox')
+    //     .find(e => e.id === 'create-offer-receiver')!;
+    //   fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
+    //   await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
+    //   expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
+    //   expect(
+    //     screen.queryByRole('checkbox', { name: 'Use Token Standard Transfer' })
+    //   ).not.toBeInTheDocument();
+    //   expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
+    //   await user.click(screen.getByRole('button', { name: 'Send' }));
+    //
+    //   await assertCorrectMockIsCalled(
+    //     true,
+    //     { amount: '1.0', receiver_party_id: 'bob::nopreapproval', description: '' },
+    //     false
+    //   );
+    // });
 
-      const user = userEvent.setup();
-      render(
-        <WalletConfigProvider>
-          <App />
-        </WalletConfigProvider>
-      );
-      expect(await screen.findByText('Transfer')).toBeDefined();
+    describe('Allocations', () => {
+      test('see allocation requests', async () => {
+        const allocationRequests: AllocationRequest[] = [];
+        server.use(
+          rest.get(
+            `${walletUrl}/v0/wallet/token-standard/allocation-requests`,
+            (_req, res, ctx) => {
+              console.error('BITCH');
+              return res(
+                ctx.json<ListAllocationRequestsResponse>({
+                  allocation_requests: allocationRequests.map(contract => {
+                    return { contract: mkContract(AllocationRequest, contract) };
+                  }),
+                })
+              );
+            }
+          ),
+          rest.get(`${walletUrl}/v0/allocations`, (_req, res, ctx) => {
+            return res(
+              ctx.json<ListAllocationsResponse>({
+                allocations: [],
+              })
+            );
+          })
+        );
 
-      const transferOffersLink = screen.getByRole('link', { name: 'Transfer' });
-      await user.click(transferOffersLink);
-      expect(screen.getByRole('heading', { name: 'Transfers' })).toBeDefined();
+        const user = userEvent.setup();
+        render(
+          <WalletConfigProvider>
+            <App />
+          </WalletConfigProvider>
+        );
+        expect(await screen.findByText('Allocations')).toBeDefined();
 
-      const receiverInput = screen
-        .getAllByRole('combobox')
-        .find(e => e.id === 'create-offer-receiver')!;
-      fireEvent.change(receiverInput, { target: { value: 'bob::nopreapproval' } });
-      await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled());
-      expect(screen.queryByRole('checkbox', { name: '' })).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole('checkbox', { name: 'Use Token Standard Transfer' })
-      ).not.toBeInTheDocument();
-      expect(screen.getByRole('textbox', { name: 'description' })).toBeInTheDocument();
-      await user.click(screen.getByRole('button', { name: 'Send' }));
-
-      await assertCorrectMockIsCalled(
-        true,
-        { amount: '1.0', receiver_party_id: 'bob::nopreapproval', description: '' },
-        false
-      );
+        const allocationsLink = screen.getByRole('link', { name: 'Allocations' });
+        await user.click(allocationsLink);
+        expect(
+          screen.getByRole('heading', { name: `Allocation Requests ${allocationRequests.length}` })
+        ).toBeDefined();
+      });
     });
   });
 

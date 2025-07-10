@@ -268,20 +268,20 @@ const MetaDisplay: React.FC<{ id: string; meta: { [key: string]: string } }> = (
   );
 };
 
-function _isAllocationForTransferLeg(
-  allocation: Contract<AmuletAllocation>,
-  allocationRequest: Contract<AllocationRequest>,
-  legId: string
-): boolean {
-  return (
-    allocation.payload.allocation.settlement.executor ===
-      allocationRequest.payload.settlement.executor &&
-    allocation.payload.allocation.settlement.settlementRef.id ===
-      allocationRequest.payload.settlement.settlementRef.id &&
-    allocation.payload.allocation.settlement.settlementRef.cid ===
-      allocationRequest.payload.settlement.settlementRef.cid &&
-    allocation.payload.allocation.transferLegId === legId
-  );
-}
+// function _isAllocationForTransferLeg(
+//   allocation: Contract<AmuletAllocation>,
+//   allocationRequest: Contract<AllocationRequest>,
+//   legId: string
+// ): boolean {
+//   return (
+//     allocation.payload.allocation.settlement.executor ===
+//       allocationRequest.payload.settlement.executor &&
+//     allocation.payload.allocation.settlement.settlementRef.id ===
+//       allocationRequest.payload.settlement.settlementRef.id &&
+//     allocation.payload.allocation.settlement.settlementRef.cid ===
+//       allocationRequest.payload.settlement.settlementRef.cid &&
+//     allocation.payload.allocation.transferLegId === legId
+//   );
+// }
 
 export default ListAllocationRequests;
