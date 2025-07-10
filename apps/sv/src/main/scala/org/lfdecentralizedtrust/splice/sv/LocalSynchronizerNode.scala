@@ -243,7 +243,7 @@ final class LocalSynchronizerNode(
           .getMediatorSynchronizerState(synchronizerId)
           .map { state =>
             if (
-              state.base.validFrom.isAfter(Instant.now()) && !state.mapping.active
+              state.base.validFrom.isBefore(Instant.now()) && !state.mapping.active
                 .contains(mediatorId)
             ) {
               throw Status.FAILED_PRECONDITION
