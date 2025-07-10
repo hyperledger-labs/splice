@@ -68,7 +68,7 @@ class MergeValidatorLicenseContractsTrigger(
         }
       outcome <-
         if (validatorLicenses.length > 1) {
-          logger.warn(
+          logger.info(
             s"Validator $validator has ${validatorLicenses.length} Validator License contracts."
           )
           mergeValidatorLicenseContracts(
