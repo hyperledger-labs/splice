@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Validator
+
+  - Fix a bug where sweeps through transfer preapprovals failed with a
+    ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
+    party (usually the validator operator) of the receiver is featured.
+
 0.4.5
 -----
 
