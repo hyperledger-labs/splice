@@ -138,4 +138,7 @@ ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 # TODO(#930) - investigate this on the canton side
 Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
 
+# TODO(#1450) - investigate this on the canton side
+FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
+
 # Make sure to have a trailing newline

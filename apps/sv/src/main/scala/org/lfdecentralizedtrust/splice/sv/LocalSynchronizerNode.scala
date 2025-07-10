@@ -257,7 +257,7 @@ final class LocalSynchronizerNode(
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "mediator_topology_transaction_active",
-        "Mediator observes itself as onboarded",
+        "Mediator onboard topology transaction is active",
         participantAdminConnection
           .getDomainTimeLowerBound(synchronizerId, NonNegativeFiniteDuration.Zero)
           .map { response =>
