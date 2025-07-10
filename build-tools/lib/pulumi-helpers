@@ -133,17 +133,21 @@ function _pulumi_automation_run_up() {
 
 function _remove_pulumi_finalizers() {
     for resource in stack update; do
+      if ! kubectl get "$resource" --all-namespaces 2>/dev/null; then
+        _info "Resource type $resource not found or no resources, skipping"
+        continue
+      fi
       kubectl get "$resource" --all-namespaces -o json | jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' | while read -r namespace name; do
         finalizers=$(kubectl get "$resource" -n "$namespace" "$name" -o json | jq -r '.metadata.finalizers')
         if [[ "$finalizers" == "null" ]]; then
-          echo "$resource $name in namespace $namespace has no finalizers, skipping"
+          _info "$resource $name in namespace $namespace has no finalizers, skipping"
         else
-          echo "$resource $name in namespace $namespace has finalizers $finalizers"
+          _info "$resource $name in namespace $namespace has finalizers $finalizers"
           new_finalizers=$(jq 'del(.[] | select(. == "finalizer.stack.pulumi.com"))' <<< "$finalizers")
           patch_payload="{\"metadata\":{\"finalizers\": $new_finalizers}}"
-          echo "Patch payload for $resource $name in namespace $namespace: $patch_payload"
+          _info "Patch payload for $resource $name in namespace $namespace: $patch_payload"
           kubectl patch -n "$namespace" "$resource" "$name" -p "$patch_payload" --type=merge
-          echo "Patched $resource $name in namespace $namespace to remove finalizers"
+          _info "Patched $resource $name in namespace $namespace to remove finalizers"
         fi
       done
     done
