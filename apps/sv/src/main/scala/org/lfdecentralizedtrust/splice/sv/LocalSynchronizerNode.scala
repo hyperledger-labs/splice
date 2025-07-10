@@ -37,7 +37,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboa
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
-import java.time.Duration
+import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
@@ -242,7 +242,10 @@ final class LocalSynchronizerNode(
         sequencerAdminConnection
           .getMediatorSynchronizerState(synchronizerId)
           .map { state =>
-            if (!state.mapping.active.contains(mediatorId)) {
+            if (
+              state.base.validFrom.isAfter(Instant.now()) && !state.mapping.active
+                .contains(mediatorId)
+            ) {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
                   s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
