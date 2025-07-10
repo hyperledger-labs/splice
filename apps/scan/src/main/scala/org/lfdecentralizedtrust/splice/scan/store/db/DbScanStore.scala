@@ -552,7 +552,9 @@ class DbScanStore(
     } yield result
   }
 
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
+  override def lookupRoundOfLatestData()(implicit
+      tc: TraceContext
+  ): Future[Option[(Long, Instant)]] =
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -571,10 +573,10 @@ class DbScanStore(
         result <- row match {
           case Some((closedRound, effectiveAt)) =>
             Future.successful(
-              (closedRound, CantonTimestamp.assertFromLong(micros = effectiveAt).toInstant)
+              Some((closedRound, CantonTimestamp.assertFromLong(micros = effectiveAt).toInstant))
             )
           case None =>
-            Future.failed(roundNotAggregated())
+            Future.successful(None)
         }
       } yield result
     }
