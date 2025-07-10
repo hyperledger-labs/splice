@@ -412,6 +412,14 @@ case class EnvironmentDefinition(
               .replace(NonNegativeLong.tryCreate(2_000_000L))
           )(conf)
       )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms
+          .updateAllSvAppConfigs_(
+            _.focus(_.topologyDelayDuration)
+              // same as canton for sim time
+              .replace(NonNegativeFiniteDuration.Zero)
+          )(conf)
+      )
       .withSequencerConnectionsFromScanDisabled(10_000)
 
   override lazy val environmentFactory: EnvironmentFactory[SpliceConfig, SpliceEnvironment] =

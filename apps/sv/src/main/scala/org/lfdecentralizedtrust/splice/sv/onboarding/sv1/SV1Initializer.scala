@@ -408,7 +408,7 @@ class SV1Initializer(
         )
         val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
         val values = initialValues.tryUpdate(
-          topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(250),
+          topologyChangeDelay = config.topologyDelayDuration.toInternal,
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
