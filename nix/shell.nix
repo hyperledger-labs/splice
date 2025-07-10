@@ -9,6 +9,11 @@ let
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
   helm-unittest = import ./helm-unittest.nix;
 
+  # Override google-cloud-sdk to use a compatible OpenSSL version
+  google-cloud-sdk-patched = (pkgs.google-cloud-sdk.override {
+    openssl = pkgs.openssl_1_1;
+  }).withExtraComponents [ pkgs.google-cloud-sdk.components.gke-gcloud-auth-plugin ];
+
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -32,7 +37,8 @@ in pkgs.mkShell {
     git
     # Required for the runner-container-hooks submodule
     git-lfs
-    (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
+    # Use the patched google-cloud-sdk
+    google-cloud-sdk-patched
     grpcurl
     daml2js
     hub # Github CLI for todo checker
