@@ -15,7 +15,7 @@ trait PostgresAroundEach extends BeforeAndAfterEach {
   private val logger = LoggerFactory.getLogger(getClass)
 
   private val hostName = env("POSTGRES_HOST")
-  private val port = 5432
+  private val port = sys.env.getOrElse("POSTGRES_PORT", "5432").toInt
   private val userName = env("POSTGRES_USER")
   private val password = env("POSTGRES_PASSWORD")
   private val baseDatabase = "postgres"
