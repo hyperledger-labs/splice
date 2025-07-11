@@ -50,16 +50,6 @@ abstract class ResetTopologyStatePlugin
 
   private def attemptToResetTopologyState(env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
     val sv1 = env.svs.local.find(_.name == "sv1").value
-    val connectedDomain = sv1.participantClientWithAdminToken.synchronizers
-      .list_connected()
-      .find(_.synchronizerAlias == sv1.config.domains.global.alias)
-      .getOrElse(
-        throw new IllegalStateException(
-          "Failed to reset environment as SV1 is not connected to global domain"
-        )
-      )
-    val synchronizerId = connectedDomain.synchronizerId
-
     def resetTopologyStateRetries(retries: Int): Unit = {
       if (retries > MAX_RETRIES) {
         logger.error(
@@ -68,6 +58,15 @@ abstract class ResetTopologyStatePlugin
         sys.exit(1)
       }
       try {
+        val connectedDomain = sv1.participantClientWithAdminToken.synchronizers
+          .list_connected()
+          .find(_.synchronizerAlias == sv1.config.domains.global.alias)
+          .getOrElse(
+            throw new IllegalStateException(
+              "Failed to reset environment as SV1 is not connected to global domain"
+            )
+          )
+        val synchronizerId = connectedDomain.synchronizerId
         resetTopologyState(env, synchronizerId, sv1)
       } catch {
         case _: CommandFailure =>
@@ -80,6 +79,9 @@ abstract class ResetTopologyStatePlugin
           logger.info(
             s"Restarting $topologyType reset as base serial has changed"
           )
+          resetTopologyStateRetries(retries + 1)
+        case e: IllegalStateException =>
+          logger.info(e.getMessage)
           resetTopologyStateRetries(retries + 1)
         case e: Throwable =>
           logger.error(s"Failed to reset $topologyType", e)
