@@ -1155,7 +1155,7 @@ lazy val `apps-common-frontend` = {
         val log = streams.value.log
         npmInstall.value
         runCommand(
-          Seq("npm-run-parallel", "check"),
+          Seq("npm", "run", "check", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
@@ -1164,7 +1164,7 @@ lazy val `apps-common-frontend` = {
       npmFix := {
         val log = streams.value.log
         runCommand(
-          Seq("npm-run-parallel", "fix"),
+          Seq("npm", "run", "fix", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
@@ -1187,7 +1187,7 @@ lazy val `apps-common-frontend` = {
         )
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
         runCommand(
-          Seq("npm-run-parallel", "test:sbt"),
+          Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
@@ -1369,7 +1369,7 @@ lazy val pulumi =
         val log = streams.value.log
         npmInstall.value
         runCommand(
-          Seq("npm-run-parallel", "fix"),
+          Seq("npm", "run", "fix"),
           log,
           None,
           Some(npmRootDir.value),
@@ -1379,7 +1379,7 @@ lazy val pulumi =
         val log = streams.value.log
         npmInstall.value
         runCommand(
-          Seq("npm-run-parallel", "check"),
+          Seq("npm", "run", "check"),
           log,
           None,
           Some(npmRootDir.value),
