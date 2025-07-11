@@ -44,6 +44,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     preparationTimeRecordTimeTolerance: NonNegativeFiniteDuration,
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration,
+    topologyChangeDelayDuration: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -86,6 +87,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
         amuletConfig,
         decentralizedSynchronizerConfig,
         preparationTimeRecordTimeToleranceTarget,
+        topologyChangeDelayDuration,
       )
     } yield
       if (state.mapping.parameters != updatedConfig)
@@ -149,6 +151,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
           task.amuletConfig,
           task.synchronizerConfig,
           task.preparationTimeRecordTimeToleranceTarget,
+          topologyChangeDelayDuration,
         ),
         forceChanges =
           if (task.preparationTimeRecordTimeToleranceTarget.isDefined)
@@ -177,6 +180,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       amuletConfig: AmuletConfig[USD],
       synchronizerConfig: Option[SynchronizerConfig],
       preparationTimeRecordTimeToleranceTarget: Option[InternalNonNegativeFiniteDuration],
+      topologyDelay: NonNegativeFiniteDuration,
   ): DynamicSynchronizerParameters = {
     val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     // Make sure that the bootstrap script for the upgrade domain is aligned with any changes made to the
@@ -204,6 +208,7 @@ class ReconcileDynamicSynchronizerParametersTrigger(
       ),
       mediatorDeduplicationTimeout =
         InternalNonNegativeFiniteDuration.fromConfig(mediatorDeduplicationTimeout),
+      topologyChangeDelay = topologyDelay.toInternal,
     )
   }
 }

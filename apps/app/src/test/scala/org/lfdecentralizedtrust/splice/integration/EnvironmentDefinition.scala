@@ -178,6 +178,10 @@ case class EnvironmentDefinition(
             ),
           )
         }
+        participants(env).foreach { p =>
+          logger.info(s"Ensuring vetting topology is effective for ${p.name}")(TraceContext.empty)
+          p.topology.synchronisation.await_idle()
+        }
       }
     )
   }
@@ -410,6 +414,14 @@ case class EnvironmentDefinition(
           .updateAllSvAppFoundDsoConfigs_(
             _.focus(_.initialSynchronizerFeesConfig.baseRateBurstAmount)
               .replace(NonNegativeLong.tryCreate(2_000_000L))
+          )(conf)
+      )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms
+          .updateAllSvAppConfigs_(
+            _.focus(_.topologyChangeDelayDuration)
+              // same as canton for sim time
+              .replace(NonNegativeFiniteDuration.Zero)
           )(conf)
       )
       .withSequencerConnectionsFromScanDisabled(10_000)
