@@ -48,6 +48,7 @@ import { hasConflictingFields } from '../../utils/configDiffs';
 import { isValidUrl } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
+import CreateUnallocatedUnclaimedActivityRecord from './actions/CreateUnallocatedUnclaimedActivityRecord';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
 import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
@@ -125,6 +126,10 @@ export const CreateVoteRequest: React.FC = () => {
     { name: 'Set Dso Rules Configuration', value: 'SRARC_SetConfig' },
     { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
     { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
+    {
+      name: 'Create Unclaimed Activity Record',
+      value: 'SRARC_CreateUnallocatedUnclaimedActivityRecord',
+    },
   ];
 
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
@@ -389,7 +394,13 @@ export const CreateVoteRequest: React.FC = () => {
           {actionName === 'SRARC_UpdateSvRewardWeight' && (
             <UpdateSvRewardWeight chooseAction={chooseAction} action={action} />
           )}
-
+          {actionName === 'SRARC_CreateUnallocatedUnclaimedActivityRecord' && (
+            <CreateUnallocatedUnclaimedActivityRecord
+              chooseAction={chooseAction}
+              action={action}
+              effectivity={effectivity}
+            />
+          )}
           <Typography variant="h5">Proposal</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>
