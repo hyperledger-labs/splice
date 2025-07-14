@@ -59,6 +59,13 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
   private val datasetName =
     s"scantotalsupply_test_dataset_${UUID.randomUUID().toString.replace("-", "_")}"
+  private val (createsBqTableName, exercisesBqTableName) = {
+    val prefix = "scan_sv_1_"
+    (
+      s"${prefix}update_history_creates",
+      s"${prefix}update_history_exercises",
+    )
+  }
 
   // Test data parameters
   private val mintedAmount = BigDecimal("1000000")
@@ -171,8 +178,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createEmptyTables(): Unit = {
     // row_id is primary key but this is not currently enforced even in actual
     // deployment
-    createTable("update_history_creates", createsSchema)
-    createTable("update_history_exercises", exercisesSchema)
+    createTable(createsBqTableName, createsSchema)
+    createTable(exercisesBqTableName, exercisesSchema)
   }
 
   private def createTable(tableName: String, schema: Schema): Unit = {
@@ -213,13 +220,13 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
     copyTableToBigQuery(
       "update_history_creates",
-      "scan_sv_1_update_history_creates",
+      createsBqTableName,
       createsSchema,
       sourceDb,
     )
     copyTableToBigQuery(
       "update_history_exercises",
-      "scan_sv_1_update_history_exercises",
+      exercisesBqTableName,
       exercisesSchema,
       sourceDb,
     )
