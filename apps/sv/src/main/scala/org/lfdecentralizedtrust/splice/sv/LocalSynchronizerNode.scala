@@ -5,8 +5,7 @@ package org.lfdecentralizedtrust.splice.sv
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -38,7 +37,7 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboa
 import org.lfdecentralizedtrust.splice.sv.config.SequencerPruningConfig
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 
-import java.time.Duration
+import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connections to the domain node (composed of sequencer + mediator) operated by the SV running this SV app.
@@ -258,20 +257,19 @@ final class LocalSynchronizerNode(
         RetryFor.WaitingOnInitDependency,
         "mediator_topology_transaction_active",
         "Mediator onboard topology transaction is active",
-        participantAdminConnection
-          .getDomainTimeLowerBound(synchronizerId, NonNegativeFiniteDuration.Zero)
-          .map { response =>
-            if (
-              response.timestamp
-                .isBefore(CantonTimestamp.tryFromInstant(mediatorSyncState.base.validFrom))
-            ) {
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"Mediator $mediatorId not onboarded yet, current domain time lower bound is ${response.timestamp} but should be at least ${mediatorSyncState.base.validFrom}"
-                )
-                .asRuntimeException()
-            }
-          },
+        if (
+          Instant
+            .now()
+            .isBefore(mediatorSyncState.base.validFrom)
+        ) {
+          Future.failed(
+            Status.FAILED_PRECONDITION
+              .withDescription(
+                s"Mediator $mediatorId not onboarded yet, it is valid from ${mediatorSyncState.base.validFrom}"
+              )
+              .asRuntimeException()
+          )
+        } else Future.unit,
         logger,
       )
       _ = logger.info(s"Initializing mediator $mediatorId")
