@@ -8,11 +8,25 @@ import {
 } from '../../components/governance/ProposalDetailsContent';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material';
-import { theme } from '@lfdecentralizedtrust/splice-common-frontend';
 import { ProposalDetails, ProposalVote, ProposalVotingInformation } from '../../utils/types';
 import userEvent from '@testing-library/user-event';
+import { SvConfigProvider, useSvConfig } from '../../utils';
+import {
+  AuthProvider,
+  SvClientProvider,
+  theme,
+  UserProvider,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { SvAdminClientProvider } from '../../contexts/SvAdminServiceContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { server, svUrl } from '../setup/setup';
+import { rest } from 'msw';
+import { ProposalVoteForm } from '../../components/governance/ProposalVoteForm';
+import App from '../../App';
+import { svPartyId } from '../mocks/constants';
 
 const voteRequest = {
   contractId: 'abc123' as ContractId<VoteRequest>,
@@ -62,7 +76,7 @@ const voteResult = {
     createdAt: '2024-01-01 13:00',
     url: 'https://example.com',
     summary: 'Summary of the proposal',
-    isVoteRequest: true,
+    isVoteRequest: false,
     action: 'SRARC_OffboardSv',
     proposal: {
       memberToOffboard: 'sv2',
@@ -96,19 +110,71 @@ const voteResult = {
   ],
 } as ProposalDetailsContentProps;
 
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchInterval: 500,
+      structuralSharing: replaceEqualDeep,
+    },
+  },
+});
+
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
+    <MemoryRouter>
+      <SvConfigProvider>
+        <WrapperProviders children={children} />
+      </SvConfigProvider>
+    </MemoryRouter>
+  );
+};
+
+const WrapperProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const config = useSvConfig();
+  const navigate = useNavigate();
+
+  return (
     <ThemeProvider theme={theme}>
-      <MemoryRouter>{children}</MemoryRouter>
+      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+        <QueryClientProvider client={queryClient}>
+          <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
+            <SvClientProvider url={config.services.sv.url}>
+              <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>
+            </SvClientProvider>
+          </UserProvider>
+        </QueryClientProvider>
+      </AuthProvider>
     </ThemeProvider>
   );
 };
+
+describe('SV user can', () => {
+  test('login and see the SV party ID', async () => {
+    const user = userEvent.setup();
+    render(
+      <SvConfigProvider>
+        <App />
+      </SvConfigProvider>
+    );
+
+    expect(await screen.findByText('Log In')).toBeDefined();
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'sv1');
+
+    const button = screen.getByRole('button', { name: 'Log In' });
+    user.click(button);
+
+    expect(await screen.findAllByDisplayValue(svPartyId)).toBeDefined();
+  });
+});
 
 describe('Proposal Details Content', () => {
   test('should render proposal details page', async () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -166,10 +232,11 @@ describe('Proposal Details Content', () => {
     const votes = within(votesSection).getAllByTestId('proposal-details-vote');
     expect(votes.length).toBe(2);
 
-    expect(screen.getByTestId('proposal-details-your-vote-section')).toBeDefined();
-    expect(screen.getByTestId('proposal-details-your-vote-input')).toBeDefined();
-    expect(screen.getByTestId('proposal-details-your-vote-accept')).toBeDefined();
-    expect(screen.getByTestId('proposal-details-your-vote-reject')).toBeDefined();
+    expect(screen.getByTestId('your-vote-form')).toBeDefined();
+    expect(screen.getByTestId('your-vote-url-input')).toBeDefined();
+    expect(screen.getByTestId('your-vote-reason-input')).toBeDefined();
+    expect(screen.getByTestId('your-vote-accept')).toBeDefined();
+    expect(screen.getByTestId('your-vote-reject')).toBeDefined();
   });
 
   test('should render featured app proposal details', () => {
@@ -184,6 +251,7 @@ describe('Proposal Details Content', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={featuredAppDetails}
           votingInformation={voteRequest.votingInformation}
@@ -217,6 +285,7 @@ describe('Proposal Details Content', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={unfeaturedAppDetails}
           votingInformation={voteRequest.votingInformation}
@@ -251,6 +320,7 @@ describe('Proposal Details Content', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={updateSvRewardWeightDetails}
           votingInformation={voteRequest.votingInformation}
@@ -299,6 +369,7 @@ describe('Proposal Details Content', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={amuletRulesConfigDetails}
           votingInformation={voteRequest.votingInformation}
@@ -361,6 +432,7 @@ describe('Proposal Details Content', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={dsoRulesConfigDetails}
           votingInformation={voteRequest.votingInformation}
@@ -465,6 +537,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -495,6 +568,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -529,6 +603,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -545,6 +620,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -563,6 +639,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -604,6 +681,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={votingInformation}
@@ -632,6 +710,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={votingInformation}
@@ -657,6 +736,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={voteRequest.votingInformation}
@@ -665,16 +745,19 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    const votingForm = screen.getByTestId('proposal-details-your-vote-section');
+    const votingForm = screen.getByTestId('your-vote-form');
     expect(votingForm).toBeDefined();
 
-    const votingFormInput = within(votingForm).getByTestId('proposal-details-your-vote-input');
-    expect(votingFormInput).toBeDefined();
+    const votingFormUrlInput = within(votingForm).getByTestId('your-vote-url-input');
+    expect(votingFormUrlInput).toBeDefined();
 
-    const votingFormAccept = within(votingForm).getByTestId('proposal-details-your-vote-accept');
+    const votingFormReasonInput = within(votingForm).getByTestId('your-vote-reason-input');
+    expect(votingFormReasonInput).toBeDefined();
+
+    const votingFormAccept = within(votingForm).getByTestId('your-vote-accept');
     expect(votingFormAccept).toBeDefined();
 
-    const votingFormReject = within(votingForm).getByTestId('proposal-details-your-vote-reject');
+    const votingFormReject = within(votingForm).getByTestId('your-vote-reject');
     expect(votingFormReject).toBeDefined();
   });
 
@@ -690,6 +773,7 @@ describe('Proposal Details > Votes & Voting', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteRequest.contractId}
           proposalDetails={voteRequest.proposalDetails}
           votingInformation={votingInformation}
@@ -698,15 +782,14 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    expect(() => screen.getByTestId('proposal-details-your-vote-section')).toThrowError(
-      /Unable to find an element/
-    );
+    expect(() => screen.getByTestId('your-vote-form')).toThrowError(/Unable to find an element/);
   });
 
   test('should not render voting form for vote result', () => {
     render(
       <Wrapper>
         <ProposalDetailsContent
+          currentSvPartyId={voteRequest.votingInformation.requester}
           contractId={voteResult.contractId}
           proposalDetails={voteResult.proposalDetails}
           votingInformation={voteResult.votingInformation}
@@ -715,8 +798,268 @@ describe('Proposal Details > Votes & Voting', () => {
       </Wrapper>
     );
 
-    expect(() => screen.getByTestId('proposal-details-your-vote-section')).toThrowError(
-      /Unable to find an element/
+    expect(() => screen.getByTestId('your-vote-form')).toThrowError(/Unable to find an element/);
+  });
+
+  test('submit button says Submit if sv has not voted', async () => {
+    const votes: ProposalVote[] = [
+      {
+        sv: 'sv1',
+        vote: 'no-vote',
+      },
+    ];
+
+    render(
+      <Wrapper>
+        <ProposalVoteForm
+          voteRequestContractId={voteRequest.contractId}
+          currentSvPartyId={'sv1'}
+          votes={votes}
+        />
+      </Wrapper>
     );
+
+    const votingForm = screen.getByTestId('your-vote-form');
+    const submitButton = within(votingForm).getByTestId('submit-vote-button');
+
+    expect(submitButton).toBeDefined();
+    expect(submitButton.textContent).toMatch(/Submit/);
+  });
+
+  test('submit button says Update if sv has already voted', async () => {
+    const votes: ProposalVote[] = [
+      {
+        sv: 'sv1',
+        vote: 'accepted',
+        reason: {
+          url: 'https://sv1.example.com',
+          body: 'SV1 Reason',
+        },
+      },
+    ];
+
+    render(
+      <Wrapper>
+        <ProposalVoteForm
+          voteRequestContractId={voteRequest.contractId}
+          currentSvPartyId={'sv1'}
+          votes={votes}
+        />
+      </Wrapper>
+    );
+
+    const votingForm = screen.getByTestId('your-vote-form');
+    const submitButton = within(votingForm).getByTestId('submit-vote-button');
+
+    expect(submitButton).toBeDefined();
+    expect(submitButton.textContent).toMatch(/Update/);
+  });
+
+  test('render success message after api returns success', async () => {
+    const votes: ProposalVote[] = [
+      {
+        sv: 'sv1',
+        vote: 'no-vote',
+      },
+      {
+        sv: 'sv2',
+        vote: 'accepted',
+        reason: {
+          url: 'https://sv2.example.com',
+          body: 'SV2 Reason',
+        },
+      },
+    ];
+
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/votes`, (_, res, ctx) => {
+        return res(ctx.status(201));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <ProposalVoteForm
+          voteRequestContractId={voteRequest.contractId}
+          currentSvPartyId={'sv1'}
+          votes={votes}
+        />
+      </Wrapper>
+    );
+
+    const votingForm = screen.getByTestId('your-vote-form');
+    expect(votingForm).toBeDefined();
+
+    const urlInput = within(votingForm).getByTestId('your-vote-url-input');
+    expect(urlInput).toBeDefined();
+
+    const reasonInput = within(votingForm).getByTestId('your-vote-reason-input');
+    expect(reasonInput).toBeDefined();
+
+    const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
+    expect(acceptRadio).toBeDefined();
+
+    await user.click(acceptRadio);
+
+    const submitButton = within(votingForm).getByTestId('submit-vote-button');
+    expect(submitButton).toBeDefined();
+
+    await user.click(submitButton);
+
+    const submissionMessage = await screen.findByTestId('submission-message');
+    expect(submissionMessage).toBeDefined();
+
+    const successMessage = await screen.findByTestId('vote-submission-success');
+
+    expect(successMessage.textContent).toMatch(/Vote successfully updated/);
+  });
+
+  test('render failure message after api returns error', async () => {
+    const votes: ProposalVote[] = [
+      {
+        sv: 'sv1',
+        vote: 'no-vote',
+      },
+      {
+        sv: 'sv2',
+        vote: 'accepted',
+        reason: {
+          url: 'https://sv2.example.com',
+          body: 'SV2 Reason',
+        },
+      },
+    ];
+
+    server.use(
+      rest.post(`${svUrl}/v0/admin/sv/votes`, (_, res, ctx) => {
+        return res(ctx.status(400));
+      })
+    );
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <ProposalVoteForm
+          voteRequestContractId={voteRequest.contractId}
+          currentSvPartyId={'sv1'}
+          votes={votes}
+        />
+      </Wrapper>
+    );
+
+    const votingForm = screen.getByTestId('your-vote-form');
+    expect(votingForm).toBeDefined();
+
+    const urlInput = within(votingForm).getByTestId('your-vote-url-input');
+    expect(urlInput).toBeDefined();
+
+    const reasonInput = within(votingForm).getByTestId('your-vote-reason-input');
+    expect(reasonInput).toBeDefined();
+
+    const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
+    expect(acceptRadio).toBeDefined();
+
+    await user.click(acceptRadio);
+
+    const submitButton = within(votingForm).getByTestId('submit-vote-button');
+    expect(submitButton).toBeDefined();
+
+    await user.click(submitButton);
+
+    const submissionMessage = await screen.findByTestId('submission-message');
+    expect(submissionMessage).toBeDefined();
+
+    const successMessage = await screen.findByTestId('vote-submission-error');
+
+    expect(successMessage.textContent).toMatch(/Something went wrong, unable to cast vote/);
+  });
+
+  test('prevent submission if provided url is invalid', async () => {
+    const votes: ProposalVote[] = [
+      {
+        sv: 'sv1',
+        vote: 'no-vote',
+      },
+      {
+        sv: 'sv2',
+        vote: 'accepted',
+        reason: {
+          url: 'https://sv2.example.com',
+          body: 'SV2 Reason',
+        },
+      },
+    ];
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <ProposalVoteForm
+          voteRequestContractId={voteRequest.contractId}
+          currentSvPartyId={'sv1'}
+          votes={votes}
+        />
+      </Wrapper>
+    );
+
+    const votingForm = screen.getByTestId('your-vote-form');
+    expect(votingForm).toBeDefined();
+
+    const urlInput = within(votingForm).getByTestId('your-vote-url-input');
+    expect(urlInput).toBeDefined();
+
+    await user.type(urlInput, 'invalid_url');
+
+    const acceptRadio = within(votingForm).getByTestId('your-vote-accept');
+    user.click(acceptRadio);
+
+    const submitButton = screen.getByTestId('submit-vote-button');
+    expect(submitButton.getAttribute('disabled')).toBeDefined();
+
+    const urlHelperText = within(votingForm).getByTestId('your-vote-url-helper-text');
+    expect(urlHelperText.textContent).toMatch(/Invalid URL/);
+  });
+
+  test('prevent submission if vote has not been chosen', async () => {
+    const votes: ProposalVote[] = [
+      {
+        sv: 'sv1',
+        vote: 'no-vote',
+      },
+      {
+        sv: 'sv2',
+        vote: 'accepted',
+        reason: {
+          url: 'https://sv2.example.com',
+          body: 'SV2 Reason',
+        },
+      },
+    ];
+
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <ProposalVoteForm
+          voteRequestContractId={voteRequest.contractId}
+          currentSvPartyId={'sv1'}
+          votes={votes}
+        />
+      </Wrapper>
+    );
+
+    const votingForm = screen.getByTestId('your-vote-form');
+    expect(votingForm).toBeDefined();
+
+    const submitButton = screen.getByTestId('submit-vote-button');
+    expect(submitButton.getAttribute('disabled')?.valueOf()).toBe('');
+
+    const rejectRadio = within(votingForm).getByTestId('your-vote-reject');
+    await user.click(rejectRadio);
+
+    expect(submitButton.getAttribute('disabled')?.valueOf()).toBe(undefined);
   });
 });
