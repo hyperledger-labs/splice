@@ -6,12 +6,10 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.collection.mutable
-import scala.concurrent.duration.*
 import scala.sys.process.ProcessLogger
 import scala.util.control.NonFatal
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
-import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
@@ -53,8 +51,6 @@ class UnclaimedSvRewardsScriptIntegrationTest
 
   "unclaimed_sv_rewards.py summarizes claimed, expired, and unclaimed minting rewards for a given beneficiary" in {
     implicit env =>
-      def openMiningRounds: Seq[Round] =
-        sv1Backend.listOpenMiningRounds().map(_.payload.round)
       def expireRewardCouponsTrigger = sv1Backend.dsoDelegateBasedAutomation
         .trigger[ExpireRewardCouponsTrigger]
       def receiveSvRewardCouponTrigger = sv1Backend.dsoAutomation
@@ -65,6 +61,11 @@ class UnclaimedSvRewardsScriptIntegrationTest
           .futureValue
           .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
+      val svRewardCouponsCount = 6L
+      val svRewardCouponsExpiredCount = 3L
+      val svRewardCouponsClaimedCount = 1L
+      val svRewardCouponsUnclaimedCount = 2L
+
       // Some rewards gets created before now
       val beginRecordTime = Instant.now().minus(10, ChronoUnit.MINUTES)
 
@@ -73,57 +74,58 @@ class UnclaimedSvRewardsScriptIntegrationTest
         expireRewardCouponsTrigger.pause().futureValue
       }
 
-      clue("Advance some rounds") {
-        Range(0, 4).foreach(_ => advanceRoundsByOneTickViaAutomation())
-        logger.debug(s"openMiningRounds: $openMiningRounds")
-      }
-
-      clue("Pause sv rewards generation") {
-        receiveSvRewardCouponTrigger.pause().futureValue
-      }
-
+      actAndCheck(
+        "Advance some rounds", {
+          Range(0, 4).foreach(_ => advanceRoundsByOneTickViaAutomation())
+          // Pause sv rewards generation
+          receiveSvRewardCouponTrigger.pause().futureValue
+        },
+      )(
+        "Sv reward coupons get created",
+        _ => {
+          sv1WalletClient.listSvRewardCoupons() should have size svRewardCouponsCount
+        },
+      )
       val svRewardCoupons = sv1WalletClient.listSvRewardCoupons()
-      val svRewardCouponsCount = svRewardCoupons.length
-      svRewardCouponsCount should not be 0
-      logger.debug(s"SvRewardCoupons count: $svRewardCouponsCount")
 
       // Expire
       ///////////
 
-      clue("Resume trigger to expire some coupons") {
-        expireRewardCouponsTrigger.resume()
-        eventuallySucceeds(timeUntilSuccess = 60.seconds) {
-          sv1WalletClient.listSvRewardCoupons().length should be < svRewardCouponsCount
+      actAndCheck(
+        "Resume expired trigger", {
+          expireRewardCouponsTrigger.resume()
+        },
+      )(
+        "Some coupons get expired",
+        _ => {
+          sv1WalletClient
+            .listSvRewardCoupons() should have size (svRewardCouponsCount - svRewardCouponsExpiredCount)
           // Pause trigger once we have some coupons expired
           expireRewardCouponsTrigger.pause().futureValue
-        }
-      }
-
+        },
+      )
       val svRewardCouponsAfterExpiry = sv1WalletClient.listSvRewardCoupons()
-      val svRewardCouponsAfterExpiryCount = svRewardCouponsAfterExpiry.length
       val svRewardCouponsExpired = svRewardCoupons.diff(svRewardCouponsAfterExpiry)
-      val svRewardCouponsExpiredCount = svRewardCouponsExpired.length
-      logger.debug(s"SvRewardCoupons expired count: $svRewardCouponsExpiredCount")
 
       // Claim
       //////////
 
-      clue("Resume trigger to claim some coupons") {
-        sv1CollectRewardsAndMergeAmuletsTrigger.resume()
-        eventuallySucceeds(timeUntilSuccess = 60.seconds) {
-          sv1WalletClient.listSvRewardCoupons().length should be < svRewardCouponsAfterExpiryCount
+      actAndCheck(
+        "Resume collect rewards trigger", {
+          sv1CollectRewardsAndMergeAmuletsTrigger.resume()
+        },
+      )(
+        "Some coupons get claimed",
+        _ => {
+          sv1WalletClient
+            .listSvRewardCoupons() should have size
+            (svRewardCouponsCount - svRewardCouponsExpiredCount - svRewardCouponsClaimedCount)
           // Pause trigger once we have some coupons claimed
           sv1CollectRewardsAndMergeAmuletsTrigger.pause().futureValue
-        }
-      }
-
+        },
+      )
       val svRewardCouponsAfterClaiming = sv1WalletClient.listSvRewardCoupons()
       val svRewardCouponsClaimed = svRewardCouponsAfterExpiry.diff(svRewardCouponsAfterClaiming)
-      val svRewardCouponsClaimedCount = svRewardCouponsClaimed.length
-      val svRewardCouponsUnclaimedCount =
-        svRewardCouponsCount - svRewardCouponsExpiredCount - svRewardCouponsClaimedCount
-      logger.debug(s"SvRewardCoupons claimed count: $svRewardCouponsClaimedCount")
-      logger.debug(s"SvRewardCoupons unclaimed count: $svRewardCouponsUnclaimedCount")
 
       // Run script and check results
       //////////////////////////////////
@@ -145,8 +147,6 @@ class UnclaimedSvRewardsScriptIntegrationTest
       )
       val rewardExpiredTotalAmount = getTotalAmount(svRewardCouponsExpired, roundInfo)
       val rewardClaimedTotalAmount = getTotalAmount(svRewardCouponsClaimed, roundInfo)
-      logger.debug(s"rewardExpiredTotalAmount: $rewardExpiredTotalAmount")
-      logger.debug(s"rewardClaimedTotalAmount: $rewardClaimedTotalAmount")
 
       // Add some minutes in case discrepancies with ledger time
       val endRecordTime = Instant
@@ -182,28 +182,20 @@ class UnclaimedSvRewardsScriptIntegrationTest
 
           assert(exitCode == 0, s"Script exited with code $exitCode")
           readLines.filter(_.startsWith("ERROR:")) shouldBe empty
-          withClue(s"Expected: reward_expired_count = $svRewardCouponsExpiredCount") {
-            readLines.exists(
-              _.contains(s"reward_expired_count = $svRewardCouponsExpiredCount")
-            ) shouldBe true
+          forExactly(1, readLines) {
+            _ should include(s"reward_expired_count = $svRewardCouponsExpiredCount")
           }
-          withClue(s"Expected: reward_expired_total_amount =") {
-            readLines.exists(
-              _.contains(s"reward_expired_total_amount = $rewardExpiredTotalAmount")
-            ) shouldBe true
+          forExactly(1, readLines) {
+            _ should include(s"reward_expired_total_amount = $rewardExpiredTotalAmount")
           }
-          withClue(s"Expected: reward_claimed_count = $svRewardCouponsClaimedCount") {
-            readLines.exists(
-              _.contains(s"reward_claimed_count = $svRewardCouponsClaimedCount")
-            ) shouldBe true
+          forExactly(1, readLines) {
+            _ should include(s"reward_claimed_count = $svRewardCouponsClaimedCount")
           }
-          withClue(s"Expected: reward_claimed_total_amount = $rewardClaimedTotalAmount") {
-            readLines.exists(_.contains("reward_claimed_total_amount =")) shouldBe true
+          forExactly(1, readLines) {
+            _ should include(s"reward_claimed_total_amount = $rewardClaimedTotalAmount")
           }
-          withClue(s"Expected: reward_unclaimed_count = $svRewardCouponsUnclaimedCount") {
-            readLines.exists(
-              _.contains(s"reward_unclaimed_count = $svRewardCouponsUnclaimedCount")
-            ) shouldBe true
+          forExactly(1, readLines) {
+            _ should include(s"reward_unclaimed_count = $svRewardCouponsUnclaimedCount")
           }
         } catch {
           case NonFatal(ex) =>
