@@ -169,7 +169,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.1`,
+                image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.5`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
