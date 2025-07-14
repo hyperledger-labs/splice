@@ -63,13 +63,6 @@ object BuildCommon {
     libraryDependencies ++= Seq(
       scalatest % Test
     ),
-    resolvers += "Artifactory Canton Drivers" at "https://digitalasset.jfrog.io/artifactory/canton-drivers/",
-    credentials += Credentials(
-      "Artifactory Realm",
-      "digitalasset.jfrog.io",
-      sys.env("ARTIFACTORY_USER"),
-      sys.env("ARTIFACTORY_PASSWORD"),
-    ),
   ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")

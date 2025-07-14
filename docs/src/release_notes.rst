@@ -24,6 +24,11 @@ Upcoming
     ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
     party (usually the validator operator) of the receiver is featured.
 
+- Splice
+
+  - Building the Splice repo, and running the vast majority of integration tests locally, no longer requires
+    JFrog access.
+
 0.4.5
 -----
 

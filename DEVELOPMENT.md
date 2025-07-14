@@ -31,31 +31,31 @@
     ```
     extra-experimental-features = nix-command flakes
     ```
-1. Configure artifactory credentials
-   Currently, building this repo requires access to Digital Asset's enterprise artifactory. To gain access,
-   please contact the Maintainers of this repo, per MAINTAINERS.md.
-   Once you have access to artifactory, you can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
-   Your username is shown at the top of the page (under "User profile: XX").
-   1. For Nix to download `canton`.
-      To do so, add the following to `/etc/nix/netrc` (you might need to create that directory as root):
-      ```
-      machine digitalasset.jfrog.io
-      login yourartifactoryusername
-      password yourartifactoryidentitytoken
-      ```
-   1. For access to the canton enterprise docker repo and for sbt to download internal dependencies
-      To do so, the `ARTIFACTORY_USER` and `ARTIFACTORY_PASSWORD` environment variables must be configured.
-      Best would be to add the environment variables to the `.envrc.private` file like so:
-      ```
-      export ARTIFACTORY_USER="yourartifactoryusername"
-      export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
-      ```
 1. After switching to the Splice repo directory, you should see a line like
    ```
    direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
    ```
 1. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
-1. If you get an authorization exception, like the following:
+1. (Optional) Configure artifactory credentials
+   A few tests rely on Enterprise canton features. To be able to run those locally, you will require access to
+   Digital Asset's enterprise artifactory. If you need to run those, please contact the Maintainers of this repo,
+   per MAINTAINERS.md.
+   Once you have access to artifactory, you can generate an artifactory Identity Token [here](https://digitalasset.jfrog.io/ui/admin/artifactory/user_profile).
+   Your username is shown at the top of the page (under "User profile: XX").
+   1. Add the following to `/etc/nix/netrc` (you might need to create that directory as root):
+      ```
+      machine digitalasset.jfrog.io
+      login yourartifactoryusername
+      password yourartifactoryidentitytoken
+      ```
+   1. In addition, add your artifactory user and password to `.envrc.private` file like so:
+      ```
+      export ARTIFACTORY_USER="yourartifactoryusername"
+      export ARTIFACTORY_PASSWORD="yourartifactoryidentitytoken"
+      ```
+   Once added, reload direnv by typing `direnv reload` in your terminal.
+1. (Optional) Configure artifactory credentials - troubleshooting
+   If you defined Artifactory access, and are getting an authorization exception, like the following:
    ```
    direnv: using nix
    error: unable to download 'https://digitalasset.jfrog.io/artifactory/canton-enterprise/canton-enterprise-2.7.0-snapshot.20230614.10547.0.v03419b62.tar.gz': HTTP error 401 ('Unauthorized')
