@@ -507,23 +507,6 @@ object SpliceTests extends LazyLogging {
       }
     }
 
-    /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
-      */
-    def eventuallySucceeds[T](
-        timeUntilSuccess: FiniteDuration = 20.seconds,
-        maxPollInterval: FiniteDuration = 5.seconds,
-        suppressErrors: Boolean = true,
-    )(testCode: => T): T = {
-      eventually(timeUntilSuccess, maxPollInterval) {
-        try {
-          if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
-        } catch {
-          case e: TestFailedException => throw e
-          case NonFatal(e) => fail(e)
-        }
-      }
-    }
-
     /** Changes `name` so it is unlikely to conflict with names used somewhere else.
       * Does nothing for isolated test environments, overloaded for shared environment.
       */
