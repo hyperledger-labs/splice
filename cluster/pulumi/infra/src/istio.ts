@@ -13,6 +13,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
+  GCP_ZONE,
   getDnsNames,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
@@ -160,6 +161,7 @@ function configureInternalGatewayService(
   const cluster = gcp.container.getCluster({
     name: CLUSTER_NAME,
     project: GCP_PROJECT,
+    location: GCP_ZONE,
   });
   // The loopback traffic would be prevented by our policy. To still allow it, we
   // add the node pool ip ranges to the list.
