@@ -5,7 +5,8 @@ package org.lfdecentralizedtrust.splice.sv
 
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle}
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -234,7 +235,7 @@ final class LocalSynchronizerNode(
           ),
         logger,
       )
-      _ <- retryProvider.waitUntil(
+      mediatorSyncState <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "sequencer_observes_mediator_onboarded",
         "local sequencer observes mediator as onboarded",
@@ -246,6 +247,27 @@ final class LocalSynchronizerNode(
               throw Status.FAILED_PRECONDITION
                 .withDescription(
                   s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
+                )
+                .asRuntimeException()
+            }
+            state
+          },
+        logger,
+      )
+      _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
+        "mediator_topology_transaction_active",
+        "Mediator onboard topology transaction is active",
+        participantAdminConnection
+          .getDomainTimeLowerBound(synchronizerId, NonNegativeFiniteDuration.Zero)
+          .map { response =>
+            if (
+              response.timestamp
+                .isBefore(CantonTimestamp.tryFromInstant(mediatorSyncState.base.validFrom))
+            ) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Mediator $mediatorId not onboarded yet, current domain time lower bound is ${response.timestamp} but should be at least ${mediatorSyncState.base.validFrom}"
                 )
                 .asRuntimeException()
             }
