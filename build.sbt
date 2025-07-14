@@ -1941,6 +1941,11 @@ printTests := {
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
     ),
     (
+      "BigQuery-accessing tests",
+      "test-full-class-names-bigquery.log",
+      (t: String) => t contains "BigQuery",
+    ),
+    (
       "resource intensive tests",
       "test-full-class-names-resource-intensive.log",
       (t: String) => isResourceIntensiveTest(t),
