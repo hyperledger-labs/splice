@@ -139,7 +139,7 @@ function installDockerRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.11.0',
+      version: ghaConfig.runnerScaleSetVersion,
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
@@ -169,7 +169,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.5`,
+                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerHookVersion}`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -419,10 +419,6 @@ function installK8sRunnerScaleSet(
             containers: [
               {
                 name: '$job',
-                env: [
-                  // TODO (#556): remove from here, already defined in splice-test-ci/Dockerfile
-                  { name: 'CI', value: 'true' },
-                ],
                 volumeMounts: [
                   {
                     name: 'cache',
@@ -474,7 +470,7 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:0.3.21`;
+  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:${ghaConfig.runnerHookVersion}`;
 
   const repo = ghaConfig.githubRepo;
 
@@ -482,7 +478,7 @@ function installK8sRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.11.0',
+      version: ghaConfig.runnerScaleSetVersion,
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
