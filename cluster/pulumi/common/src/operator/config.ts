@@ -7,8 +7,6 @@ import { z } from 'zod';
 export const OperatorDeploymentConfigSchema = z.object({
   operatorDeployment: z.object({
     reference: GitReferenceSchema,
-    // TODO(DACH-NY/canton-network-internal#544) - delete this and move the config back to the operator project
-    useOperatorV2: z.boolean().default(true),
   }),
 });
 
