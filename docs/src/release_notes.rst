@@ -17,6 +17,8 @@ Upcoming
     populate the token metadata total supply using the aggregates used for closed rounds.
     The data used corresponds to the data served by the ``/v0/total-amulet-balance``
     endpoint in :ref:`app_dev_scan_api` for the latest closed round.
+  - Fix `bug #1280 <https://github.com/hyperledger-labs/splice/pull/1280>`_:
+    ``record_time`` in Scan API ``/updates`` is now right-padded to 6 digits (microseconds).
 
 - Validator
 
