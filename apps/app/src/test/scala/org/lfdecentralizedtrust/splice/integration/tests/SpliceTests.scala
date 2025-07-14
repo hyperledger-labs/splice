@@ -67,7 +67,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
 import scala.util.chaining.scalaUtilChainingOps
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /** Analogue to Canton's CommunityTests */
