@@ -267,6 +267,7 @@ case class SvAppBackendConfig(
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
+    skipSynchronizerInitialization: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
