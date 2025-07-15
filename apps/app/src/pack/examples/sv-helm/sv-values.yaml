@@ -58,6 +58,14 @@ domain:
   sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.YOUR_HOSTNAME"
   sequencerAvailabilityDelay: "60 seconds"
   enableBftSequencer: false
+  # Enable this to skip initialization of the sequencer and mediator node.
+  # This needs to be false when a node is first created but can be set to true afterwards.
+  # Setting it to true allows the SV app to start without the sequencer being up
+  # which can be useful, e.g., when a database migration blocks the sequencer from starting
+  # until it completes.
+  # Note that you must set it (temporarily) to false if you reset your mediator or sequencer
+  # or change the sequencer or mediator config, e.g., the sequencer url.
+  skipInitialization: false
 
 # Please make the ``scan`` service `publicUrl` accessible for other validators to read from, and set the URL below to your Scan service.
 # Make sure your cluster's ingress is correctly configured for Scan and can be accessed through the provided URL.

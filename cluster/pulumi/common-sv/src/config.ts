@@ -95,6 +95,11 @@ export const SvConfigSchema = z.object({
           enableImportUpdatesBackfill: z.boolean().optional(),
         })
         .optional(),
+      synchronizer: z.object({
+        skipInitialization: z.boolean().default(false),
+        // This can be used on clusters like CILR where we usually would expect to skip initialization but the sv runbook gets reset periodically.
+        forceSvRunbookInitialization: z.boolean().default(false),
+      }).optional(),
     })
     .optional(),
 });
