@@ -9,13 +9,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_DsoRules,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
-  SRARC_CreateUnallocatedUnclaimedActivityRecord,
-  SRARC_SetConfig,
-}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  DsoRules_CreateUnallocatedUnclaimedActivityRecord,
   DsoRules_SetConfig,
 }
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
