@@ -570,7 +570,8 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com",
+          "skipInitialization": true
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [

@@ -48,7 +48,7 @@ import {
   SvParticipant,
   updateHistoryBackfillingValues,
 } from 'splice-pulumi-common-sv';
-import { SvConfig } from 'splice-pulumi-common-sv/src/config';
+import { svConfig, SvConfig } from 'splice-pulumi-common-sv/src/config';
 import {
   installValidatorApp,
   installValidatorSecrets,
@@ -434,6 +434,7 @@ function installSvApp(
               enableBftSequencer: true,
             }
           : {}),
+        skipInitialization: svConfig?.synchronizer?.skipInitialization,
       },
     scan: {
       publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
