@@ -28,7 +28,7 @@ Upcoming
 
 - SV
 
-  - Addded a ``domain.skipInitialization`` helm values that can be set for nodes that have already been onboarded and allows the SV app
+  - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
     to start without the sequencer being up. This can be useful for long-running sequencer databes migrations.
 
 0.4.5
