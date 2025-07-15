@@ -1,8 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as React from 'react';
-import { Box, Tab, Tabs, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { Box, Button, Typography } from '@mui/material';
+import { useMemo } from 'react';
 import {
   ActionRequiredSection,
   ActionRequiredData,
@@ -24,6 +24,7 @@ import {
   getVoteResultStatus,
 } from '../utils/governance';
 import { SupportedActionTag, ProposalListingData } from '../utils/types';
+import { Link as RouterLink } from 'react-router-dom';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -41,8 +42,6 @@ const QUERY_LIMIT = 50;
 export const Governance: React.FC = () => {
   const svConfig = useSvConfig();
   const amuletName = svConfig.spliceInstanceNames.amuletName;
-
-  const [tabValue, setTabValue] = useState('voting');
 
   const votesHooks = useVotesHooks();
   const dsoInfosQuery = votesHooks.useDsoInfos();
@@ -162,18 +161,17 @@ export const Governance: React.FC = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h1" gutterBottom data-testid="governance-page-title">
-        Governance
-      </Typography>
-
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)}>
-          <Tab label="Voting" value="voting" />
-          <Tab label="Initiate Vote" value="initiate-vote" />
-        </Tabs>
+      <Box sx={{ mb: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h2" gutterBottom data-testid="governance-page-title">
+          Governance
+        </Typography>
+        <Button variant="contained" component={RouterLink} to={`/governance-beta/proposals/create`}>
+          Initiate Proposal
+        </Button>
       </Box>
 
       <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
+
       <ProposalListingSection
         sectionTitle="Inflight Votes"
         data={inflightRequests}
@@ -181,6 +179,7 @@ export const Governance: React.FC = () => {
         showVoteStats
         showAcceptanceThreshold
       />
+
       <ProposalListingSection
         sectionTitle="Vote History"
         data={voteHistory}
