@@ -34,7 +34,6 @@ export function useLookupAnsEntryByNameFromResponse(
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupAnsEntryByName', AnsEntry, name],
     queryFn: async () => {
-      console.error(`Lookup ANS`);
       try {
         const response = await getResponse(name);
         return response.entry;
