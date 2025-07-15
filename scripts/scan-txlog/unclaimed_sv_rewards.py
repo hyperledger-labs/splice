@@ -121,7 +121,7 @@ def _log_uncaught_exceptions():
 class TemplateQualifiedNames:
     sv_reward_coupon = "Splice.Amulet:SvRewardCoupon"
     issuing_mining_round = "Splice.Round:IssuingMiningRound"
-    closing_mining_round = "Splice.Round:ClosedMiningRound"
+    closed_mining_round = "Splice.Round:ClosedMiningRound"
 
 
 @dataclass
@@ -257,8 +257,8 @@ class LfValue:
     def get_issuing_mining_round_issuance_per_sv_reward(self):
         return self.__get_record_field("issuancePerSvRewardCoupon").__get_numeric()
 
-     # template ClosingMiningRound -> issuancePerSvRewardCoupon
-    def get_closing_mining_round_issuance_per_sv_reward(self):
+     # template ClosedMiningRound -> issuancePerSvRewardCoupon
+    def get_closed_mining_round_issuance_per_sv_reward(self):
         return self.__get_record_field("issuancePerSvRewardCoupon").__get_numeric()
 
     # template OpenMiningRound -> round
@@ -441,7 +441,7 @@ class IssuingRound:
     issuance_per_sv_reward: DamlDecimal
 
 @dataclass
-class ClosingRound:
+class ClosedRound:
     round: int
     record_time: datetime
     issuance_per_sv_reward: DamlDecimal
@@ -449,11 +449,16 @@ class ClosingRound:
 @dataclass
 class State:
     beneficiary: str
+    # Maps CIDs of active SvRewardCoupons to their reward information
     active_rewards: dict[str, Reward]
+    # Maps CIDs of active issuing rounds to their round numbers
+    active_issuing_rounds_cid_to_round_number: dict[str, int]
+    # Maps round numbers of active issuing rounds to their round information
     active_issuing_rounds: dict[int, IssuingRound]
-    active_issuing_rounds_contracts: dict[str, int]
-    active_closing_rounds: dict[int, ClosingRound]
-    active_closing_rounds_contracts: dict[str, int]
+    # Maps CIDs of active closed rounds to their round numbers
+    active_closed_rounds_cid_to_round_number: dict[str, int]
+    # Maps round numbers of active closed rounds to their round information
+    active_closed_rounds: dict[int, ClosedRound]
     begin_record_time: datetime
     end_record_time: datetime
     grace_period_for_mining_rounds_in_minutes: datetime
@@ -482,9 +487,9 @@ class State:
             beneficiary=args.beneficiary,
             active_rewards={},
             active_issuing_rounds={},
-            active_issuing_rounds_contracts={},
-            active_closing_rounds={},
-            active_closing_rounds_contracts={},
+            active_issuing_rounds_cid_to_round_number={},
+            active_closed_rounds={},
+            active_closed_rounds_cid_to_round_number={},
             begin_record_time=begin_record_time,
             end_record_time=end_record_time,
             grace_period_for_mining_rounds_in_minutes = grace_period_for_mining_rounds_in_minutes,
@@ -535,18 +540,18 @@ class State:
                     issuance_per_sv_reward=event.payload.get_issuing_mining_round_issuance_per_sv_reward(),
                 )
                 LOG.debug(f"Adding issuing round {issuing_round} to active_issuing_rounds")
-                self.active_issuing_rounds_contracts[event.contract_id] = round_number
+                self.active_issuing_rounds_cid_to_round_number[event.contract_id] = round_number
                 self.active_issuing_rounds[round_number] = issuing_round
-            case TemplateQualifiedNames.closing_mining_round:
+            case TemplateQualifiedNames.closed_mining_round:
                 round_number = event.payload.get_closed_mining_round_round()
-                closing_round = ClosingRound(
+                closed_round = ClosedRound(
                     round=round_number,
                     record_time=transaction.record_time,
-                    issuance_per_sv_reward=event.payload.get_closing_mining_round_issuance_per_sv_reward(),
+                    issuance_per_sv_reward=event.payload.get_closed_mining_round_issuance_per_sv_reward(),
                 )
-                LOG.debug(f"Adding closing round {closing_round} to active_closing_rounds")
-                self.active_closing_rounds_contracts[event.contract_id] = round_number
-                self.active_closing_rounds[round_number] = closing_round
+                LOG.debug(f"Adding closed round {closed_round} to active_closed_rounds")
+                self.active_closed_rounds_cid_to_round_number[event.contract_id] = round_number
+                self.active_closed_rounds[round_number] = closed_round
 
 
     def process_exercised_event(self, transaction: TransactionTree, event: ExercisedEvent):
@@ -567,21 +572,21 @@ class State:
             case TemplateQualifiedNames.issuing_mining_round:
                 match event.choice_name:
                     case "Archive":
-                        match self.active_issuing_rounds_contracts.pop(event.contract_id, None):
+                        match self.active_issuing_rounds_cid_to_round_number.pop(event.contract_id, None):
                             case None:
                                 pass
                             case round_number:
                                 self.active_issuing_rounds.pop(round_number)
                     case _:
                         self.process_events(transaction, event.child_event_ids)
-            case TemplateQualifiedNames.closing_mining_round:
+            case TemplateQualifiedNames.closed_mining_round:
                 match event.choice_name:
                     case "Archive":
-                        match self.active_closing_rounds_contracts.pop(event.contract_id, None):
+                        match self.active_closed_rounds_cid_to_round_number.pop(event.contract_id, None):
                             case None:
                                 pass
                             case round_number:
-                                self.active_closing_rounds.pop(round_number)
+                                self.active_closed_rounds.pop(round_number)
                     case _:
                         self.process_events(transaction, event.child_event_ids)
             case _:
@@ -597,34 +602,38 @@ class State:
             case None:
                 pass
             case reward:
-                issuing = self.active_issuing_rounds.get(reward.round)
-                closing = self.active_closing_rounds.get(reward.round)
-                match (issuing, closing):
-                    # If the mining round for a reward is not found, it means that a `SvRewardCoupon` was
-                    # created, but the corresponding mining round was created after the end-record-time + grace period.
-                    # This should not happen, as the additional grace period should be sufficient to ensure
-                    # we capture the complete set of mining rounds for the collected rewards.
-                    case (None, None):
-                        self._fail(
-                            f"Fatal: missing issuing round {reward.round} for reward {reward.contract_id}\n"
-                            f"Consider increase input: grace-period-for-mining-rounds-in-minutes.\n"
-                            f"Currently it is set to {self.grace_period_for_mining_rounds_in_minutes}"
-                        )
-                    case (mining_round_info, None) | (_, mining_round_info):
-                        amount = reward.weight * mining_round_info.issuance_per_sv_reward
-                        LOG.debug(
-                            f"Updating {status} summary with amount {amount}, corresponding to contract {event.contract_id}"
-                        )
-                        match status:
-                            case RewardStatus.EXPIRED:
+                match status:
+                    case RewardStatus.EXPIRED:
+                        match self.active_closed_rounds.get(reward.round):
+                            case None:
+                                self._fail_with_missing_round(reward)
+                            case mining_round_info:
+                                amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                                LOG.debug(
+                                    f"Updating expired summary with amount {amount}, corresponding to contract {event.contract_id}"
+                                )
                                 self.reward_summary.reward_expired_count += 1
                                 self.reward_summary.reward_expired_total_amount += amount
-                            case RewardStatus.CLAIMED:
+                    case RewardStatus.CLAIMED:
+                        match self.active_issuing_rounds.get(reward.round):
+                            case None:
+                                self._fail_with_missing_round(reward)
+                            case mining_round_info:
+                                amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                                LOG.debug(
+                                    f"Updating claimed summary with amount {amount}, corresponding to contract {event.contract_id}"
+                                )
                                 self.reward_summary.reward_claimed_count += 1
                                 self.reward_summary.reward_claimed_total_amount += amount
 
         self.process_events(transaction, event.child_event_ids)
 
+    def _fail_with_missing_round(self, reward):
+        self._fail(
+            f"Fatal: missing round {reward.round} for reward {reward.contract_id}\n"
+            f"Consider increase input: grace-period-for-mining-rounds-in-minutes.\n"
+            f"Currently it is set to {self.grace_period_for_mining_rounds_in_minutes}"
+        )
 
     def _fail(self, message, cause=None):
         LOG.error(message)
@@ -677,7 +686,7 @@ async def main():
         f"active_mining_rounds count: {len(app_state.active_issuing_rounds)}"
     )
     LOG.debug(
-        f"active_closing_rounds count: {len(app_state.active_closing_rounds)}"
+        f"active_closed_rounds count: {len(app_state.active_closed_rounds)}"
     )
 
     reward_summary = app_state.reward_summary
