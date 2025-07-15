@@ -26,6 +26,11 @@ Upcoming
     ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
     party (usually the validator operator) of the receiver is featured.
 
+- SV
+
+  - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
+    to start without the sequencer being up. This is useful for long-running sequencer database migrations.
+
 0.4.5
 -----
 
