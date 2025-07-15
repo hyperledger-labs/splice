@@ -14,12 +14,15 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
-import bq.{Field, InsertAllRequest, JobInfo, Schema, TableId}
+import bq.{Field, JobInfo, Schema, TableId}
+import bq.storage.v1.{JsonStreamWriter, TableSchema}
+import bq.storage.v1.TableFieldSchema.Mode
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 
 import java.nio.file.Paths
 import java.util.UUID
 import scala.concurrent.duration.*
+import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import slick.jdbc.GetResult
 
@@ -238,57 +241,127 @@ class ScanTotalSupplyBigQueryIntegrationTest
       targetSchema: Schema,
       sourceDb: DbStorage,
   ): Unit = {
-    // runtime interpretation of bq Schema; convert Slick+PG to BigQuery
-    implicit val r: GetResult[InsertAllRequest.RowToInsert] = GetResult { r =>
-      InsertAllRequest.RowToInsert of targetSchema.getFields.asScala.view
-        .map { field =>
-          val n = field.getName
-          n -> {
-            try
-              field.getType match {
-                // assuming JSON is stored as String
-                case STRING | JSON => r.rs getString n
-                case INTEGER => r.rs getLong n
-                case TIMESTAMP =>
-                  LfTimestamp.assertFromInstant(r.rs.getTimestamp(n).toInstant).toString
-                case BOOLEAN => r.rs getBoolean n
-                case other => throw new IllegalArgumentException(s"Unsupported type: $other")
+    import org.json.JSONObject
+
+    val writer = createJsonStreamWriter(targetTable, createTableSchema(targetSchema))
+
+    try {
+      // runtime interpretation of bq Schema; convert Slick+PG to BigQuery
+      implicit val r: GetResult[JSONObject] = GetResult { r =>
+        new JSONObject(
+          targetSchema.getFields.asScala.view
+            .map { field =>
+              val n = field.getName
+              n -> {
+                try
+                  field.getType match {
+                    case STRING => r.rs.getString(n)
+                    case JSON =>
+                      val raw = r.rs.getString(n)
+                      if (!r.rs.wasNull)
+                        try new JSONObject(raw)
+                        catch {
+                          case e: org.json.JSONException =>
+                            fail(s"error parsing JSON field $n, contents $raw", e)
+                        }
+                      else null
+                    case INTEGER =>
+                      val value = r.rs.getLong(n)
+                      if (!r.rs.wasNull) value.toString
+                      else null
+                    case TIMESTAMP =>
+                      val ts = r.rs.getTimestamp(n)
+                      if (ts ne null)
+                        LfTimestamp.assertFromInstant(ts.toInstant).toString
+                      else null
+                    case BOOLEAN =>
+                      val value = r.rs.getBoolean(n)
+                      if (!r.rs.wasNull) value else null
+                    case other => throw new IllegalArgumentException(s"Unsupported type: $other")
+                  }
+                catch {
+                  case e: java.sql.SQLException =>
+                    throw new java.sql.SQLException(
+                      s"reading '$n' of BQ type '${field.getType}': ${e.getMessage}",
+                      e,
+                    )
+                }
               }
-            catch {
-              case e: java.sql.SQLException =>
-                throw new java.sql.SQLException(
-                  s"reading '$n' of BQ type '${field.getType}' and PG column ${r.rs.getObject(n).getClass.getName}: ${e.getMessage}",
-                  e,
-                )
             }
-          }
-        }
-        .toMap
-        .asJava
-    }
-
-    // fetch all rows and prepare the BigQuery InsertAllRequest
-    val fieldNames = targetSchema.getFields.asScala.view.map(_.getName).mkString(", ")
-    val insertAll = sourceDb
-      .query(
-        sql"SELECT #$fieldNames FROM #$sourceTable".as[InsertAllRequest.RowToInsert],
-        s"Export $sourceTable to BigQuery",
-      )
-      .map { rows =>
-        InsertAllRequest.of(TableId.of(datasetName, targetTable), rows.asJava)
+            .toMap
+            .asJava
+        )
       }
-      .futureValueUS
 
-    // load into BigQuery
-    val insertResponse = bigquery.insertAll(insertAll)
-    if (insertResponse.hasErrors) {
-      val allErrors = insertResponse.getInsertErrors.asScala.view
-        .map { case (row, errors) =>
-          s"Row $row: ${errors.asScala.view.map(_.getMessage).mkString(", ")}"
+      // Fetch all rows from the source table
+      val fieldNames = targetSchema.getFields.asScala.view.map(_.getName).mkString(", ")
+      val rows = sourceDb
+        .query(
+          sql"SELECT #$fieldNames FROM #$sourceTable".as[JSONObject],
+          s"Export $sourceTable to BigQuery",
+        )
+        .futureValueUS
+
+      // Stream rows to BigQuery in batches
+      val batchSize = 500
+      Future
+        .traverse(rows grouped batchSize) { batch =>
+          import org.json.JSONArray
+          Future(writer.append(new JSONArray(batch.asJava)).get())
         }
-        .mkString(";\n")
-      fail(s"Failed to insert rows into BigQuery: $allErrors")
+        .futureValue
+    } finally {
+      // Close the writer
+      writer.close()
     }
+  }
+
+  private def createTableSchema(schema: Schema): TableSchema = {
+    val tableSchemaBuilder = TableSchema.newBuilder()
+
+    schema.getFields.asScala.foreach { field =>
+      val fieldBuilder = bq.storage.v1.TableFieldSchema
+        .newBuilder()
+        .setName(field.getName)
+        .setType(convertToBigQueryStorageType(field.getType))
+
+      fieldBuilder.setMode(field.getMode match {
+        case Field.Mode.NULLABLE => Mode.NULLABLE
+        case Field.Mode.REQUIRED => Mode.REQUIRED
+        case Field.Mode.REPEATED => Mode.REPEATED
+        case _ => Mode.NULLABLE
+      })
+
+      tableSchemaBuilder.addFields(fieldBuilder)
+    }
+
+    tableSchemaBuilder.build()
+  }
+
+  import bq.storage.v1.TableFieldSchema.Type as BQSType
+  private def convertToBigQueryStorageType(
+      legacyType: bq.LegacySQLTypeName
+  ): BQSType = {
+
+    legacyType match {
+      case STRING => BQSType.STRING
+      case INTEGER => BQSType.INT64
+      case TIMESTAMP => BQSType.TIMESTAMP
+      case BOOLEAN => BQSType.BOOL
+      case JSON => BQSType.STRING
+      case _ => throw new IllegalArgumentException(s"Unsupported type: $legacyType")
+    }
+  }
+
+  private def createJsonStreamWriter(
+      targetTable: String,
+      tableSchema: TableSchema,
+  ): JsonStreamWriter = {
+    val parent = s"projects/${bigquery.getOptions.getProjectId}/datasets/$datasetName"
+    val fullTableId = s"$parent/tables/$targetTable"
+
+    // Create the JSON writer
+    JsonStreamWriter.newBuilder(fullTableId, tableSchema).build()
   }
 
   /** Runs the total supply queries from the SQL file
