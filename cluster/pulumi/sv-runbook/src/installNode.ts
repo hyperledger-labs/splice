@@ -259,7 +259,9 @@ async function installSvAndValidator(
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
-      skipInitialization: svConfig?.synchronizer?.skipInitialization && !svConfig?.synchronizer.forceSvRunbookInitialization,
+      skipInitialization:
+        svConfig?.synchronizer?.skipInitialization &&
+        !svConfig?.synchronizer.forceSvRunbookInitialization,
     },
     cometBFT: {
       ...(valuesFromYamlFile.cometBFT || {}),
