@@ -9,10 +9,10 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMi
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.BaseTest.getResourcePath
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
 import bq.{Field, InsertAllRequest, JobInfo, Schema, TableId}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
@@ -242,14 +242,26 @@ class ScanTotalSupplyBigQueryIntegrationTest
     implicit val r: GetResult[InsertAllRequest.RowToInsert] = GetResult { r =>
       InsertAllRequest.RowToInsert of targetSchema.getFields.asScala.view
         .map { field =>
-          field.getName -> (field.getType match {
-            case STRING => r.<<[String]
-            case INTEGER => r.<<[Long]
-            case TIMESTAMP => r.<<[CantonTimestamp]
-            case BOOLEAN => r.<<[Boolean]
-            case JSON => r.<<[String] // assuming JSON is stored as String
-            case other => throw new IllegalArgumentException(s"Unsupported type: $other")
-          })
+          val n = field.getName
+          n -> {
+            try
+              field.getType match {
+                // assuming JSON is stored as String
+                case STRING | JSON => r.rs getString n
+                case INTEGER => r.rs getLong n
+                case TIMESTAMP =>
+                  LfTimestamp.assertFromInstant(r.rs.getTimestamp(n).toInstant).toString
+                case BOOLEAN => r.rs getBoolean n
+                case other => throw new IllegalArgumentException(s"Unsupported type: $other")
+              }
+            catch {
+              case e: java.sql.SQLException =>
+                throw new java.sql.SQLException(
+                  s"reading '$n' of BQ type '${field.getType}' and PG column ${r.rs.getObject(n).getClass.getName}: ${e.getMessage}",
+                  e,
+                )
+            }
+          }
         }
         .toMap
         .asJava
