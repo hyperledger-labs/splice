@@ -117,7 +117,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
         <TextField id="create-reason" value={reason} onChange={e => setReason(e.target.value)} />
       </FormControl>
 
-      <Typography variant="h6">Expires At</Typography>
+      <Typography variant="h6">Can be claimed until</Typography>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DesktopDateTimePicker
           label={`Enter time in local timezone (${getUTCWithOffset()})`}
