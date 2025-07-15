@@ -31,6 +31,19 @@ Upcoming
   - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
     to start without the sequencer being up. This is useful for long-running sequencer database migrations.
 
+- Sequencer
+
+  - Fix a sequential scan in a pruning query. This requires a
+    long-running sequencer database migration (expected around an hour
+    on mainnet). Make sure to set ``domain.skipInitialization`` on the
+    SV app so the rest of your SV node can continue functioning.
+
+- Participant
+
+  - Fix an issue in sequencer BFT connections where the node got
+    completely disconnected on certain failures even if only one
+    sequencer reported those failures.
+
 0.4.5
 -----
 
