@@ -267,6 +267,10 @@ case class SvAppBackendConfig(
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
+    // Skip synchronizer initialization and synchronizer config reconciliation.
+    // Can be safely set to true for an SV that has completed onboarding unless you
+    // 1. try to reset one of your sequencers or mediators
+    // 2. change sequencer URLs that need to get published externally.
     skipSynchronizerInitialization: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
