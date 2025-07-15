@@ -11,14 +11,30 @@ Release Notes
 Upcoming
 --------
 
+- Scan
+
+  - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
+    populate the token metadata total supply using the aggregates used for closed rounds.
+    The data used corresponds to the data served by the ``/v0/total-amulet-balance``
+    endpoint in :ref:`app_dev_scan_api` for the latest closed round.
+
+- Validator
+
+  - Fix a bug where sweeps through transfer preapprovals failed with a
+    ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
+    party (usually the validator operator) of the receiver is featured.
+
+0.4.5
+-----
+
 - SV
 
   - *breaking* SV participants now enable sequencer BFT connections
     for the SV participant by default.  You must remove the
     ``useSequencerConnectionsFromScan: false`` config and the
     ``decentralizedSynchronizerUrl`` config from your SV helm values.
-    If needed, the previous behavior can be restore by setting those two variables again
-    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator and SV respectively:
+    If needed, the previous behavior can be restored by setting those two variables again
+    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator app and SV app respectively:
     ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
     ``canton.sv-apps.sv.bft-sequencer-connection = false``
 
@@ -86,7 +102,6 @@ Upcoming
    wallet             0.1.11
    walletPayments     0.1.11
    ================== =======
-
 
 0.4.4
 -----

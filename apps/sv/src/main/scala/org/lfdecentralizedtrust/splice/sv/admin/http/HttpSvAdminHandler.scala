@@ -249,18 +249,25 @@ class HttpSvAdminHandler(
       body: definitions.UpdateAmuletPriceVoteRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.UpdateAmuletPriceVoteResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.updateAmuletPriceVote") { _ => _ =>
-      val amuletPrice = Codec.tryDecode(Codec.BigDecimal)(body.amuletPrice)
-      SvApp
-        .updateAmuletPriceVote(
-          amuletPrice,
-          dsoStoreWithIngestion,
-          logger,
-        )
-        .flatMap {
-          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.UpdateAmuletPriceVoteResponseOK)
-        }
+    withSpan(s"$workflowId.updateAmuletPriceVote") { implicit traceContext => _ =>
+      retryProvider.retryForClientCalls(
+        "updateAmuletPriceVote",
+        "Update Amulet Price Vote", {
+          val amuletPrice = Codec.tryDecode(Codec.BigDecimal)(body.amuletPrice)
+          SvApp
+            .updateAmuletPriceVote(
+              amuletPrice,
+              dsoStoreWithIngestion,
+              logger,
+            )
+            .flatMap {
+              case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+              case Right(()) =>
+                Future.successful(v0.SvAdminResource.UpdateAmuletPriceVoteResponseOK)
+            }
+        },
+        logger,
+      )
     }
   }
 

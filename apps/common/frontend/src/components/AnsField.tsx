@@ -57,8 +57,11 @@ export const BaseAnsField: React.FC<BaseAnsFieldProps> = propas => {
       setResolvedPartyId(party);
     };
     const ansEntryParty = ansEntry.data?.user || userInput.value;
-    setPartyAndNotify(ansEntryParty);
-  }, [userInput, ansEntry, onPartyChanged]);
+    if (resolvedPartyId !== ansEntryParty) {
+      // prevent infinite loop
+      setPartyAndNotify(ansEntryParty);
+    }
+  }, [userInput, ansEntry, resolvedPartyId, onPartyChanged]);
 
   const onInputChange = async (_: React.SyntheticEvent, newValue: string, reason: string) => {
     if (reason === 'reset') {

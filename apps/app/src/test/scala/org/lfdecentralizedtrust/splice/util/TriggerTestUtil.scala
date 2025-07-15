@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.canton.{BaseTest, ScalaFuturesWithPatience}
+import com.typesafe.scalalogging.LazyLogging
 import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition.sv1Backend
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -35,7 +36,7 @@ trait TriggerTestUtil { self: BaseTest =>
   }
 }
 
-object TriggerTestUtil extends ScalaFuturesWithPatience {
+object TriggerTestUtil extends ScalaFuturesWithPatience with LazyLogging {
 
   /** Enable/Disable triggers before executing a code block
     */
@@ -44,10 +45,14 @@ object TriggerTestUtil extends ScalaFuturesWithPatience {
       triggersToResumeAtStart: Seq[Trigger] = Seq.empty,
   )(codeBlock: => T): T = {
     try {
+      logger.info(s"Pausing triggers for block: $triggersToPauseAtStart")
+      logger.info(s"Resuming triggers for block: $triggersToResumeAtStart")
       triggersToPauseAtStart.foreach(_.pause().futureValue)
       triggersToResumeAtStart.foreach(_.resume())
       codeBlock
     } finally {
+      logger.info(s"Resuming triggers after block: $triggersToPauseAtStart")
+      logger.info(s"Pausing triggers after block: $triggersToResumeAtStart")
       triggersToPauseAtStart.foreach(_.resume())
       triggersToResumeAtStart.foreach(_.pause().futureValue)
     }

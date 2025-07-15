@@ -195,6 +195,7 @@ class ScanApp(
         retryProvider,
         loggerFactory,
         store,
+        storage,
         acsSnapshotStore,
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
@@ -275,7 +276,7 @@ class ScanApp(
         store,
         config.spliceInstanceNames,
         loggerFactory,
-      )()
+      )
 
       tokenStandardAllocationInstructionHandler = new HttpTokenStandardAllocationInstructionHandler(
         store,

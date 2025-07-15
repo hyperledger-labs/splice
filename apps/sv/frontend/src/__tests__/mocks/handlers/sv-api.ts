@@ -118,6 +118,9 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
       }
     });
   }),
+  rest.post(`${svUrl}/v0/admin/sv/votes`, (_, res, ctx) => {
+    return res(ctx.status(201));
+  }),
   rest.get(`${svUrl}/v0/admin/domain/cometbft/debug`, (_, res, ctx) => {
     return res(
       ctx.status(404),

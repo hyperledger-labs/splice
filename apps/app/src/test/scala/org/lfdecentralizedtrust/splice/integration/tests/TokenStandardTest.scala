@@ -340,11 +340,12 @@ trait TokenStandardTest extends ExternallySignedPartyTestUtil {
 
         },
       )(
-        "There exists a new trade proposal",
+        "The new trade proposal exists and is visible to the venue's participant",
         _ => {
-          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
             .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
-              bobParty
+              venueParty,
+              predicate = c => c.data.approvers.size == 2,
             )
         },
       )

@@ -135,6 +135,9 @@ class ValidatorApp(
   override def packagesForJsonDecoding =
     super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
+  // We don't want the validator to mess around with things like sequencer connections until the SV app finishes init
+  override def waitForPartyBeforePreinitialize = false
+
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
@@ -263,7 +266,7 @@ class ValidatorApp(
                   }
                 } yield ()
               case None =>
-                if (config.svValidator)
+                if (config.svValidator && config.disableSvValidatorBftSequencerConnection)
                   appInitStep("Ensuring decentralized synchronizer already registered") {
                     domainConnector.waitForDecentralizedSynchronizerIsRegisteredAndConnected()
                   }
@@ -781,7 +784,7 @@ class ValidatorApp(
             domainTimeAutomationService.domainTimeSync,
             domainParamsAutomationService.domainUnpausedSync,
             config.treasury,
-            storage: Storage,
+            storage,
             retryProvider,
             scanConnection,
             packageVersionSupport,
@@ -815,6 +818,7 @@ class ValidatorApp(
         domainParamsAutomationService.domainUnpausedSync,
         walletManagerOpt,
         store,
+        storage,
         scanConnection,
         ledgerClient,
         participantAdminConnection,

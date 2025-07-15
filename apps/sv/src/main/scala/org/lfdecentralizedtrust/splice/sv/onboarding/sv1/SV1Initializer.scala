@@ -173,7 +173,9 @@ class SV1Initializer(
             minObservationDuration = config.timeTrackerMinObservationDuration
           ),
         ),
-        RetryFor.WaitingOnInitDependency,
+        overwriteExistingConnection =
+          false, // The validator will manage sequencer connections after initial setup
+        retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
       (dsoParty, svParty, _) <- (
@@ -408,8 +410,7 @@ class SV1Initializer(
         )
         val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
         val values = initialValues.tryUpdate(
-          // TODO(DACH-NY/canton-network-node#6055) Consider increasing topology change delay again
-          topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
+          topologyChangeDelay = config.topologyChangeDelayDuration.toInternal,
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
