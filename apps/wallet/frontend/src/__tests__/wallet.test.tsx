@@ -184,7 +184,6 @@ describe('Wallet user can', () => {
           rest.get(
             `${walletUrl}/v0/wallet/token-standard/allocation-requests`,
             (_req, res, ctx) => {
-              console.error('BITCH');
               return res(
                 ctx.json<ListAllocationRequestsResponse>({
                   allocation_requests: allocationRequests.map(contract => {
