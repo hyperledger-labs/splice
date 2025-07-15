@@ -18,6 +18,9 @@ import {
 } from './mocks/constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
+import { ListAllocationRequestsResponse, ListAllocationsResponse } from 'wallet-openapi';
+import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { mkContract } from './mocks/contract';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
@@ -172,6 +175,47 @@ describe('Wallet user can', () => {
         { amount: '1.0', receiver_party_id: 'bob::nopreapproval', description: '' },
         false
       );
+    });
+
+    describe('Allocations', () => {
+      test('see allocation requests', async () => {
+        const allocationRequests: AllocationRequest[] = [];
+        server.use(
+          rest.get(
+            `${walletUrl}/v0/wallet/token-standard/allocation-requests`,
+            (_req, res, ctx) => {
+              return res(
+                ctx.json<ListAllocationRequestsResponse>({
+                  allocation_requests: allocationRequests.map(contract => {
+                    return { contract: mkContract(AllocationRequest, contract) };
+                  }),
+                })
+              );
+            }
+          ),
+          rest.get(`${walletUrl}/v0/allocations`, (_req, res, ctx) => {
+            return res(
+              ctx.json<ListAllocationsResponse>({
+                allocations: [],
+              })
+            );
+          })
+        );
+
+        const user = userEvent.setup();
+        render(
+          <WalletConfigProvider>
+            <App />
+          </WalletConfigProvider>
+        );
+        expect(await screen.findByText('Allocations')).toBeDefined();
+
+        const allocationsLink = screen.getByRole('link', { name: 'Allocations' });
+        await user.click(allocationsLink);
+        expect(
+          screen.getByRole('heading', { name: `Allocation Requests ${allocationRequests.length}` })
+        ).toBeDefined();
+      });
     });
   });
 

@@ -1022,7 +1022,9 @@ lazy val `apps-common-frontend` = {
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
           (`splice-dso-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
-          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
+          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
+          // not implemented by any daml code above
+          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,

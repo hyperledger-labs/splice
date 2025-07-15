@@ -40,14 +40,8 @@ interface BaseAnsFieldProps extends AnsFieldProps {
   ansEntry: UseQueryResult<AnsEntry>;
 }
 
-export const BaseAnsField: React.FC<BaseAnsFieldProps> = ({
-  userInput,
-  updateUserInput,
-  onPartyChanged,
-  ansEntries,
-  ansEntry,
-  ...props
-}) => {
+export const BaseAnsField: React.FC<BaseAnsFieldProps> = propas => {
+  const { userInput, updateUserInput, onPartyChanged, ansEntries, ansEntry, ...props } = propas;
   const [resolvedPartyId, setResolvedPartyId] = React.useState<string>('');
   const nameServiceAcronym =
     window.splice_config.spliceInstanceNames?.nameServiceNameAcronym.toLowerCase();
