@@ -127,13 +127,13 @@ const AllocationRequestDisplay: React.FC<{
             {Object.keys(requestMeta.values).length > 0 ? (
               <>
                 <Typography variant="h5">Request Meta</Typography>
-                <MetaDisplay meta={requestMeta.values} id={`${request.contractId}-settlement`} />
+                <MetaDisplay meta={requestMeta.values} />
               </>
             ) : null}
             {Object.keys(settlementMeta.values).length > 0 ? (
               <>
                 <Typography variant="h5">Settlement Meta</Typography>
-                <MetaDisplay meta={settlementMeta.values} id={`${request.contractId}-settlement`} />
+                <MetaDisplay meta={settlementMeta.values} />
               </>
             ) : null}
             <Container>
@@ -192,7 +192,7 @@ const TransferLegsDisplay: React.FC<{
                 </Typography>
               </TableCell>
               <TableCell>
-                <MetaDisplay id={id} meta={meta.values} />
+                <MetaDisplay meta={meta.values} />
               </TableCell>
               <TableCell>
                 <AllocationRequestActionButton
@@ -241,7 +241,7 @@ const AllocationRequestActionButton: React.FC<{
   // }
 };
 
-const MetaDisplay: React.FC<{ id: string; meta: { [key: string]: string } }> = ({ id, meta }) => {
+const MetaDisplay: React.FC<{ meta: { [key: string]: string } }> = ({ meta }) => {
   return (
     <Stack spacing={2}>
       {Object.keys(meta)
@@ -249,12 +249,7 @@ const MetaDisplay: React.FC<{ id: string; meta: { [key: string]: string } }> = (
         .map(key => {
           const value = meta[key];
           return (
-            <Stack
-              key={`${id}-meta-${key}`}
-              overflow="hidden"
-              textOverflow="ellipsis"
-              maxWidth="150px"
-            >
+            <Stack key={`meta-${key}`} overflow="hidden" textOverflow="ellipsis" maxWidth="150px">
               <Typography variant="body2" noWrap>
                 {key}:
               </Typography>

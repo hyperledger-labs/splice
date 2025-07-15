@@ -32,6 +32,15 @@ import scala.jdk.OptionConverters.*
 
 trait TokenStandardTest extends ExternallySignedPartyTestUtil {
 
+  // We upload the current file w/o respecting the initial package config used for Daml compatibility tests,
+  // as we don't want to check upgrade compatibility for splice-token-test-trading-app. This does not conflict
+  // with checking upgrade compatibility for splice-amulet, as the splice-token-test-trading-app does
+  // not statically link with splice-amulet.
+  // Tests that use this will require the annotation
+  // `org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0`
+  protected val tokenStandardTestDarPath =
+    "token-standard/examples/splice-token-test-trading-app/.daml/dist/splice-token-test-trading-app-current.dar"
+
   val emptyExtraArgs =
     org.lfdecentralizedtrust.splice.util.ChoiceContextWithDisclosures.emptyExtraArgs
 

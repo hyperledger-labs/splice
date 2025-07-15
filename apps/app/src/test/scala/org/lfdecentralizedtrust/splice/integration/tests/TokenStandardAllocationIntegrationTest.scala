@@ -47,13 +47,6 @@ class TokenStandardAllocationIntegrationTest
 
   import TokenStandardAllocationIntegrationTest.*
 
-  // We upload the current file w/o respecting the initial package config used for Daml compatibility tests,
-  // as we don't want to check upgrade compatibility for splice-token-test-trading-app. This does not conflict
-  // with checking upgrade compatibility for splice-amulet, as the splice-token-test-trading-app does
-  // not statically link with splice-amulet.
-  private val darPath =
-    "token-standard/examples/splice-token-test-trading-app/.daml/dist/splice-token-test-trading-app-current.dar"
-
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
@@ -64,7 +57,7 @@ class TokenStandardAllocationIntegrationTest
           bobValidatorBackend,
           splitwellValidatorBackend,
         ).foreach { backend =>
-          backend.participantClient.upload_dar_unless_exists(darPath)
+          backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
         }
       })
   }

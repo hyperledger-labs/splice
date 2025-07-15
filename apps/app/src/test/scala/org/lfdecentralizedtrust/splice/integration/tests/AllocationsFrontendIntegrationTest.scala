@@ -30,15 +30,13 @@ import java.util.Optional
 import scala.util.Random
 import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class AllocationsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
     with FrontendLoginUtil
     with TokenStandardTest {
-
-  private val tokenStandardTestDarPath =
-    "token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar"
 
   private val amuletPrice = 2
   override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
