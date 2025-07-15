@@ -28,6 +28,7 @@ pulumiProjectConfig:
       tier: 'db-custom-2-7680'
       # enable enterprise plus for better performance and faster maintenance
       enterprisePlus: false
+    skipSynchronizerInitialization: true
   sv-runbook:
     cloudSql:
       enabled: false
