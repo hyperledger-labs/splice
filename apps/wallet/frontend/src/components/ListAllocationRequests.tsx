@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 import {
+  Button,
   Card,
   CardContent,
   Chip,
@@ -15,7 +16,11 @@ import {
 } from '@mui/material';
 import Typography from '@mui/material/Typography';
 import { useTokenStandardAllocationRequests } from '../hooks/useTokenStandardAllocationRequests';
-import { DateWithDurationDisplay, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import {
+  DateWithDurationDisplay,
+  DisableConditionally,
+  Loading,
+} from '@lfdecentralizedtrust/splice-common-frontend';
 import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { usePrimaryParty } from '../hooks';
@@ -24,6 +29,14 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import BftAnsEntry from './BftAnsEntry';
 import { useAmuletAllocations } from '../hooks/useAmuletAllocations';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
+import { useMutation } from '@tanstack/react-query';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { AllocateAmuletRequest } from 'wallet-openapi';
+import { damlTimestampToOpenApiTimestamp } from '../utils/timestampConversion';
+import {
+  SettlementInfo,
+  TransferLeg,
+} from '@daml.js/splice-api-token-allocation/lib/Splice/Api/Token/AllocationV1/module';
 
 dayjs.extend(relativeTime);
 
@@ -196,6 +209,7 @@ const TransferLegsDisplay: React.FC<{
               </TableCell>
               <TableCell>
                 <AllocationRequestActionButton
+                  id={id}
                   allocationRequest={allocationRequest}
                   allocations={allocations}
                   transferLegId={transferLegId}
@@ -211,34 +225,65 @@ const TransferLegsDisplay: React.FC<{
 };
 
 const AllocationRequestActionButton: React.FC<{
+  id: string;
   allocationRequest: Contract<AllocationRequest>;
   allocations: Contract<AmuletAllocation>[];
   userParty: string;
   transferLegId: string;
-}> = () => {
-  /*TODO (#1100): uncomment and implement callback*/
-  return null;
-  // const transferLeg = allocationRequest.payload.transferLegs[transferLegId];
-  // const actionAllowed =
-  //   transferLeg.sender === userParty && transferLeg.instrumentId.id === 'Amulet';
-  // const alreadyAccepted = !!allocations.find(alloc =>
-  //   isAllocationForTransferLeg(alloc, allocationRequest, transferLegId)
-  // );
-  //
-  // if (!actionAllowed) return null;
-  // else if (alreadyAccepted) {
+}> = ({ id, allocationRequest, transferLegId, userParty, allocations }) => {
+  const transferLeg = allocationRequest.payload.transferLegs[transferLegId];
+  const actionAllowed =
+    transferLeg.sender === userParty && transferLeg.instrumentId.id === 'Amulet';
+  const settlement = allocationRequest.payload.settlement;
+  const alreadyAccepted = !!allocations.find(alloc =>
+    isAllocationForTransferLeg(alloc, allocationRequest, transferLegId)
+  );
+
+  const { createAllocation } = useWalletClient();
+  const createAllocationMutation = useMutation({
+    mutationFn: async () => {
+      const payload: AllocateAmuletRequest = openApiRequestFromTransferLeg(
+        settlement,
+        transferLeg,
+        transferLegId
+      );
+      return await createAllocation(payload);
+    },
+    onSuccess: () => {},
+    onError: error => {
+      console.error('Failed to submit allocation', error);
+    },
+  });
+
+  if (!actionAllowed) return null;
+  // TODO (#1413): show the withdraw button and implement the callback, instead of showing nothing
+  if (alreadyAccepted) return null;
   //   return (
   //     <Button variant="pill" size="small" className="allocation-request-withdraw">
   //       Withdraw
   //     </Button>
   //   );
-  // } else {
-  //   return (
-  //     <Button variant="pill" size="small" className="allocation-request-accept">
-  //       Accept
-  //     </Button>
-  //   );
-  // }
+  // else
+  return (
+    <DisableConditionally
+      conditions={[
+        {
+          disabled: createAllocationMutation.isPending,
+          reason: 'Creating allocation...',
+        },
+      ]}
+    >
+      <Button
+        id={`${id}-accept`}
+        variant="pill"
+        size="small"
+        className="allocation-request-accept"
+        onClick={() => createAllocationMutation.mutate()}
+      >
+        Accept
+      </Button>
+    </DisableConditionally>
+  );
 };
 
 const MetaDisplay: React.FC<{ meta: { [key: string]: string } }> = ({ meta }) => {
@@ -263,20 +308,46 @@ const MetaDisplay: React.FC<{ meta: { [key: string]: string } }> = ({ meta }) =>
   );
 };
 
-// function _isAllocationForTransferLeg(
-//   allocation: Contract<AmuletAllocation>,
-//   allocationRequest: Contract<AllocationRequest>,
-//   legId: string
-// ): boolean {
-//   return (
-//     allocation.payload.allocation.settlement.executor ===
-//       allocationRequest.payload.settlement.executor &&
-//     allocation.payload.allocation.settlement.settlementRef.id ===
-//       allocationRequest.payload.settlement.settlementRef.id &&
-//     allocation.payload.allocation.settlement.settlementRef.cid ===
-//       allocationRequest.payload.settlement.settlementRef.cid &&
-//     allocation.payload.allocation.transferLegId === legId
-//   );
-// }
+function isAllocationForTransferLeg(
+  allocation: Contract<AmuletAllocation>,
+  allocationRequest: Contract<AllocationRequest>,
+  legId: string
+): boolean {
+  return (
+    allocation.payload.allocation.settlement.executor ===
+      allocationRequest.payload.settlement.executor &&
+    allocation.payload.allocation.settlement.settlementRef.id ===
+      allocationRequest.payload.settlement.settlementRef.id &&
+    allocation.payload.allocation.settlement.settlementRef.cid ===
+      allocationRequest.payload.settlement.settlementRef.cid &&
+    allocation.payload.allocation.transferLegId === legId
+  );
+}
+
+export function openApiRequestFromTransferLeg(
+  settlement: SettlementInfo,
+  transferLeg: TransferLeg,
+  transferLegId: string
+): AllocateAmuletRequest {
+  return {
+    settlement: {
+      executor: settlement.executor,
+      settlement_ref: {
+        id: settlement.settlementRef.id,
+        cid: settlement.settlementRef.cid as string,
+      },
+      requested_at: damlTimestampToOpenApiTimestamp(settlement.requestedAt),
+      allocate_before: damlTimestampToOpenApiTimestamp(settlement.allocateBefore),
+      settle_before: damlTimestampToOpenApiTimestamp(settlement.settleBefore),
+      meta: settlement.meta.values,
+    },
+    transfer_leg_id: transferLegId,
+    transfer_leg: {
+      receiver: transferLeg.receiver,
+      amount: transferLeg.amount,
+      meta: transferLeg.meta.values,
+    },
+  };
+}
 
 export default ListAllocationRequests;

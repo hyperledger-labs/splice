@@ -177,7 +177,7 @@ class AllocationsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    "see allocation requests" in { implicit env =>
+    "see and accept allocation requests" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceTransferAmount = BigDecimal(5)
@@ -248,6 +248,30 @@ class AllocationsFrontendIntegrationTest
             }
           }
         }
+
+        clue("sanity check: alice has no allocations yet") {
+          aliceWalletClient.listAmuletAllocations() shouldBe empty
+        }
+
+        actAndCheck(
+          "click on accepting the allocation request", {
+            val aliceTransferLeg @ (aliceTransferLegId, _) =
+              otcTrade.aliceRequest.transferLegs.asScala
+                .find(_._2.sender == aliceParty.toProtoPrimitive)
+                .valueOrFail("Couldn't find alice's transfer leg")
+            click on s"transfer-leg-${otcTrade.trade.id.contractId}-$aliceTransferLegId-accept"
+            aliceTransferLeg
+          },
+        )(
+          "the allocation is shown",
+          { case (aliceTransferLegId, aliceTransferLeg) =>
+            // TODO (#1106): check the allocation is in the FE as opposed to checking the BE
+            val allocation = aliceWalletClient.listAmuletAllocations().loneElement
+            allocation.payload.allocation.settlement should be(otcTrade.aliceRequest.settlement)
+            allocation.payload.allocation.transferLegId should be(aliceTransferLegId)
+            allocation.payload.allocation.transferLeg should be(aliceTransferLeg)
+          },
+        )
       }
     }
 
