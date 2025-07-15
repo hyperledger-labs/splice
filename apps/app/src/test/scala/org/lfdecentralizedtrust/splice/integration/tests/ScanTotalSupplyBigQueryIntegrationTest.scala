@@ -119,62 +119,90 @@ class ScanTotalSupplyBigQueryIntegrationTest
     }
   }
 
-  import bq.LegacySQLTypeName.{INTEGER, STRING, TIMESTAMP, JSON, BOOLEAN}
+  import bq.storage.v1.TableFieldSchema.Type as BQSType
 
-  private def fld(name: String, typ: bq.LegacySQLTypeName) =
-    Field.newBuilder(name, typ).setMode(Field.Mode.NULLABLE).build()
+  private case class ConvertibleColumn(
+      name: String,
+      bqType: bq.LegacySQLTypeName,
+      bqStreamType: BQSType,
+      pgIsTextArray: Boolean,
+  ) {
+    def bqSchemaField =
+      Field
+        .newBuilder(name, bqType)
+        .setMode(Field.Mode.NULLABLE)
+        .build()
+
+    def bqsSchemaField =
+      bq.storage.v1.TableFieldSchema
+        .newBuilder()
+        .setName(name)
+        .setType(bqStreamType)
+        .setMode(Mode.NULLABLE)
+        .build()
+  }
+
+  private def cc(name: String, bqType: bq.LegacySQLTypeName, pgIsTextArray: Boolean = false) =
+    ConvertibleColumn(name, bqType, convertToBigQueryStorageType(bqType), pgIsTextArray)
+
+  import bq.LegacySQLTypeName.{INTEGER, STRING, TIMESTAMP, JSON, BOOLEAN}
 
   // Datastream variant of update_history_creates
   // contains Amulet, LockedAmulet, UnclaimedReward, &c
-  private val createsSchema = Schema.of(
-    fld("history_id", INTEGER),
-    fld("row_id", INTEGER),
-    fld("ingested_at", TIMESTAMP),
-    fld("event_id", STRING),
-    fld("update_row_id", INTEGER),
-    fld("contract_id", STRING),
-    fld("created_at", INTEGER),
-    fld("template_id_package_id", STRING),
-    fld("template_id_module_name", STRING),
-    fld("template_id_entity_name", STRING),
-    fld("package_name", STRING),
-    fld("create_arguments", JSON),
-    fld("signatories", JSON),
-    fld("observers", JSON),
-    fld("contract_key", JSON),
-    fld("record_time", INTEGER),
-    fld("update_id", STRING),
-    fld("domain_id", STRING),
-    fld("migration_id", INTEGER),
+  private val createsSchema = Seq(
+    cc("history_id", INTEGER),
+    cc("row_id", INTEGER),
+    cc("ingested_at", TIMESTAMP),
+    cc("event_id", STRING),
+    cc("update_row_id", INTEGER),
+    cc("contract_id", STRING),
+    cc("created_at", INTEGER),
+    cc("template_id_package_id", STRING),
+    cc("template_id_module_name", STRING),
+    cc("template_id_entity_name", STRING),
+    cc("package_name", STRING),
+    cc("create_arguments", JSON),
+    cc("signatories", JSON, pgIsTextArray = true),
+    cc("observers", JSON, pgIsTextArray = true),
+    cc("contract_key", JSON),
+    cc("record_time", INTEGER),
+    cc("update_id", STRING),
+    cc("domain_id", STRING),
+    cc("migration_id", INTEGER),
   )
 
   // Datastream variant of update_history_exercises
   // contains AmuletRules_Transfer &c
-  private val exercisesSchema = Schema.of(
-    fld("history_id", INTEGER),
-    fld("row_id", INTEGER),
-    fld("ingested_at", TIMESTAMP),
-    fld("event_id", STRING),
-    fld("update_row_id", INTEGER),
-    fld("child_event_ids", JSON),
-    fld("choice", STRING),
-    fld("template_id_package_id", STRING),
-    fld("template_id_module_name", STRING),
-    fld("template_id_entity_name", STRING),
-    fld("contract_id", STRING),
-    fld("consuming", BOOLEAN),
-    fld("argument", JSON),
-    fld("result", JSON),
-    fld("package_name", STRING),
-    fld("interface_id_package_id", STRING),
-    fld("interface_id_module_name", STRING),
-    fld("interface_id_entity_name", STRING),
-    fld("acting_parties", JSON),
-    fld("record_time", INTEGER),
-    fld("update_id", STRING),
-    fld("domain_id", STRING),
-    fld("migration_id", INTEGER),
+  private val exercisesSchema = Seq(
+    cc("history_id", INTEGER),
+    cc("row_id", INTEGER),
+    cc("ingested_at", TIMESTAMP),
+    cc("event_id", STRING),
+    cc("update_row_id", INTEGER),
+    cc("child_event_ids", JSON, pgIsTextArray = true),
+    cc("choice", STRING),
+    cc("template_id_package_id", STRING),
+    cc("template_id_module_name", STRING),
+    cc("template_id_entity_name", STRING),
+    cc("contract_id", STRING),
+    cc("consuming", BOOLEAN),
+    cc("argument", JSON),
+    cc("result", JSON),
+    cc("package_name", STRING),
+    cc("interface_id_package_id", STRING),
+    cc("interface_id_module_name", STRING),
+    cc("interface_id_entity_name", STRING),
+    cc("acting_parties", JSON, pgIsTextArray = true),
+    cc("record_time", INTEGER),
+    cc("update_id", STRING),
+    cc("domain_id", STRING),
+    cc("migration_id", INTEGER),
   )
+
+  private type ConvertibleSchema = Seq[ConvertibleColumn]
+
+  private def bqSchema(schema: ConvertibleSchema): Schema =
+    Schema.of(schema.map(_.bqSchemaField)*)
 
   // create empty tables in BigQuery that match the schema inferred by Datastream,
   // less the datastream_metadata column (which we don't use)
@@ -185,9 +213,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
     createTable(exercisesBqTableName, exercisesSchema)
   }
 
-  private def createTable(tableName: String, schema: Schema): Unit = {
+  private def createTable(tableName: String, schema: ConvertibleSchema): Unit = {
     val tableId = TableId.of(datasetName, tableName)
-    val tableDefinition = bq.StandardTableDefinition.of(schema)
+    val tableDefinition = bq.StandardTableDefinition of bqSchema(schema)
     val tableInfo = bq.TableInfo.of(tableId, tableDefinition)
     bigquery.create(tableInfo)
   }
@@ -238,63 +266,19 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def copyTableToBigQuery(
       sourceTable: String,
       targetTable: String,
-      targetSchema: Schema,
+      targetSchema: ConvertibleSchema,
       sourceDb: DbStorage,
   ): Unit = {
     import org.json.JSONObject
 
-    val writer = createJsonStreamWriter(targetTable, createTableSchema(targetSchema))
+    val writer = createJsonStreamWriter(targetTable, createStreamSchema(targetSchema))
 
     try {
       // runtime interpretation of bq Schema; convert Slick+PG to BigQuery
-      implicit val r: GetResult[JSONObject] = GetResult { r =>
-        new JSONObject(
-          targetSchema.getFields.asScala.view
-            .map { field =>
-              val n = field.getName
-              n -> {
-                try
-                  field.getType match {
-                    case STRING => r.rs.getString(n)
-                    case JSON =>
-                      val raw = r.rs.getString(n)
-                      if (!r.rs.wasNull)
-                        try new JSONObject(raw)
-                        catch {
-                          case e: org.json.JSONException =>
-                            fail(s"error parsing JSON field $n, contents $raw", e)
-                        }
-                      else null
-                    case INTEGER =>
-                      val value = r.rs.getLong(n)
-                      if (!r.rs.wasNull) value.toString
-                      else null
-                    case TIMESTAMP =>
-                      val ts = r.rs.getTimestamp(n)
-                      if (ts ne null)
-                        LfTimestamp.assertFromInstant(ts.toInstant).toString
-                      else null
-                    case BOOLEAN =>
-                      val value = r.rs.getBoolean(n)
-                      if (!r.rs.wasNull) value else null
-                    case other => throw new IllegalArgumentException(s"Unsupported type: $other")
-                  }
-                catch {
-                  case e: java.sql.SQLException =>
-                    throw new java.sql.SQLException(
-                      s"reading '$n' of BQ type '${field.getType}': ${e.getMessage}",
-                      e,
-                    )
-                }
-              }
-            }
-            .toMap
-            .asJava
-        )
-      }
+      implicit val r: GetResult[JSONObject] = interpretPGRowWithSchema(targetSchema)
 
       // Fetch all rows from the source table
-      val fieldNames = targetSchema.getFields.asScala.view.map(_.getName).mkString(", ")
+      val fieldNames = targetSchema.view.map(_.name).mkString(", ")
       val rows = sourceDb
         .query(
           sql"SELECT #$fieldNames FROM #$sourceTable".as[JSONObject],
@@ -316,41 +300,82 @@ class ScanTotalSupplyBigQueryIntegrationTest
     }
   }
 
-  private def createTableSchema(schema: Schema): TableSchema = {
+  private def interpretPGRowWithSchema(
+      targetSchema: ConvertibleSchema
+  ) = GetResult { r =>
+    import org.json.{JSONArray, JSONObject}
+    new JSONObject(
+      targetSchema.view
+        .map { field =>
+          val n = field.name
+          n -> {
+            try
+              field.bqType match {
+                case STRING => r.rs.getString(n)
+                case JSON =>
+                  val raw = r.rs.getString(n)
+                  if (!r.rs.wasNull) {
+                    try {
+                      if (field.pgIsTextArray)
+                        r.rs.getArray(n).getArray match {
+                          case a: Array[String] =>
+                            new JSONArray(a.toSeq.asJava)
+                          case e => fail(s"$e not a text array")
+                        }
+                      else
+                        new JSONObject(raw)
+                    } catch {
+                      case e: org.json.JSONException =>
+                        fail(s"error parsing JSON field $n, contents $raw", e)
+                    }
+                  } else null
+                case INTEGER =>
+                  val value = r.rs.getLong(n)
+                  if (!r.rs.wasNull) value.toString
+                  else null
+                case TIMESTAMP =>
+                  val ts = r.rs.getTimestamp(n)
+                  if (ts ne null)
+                    LfTimestamp.assertFromInstant(ts.toInstant).toString
+                  else null
+                case BOOLEAN =>
+                  val value = r.rs.getBoolean(n)
+                  if (!r.rs.wasNull) value else null
+                case other => throw new IllegalArgumentException(s"Unsupported type: $other")
+              }
+            catch {
+              case e: java.sql.SQLException =>
+                throw new java.sql.SQLException(
+                  s"reading '$n' of BQ type '${field.bqType}': ${e.getMessage}",
+                  e,
+                )
+            }
+          }
+        }
+        .toMap
+        .asJava
+    )
+  }
+
+  private def createStreamSchema(schema: ConvertibleSchema): TableSchema = {
     val tableSchemaBuilder = TableSchema.newBuilder()
 
-    schema.getFields.asScala.foreach { field =>
-      val fieldBuilder = bq.storage.v1.TableFieldSchema
-        .newBuilder()
-        .setName(field.getName)
-        .setType(convertToBigQueryStorageType(field.getType))
-
-      fieldBuilder.setMode(field.getMode match {
-        case Field.Mode.NULLABLE => Mode.NULLABLE
-        case Field.Mode.REQUIRED => Mode.REQUIRED
-        case Field.Mode.REPEATED => Mode.REPEATED
-        case _ => Mode.NULLABLE
-      })
-
-      tableSchemaBuilder.addFields(fieldBuilder)
+    schema.foreach { field =>
+      tableSchemaBuilder.addFields(field.bqsSchemaField)
     }
 
     tableSchemaBuilder.build()
   }
 
-  import bq.storage.v1.TableFieldSchema.Type as BQSType
   private def convertToBigQueryStorageType(
       legacyType: bq.LegacySQLTypeName
-  ): BQSType = {
-
-    legacyType match {
-      case STRING => BQSType.STRING
-      case INTEGER => BQSType.INT64
-      case TIMESTAMP => BQSType.TIMESTAMP
-      case BOOLEAN => BQSType.BOOL
-      case JSON => BQSType.STRING
-      case _ => throw new IllegalArgumentException(s"Unsupported type: $legacyType")
-    }
+  ): BQSType = legacyType match {
+    case STRING => BQSType.STRING
+    case INTEGER => BQSType.INT64
+    case TIMESTAMP => BQSType.TIMESTAMP
+    case BOOLEAN => BQSType.BOOL
+    case JSON => BQSType.STRING
+    case _ => throw new IllegalArgumentException(s"Unsupported type: $legacyType")
   }
 
   private def createJsonStreamWriter(
