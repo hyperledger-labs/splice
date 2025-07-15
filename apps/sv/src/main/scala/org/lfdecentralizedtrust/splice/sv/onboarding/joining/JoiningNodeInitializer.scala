@@ -389,7 +389,6 @@ class JoiningNodeInitializer(
                 localSynchronizerNode,
                 decentralizedSynchronizer,
               )
-              _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
             } yield ()
           }
         } else {
@@ -402,6 +401,7 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
+      _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
       _ <-
         if (!config.skipSynchronizerInitialization) {
           synchronizerNodeReconciler
