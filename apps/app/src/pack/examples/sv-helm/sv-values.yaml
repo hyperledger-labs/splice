@@ -65,6 +65,7 @@ domain:
   # until it completes.
   # Note that you must set it (temporarily) to false if you reset your mediator or sequencer
   # or change the sequencer or mediator config, e.g., the sequencer url.
+  # This has no effect when `migrating: true`.
   skipInitialization: false
 
 # Please make the ``scan`` service `publicUrl` accessible for other validators to read from, and set the URL below to your Scan service.
