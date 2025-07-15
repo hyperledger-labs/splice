@@ -102,7 +102,7 @@ describe('Wallet user can', () => {
       )
     );
     const disabledPreapproveTransfersBtn = await screen.findByRole('button', {
-      name: /Pre-approve incoming direct transfers/,
+      name: 'Fart',
     });
     await waitFor(() => expect(disabledPreapproveTransfersBtn).toBeDisabled());
   });
