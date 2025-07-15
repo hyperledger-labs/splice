@@ -50,7 +50,7 @@ import {
   Notification,
   ListTokenStandardTransfersResponse,
 } from '../models/models';
-import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
