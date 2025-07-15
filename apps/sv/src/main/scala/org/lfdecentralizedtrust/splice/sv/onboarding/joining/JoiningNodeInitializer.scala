@@ -349,50 +349,75 @@ class JoiningNodeInitializer(
           dsoPartyId,
         ),
       ).tupled
-      _ <- localSynchronizerNode.traverse_ { localSynchronizerNode =>
-        for {
-          // First, make sure the identity of the new domain nodes is known on the domain
-          _ <-
-            (
-              localSynchronizerNode.addLocalSequencerIdentityIfRequired(
-                config.domains.global.alias,
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          localSynchronizerNode.traverse_ { localSynchronizerNode =>
+            for {
+              // First, make sure the identity of the new domain nodes is known on the domain
+              _ <-
+                (
+                  localSynchronizerNode.addLocalSequencerIdentityIfRequired(
+                    config.domains.global.alias,
+                    decentralizedSynchronizer,
+                  ),
+                  localSynchronizerNode.addLocalMediatorIdentityIfRequired(
+                    decentralizedSynchronizer
+                  ),
+                ).tupled
+              // Then, add the new local domain node to the DSO rules with an "onboarding" status
+              // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
+              _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
+                Some(localSynchronizerNode),
                 decentralizedSynchronizer,
-              ),
-              localSynchronizerNode.addLocalMediatorIdentityIfRequired(decentralizedSynchronizer),
-            ).tupled
-          // Then, add the new local domain node to the DSO rules with an "onboarding" status
-          // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
-          _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
-            Some(localSynchronizerNode),
-            decentralizedSynchronizer,
-            Onboarding,
-            config.domainMigrationId,
-            config.scan,
-          )
-          // Finally, fully onboard the sequencer and mediator
-          _ <-
-            localSynchronizerNode.onboardLocalSequencerIfRequired(
-              svConnection.map(_._2)
-            )
-          // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
-          _ = if (!skipTrafficReconciliationTriggers)
+                Onboarding,
+                config.domainMigrationId,
+                config.scan,
+              )
+              // Finally, fully onboard the sequencer and mediator
+              _ <-
+                localSynchronizerNode.onboardLocalSequencerIfRequired(
+                  svConnection.map(_._2)
+                )
+              // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
+              _ = if (!skipTrafficReconciliationTriggers)
+                dsoAutomationService.registerTrafficReconciliationTriggers()
+              _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
+                decentralizedSynchronizer
+              )
+              _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
+              _ <- waitForSvToObtainUnlimitedTraffic(
+                localSynchronizerNode,
+                decentralizedSynchronizer,
+              )
+              _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
+            } yield ()
+          }
+        } else {
+          if (!skipTrafficReconciliationTriggers) {
             dsoAutomationService.registerTrafficReconciliationTriggers()
-          _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
-            decentralizedSynchronizer
+          }
+          checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
+          logger.info(
+            "Skipping synchronizer initialization because skipSynchronizerInitialization is enabled"
           )
-          _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
-          _ <- waitForSvToObtainUnlimitedTraffic(localSynchronizerNode, decentralizedSynchronizer)
-          _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
-        } yield ()
-      }
-      _ <- synchronizerNodeReconciler
-        .reconcileSynchronizerNodeConfigIfRequired(
-          localSynchronizerNode,
-          decentralizedSynchronizer,
-          OnboardedAfterDelay,
-          config.domainMigrationId,
-          config.scan,
-        )
+          Future.unit
+        }
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          synchronizerNodeReconciler
+            .reconcileSynchronizerNodeConfigIfRequired(
+              localSynchronizerNode,
+              decentralizedSynchronizer,
+              OnboardedAfterDelay,
+              config.domainMigrationId,
+              config.scan,
+            )
+        } else {
+          logger.info(
+            "Skipping synchronizer config reconciliation as skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
       _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
         dsoAutomationService,
         dsoStore,

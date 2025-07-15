@@ -17,12 +17,19 @@ Upcoming
     populate the token metadata total supply using the aggregates used for closed rounds.
     The data used corresponds to the data served by the ``/v0/total-amulet-balance``
     endpoint in :ref:`app_dev_scan_api` for the latest closed round.
+  - Fix `bug #1280 <https://github.com/hyperledger-labs/splice/pull/1280>`_:
+    ``record_time`` in Scan API ``/updates`` is now right-padded to 6 digits (microseconds).
 
 - Validator
 
   - Fix a bug where sweeps through transfer preapprovals failed with a
     ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
     party (usually the validator operator) of the receiver is featured.
+
+- SV
+
+  - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
+    to start without the sequencer being up. This is useful for long-running sequencer database migrations.
 
 0.4.5
 -----

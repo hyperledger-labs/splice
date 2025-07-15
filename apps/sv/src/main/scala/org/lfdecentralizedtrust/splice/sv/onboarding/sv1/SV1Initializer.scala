@@ -149,7 +149,14 @@ class SV1Initializer(
         loggerFactory,
         retryProvider,
       )
-      (namespace, synchronizerId) <- bootstrapDomain(localSynchronizerNode)
+      (namespace, synchronizerId) <-
+        if (config.skipSynchronizerInitialization) {
+          participantAdminConnection.getSynchronizerId(config.domains.global.alias).map { s =>
+            (s.namespace, s)
+          }
+        } else {
+          bootstrapDomain(localSynchronizerNode)
+        }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
@@ -320,10 +327,18 @@ class SV1Initializer(
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
       // for example if sv1 restarted after bootstrapping the DsoRules.
       // We only set the domain sequencer config if the existing one is different here.
-      _ <- withDsoStore.reconcileSequencerConfigIfRequired(
-        Some(localSynchronizerNode),
-        config.domainMigrationId,
-      )
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          withDsoStore.reconcileSequencerConfigIfRequired(
+            Some(localSynchronizerNode),
+            config.domainMigrationId,
+          )
+        } else {
+          logger.info(
+            "Skipping reconcile sequencer config step because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
     } yield (
       decentralizedSynchronizer,
       dsoPartyHosting,

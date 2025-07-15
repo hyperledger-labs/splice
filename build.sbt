@@ -1187,7 +1187,7 @@ lazy val `apps-common-frontend` = {
         )
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
         runCommand(
-          Seq("npm-run-parallel", "test:sbt"),
+          Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
