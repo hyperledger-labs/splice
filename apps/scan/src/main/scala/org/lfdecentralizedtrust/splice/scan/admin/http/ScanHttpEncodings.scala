@@ -4,8 +4,8 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.{data, data as javaApi}
 import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.ledger.javaapi.{data, data as javaApi}
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -15,12 +15,13 @@ import io.circe.Json
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.ledger.api as ledgerApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members
-import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.ValidatorReceivedFaucets
+import org.lfdecentralizedtrust.splice.http.v0.{definitions, definitions as httpApi}
 import org.lfdecentralizedtrust.splice.store.TreeUpdateWithMigrationId
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
 import org.lfdecentralizedtrust.splice.util.{Contract, EventId, LegacyOffset, Trees}
 
+import java.time.format.DateTimeFormatterBuilder
 import java.time.{Instant, ZoneOffset}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -32,6 +33,12 @@ import scala.jdk.OptionConverters.*
   * http: org.lfdecentralizedtrust.splice.http.v0.httpApi.*
   */
 sealed trait ScanHttpEncodings {
+  private val recordTimeDateFormatter =
+    new DateTimeFormatterBuilder()
+      .appendInstant(6) // 6 digits of precision for microseconds, right padded with zeros
+      .toFormatter()
+  private def formatRecordTime(instant: Instant) =
+    recordTimeDateFormatter.format(instant)
 
   def lapiToHttpUpdate(
       updateWithMigrationId: TreeUpdateWithMigrationId,
@@ -46,7 +53,7 @@ sealed trait ScanHttpEncodings {
               tree.getUpdateId,
               updateWithMigrationId.migrationId,
               tree.getWorkflowId,
-              tree.getRecordTime.toString,
+              formatRecordTime(tree.getRecordTime),
               updateWithMigrationId.update.synchronizerId.toProtoPrimitive,
               tree.getEffectiveAt.toString,
               LegacyOffset.Api.fromLong(tree.getOffset),
@@ -78,7 +85,7 @@ sealed trait ScanHttpEncodings {
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 LegacyOffset.Api.fromLong(update.offset),
-                update.recordTime.toString,
+                formatRecordTime(update.recordTime.toInstant),
                 httpApi.UpdateHistoryAssignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
@@ -105,7 +112,7 @@ sealed trait ScanHttpEncodings {
               httpApi.UpdateHistoryReassignment(
                 update.updateId,
                 LegacyOffset.Api.fromLong(update.offset),
-                update.recordTime.toString,
+                formatRecordTime(update.recordTime.toInstant),
                 httpApi.UpdateHistoryUnassignment(
                   submitter.toProtoPrimitive,
                   source.toProtoPrimitive,
