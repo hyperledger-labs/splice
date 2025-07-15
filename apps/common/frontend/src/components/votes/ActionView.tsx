@@ -288,7 +288,9 @@ export const ActionView: React.FC<{
                 Beneficiary: <PartyId partyId={dsoAction.value.beneficiary} />,
                 Amount: <Typography>{dsoAction.value.amount}</Typography>,
                 Reason: <Typography>{dsoAction.value.reason}</Typography>,
-                'Expires At': <DateWithDurationDisplay datetime={dsoAction.value.expiresAt} />,
+                'Can be claimed until': (
+                  <DateWithDurationDisplay datetime={dsoAction.value.expiresAt} />
+                ),
               }}
             />
             {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
