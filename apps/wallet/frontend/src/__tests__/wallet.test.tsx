@@ -50,7 +50,7 @@ function featureSupportHandler(
   });
 }
 
-test('login screen shows up allocation', async () => {
+test('login screen shows up', async () => {
   render(
     <WalletConfigProvider>
       <App />
@@ -60,7 +60,7 @@ test('login screen shows up allocation', async () => {
 });
 
 describe('Wallet user can', () => {
-  test('login and see the user party ID allocation', async () => {
+  test('login and see the user party ID', async () => {
     const user = userEvent.setup();
     render(
       <WalletConfigProvider>
