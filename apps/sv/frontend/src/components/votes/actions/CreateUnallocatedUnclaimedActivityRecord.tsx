@@ -97,6 +97,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
           id="create-amount"
           type="number"
           value={amount}
+          inputProps={{ 'data-testid': 'create-amount' }}
           onChange={e => {
             const newValue = e.target.value;
             setAmount(newValue);
