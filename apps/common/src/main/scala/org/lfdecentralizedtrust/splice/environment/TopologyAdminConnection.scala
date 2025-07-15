@@ -294,7 +294,7 @@ abstract class TopologyAdminConnection(
           )
       }
 
-  private def listMediatorSynchronizerState(
+  def listMediatorSynchronizerState(
       store: TopologyStoreId,
       synchronizerId: SynchronizerId,
       proposals: Boolean,
@@ -335,7 +335,7 @@ abstract class TopologyAdminConnection(
         )
     }
 
-  private def listDecentralizedNamespaceDefinition(
+  def listDecentralizedNamespaceDefinition(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
       proposals: TopologyTransactionType = AuthorizedState,

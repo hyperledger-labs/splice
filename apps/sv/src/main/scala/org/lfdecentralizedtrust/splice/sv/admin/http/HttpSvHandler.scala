@@ -574,7 +574,7 @@ class HttpSvHandler(
                 case _ => None
               } match {
               case Some(activeMapping) =>
-                activeMapping.base.validFrom
+                activeMapping.base.sequenced
               case None =>
                 throw Status.NOT_FOUND
                   .withDescription(

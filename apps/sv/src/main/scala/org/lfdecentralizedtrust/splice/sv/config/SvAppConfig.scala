@@ -261,8 +261,6 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
-    topologyChangeDelayDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMillis(250),
     delegatelessAutomation: Boolean = true,
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
