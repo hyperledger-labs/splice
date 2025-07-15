@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { DateWithDurationDisplay } from '@lfdecentralizedtrust/splice-common-frontend';
+import { Decimal } from 'decimal.js-light';
 import React, { useCallback, useEffect, useState } from 'react';
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
@@ -100,11 +101,15 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
             const newValue = e.target.value;
             setAmount(newValue);
 
-            const numericValue = parseFloat(newValue);
-            if (isNaN(numericValue) || numericValue <= 0) {
+            try {
+              const decimal = new Decimal(newValue);
+              if (decimal.lte(0)) {
+                setAmountError('Amount must be a positive number');
+              } else {
+                setAmountError(null);
+              }
+            } catch {
               setAmountError('Amount must be a positive number');
-            } else {
-              setAmountError(null);
             }
           }}
           error={!!amountError}
