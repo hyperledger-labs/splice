@@ -26,6 +26,11 @@ Upcoming
     ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
     party (usually the validator operator) of the receiver is featured.
 
+- Splice
+
+  - Building the Splice repo, and running the vast majority of integration tests locally, no longer requires
+    JFrog access.
+
 - SV
 
   - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
