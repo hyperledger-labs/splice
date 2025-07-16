@@ -311,15 +311,13 @@ class BootstrapPackageConfigIntegrationTest
       eventually() {
         vettingIsUpdatedForTheNewConfig(
           sv2Backend.participantClient,
-          // it depends if the amulet rules contract was pruned or not by the time vetting ran
           Some(
             vettingScheduledTime
           ),
-          Seq(
-            amuletCreateTimeWhenVettingResumed,
-            // there's a chance that amulet rules changed after vetting resumed (eg: pruning)
-            amuletRulesCreateTimestamp,
-          ),
+          Some(amuletCreateTimeWhenVettingResumed),
+          // it depends if the amulet rules contract was pruned or not by the time vetting ran
+          // there's a chance that amulet rules changed after vetting resumed (eg: pruning)
+          Some(amuletRulesCreateTimestamp),
         )
       }
     }
@@ -342,7 +340,8 @@ class BootstrapPackageConfigIntegrationTest
   private def vettingIsUpdatedForTheNewConfig(
       participantClient: ParticipantClientReference,
       scheduledTimeO: Option[CantonTimestamp],
-      alternativeScheduledTimes: Seq[CantonTimestamp] = Seq.empty,
+      scheduledTime1: Option[CantonTimestamp] = None,
+      scheduledTime2: Option[CantonTimestamp] = None,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val vettingTopologyState = participantClient.topology.vetted_packages.list(
       store = Some(
@@ -368,8 +367,8 @@ class BootstrapPackageConfigIntegrationTest
         .find(_.packageId == expectedVettedVersion.packageId)
         .value
 
-      newAmuletVettedPackage.validFrom should be(
-        equal(scheduledTimeO) or contain atLeastOneElementOf alternativeScheduledTimes
+      newAmuletVettedPackage.validFrom should (
+        equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
       )
     }
   }
