@@ -182,7 +182,10 @@ class JoiningNodeInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        localSynchronizerNode,
       )
       _ <- DomainMigrationInfo.saveToUserMetadata(
         svAutomation.connection,

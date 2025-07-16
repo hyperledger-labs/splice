@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import cats.data.OptionT
-import cats.implicits.catsSyntaxTuple7Semigroupal
+import cats.implicits.catsSyntaxTuple6Semigroupal
 import cats.instances.future.*
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -51,10 +51,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvOnboardingConfig,
 }
 import org.lfdecentralizedtrust.splice.sv.metrics.SvAppMetrics
-import org.lfdecentralizedtrust.splice.sv.migration.{
-  DomainDataSnapshotGenerator,
-  SynchronizerNodeIdentities,
-}
+import org.lfdecentralizedtrust.splice.sv.migration.DomainDataSnapshotGenerator
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
@@ -65,7 +62,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvUtil,
   ValidatorOnboardingSecret,
 }
-import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CryptoConfig,
@@ -83,7 +80,6 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.util.MonadUtil
 import io.circe.Json
-import io.circe.syntax.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -92,10 +88,9 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
-import java.nio.file.Paths
 import java.time.Instant
 import java.util.Optional
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -423,7 +418,7 @@ class SvApp(
         svAutomation.connection,
       )
 
-      (_, _, isDevNet, _, _, _, _) <- (
+      (_, _, isDevNet, _, _, _) <- (
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
         // 1. The ValidatorLicense has both the DSO and the SV as a stakeholder.
         //    That can cause problems during the DSO party migration because the contract is imported there
@@ -468,17 +463,6 @@ class SvApp(
               )
             )
             .getOrElse(Future.unit)
-        },
-        appInitStep("Dump identities") {
-          SvApp.backupNodeIdentities(
-            config,
-            localSynchronizerNode,
-            dsoStore,
-            participantAdminConnection,
-            clock,
-            logger,
-            loggerFactory,
-          )
         },
         appInitStep("Wait until configured onboarding contracts have been created") {
           waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
@@ -1261,46 +1245,5 @@ object SvApp {
         Seq(User.Right.ParticipantAdmin.INSTANCE),
       )
     } yield ()
-  }
-
-  private def backupNodeIdentities(
-      config: SvAppBackendConfig,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
-      dsoStore: SvDsoStore,
-      participantAdminConnection: ParticipantAdminConnection,
-      clock: Clock,
-      logger: TracedLogger,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
-    config.identitiesDump.fold(Future.successful(()))(backupConfig => {
-      val now = clock.now.toInstant
-      val filename = Paths.get(
-        s"sv_identities_${now}.json"
-      )
-      logger.debug(
-        s"Attempting to write node identities to ${backupConfig.locationDescription} at path: $filename"
-      )
-      for {
-        identities <- SynchronizerNodeIdentities.getSynchronizerNodeIdentities(
-          participantAdminConnection,
-          localSynchronizerNode.getOrElse(
-            sys.error("Cannot dump identities with no localSynchronizerNode")
-          ),
-          dsoStore,
-          config.domains.global.alias,
-          loggerFactory,
-        )
-        _ <- Future {
-          blocking {
-            BackupDump.write(
-              backupConfig,
-              filename,
-              identities.toHttp().asJson.noSpaces,
-              loggerFactory,
-            )
-          }
-        }
-      } yield ()
-    })
   }
 }
