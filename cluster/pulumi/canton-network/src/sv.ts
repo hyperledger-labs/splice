@@ -369,7 +369,7 @@ async function installValidator(
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
-    logLevel: svConfig.logging.appsLogLevel,
+    logLevel: svConfig.logging?.appsLogLevel,
   });
 
   return validator;
@@ -474,7 +474,7 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
-    logLevel: config.logging.appsLogLevel,
+    logLevel: config.logging?.appsLogLevel,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -542,7 +542,7 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
-    logLevel: config.logging.appsLogLevel,
+    logLevel: config.logging?.appsLogLevel,
     ...updateHistoryBackfillingValues,
   };
 

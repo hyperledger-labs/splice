@@ -61,7 +61,6 @@ abstract class InStackDecentralizedSynchronizerNode
       mediatorPostgres: Postgres;
     },
     active: boolean,
-    logLevel: LogLevel,
     driver:
       | { type: 'cometbft'; host: Output<string>; port: number }
       | {
@@ -70,6 +69,7 @@ abstract class InStackDecentralizedSynchronizerNode
           externalPort: number;
         },
     version: CnChartVersion,
+    logLevel?: LogLevel,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -215,13 +215,13 @@ export class InStackCometBftDecentralizedSynchronizerNode
     this.installDecentralizedSynchronizer(
       dbs,
       active,
-      svConfig.logging.cantonLogLevel,
       {
         type: 'cometbft',
         host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
         port: 26657,
       },
       version,
+      svConfig.logging?.cantonLogLevel,
       imagePullServiceAccountName,
       opts
     );
@@ -239,8 +239,8 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
       mediatorPostgres: Postgres;
     },
     active: boolean,
-    logLevel: LogLevel,
     version: CnChartVersion,
+    logLevel?: LogLevel,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
   ) {
@@ -248,13 +248,13 @@ export class InStackCantonBftDecentralizedSynchronizerNode extends InStackDecent
     this.installDecentralizedSynchronizer(
       dbs,
       active,
-      logLevel,
       {
         type: 'cantonbft',
         externalAddress: `sequencer-p2p-${migrationId}.${ingressName}.${CLUSTER_HOSTNAME}`,
         externalPort: 443,
       },
       version,
+      logLevel,
       imagePullServiceAccountName,
       opts
     );

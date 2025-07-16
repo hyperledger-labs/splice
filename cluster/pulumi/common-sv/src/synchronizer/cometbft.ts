@@ -111,7 +111,7 @@ export function installCometBftNode(
       keysSecret: keysSecret ? keysSecret.metadata.name : '',
       enableTimeoutCommit,
     },
-    logLevel: svConfiguration.logging.cantonLogLevel.toLowerCase(),
+    logLevel: svConfiguration.logging?.cometbftLogLevel,
     peers: nodeConfigs.peers
       .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
       .map(peer => {
@@ -146,7 +146,7 @@ export function installCometBftNode(
     db: {
       volumeSize: clusterSmallDisk ? '240Gi' : svsConfig?.cometbft?.volumeSize,
     },
-    extraLogLevelFlags: svConfiguration.logging.cometbftExtraLogLevelFlags,
+    extraLogLevelFlags: svConfiguration.logging?.cometbftExtraLogLevelFlags,
     serviceAccountName: imagePullServiceAccountName,
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;

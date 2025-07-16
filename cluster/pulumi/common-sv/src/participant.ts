@@ -78,7 +78,7 @@ export function installSvParticipant(
     'splice-participant',
     {
       ...participantValuesWithOverwrites,
-      logLevel: svConfig.logging.cantonLogLevel,
+      logLevel: svConfig.logging?.cantonLogLevel,
       participantAdminUserNameFrom,
       metrics: {
         enable: true,

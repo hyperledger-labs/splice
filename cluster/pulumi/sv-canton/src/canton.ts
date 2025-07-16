@@ -125,8 +125,8 @@ export function installCantonComponents(
             setCoreDbNames: svConfig.isCoreSv,
           },
           isActiveMigration,
-          svConfig.logging.cantonLogLevel,
           migrationInfo.version,
+          svConfig.logging?.cantonLogLevel,
           imagePullServiceAccountName,
           opts
         )
