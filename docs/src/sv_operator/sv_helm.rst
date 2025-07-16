@@ -142,7 +142,7 @@ If you are using the ingress configuration of this runbook, the correct URLs to 
 ``https://cns.sv.YOUR_HOSTNAME`` (for the CNS web UI).
 An identifier that is unique to the user must be set via the `sub` field of the issued JWT.
 On some occasions, this identifier will be used as a user name for that user on your SV node's Canton participant.
-In :ref:`helm-sv-install`, you fwill be required to configure a user identifier as the ``validatorWalletUser`` -
+In :ref:`helm-sv-install`, you will be required to configure a user identifier as the ``validatorWalletUser`` -
 make sure that whatever you configure there matches the contents of the `sub` field of JWTs issued for that user.
 
 *All* JWTs issued for use with your SV node:
