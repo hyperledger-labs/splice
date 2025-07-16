@@ -50,6 +50,8 @@ monitoring:
       loadTester:
         minRate: 0.95
     logAlerts:
+      # TODO(hyperledger-labs/splice#1483): stop ignoring sequencer connection warnings once they have better signal
+      # TODO(hyperledger-labs/splice#1288): ignore fewer mediator warnings once they have better signal
       common: |
         severity>=WARNING
         resource.type="k8s_container"
@@ -72,9 +74,7 @@ monitoring:
         -- regex is significantly faster than OR; gcp docs themselves recommend
         -- regex-based factoring
         -resource.labels.container_name=~"\A(ans|wallet|scan|sv|splitwell)-web-ui\z"
-        -- sequencer down
-        -(resource.labels.namespace_name=~"validator|splitwell"
-          AND resource.labels.container_name=~"participant"
+        -(resource.labels.container_name=~"participant"
           AND jsonPayload.message=~"SEQUENCER_SUBSCRIPTION_LOST|Request failed for sequencer|Sequencer shutting down|Submission timed out|Response message for request .* timed out |periodic acknowledgement failed|Token refresh failed with Status{code=UNAVAILABLE")
         -(resource.labels.container_name="postgres-exporter" AND jsonPayload.msg=~"Error loading config|Excluded databases")
         -jsonPayload.message=~"UnknownHostException"
@@ -85,7 +85,7 @@ monitoring:
         -(resource.labels.container_name=~"participant" AND
           jsonPayload.message=~"SYNC_SERVICE_ALARM.*Received a request.*where the view.*has (missing|extra) recipients|LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients|channel.*shutdown did not complete gracefully in allotted|LOCAL_VERDICT_FAILED_MODEL_CONFORMANCE_CHECK.*: UnvettedPackages")
         -(resource.labels.container_name="mediator" AND
-          jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*(Reason: (Missing root hash message for informee participants|Superfluous root hash message)|Received a (mediator|confirmation) response.*with an invalid root hash)")
+          jsonPayload.message=~"MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*(Reason: (Missing root hash message for informee participants|Superfluous root hash message)|Received a (mediator|confirmation) response.*with an invalid root hash|The request.*must not be used until)")
         -(jsonPayload.logger_name=~"c.d.n.a.AdminAuthExtractor:" AND jsonPayload.message=~"Authorization Failed")
         -(jsonPayload.level="error" AND jsonPayload.msg=~"/readyz")
         -- The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
