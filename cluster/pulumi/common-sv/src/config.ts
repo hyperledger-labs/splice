@@ -17,6 +17,7 @@ import { SweepConfig } from 'splice-pulumi-common-validator';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
+import { SingleSvConfiguration } from './singleSvConfig';
 import {
   StaticCometBftConfig,
   StaticCometBftConfigWithNodeName,
@@ -60,7 +61,7 @@ export type SequencerPruningConfig = {
   retentionPeriod?: string;
 };
 
-export interface SvConfig extends StaticSvConfig {
+export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   isFirstSv: boolean;
   auth0Client: Auth0Client;
   nodeConfigs: {
@@ -110,9 +111,9 @@ export type Config = z.infer<typeof SvConfigSchema>;
 
 // eslint-disable-next-line
 // @ts-ignore
-export const svConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
+export const svsConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
 
-export const updateHistoryBackfillingValues = svConfig?.scan?.enableImportUpdatesBackfill
+export const updateHistoryBackfillingValues = svsConfig?.scan?.enableImportUpdatesBackfill
   ? {
       updateHistoryBackfilling: {
         enabled: true,

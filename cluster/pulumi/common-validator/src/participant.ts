@@ -3,36 +3,35 @@
 import * as postgres from 'splice-pulumi-common/src/postgres';
 import { Output } from '@pulumi/pulumi';
 import {
+  activeVersion,
   Auth0Config,
   auth0UserNameEnvVarSource,
   ChartValues,
   DEFAULT_AUDIENCE,
-  activeVersion,
   DomainMigrationIndex,
   ExactNamespace,
+  getParticipantKmsHelmResources,
   installSpliceHelmChart,
   jmxOptions,
   loadYamlFromFile,
-  LogLevel,
-  SPLICE_ROOT,
   sanitizedForPostgres,
+  SPLICE_ROOT,
   SpliceCustomResourceOptions,
-  KmsConfig,
-  getParticipantKmsHelmResources,
 } from 'splice-pulumi-common';
+import { ValidatorNodeConfig } from 'splice-pulumi-common-validator';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
 export function installParticipant(
+  validatorConfig: ValidatorNodeConfig,
   migrationId: DomainMigrationIndex,
   xns: ExactNamespace,
   auth0Config: Auth0Config,
   nodeIdentifier: string,
-  kmsConfig?: KmsConfig,
   version: CnChartVersion = activeVersion,
   defaultPostgres?: postgres.Postgres,
-  logLevel?: LogLevel,
   customOptions?: SpliceCustomResourceOptions
 ): { participantAddress: Output<string> } {
+  const kmsConfig = validatorConfig.kms;
   const { kmsValues, kmsDependencies } = kmsConfig
     ? getParticipantKmsHelmResources(xns, kmsConfig)
     : { kmsValues: {}, kmsDependencies: [] };
@@ -73,7 +72,7 @@ export function installParticipant(
     'splice-participant',
     {
       ...participantValuesWithSpecifiedAud,
-      logLevel,
+      logLevel: validatorConfig.logging?.level,
       persistence: {
         databaseName: pgName,
         schema: 'participant',

@@ -48,7 +48,7 @@ import {
   SvParticipant,
   updateHistoryBackfillingValues,
 } from 'splice-pulumi-common-sv';
-import { svConfig, SvConfig } from 'splice-pulumi-common-sv/src/config';
+import { svsConfig, SvConfig } from 'splice-pulumi-common-sv/src/config';
 import {
   installValidatorApp,
   installValidatorSecrets,
@@ -255,9 +255,8 @@ export async function installSvNode(
 
   const scan = installScan(
     xns,
-    config.isFirstSv,
+    config,
     decentralizedSynchronizerUpgradeConfig,
-    config.nodeName,
     dependsOn,
     canton.decentralizedSynchronizer,
     svApp,
@@ -370,6 +369,7 @@ async function installValidator(
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
+    logLevel: svConfig.logging.appsLogLevel,
   });
 
   return validator;
@@ -434,7 +434,7 @@ function installSvApp(
               enableBftSequencer: true,
             }
           : {}),
-        skipInitialization: svConfig?.synchronizer?.skipInitialization,
+        skipInitialization: svsConfig?.synchronizer?.skipInitialization,
       },
     scan: {
       publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
@@ -474,6 +474,7 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    logLevel: config.logging.appsLogLevel,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -502,9 +503,8 @@ function installSvApp(
 
 function installScan(
   xns: ExactNamespace,
-  isFirstSv: boolean,
+  config: SvConfig,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-  nodename: string,
   dependsOn: CnInput<Resource>[],
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: pulumi.Resource,
@@ -512,7 +512,7 @@ function installScan(
   postgres: Postgres
 ) {
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
-  const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
+  const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
   const externalSequencerP2pAddress = (
     decentralizedSynchronizerNode as unknown as CantonBftSynchronizerNode
   ).externalSequencerP2pAddress;
@@ -521,7 +521,7 @@ function installScan(
     metrics: {
       enable: true,
     },
-    isFirstSv: isFirstSv,
+    isFirstSv: config.isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch,
@@ -542,6 +542,7 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
+    logLevel: config.logging.appsLogLevel,
     ...updateHistoryBackfillingValues,
   };
 

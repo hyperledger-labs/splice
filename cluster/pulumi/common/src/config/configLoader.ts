@@ -6,7 +6,7 @@ import { merge } from 'lodash';
 
 import { spliceEnvConfig } from './envConfig';
 
-function loadClusterYamlConfig() {
+function loadClusterYamlConfig(): unknown {
   const clusterBaseConfig = readAndParseYaml(
     `${spliceEnvConfig.context.splicePath}/cluster/deployment/config.yaml`
   );
@@ -26,4 +26,9 @@ function readAndParseYaml(filePath: string): unknown {
   }
 }
 
-export const clusterYamlConfig = loadClusterYamlConfig();
+export const clusterYamlConfig: unknown = loadClusterYamlConfig();
+
+export function clusterSubConfig(key: string): unknown {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (clusterYamlConfig as any)[key] || {};
+}

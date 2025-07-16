@@ -23,6 +23,7 @@ import {
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  LogLevel,
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
@@ -75,6 +76,7 @@ type BasicValidatorConfig = {
   dependencies: CnInput<pulumi.Resource>[];
   participantPruningConfig?: ParticipantPruningConfig;
   deduplicationDuration?: string;
+  logLevel?: LogLevel;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -225,6 +227,7 @@ export async function installValidatorApp(
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
+      logLevel: config.logLevel,
       ...spliceInstanceNames,
     },
     chartVersion,

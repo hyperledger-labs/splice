@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Auth0ClientType, getAuth0Config, Auth0Fetch } from 'splice-pulumi-common';
-import { clusterSvsConfiguration, svRunbookConfig } from 'splice-pulumi-common-sv';
+import { Auth0ClientType, Auth0Fetch, getAuth0Config } from 'splice-pulumi-common';
+import { configForSv, svRunbookConfig } from 'splice-pulumi-common-sv';
 
 import { installNode } from './installNode';
 import {
@@ -16,9 +16,7 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
   const svAppConfig = {
     onboardingName: svRunbookConfig.onboardingName,
     disableOnboardingParticipantPromotionDelay: DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY,
-    externalGovernanceKey: clusterSvsConfiguration[svRunbookConfig.nodeName]?.participant?.kms
-      ? true
-      : false,
+    externalGovernanceKey: configForSv(svRunbookConfig.nodeName)?.participant?.kms ? true : false,
   };
   const validatorAppConfig = {
     walletUserName: svRunbookConfig.validatorWalletUser!,

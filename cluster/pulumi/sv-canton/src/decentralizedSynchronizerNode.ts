@@ -25,6 +25,7 @@ import {
   CometbftSynchronizerNode,
   DecentralizedSynchronizerNode,
   installCometBftNode,
+  SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
 } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
@@ -166,6 +167,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
   cometbftRpcServiceName: string;
 
   constructor(
+    svConfig: SingleSvConfiguration,
     cometbft: {
       nodeConfigs: {
         self: StaticCometBftConfigWithNodeName;
@@ -185,7 +187,6 @@ export class InStackCometBftDecentralizedSynchronizerNode
     active: boolean,
     runningMigration: boolean,
     onboardingName: string,
-    logLevel: LogLevel,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
     opts?: SpliceCustomResourceOptions
@@ -195,10 +196,10 @@ export class InStackCometBftDecentralizedSynchronizerNode
       xns,
       onboardingName,
       new CometBftNodeConfigs(migrationId, cometbft.nodeConfigs),
+      svConfig,
       migrationId,
       active,
       runningMigration,
-      logLevel.toLowerCase(),
       version,
       cometbft.enableStateSync,
       cometbft.enableTimeoutCommit,
@@ -214,7 +215,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     this.installDecentralizedSynchronizer(
       dbs,
       active,
-      logLevel,
+      svConfig.logging.cantonLogLevel,
       {
         type: 'cometbft',
         host: pulumi.interpolate`${cometbftRelease.rpcServiceName}.${xns.logicalName}.svc.cluster.local`,
