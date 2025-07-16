@@ -1,10 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
-import com.daml.ledger.javaapi.data.CreatedEvent
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
   AllocationSpecification,
   SettlementInfo,
@@ -15,9 +11,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.I
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
-import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.util.{
-  Contract,
   FrontendLoginUtil,
   SpliceUtil,
   WalletFrontendTestUtil,
@@ -30,6 +24,7 @@ import java.time.{LocalDateTime, ZoneOffset}
 import java.util.Optional
 import scala.util.Random
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class AllocationsFrontendIntegrationTest
@@ -144,24 +139,21 @@ class AllocationsFrontendIntegrationTest
     )(
       "the allocation is created",
       _ => {
-        // TODO (#1106): check in the FE as opposed to checking the ledger
-        val allocation =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
-            .of_party(
-              party = sender,
-              filterTemplates = Seq(AmuletAllocation.TEMPLATE_ID).map(TemplateId.fromJavaIdentifier),
-            )
-            .loneElement
+        val allocation = findAll(className("allocation")).toSeq.loneElement
 
-        val specification = Contract
-          .fromCreatedEvent(AmuletAllocation.COMPANION)(
-            CreatedEvent.fromProto(toJavaProto(allocation.event))
-          )
-          .getOrElse(fail(s"Failed to parse allocation contract: $allocation"))
-          .payload
-          .allocation
+        checkSettlementInfo(
+          allocation,
+          wantedAllocation.settlement.settlementRef.id,
+          wantedAllocation.settlement.settlementRef.cid.map(_.contractId).toScala,
+          wantedAllocation.settlement.executor,
+        )
 
-        specification should be(wantedAllocation)
+        checkTransferLegs(
+          allocation,
+          Map(
+            wantedAllocation.transferLegId -> wantedAllocation.transferLeg
+          ),
+        )
       },
     )
   }
@@ -215,9 +207,14 @@ class AllocationsFrontendIntegrationTest
           eventually() {
             val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
 
-            checkSettlementInfo(allocationRequest, otcTrade, venueParty)
+            checkSettlementInfo(
+              allocationRequest,
+              "OTCTradeProposal", // hardcoded in daml
+              Some(otcTrade.trade.data.tradeCid.contractId),
+              venueParty.toProtoPrimitive,
+            )
 
-            checkTransferLegs(allocationRequest, otcTrade)
+            checkTransferLegs(allocationRequest, otcTrade.trade.data.transferLegs.asScala.toMap)
           }
         }
 
@@ -238,9 +235,14 @@ class AllocationsFrontendIntegrationTest
           { _ =>
             val allocation = findAll(className("allocation")).toSeq.loneElement
 
-            checkSettlementInfo(allocation, otcTrade, venueParty)
+            checkSettlementInfo(
+              allocation,
+              "OTCTradeProposal", // hardcoded in daml
+              Some(otcTrade.trade.data.tradeCid.contractId),
+              venueParty.toProtoPrimitive,
+            )
 
-            checkTransferLegs(allocation, otcTrade)
+            checkTransferLegs(allocation, otcTrade.trade.data.transferLegs.asScala.toMap)
           },
         )
       }
@@ -275,45 +277,46 @@ class AllocationsFrontendIntegrationTest
 
   private def checkSettlementInfo(
       parent: Element,
-      otcTrade: CreateAllocationRequestResult,
-      venueParty: PartyId,
+      id: String,
+      cid: Option[String],
+      executor: String,
   ) = {
     seleniumText(
       parent.childElement(className("settlement-id"))
     ) should be(
-      // hardcoded in daml
-      "SettlementRef id: OTCTradeProposal"
+      s"SettlementRef id: $id"
+    )
+    cid.foreach(cid =>
+      seleniumText(
+        parent.childElement(className("settlement-cid"))
+      ) should be(s"SettlementRef cid: $cid")
     )
     seleniumText(
-      parent.childElement(className("settlement-cid"))
-    ) should be(s"SettlementRef cid: ${otcTrade.trade.data.tradeCid.contractId}")
-    seleniumText(
       parent.childElement(className("settlement-executor"))
-    ) should matchText(venueParty.toProtoPrimitive)
+    ) should matchText(executor)
   }
 
   private def checkTransferLegs(
       parent: Element,
-      otcTrade: CreateAllocationRequestResult,
+      transferLegs: Map[String, TransferLeg],
   ) = {
     val rows =
       parent.findAllChildElements(className("allocation-row")).toSeq
-    rows.zip(otcTrade.trade.data.transferLegs.asScala.toSeq.sortBy(_._1)).foreach {
-      case (row, (legId, transferLeg)) =>
-        seleniumText(
-          row.childElement(className("allocation-legid"))
-        ) should matchText(legId)
-        seleniumText(
-          row.childElement(className("allocation-amount-instrument"))
-        ) should matchText(
-          s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
-        )
-        seleniumText(
-          row.childElement(className("allocation-sender"))
-        ) should matchText(transferLeg.sender)
-        seleniumText(
-          row.childElement(className("allocation-receiver"))
-        ) should matchText(transferLeg.receiver)
+    rows.zip(transferLegs.toSeq.sortBy(_._1)).foreach { case (row, (legId, transferLeg)) =>
+      seleniumText(
+        row.childElement(className("allocation-legid"))
+      ) should matchText(legId)
+      seleniumText(
+        row.childElement(className("allocation-amount-instrument"))
+      ) should matchText(
+        s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
+      )
+      seleniumText(
+        row.childElement(className("allocation-sender"))
+      ) should matchText(transferLeg.sender)
+      seleniumText(
+        row.childElement(className("allocation-receiver"))
+      ) should matchText(transferLeg.receiver)
     }
   }
 }
