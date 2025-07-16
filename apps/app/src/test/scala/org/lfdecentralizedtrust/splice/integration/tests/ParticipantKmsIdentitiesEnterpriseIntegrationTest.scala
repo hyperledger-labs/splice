@@ -16,7 +16,9 @@ import org.lfdecentralizedtrust.splice.util.StandaloneCanton
 
 import java.nio.file.{Path, Paths}
 
-class ParticipantKmsIdentitiesEnterpriseIntegrationTest extends IntegrationTest with StandaloneCanton {
+class ParticipantKmsIdentitiesEnterpriseIntegrationTest
+    extends IntegrationTest
+    with StandaloneCanton {
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val aliceParticipantDumpFile = testDumpDir.resolve("alice-kms-id-identity-dump.json")
