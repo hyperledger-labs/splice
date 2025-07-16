@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.admin.api.client.data.TemplateId
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
@@ -272,6 +273,8 @@ class AllocationsFrontendIntegrationTest
             allocation.payload.allocation.transferLeg should be(aliceTransferLeg)
           },
         )
+
+        Threading.sleep(600_000L)
       }
     }
 
