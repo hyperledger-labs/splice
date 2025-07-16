@@ -241,12 +241,6 @@ class JoiningNodeInitializer(
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
-            _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-              dsoAutomation,
-              dsoStore,
-              decentralizedSynchronizerId,
-              Some(withSvStore),
-            )
           } yield dsoAutomation
         } else {
           logger.info(
