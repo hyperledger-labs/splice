@@ -23,6 +23,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -97,7 +98,10 @@ object ExternalPartyWalletStore {
   /** Contract of a wallet store for a specific external party. */
   def contractFilter(
       key: Key
-  ): ContractFilter[ExternalPartyWalletAcsStoreRowData] = {
+  ): ContractFilter[
+    ExternalPartyWalletAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     val externalParty = key.externalParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive
 

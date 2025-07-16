@@ -48,9 +48,9 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   val defaultWalletAmuletPrice = SpliceUtil.damlDecimal(0.005)
   def walletAmuletPrice = defaultWalletAmuletPrice
 
-  def walletUsdToAmulet(usd: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice) =
+  def walletUsdToAmulet(usd: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice): BigDecimal =
     (usd / amuletPrice).setScale(10, RoundingMode.HALF_UP)
-  def walletAmuletToUsd(cc: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice) =
+  def walletAmuletToUsd(cc: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice): BigDecimal =
     (cc * amuletPrice).setScale(10, RoundingMode.HALF_UP)
 
   lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(SpliceUtil.defaultHoldingFee.rate)

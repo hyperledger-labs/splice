@@ -47,7 +47,7 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
-import { updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
+import { svConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
@@ -246,7 +246,7 @@ async function installSvAndValidator(
     ? [
         {
           beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
-          weight: '3333',
+          weight: 3333,
         },
       ]
     : [];
@@ -259,6 +259,9 @@ async function installSvAndValidator(
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
+      skipInitialization:
+        svConfig?.synchronizer?.skipInitialization &&
+        !svConfig?.synchronizer.forceSvRunbookInitialization,
     },
     cometBFT: {
       ...(valuesFromYamlFile.cometBFT || {}),

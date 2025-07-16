@@ -9,11 +9,10 @@ As for documentation, we currently have to refer you to the source code of the
 Daml files defining the relevant Daml interfaces, and the source code of the
 OpenAPI specifications for the off-ledger APIs.
 
-Note that the `splice-api-token-burn-mint` API is not explained in CIP-0056. It was added
-later due to discovering the need for it when considering how to build a bridge
-leveraging an existing token implementation. See the [CHANGELOG](CHANGELOG.md)
-for  a description of that change, and other major and minor changes that were done between
-proposing CIP-0056 and releasing the APIs together with their `Amulet` implementation.
+Note that the fine-tuning of the API definitions happened after proposing
+CIP-0056.  See the [CHANGELOG](CHANGELOG.md) for the changes that were done
+between proposing CIP-0056 and releasing the APIs together with their `Amulet`
+implementation.
 
 
 ## Testing

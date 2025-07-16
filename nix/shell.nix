@@ -6,7 +6,7 @@ let
   damlCompilerSources = builtins.fromJSON (builtins.readFile ./daml-compiler-sources.json);
 
   # No macOS support for firefox
-  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
+  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];
 
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;

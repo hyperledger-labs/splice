@@ -5,10 +5,6 @@ on:
       - 'main'
       - 'release-line-**'
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   id-token: write # Required for GCP Workload Identity for failure notifications
   contents: read

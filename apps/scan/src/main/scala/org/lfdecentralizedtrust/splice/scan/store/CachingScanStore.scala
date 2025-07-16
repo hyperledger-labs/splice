@@ -44,7 +44,7 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
 
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class CachingScanStore(
     override protected val loggerFactory: NamedLoggerFactory,
@@ -155,11 +155,13 @@ class CachingScanStore(
       store.getAmuletConfigForRound,
     ).get(round)
 
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
+  override def lookupRoundOfLatestData()(implicit
+      tc: TraceContext
+  ): Future[Option[(Long, Instant)]] =
     getCache(
       "roundOfLatestData",
       cacheConfig.roundOfLatestData,
-      (_: Unit) => store.getRoundOfLatestData(),
+      (_: Unit) => store.lookupRoundOfLatestData(),
     ).get(())
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
@@ -376,17 +378,26 @@ class CachingScanStore(
       cacheConfig: CacheConfig,
       loader: Key => Future[Value],
   )(implicit tc: TraceContext) = {
-    val cacheMetrics = storeMetrics.registerNewCacheMetrics(cacheName)
     cacheOfCaches
       .getOrElseUpdate(
         cacheName,
-        ScaffeineCache.buildTracedAsync[Future, Key, Value](
-          Scaffeine()
-            .expireAfterWrite(cacheConfig.ttl.asFiniteApproximation)
-            .maximumSize(cacheConfig.maxSize),
-          _ => key => loader(key),
-          metrics = cacheMetrics.map(Some(_)).onShutdown(None),
-        )(logger, cacheName),
+        blocking {
+          synchronized {
+            // the function to provide the value if the key is not present can in theory be called multiple times by concurrent threads.
+            // that would cause the same gauges to be created multiple times
+            cacheOfCaches.getOrElseUpdate(
+              cacheName,
+              ScaffeineCache.buildTracedAsync[Future, Key, Value](
+                Scaffeine()
+                  .expireAfterWrite(cacheConfig.ttl.asFiniteApproximation)
+                  .maximumSize(cacheConfig.maxSize),
+                _ => key => loader(key),
+                metrics =
+                  storeMetrics.registerNewCacheMetrics(cacheName).map(Some(_)).onShutdown(None),
+              )(logger, cacheName),
+            )
+          }
+        },
       )
       .asInstanceOf[ScaffeineCache.TracedAsyncLoadingCache[Future, Key, Value]]
   }

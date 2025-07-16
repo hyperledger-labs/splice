@@ -95,7 +95,7 @@ object MetricsDocs {
     // scan
     new DbScanStoreMetrics(
       generator,
-      NamedLoggerFactory.root.getTracedLogger(getClass),
+      NamedLoggerFactory.root,
       ProcessingTimeout(),
     )
     val scanMetrics = generator.getAll()

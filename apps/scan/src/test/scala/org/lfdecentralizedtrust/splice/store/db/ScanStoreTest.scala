@@ -2354,7 +2354,7 @@ class DbScanStoreTest
       ),
       participantId = mkParticipantId("ScanStoreTest"),
       enableImportUpdateBackfill = true,
-      new DbScanStoreMetrics(new NoOpMetricsFactory(), logger, timeouts),
+      new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

@@ -18,6 +18,11 @@ an upgrade of the docker-compose file or a ``helm upgrade`` for a
 kubernetes deployment. Make sure to read the :ref:`release_notes` to learn
 about changes you may need to make as part of the upgrade.
 
+Note that for docker-compose you must update the full bundle including
+the docker compose file and the start.sh script and adjust
+``IMAGE_TAG``. Only updating ``IMAGE_TAG`` is insufficient as the old
+docker compose files might be incompatible with the new version.
+
 Major upgrades currently require a more complex :ref:`procedure <validator-upgrades>`
 with network-wide coordination and downtime.
 

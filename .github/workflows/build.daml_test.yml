@@ -22,6 +22,8 @@ jobs:
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: skip
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup
         if: steps.skip.outputs.skip != 'true'

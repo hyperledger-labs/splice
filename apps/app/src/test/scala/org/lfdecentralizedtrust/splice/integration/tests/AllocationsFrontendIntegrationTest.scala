@@ -23,15 +23,20 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.time.{Instant, LocalDateTime, ZoneOffset}
+import java.time.{LocalDateTime, ZoneOffset}
 import java.util.Optional
+import scala.util.Random
+import scala.jdk.CollectionConverters.*
 
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class AllocationsFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice")
     with WalletTestUtil
     with WalletFrontendTestUtil
-    with FrontendLoginUtil {
+    with FrontendLoginUtil
+    with TokenStandardTest {
 
   private val amuletPrice = 2
   override def walletAmuletPrice = SpliceUtil.damlDecimal(amuletPrice.toDouble)
@@ -39,6 +44,16 @@ class AllocationsFrontendIntegrationTest
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAmuletPrice(amuletPrice)
+      .withAdditionalSetup(implicit env => {
+        Seq(
+          sv1ValidatorBackend,
+          aliceValidatorBackend,
+          bobValidatorBackend,
+          splitwellValidatorBackend,
+        ).foreach { backend =>
+          backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
+        }
+      })
 
   private def createAllocation(sender: PartyId)(implicit
       ev: SpliceTestConsoleEnvironment,
@@ -48,13 +63,13 @@ class AllocationsFrontendIntegrationTest
     val receiver = validatorPartyId
     val now = LocalDateTime
       .now()
-      // FE only supports minute precision, so we truncate
-      .truncatedTo(ChronoUnit.MINUTES)
+      .truncatedTo(ChronoUnit.MICROS)
       .toInstant(ZoneOffset.UTC)
+    val requestedAt = now.minusSeconds(1800)
     val allocateBefore = now.plusSeconds(3600)
     val settleBefore = now.plusSeconds(3600 * 2)
 
-    def wantedAllocation(requestedAt: Instant) = new AllocationSpecification(
+    val wantedAllocation = new AllocationSpecification(
       new SettlementInfo(
         validatorPartyId.toProtoPrimitive,
         new SettlementReference("some_reference", Optional.empty),
@@ -72,26 +87,15 @@ class AllocationsFrontendIntegrationTest
         new Metadata(java.util.Map.of("k3", "v3")),
       ),
     )
-    // use the data here to create, but ignore the requestedAt field
-    val create = wantedAllocation(Instant.now())
 
-    actAndCheck(
-      "go to allocations page", {
-        click on "navlink-allocations"
-      },
-    )(
-      "allocations page is shown",
-      _ => {
-        currentUrl should endWith("/allocations")
-      },
-    )
+    browseToAllocationsPage()
 
     actAndCheck(
       "create allocation", {
         textField("create-allocation-transfer-leg-id").underlying
-          .sendKeys(create.transferLegId)
+          .sendKeys(wantedAllocation.transferLegId)
         textField("create-allocation-settlement-ref-id").underlying
-          .sendKeys(create.settlement.settlementRef.id)
+          .sendKeys(wantedAllocation.settlement.settlementRef.id)
         click on "create-allocation-transfer-leg-receiver"
         setAnsField(
           textField("create-allocation-transfer-leg-receiver"),
@@ -107,22 +111,32 @@ class AllocationsFrontendIntegrationTest
         click on "create-allocation-amulet-amount"
         numberField("create-allocation-amulet-amount").value = ""
         numberField("create-allocation-amulet-amount").underlying.sendKeys(
-          create.transferLeg.amount.toString
+          wantedAllocation.transferLeg.amount.toString
         )
 
-        setDateTime(
-          "alice",
-          "create-allocation-settlement-settle-before",
-          create.settlement.settleBefore,
-        )
-        setDateTime(
-          "alice",
-          "create-allocation-settlement-allocate-before",
-          create.settlement.allocateBefore,
-        )
+        val allocationTimestampFormat =
+          DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+        textField("create-allocation-settlement-requested-at").underlying
+          .sendKeys(
+            allocationTimestampFormat.format(
+              wantedAllocation.settlement.requestedAt.atOffset(ZoneOffset.UTC)
+            )
+          )
+        textField("create-allocation-settlement-settle-before").underlying
+          .sendKeys(
+            allocationTimestampFormat.format(
+              wantedAllocation.settlement.settleBefore.atOffset(ZoneOffset.UTC)
+            )
+          )
+        textField("create-allocation-settlement-allocate-before").underlying
+          .sendKeys(
+            allocationTimestampFormat.format(
+              wantedAllocation.settlement.allocateBefore.atOffset(ZoneOffset.UTC)
+            )
+          )
 
-        setMeta(create.settlement.meta, "settlement")
-        setMeta(create.transferLeg.meta, "transfer-leg")
+        setMeta(wantedAllocation.settlement.meta, "settlement")
+        setMeta(wantedAllocation.transferLeg.meta, "transfer-leg")
 
         click on "create-allocation-submit-button"
       },
@@ -146,7 +160,7 @@ class AllocationsFrontendIntegrationTest
           .payload
           .allocation
 
-        specification should be(wantedAllocation(specification.settlement.requestedAt))
+        specification should be(wantedAllocation)
       },
     )
   }
@@ -163,7 +177,105 @@ class AllocationsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    "create a token standard allocation" in { implicit env =>
+    "see and accept allocation requests" in { implicit env =>
+      val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceTransferAmount = BigDecimal(5)
+
+      val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      val bobTransferAmount = BigDecimal(6)
+
+      val venuePartyHint = s"venue-party-${Random.nextInt()}"
+      val venueParty = splitwellValidatorBackend.onboardUser(
+        splitwellWalletClient.config.ledgerApiUser,
+        Some(
+          PartyId.tryFromProtoPrimitive(
+            s"$venuePartyHint::${splitwellValidatorBackend.participantClient.id.namespace.toProtoPrimitive}"
+          )
+        ),
+      )
+
+      aliceWalletClient.tap(1000)
+      bobWalletClient.tap(1000)
+
+      val otcTrade = createAllocationRequestViaOTCTrade(
+        aliceParty,
+        aliceTransferAmount,
+        bobParty,
+        bobTransferAmount,
+        venueParty,
+      )
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        browseToAllocationsPage()
+
+        clue("check that the allocation request is shown") {
+          eventually() {
+            val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
+
+            seleniumText(
+              allocationRequest.childElement(className("allocation-request-id"))
+            ) should be(
+              // hardcoded in daml
+              "SettlementRef id: OTCTradeProposal"
+            )
+            seleniumText(
+              allocationRequest.childElement(className("allocation-request-cid"))
+            ) should be(s"SettlementRef cid: ${otcTrade.trade.data.tradeCid.contractId}")
+            seleniumText(
+              allocationRequest.childElement(className("allocation-executor"))
+            ) should matchText(venueParty.toProtoPrimitive)
+
+            val rows =
+              allocationRequest.findAllChildElements(className("allocation-request-row")).toSeq
+            rows.zip(otcTrade.trade.data.transferLegs.asScala.toSeq.sortBy(_._1)).foreach {
+              case (row, (legId, transferLeg)) =>
+                seleniumText(
+                  row.childElement(className("allocation-legid"))
+                ) should matchText(legId)
+                seleniumText(
+                  row.childElement(className("allocation-amount-instrument"))
+                ) should matchText(
+                  s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
+                )
+                seleniumText(
+                  row.childElement(className("allocation-sender"))
+                ) should matchText(transferLeg.sender)
+                seleniumText(
+                  row.childElement(className("allocation-receiver"))
+                ) should matchText(transferLeg.receiver)
+            }
+          }
+        }
+
+        clue("sanity check: alice has no allocations yet") {
+          aliceWalletClient.listAmuletAllocations() shouldBe empty
+        }
+
+        actAndCheck(
+          "click on accepting the allocation request", {
+            val aliceTransferLeg @ (aliceTransferLegId, _) =
+              otcTrade.aliceRequest.transferLegs.asScala
+                .find(_._2.sender == aliceParty.toProtoPrimitive)
+                .valueOrFail("Couldn't find alice's transfer leg")
+            click on s"transfer-leg-${otcTrade.trade.id.contractId}-$aliceTransferLegId-accept"
+            aliceTransferLeg
+          },
+        )(
+          "the allocation is shown",
+          { case (aliceTransferLegId, aliceTransferLeg) =>
+            // TODO (#1106): check the allocation is in the FE as opposed to checking the BE
+            val allocation = aliceWalletClient.listAmuletAllocations().loneElement
+            allocation.payload.allocation.settlement should be(otcTrade.aliceRequest.settlement)
+            allocation.payload.allocation.transferLegId should be(aliceTransferLegId)
+            allocation.payload.allocation.transferLeg should be(aliceTransferLeg)
+          },
+        )
+      }
+    }
+
+    "create a token standard allocation manually" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(1000)
@@ -175,5 +287,18 @@ class AllocationsFrontendIntegrationTest
       }
     }
 
+  }
+
+  private def browseToAllocationsPage()(implicit driver: WebDriverType) = {
+    actAndCheck(
+      "go to allocations page", {
+        click on "navlink-allocations"
+      },
+    )(
+      "allocations page is shown",
+      _ => {
+        currentUrl should endWith("/allocations")
+      },
+    )
   }
 }

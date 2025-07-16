@@ -115,7 +115,8 @@ class DomainConnector(
     logger.info(s"Ensuring domain $alias registered with config $domainConfig")
     participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
-      RetryFor.WaitingOnInitDependency,
+      overwriteExistingConnection = true,
+      retryFor = RetryFor.WaitingOnInitDependency,
     )
   }
 
