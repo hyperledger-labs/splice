@@ -367,8 +367,9 @@ class BootstrapPackageConfigIntegrationTest
       val newAmuletVettedPackage = vettingState.packages
         .find(_.packageId == expectedVettedVersion.packageId)
         .value
-      newAmuletVettedPackage.validFrom shouldBe oneElementOf(
-        Seq(scheduledTimeO) ++ alternativeScheduledTimes.map(Some(_))
+
+      newAmuletVettedPackage.validFrom should be(
+        equal(scheduledTimeO) or contain atLeastOneElementOf alternativeScheduledTimes
       )
     }
   }
