@@ -1,3 +1,5 @@
+// Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
 import * as fs from 'fs';
 import * as semver from 'semver';
 import { SPLICE_ROOT } from 'splice-pulumi-common';
