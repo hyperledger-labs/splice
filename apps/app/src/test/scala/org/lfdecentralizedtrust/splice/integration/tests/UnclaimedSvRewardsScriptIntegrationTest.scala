@@ -18,7 +18,10 @@ import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.sv.automation.confirmation.ArchiveClosedMiningRoundsTrigger
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExpireRewardCouponsTrigger
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
@@ -51,6 +54,8 @@ class UnclaimedSvRewardsScriptIntegrationTest
 
   "unclaimed_sv_rewards.py summarizes claimed, expired, and unclaimed minting rewards for a given beneficiary" in {
     implicit env =>
+      def expireIssuingMiningRoundTrigger = sv1Backend.dsoDelegateBasedAutomation
+        .trigger[ExpireIssuingMiningRoundTrigger]
       def expireRewardCouponsTrigger = sv1Backend.dsoDelegateBasedAutomation
         .trigger[ExpireRewardCouponsTrigger]
       def receiveSvRewardCouponTrigger = sv1Backend.dsoAutomation
@@ -74,19 +79,22 @@ class UnclaimedSvRewardsScriptIntegrationTest
         expireRewardCouponsTrigger.pause().futureValue
       }
 
-      actAndCheck(
-        "Advance some rounds", {
-          Range(0, 4).foreach(_ => advanceRoundsByOneTickViaAutomation())
-          // Pause sv rewards generation
-          receiveSvRewardCouponTrigger.pause().futureValue
-        },
+      clue("SV reward coupons for round 0,1,2 have been created") {
+        sv1WalletClient.listSvRewardCoupons() should have size 3
+      }
+
+      val (_, svRewardCoupons) = actAndCheck(
+        "Advance to round 5",
+        Range(0, 3).foreach(_ => advanceRoundsByOneTickViaAutomation()),
       )(
-        "Sv reward coupons get created",
+        "All reward coupons got created",
         _ => {
-          sv1WalletClient.listSvRewardCoupons() should have size svRewardCouponsCount
+          val svRewardCoupons = sv1WalletClient.listSvRewardCoupons()
+          svRewardCoupons should have size (svRewardCouponsCount)
+          svRewardCoupons
         },
       )
-      val svRewardCoupons = sv1WalletClient.listSvRewardCoupons()
+      receiveSvRewardCouponTrigger.pause().futureValue
 
       // Expire
       ///////////
@@ -96,7 +104,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
           expireRewardCouponsTrigger.resume()
         },
       )(
-        "Some coupons get expired",
+        "Coupons for round 0,1,2 get expired",
         _ => {
           sv1WalletClient
             .listSvRewardCoupons() should have size (svRewardCouponsCount - svRewardCouponsExpiredCount)
@@ -110,20 +118,21 @@ class UnclaimedSvRewardsScriptIntegrationTest
       // Claim
       //////////
 
-      actAndCheck(
-        "Resume collect rewards trigger", {
-          sv1CollectRewardsAndMergeAmuletsTrigger.resume()
-        },
-      )(
-        "Some coupons get claimed",
-        _ => {
-          sv1WalletClient
-            .listSvRewardCoupons() should have size
-            (svRewardCouponsCount - svRewardCouponsExpiredCount - svRewardCouponsClaimedCount)
-          // Pause trigger once we have some coupons claimed
-          sv1CollectRewardsAndMergeAmuletsTrigger.pause().futureValue
-        },
-      )
+      setTriggersWithin(
+        triggersToPauseAtStart = Seq(expireIssuingMiningRoundTrigger),
+        triggersToResumeAtStart = Seq(sv1CollectRewardsAndMergeAmuletsTrigger),
+      ) {
+        actAndCheck(
+          "Advance round to allow claiming one sv reward coupon",
+          advanceRoundsByOneTickViaAutomation(),
+        )(
+          "Coupon for round 3 gets claimed",
+          _ =>
+            sv1WalletClient
+              .listSvRewardCoupons() should have size
+              (svRewardCouponsCount - svRewardCouponsExpiredCount - svRewardCouponsClaimedCount),
+        )
+      }
       val svRewardCouponsAfterClaiming = sv1WalletClient.listSvRewardCoupons()
       val svRewardCouponsClaimed = svRewardCouponsAfterExpiry.diff(svRewardCouponsAfterClaiming)
 
@@ -131,10 +140,10 @@ class UnclaimedSvRewardsScriptIntegrationTest
       //////////////////////////////////
 
       clue(
-        "Advance some rounds to have the close the rounds where the coupons have been expired or claimed"
+        "Advance so all rounds up to 5 are closed"
       ) {
         // Note: ArchiveClosedMiningRoundsTrigger is paused for this test
-        Range(0, 4).foreach(_ => advanceRoundsByOneTickViaAutomation())
+        Range(0, 2).foreach(_ => advanceRoundsByOneTickViaAutomation())
       }
 
       // Calculate totals
