@@ -39,7 +39,9 @@ Upcoming
     SV app so the rest of your SV node can continue functioning. The
     liveness probe of the sequencer will fail during the migration so
     make sure to temporarily bump ``livenessProbeInitialDelaySeconds``
-    and reduce it back to the default after the migration is complete.
+    and reduce it back to the default after the migration is
+    complete. Otherwise the liveness probe will kill the sequencer and
+    the migration will never complete.
 
 - Participant
 
