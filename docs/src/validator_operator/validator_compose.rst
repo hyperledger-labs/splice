@@ -103,6 +103,7 @@ Deployment
 
   ``<party_hint>`` will be used as the prefix of the Party ID of your validator's administrator.
      This must be of format `<organization>-<function>-<enumerator>`, e.g. `myCompany-myWallet-1`.
+     It cannot be changed over time as it is part of the node party ID.
 
 Note that the validator may be stopped with the command ``./stop.sh`` and restarted again with the same ``start.sh``
 command as above. Its data will be retained between invocations. In subseqent invocations, the secret itself may be
@@ -171,6 +172,7 @@ LEDGER_API_ADMIN_USER         Should match the `sub` field of JWTs issued for th
 WALLET_ADMIN_USER             The user ID of the user which should login as the wallet administrator. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``.
 WALLET_UI_CLIENT_ID           The client id of the OAuth app for the wallet UI.
 ANS_UI_CLIENT_ID              The client id of the OAuth app for the CNS UI.
+CONTACT_POINT                 The contact point for your validator node that can be used by other node operators to reach out to you if needed (slack username or an email address).
 ============================= ===========================================================================
 
 In order to enable auth in the deployment, add the `-a` flag to the `start.sh`
