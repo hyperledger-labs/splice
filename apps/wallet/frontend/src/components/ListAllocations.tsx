@@ -4,7 +4,7 @@ import React from 'react';
 import { useAmuletAllocations } from '../hooks/useAmuletAllocations';
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import Typography from '@mui/material/Typography';
-import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
+import { Card, CardContent, Chip, Stack } from '@mui/material';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 import TransferLegsDisplay from './TransferLegsDisplay';
@@ -69,12 +69,12 @@ const AllocationDisplay: React.FC<{ allocation: Contract<AmuletAllocation> }> = 
 
 // TODO (#1503): implement
 const WithdrawAllocationButton: React.FC = () => {
-  // return null;
-  return (
-    <Button variant="pill" size="small" className="allocation-withdraw">
-      Withdraw
-    </Button>
-  );
+  return null;
+  // return (
+  //   <Button variant="pill" size="small" className="allocation-withdraw">
+  //     Withdraw
+  //   </Button>
+  // );
 };
 
 export default ListAllocations;

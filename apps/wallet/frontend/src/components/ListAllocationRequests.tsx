@@ -138,13 +138,12 @@ const AllocationRequestActionButton: React.FC<{
 
   if (!actionAllowed) return null;
   // TODO (#1413): show the withdraw button and implement the callback, instead of showing nothing
-  if (alreadyAccepted)
-    //return null;
-    return (
-      <Button variant="pill" size="small" className="allocation-request-withdraw">
-        Withdraw
-      </Button>
-    );
+  if (alreadyAccepted) return null;
+  // return (
+  //   <Button variant="pill" size="small" className="allocation-request-withdraw">
+  //     Withdraw
+  //   </Button>
+  // );
   else
     return (
       <DisableConditionally
