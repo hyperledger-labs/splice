@@ -72,6 +72,7 @@ Console.out.println(
   s"Using Github CLI (`hub`) to fetch open issues assuming that an appropriate access token is provided in GITHUB_TOKEN. Please call `hub` manually to check your setup in case the process is stuck."
 )
 
+
 // Determine open issues
 val fixedIssuesCurrentPR: Set[Int] = {
   prNumO.fold(Set.empty[Int])({ prNum =>
