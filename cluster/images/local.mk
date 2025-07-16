@@ -128,12 +128,11 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
 
-%/$(docker-copy-release-to-ghcr):  %/$(docker-image-tag) %/$(docker-build)
-	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))
-
-%/$(docker-scan):  %/$(docker-image-tag) %/$(docker-build)
+%/$(docker-scan):  %/$(docker-image-tag)
 	cd $(@D) && docker-scan $$(cat $(abspath $<))
 
+%/$(docker-copy-release-to-ghcr):  %/$(docker-image-tag) %/$(docker-build)
+	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))
 
 #########
 # Global targets

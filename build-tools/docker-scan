@@ -5,7 +5,7 @@ set -euo pipefail
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
-image="$(<target/local-image-tag)"
+image="$(<target/image-tag)"
 
 bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --blackduck.url=https://digitalasset.blackducksoftware.com/ \
