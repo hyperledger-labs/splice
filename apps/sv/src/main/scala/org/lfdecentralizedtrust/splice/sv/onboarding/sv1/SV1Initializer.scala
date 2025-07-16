@@ -250,7 +250,10 @@ class SV1Initializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        Some(localSynchronizerNode),
       )
       (_, decentralizedSynchronizer) <- (
         SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),

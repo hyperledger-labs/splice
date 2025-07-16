@@ -10,14 +10,19 @@ import org.lfdecentralizedtrust.splice.automation.{
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
 }
-import org.lfdecentralizedtrust.splice.environment.{RetryProvider, SpliceLedgerClient}
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  RetryProvider,
+  SpliceLedgerClient,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.sv.store.SvSvStore
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -31,8 +36,11 @@ class SvSvAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
+    dsoStore: SvDsoStore,
     storage: Storage,
     ledgerClient: SpliceLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -61,6 +69,21 @@ class SvSvAutomationService(
       triggerContext,
     )
   )
+
+  config.identitiesDump.foreach { backupConfig =>
+    registerTrigger(
+      new BackupNodeIdentitiesTrigger(
+        config.domains.global.alias,
+        dsoStore,
+        backupConfig,
+        participantAdminConnection,
+        localSynchronizerNode.getOrElse(
+          sys.error("Cannot dump identities with no localSynchronizerNode")
+        ),
+        triggerContext,
+      )
+    )
+  }
 }
 
 object SvSvAutomationService extends AutomationServiceCompanion {
