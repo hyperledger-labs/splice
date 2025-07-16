@@ -21,7 +21,7 @@ import {
   DisableConditionally,
   Loading,
 } from '@lfdecentralizedtrust/splice-common-frontend';
-import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { usePrimaryParty } from '../hooks';
 import dayjs from 'dayjs';
