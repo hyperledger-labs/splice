@@ -25,8 +25,7 @@ jobs:
         with:
           test_name: static_tests
           save_nix_cache: true
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          oss_only: true
 
       - name: Build docs
         uses: ./.github/actions/sbt/execute_sbt_command
