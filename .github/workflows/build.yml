@@ -243,6 +243,20 @@ jobs:
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
+  scala_test_canton_enterprise:
+    uses: ./.github/workflows/build.scala_test.yml
+    if: ${{ ! inputs.oss_only }}
+    with:
+      runs_on: self-hosted-k8s-large
+      test_names_file: 'test-full-class-names-canton-enterprise.log'
+      start_canton_options: -w
+      parallelism: 1
+      test_name: canton-enterprise
+      with_gcp_creds: true
+      commit_sha: ${{ inputs.commit_sha }}
+      daml_base_version: ${{ inputs.daml_base_version }}
+    secrets: inherit
+
   ui_tests:
     uses: ./.github/workflows/build.ui_tests.yml
     secrets: inherit
@@ -292,6 +306,7 @@ jobs:
     - scala_test_docker_compose
     - scala_test_local_net
     - scala_test_app_upgrade
+    - scala_test_canton_enterprise
     - scala_test_without_canton
     - ui_tests
     - ts_cli_tests
