@@ -16,15 +16,4 @@ bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --detect.project.name=DACH-NY_canton-network-internal_images \
   --detect.project.version.name="$image"
 
-
-#bash <(curl -s -L https://detect.synopsys.com/detect8.sh)   \
-#  --blackduck.url=https://digitalasset.blackducksoftware.com/   \
-#  --blackduck.trust.cert=true   \
-#  --blackduck.api.token=$BLACKDUCK_HUBDETECT_TOKEN   \
-#  --detect.project.name=DACH-NY_canton-network-internal_images   \
-#  --detect.tools=DOCKER,SIGNATURE_SCAN   \
-#  --detect.docker.passthrough.cleanup.inspector.container=true    \
-#  --detect.docker.image=wallet-web-ui   \
-#  --detect.project.version.name=0.4.4-itai-dirty    \
-#  --detect.project.version.notes="wallet-web-ui@sha256:83e581666b7f1ed33b2bd22a1ad41ddfd4cfe35674656b09caccedf79ade3a92"   \
-#  --detect.docker.platform.top.layer.id=sha256:b22c35a89de1dd863e6768b69f60c88cc09d3167a047452fafd14fe370d70176
+#TODO(DACH-NY/canton-network-internal#726): run also with `--detect.docker.platform.top.layer.id=sha256:...`, to detect separately vulnerabilities added by us on top of the base image
