@@ -25,9 +25,9 @@ bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --detect.tools.excluded=BINARY_SCAN \
   --detect.project.name=DACH-NY_canton-network-internal_images \
   --detect.project.version.name="$image" \
-  --detect.docker.inspector.inspector.service.port=$((BASE_PORT + (index*3) + 0)) \
-  --detect.docker.inspector.image.inspector.port=$((BASE_PORT + (index*3) + 1)) \
-  --detect.docker.inspector.container.inspector.port=$((BASE_PORT + (index*3) + 2)) \
+  --detect.docker.passthrough.imageinspector.service.port.alpine=$((BASE_PORT + (index*3) + 0)) \
+  --detect.docker.passthrough.imageinspector.service.port.centos=$((BASE_PORT + (index*3) + 1)) \
+  --detect.docker.passthrough.imageinspector.service.port.ubuntu=$((BASE_PORT + (index*3) + 2)) \
   --detect.output.path="${TMP_DIR}/output" \
   --detect.tools.output.path="${TMP_DIR}/tool_output" \
 
