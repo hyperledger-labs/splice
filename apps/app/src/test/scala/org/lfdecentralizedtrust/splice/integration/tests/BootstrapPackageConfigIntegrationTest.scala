@@ -298,8 +298,12 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    val amuletCreateTime =
+    def amuletRulesCreateTimestamp = {
       CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+    }
+
+    val amuletCreateTimeWhenVettingResumed =
+      amuletRulesCreateTimestamp
     sv2PackageVettingTrigger.resume()
     sv2ValidatorPackageVettingTrigger.resume()
 
@@ -311,8 +315,10 @@ class BootstrapPackageConfigIntegrationTest
           Some(
             vettingScheduledTime
           ),
-          Some(
-            amuletCreateTime
+          Seq(
+            amuletCreateTimeWhenVettingResumed,
+            // there's a chance that amulet rules changed after vetting resumed (eg: pruning)
+            amuletRulesCreateTimestamp,
           ),
         )
       }
@@ -336,7 +342,7 @@ class BootstrapPackageConfigIntegrationTest
   private def vettingIsUpdatedForTheNewConfig(
       participantClient: ParticipantClientReference,
       scheduledTimeO: Option[CantonTimestamp],
-      alternativeScheduledTime: Option[CantonTimestamp] = None,
+      alternativeScheduledTimes: Seq[CantonTimestamp] = Seq.empty,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val vettingTopologyState = participantClient.topology.vetted_packages.list(
       store = Some(
@@ -361,9 +367,9 @@ class BootstrapPackageConfigIntegrationTest
       val newAmuletVettedPackage = vettingState.packages
         .find(_.packageId == expectedVettedVersion.packageId)
         .value
-      newAmuletVettedPackage.validFrom should (equal(scheduledTimeO) or equal(
-        alternativeScheduledTime
-      ))
+      newAmuletVettedPackage.validFrom shouldBe oneElementOf(
+        Seq(scheduledTimeO) ++ alternativeScheduledTimes.map(Some(_))
+      )
     }
   }
 
