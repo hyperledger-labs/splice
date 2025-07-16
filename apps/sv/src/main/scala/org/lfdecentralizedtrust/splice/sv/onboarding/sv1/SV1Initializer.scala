@@ -142,13 +142,21 @@ class SV1Initializer(
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
       )
-      _ <- SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
-        cantonIdentifierConfig,
-        localSynchronizerNode,
-        clock,
-        loggerFactory,
-        retryProvider,
-      )
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
+            cantonIdentifierConfig,
+            localSynchronizerNode,
+            clock,
+            loggerFactory,
+            retryProvider,
+          )
+        } else {
+          logger.info(
+            "Skipping synchronizer node initialization because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
       (namespace, synchronizerId) <-
         if (config.skipSynchronizerInitialization) {
           participantAdminConnection.getSynchronizerId(config.domains.global.alias).map { s =>

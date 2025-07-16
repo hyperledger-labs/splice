@@ -53,6 +53,7 @@ class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
           )
           // Check that sequencer connection really doesn't work anymore.
           svWithoutSequencer.sequencerClient.health.status.toString should include("UNAVAILABLE")
+          svWithoutSequencer.startSync()
         }
     }
   }

@@ -279,15 +279,23 @@ class JoiningNodeInitializer(
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
       )
-      _ <- localSynchronizerNode.traverse(lsn =>
-        SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
-          cantonIdentifierConfig,
-          lsn,
-          clock,
-          loggerFactory,
-          retryProvider,
-        )
-      )
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          localSynchronizerNode.traverse(lsn =>
+            SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
+              cantonIdentifierConfig,
+              lsn,
+              clock,
+              loggerFactory,
+              retryProvider,
+            )
+          )
+        } else {
+          logger.info(
+            "Skipping synchronizer node initialization because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
       _ <- onboard(
         decentralizedSynchronizerId,
         dsoAutomation,
