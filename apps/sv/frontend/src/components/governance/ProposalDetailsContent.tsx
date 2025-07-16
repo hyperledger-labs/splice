@@ -104,11 +104,6 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
         </Box>
 
         <Paper sx={{ bgcolor: 'background.paper', p: 6 }}>
-          {/* Proposal Details Section */}
-          {/* <Typography variant="h6" component="h2" gutterBottom sx={{ mb: 3 }}> */}
-          {/*   Proposal Details */}
-          {/* </Typography> */}
-
           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
             <DetailItem
               label="Action"
