@@ -798,13 +798,34 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'acknowledgement_alerts.yaml': readGrafanaAlertingFile('acknowledgement_alerts.yaml'),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
+              // The burst alert is optional to maintain backwards compatibility of the config schema.
+              // If the burst parameters are not defined, the alert will be configured
+              // with a threshold that is quick to evaluate but unlikely to trigger in practice (1GB wasted over 1min).
               .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES',
-                (monitoringConfig.alerting.alerts.trafficWaste.kilobytes * 1024).toString()
+                '$WASTED_TRAFFIC_ALERT_BURST_THRESHOLD_BYTES',
+                (monitoringConfig.alerting.alerts.trafficWaste.burst.kilobytes * 1024).toString()
               )
               .replaceAll(
-                '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
-                monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
+                '$WASTED_TRAFFIC_ALERT_BURST_TIME_RANGE_MINS',
+                monitoringConfig.alerting.alerts.trafficWaste.burst.timeRange
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_SUSTAINED_THRESHOLD_BYTES',
+                (
+                  monitoringConfig.alerting.alerts.trafficWaste.sustained.kilobytes * 1024
+                ).toString()
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_SUSTAINED_SAMPLE_TIME_RANGE',
+                monitoringConfig.alerting.alerts.trafficWaste.sustained.sampleTimeRange
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_SUSTAINED_TIME_RANGE',
+                monitoringConfig.alerting.alerts.trafficWaste.sustained.timeRange
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_SUSTAINED_QUANTILE',
+                monitoringConfig.alerting.alerts.trafficWaste.sustained.quantile.toString()
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
