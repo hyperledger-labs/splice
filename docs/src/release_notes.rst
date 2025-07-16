@@ -36,7 +36,10 @@ Upcoming
   - Fix a sequential scan in a pruning query. This requires a
     long-running sequencer database migration (expected around an hour
     on mainnet). Make sure to set ``domain.skipInitialization`` on the
-    SV app so the rest of your SV node can continue functioning.
+    SV app so the rest of your SV node can continue functioning. The
+    liveness probe of the sequencer will fail during the migration so
+    make sure to temporarily bump ``livenessProbeInitialDelaySeconds``
+    and reduce it back to the default after the migration is complete.
 
 - Participant
 
