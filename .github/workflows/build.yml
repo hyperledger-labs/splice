@@ -252,6 +252,7 @@ jobs:
       with_gcp_creds: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: true
     secrets: inherit
 
   final_result:
