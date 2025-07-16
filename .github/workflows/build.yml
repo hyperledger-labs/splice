@@ -172,7 +172,7 @@ jobs:
       oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
-  scala_test_frontend_wall_clock_time_oss:
+  scala_test_frontend_wall_clock_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
       runs_on: self-hosted-k8s-x-large
@@ -183,7 +183,7 @@ jobs:
       is_frontend_test: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
-      oss_only: true
+      oss_only: ${{ inputs.oss_only }}
     secrets: inherit
 
   scala_test_frontend_simtime:
@@ -287,7 +287,7 @@ jobs:
     - scala_test_disaster_recovery
     - scala_test_with_cometbft
     - scala_test_wall_clock_time
-    - scala_test_frontend_wall_clock_time_oss
+    - scala_test_frontend_wall_clock_time
     - scala_test_frontend_simtime
     - scala_test_docker_compose
     - scala_test_local_net
