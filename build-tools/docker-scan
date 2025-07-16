@@ -10,7 +10,7 @@ image="$(<target/image-tag)"
 # Compute a unique index per image name, to be used for tmp directories and port numbers,
 # as otherwise blackduck is unhappy with parallelism
 # shellcheck disable=SC2012
-index=$(ls .. | "grep -nx $(basename "$(pwd)")" | sed 's/:.*//')
+index=$(ls .. | grep -nx "$(basename "$(pwd)")" | sed 's/:.*//')
 
 BASE_PORT=9000
 TMP_DIR="/tmp/blackduck-docker-scan/${index}"
