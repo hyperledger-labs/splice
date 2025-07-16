@@ -352,3 +352,5 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ env.JOBS }}
+          # Allow skipping the enterprise-only jobs
+          allowed-skips: scala_test_with_cometbft, scala_test_docker_compose, scala_test_local_net, scala_test_canton_enterprise
