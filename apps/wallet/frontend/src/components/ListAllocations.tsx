@@ -43,7 +43,7 @@ const AllocationDisplay: React.FC<{ allocation: Contract<AmuletAllocation> }> = 
 }) => {
   const { settlement, transferLeg, transferLegId } = allocation.payload.allocation;
   return (
-    <Card className="allocation-request" variant="outlined">
+    <Card className="allocation" variant="outlined">
       <CardContent
         sx={{
           display: 'flex',

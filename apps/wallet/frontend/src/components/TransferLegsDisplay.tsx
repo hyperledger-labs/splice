@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 import BftAnsEntry from './BftAnsEntry';
 import { TransferLeg } from '@daml.js/splice-api-token-allocation/lib/Splice/Api/Token/AllocationV1/module';
 import MetaDisplay from './MetaDisplay';
+import BigNumber from 'bignumber.js';
 
 const TransferLegsDisplay: React.FC<{
   parentId: string;
@@ -45,7 +46,7 @@ const TransferLegsDisplay: React.FC<{
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2" className="allocation-amount-instrument">
-                    {amount} {instrumentId.id}
+                    {BigNumber(amount).toFormat()} {instrumentId.id}
                   </Typography>
                 </TableCell>
                 <TableCell>

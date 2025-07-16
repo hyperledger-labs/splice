@@ -3,7 +3,6 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.admin.api.client.data.TemplateId
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
@@ -16,6 +15,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.holdingv1.I
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.Metadata
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
   FrontendLoginUtil,
@@ -215,38 +215,9 @@ class AllocationsFrontendIntegrationTest
           eventually() {
             val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
 
-            seleniumText(
-              allocationRequest.childElement(className("allocation-request-id"))
-            ) should be(
-              // hardcoded in daml
-              "SettlementRef id: OTCTradeProposal"
-            )
-            seleniumText(
-              allocationRequest.childElement(className("allocation-request-cid"))
-            ) should be(s"SettlementRef cid: ${otcTrade.trade.data.tradeCid.contractId}")
-            seleniumText(
-              allocationRequest.childElement(className("allocation-executor"))
-            ) should matchText(venueParty.toProtoPrimitive)
+            checkSettlementInfo(allocationRequest, otcTrade, venueParty)
 
-            val rows =
-              allocationRequest.findAllChildElements(className("allocation-request-row")).toSeq
-            rows.zip(otcTrade.trade.data.transferLegs.asScala.toSeq.sortBy(_._1)).foreach {
-              case (row, (legId, transferLeg)) =>
-                seleniumText(
-                  row.childElement(className("allocation-legid"))
-                ) should matchText(legId)
-                seleniumText(
-                  row.childElement(className("allocation-amount-instrument"))
-                ) should matchText(
-                  s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
-                )
-                seleniumText(
-                  row.childElement(className("allocation-sender"))
-                ) should matchText(transferLeg.sender)
-                seleniumText(
-                  row.childElement(className("allocation-receiver"))
-                ) should matchText(transferLeg.receiver)
-            }
+            checkTransferLegs(allocationRequest, otcTrade)
           }
         }
 
@@ -256,25 +227,22 @@ class AllocationsFrontendIntegrationTest
 
         actAndCheck(
           "click on accepting the allocation request", {
-            val aliceTransferLeg @ (aliceTransferLegId, _) =
+            val (aliceTransferLegId, _) =
               otcTrade.aliceRequest.transferLegs.asScala
                 .find(_._2.sender == aliceParty.toProtoPrimitive)
                 .valueOrFail("Couldn't find alice's transfer leg")
             click on s"transfer-leg-${otcTrade.trade.id.contractId}-$aliceTransferLegId-accept"
-            aliceTransferLeg
           },
         )(
           "the allocation is shown",
-          { case (aliceTransferLegId, aliceTransferLeg) =>
-            // TODO (#1106): check the allocation is in the FE as opposed to checking the BE
-            val allocation = aliceWalletClient.listAmuletAllocations().loneElement
-            allocation.payload.allocation.settlement should be(otcTrade.aliceRequest.settlement)
-            allocation.payload.allocation.transferLegId should be(aliceTransferLegId)
-            allocation.payload.allocation.transferLeg should be(aliceTransferLeg)
+          { _ =>
+            val allocation = findAll(className("allocation")).toSeq.loneElement
+
+            checkSettlementInfo(allocation, otcTrade, venueParty)
+
+            checkTransferLegs(allocation, otcTrade)
           },
         )
-
-        Threading.sleep(600_000L)
       }
     }
 
@@ -303,5 +271,49 @@ class AllocationsFrontendIntegrationTest
         currentUrl should endWith("/allocations")
       },
     )
+  }
+
+  private def checkSettlementInfo(
+      parent: Element,
+      otcTrade: CreateAllocationRequestResult,
+      venueParty: PartyId,
+  ) = {
+    seleniumText(
+      parent.childElement(className("settlement-id"))
+    ) should be(
+      // hardcoded in daml
+      "SettlementRef id: OTCTradeProposal"
+    )
+    seleniumText(
+      parent.childElement(className("settlement-cid"))
+    ) should be(s"SettlementRef cid: ${otcTrade.trade.data.tradeCid.contractId}")
+    seleniumText(
+      parent.childElement(className("settlement-executor"))
+    ) should matchText(venueParty.toProtoPrimitive)
+  }
+
+  private def checkTransferLegs(
+      parent: Element,
+      otcTrade: CreateAllocationRequestResult,
+  ) = {
+    val rows =
+      parent.findAllChildElements(className("allocation-row")).toSeq
+    rows.zip(otcTrade.trade.data.transferLegs.asScala.toSeq.sortBy(_._1)).foreach {
+      case (row, (legId, transferLeg)) =>
+        seleniumText(
+          row.childElement(className("allocation-legid"))
+        ) should matchText(legId)
+        seleniumText(
+          row.childElement(className("allocation-amount-instrument"))
+        ) should matchText(
+          s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
+        )
+        seleniumText(
+          row.childElement(className("allocation-sender"))
+        ) should matchText(transferLeg.sender)
+        seleniumText(
+          row.childElement(className("allocation-receiver"))
+        ) should matchText(transferLeg.receiver)
+    }
   }
 }

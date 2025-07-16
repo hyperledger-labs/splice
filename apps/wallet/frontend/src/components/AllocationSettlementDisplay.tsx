@@ -26,14 +26,14 @@ const AllocationSettlementDisplay: React.FC<{
         <Stack width="100%">
           {settlementRef.id ? (
             <Stack maxWidth="md">
-              <Typography className="allocation-request-id" variant="body2" noWrap>
+              <Typography className="settlement-id" variant="body2" noWrap>
                 SettlementRef id: {settlementRef.id}
               </Typography>
             </Stack>
           ) : null}
           {settlementRef.cid ? (
             <Stack maxWidth="md">
-              <Typography className="allocation-request-cid" variant="body2" noWrap>
+              <Typography className="settlement-cid" variant="body2" noWrap>
                 SettlementRef cid: {settlementRef.cid}
               </Typography>
             </Stack>
@@ -47,7 +47,7 @@ const AllocationSettlementDisplay: React.FC<{
       <Stack direction="row" spacing={2}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="body2">Executor:</Typography>
-          <BftAnsEntry partyId={executor} className="allocation-executor" />
+          <BftAnsEntry partyId={executor} className="settlement-executor" />
         </Stack>
         <Stack>
           <Typography variant="body2">
