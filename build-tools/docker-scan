@@ -7,6 +7,16 @@ source "${script_dir}/lib/libcli.source"
 
 image="$(<target/image-tag)"
 
+# Compute a unique index per image name, to be used for tmp directories and port numbers,
+# as otherwise blackduck is unhappy with parallelism
+# shellcheck disable=SC2012
+index=$(ls .. | "grep -nx $(basename "$(pwd)")" | sed 's/:.*//')
+
+BASE_PORT=9000
+TMP_DIR="/tmp/blackduck-docker-scan/${index}"
+mkdir -p "${TMP_DIR}"
+export DETECT_JAR_DOWNLOAD_DIR="${TMP_DIR}/detect_jars"
+
 bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --blackduck.url=https://digitalasset.blackducksoftware.com/ \
   --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
@@ -14,6 +24,11 @@ bash <(curl -s https://detect.blackduck.com/detect10.sh) \
   --detect.tools=DOCKER,SIGNATURE_SCAN \
   --detect.tools.excluded=BINARY_SCAN \
   --detect.project.name=DACH-NY_canton-network-internal_images \
-  --detect.project.version.name="$image"
+  --detect.project.version.name="$image" \
+  --detect.docker.inspector.inspector.service.port=$((BASE_PORT + (index*3) + 0)) \
+  --detect.docker.inspector.image.inspector.port=$((BASE_PORT + (index*3) + 1)) \
+  --detect.docker.inspector.container.inspector.port=$((BASE_PORT + (index*3) + 2)) \
+  --detect.output.path="${UNIQUE_DIR}/output" \
+  --detect.tools.output.path="${UNIQUE_DIR}/tool_output" \
 
 #TODO(DACH-NY/canton-network-internal#726): run also with `--detect.docker.platform.top.layer.id=sha256:...`, to detect separately vulnerabilities added by us on top of the base image
