@@ -62,7 +62,7 @@ object BuildCommon {
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
     libraryDependencies ++= Seq(
       scalatest % Test
-    ),
+    )
   ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
