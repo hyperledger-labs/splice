@@ -3,8 +3,6 @@
 import { KmsConfigSchema, LogLevelSchema } from 'splice-pulumi-common';
 import { z } from 'zod';
 
-console.error(KmsConfigSchema);
-
 export const ValidatorNodeConfigSchema = z.object({
   logging: z
     .object({
