@@ -13,6 +13,11 @@ import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-fronte
 import BftAnsField from './BftAnsField';
 import AmountInput from './AmountInput';
 import { Add, Remove } from '@mui/icons-material';
+import {
+  DAML_TIMESTAMP_FORMAT,
+  damlTimestampToOpenApiTimestamp,
+  isValidDamlTimestamp,
+} from '../utils/timestampConversion';
 
 const CreateAllocation: React.FC = () => {
   const { createAllocation } = useWalletClient();
@@ -132,12 +137,12 @@ const CreateAllocation: React.FC = () => {
             Furthermore, the timestamps need to match that of an original allocation request,
             so they will either be copy-pasted or (in the near future) auto-filled.
             Therefore, a TextField where we validate the timestamp is correctly formatted makes more sense.*/}
-            <Typography variant="h6">Requested at ({ALLOCATION_TIMESTAMP_FORMAT})</Typography>
+            <Typography variant="h6">Requested at ({DAML_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-requested-at"
-              placeholder={ALLOCATION_TIMESTAMP_FORMAT}
+              placeholder={DAML_TIMESTAMP_FORMAT}
               value={allocation.settlement.requested_at || ''}
-              error={!isValidAllocationTimestamp(allocation.settlement.requested_at)}
+              error={!isValidDamlTimestamp(allocation.settlement.requested_at)}
               onChange={event =>
                 setAllocation({
                   ...allocation,
@@ -145,12 +150,12 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Settle before ({ALLOCATION_TIMESTAMP_FORMAT})</Typography>
+            <Typography variant="h6">Settle before ({DAML_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-settle-before"
-              placeholder={ALLOCATION_TIMESTAMP_FORMAT}
+              placeholder={DAML_TIMESTAMP_FORMAT}
               value={allocation.settlement.settle_before || ''}
-              error={!isValidAllocationTimestamp(allocation.settlement.settle_before)}
+              error={!isValidDamlTimestamp(allocation.settlement.settle_before)}
               onChange={event =>
                 setAllocation({
                   ...allocation,
@@ -158,12 +163,12 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Allocate before ({ALLOCATION_TIMESTAMP_FORMAT})</Typography>
+            <Typography variant="h6">Allocate before ({DAML_TIMESTAMP_FORMAT})</Typography>
             <TextField
               id="create-allocation-settlement-allocate-before"
-              placeholder={ALLOCATION_TIMESTAMP_FORMAT}
+              placeholder={DAML_TIMESTAMP_FORMAT}
               value={allocation.settlement.allocate_before || ''}
-              error={!isValidAllocationTimestamp(allocation.settlement.allocate_before)}
+              error={!isValidDamlTimestamp(allocation.settlement.allocate_before)}
               onChange={event =>
                 setAllocation({
                   ...allocation,
@@ -227,7 +232,7 @@ interface PartialAllocateAmuletRequest {
     executor: string;
     settlement_ref: AllocateAmuletRequestSettlementSettlementRef;
     // dates as strings as opposed to numbers, they're converted once pressing Send.
-    // the user will type (likely copy-paste, or auto-fill) a string with ALLOCATION_TIMESTAMP_FORMAT
+    // the user will type (likely copy-paste, or auto-fill) a string with DAML_TIMESTAMP_FORMAT
     requested_at: string;
     allocate_before: string;
     settle_before: string;
@@ -270,7 +275,7 @@ function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletReq
       partial.settlement.allocate_before,
       partial.settlement.settle_before,
       partial.settlement.allocate_before,
-    ].every(isValidAllocationTimestamp)
+    ].every(isValidDamlTimestamp)
   ) {
     return null;
   }
@@ -278,9 +283,9 @@ function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletReq
     settlement: {
       executor: partial.settlement.executor,
       meta: partial.settlement.meta,
-      requested_at: getAllocationTimestamp(partial.settlement.requested_at),
-      allocate_before: getAllocationTimestamp(partial.settlement.allocate_before),
-      settle_before: getAllocationTimestamp(partial.settlement.settle_before),
+      requested_at: damlTimestampToOpenApiTimestamp(partial.settlement.requested_at),
+      allocate_before: damlTimestampToOpenApiTimestamp(partial.settlement.allocate_before),
+      settle_before: damlTimestampToOpenApiTimestamp(partial.settlement.settle_before),
       settlement_ref: {
         id: partial.settlement.settlement_ref.id,
         cid: partial.settlement.settlement_ref.cid,
@@ -293,24 +298,6 @@ function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletReq
       meta: partial.transfer_leg.meta,
     },
   };
-}
-
-const ALLOCATION_TIMESTAMP_FORMAT = 'YYYY-MM-DDTHH:mm:ss.SSSSSSZ';
-// eq to the above, but enforces 6 digits for microseconds (as expected in daml)
-// dayjs doesn't, because JS dates don't support microsecond precision
-const ALLOCATION_TIMESTAMP_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
-function isValidAllocationTimestamp(str: string): boolean {
-  return ALLOCATION_TIMESTAMP_REGEX.test(str);
-}
-// only call this if the timestamp is valid
-// this is necessary only because JS doesn't support microsecond precision
-function getAllocationTimestamp(str: string): number {
-  const timestampWithMillisecondPrecision = new Date(str);
-  // valueOf returns milliseconds since epoch
-  const millis = timestampWithMillisecondPrecision.valueOf();
-  // get the last 3 characters (microseconds), excluding the Z (timezone, UTC)
-  const micros = Number(str.slice(str.length - 4, str.length - 1));
-  return millis * 1000 + micros;
 }
 
 export default CreateAllocation;

@@ -4,7 +4,7 @@ import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 
 export const useTokenStandardAllocationRequests = (): UseQueryResult<
   Contract<AllocationRequest>[]

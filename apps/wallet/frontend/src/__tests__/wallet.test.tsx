@@ -13,14 +13,24 @@ import {
   aliceEntry,
   alicePartyId,
   aliceTransferPreapproval,
+  bobPartyId,
   nameServiceEntries,
   userLogin,
 } from './mocks/constants';
 import { requestMocks } from './mocks/handlers/transfers-api';
 import { server } from './setup/setup';
-import { ListAllocationRequestsResponse, ListAllocationsResponse } from 'wallet-openapi';
-import { AllocationRequest } from '@daml.js/splice-api-token-transfer-instruction/lib/Splice/Api/Token/AllocationRequestV1/module';
+import {
+  AllocateAmuletRequest,
+  AllocateAmuletResponse,
+  ListAllocationRequestsResponse,
+  ListAllocationsResponse,
+} from 'wallet-openapi';
+import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { mkContract } from './mocks/contract';
+import { openApiRequestFromTransferLeg } from '../components/ListAllocationRequests';
+import * as damlTypes from '@daml/types';
+import { ContractId } from '@daml/types';
+import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
@@ -178,8 +188,13 @@ describe('Wallet user can', () => {
     });
 
     describe('Allocations', () => {
-      test('see allocation requests', async () => {
-        const allocationRequests: AllocationRequest[] = [];
+      test('see allocation requests, and accept them', async () => {
+        const allocationRequest = getAllocationRequest();
+        const allocationRequests = [allocationRequest];
+        let calledCreate: (body: AllocateAmuletRequest) => void;
+        const createPromise: Promise<AllocateAmuletRequest> = new Promise(
+          resolve => (calledCreate = resolve)
+        );
         server.use(
           rest.get(
             `${walletUrl}/v0/wallet/token-standard/allocation-requests`,
@@ -215,6 +230,42 @@ describe('Wallet user can', () => {
         expect(
           screen.getByRole('heading', { name: `Allocation Requests ${allocationRequests.length}` })
         ).toBeDefined();
+
+        expect(
+          await screen.findByText(
+            `SettlementRef id: ${allocationRequest.settlement.settlementRef.id}`
+          )
+        ).toBeDefined();
+
+        const acceptButtons = await screen.findAllByRole('button', { name: 'Accept' });
+        // one has a different sender, and one a different instrument, so those shouldn't be accepted
+        expect(acceptButtons.length).toBe(1);
+
+        server.use(
+          rest.post(`${walletUrl}/v0/allocations`, async (req, res, ctx) => {
+            const body = await req.json();
+            calledCreate(body);
+            const response: AllocateAmuletResponse = {
+              output: {
+                allocation_instruction_cid: 'alloc_instr_cid',
+                allocation_cid: 'alloc_cid',
+                dummy: {},
+              },
+              sender_change_cids: ['whatever'],
+              meta: {},
+            };
+            return res(ctx.json(response));
+          })
+        );
+
+        acceptButtons[0].click();
+        const calledWithBody = await createPromise;
+        const expected = openApiRequestFromTransferLeg(
+          allocationRequest.settlement,
+          allocationRequest.transferLegs.acceptable,
+          'acceptable'
+        );
+        expect(calledWithBody).toStrictEqual(expected);
       });
     });
   });
@@ -565,4 +616,53 @@ async function assertCorrectMockIsCalled(
     expect(requestMocks.transferPreapprovalSend).not.toHaveBeenCalled();
     expect(requestMocks.createTransferViaTokenStandard).not.toHaveBeenCalled();
   }
+}
+
+function getAllocationRequest() {
+  return {
+    settlement: {
+      executor: 'executor',
+      settlementRef: {
+        id: 'the_id',
+        cid: null as damlTypes.Optional<ContractId<AnyContract>>,
+      },
+      requestedAt: new Date().toISOString(),
+      allocateBefore: new Date().toISOString(),
+      settleBefore: new Date().toISOString(),
+      meta: { values: {} },
+    },
+    transferLegs: {
+      acceptable: {
+        sender: alicePartyId,
+        receiver: bobPartyId,
+        amount: '3',
+        instrumentId: {
+          id: 'Amulet',
+          admin: 'dso::party',
+        },
+        meta: { values: {} },
+      },
+      different_sender: {
+        sender: bobPartyId,
+        receiver: alicePartyId,
+        amount: '3',
+        instrumentId: {
+          id: 'Amulet',
+          admin: 'dso::party',
+        },
+        meta: { values: {} },
+      },
+      different_instrument: {
+        sender: alicePartyId,
+        receiver: bobPartyId,
+        amount: '3',
+        instrumentId: {
+          id: 'Another',
+          admin: 'dso::party',
+        },
+        meta: { values: {} },
+      },
+    },
+    meta: { values: {} },
+  };
 }
