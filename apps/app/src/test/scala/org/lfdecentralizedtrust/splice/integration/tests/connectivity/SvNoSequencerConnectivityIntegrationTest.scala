@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.connectivity
 
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
@@ -44,6 +45,9 @@ class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
     forAll(Seq((sv1Backend, sv1LocalBackend), (sv2Backend, sv2LocalBackend))) {
       case (sv, svWithoutSequencer) =>
         clue(s"SV ${sv.name} can start without sequencer") {
+          val triggersBefore =
+            (sv.dsoAutomation.triggers[Trigger] ++ sv.svAutomation.triggers[Trigger])
+              .map(_.getClass.getCanonicalName)
           sv.stop()
           toxiproxy.disableConnectionViaProxy(
             UseToxiproxy.sequencerAdminApi(svWithoutSequencer.name)
@@ -54,6 +58,10 @@ class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
           // Check that sequencer connection really doesn't work anymore.
           svWithoutSequencer.sequencerClient.health.status.toString should include("UNAVAILABLE")
           svWithoutSequencer.startSync()
+          val triggersAfter =
+            (svWithoutSequencer.dsoAutomation.triggers[Trigger] ++ svWithoutSequencer.svAutomation
+              .triggers[Trigger]).map(_.getClass.getCanonicalName)
+          triggersAfter shouldBe triggersBefore
         }
     }
   }
