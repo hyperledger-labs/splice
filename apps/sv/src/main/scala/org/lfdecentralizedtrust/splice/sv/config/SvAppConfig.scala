@@ -3,6 +3,20 @@
 
 package org.lfdecentralizedtrust.splice.sv.config
 
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeLong,
+  NonNegativeNumeric,
+  PositiveInt,
+  PositiveNumeric,
+}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
+import com.digitalasset.canton.topology.PartyId
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -18,20 +32,6 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{
-  NonNegativeLong,
-  NonNegativeNumeric,
-  PositiveInt,
-  PositiveNumeric,
-}
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
-import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.topology.PartyId
-import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.nio.file.Path
 
@@ -261,6 +261,7 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(0),
     delegatelessAutomation: Boolean = true,
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
