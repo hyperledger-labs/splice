@@ -1144,28 +1144,33 @@ class HttpWalletHandler(
       )
       for {
         wallet <- getUserWallet(user)
-        synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
         store = wallet.store
-        allocation <- store.multiDomainAcsStore.getContractById(
-          amuletAllocationCodegen.AmuletAllocation.COMPANION
-        )(allocationCid)
+        allocation <- store.multiDomainAcsStore
+          .getContractById(
+            amuletAllocationCodegen.AmuletAllocation.COMPANION
+          )(allocationCid)
+          .map(
+            _.toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"AmuletAllocation is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        context <- scanConnection.getAllocationWithdrawContext(
+          allocation.contractId.toInterface(allocationv1.Allocation.INTERFACE)
+        )
         result <- wallet.connection
           .submit(
             Seq(store.key.validatorParty, store.key.endUserParty),
             Seq.empty,
-            allocation.contractId
-              .toInterface(allocationv1.Allocation.INTERFACE)
-              .exerciseAllocation_Withdraw(
-                // not fetching the context because we know it's not required,
-                // as we're only supporting AmuletAllocation here
-                new metadatav1.ExtraArgs(
-                  new metadatav1.ChoiceContext(java.util.Map.of()),
-                  new metadatav1.Metadata(java.util.Map.of()),
-                )
-              ),
+            allocation.exercise(
+              _.toInterface(allocationv1.Allocation.INTERFACE)
+                .exerciseAllocation_Withdraw(context.toExtraArgs())
+            ),
           )
           .noDedup
-          .withSynchronizerId(synchronizerId)
+          .withSynchronizerId(allocation.domain)
+          .withDisclosedContracts(DisclosedContracts.fromProto(context.disclosedContracts))
           .yieldResult()
       } yield WalletResource.WithdrawAmuletAllocationResponseOK(
         d0.AmuletAllocationWithdrawResult(

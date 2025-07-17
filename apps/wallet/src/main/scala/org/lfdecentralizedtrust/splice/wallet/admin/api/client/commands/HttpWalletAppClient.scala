@@ -1236,6 +1236,31 @@ object HttpWalletAppClient {
       }
     }
 
+    final case class WithdrawAmuletAllocation(
+        contractId: amuletAllocationCodegen.AmuletAllocation.ContractId
+    ) extends InternalBaseCommand[
+          http.WithdrawAmuletAllocationResponse,
+          definitions.AmuletAllocationWithdrawResult,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.WithdrawAmuletAllocationResponse] =
+        client.withdrawAmuletAllocation(contractId.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.WithdrawAmuletAllocationResponse, Either[
+        String,
+        definitions.AmuletAllocationWithdrawResult,
+      ]] = { case http.WithdrawAmuletAllocationResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
     final case object ListAmuletAllocations
         extends InternalBaseCommand[
           http.ListAmuletAllocationsResponse,
