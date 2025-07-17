@@ -799,6 +799,43 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/allocations/{contract_id}/withdraw:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "withdrawAmuletAllocation"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The AmuletAllocation has been withdrawn
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmuletAllocationWithdrawResult"
+        "404":
+          description: |
+            The allocation or the submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A withdraw for the allocation is currently being processed, which may or may not succeed.
+            Retry submitting the request with exponential back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+
 components:
   schemas:
     UserStatusResponse:
@@ -1511,3 +1548,18 @@ components:
       properties:
         contract:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    AmuletAllocationWithdrawResult:
+      type: object
+      required:
+        - sender_holding_cids
+        - meta
+      properties:
+        sender_holding_cids:
+          type: array
+          items:
+            type: string
+        meta:
+          type: object
+          additionalProperties:
+            type: string

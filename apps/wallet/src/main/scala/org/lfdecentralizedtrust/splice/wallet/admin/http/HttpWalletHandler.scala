@@ -1130,6 +1130,52 @@ class HttpWalletHandler(
       Codec.encode(SpliceUtil.currentAmount(lockedAmulet.payload.amulet, round)),
     )
 
+  override def withdrawAmuletAllocation(
+      respond: WalletResource.WithdrawAmuletAllocationResponse.type
+  )(
+      contractId: String
+  )(tUser: TracedUser): Future[WalletResource.WithdrawAmuletAllocationResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.withdrawAmuletAllocation") { implicit traceContext => _ =>
+      val allocationCid = Codec.tryDecodeJavaContractId(
+        amuletAllocationCodegen.AmuletAllocation.COMPANION
+      )(
+        contractId
+      )
+      for {
+        wallet <- getUserWallet(user)
+        synchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
+        store = wallet.store
+        allocation <- store.multiDomainAcsStore.getContractById(
+          amuletAllocationCodegen.AmuletAllocation.COMPANION
+        )(allocationCid)
+        result <- wallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            allocation.contractId
+              .toInterface(allocationv1.Allocation.INTERFACE)
+              .exerciseAllocation_Withdraw(
+                // not fetching the context because we know it's not required,
+                // as we're only supporting AmuletAllocation here
+                new metadatav1.ExtraArgs(
+                  new metadatav1.ChoiceContext(java.util.Map.of()),
+                  new metadatav1.Metadata(java.util.Map.of()),
+                )
+              ),
+          )
+          .noDedup
+          .withSynchronizerId(synchronizerId)
+          .yieldResult()
+      } yield WalletResource.WithdrawAmuletAllocationResponseOK(
+        d0.AmuletAllocationWithdrawResult(
+          result.exerciseResult.senderHoldingCids.asScala.map(_.contractId).toVector,
+          result.exerciseResult.meta.values.asScala.toMap,
+        )
+      )
+    }
+  }
+
   private[this] def getUserTreasury(user: String)(implicit
       tc: TraceContext
   ): Future[TreasuryService] =
