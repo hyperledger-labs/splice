@@ -88,7 +88,6 @@ const WithdrawAllocationButton: React.FC<{ allocationCid: ContractId<AmuletAlloc
 
   return (
     <Button
-      id={`allocation-${allocationCid}-withdraw`}
       variant="pill"
       size="small"
       className="allocation-withdraw"
