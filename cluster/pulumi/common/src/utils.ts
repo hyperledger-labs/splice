@@ -179,20 +179,67 @@ export function fixedTokens(): boolean {
   return _fixedTokens;
 }
 
-export const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
+export const clusterNetwork = isDevNet ? 'dev' : isMainNet ? 'main' : 'test';
+
+function getClusterDirectory(): string {
+  const net = {
+    dev: 'DevNet',
+    main: 'MainNet',
+    test: 'TestNet',
+  }[clusterNetwork];
+
+  if (!net) {
+    throw new Error(`Unknown cluster network: ${clusterNetwork}`);
+  }
+
+  return net;
+}
+
+export const clusterDirectory = getClusterDirectory();
+
+function getPathToPrivateConfigFile(fileName: string): string | undefined {
+  const path = PRIVATE_CONFIGS_PATH;
+
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
+    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
+  }
+
+  if (!path) {
+    return undefined;
+  }
+
+  return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+function getPathToPublicConfigFile(fileName: string): string | undefined {
+  const path = PUBLIC_CONFIGS_PATH;
+
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
+    throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
+  }
+
+  if (!path) {
+    return undefined;
+  }
+
+  return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+export function externalIpRangesFile(): string | undefined {
+  if (!spliceConfig.pulumiProjectConfig.isExternalCluster) {
+    return undefined;
+  }
+
+  return getPathToPrivateConfigFile('allowed-ip-ranges.json');
+}
+
+export function approvedSvIdentitiesFile(): string | undefined {
+  return getPathToPublicConfigFile('approved-sv-id-values.yaml');
+}
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  if (PUBLIC_CONFIGS_PATH) {
-    const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
-    return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
-      .approvedSvIdentities;
-  } else {
-    if (spliceConfig.pulumiProjectConfig.isExternalCluster) {
-      throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
-    }
-
-    return [];
-  }
+  const file = approvedSvIdentitiesFile();
+  return file ? loadYamlFromFile(file).approvedSvIdentities : [];
 }
 
 // Typically used for overriding chart values.

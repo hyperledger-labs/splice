@@ -1,0 +1,30 @@
+nginxImage: nginx:latest  # Replace `:latest` with `@sha256:digest` of a chosen image for security reasons
+
+runtimeDetails:
+  scanUrl: "http://scan-app.sv:5012"
+
+deploymentDetails:  # optional, exposes static configuration under path /
+  network: TARGET_CLUSTER  # One of "main", "test" or "dev"
+  configDigest:
+    allowedIpRanges:
+      type: "md5"
+      value: MD5_HASH_OF_ALLOWED_IP_RANGES
+    approvedSvIdentities:
+      type: "md5"
+      value: MD5_HASH_OF_APPROVED_SV_IDENTITIES
+  synchronizer:
+    active:
+      chainIdSuffix: CHAIN_ID_SUFFIX
+      migrationId: MIGRATION_ID
+    #staging:  # Configure this when staging synchronizer is enabled
+    #  chainIdSuffix: CHAIN_ID_SUFFIX
+    #  migrationId: STAGING_SYNCHRONIZER_MIGRATION_ID
+    #  version: STAGING_SYNCHRONIZER_VERSION
+    #legacy:  # Configure this when legacy synchronizer is enabled
+    #  chainIdSuffix: CHAIN_ID_SUFFIX
+    #  migrationId: LEGACY_SYNCHRONIZER_MIGRATION_ID
+    #  version: LEGACY_SYNCHRONIZER_VERSION
+
+#istioVirtualService:  # optional, configures the Istio VirtualService for routing
+#  host: "info.example.com"
+#  gateway: "istio-gateway-example"

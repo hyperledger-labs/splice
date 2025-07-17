@@ -591,6 +591,19 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
+Please modify the file ``splice-node/examples/sv-helm/info-values.yaml`` as follows:
+
+- Replace ``TARGET_CLUSTER`` with |splice_cluster|
+- Replace ``MD5_HASH_OF_ALLOWED_IP_RANGES`` with the MD5 hash of the ``allowed-ip-ranges.json`` file corresponding to the |splice_cluster| network.
+- Replace ``MD5_HASH_OF_APPROVED_SV_IDENTITIES`` with the MD5 hash of the ``approved-sv-id-values.yaml`` file corresponding to the |splice_cluster| network.
+- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace all instances of ``CHAIN_ID_SUFFIX`` with the chain ID suffix of the |splice_cluster| network.
+- Uncomment ``staging`` synchronizer and ``legacy`` synchronizer sections if you are using them.
+- Replace ``STAGING_SYNCHRONIZER_MIGRATION_ID`` with the migration ID of the staging synchronizer on your target cluster.
+- Replace ``STAGING_SYNCHRONIZER_VERSION`` with the version of the staging synchronizer on your target cluster.
+- Replace ``LEGACY_SYNCHRONIZER_MIGRATION_ID`` with the migration ID of the legacy synchronizer on your target cluster.
+- Replace ``LEGACY_SYNCHRONIZER_VERSION`` with the version of the legacy synchronizer on your target cluster.
+
 The `configs repo <https://github.com/global-synchronizer-foundation/configs>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
 
 1. ``SV_IDENTITIES_FILE``: The list of SV identities for your node to auto-approve as peer SVs. Locate and review the ``approved-sv-id-values.yaml`` file corresponding to the network to which you are connecting.
@@ -626,6 +639,12 @@ Install the SV node apps (replace ``helm install`` in these commands with ``helm
     helm install scan |helm_repo_prefix|/splice-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
     helm install validator |helm_repo_prefix|/splice-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
+Install the INFO app, which is used to provide information about the SV node and its configuration:
+
+.. parsed-literal::
+
+    helm install info |helm_repo_prefix|/splice-info -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/info-values.yaml
+
 
 
 Once everything is running, you should be able to inspect the state of the
@@ -641,6 +660,7 @@ namespace. A typical query might look as follows:
     global-domain-0-cometbft-c584c9468-9r2v5     2/2     Running   2 (14m ago)   14m
     global-domain-0-mediator-7bfb5f6b6d-ts5zp    2/2     Running   0             13m
     global-domain-0-sequencer-6c85d98bb6-887c7   2/2     Running   0             13m
+    info-9fb7bc859-27226                         2/2     Running   0             10m
     mediator-pg-0                                2/2     Running   0             14m
     participant-0-57579c64ff-wmzk5               2/2     Running   0             14m
     participant-pg-0                             2/2     Running   0             14m
@@ -724,6 +744,7 @@ Each SV is required to configure their cluster ingress to allow traffic from the
 * ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
 * ``https://sequencer-<MIGRATION_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
+* ``https://info.sv.<YOUR_HOSTNAME>`` should be routed to service ``info`` in the ``sv`` namespace. This endpoint should be publicly accessible without any IP restrictions.
 
 .. warning::
 
