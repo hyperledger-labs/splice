@@ -185,7 +185,6 @@ class ValidatorAutomationService(
     )
   )
 
-  registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
   if (sequencerConnectionFromScan)
     registerTrigger(
       new ReconcileSequencerConnectionsTrigger(

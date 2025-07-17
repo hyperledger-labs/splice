@@ -61,7 +61,6 @@ class SvSvAutomationService(
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
     SvSvAutomationService
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
-  registerTrigger(new AssignTrigger(triggerContext, svStore, connection, store.key.svParty))
 
   registerTrigger(
     SqlIndexInitializationTrigger(
