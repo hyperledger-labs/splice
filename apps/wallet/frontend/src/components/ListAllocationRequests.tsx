@@ -46,8 +46,14 @@ const ListAllocationRequests: React.FC = () => {
   const allocations = allocationsQuery.data || [];
 
   return (
-    <Stack spacing={4} direction="column" justifyContent="center" id="allocation-requests">
-      <Typography mt={6} variant="h4">
+    <Stack
+      spacing={4}
+      direction="column"
+      justifyContent="center"
+      id="allocation-requests"
+      aria-labelledby="allocation-requests-label"
+    >
+      <Typography mt={6} variant="h4" id="allocation-requests-label">
         Allocation Requests <Chip label={allocationRequests.length} color="success" />
       </Typography>
       {allocationRequests.map(ar => (
