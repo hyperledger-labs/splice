@@ -23,6 +23,9 @@ const PulumiProjectConfigSchema = z.object({
     protected: z.boolean(),
     tier: z.string(),
     enterprisePlus: z.boolean(),
+    // https://cloud.google.com/sql/docs/mysql/backup-recovery/backups#retained-backups
+    // controls the number of automated gcp sql backups to retain
+    backupsToRetain: z.number().optional(),
   }),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
