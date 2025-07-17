@@ -8,12 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
 0.4.6
 -----
 
 - Info (new)
 
-  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accesible.
+  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accessible.
     The new `info` endpoint provides:
 
     - Static information about network, sv, synchronizers, config digests of ip ranges and identities under ``https://info.sv.<YOUR_HOSTNAME>``.
