@@ -90,6 +90,14 @@ export function installParticipant(
       },
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
+      resources: {
+        requests: {
+          memory: '4Gi',
+        },
+        limits: {
+          memory: '8Gi',
+        },
+      },
     },
     version,
     {

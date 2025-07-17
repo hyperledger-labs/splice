@@ -563,6 +563,14 @@
           "schema": "participant",
           "secretName": "participant-pg-secrets"
         },
+        "resources": {
+          "limits": {
+            "memory": "8Gi"
+          },
+          "requests": {
+            "memory": "4Gi"
+          }
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
