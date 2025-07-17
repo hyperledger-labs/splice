@@ -4,11 +4,14 @@ import React from 'react';
 import { useAmuletAllocations } from '../hooks/useAmuletAllocations';
 import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import Typography from '@mui/material/Typography';
-import { Card, CardContent, Chip, Stack } from '@mui/material';
+import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 import TransferLegsDisplay from './TransferLegsDisplay';
 import AllocationSettlementDisplay from './AllocationSettlementDisplay';
+import { useMutation } from '@tanstack/react-query';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { ContractId } from '@daml/types';
 
 const ListAllocations: React.FC = () => {
   const allocationsQuery = useAmuletAllocations();
@@ -59,7 +62,9 @@ const AllocationDisplay: React.FC<{ allocation: Contract<AmuletAllocation> }> = 
             transferLegs={{
               [transferLegId]: transferLeg,
             }}
-            getActionButton={() => <WithdrawAllocationButton />}
+            getActionButton={() => (
+              <WithdrawAllocationButton allocationCid={allocation.contractId} />
+            )}
           />
         </Stack>
       </CardContent>
@@ -67,14 +72,31 @@ const AllocationDisplay: React.FC<{ allocation: Contract<AmuletAllocation> }> = 
   );
 };
 
-// TODO (#1503): implement
-const WithdrawAllocationButton: React.FC = () => {
-  return null;
-  // return (
-  //   <Button variant="pill" size="small" className="allocation-withdraw">
-  //     Withdraw
-  //   </Button>
-  // );
+const WithdrawAllocationButton: React.FC<{ allocationCid: ContractId<AmuletAllocation> }> = ({
+  allocationCid,
+}) => {
+  const { withdrawAllocation } = useWalletClient();
+  const withdrawAllocationMutation = useMutation({
+    mutationFn: async () => {
+      return await withdrawAllocation(allocationCid);
+    },
+    onSuccess: () => {},
+    onError: error => {
+      console.error('Failed to withdraw allocation', error);
+    },
+  });
+
+  return (
+    <Button
+      id={`allocation-${allocationCid}-withdraw`}
+      variant="pill"
+      size="small"
+      className="allocation-withdraw"
+      onClick={() => withdrawAllocationMutation.mutate()}
+    >
+      Withdraw
+    </Button>
+  );
 };
 
 export default ListAllocations;

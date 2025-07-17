@@ -116,11 +116,12 @@ const AllocationRequestActionButton: React.FC<{
   const actionAllowed =
     transferLeg.sender === userParty && transferLeg.instrumentId.id === 'Amulet';
   const settlement = allocationRequest.payload.settlement;
-  const alreadyAccepted = !!allocations.find(alloc =>
+  const correspondingAllocation = allocations.find(alloc =>
     isAllocationForTransferLeg(alloc, allocationRequest, transferLegId)
   );
+  const alreadyAccepted = !!correspondingAllocation;
 
-  const { createAllocation } = useWalletClient();
+  const { createAllocation, withdrawAllocation } = useWalletClient();
   const createAllocationMutation = useMutation({
     mutationFn: async () => {
       const payload: AllocateAmuletRequest = openApiRequestFromTransferLeg(
@@ -135,16 +136,34 @@ const AllocationRequestActionButton: React.FC<{
       console.error('Failed to submit allocation', error);
     },
   });
+  const withdrawAllocationMutation = useMutation({
+    mutationFn: async () => {
+      if (correspondingAllocation) {
+        return await withdrawAllocation(correspondingAllocation.contractId);
+      } else {
+        throw new Error("This mutation shouldn't be called without a corresponding allocation");
+      }
+    },
+    onSuccess: () => {},
+    onError: error => {
+      console.error('Failed to withdraw allocation', error);
+    },
+  });
 
   if (!actionAllowed) return null;
-  // TODO (#1413): show the withdraw button and implement the callback, instead of showing nothing
-  if (alreadyAccepted) return null;
-  // return (
-  //   <Button variant="pill" size="small" className="allocation-request-withdraw">
-  //     Withdraw
-  //   </Button>
-  // );
-  else
+  if (alreadyAccepted) {
+    return (
+      <Button
+        id={`${parentComponentId}-withdraw`}
+        variant="pill"
+        size="small"
+        className="allocation-withdraw"
+        onClick={() => withdrawAllocationMutation.mutate()}
+      >
+        Withdraw
+      </Button>
+    );
+  } else {
     return (
       <DisableConditionally
         conditions={[
@@ -165,6 +184,7 @@ const AllocationRequestActionButton: React.FC<{
         </Button>
       </DisableConditionally>
     );
+  }
 };
 
 function isAllocationForTransferLeg(
