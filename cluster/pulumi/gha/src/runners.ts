@@ -250,11 +250,16 @@ function installDockerRunnerScaleSet(
                 ],
                 startupProbe: {
                   exec: {
-                    command: ['docker', 'version'],
+                    command: [
+                      "sh",
+                      "-c",
+                      "until docker version > /dev/null 2>&1; do echo 'Waiting for Docker daemon to start...'; sleep 3; done; exit 0"
+                    ]
                   },
-                  initialDelaySeconds: 3,
-                  periodSeconds: 2,
-                  failureThreshold: 20,
+                  initialDelaySeconds: 10,
+                  periodSeconds: 5,
+                  timeoutSeconds: 15,
+                  failureThreshold: 30,
                 },
               },
             ],
