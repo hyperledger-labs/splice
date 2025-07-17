@@ -596,8 +596,6 @@ template AmuletRules
             futureValues = []
         return AmuletRules_SetConfigResult with ..
 
-    -- TODO(#925): make the following three deprecated choices `abort` once all tests that depend on it are migrated.
-
     -- This inserts a new AmuletConfig Schedule into the future Schedules
     -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult

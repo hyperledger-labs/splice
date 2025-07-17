@@ -6,13 +6,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   TransferConfig,
   USD,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddSv,
   SRARC_OffboardSv,
@@ -31,6 +29,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_SetConfig,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
@@ -43,19 +43,17 @@ import java.util.Optional
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
-//TODO(#925): adapt this test to work only with SetConfig
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
 
-  // TODO(#925): change tests to work with current version
   private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.7",
-    amuletNameServiceVersion = "0.1.7",
-    dsoGovernanceVersion = "0.1.10",
-    validatorLifecycleVersion = "0.1.1",
-    walletVersion = "0.1.7",
-    walletPaymentsVersion = "0.1.7",
+    amuletVersion = "0.1.8",
+    amuletNameServiceVersion = "0.1.8",
+    dsoGovernanceVersion = "0.1.11",
+    validatorLifecycleVersion = "0.1.2",
+    walletVersion = "0.1.8",
+    walletPaymentsVersion = "0.1.8",
   )
-  // TODO(#925): when using the latest version, this can be removed
+
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: EnvironmentDefinition =
@@ -488,8 +486,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
     val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
       "SV1 create a vote request for a new Amulet Configuration (changing the transfer config)", {
 
-        val initialValue = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
-        val transferConfig = initialValue.transferConfig
+        val initialConfig = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
+        val transferConfig = initialConfig.transferConfig
         val newTransferConfig = new TransferConfig[USD](
           transferConfig.createFee,
           transferConfig.holdingFee,
@@ -501,26 +499,20 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           42,
         )
 
-        val futureValue =
-          new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2[Instant, AmuletConfig[
-            USD
-          ]](
-            Instant.now().plusSeconds(3600),
-            new AmuletConfig[USD](
-              newTransferConfig,
-              initialValue.issuanceCurve,
-              initialValue.decentralizedSynchronizer,
-              initialValue.tickDuration,
-              initialValue.packageConfig,
-              java.util.Optional.empty(),
-              java.util.Optional.empty(),
-            ),
-          )
+        val newAmuletConfig = new AmuletConfig[USD](
+          newTransferConfig,
+          initialConfig.issuanceCurve,
+          initialConfig.decentralizedSynchronizer,
+          initialConfig.tickDuration,
+          initialConfig.packageConfig,
+          java.util.Optional.empty(),
+          java.util.Optional.empty(),
+        )
 
         val action: ActionRequiringConfirmation =
           new ARC_AmuletRules(
-            new CRARC_AddFutureAmuletConfigSchedule(
-              new AmuletRules_AddFutureAmuletConfigSchedule(futureValue)
+            new CRARC_SetConfig(
+              new AmuletRules_SetConfig(newAmuletConfig, initialConfig)
             )
           )
 
@@ -530,7 +522,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           "url",
           "description",
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-          None,
+          Some(Instant.now().plusSeconds(3600)),
         )
       },
     )(

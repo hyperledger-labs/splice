@@ -12,9 +12,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
@@ -62,14 +62,13 @@ class BootstrapPackageConfigIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  // These versions are from the release 0.1.17
   private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.4",
-    amuletNameServiceVersion = "0.1.4",
-    dsoGovernanceVersion = "0.1.6",
-    validatorLifecycleVersion = "0.1.1",
-    walletVersion = "0.1.4",
-    walletPaymentsVersion = "0.1.4",
+    amuletVersion = "0.1.8",
+    amuletNameServiceVersion = "0.1.8",
+    dsoGovernanceVersion = "0.1.11",
+    validatorLifecycleVersion = "0.1.2",
+    walletVersion = "0.1.8",
+    walletPaymentsVersion = "0.1.8",
   )
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
@@ -213,12 +212,10 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       val upgradeAction = new ARC_AmuletRules(
-        new CRARC_AddFutureAmuletConfigSchedule(
-          new AmuletRules_AddFutureAmuletConfigSchedule(
-            new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-              scheduledTime,
-              newAmuletConfig,
-            )
+        new CRARC_SetConfig(
+          new AmuletRules_SetConfig(
+            newAmuletConfig,
+            amuletConfig,
           )
         )
       )
@@ -234,7 +231,7 @@ class BootstrapPackageConfigIntegrationTest
                 "url",
                 "description",
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-                None,
+                Some(scheduledTime),
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)

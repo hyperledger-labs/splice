@@ -47,14 +47,11 @@ import { useSvConfig } from '../../utils';
 import { hasConflictingFields } from '../../utils/configDiffs';
 import { isValidUrl } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
-import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
-import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetAmuletRulesConfig from './actions/SetAmuletRulesConfig';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
-import UpdateFutureAmuletConfigSchedule from './actions/UpdateFutureAmuletConfigSchedule';
 import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
 
 dayjs.extend(utc);
@@ -377,15 +374,6 @@ export const CreateVoteRequest: React.FC = () => {
             />
           )}
           {actionName === 'CRARC_SetConfig' && <SetAmuletRulesConfig chooseAction={chooseAction} />}
-          {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
-            <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
-          )}
-          {actionName === 'CRARC_RemoveFutureAmuletConfigSchedule' && (
-            <RemoveFutureAmuletConfigSchedule chooseAction={chooseAction} />
-          )}
-          {actionName === 'CRARC_UpdateFutureAmuletConfigSchedule' && (
-            <UpdateFutureAmuletConfigSchedule chooseAction={chooseAction} />
-          )}
           {actionName === 'SRARC_UpdateSvRewardWeight' && (
             <UpdateSvRewardWeight chooseAction={chooseAction} action={action} />
           )}
