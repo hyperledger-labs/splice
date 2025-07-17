@@ -172,6 +172,9 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
         pollingTriggerInterval,
       )
     val delay = Random.nextLong(upperBound)
+    // Check for staleness first so we can quickly move on to other tasks.
+    // Otherwise we might block an execution slot for the wait time for a a stale task.
+    // If tasks get produced faster than our wait time this will lead to falling further and further behind.
     isStaleTask(task).flatMap {
       if (_) {
         Future.successful(
@@ -188,6 +191,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
           )
           .onShutdown(logger.debug(s"Closing after waiting $delay ms"))
           .flatMap(_ =>
+            // Check for staleness again, another SV may have completed it in the wait time.
             isStaleTask(task).flatMap {
               if (_) {
                 Future.successful(
