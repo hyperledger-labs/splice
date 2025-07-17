@@ -788,8 +788,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
             'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml').replaceAll(
               '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
               (
-                monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace /
-                100.0
+                monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace
               ).toString()
             ),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
