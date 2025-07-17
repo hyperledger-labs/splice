@@ -30,7 +30,7 @@ export function installInfo(
 
   function fileDigestMd5(file: string | undefined): string {
     const data = file ? fs.readFileSync(file, 'utf8') : '';
-    return 'md5:' + md5(data);
+    return md5(data);
   }
 
   const infoValues = {
