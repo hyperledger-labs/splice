@@ -1,4 +1,10 @@
+#!/usr/bin/env bash
+
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # wait for `docker version` to succeed, at most 30 iterations
+
 for i in {1..30}; do
   if docker version &>/dev/null; then
     break
@@ -12,4 +18,4 @@ if ! docker version &>/dev/null; then
   exit 1
 fi
 
-/home/runner/run.sh
+/home/runner/run-base.sh
