@@ -1,5 +1,10 @@
 # Reference configuration options
-#svs:
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      cantonLogLevel: DEBUG
+      cometbftLogLevel: debug
 #  sv-1:
 #    cometbft:
 #      snapshotName: "nicu-test-cometbft-cloning"
@@ -32,6 +37,9 @@ pulumiProjectConfig:
   sv-runbook:
     cloudSql:
       enabled: false
+validator1:
+  logging:
+    level: DEBUG
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:

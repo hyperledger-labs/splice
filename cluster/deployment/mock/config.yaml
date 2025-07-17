@@ -105,3 +105,8 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
+svs:
+  sv-2:
+    logging:
+      appsLogLevel: INFO
+      cantonLogLevel: INFO

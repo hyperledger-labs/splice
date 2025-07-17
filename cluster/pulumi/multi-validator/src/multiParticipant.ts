@@ -40,11 +40,11 @@ export class MultiParticipant extends MultiNodeDeployment {
             },
             {
               name: 'LOG_LEVEL_CANTON',
-              value: 'INFO',
+              value: multiValidatorConfig?.logLevel,
             },
             {
               name: 'LOG_LEVEL_STDOUT',
-              value: 'INFO',
+              value: multiValidatorConfig?.logLevel,
             },
           ],
           ports: ports.map(port => ({

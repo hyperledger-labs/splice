@@ -542,6 +542,7 @@
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {

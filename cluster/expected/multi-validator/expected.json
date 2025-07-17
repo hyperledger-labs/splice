@@ -2484,6 +2484,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2864,6 +2872,14 @@
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
                     "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
                   },
                   {
                     "name": "NUM_NODES",
@@ -3248,6 +3264,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3630,6 +3654,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4010,6 +4042,14 @@
                   {
                     "name": "SPLICE_APP_CONTACT_POINT",
                     "value": "sv-support@digitalasset.com"
+                  },
+                  {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
                   },
                   {
                     "name": "NUM_NODES",

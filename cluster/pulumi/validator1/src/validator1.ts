@@ -13,7 +13,6 @@ import {
   installAuth0UISecret,
   installSpliceHelmChart,
   spliceInstanceNames,
-  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
@@ -21,7 +20,7 @@ import {
   ansDomainPrefix,
   DecentralizedSynchronizerUpgradeConfig,
 } from 'splice-pulumi-common';
-import { installParticipant } from 'splice-pulumi-common-validator';
+import { installParticipant, splitwellDarPaths } from 'splice-pulumi-common-validator';
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
@@ -62,7 +61,6 @@ export async function installValidator1(
     { dependsOn: [xns.ns] }
   );
 
-  const kmsConfig = validator1Config?.kms;
   const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
   const imagePullDeps = imagePullSecret(xns);
@@ -85,14 +83,13 @@ export async function installValidator1(
   const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat([loopback]);
 
   const participant = installParticipant(
+    validator1Config,
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
     'validator1',
-    kmsConfig,
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
-    undefined,
     {
       dependsOn: participantDependsOn,
     }

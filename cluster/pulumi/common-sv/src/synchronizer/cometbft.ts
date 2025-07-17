@@ -24,8 +24,8 @@ import {
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
-import { clusterSvsConfiguration } from '../clusterSvConfig';
-import { svConfig } from '../config';
+import { svsConfig } from '../config';
+import { SingleSvConfiguration } from '../singleSvConfig';
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync } from './cometbftConfig';
 
@@ -64,10 +64,10 @@ export function installCometBftNode(
   xns: ExactNamespace,
   onboardingName: string,
   nodeConfigs: CometBftNodeConfigs,
+  svConfiguration: SingleSvConfiguration,
   migrationId: DomainMigrationIndex,
   isActiveDomain: boolean,
   isRunningMigration: boolean,
-  logLevel: string,
   version: CnChartVersion = activeVersion,
   enableStateSync: boolean = !disableCometBftStateSync,
   enableTimeoutCommit: boolean = false,
@@ -111,7 +111,7 @@ export function installCometBftNode(
       keysSecret: keysSecret ? keysSecret.metadata.name : '',
       enableTimeoutCommit,
     },
-    logLevel,
+    logLevel: svConfiguration.logging?.cometbftLogLevel,
     peers: nodeConfigs.peers
       .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
       .map(peer => {
@@ -144,14 +144,13 @@ export function installCometBftNode(
       labels: [{ key: 'active_migration', value: isActiveDomain }],
     },
     db: {
-      volumeSize: clusterSmallDisk ? '240Gi' : svConfig?.cometbft?.volumeSize,
+      volumeSize: clusterSmallDisk ? '240Gi' : svsConfig?.cometbft?.volumeSize,
     },
-    extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
+    extraLogLevelFlags: svConfiguration.logging?.cometbftExtraLogLevelFlags,
     serviceAccountName: imagePullServiceAccountName,
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;
   const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
-  const svConfiguration = clusterSvsConfiguration[svIdentifier];
   let volumeDependecies: Resource[] = [];
   if (svConfiguration?.cometbft) {
     const volumeSize = cometbftChartValues.db.volumeSize;
