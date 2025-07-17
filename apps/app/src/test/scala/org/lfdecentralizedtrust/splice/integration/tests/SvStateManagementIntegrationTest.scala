@@ -38,7 +38,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequ
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 
-import java.time.Instant
 import java.util.Optional
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
