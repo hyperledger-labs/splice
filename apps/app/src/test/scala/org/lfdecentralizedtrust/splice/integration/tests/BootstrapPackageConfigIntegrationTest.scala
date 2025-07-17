@@ -41,6 +41,7 @@ import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class BootstrapPackageConfigIntegrationTest
@@ -215,7 +216,7 @@ class BootstrapPackageConfigIntegrationTest
         )
       )
 
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 30.seconds)(
         "Voting on a AmuletRules config change for upgraded packages", {
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
