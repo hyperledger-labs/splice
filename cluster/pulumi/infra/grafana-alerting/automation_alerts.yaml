@@ -486,5 +486,5 @@ groups:
         execErrState: Error
         for: 5m
         annotations:
-          description: '{{ index $labels "trigger_name" }} in {{ index $labels "namespace" }} reached contention threshold over the total attempts'
+          description: '{{ index $labels "trigger_name" }} had more than 10% contention in the last 30 minutes.'
         isPaused: false
