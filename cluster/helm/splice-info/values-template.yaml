@@ -40,3 +40,7 @@ resources:
   requests:
     cpu: "0"
     memory: 32Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
