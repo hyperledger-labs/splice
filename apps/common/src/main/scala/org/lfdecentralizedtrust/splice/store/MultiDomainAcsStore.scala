@@ -10,8 +10,8 @@ import com.daml.ledger.api.v2.transaction_filter.{
   TransactionFilter as LapiTransactionFilter,
 }
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
-import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
-import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, ExercisedEvent}
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.metrics.api.MetricsContext
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
@@ -22,8 +22,7 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TreeUpdateOrOffsetCheckpoint,
 }
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
-import org.lfdecentralizedtrust.splice.store.db.AcsQueries.SelectFromAcsTableResult
-import org.lfdecentralizedtrust.splice.store.db.AcsRowData
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes, AcsRowData}
 import org.lfdecentralizedtrust.splice.util.Contract.Companion
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
@@ -36,7 +35,7 @@ import org.lfdecentralizedtrust.splice.util.{
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.digitalasset.canton.participant.pretty.Implicits.prettyContractId
@@ -225,6 +224,14 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       tc: TraceContext
   ): Future[Boolean]
 
+  def listInterfaceViews[C, ICid <: ContractId[?], View <: DamlRecord[View]](
+      companion: C,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Seq[Contract[ICid, View]]]
+
   /** Signal when the store has finished ingesting ledger data from the given offset
     * or a larger one or node-level shutdown was initiated
     */
@@ -271,33 +278,30 @@ object MultiDomainAcsStore {
   }
 
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
-  trait ContractFilter[R <: AcsRowData] {
-
-    def templateIds: Set[PackageQualifiedName]
+  trait ContractFilter[R <: AcsRowData, IR <: AcsInterfaceViewRowData] {
 
     /** The filter required for ingestion into this store. */
     def ingestionFilter: IngestionFilter
 
     /** Whether the event is in scope. */
-    def contains(ev: CreatedEvent): Boolean
+    def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean
 
-    /** Whether the scope might contain an event of the given template. */
-    def mightContain[TC, TCid, T](templateCompanion: JavaContractCompanion[TC, TCid, T]): Boolean
-
-    /** Whether the scope might contain an event of the given template. */
-    def mightContain(identifier: Identifier): Boolean
-
-    def decodeMatchingContract(
-        ev: CreatedEvent
-    ): Option[Contract[?, ?]]
+    /** Whether the contract referenced by the (archive)-ExercisedEvent should be archived.
+      * Since the payload is not included in the event, this will be best-effort,
+      * meaning that `true` might be returned for contracts that were never ingested.
+      * This is fine, as removing something that doesn't exist is a noop.
+      */
+    def shouldArchive(exercisedEvent: ExercisedEvent): Boolean
 
     def matchingContractToRow(
         ev: CreatedEvent
     ): Option[R]
 
-    def decodeMatchingContractFromRow(
-        row: SelectFromAcsTableResult
-    )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]]
+    def matchingInterfaceRows(
+        ev: CreatedEvent
+    )(implicit
+        elc: ErrorLoggingContext
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])]
 
     def isStakeholderOf(ev: CreatedEvent): Boolean
 
@@ -315,12 +319,10 @@ object MultiDomainAcsStore {
     CreatedEvent => Option[Contract[TCid, T]]
   private type EncodeToRow[TCid <: ContractId[T], T <: Template, R <: AcsRowData] =
     Contract[TCid, T] => R
-  private type DecodeFromRow = (SelectFromAcsTableResult, TemplateJsonDecoder) => Contract[?, ?]
 
   case class TemplateFilter[TCid <: ContractId[T], T <: Template, R <: AcsRowData](
       evPredicate: CreatedEvent => Boolean,
       decodeFromCreatedEvent: DecodeFromCreatedEvent[TCid, T],
-      decodeFromRow: DecodeFromRow,
       encodeToRow: EncodeToRow[TCid, T, R],
   ) {
     def matchingContractToRow(
@@ -328,59 +330,86 @@ object MultiDomainAcsStore {
     ): Option[R] = {
       decodeFromCreatedEvent(ev).map(encodeToRow)
     }
+  }
 
-    def mapEncode[R2 <: AcsRowData](f: R => R2): TemplateFilter[TCid, T, R2] = TemplateFilter(
-      evPredicate,
-      decodeFromCreatedEvent,
-      decodeFromRow,
-      contract => f(encodeToRow(contract)),
-    )
+  private type DecodeInterfaceFromCreatedEvent[ICid, View] =
+    CreatedEvent => Option[Contract[ICid, View]]
+  private type EncodeInterfaceToRow[ICid, View, IR <: AcsInterfaceViewRowData] =
+    Contract[ICid, View] => IR
+
+  case class InterfaceFilter[ICid <: ContractId[Marker], Marker, View <: DamlRecord[
+    ?
+  ], IR <: AcsInterfaceViewRowData](
+      interfaceId: Identifier,
+      evPredicate: CreatedEvent => Boolean,
+      decodeFromCreatedEvent: DecodeInterfaceFromCreatedEvent[ICid, View],
+      encodeToRow: EncodeInterfaceToRow[ICid, View, IR],
+  ) {
+    def matchingContractToRow(ev: CreatedEvent): Option[IR] = {
+      decodeFromCreatedEvent(ev).map(encodeToRow)
+    }
   }
 
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
-  case class SimpleContractFilter[R <: AcsRowData](
+  case class SimpleContractFilter[R <: AcsRowData, IR <: AcsInterfaceViewRowData](
       primaryParty: PartyId,
       templateFilters: Map[
         PackageQualifiedName,
         TemplateFilter[?, ?, R],
       ],
-  ) extends ContractFilter[R] {
+      interfaceFilters: Map[
+        PackageQualifiedName,
+        InterfaceFilter[?, ?, ?, IR],
+      ],
+  ) extends ContractFilter[R, IR] {
 
-    // TODO(#829) Drop this once the ledger API exposes package names
-    // on the read path.
-    private val templateFiltersWithoutPackageNames =
-      templateFilters.view.map { case (name, filter) =>
+    private val templateFiltersWithoutPackageNames = filtersWithoutPackageNames(templateFilters)
+
+    private val interfaceFiltersWithoutPackageNames = filtersWithoutPackageNames(interfaceFilters)
+
+    // TODO(#829) Drop this once the ledger API exposes package names on the read path.
+    private def filtersWithoutPackageNames[F](
+        filters: Map[PackageQualifiedName, F]
+    ): Map[QualifiedName, F] =
+      filters.view.map { case (name, filter) =>
         name.qualifiedName -> filter
       }.toMap
 
-    override val templateIds = templateFilters.keySet
-
     override val ingestionFilter =
       IngestionFilter(
-        primaryParty
+        primaryParty,
+        interfaceFilters.values.map(_.interfaceId).toSeq,
       )
 
-    override def contains(ev: CreatedEvent): Boolean =
-      templateFiltersWithoutPackageNames
+    override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
+      val matchesTemplate = templateFiltersWithoutPackageNames
         .get(QualifiedName(ev.getTemplateId))
         .exists(_.evPredicate(ev))
-
-    override def mightContain[TC, TCid, T](
-        templateCompanion: JavaContractCompanion[TC, TCid, T]
-    ): Boolean =
-      templateFilters.contains(PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId))
-
-    override def mightContain(identifier: Identifier): Boolean = {
-      templateFiltersWithoutPackageNames.contains(QualifiedName(identifier))
+      lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
+        interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier)).exists(_.evPredicate(ev))
+      }
+      lazy val interfaceToFailureMap = ev.getFailedInterfaceViews.asScala.filter {
+        case (identifier, _) =>
+          interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier))
+      }
+      if (interfaceToFailureMap.nonEmpty) {
+        elc.error(
+          show"Found failed interface views that match an interface id in a filter: $interfaceToFailureMap. " +
+            show"This might be a bug in the daml definition of the interface's view. " +
+            show"Resolve the error, and if required, reingest the data."
+        )
+      }
+      matchesTemplate || interfaceViews.nonEmpty
     }
 
-    override def decodeMatchingContract(
-        ev: CreatedEvent
-    ): Option[Contract[?, ?]] = {
-      for {
-        templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
-        contract <- templateFilter.decodeFromCreatedEvent(ev)
-      } yield contract
+    override def shouldArchive(
+        exercisedEvent: ExercisedEvent
+    ): Boolean = {
+      templateFiltersWithoutPackageNames.contains(
+        QualifiedName(exercisedEvent.getTemplateId)
+      ) || exercisedEvent.getImplementedInterfaces.asScala.exists(interfaceId =>
+        interfaceFiltersWithoutPackageNames.contains(QualifiedName(interfaceId))
+      )
     }
 
     override def matchingContractToRow(
@@ -392,18 +421,49 @@ object MultiDomainAcsStore {
       } yield row
     }
 
-    override def decodeMatchingContractFromRow(
-        row: SelectFromAcsTableResult
-    )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]] = {
-      for {
-        templateFilter <- templateFiltersWithoutPackageNames.get(row.templateIdQualifiedName)
-      } yield templateFilter.decodeFromRow(row, templateJsonDecoder)
+    override def matchingInterfaceRows(
+        ev: CreatedEvent
+    )(implicit
+        elc: ErrorLoggingContext
+    ): Option[(AcsRowData.AcsRowDataFromInterface, Seq[IR])] = {
+      val acsRowData = AcsRowData.AcsRowDataFromInterface(
+        ev.getTemplateId,
+        new ContractId[DamlRecord[?]](ev.getContractId),
+        AcsJdbcTypes.payloadJsonFromJavaApiDamlRecord(ev.getArguments),
+        ev.getCreatedEventBlob,
+        ev.getCreatedAt,
+      )
+      val interfaceRowDatas = for {
+        (identifier, _) <- ev.getInterfaceViews.asScala
+        interfaceFilter <- interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier))
+        result <- interfaceFilter.matchingContractToRow(ev)
+      } yield result
+
+      if (interfaceRowDatas.isEmpty) {
+        None
+      } else {
+        Some((acsRowData, interfaceRowDatas.toSeq))
+      }
     }
 
     override def isStakeholderOf(ev: CreatedEvent): Boolean = {
       val eventStakeholder = (ev.getSignatories.asScala ++ ev.getObservers.asScala).toSet
       eventStakeholder.contains(primaryParty.toProtoPrimitive)
     }
+  }
+  object SimpleContractFilter {
+    def apply[R <: AcsRowData](
+        primaryParty: PartyId,
+        templateFilters: Map[
+          PackageQualifiedName,
+          TemplateFilter[?, ?, R],
+        ],
+    ): SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested] =
+      SimpleContractFilter[R, AcsInterfaceViewRowData.NoInterfacesIngested](
+        primaryParty,
+        templateFilters,
+        Map.empty,
+      )
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
@@ -413,8 +473,6 @@ object MultiDomainAcsStore {
       p: Contract[TCid, T] => Boolean
   )(
       encode: EncodeToRow[TCid, T, R]
-  )(implicit
-      companionClass: ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T]
   ): (
       PackageQualifiedName,
       TemplateFilter[TCid, T, R],
@@ -427,8 +485,32 @@ object MultiDomainAcsStore {
           c.exists(p)
         },
         ev => Contract.fromCreatedEvent(templateCompanion)(ev),
-        (row, templateJsonDecoder) =>
-          row.toContract(templateCompanion)(companionClass, templateJsonDecoder),
+        encode,
+      ),
+    )
+
+  def mkFilterInterface[ICid <: ContractId[Marker], Marker, View <: DamlRecord[
+    View
+  ], IR <: AcsInterfaceViewRowData](
+      interfaceCompanion: Contract.Companion.Interface[ICid, Marker, View]
+  )(p: Contract[ICid, View] => Boolean)(
+      encode: EncodeInterfaceToRow[ICid, View, IR]
+  ): (
+      PackageQualifiedName,
+      InterfaceFilter[ICid, Marker, View, IR],
+  ) =
+    (
+      PackageQualifiedName(interfaceCompanion.getTemplateIdWithPackageId),
+      InterfaceFilter(
+        interfaceCompanion.TEMPLATE_ID_WITH_PACKAGE_ID,
+        ev => {
+          val c = Contract.fromCreatedEvent(interfaceCompanion)(ev)
+          c.exists(p)
+        },
+        ev => {
+          val result = Contract.fromCreatedEvent(interfaceCompanion)(ev)
+          result
+        },
         encode,
       ),
     )
@@ -438,6 +520,7 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
+      includeInterfaces: Seq[Identifier],
       includeCreatedEventBlob: Boolean = true,
   ) {
 
@@ -445,13 +528,27 @@ object MultiDomainAcsStore {
       LapiTransactionFilter(
         filtersByParty = Map(
           primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
-            Seq(
+            CumulativeFilter(
+              CumulativeFilter.IdentifierFilter.WildcardFilter(
+                com.daml.ledger.api.v2.transaction_filter.WildcardFilter(includeCreatedEventBlob)
+              )
+            ) +: includeInterfaces.map { interfaceId =>
               CumulativeFilter(
-                CumulativeFilter.IdentifierFilter.WildcardFilter(
-                  com.daml.ledger.api.v2.transaction_filter.WildcardFilter(includeCreatedEventBlob)
+                CumulativeFilter.IdentifierFilter.InterfaceFilter(
+                  com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
+                    Some(
+                      com.daml.ledger.api.v2.value.Identifier(
+                        packageId = interfaceId.getPackageId,
+                        moduleName = interfaceId.getModuleName,
+                        entityName = interfaceId.getEntityName,
+                      )
+                    ),
+                    includeInterfaceView = true,
+                    includeCreatedEventBlob = includeCreatedEventBlob,
+                  )
                 )
               )
-            )
+            }
           )
         ),
         filtersForAnyParty = None,
@@ -506,8 +603,6 @@ object MultiDomainAcsStore {
       )
     }
 
-    def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(companion: C): Boolean
-
     def typeId(companion: C): Identifier
 
     def toContractId(companion: C, contractId: String): TCid
@@ -529,10 +624,6 @@ object MultiDomainAcsStore {
           event: CreatedEvent
       ): Option[Contract[TCid, T]] = Contract.fromCreatedEvent(companion)(event)
 
-      override def mightContain(filter: MultiDomainAcsStore.ContractFilter[?])(
-          companion: Contract.Companion.Template[TCid, T]
-      ): Boolean = filter.mightContain(companion)
-
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
         companion.getTemplateIdWithPackageId
 
@@ -550,6 +641,41 @@ object MultiDomainAcsStore {
           decoder: TemplateJsonDecoder
       ): Either[ProtoDeserializationError, Contract[TCid, T]] = {
         Contract.fromHttp(typeId(companion), cId, decoder.decodeTemplate(companion))(
+          templateId,
+          payload,
+          createdEventBlob,
+          createdAt,
+        )
+      }
+    }
+
+  implicit def interfaceCompanion[ICid <: ContractId[Marker], Marker, View <: DamlRecord[View]]
+      : ContractCompanion[Contract.Companion.Interface[ICid, Marker, View], ICid, View] =
+    new ContractCompanion[Contract.Companion.Interface[ICid, Marker, View], ICid, View] {
+      override def fromCreatedEvent(
+          companion: Contract.Companion.Interface[ICid, Marker, View]
+      )(event: CreatedEvent): Option[Contract[ICid, View]] =
+        Contract.fromCreatedEvent(companion)(event)
+
+      override def typeId(companion: Contract.Companion.Interface[ICid, Marker, View]): Identifier =
+        companion.getTemplateIdWithPackageId
+
+      override def toContractId(
+          companion: Companion.Interface[ICid, Marker, View],
+          contractId: String,
+      ): ICid = companion.toContractId(new ContractId[Marker](contractId))
+
+      override protected def fromJson(
+          companion: Companion.Interface[ICid, Marker, View],
+          cId: ICid,
+          templateId: Identifier,
+          payload: Json,
+          createdEventBlob: ByteString,
+          createdAt: Instant,
+      )(implicit
+          decoder: TemplateJsonDecoder
+      ): Either[ProtoDeserializationError, Contract[ICid, View]] = {
+        Contract.fromHttp(typeId(companion), cId, decoder.decodeInterface(companion))(
           templateId,
           payload,
           createdEventBlob,

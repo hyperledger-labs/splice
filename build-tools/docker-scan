@@ -1,0 +1,19 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+image="$(<target/local-image-tag)"
+
+bash <(curl -s https://detect.blackduck.com/detect10.sh) \
+  --blackduck.url=https://digitalasset.blackducksoftware.com/ \
+  --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
+  --detect.docker.image="$image" \
+  --detect.tools=DOCKER,SIGNATURE_SCAN \
+  --detect.tools.excluded=BINARY_SCAN \
+  --detect.project.name=DACH-NY_canton-network-internal_images \
+  --detect.project.version.name="$image"
+
+#TODO(DACH-NY/canton-network-internal#726): run also with `--detect.docker.platform.top.layer.id=sha256:...`, to detect separately vulnerabilities added by us on top of the base image

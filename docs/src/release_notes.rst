@@ -11,14 +11,60 @@ Release Notes
 Upcoming
 --------
 
+- Scan
+
+  - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
+    populate the token metadata total supply using the aggregates used for closed rounds.
+    The data used corresponds to the data served by the ``/v0/total-amulet-balance``
+    endpoint in :ref:`app_dev_scan_api` for the latest closed round.
+  - Fix `bug #1280 <https://github.com/hyperledger-labs/splice/pull/1280>`_:
+    ``record_time`` in Scan API ``/updates`` is now right-padded to 6 digits (microseconds).
+
+- Validator
+
+  - Fix a bug where sweeps through transfer preapprovals failed with a
+    ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
+    party (usually the validator operator) of the receiver is featured.
+
+- Splice
+
+  - Building the Splice repo, and running the vast majority of integration tests locally, no longer requires
+    JFrog access.
+
+- SV
+
+  - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
+    to start without the sequencer being up. This is useful for long-running sequencer database migrations.
+
+- Sequencer
+
+  - Fix a sequential scan in a pruning query. This requires a
+    long-running sequencer database migration (expected around an hour
+    on mainnet). Make sure to set ``domain.skipInitialization`` on the
+    SV app so the rest of your SV node can continue functioning. The
+    liveness probe of the sequencer will fail during the migration so
+    make sure to temporarily bump ``livenessProbeInitialDelaySeconds``
+    and reduce it back to the default after the migration is
+    complete. Otherwise the liveness probe will kill the sequencer and
+    the migration will never complete.
+
+- Participant
+
+  - Fix an issue in sequencer BFT connections where the node got
+    completely disconnected on certain failures even if only one
+    sequencer reported those failures.
+
+0.4.5
+-----
+
 - SV
 
   - *breaking* SV participants now enable sequencer BFT connections
     for the SV participant by default.  You must remove the
     ``useSequencerConnectionsFromScan: false`` config and the
     ``decentralizedSynchronizerUrl`` config from your SV helm values.
-    If needed, the previous behavior can be restore by setting those two variables again
-    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator and SV respectively:
+    If needed, the previous behavior can be restored by setting those two variables again
+    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator app and SV app respectively:
     ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
     ``canton.sv-apps.sv.bft-sequencer-connection = false``
 
@@ -86,7 +132,6 @@ Upcoming
    wallet             0.1.11
    walletPayments     0.1.11
    ================== =======
-
 
 0.4.4
 -----

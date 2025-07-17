@@ -142,19 +142,6 @@ jobs:
       daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
 
-  scala_test_with_bft:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-medium
-      test_names_file: "test-full-class-names-canton-bft.log"
-      start_canton_options: -we
-      parallelism: 1
-      test_name: canton bft
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-    secrets: inherit
-
-
   scala_test_wall_clock_time:
     uses: ./.github/workflows/build.scala_test.yml
     with:
@@ -165,21 +152,6 @@ jobs:
       parallelism: 10
       test_name: wall-clock-time
       with_gcp_creds: true
-      commit_sha: ${{ inputs.commit_sha }}
-      daml_base_version: ${{ inputs.daml_base_version }}
-    secrets: inherit
-
-  scala_test_wall_clock_time_bft:
-    uses: ./.github/workflows/build.scala_test.yml
-    with:
-      runs_on: self-hosted-k8s-large
-      test_names_file: 'test-full-class-names.log'
-      start_canton_options: -we
-      parallelism: 10
-      test_name: wall-clock-time-bft
-      with_gcp_creds: true
-      pre_sbt_cmd: "export SPLICE_USE_BFT_SEQUENCER=1"
-      run_if_commit_tag: 'bft'
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
     secrets: inherit
@@ -280,6 +252,7 @@ jobs:
       with_gcp_creds: true
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
+      oss_only: true
     secrets: inherit
 
   final_result:
@@ -293,7 +266,6 @@ jobs:
     - scala_test_record_time_tolerance
     - scala_test_disaster_recovery
     - scala_test_with_cometbft
-    - scala_test_with_bft
     - scala_test_wall_clock_time
     - scala_test_frontend_wall_clock_time_oss
     - scala_test_frontend_simtime

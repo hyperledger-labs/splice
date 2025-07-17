@@ -1,8 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.ledger.api.v2.value.Identifier
-import com.daml.ledger.api.v2
-import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
@@ -27,38 +25,40 @@ import org.lfdecentralizedtrust.splice.util.{
   WalletTestUtil,
 }
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 import scala.util.Random
 import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequestView
-import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
+import org.lfdecentralizedtrust.splice.console.{
+  ParticipantClientReference,
+  WalletAppClientReference,
+}
+import org.lfdecentralizedtrust.splice.integration.tests.TokenStandardTest.CreateAllocationRequestResult
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 
-//TODO(#1304) - re-enable
-@org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
+@org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class TokenStandardAllocationIntegrationTest
     extends IntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with TriggerTestUtil
-    with ExternallySignedPartyTestUtil {
+    with ExternallySignedPartyTestUtil
+    with TokenStandardTest {
 
   import TokenStandardAllocationIntegrationTest.*
-
-  private val darPath =
-    "token-standard/splice-token-standard-test/.daml/dist/splice-token-standard-test-current.dar"
 
   override def environmentDefinition: EnvironmentDefinition = {
     EnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
-        splitwellValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+        Seq(
+          sv1ValidatorBackend,
+          aliceValidatorBackend,
+          bobValidatorBackend,
+          splitwellValidatorBackend,
+        ).foreach { backend =>
+          backend.participantClient.upload_dar_unless_exists(tokenStandardTestDarPath)
+        }
       })
   }
 
@@ -69,37 +69,6 @@ class TokenStandardAllocationIntegrationTest
   val bobTransferAmount = walletUsdToAmulet(20.0)
   val feesReserveMultiplier = 1.1 // fee reserves are 4 x the fees required for the transfer
   val feesUpperBound = walletUsdToAmulet(1.15)
-
-  def mkTransferLeg(
-      dso: PartyId,
-      sender: PartyId,
-      receiver: PartyId,
-      amount: BigDecimal,
-  ): allocationv1.TransferLeg =
-    new allocationv1.TransferLeg(
-      sender.toProtoPrimitive,
-      receiver.toProtoPrimitive,
-      amount.bigDecimal,
-      new holdingv1.InstrumentId(dso.toProtoPrimitive, "Amulet"),
-      emptyMetadata,
-    )
-
-  def mkTestTradeProposal(
-      dso: PartyId,
-      venue: PartyId,
-      alice: PartyId,
-      bob: PartyId,
-  ): tradingapp.OTCTradeProposal = {
-    val aliceLeg = mkTransferLeg(dso, alice, bob, aliceTransferAmount)
-    // TODO(#561): swap against a token from the token reference implementation
-    val bobLeg = mkTransferLeg(dso, bob, alice, bobTransferAmount)
-    new tradingapp.OTCTradeProposal(
-      venue.toProtoPrimitive,
-      None.toJava,
-      Map("leg0" -> aliceLeg, "leg1" -> bobLeg).asJava,
-      Seq(alice.toProtoPrimitive).asJava,
-    )
-  }
 
   def createAllocationCommand(
       participantClient: ParticipantClientReference,
@@ -155,81 +124,31 @@ class TokenStandardAllocationIntegrationTest
   }
 
   def createAllocation(
-      participantClient: ParticipantClientReference,
+      walletClient: WalletAppClientReference,
       request: allocationrequestv1.AllocationRequestView,
       legId: String,
-  )(implicit
-      env: SpliceTestConsoleEnvironment
   ): allocationv1.Allocation.ContractId = {
-    val senderParty = PartyId.tryFromProtoPrimitive(request.transferLegs.get(legId).sender)
+    val transferLeg = request.transferLegs.get(legId)
+    val senderParty = PartyId.tryFromProtoPrimitive(transferLeg.sender)
     val (_, allocation) = actAndCheck(
       show"Create allocation for leg $legId with sender $senderParty", {
-        val factoryChoice = createAllocationCommand(
-          participantClient,
-          request,
-          legId,
-        )
-        participantClient.ledger_api_extensions.commands
-          .submitJava(
-            Seq(senderParty),
-            commands = factoryChoice.factoryId
-              .exerciseAllocationFactory_Allocate(factoryChoice.args)
-              .commands
-              .asScala
-              .toSeq,
-            disclosedContracts = factoryChoice.disclosedContracts,
+        walletClient.allocateAmulet(
+          new allocationv1.AllocationSpecification(
+            request.settlement,
+            legId,
+            transferLeg,
           )
+        )
       },
     )(
       show"There exists an allocation from $senderParty",
       _ => {
-        val allocations =
-          participantClient.ledger_api.state.acs.of_party(
-            party = senderParty,
-            filterInterfaces = Seq(allocationv1.Allocation.TEMPLATE_ID).map(templateId =>
-              Identifier(
-                templateId.getPackageId,
-                templateId.getModuleName,
-                templateId.getEntityName,
-              )
-            ),
-          )
-        allocations should have size (1)
+        val allocations = walletClient.listAmuletAllocations()
+        allocations should have size 1
         allocations.head
       },
     )
-    new allocationv1.Allocation.ContractId(allocation.event.contractId)
-  }
-
-  def listAllocationRequests(
-      participantClient: ParticipantClientReference,
-      senderParty: PartyId,
-  ): Seq[AllocationRequestView] = {
-    clue(show"Retrieves allocation requests for $senderParty") {
-      val allocationRequests =
-        participantClient.ledger_api.state.acs.of_party(
-          party = senderParty,
-          filterInterfaces =
-            Seq(allocationrequestv1.AllocationRequest.TEMPLATE_ID).map(templateId =>
-              Identifier(
-                templateId.getPackageId,
-                templateId.getModuleName,
-                templateId.getEntityName,
-              )
-            ),
-        )
-      allocationRequests.map(allocationRequest => {
-        val requestViewRaw = (allocationRequest.event.interfaceViews.head.viewValue
-          .getOrElse(throw new RuntimeException("expected an interface view to be present")))
-        allocationrequestv1.AllocationRequestView
-          .valueDecoder()
-          .decode(
-            javaapi.data.DamlRecord.fromProto(
-              v2.value.Record.toJavaProto(requestViewRaw)
-            )
-          )
-      })
-    }
+    new allocationv1.Allocation.ContractId(allocation.contractId.contractId)
   }
 
   "Settle a DvP using allocations" in { implicit env =>
@@ -484,119 +403,20 @@ class TokenStandardAllocationIntegrationTest
         ),
     )
 
-    // Alice creates the TestTradeProposal
-    val (_, aliceProposal) =
-      actAndCheck(
-        "Create test OTC Trade Proposal", {
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              actAs = Seq(aliceParty),
-              commands = mkTestTradeProposal(dsoParty, venueParty, aliceParty, bobParty)
-                .create()
-                .commands()
-                .asScala
-                .toSeq,
-            )
-
-        },
-      )(
-        "There exists a trade proposal visible to both bob's and the venue's participants",
-        _ => {
-          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
-              bobParty
-            )
-          splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
-              bobParty
-            )
-        },
-      )
-
-    // Bob accepts
-    val (_, acceptedProposal) =
-      actAndCheck(
-        "Bob accepts alice's trade proposal", {
-          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              actAs = Seq(bobParty),
-              commands = aliceProposal.id
-                .exerciseOTCTradeProposal_Accept(
-                  bobParty.toProtoPrimitive
-                )
-                .commands()
-                .asScala
-                .toSeq,
-            )
-
-        },
-      )(
-        "There exists a new trade proposal",
-        _ => {
-          bobValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .awaitJava(tradingapp.OTCTradeProposal.COMPANION)(
-              bobParty
-            )
-        },
-      )
-
-    // Venue initiates settlement
-    val prepareUntil = Instant.now().plus(10, ChronoUnit.MINUTES)
-    val settleUntil = prepareUntil.plus(10, ChronoUnit.MINUTES)
-
-    val (_, (trade, aliceRequest, bobRequest)) =
-      actAndCheck(
-        "Venue initiates settlement", {
-          splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitJava(
-              actAs = Seq(venueParty),
-              commands = acceptedProposal.id
-                .exerciseOTCTradeProposal_InitiateSettlement(
-                  prepareUntil,
-                  settleUntil,
-                )
-                .commands()
-                .asScala
-                .toSeq,
-            )
-
-        },
-      )(
-        "There exists an OTCTrade visible as an allocation request to Alice and Bob",
-        _ =>
-          suppressFailedClues(loggerFactory) {
-            val trade =
-              splitwellValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-                .awaitJava(tradingapp.OTCTrade.COMPANION)(
-                  venueParty
-                )
-            val aliceRequest = clue("Alice sees the allocation request") {
-              val requests = listAllocationRequests(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                aliceParty,
-              )
-              val request = requests.loneElement
-              request.transferLegs.asScala should have size (2)
-              request
-            }
-            val bobRequest = clue("Bob sees the allocation request") {
-              val requests = listAllocationRequests(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bobParty,
-              )
-              val request = requests.loneElement
-              request.transferLegs.asScala should have size (2)
-              request
-            }
-            (trade, aliceRequest, bobRequest)
-          },
+    val CreateAllocationRequestResult(trade, aliceRequest, bobRequest) =
+      createAllocationRequestViaOTCTrade(
+        aliceParty,
+        aliceTransferAmount,
+        bobParty,
+        bobTransferAmount,
+        venueParty,
       )
 
     val (aliceAllocationId, _) =
       actAndCheck(
         "Alice creates the matching allocation",
         createAllocation(
-          aliceValidatorBackend.participantClientWithAdminToken,
+          aliceWalletClient,
           aliceRequest,
           "leg0",
         ),
@@ -620,7 +440,7 @@ class TokenStandardAllocationIntegrationTest
       actAndCheck(
         "Bob creates the matching allocation",
         createAllocation(
-          bobValidatorBackend.participantClientWithAdminToken,
+          bobWalletClient,
           bobRequest,
           "leg1",
         ),

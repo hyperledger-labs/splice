@@ -20,7 +20,12 @@ import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsQueries,
+  AcsTables,
+  DbAppStore,
+}
 import org.lfdecentralizedtrust.splice.store.{LimitHelpers, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
   Contract,
@@ -57,6 +62,7 @@ class DbValidatorStore(
 ) extends DbAppStore(
       storage = storage,
       acsTableName = ValidatorTables.acsTableName,
+      interfaceViewsTableNameOpt = None,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
@@ -87,7 +93,8 @@ class DbValidatorStore(
 
   override lazy val acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
+        org.lfdecentralizedtrust.splice.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] = ValidatorStore.contractFilter(key, domainMigrationId)
 
   import multiDomainAcsStore.waitUntilAcsIngested

@@ -3,6 +3,8 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _splice-token-standard-test-docs:
+
 splice-token-standard-test docs
 ===============================
 

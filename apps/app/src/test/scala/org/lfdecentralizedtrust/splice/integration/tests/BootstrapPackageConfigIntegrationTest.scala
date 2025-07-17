@@ -298,8 +298,12 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    val amuletCreateTime =
+    def amuletRulesCreateTimestamp = {
       CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+    }
+
+    val amuletCreateTimeWhenVettingResumed =
+      amuletRulesCreateTimestamp
     sv2PackageVettingTrigger.resume()
     sv2ValidatorPackageVettingTrigger.resume()
 
@@ -307,13 +311,13 @@ class BootstrapPackageConfigIntegrationTest
       eventually() {
         vettingIsUpdatedForTheNewConfig(
           sv2Backend.participantClient,
-          // it depends if the amulet rules contract was pruned or not by the time vetting ran
           Some(
             vettingScheduledTime
           ),
-          Some(
-            amuletCreateTime
-          ),
+          Some(amuletCreateTimeWhenVettingResumed),
+          // it depends if the amulet rules contract was pruned or not by the time vetting ran
+          // there's a chance that amulet rules changed after vetting resumed (eg: pruning)
+          Some(amuletRulesCreateTimestamp),
         )
       }
     }
@@ -336,7 +340,8 @@ class BootstrapPackageConfigIntegrationTest
   private def vettingIsUpdatedForTheNewConfig(
       participantClient: ParticipantClientReference,
       scheduledTimeO: Option[CantonTimestamp],
-      alternativeScheduledTime: Option[CantonTimestamp] = None,
+      scheduledTime1: Option[CantonTimestamp] = None,
+      scheduledTime2: Option[CantonTimestamp] = None,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val vettingTopologyState = participantClient.topology.vetted_packages.list(
       store = Some(
@@ -361,9 +366,10 @@ class BootstrapPackageConfigIntegrationTest
       val newAmuletVettedPackage = vettingState.packages
         .find(_.packageId == expectedVettedVersion.packageId)
         .value
-      newAmuletVettedPackage.validFrom should (equal(scheduledTimeO) or equal(
-        alternativeScheduledTime
-      ))
+
+      newAmuletVettedPackage.validFrom should (
+        equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
+      )
     }
   }
 

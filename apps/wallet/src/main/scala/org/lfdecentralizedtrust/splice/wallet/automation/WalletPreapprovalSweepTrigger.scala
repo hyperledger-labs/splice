@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, Splic
 import SpliceLedgerConnection.CommandId
 import org.lfdecentralizedtrust.splice.environment.ledger.api.DedupDuration
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
+import org.lfdecentralizedtrust.splice.util.ContractWithState
 import org.lfdecentralizedtrust.splice.wallet.config.WalletSweepConfig
 import org.lfdecentralizedtrust.splice.wallet.store.UserWalletStore
 import org.lfdecentralizedtrust.splice.wallet.treasury.TreasuryService
@@ -115,7 +116,8 @@ class WalletPreapprovalSweepTrigger(
           )
         ),
         extraDisclosedContracts = connection.disclosedContracts(
-          preapproval
+          preapproval,
+          featuredAppRight.map(ContractWithState(_, preapproval.state)).toList*
         ),
       )
     } yield ()

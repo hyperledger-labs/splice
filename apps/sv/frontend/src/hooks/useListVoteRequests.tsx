@@ -32,7 +32,8 @@ export const useListDsoRulesVoteRequests = (): UseQueryResult<Contract<VoteReque
 
 export const useListVoteRequestResult = (
   query: ListVoteRequestResultParams,
-  limit: number = 10
+  limit: number = 10,
+  retry: boolean = true
 ): UseQueryResult<DsoRules_CloseVoteRequestResult[]> => {
   const { listVoteRequestResults } = useSvAdminClient();
   return useQuery({
@@ -57,5 +58,6 @@ export const useListVoteRequestResult = (
       );
       return List(DsoRules_CloseVoteRequestResult).decoder.runWithException(dso_rules_vote_results);
     },
+    retry,
   });
 };

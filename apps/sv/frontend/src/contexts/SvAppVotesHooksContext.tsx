@@ -35,7 +35,8 @@ export const SvAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ chi
       requester: string | undefined,
       effectiveFrom: string | undefined,
       effectiveTo: string | undefined,
-      accepted: boolean | undefined
+      accepted: boolean | undefined,
+      retry: boolean = true
     ): UseQueryResult<DsoRules_CloseVoteRequestResult[]> {
       return svHooks.useListVoteRequestResult(
         {
@@ -45,7 +46,8 @@ export const SvAppVotesHooksProvider: React.FC<React.PropsWithChildren> = ({ chi
           effectiveTo,
           accepted,
         },
-        limit
+        limit,
+        retry
       );
     },
     useListVotes(contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> {

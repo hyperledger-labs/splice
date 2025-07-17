@@ -31,8 +31,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: daml_test
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          oss_only: true
 
       - name: Run Daml tests
         if: steps.skip.outputs.skip != 'true'

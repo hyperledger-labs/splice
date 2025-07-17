@@ -18,7 +18,7 @@ object SplitwellTables extends AcsTables {
       groupId: Option[String] = None,
       groupOwner: Option[PartyId] = None,
       paymentRequestCid: Option[AppPaymentRequest.ContractId] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "install_user" -> installUser,
       "group_id" -> groupId.map(lengthLimited),

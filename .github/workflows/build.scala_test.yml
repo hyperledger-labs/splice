@@ -122,8 +122,6 @@ jobs:
         with:
           with_canton: ${{ inputs.with_canton }}
           start_canton_options: ${{ inputs.start_canton_options }}
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           test_suite_name: ${{ inputs.test_name }}
           test_names: ${{ needs.split_tests.outputs.test_names }}
           runner_index: ${{ matrix.runner-index }}
@@ -141,3 +139,5 @@ jobs:
           failure_notifications_slack_channel: ${{ secrets.FAILURE_NOTIFICATIONS_SLACK_CHANNEL }}
           daml_base_version: ${{ inputs.daml_base_version }}
           oss_only: ${{ inputs.oss_only }}
+          artifactory_user: ${{ inputs.oss_only && '' || vars.ARTIFACTORY_USER }}
+          artifactory_password: ${{ inputs.oss_only && '' || secrets.ARTIFACTORY_PASSWORD }}

@@ -14,7 +14,7 @@ object SvTables extends AcsTables {
       contractExpiresAt: Option[Timestamp] = None,
       onboardingSecret: Option[String] = None,
       svCandidateName: Option[String] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "onboarding_secret" -> onboardingSecret.map(lengthLimited),
       "sv_candidate_name" -> svCandidateName.map(lengthLimited),

@@ -50,15 +50,17 @@ abstract class ResetTopologyStatePlugin
 
   private def attemptToResetTopologyState(env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
     val sv1 = env.svs.local.find(_.name == "sv1").value
-    val connectedDomain = sv1.participantClientWithAdminToken.synchronizers
-      .list_connected()
-      .find(_.synchronizerAlias == sv1.config.domains.global.alias)
-      .getOrElse(
-        throw new IllegalStateException(
-          "Failed to reset environment as SV1 is not connected to global domain"
+    val synchronizerId = eventuallySucceeds() {
+      val connectedDomain = sv1.participantClientWithAdminToken.synchronizers
+        .list_connected()
+        .find(_.synchronizerAlias == sv1.config.domains.global.alias)
+        .getOrElse(
+          throw new IllegalStateException(
+            "Failed to reset environment as SV1 is not connected to global domain"
+          )
         )
-      )
-    val synchronizerId = connectedDomain.synchronizerId
+      connectedDomain.synchronizerId
+    }
 
     def resetTopologyStateRetries(retries: Int): Unit = {
       if (retries > MAX_RETRIES) {

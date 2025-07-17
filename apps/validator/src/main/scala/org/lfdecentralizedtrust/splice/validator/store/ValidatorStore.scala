@@ -28,9 +28,10 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.data.Time.Timestamp
+import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -192,7 +193,10 @@ object ValidatorStore {
   def contractFilter(
       key: Key,
       domainMigrationId: Long,
-  ): MultiDomainAcsStore.ContractFilter[ValidatorAcsStoreRowData] = {
+  ): MultiDomainAcsStore.ContractFilter[
+    ValidatorAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
     val validator = key.validatorParty.toProtoPrimitive
     val dso = key.dsoParty.toProtoPrimitive

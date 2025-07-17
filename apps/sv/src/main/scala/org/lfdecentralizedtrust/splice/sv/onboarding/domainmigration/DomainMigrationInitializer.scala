@@ -172,7 +172,10 @@ class DomainMigrationInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        Some(localSynchronizerNode),
       )
       _ <- SetupUtil
         .grantSvUserRightActAsDso(

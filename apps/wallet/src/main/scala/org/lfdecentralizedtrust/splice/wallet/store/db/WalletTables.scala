@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.wallet.store.db
 
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
   AcsRowData,
   AcsTables,
   IndexColumnValue,
@@ -27,7 +28,7 @@ object WalletTables extends AcsTables {
       rewardCouponRound: Option[Long] = None,
       rewardCouponWeight: Option[Long] = None,
       transferPreapprovalReceiver: Option[PartyId] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "reward_coupon_round" -> IndexColumnValue(rewardCouponRound),
       "reward_coupon_weight" -> IndexColumnValue(rewardCouponWeight),
@@ -35,10 +36,15 @@ object WalletTables extends AcsTables {
     )
   }
 
+  case class UserWalletAcsInterfaceViewRowData(contract: Contract[?, ?])
+      extends AcsInterfaceViewRowData.AcsInterfaceViewRowDataFromContract {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+
   case class ExternalPartyWalletAcsStoreRowData(
       contract: Contract[?, ?],
       rewardCouponRound: Option[Long] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override val contractExpiresAt: Option[Timestamp] = None
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "reward_coupon_round" -> IndexColumnValue(rewardCouponRound)
@@ -86,4 +92,5 @@ object WalletTables extends AcsTables {
   val acsTableName: String = "user_wallet_acs_store"
   val externalPartyAcsTableName: String = "external_party_wallet_acs_store"
   val txLogTableName: String = "user_wallet_txlog_store"
+  val interfaceViewsTableName: String = "user_wallet_acs_interface_views"
 }
