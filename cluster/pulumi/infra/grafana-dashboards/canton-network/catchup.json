@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1972,
+  "id": 3259,
   "links": [],
   "panels": [
     {
@@ -83,8 +83,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -115,11 +114,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -128,7 +128,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}",
+          "expr": "min by (namespace, job) (daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -145,7 +145,7 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "delta(daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}[5m]) / 5",
+          "expr": "max by (namespace, job) (delta(daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}[5m])) / 5",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -208,8 +208,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -240,11 +239,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -253,7 +253,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"}",
+          "expr": "min by (namespace)(daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -315,8 +315,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -347,11 +346,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -360,7 +360,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\",job=~\"global-domain-$migration-mediator\"}",
+          "expr": "min by (namespace, job)(daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\",job=~\"global-domain-$migration-mediator\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -435,8 +435,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -467,11 +466,12 @@
           "sortDesc": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "asc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -542,8 +542,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -574,11 +573,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -649,8 +649,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -681,11 +680,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -770,8 +770,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -798,11 +797,12 @@
           "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -877,8 +877,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -905,11 +904,12 @@
           "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -984,8 +984,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1509,7 +1508,7 @@
   ],
   "preload": false,
   "refresh": "30s",
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": [
@@ -1528,7 +1527,9 @@
       },
       {
         "current": {
-          "text": "All",
+          "text": [
+            "All"
+          ],
           "value": [
             "$__all"
           ]
@@ -1580,11 +1581,9 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "PAR::Global-Synchronizer-Foundation::1220ba8e4660..."
-          ],
+          "text": "All",
           "value": [
-            "PAR::Global-Synchronizer-Foundation::1220ba8e4660..."
+            "$__all"
           ]
         },
         "datasource": {
@@ -1615,6 +1614,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 1,
-  "weekStart": ""
+  "version": 2
 }
