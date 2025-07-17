@@ -170,7 +170,7 @@ function installDockerRunnerScaleSet(
               {
                 name: 'runner',
                 image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerHookVersion}`,
-                command: ['/home/runner/run.sh'],
+                command: ['/home/runner/wait-docker-and-run.sh'],
                 env: [
                   {
                     name: 'DOCKER_HOST',

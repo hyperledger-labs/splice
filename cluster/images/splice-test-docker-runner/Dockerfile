@@ -15,3 +15,4 @@ RUN sudo ln -s /usr/bin/python3 /usr/bin/python
 ENV COURSIER_CACHE=/cache/coursier
 
 COPY target/LICENSE .
+COPY wait-docker-and-run.sh /home/runner/wait-docker-and-run.sh
