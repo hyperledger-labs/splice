@@ -71,8 +71,6 @@ monitoring:
   alerting:
     enableNoDataAlerts: true
     alerts:
-      delegatelessContention:
-        thresholdPerNamespace: 0.05
       cloudSql:
         maintenance: true
     logAlerts:

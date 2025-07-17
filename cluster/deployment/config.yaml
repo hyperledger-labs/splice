@@ -40,6 +40,8 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      delegatelessContention:
+        thresholdPerNamespace: 0.05
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
