@@ -17,6 +17,7 @@ TMP_DIR="/tmp/blackduck-docker-scan/${index}"
 mkdir -p "${TMP_DIR}"
 export DETECT_JAR_DOWNLOAD_DIR="${TMP_DIR}/detect_jars"
 
+# We blindly retry on failures, as we've seen unexplained failures in the scans that we couldn't resolve.
 for i in {1..10}; do
   set +e
   bash <(curl -s https://detect.blackduck.com/detect10.sh) \
