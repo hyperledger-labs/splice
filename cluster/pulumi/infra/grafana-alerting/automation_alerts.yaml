@@ -477,7 +477,7 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: (${total_contention} > 0.05 * ${total_attempts}) && (${total_contention} > 0)
+              expression: (${total_contention} > $CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE * ${total_attempts}) && (${total_contention} > 0)
               intervalMs: 1000
               maxDataPoints: 43200
               refId: threshold
