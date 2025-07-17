@@ -172,28 +172,39 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
         pollingTriggerInterval,
       )
     val delay = Random.nextLong(upperBound)
-    DelayUtil
-      .delayIfNotClosing(
-        "dso-delegate-task-delay",
-        FiniteDuration.apply(delay, TimeUnit.MILLISECONDS),
-        this,
-      )
-      .onShutdown(logger.debug(s"Closing after waiting $delay ms"))
-      .flatMap(_ =>
-        isStaleTask(task).flatMap {
-          case true =>
-            Future.successful(
-              TaskSuccess(
-                s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
-              )
-            )
-          case false =>
-            logger.info(
-              s"Completing dso delegate task ${task.toString} after waiting a delay of $delay ms"
-            )
-            completeTaskAsDsoDelegate(task, svParty)
-        }
-      )
+    isStaleTask(task).flatMap {
+      if (_) {
+        Future.successful(
+          TaskSuccess(
+            s"Skipping because task ${task.toString} is already completed"
+          )
+        )
+      } else {
+        DelayUtil
+          .delayIfNotClosing(
+            "dso-delegate-task-delay",
+            FiniteDuration.apply(delay, TimeUnit.MILLISECONDS),
+            this,
+          )
+          .onShutdown(logger.debug(s"Closing after waiting $delay ms"))
+          .flatMap(_ =>
+            isStaleTask(task).flatMap {
+              if (_) {
+                Future.successful(
+                  TaskSuccess(
+                    s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
+                  )
+                )
+              } else {
+                logger.info(
+                  s"Completing dso delegate task ${task.toString} after waiting a delay of $delay ms"
+                )
+                completeTaskAsDsoDelegate(task, svParty)
+              }
+            }
+          )
+      }
+    }
   }
 
   protected def completeTaskAsDsoDelegate(
