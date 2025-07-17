@@ -86,6 +86,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
       <FormControl fullWidth>
         <TextField
           id="create-beneficiary"
+          inputProps={{ 'data-testid': 'create-beneficiary' }}
           value={beneficiary}
           onChange={e => setBeneficiary(e.target.value)}
         />
@@ -122,7 +123,12 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
 
       <Typography variant="h6">Reason</Typography>
       <FormControl fullWidth>
-        <TextField id="create-reason" value={reason} onChange={e => setReason(e.target.value)} />
+        <TextField
+          id="create-reason"
+          inputProps={{ 'data-testid': 'create-reason' }}
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+        />
       </FormControl>
 
       <Typography variant="h6">Can be claimed until</Typography>
