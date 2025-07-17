@@ -43,6 +43,7 @@ class ExpireIssuingMiningRoundTrigger(
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
+    val roundNumber = round.payload.round.number
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
@@ -62,7 +63,7 @@ class ExpireIssuingMiningRoundTrigger(
         .noDedup
         .withPreferredPackage(preferredPackageIds)
         .yieldResult()
-    } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
+    } yield TaskSuccess(s"successfully created the closed mining round $roundNumber with cid $cid")
   }
 }
 
