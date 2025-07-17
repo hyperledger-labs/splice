@@ -1,0 +1,60 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+chart:
+  version: "0.3.1"
+
+templates:
+  - configmap-content-static.yaml
+
+tests:
+  - it: "should render minimal configmap with deployment details in JSON format"
+    set:
+      deploymentDetails:
+        network: "dev"
+        configDigest:
+          allowedIpRanges:
+            type: "md5"
+            value: "AAA"
+          approvedSvIdentities:
+            type: "sha256"
+            value: "BBB"
+        synchronizer:
+          active:
+            chainIdSuffix: "id0"
+            migrationId: 4
+    asserts:
+      - equal:
+          path: data["index.html"]
+          value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:AAA","approved-sv-id-values":"sha256:BBB"},"network":"dev","sv":{"version":"0.3.1"},"synchronizer":{"active":{"chainIdSuffix":"id0","migrationId":4,"version":"0.3.1"},"legacy":null,"staging":null}}}'
+
+  - it: "should render full configmap with deployment details in JSON format"
+    set:
+      deploymentDetails:
+        network: "dev"
+        sv:
+          version: "0.3.3"
+        configDigest:
+          allowedIpRanges:
+            type: "md5"
+            value: "AAA"
+          approvedSvIdentities:
+            type: "sha256"
+            value: "BBB"
+        synchronizer:
+          active:
+            chainIdSuffix: "id0"
+            migrationId: 4
+            version: "0.3.3"
+          staging:
+            chainIdSuffix: "id1"
+            migrationId: 5
+            version: "0.3.4"
+          legacy:
+            chainIdSuffix: "id9"
+            migrationId: 3
+            version: "0.3.2"
+    asserts:
+      - equal:
+          path: data["index.html"]
+          value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:AAA","approved-sv-id-values":"sha256:BBB"},"network":"dev","sv":{"version":"0.3.3"},"synchronizer":{"active":{"chainIdSuffix":"id0","migrationId":4,"version":"0.3.3"},"legacy":{"chainIdSuffix":"id9","migrationId":3,"version":"0.3.2"},"staging":{"chainIdSuffix":"id1","migrationId":5,"version":"0.3.4"}}}}'

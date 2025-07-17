@@ -468,6 +468,90 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-info",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "info",
+      "namespace": "sv-1",
+      "timeout": 600,
+      "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_apps",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "cluster": {
+          "dnsName": "mock.global.canton.network.digitalasset.com",
+          "fixedTokens": false,
+          "hostname": "mock.global.canton.network.digitalasset.com",
+          "name": "cn-mocknet"
+        },
+        "deploymentDetails": {
+          "configDigest": {
+            "allowedIpRanges": {
+              "type": "md5",
+              "value": "md5:90eedde4a8599204a45dcb972e212c8b"
+            },
+            "approvedSvIdentities": {
+              "type": "md5",
+              "value": "md5:7dc4e6604e5b8d704a0ad2994ac501ff"
+            }
+          },
+          "network": "test",
+          "sv": {
+            "version": "0.3.20"
+          },
+          "synchronizer": {
+            "active": {
+              "chainIdSuffix": "4",
+              "migrationId": 3,
+              "version": "0.3.20"
+            },
+            "legacy": null,
+            "staging": {
+              "chainIdSuffix": "4",
+              "migrationId": 4,
+              "version": "0.3.21"
+            }
+          }
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "istioVirtualService": {
+          "gateway": "cluster-ingress/cn-http-gateway",
+          "host": "info.sv-2.mock.global.canton.network.digitalasset.com"
+        },
+        "runtimeDetails": {
+          "scanUrl": "http://scan-app.sv-1:5012"
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_apps",
+            "operator": "Exists"
+          }
+        ]
+      },
+      "version": "0.3.20"
+    },
+    "name": "sv-1-info",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-ingress-runbook",
       "compat": "true",
       "maxHistory": 10,
@@ -615,6 +699,7 @@
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "isFirstSv": true,
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true
         },
@@ -664,6 +749,12 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
+            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -782,6 +873,7 @@
           "readVsWriteScalingFactor": 4
         },
         "isDevNet": false,
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true
         },
@@ -874,6 +966,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true
         },
@@ -901,6 +994,14 @@
           "schema": "validator_sv_1",
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
+        },
+        "resources": {
+          "limits": {
+            "memory": "4Gi"
+          },
+          "requests": {
+            "memory": "2Gi"
+          }
         },
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {

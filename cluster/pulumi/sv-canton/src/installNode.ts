@@ -9,6 +9,7 @@ import {
   supportsSvRunbookReset,
 } from 'splice-pulumi-common';
 import {
+  configForSv,
   coreSvsToDeploy,
   InstalledMigrationSpecificSv,
   sv1Config,
@@ -50,6 +51,7 @@ export function installNode(
       auth0SvAppName: nodeConfig.auth0SvAppName,
       isFirstSv: isFirstSv,
       isCoreSv: isCoreSv,
+      ...configForSv(nodeConfig.nodeName),
     },
     DecentralizedSynchronizerUpgradeConfig,
     {

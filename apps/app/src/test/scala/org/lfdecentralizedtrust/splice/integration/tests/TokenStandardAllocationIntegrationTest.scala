@@ -29,6 +29,7 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Random
 import com.digitalasset.canton.util.ShowUtil.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
 import org.lfdecentralizedtrust.splice.console.{
   ParticipantClientReference,
   WalletAppClientReference,
@@ -316,50 +317,19 @@ class TokenStandardAllocationIntegrationTest
 
   "Withdraw an allocation" in { implicit env =>
     val allocatedOtcTrade = setupAllocatedOtcTrade()
+    // sanity check
+    aliceWalletClient.listAmuletAllocations() should have size (1)
     actAndCheck(
       "Settlement venue withdraw the trade", {
-        val aliceContext = clue("Get choice context for alice's allocation") {
-          val scanResponse =
-            sv1ScanBackend.getAllocationWithdrawContext(allocatedOtcTrade.aliceAllocationId)
-          aliceValidatorBackend.scanProxy.getAllocationWithdrawContext(
-            allocatedOtcTrade.aliceAllocationId
-          ) shouldBe scanResponse
-          scanResponse
-        }
-
-        def mkExtraArg(context: ChoiceContextWithDisclosures) =
-          new metadatav1.ExtraArgs(context.choiceContext, emptyMetadata)
-
-        val withdrawChoice = new allocationv1.Allocation_Withdraw(
-          mkExtraArg(aliceContext)
-        )
-
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-          .submitJava(
-            Seq(allocatedOtcTrade.aliceParty),
-            commands = allocatedOtcTrade.aliceAllocationId
-              .exerciseAllocation_Withdraw(
-                withdrawChoice
-              )
-              .commands()
-              .asScala
-              .toSeq,
-            disclosedContracts = aliceContext.disclosedContracts,
+        aliceWalletClient.withdrawAmuletAllocation(
+          new amuletallocationCodegen.AmuletAllocation.ContractId(
+            allocatedOtcTrade.aliceAllocationId.contractId
           )
+        )
       },
     )(
       "Allocation is archived",
-      _ =>
-        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs.of_party(
-          party = allocatedOtcTrade.aliceParty,
-          filterInterfaces = Seq(allocationv1.Allocation.TEMPLATE_ID).map(templateId =>
-            Identifier(
-              templateId.getPackageId,
-              templateId.getModuleName,
-              templateId.getEntityName,
-            )
-          ),
-        ) shouldBe empty,
+      _ => aliceWalletClient.listAmuletAllocations() shouldBe empty,
     )
   }
 

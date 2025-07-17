@@ -1,0 +1,43 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- define "configmap-content-static" }}
+deploymentInfo:
+  network: {{ .Values.deploymentDetails.network | quote }}
+  sv:
+    version: {{ .Values.deploymentDetails | dig "sv" "version" $.Chart.Version | quote }}
+  configDigest:
+    {{- with .Values.deploymentDetails.configDigest }}
+    allowed-ip-ranges: {{ printf "%s:%s" .allowedIpRanges.type .allowedIpRanges.value | quote }}
+    approved-sv-id-values: {{ printf "%s:%s" .approvedSvIdentities.type .approvedSvIdentities.value | quote }}
+    {{- end }}
+  synchronizer:
+    {{- with .Values.deploymentDetails.synchronizer }}
+    active:
+      version: {{ .active.version | default $.Chart.Version | quote }}
+      migrationId: {{ .active.migrationId }}
+      chainIdSuffix: {{ .active.chainIdSuffix | quote }}
+    staging:
+      {{- if .staging }}
+      version: {{ .staging.version | quote }}
+      migrationId: {{ .staging.migrationId }}
+      chainIdSuffix: {{ .staging.chainIdSuffix | quote }}
+      {{- end }}
+    legacy:
+      {{- if .legacy }}
+      version: {{ .legacy.version | quote }}
+      migrationId: {{ .legacy.migrationId }}
+      chainIdSuffix: {{ .legacy.chainIdSuffix | quote }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+
+{{- if .Values.deploymentDetails }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-content-static
+  namespace: {{ .Release.Namespace }}
+data:
+  index.html: {{ include "configmap-content-static" . | fromYaml | toJson | quote }}
+{{- end }}
