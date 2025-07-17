@@ -869,6 +869,7 @@
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {
           "amuletName": "Amulet",

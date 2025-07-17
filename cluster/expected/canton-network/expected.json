@@ -905,6 +905,14 @@
           "secretName": "cn-apps-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {
+          "limits": {
+            "memory": "4Gi"
+          },
+          "requests": {
+            "memory": "2Gi"
+          }
+        },
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
