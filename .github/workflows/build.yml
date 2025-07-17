@@ -290,7 +290,8 @@ jobs:
     secrets: inherit
 
   final_result:
-    if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+    # if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') }}
+    if : ${{ always() }}
     needs:
     - static_tests
     - deployment_test
