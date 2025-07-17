@@ -432,7 +432,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum(rate(splice_trigger_attempted_total{isDsoDelegateTrigger="true", node_type="sv"}[30m])) by (trigger_name, namespace)
+              expr: sum(rate(splice_trigger_attempted_total{isDsoDelegateTrigger="true", node_type="sv"}[30m])) by (namespace)
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -449,7 +449,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: sum(rate(splice_trigger_attempted_total{statusCode!~"OK", isDsoDelegateTrigger="true", node_type="sv", contentionFailure="true"}[15m])) by (trigger_name, namespace)
+              expr: sum(rate(splice_trigger_attempted_total{statusCode!~"OK", isDsoDelegateTrigger="true", node_type="sv", contentionFailure="true"}[30m])) by (namespace)
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -477,7 +477,7 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: (${total_contention} > 0.1 * ${total_attempts}) && (${total_contention} > 0)
+              expression: (${total_contention} > $CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE * ${total_attempts}) && (${total_contention} > 0)
               intervalMs: 1000
               maxDataPoints: 43200
               refId: threshold
@@ -486,5 +486,5 @@ groups:
         execErrState: Error
         for: 5m
         annotations:
-          description: '{{ index $labels "trigger_name" }} in {{ index $labels "namespace" }} reached contention threshold over the total attempts'
+          description: '{{ index $labels "namespace" }} had more than 5% contention in the last 30 minutes.'
         isPaused: false
