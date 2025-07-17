@@ -24,6 +24,9 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      delegatelessContention: z.object({
+        thresholdPerNamespace: z.number(),
+      }),
       trafficWaste: z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
