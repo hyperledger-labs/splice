@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.validator.automation
 
 import org.lfdecentralizedtrust.splice.automation.{
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
