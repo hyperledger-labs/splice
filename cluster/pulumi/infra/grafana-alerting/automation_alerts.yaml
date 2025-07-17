@@ -432,7 +432,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: sum(rate(splice_trigger_attempted_total{isDsoDelegateTrigger="true", node_type="sv"}[30m])) by (trigger_name, namespace)
+              expr: sum(rate(splice_trigger_attempted_total{isDsoDelegateTrigger="true", node_type="sv"}[30m])) by (trigger_name)
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -449,7 +449,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: sum(rate(splice_trigger_attempted_total{statusCode!~"OK", isDsoDelegateTrigger="true", node_type="sv", contentionFailure="true"}[15m])) by (trigger_name, namespace)
+              expr: sum(rate(splice_trigger_attempted_total{statusCode!~"OK", isDsoDelegateTrigger="true", node_type="sv", contentionFailure="true"}[30m])) by (trigger_name)
               instant: true
               intervalMs: 1000
               legendFormat: __auto
