@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.config.{SpliceConfig, ParticipantClientCo
 import org.lfdecentralizedtrust.splice.sv.config.SvParticipantClientConfig
 import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import org.lfdecentralizedtrust.splice.sv.config.SvSequencerConfig
+import org.lfdecentralizedtrust.splice.sv.config.{SvMediatorConfig, SvSequencerConfig}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import eu.rekawek.toxiproxy.{Proxy, ToxiproxyClient}
@@ -22,6 +22,7 @@ case class UseToxiproxy(
     createScanAppProxies: Boolean = false,
     createScanLedgerApiProxy: Boolean = false,
     createSequencerProxies: Boolean = false,
+    createMediatorProxies: Boolean = false,
     instanceFilter: String => Boolean = _ => true,
 ) extends EnvironmentSetupPlugin[SpliceConfig, SpliceEnvironment]
     with BaseTest {
@@ -94,6 +95,21 @@ case class UseToxiproxy(
       .modify(c => c.copy(port = admListenPort))
       .focus(_.internalApi)
       .modify(c => c.copy(port = publicListenPort))
+  }
+
+  def addMediatorProxy(
+      instanceName: String,
+      mediator: SvMediatorConfig,
+  ): SvMediatorConfig = applyInstanceFilter(instanceName, mediator) {
+    val bump = portBump
+    val host = mediator.adminApi.address
+    val admPort = mediator.adminApi.port
+    val admUpstream = s"${host}:${admPort}"
+    val admListenPort = admPort + bump
+    addProxy(mediatorAdminApi(instanceName), s"localhost:${admListenPort}", admUpstream)
+    mediator
+      .focus(_.adminApi)
+      .modify(c => c.copy(port = admListenPort))
   }
 
   override def beforeEnvironmentCreated(config: SpliceConfig): SpliceConfig = {
@@ -198,7 +214,25 @@ case class UseToxiproxy(
           )
       else scanLedgerApiConf
 
-    sequencerConf
+    val mediatorConf =
+      if (createMediatorProxies)
+        sequencerConf
+          .focus(_.svApps)
+          .modify(
+            _.toSeq
+              .sortBy(_._1.unwrap)
+              .map { case (n, c) =>
+                (
+                  n,
+                  c.focus(_.localSynchronizerNode)
+                    .modify(_.map(_.focus(_.mediator).modify(addMediatorProxy(n.unwrap, _)))),
+                )
+              }
+              .toMap
+          )
+      else sequencerConf
+
+    mediatorConf
   }
 
   override def afterEnvironmentDestroyed(config: SpliceConfig): Unit = {
@@ -230,4 +264,5 @@ object UseToxiproxy {
   def scanHttpApiProxyName(forInstance: String): String = s"$forInstance-scan-api"
   def sequencerAdminApi(forInstance: String): String = s"$forInstance-seq-adm-api"
   def sequencerPublicApi(forInstance: String): String = s"$forInstance-seq-pub-api"
+  def mediatorAdminApi(forInstance: String): String = s"$forInstance-med-adm-api"
 }

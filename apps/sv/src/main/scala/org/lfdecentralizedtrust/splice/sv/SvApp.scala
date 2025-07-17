@@ -469,12 +469,19 @@ class SvApp(
         },
         localSynchronizerNode match {
           case Some(node) =>
-            appInitStep(
-              "Ensure that the local mediators's sequencer request amplification config is up to date"
-            ) {
-              // Normally we set this up during mediator init
-              // but if the config changed without a mediator reset we need to update it here.
-              node.ensureMediatorSequencerRequestAmplification()
+            if (!config.skipSynchronizerInitialization) {
+              appInitStep(
+                "Ensure that the local mediators's sequencer request amplification config is up to date"
+              ) {
+                // Normally we set this up during mediator init
+                // but if the config changed without a mediator reset we need to update it here.
+                node.ensureMediatorSequencerRequestAmplification()
+              }
+            } else {
+              logger.info(
+                "Skipping mediator sequencer amplification configuration because skipSynchronizerInitialization is enabled"
+              )
+              Future.unit
             }
           case None => Future.unit
         },
