@@ -23,6 +23,7 @@ const PulumiProjectConfigSchema = z.object({
     protected: z.boolean(),
     tier: z.string(),
     enterprisePlus: z.boolean(),
+    backupsToRetain: z.number().optional(),
   }),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
