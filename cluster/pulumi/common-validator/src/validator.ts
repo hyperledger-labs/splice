@@ -228,6 +228,16 @@ export async function installValidatorApp(
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
       logLevel: config.logLevel,
+      resources: baseConfig.svValidator
+        ? {
+            requests: {
+              memory: '2Gi',
+            },
+            limits: {
+              memory: '4Gi',
+            },
+          }
+        : {},
       ...spliceInstanceNames,
     },
     chartVersion,
