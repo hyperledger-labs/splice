@@ -94,6 +94,7 @@ object SvOnboardingConfig {
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
+      initialRound: Long = 0L,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -264,7 +265,6 @@ case class SvAppBackendConfig(
     delegatelessAutomation: Boolean = true,
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
-    initialRound: Long = 0L,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

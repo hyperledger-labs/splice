@@ -3,8 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
-import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.config.{
+  NetworkAppClientConfig,
+  SpliceInstanceNamesConfig,
+  UpgradesConfig,
+}
 import org.lfdecentralizedtrust.splice.environment.{
+  BaseLedgerConnection,
   PackageVersionSupport,
   ParticipantAdminConnection,
   RetryFor,
@@ -31,9 +36,13 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import com.digitalasset.canton.admin.api.client.data.SequencerAdminStatus.implicitPrettyString
 
 import scala.jdk.CollectionConverters.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
+import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{FoundDso, JoinWithKey}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -248,6 +257,107 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
         logger.info(s"Registering namespace membership trigger for ${dsoStore.key.svParty}")
         dsoAutomation.registerSvNamespaceMembershipTrigger()
       }
+
+  protected def establishInitialRound(
+      connection: BaseLedgerConnection,
+      upgradesConfig: UpgradesConfig,
+  )(implicit
+      tc: TraceContext,
+      ece: ExecutionContextExecutor,
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      mat: Materializer,
+  ): Future[Long] =
+    for {
+      initialRound <- connection
+        // if simply restarting use the user metadata's initial round
+        .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
+        .flatMap {
+          case Some(round) =>
+            logger.info(s"Initial round $round already set in user's metadata.")
+            Future.successful(round.toLong)
+          case None =>
+            logger.info(s"No round set in user's metadata, using the one from the configuration.")
+            config.onboarding match {
+              case Some(onboardingConfig) =>
+                onboardingConfig match {
+                  case onboardingConfig: FoundDso =>
+                    setInitialRound(connection, onboardingConfig.initialRound)
+                  case onboardingConfig: JoinWithKey =>
+                    setInitialRoundFromSponsor(
+                      connection,
+                      onboardingConfig,
+                      upgradesConfig,
+                    )
+                  case _ =>
+                    throw new IllegalStateException(
+                      "Only first initial node can set the initial round"
+                    )
+                }
+              case None => throw new IllegalStateException("No onboarding config set")
+            }
+        }
+    } yield initialRound
+
+  private def setInitialRound(connection: BaseLedgerConnection, initialRound: Long)(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Long] =
+    for {
+      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
+        connection,
+        config,
+        initialRound.toString,
+      )
+    } yield initialRound
+
+  private def setInitialRoundFromSponsor(
+      connection: BaseLedgerConnection,
+      joiningConfig: JoinWithKey,
+      upgradesConfig: UpgradesConfig,
+  )(implicit
+      tc: TraceContext,
+      ece: ExecutionContextExecutor,
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      mat: Materializer,
+  ): Future[Long] =
+    for {
+      initialRound <- {
+        val sponsorConfig = joiningConfig.svClient.adminApi
+        retryProvider.getValueWithRetries(
+          RetryFor.InitializingClientCalls,
+          "initial_round_from_sponsor",
+          "Initial Round from sponsoring SV",
+          setInitialRoundFromSponsor(sponsorConfig, upgradesConfig),
+          logger,
+        )
+      }
+      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
+        connection,
+        config,
+        initialRound,
+      )
+    } yield initialRound.toLong
+
+  private def setInitialRoundFromSponsor(
+      sponsorConfig: NetworkAppClientConfig,
+      upgradesConfig: UpgradesConfig,
+  )(implicit
+      tc: TraceContext,
+      ece: ExecutionContextExecutor,
+      httpClient: HttpClient,
+      templateDecoder: TemplateJsonDecoder,
+      mat: Materializer,
+  ): Future[String] =
+    SvConnection(
+      sponsorConfig,
+      upgradesConfig,
+      retryProvider,
+      loggerFactory,
+    ).flatMap { svConnection =>
+      svConnection.getDsoInfo().map(_.initialRound).andThen(_ => svConnection.close())
+    }
 
   private def isOnboardedInDecentralizedNamespace(
       svcStore: SvDsoStore
