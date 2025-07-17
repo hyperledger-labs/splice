@@ -6,7 +6,7 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.plugins.toxiproxy.UseToxiproxy
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 
-class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
+class SvNoSynchronizerConnectivityIntegrationTest extends IntegrationTest {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -28,11 +28,12 @@ class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
 
   private val toxiproxy = UseToxiproxy(
     createSequencerProxies = true,
+    createMediatorProxies = true,
     instanceFilter = (name: String) => name.contains("Local"),
   )
   registerPlugin(toxiproxy)
 
-  "SV app can restart without working sequencer" in { implicit env =>
+  "SV app can restart without working synchronizer" in { implicit env =>
     startAllSync(
       sv1Backend,
       sv2Backend,
@@ -44,7 +45,7 @@ class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
 
     forAll(Seq((sv1Backend, sv1LocalBackend), (sv2Backend, sv2LocalBackend))) {
       case (sv, svWithoutSequencer) =>
-        clue(s"SV ${sv.name} can start without sequencer") {
+        clue(s"SV ${sv.name} can start without synchronizer") {
           val triggersBefore =
             (sv.dsoAutomation.triggers[Trigger] ++ sv.svAutomation.triggers[Trigger])
               .map(_.getClass.getCanonicalName)
@@ -55,8 +56,13 @@ class SvNoSequencerConnectivityIntegrationTest extends IntegrationTest {
           toxiproxy.disableConnectionViaProxy(
             UseToxiproxy.sequencerPublicApi(svWithoutSequencer.name)
           )
+          toxiproxy.disableConnectionViaProxy(
+            UseToxiproxy.mediatorAdminApi(svWithoutSequencer.name)
+          )
           // Check that sequencer connection really doesn't work anymore.
           svWithoutSequencer.sequencerClient.health.status.toString should include("UNAVAILABLE")
+          // Check that mediator connection really doesn't work anymore.
+          svWithoutSequencer.mediatorClient.health.status.toString should include("UNAVAILABLE")
           svWithoutSequencer.startSync()
           val triggersAfter =
             (svWithoutSequencer.dsoAutomation.triggers[Trigger] ++ svWithoutSequencer.svAutomation

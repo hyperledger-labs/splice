@@ -8,8 +8,13 @@
 Release Notes
 =============
 
-0.4.6
+0.4.7
 -----
+
+Note: 0.4.6 had a bug and should be skipped in favor of 0.4.7 which
+fixed a bug where the ``skipSynchronizerInitialization`` option could
+still result in the SV app crashing if its mediator was unreachable
+which can happen in certain cases when the sequencer is down.
 
 - Info (new)
 
