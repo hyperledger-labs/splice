@@ -11,6 +11,16 @@ Release Notes
 Upcoming
 --------
 
+- Info (new)
+
+  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accesisble.
+    The new `info` endpoint provides:
+
+    - Static information about network, sv, synchronizers, config digests of ip ranges and identities under ``https://info.sv.<YOUR_HOSTNAME>``.
+    - Regularly updated (every minute) copy of DSO information under ``https://info.sv.<YOUR_HOSTNAME>/runtime/dso.json``.
+
+    The relevant documentation is updated at :ref:`sv-helm`.
+
 - Scan
 
   - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
@@ -67,14 +77,6 @@ Upcoming
     as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator app and SV app respectively:
     ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
     ``canton.sv-apps.sv.bft-sequencer-connection = false``
-
-  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accesisble.
-    The new `info` endpoint provides:
-
-    - Static information about network, sv, synchronizers, config digests of ip ranges and identities under ``https://info.sv.<YOUR_HOSTNAME>``.
-    - Regularly updated (every minute) copy of DSO information under ``https://info.sv.<YOUR_HOSTNAME>/runtime/dso.json``.
-
-    The relevant documentation is updated at :ref:`sv-helm`.
 
   - The extra beneficiaries weight config has been fixed to accept integer values.
     The string values for weight have been deprecated and will be removed in future releases.
