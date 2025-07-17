@@ -483,31 +483,31 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       }
     }
 
+    val initialConfig = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
+    val transferConfig = initialConfig.transferConfig
+    val newTransferConfig = new TransferConfig[USD](
+      transferConfig.createFee,
+      transferConfig.holdingFee,
+      transferConfig.transferFee,
+      transferConfig.lockHolderFee,
+      transferConfig.extraFeaturedAppRewardAmount,
+      42,
+      42,
+      42,
+    )
+
+    val newAmuletConfig = new AmuletConfig[USD](
+      newTransferConfig,
+      initialConfig.issuanceCurve,
+      initialConfig.decentralizedSynchronizer,
+      initialConfig.tickDuration,
+      initialConfig.packageConfig,
+      java.util.Optional.empty(),
+      java.util.Optional.empty(),
+    )
+
     val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
       "SV1 create a vote request for a new Amulet Configuration (changing the transfer config)", {
-
-        val initialConfig = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
-        val transferConfig = initialConfig.transferConfig
-        val newTransferConfig = new TransferConfig[USD](
-          transferConfig.createFee,
-          transferConfig.holdingFee,
-          transferConfig.transferFee,
-          transferConfig.lockHolderFee,
-          transferConfig.extraFeaturedAppRewardAmount,
-          42,
-          42,
-          42,
-        )
-
-        val newAmuletConfig = new AmuletConfig[USD](
-          newTransferConfig,
-          initialConfig.issuanceCurve,
-          initialConfig.decentralizedSynchronizer,
-          initialConfig.tickDuration,
-          initialConfig.packageConfig,
-          java.util.Optional.empty(),
-          java.util.Optional.empty(),
-        )
 
         val action: ActionRequiringConfirmation =
           new ARC_AmuletRules(
@@ -522,7 +522,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           "url",
           "description",
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-          Some(Instant.now().plusSeconds(3600)),
+          None,
         )
       },
     )(
@@ -540,15 +540,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority did not vote yet, thus the trigger should not change the amulet config futureValues",
+      "The majority did not vote yet, thus the trigger should not change the amulet config",
       _ => {
         sv2Backend
           .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
-          .futureValues
-          .size() shouldBe initialFutureValuesSize
+          .initialValue shouldBe initialConfig
       },
     )
 
@@ -557,15 +556,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
-      "The majority has voted but without an acceptance majority, the trigger should not change the amulet config futureValues",
+      "The majority has voted but without an acceptance majority, the trigger should not change the amulet config",
       _ => {
         sv3Backend
           .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
-          .futureValues
-          .size() shouldBe initialFutureValuesSize
+          .initialValue shouldBe initialConfig
       },
     )
 
@@ -574,15 +572,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority accepts, the trigger should change the amulet config futureValues",
+      "The majority accepts, the trigger should change the amulet config",
       _ => {
         sv4Backend
           .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
-          .futureValues
-          .size() shouldBe initialFutureValuesSize + 1
+          .initialValue shouldBe newAmuletConfig
       },
     )
 

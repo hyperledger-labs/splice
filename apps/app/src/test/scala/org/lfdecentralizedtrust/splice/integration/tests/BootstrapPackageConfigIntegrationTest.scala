@@ -231,7 +231,7 @@ class BootstrapPackageConfigIntegrationTest
                 "url",
                 "description",
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-                Some(scheduledTime),
+                None,
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)

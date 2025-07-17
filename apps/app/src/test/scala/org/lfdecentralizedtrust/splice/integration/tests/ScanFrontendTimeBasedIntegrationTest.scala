@@ -572,11 +572,7 @@ class ScanFrontendTimeBasedIntegrationTest
         "url",
         "Testing Testingaton",
         dsoInfo.dsoRules.payload.config.voteRequestTimeout,
-        Some(
-          getLedgerTime.toInstant.plusSeconds(
-            defaultTickDuration.minusSeconds(1).duration.toSeconds
-          )
-        ),
+        None,
       )
 
       withFrontEnd("scan-ui") { implicit webDriver =>
