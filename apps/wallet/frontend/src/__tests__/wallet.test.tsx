@@ -31,6 +31,7 @@ import { openApiRequestFromTransferLeg } from '../components/ListAllocationReque
 import * as damlTypes from '@daml/types';
 import { ContractId } from '@daml/types';
 import { AnyContract } from '@daml.js/splice-api-token-metadata/lib/Splice/Api/Token/MetadataV1/module';
+import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
 
 const dsoEntry = nameServiceEntries.find(e => e.name.startsWith('dso'))!;
 
@@ -188,6 +189,44 @@ describe('Wallet user can', () => {
     });
 
     describe('Allocations', () => {
+      test('see allocations', async () => {
+        const allocations = Array.from({ length: 3 }, (_, i) =>
+          getAllocation(`settlement_${i}`, `transfer_leg_${i}`, `receiver_${i}::party`, `${i + 1}`)
+        );
+        server.use(
+          rest.get(`${walletUrl}/v0/allocations`, (_req, res, ctx) => {
+            return res(
+              ctx.json<ListAllocationsResponse>({
+                allocations: allocations.map(allocationPayload => {
+                  return {
+                    contract: mkContract(AmuletAllocation, allocationPayload),
+                  };
+                }),
+              })
+            );
+          })
+        );
+
+        const user = userEvent.setup();
+        render(
+          <WalletConfigProvider>
+            <App />
+          </WalletConfigProvider>
+        );
+        expect(await screen.findByText('Allocations')).toBeDefined();
+
+        const allocationsLink = screen.getByRole('link', { name: 'Allocations' });
+        await user.click(allocationsLink);
+        expect(
+          screen.getByRole('heading', { name: `Allocations ${allocations.length}` })
+        ).toBeDefined();
+
+        const settlementRefIds = await screen.findAllByText(/SettlementRef id.*/);
+        expect(settlementRefIds.map(e => e.textContent)).toStrictEqual(
+          allocations.map(a => `SettlementRef id: ${a.allocation.settlement.settlementRef.id}`)
+        );
+      });
+
       test('see allocation requests, and accept them', async () => {
         const allocationRequest = getAllocationRequest();
         const allocationRequests = [allocationRequest];
@@ -664,5 +703,37 @@ function getAllocationRequest() {
       },
     },
     meta: { values: {} },
+  };
+}
+
+function getAllocation(
+  settlementId: string,
+  transferLegId: string,
+  receiver: string,
+  amount: string
+) {
+  return {
+    lockedAmulet: `lockedamulet${settlementId}`,
+    allocation: {
+      transferLegId,
+      transferLeg: {
+        sender: alicePartyId,
+        receiver,
+        amount,
+        meta: { values: {} },
+        instrumentId: { id: 'Amulet', admin: 'dso::party' },
+      },
+      settlement: {
+        executor: 'executor',
+        settlementRef: {
+          id: settlementId,
+          cid: null,
+        },
+        requestedAt: new Date().toISOString(),
+        allocateBefore: new Date().toISOString(),
+        settleBefore: new Date().toISOString(),
+        meta: { values: {} },
+      },
+    },
   };
 }
