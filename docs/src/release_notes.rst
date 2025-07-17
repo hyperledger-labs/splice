@@ -13,7 +13,7 @@ Release Notes
 
 - Info (new)
 
-  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accesisble.
+  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accesible.
     The new `info` endpoint provides:
 
     - Static information about network, sv, synchronizers, config digests of ip ranges and identities under ``https://info.sv.<YOUR_HOSTNAME>``.
@@ -43,7 +43,7 @@ Release Notes
 
 - SV
 
-  - Addded a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
+  - Added a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
     to start without the sequencer being up. This is useful for long-running sequencer database migrations.
 
 - Sequencer
