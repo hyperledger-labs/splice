@@ -251,7 +251,6 @@ class SV1Initializer(
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
-      // scan needs to know the initial round
       initialRound <- establishInitialRound(
         svAutomation.connection,
         upgradesConfig,

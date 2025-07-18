@@ -241,9 +241,7 @@ class DomainMigrationInitializer(
             loggerFactory,
           ).restoreParticipantUsersData(participantUsersData)
         }
-        case None =>
-          logger.info("No participant user data")
-          Future.unit
+        case None => Future.unit
       }
       _ <- establishInitialRound(
         readOnlyConnection,
