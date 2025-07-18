@@ -182,7 +182,6 @@ testAmuletUsedAfterHoldingFeeChanged: Script ()
 testAmuletUsedAfterHoldingFeeChanged = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
-  now <- getTime
 
   let holdingFee = 0.00002
       smallerHoldingFee = 0.00005
@@ -190,13 +189,11 @@ testAmuletUsedAfterHoldingFeeChanged = do
 
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
-  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
-    newScheduleItem = (
-          addRelTime now (minutes 1),
-          amuletRules.configSchedule.initialValue with
-            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
-              holdingFee = RatePerRound smallerHoldingFee
-        )
+  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+    newConfig = amuletRules.configSchedule.initialValue with
+                            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
+                              holdingFee = RatePerRound smallerHoldingFee
+    baseConfig = amuletRules.configSchedule.initialValue
 
   runNextIssuance app
   amuletRound2Cid <- tap app alice 100.0

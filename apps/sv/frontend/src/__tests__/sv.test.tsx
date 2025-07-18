@@ -221,6 +221,7 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
     expect(await screen.findByText('Executed')).toBeDefined();
     await user.click(screen.getByText('Executed'));
 
+    // Deprecated from dsoGovernance 0.1.15 (should still be displayed in Executed)
     expect(await screen.findByText('CRARC_AddFutureAmuletConfigSchedule')).toBeDefined();
   });
 

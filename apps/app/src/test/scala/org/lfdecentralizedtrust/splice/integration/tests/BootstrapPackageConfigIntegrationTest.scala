@@ -8,13 +8,14 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
@@ -40,7 +41,7 @@ import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class BootstrapPackageConfigIntegrationTest
@@ -62,14 +63,13 @@ class BootstrapPackageConfigIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  // These versions are from the release 0.1.17
   private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.4",
-    amuletNameServiceVersion = "0.1.4",
-    dsoGovernanceVersion = "0.1.6",
-    validatorLifecycleVersion = "0.1.1",
-    walletVersion = "0.1.4",
-    walletPaymentsVersion = "0.1.4",
+    amuletVersion = "0.1.8",
+    amuletNameServiceVersion = "0.1.8",
+    dsoGovernanceVersion = "0.1.11",
+    validatorLifecycleVersion = "0.1.2",
+    walletVersion = "0.1.8",
+    walletPaymentsVersion = "0.1.8",
   )
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
@@ -151,11 +151,6 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    assertThrowsAndLogsCommandFailures(
-      sv1ScanBackend.getExternalPartyAmuletRules(),
-      _.errorMessage should include("Not Found"),
-    )
-
     clue("Upload all splitwell versions") {
       // This simulates an app vetting newer versions of their own DARs depending on newer splice-amulet versions
       // before the SVs do so. Topology aware package selection will then force the old splice-amulet and old splitwell versions
@@ -213,17 +208,15 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       val upgradeAction = new ARC_AmuletRules(
-        new CRARC_AddFutureAmuletConfigSchedule(
-          new AmuletRules_AddFutureAmuletConfigSchedule(
-            new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-              scheduledTime,
-              newAmuletConfig,
-            )
+        new CRARC_SetConfig(
+          new AmuletRules_SetConfig(
+            newAmuletConfig,
+            amuletConfig,
           )
         )
       )
 
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 30.seconds)(
         "Voting on a AmuletRules config change for upgraded packages", {
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
@@ -233,8 +226,8 @@ class BootstrapPackageConfigIntegrationTest
                 upgradeAction,
                 "url",
                 "description",
-                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-                None,
+                new RelTime(19_000_000),
+                Some(scheduledTime),
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -256,12 +249,9 @@ class BootstrapPackageConfigIntegrationTest
         "observing AmuletRules with upgraded config",
         _ => {
           val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
-          val configs =
-            newAmuletRules.payload.configSchedule.futureValues.asScala.toList.map(_._2)
-          forExactly(1, configs) { config =>
-            config.packageConfig.amulet shouldBe DarResources.amulet.bootstrap.metadata.version
-              .toString()
-          }
+
+          newAmuletRules.payload.configSchedule.initialValue.packageConfig.amulet shouldBe DarResources.amulet.bootstrap.metadata.version
+            .toString()
         },
       )
 

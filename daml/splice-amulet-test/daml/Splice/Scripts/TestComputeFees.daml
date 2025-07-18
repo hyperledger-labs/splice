@@ -97,14 +97,11 @@ testScaledHoldingFees = do
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
   -- Set holding fee and initial amulet price
-  now <- getTime
-  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
-    newScheduleItem = (
-          addRelTime now (minutes 1),
-          amuletRules.configSchedule.initialValue with
-            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
-              holdingFee = RatePerRound holdingFee
-        )
+  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+    newConfig = amuletRules.configSchedule.initialValue with
+                            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
+                              holdingFee = RatePerRound holdingFee
+    baseConfig = amuletRules.configSchedule.initialValue
 
   advanceToIssuanceWithPrice app initialAmuletPrice
   cid <- tap app alice 100.0

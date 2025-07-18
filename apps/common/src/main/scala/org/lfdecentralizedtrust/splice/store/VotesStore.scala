@@ -5,18 +5,15 @@ package org.lfdecentralizedtrust.splice.store
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules,
   DsoRules_CloseVoteRequestResult,
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.config.Thresholds
-import org.lfdecentralizedtrust.splice.environment.DarResources
 import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRules
 import org.lfdecentralizedtrust.splice.util.Contract
 
@@ -68,7 +65,6 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
       def fulfillConditionsForEarlyClosing(
           request: VoteRequest,
           dsoRules: Contract[DsoRules.ContractId, DsoRules],
-          amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       ): Boolean = {
         val votes = request.votes.values().asScala
         val majorityRejected = votes.count(_.accept == false) >= Thresholds.requiredNumVotes(
@@ -77,18 +73,9 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
         val majorityAccepted = votes.count(_.accept) >= Thresholds.requiredNumVotes(
           dsoRules
         )
-        val dsoGovernanceVersion = PackageVersion.assertFromString(
-          amuletRules.payload.configSchedule.initialValue.packageConfig.dsoGovernance
-        )
         request.targetEffectiveAt.toScala match {
           case Some(_) => majorityRejected
-          case None =>
-            if (dsoGovernanceVersion >= DarResources.dsoGovernance_0_1_11.metadata.version) {
-              majorityRejected || majorityAccepted
-            } else {
-              // TODO(#925): get rid of this case
-              votes.size >= dsoRules.payload.svs.size()
-            }
+          case None => majorityRejected || majorityAccepted
         }
       }
 
@@ -105,7 +92,6 @@ trait ActiveVotesStore extends AppStore with DsoRulesStore with HasAmuletRules {
           fulfillConditions(request.payload, dsoRules.contract) || fulfillConditionsForEarlyClosing(
             request.payload,
             dsoRules.contract,
-            amuletRules,
           )
         )
 

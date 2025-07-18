@@ -392,6 +392,7 @@ const ActionValueTable: React.FC<{
   );
 };
 
+// Deprecated from dsoGovernance 0.1.15 (needed for past actions)
 const AddFutureConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
   dsoInfosQuery: UseQueryResult<DsoInfo>;
@@ -511,6 +512,7 @@ const AddFutureConfigValueTable: React.FC<{
   );
 };
 
+// Deprecated from dsoGovernance 0.1.15 (needed for past actions)
 const RemoveFutureConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
   dsoInfosQuery: UseQueryResult<DsoInfo>;
@@ -582,6 +584,7 @@ const RemoveFutureConfigValueTable: React.FC<{
   );
 };
 
+// Deprecated from dsoGovernance 0.1.15 (needed for past actions)
 const UpdateFutureConfigValueTable: React.FC<{
   votesHooks: BaseVotesHooks;
   dsoInfosQuery: UseQueryResult<DsoInfo>;
