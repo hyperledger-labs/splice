@@ -71,6 +71,11 @@ class UnclaimedSvRewardsScriptIntegrationTest
       val svRewardCouponsClaimedCount = 1L
       val svRewardCouponsUnclaimedCount = 2L
 
+      val sv1Name = sv1Backend.config.onboarding.map(_.name).getOrElse(fail("sv1 name not found"))
+      val sv1TotalWeight: Long =
+        sv1Backend.config.rewardWeightBpsOf(sv1Name).getOrElse(fail("sv1 weight not found"))
+      sv1TotalWeight should be > 0L
+
       // Some rewards gets created before now
       val beginRecordTime = Instant.now().minus(10, ChronoUnit.MINUTES)
 
@@ -90,7 +95,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
         "All reward coupons got created",
         _ => {
           val svRewardCoupons = sv1WalletClient.listSvRewardCoupons()
-          svRewardCoupons should have size (svRewardCouponsCount)
+          svRewardCoupons should have size svRewardCouponsCount
           svRewardCoupons
         },
       )
@@ -154,17 +159,58 @@ class UnclaimedSvRewardsScriptIntegrationTest
             (co.payload.round.number.longValue(), BigDecimal(co.payload.issuancePerSvRewardCoupon))
           )
       )
-      val rewardExpiredTotalAmount = getTotalAmount(svRewardCouponsExpired, roundInfo)
-      val rewardClaimedTotalAmount = getTotalAmount(svRewardCouponsClaimed, roundInfo)
+      val weight = sv1TotalWeight / 2
+      val rewardExpiredTotalAmount = getTotalAmount(svRewardCouponsExpired, roundInfo, weight)
+      val rewardClaimedTotalAmount = getTotalAmount(svRewardCouponsClaimed, roundInfo, weight)
+      val sv1Party = sv1Backend.getDsoInfo().svParty
 
       // Add some minutes in case discrepancies with ledger time
       val endRecordTime = Instant
         .now()
         .plus(5, ChronoUnit.MINUTES)
 
-      clue("Run unclaimed_sv_rewards.py and check results") {
-        val sv1Party = sv1Backend.getDsoInfo().svParty
-        val readLines = mutable.Buffer[String]()
+      val readLines = mutable.Buffer[String]()
+      clue("Run unclaimed_sv_rewards.py with invalid weight and check failure") {
+        val errorProcessor = ProcessLogger(line => readLines.append(line))
+        try {
+          val process = scala.sys.process
+            .Process(
+              Seq(
+                "python",
+                "scripts/scan-txlog/unclaimed_sv_rewards.py",
+                sv1ScanBackend.httpClientConfig.url.toString(),
+                "--grace-period-for-mining-rounds-in-minutes",
+                "30",
+                "--loglevel",
+                "DEBUG",
+                "--beneficiary",
+                sv1Party.toProtoPrimitive,
+                "--begin-migration-id",
+                "0",
+                "--begin-record-time",
+                beginRecordTime.toString,
+                "--end-record-time",
+                endRecordTime.toString,
+                "--weight",
+                (sv1TotalWeight + 1).toString, // Invalid weight
+              )
+            )
+            .run(errorProcessor)
+
+          val exitCode = process.exitValue()
+          exitCode should not be 0
+          forExactly(1, readLines) {
+            _ should include("Invalid weight input:")
+          }
+        } catch {
+          case NonFatal(ex) =>
+            readLines.foreach(logger.error(_))
+            fail("Unexpected failure running script", ex)
+        }
+      }
+
+      clue("Run unclaimed_sv_rewards.py with valid inputs and check results") {
+        readLines.clear()
         val errorProcessor = ProcessLogger(line => readLines.append(line))
         try {
           val exitCode = scala.sys.process
@@ -185,6 +231,8 @@ class UnclaimedSvRewardsScriptIntegrationTest
                 beginRecordTime.toString,
                 "--end-record-time",
                 endRecordTime.toString,
+                "--weight",
+                weight.toString,
               )
             )
             .!(errorProcessor)
@@ -222,11 +270,13 @@ class UnclaimedSvRewardsScriptIntegrationTest
         ]
       ],
       roundInfo: Map[Long, BigDecimal],
+      weight: Long,
   ): BigDecimal = {
     coupons.map { co =>
       val issuancePerSvRewardCoupon =
         roundInfo.getOrElse(co.payload.round.number, fail("Round not found"))
-      BigDecimal(co.payload.weight.longValue()) * issuancePerSvRewardCoupon
+      weight should be <= co.payload.weight.longValue()
+      BigDecimal(weight) * issuancePerSvRewardCoupon
     }.sum
   }
 }
