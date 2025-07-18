@@ -226,7 +226,7 @@ class BootstrapPackageConfigIntegrationTest
                 upgradeAction,
                 "url",
                 "description",
-                new RelTime(19_000),
+                new RelTime(19_000_000),
                 Some(scheduledTime),
               )
             },

@@ -330,7 +330,7 @@ class AppUpgradeIntegrationTest
                     "url",
                     "description",
                     sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-                    Some(Instant.now().plus(1, ChronoUnit.HOURS)),
+                    None,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)

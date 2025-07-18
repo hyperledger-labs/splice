@@ -31,6 +31,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
@@ -56,6 +57,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           sv4Backend.participantClient,
         )
       )
+      .addConfigTransform((_, config) => ConfigTransforms.withNoVoteCooldown(config))
 
   private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
     new SRARC_OffboardSv(
