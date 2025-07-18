@@ -91,6 +91,7 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 
 import java.nio.file.Paths
 import java.time.Instant
@@ -514,6 +515,14 @@ class SvApp(
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
 
+      initialRound <- svAutomation.connection
+        .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
+        .flatMap {
+          case Some(round) => Future.successful(round)
+          case None =>
+            throw new IllegalStateException("No initial round specified in user's metadata")
+        }
+
       handler = new HttpSvHandler(
         config.ledgerApiUser,
         svAutomation,
@@ -535,6 +544,7 @@ class SvApp(
         cometBftClient,
         loggerFactory,
         config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
+        initialRound,
       )
 
       adminHandler = new HttpSvAdminHandler(

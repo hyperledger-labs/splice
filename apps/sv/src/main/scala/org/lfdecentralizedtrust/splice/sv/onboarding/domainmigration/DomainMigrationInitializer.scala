@@ -243,6 +243,10 @@ class DomainMigrationInitializer(
         }
         case None => Future.unit
       }
+      _ <- establishInitialRound(
+        readOnlyConnection,
+        upgradesConfig,
+      )
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

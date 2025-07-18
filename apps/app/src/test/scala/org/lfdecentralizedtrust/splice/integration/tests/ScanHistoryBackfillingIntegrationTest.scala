@@ -43,6 +43,8 @@ class ScanHistoryBackfillingIntegrationTest
     with HasActorSystem
     with HasExecutionContext {
 
+  val initialRound = 48151623L
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
@@ -69,6 +71,11 @@ class ScanHistoryBackfillingIntegrationTest
             updateHistoryBackfillBatchSize = 2,
             txLogBackfillBatchSize = 2,
           )
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(initialRound = initialRound)
         )(config)
       )
       // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
