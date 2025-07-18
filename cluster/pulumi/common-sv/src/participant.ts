@@ -89,6 +89,14 @@ export function installSvParticipant(
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
+      resources: {
+        limits: {
+          memory: '18Gi',
+        },
+        requests: {
+          memory: '12Gi',
+        },
+      },
     },
     version,
     {

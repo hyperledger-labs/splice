@@ -1854,6 +1854,14 @@
           "schema": "participant",
           "secretName": "participant-3-pg-secrets"
         },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
+        },
         "serviceAccountName": "sv-canton-migration-3",
         "tolerations": [
           {
@@ -1997,6 +2005,14 @@
           "postgresName": "participant-4-pg",
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
         },
         "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
@@ -3656,6 +3672,14 @@
           "schema": "participant",
           "secretName": "participant-3-pg-secrets"
         },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
+        },
         "serviceAccountName": "sv-canton-migration-3",
         "tolerations": [
           {
@@ -3799,6 +3823,14 @@
           "postgresName": "participant-4-pg",
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
         },
         "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
