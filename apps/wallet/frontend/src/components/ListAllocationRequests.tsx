@@ -159,15 +159,24 @@ const AllocationRequestActionButton: React.FC<{
   if (!actionAllowed) return null;
   if (alreadyAccepted) {
     return (
-      <Button
-        id={`${parentComponentId}-withdraw`}
-        variant="pill"
-        size="small"
-        className="allocation-withdraw"
-        onClick={() => withdrawAllocationMutation.mutate()}
+      <DisableConditionally
+        conditions={[
+          {
+            disabled: withdrawAllocationMutation.isPending,
+            reason: 'Withdrawing allocation...',
+          },
+        ]}
       >
-        Withdraw
-      </Button>
+        <Button
+          id={`${parentComponentId}-withdraw`}
+          variant="pill"
+          size="small"
+          className="allocation-withdraw"
+          onClick={() => withdrawAllocationMutation.mutate()}
+        >
+          Withdraw
+        </Button>
+      </DisableConditionally>
     );
   } else {
     return (

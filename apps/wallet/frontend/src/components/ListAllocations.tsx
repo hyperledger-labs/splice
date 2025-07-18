@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import React from 'react';
 import { useAmuletAllocations } from '../hooks/useAmuletAllocations';
-import { Loading } from '@lfdecentralizedtrust/splice-common-frontend';
+import { DisableConditionally, Loading } from '@lfdecentralizedtrust/splice-common-frontend';
 import Typography from '@mui/material/Typography';
 import { Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
@@ -93,14 +93,23 @@ const WithdrawAllocationButton: React.FC<{ allocationCid: ContractId<AmuletAlloc
   });
 
   return (
-    <Button
-      variant="pill"
-      size="small"
-      className="allocation-withdraw"
-      onClick={() => withdrawAllocationMutation.mutate()}
+    <DisableConditionally
+      conditions={[
+        {
+          disabled: withdrawAllocationMutation.isPending,
+          reason: 'Withdrawing allocation...',
+        },
+      ]}
     >
-      Withdraw
-    </Button>
+      <Button
+        variant="pill"
+        size="small"
+        className="allocation-withdraw"
+        onClick={() => withdrawAllocationMutation.mutate()}
+      >
+        Withdraw
+      </Button>
+    </DisableConditionally>
   );
 };
 
