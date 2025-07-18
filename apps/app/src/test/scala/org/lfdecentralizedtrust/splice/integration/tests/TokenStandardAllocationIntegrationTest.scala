@@ -336,8 +336,8 @@ class TokenStandardAllocationIntegrationTest
   "Reject an allocation request" in { implicit env =>
     val allocatedOtcTrade = setupAllocatedOtcTrade()
     // sanity checks
-    aliceWalletClient.listAmuletAllocations() should have size (1)
-    bobWalletClient.listAmuletAllocations() should have size (1)
+    aliceWalletClient.listAllocationRequests() should have size (1)
+    bobWalletClient.listAllocationRequests() should have size (1)
 
     actAndCheck(
       "Alice rejects the allocation request", {
