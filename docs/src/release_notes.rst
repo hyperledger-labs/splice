@@ -11,6 +11,10 @@ Release Notes
 Upcoming
 --------
 
+- Dashboards
+
+  - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
+
 0.4.7
 -----
 
