@@ -170,7 +170,7 @@ class AllocationsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    "see and accept allocation requests" in { implicit env =>
+    "see, accept and withdraw allocation requests" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceTransferAmount = BigDecimal(5)
@@ -222,7 +222,7 @@ class AllocationsFrontendIntegrationTest
           aliceWalletClient.listAmuletAllocations() shouldBe empty
         }
 
-        actAndCheck(
+        val (_, allocationElement) = actAndCheck(
           "click on accepting the allocation request", {
             val (aliceTransferLegId, _) =
               otcTrade.aliceRequest.transferLegs.asScala
@@ -243,6 +243,21 @@ class AllocationsFrontendIntegrationTest
             )
 
             checkTransferLegs(allocation, otcTrade.trade.data.transferLegs.asScala.toMap)
+
+            allocation
+          },
+        )
+
+        actAndCheck(
+          "click on withdrawing the allocation", {
+            click on allocationElement
+              .findChildElement(className("allocation-withdraw"))
+              .valueOrFail("Could not find withdraw button for allocation")
+          },
+        )(
+          "the allocation is not shown anymore",
+          _ => {
+            findAll(className("allocation")).toSeq shouldBe empty
           },
         )
       }

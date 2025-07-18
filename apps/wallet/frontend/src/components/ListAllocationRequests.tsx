@@ -46,8 +46,14 @@ const ListAllocationRequests: React.FC = () => {
   const allocations = allocationsQuery.data || [];
 
   return (
-    <Stack spacing={4} direction="column" justifyContent="center" id="allocation-requests">
-      <Typography mt={6} variant="h4">
+    <Stack
+      spacing={4}
+      direction="column"
+      justifyContent="center"
+      id="allocation-requests"
+      aria-labelledby="allocation-requests-label"
+    >
+      <Typography mt={6} variant="h4" id="allocation-requests-label">
         Allocation Requests <Chip label={allocationRequests.length} color="success" />
       </Typography>
       {allocationRequests.map(ar => (
@@ -116,11 +122,12 @@ const AllocationRequestActionButton: React.FC<{
   const actionAllowed =
     transferLeg.sender === userParty && transferLeg.instrumentId.id === 'Amulet';
   const settlement = allocationRequest.payload.settlement;
-  const alreadyAccepted = !!allocations.find(alloc =>
+  const correspondingAllocation = allocations.find(alloc =>
     isAllocationForTransferLeg(alloc, allocationRequest, transferLegId)
   );
+  const alreadyAccepted = !!correspondingAllocation;
 
-  const { createAllocation } = useWalletClient();
+  const { createAllocation, withdrawAllocation } = useWalletClient();
   const createAllocationMutation = useMutation({
     mutationFn: async () => {
       const payload: AllocateAmuletRequest = openApiRequestFromTransferLeg(
@@ -135,16 +142,43 @@ const AllocationRequestActionButton: React.FC<{
       console.error('Failed to submit allocation', error);
     },
   });
+  const withdrawAllocationMutation = useMutation({
+    mutationFn: async () => {
+      if (correspondingAllocation) {
+        return await withdrawAllocation(correspondingAllocation.contractId);
+      } else {
+        throw new Error("This mutation shouldn't be called without a corresponding allocation");
+      }
+    },
+    onSuccess: () => {},
+    onError: error => {
+      console.error('Failed to withdraw allocation', error);
+    },
+  });
 
   if (!actionAllowed) return null;
-  // TODO (#1413): show the withdraw button and implement the callback, instead of showing nothing
-  if (alreadyAccepted) return null;
-  // return (
-  //   <Button variant="pill" size="small" className="allocation-request-withdraw">
-  //     Withdraw
-  //   </Button>
-  // );
-  else
+  if (alreadyAccepted) {
+    return (
+      <DisableConditionally
+        conditions={[
+          {
+            disabled: withdrawAllocationMutation.isPending,
+            reason: 'Withdrawing allocation...',
+          },
+        ]}
+      >
+        <Button
+          id={`${parentComponentId}-withdraw`}
+          variant="pill"
+          size="small"
+          className="allocation-withdraw"
+          onClick={() => withdrawAllocationMutation.mutate()}
+        >
+          Withdraw
+        </Button>
+      </DisableConditionally>
+    );
+  } else {
     return (
       <DisableConditionally
         conditions={[
@@ -165,6 +199,7 @@ const AllocationRequestActionButton: React.FC<{
         </Button>
       </DisableConditionally>
     );
+  }
 };
 
 function isAllocationForTransferLeg(
