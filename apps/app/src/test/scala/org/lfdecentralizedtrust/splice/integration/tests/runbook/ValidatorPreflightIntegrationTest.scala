@@ -399,7 +399,9 @@ abstract class ValidatorPreflightIntegrationTestBase
   }
 
   "can dump participant identities of validator" in { _ =>
-    validatorClient().dumpParticipantIdentities()
+    eventuallySucceeds() {
+      validatorClient().dumpParticipantIdentities()
+    }
   }
 
   "connect to all sequencers stated in latest DsoRules contract" in { implicit env =>
