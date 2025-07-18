@@ -244,14 +244,6 @@ export async function installSvNode(
     config
   );
 
-  installInfo(
-    xns,
-    `info.${config.ingressName}.${CLUSTER_HOSTNAME}`,
-    'cluster-ingress/cn-http-gateway',
-    decentralizedSynchronizerUpgradeConfig,
-    `http://scan-app.${config.nodeName}:5012`
-  );
-
   const svApp = installSvApp(
     decentralizedSynchronizerUpgradeConfig,
     config,
@@ -271,6 +263,15 @@ export async function installSvNode(
     svApp,
     canton.participant,
     appsPostgres
+  );
+
+  installInfo(
+    xns,
+    `info.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+    'cluster-ingress/cn-http-gateway',
+    decentralizedSynchronizerUpgradeConfig,
+    `http://scan-app.${config.nodeName}:5012`,
+    scan
   );
 
   if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
