@@ -1802,6 +1802,7 @@ printTests := {
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+  def isEnterpriseIntegrationTest(name: String): Boolean = name.contains("Enterprise")
 
   def isIntegrationTest(name: String): Boolean =
     name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
@@ -1959,6 +1960,11 @@ printTests := {
       "tests with wall clock time using CometBFT",
       "test-cometbft-full-class-names.log",
       (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isCometBftTest(t),
+    ),
+    (
+      "tests requiring Canton Enterprise",
+      "test-full-class-names-canton-enterprise.log",
+      (t: String) => isEnterpriseIntegrationTest(t),
     ),
     (
       "tests with wall clock time",
