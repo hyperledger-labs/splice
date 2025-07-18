@@ -302,6 +302,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                     logger.debug(
                       "No participant users metadata was found, setting the initial round to 0."
                     )
+                    // TODO(#1580): set it to initial round from user's metadata
                     setInitialRound(connection, 0L)
                 }
               case None =>
