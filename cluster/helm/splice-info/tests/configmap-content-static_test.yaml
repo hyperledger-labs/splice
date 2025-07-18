@@ -15,10 +15,10 @@ tests:
         configDigest:
           allowedIpRanges:
             type: "md5"
-            value: "AAA"
+            value: "d41d8cd98f00b204e9800998ecf8427e"
           approvedSvIdentities:
             type: "sha256"
-            value: "BBB"
+            value: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         synchronizer:
           active:
             chainIdSuffix: "id0"
@@ -26,7 +26,7 @@ tests:
     asserts:
       - equal:
           path: data["index.html"]
-          value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:AAA","approved-sv-id-values":"sha256:BBB"},"network":"dev","sv":{"version":"0.3.1"},"synchronizer":{"active":{"chainIdSuffix":"id0","migrationId":4,"version":"0.3.1"},"legacy":null,"staging":null}}}'
+          value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:d41d8cd98f00b204e9800998ecf8427e","approved-sv-id-values":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},"network":"dev","sv":{"version":"0.3.1"},"synchronizer":{"active":{"chainIdSuffix":"id0","migrationId":4,"version":"0.3.1"},"legacy":null,"staging":null}}}'
 
   - it: "should render full configmap with deployment details in JSON format"
     set:
@@ -37,10 +37,10 @@ tests:
         configDigest:
           allowedIpRanges:
             type: "md5"
-            value: "AAA"
+            value: "d41d8cd98f00b204e9800998ecf8427e"
           approvedSvIdentities:
             type: "sha256"
-            value: "BBB"
+            value: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         synchronizer:
           active:
             chainIdSuffix: "id0"
@@ -57,4 +57,4 @@ tests:
     asserts:
       - equal:
           path: data["index.html"]
-          value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:AAA","approved-sv-id-values":"sha256:BBB"},"network":"dev","sv":{"version":"0.3.3"},"synchronizer":{"active":{"chainIdSuffix":"id0","migrationId":4,"version":"0.3.3"},"legacy":{"chainIdSuffix":"id9","migrationId":3,"version":"0.3.2"},"staging":{"chainIdSuffix":"id1","migrationId":5,"version":"0.3.4"}}}}'
+          value: '{"deploymentInfo":{"configDigest":{"allowed-ip-ranges":"md5:d41d8cd98f00b204e9800998ecf8427e","approved-sv-id-values":"sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},"network":"dev","sv":{"version":"0.3.3"},"synchronizer":{"active":{"chainIdSuffix":"id0","migrationId":4,"version":"0.3.3"},"legacy":{"chainIdSuffix":"id9","migrationId":3,"version":"0.3.2"},"staging":{"chainIdSuffix":"id1","migrationId":5,"version":"0.3.4"}}}}'

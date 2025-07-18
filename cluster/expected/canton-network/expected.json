@@ -501,11 +501,11 @@
           "configDigest": {
             "allowedIpRanges": {
               "type": "md5",
-              "value": "md5:90eedde4a8599204a45dcb972e212c8b"
+              "value": "90eedde4a8599204a45dcb972e212c8b"
             },
             "approvedSvIdentities": {
               "type": "md5",
-              "value": "md5:7dc4e6604e5b8d704a0ad2994ac501ff"
+              "value": "7dc4e6604e5b8d704a0ad2994ac501ff"
             }
           },
           "network": "test",
