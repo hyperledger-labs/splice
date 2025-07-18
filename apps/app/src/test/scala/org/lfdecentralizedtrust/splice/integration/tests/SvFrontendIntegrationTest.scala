@@ -10,6 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_SetConfig,
@@ -649,6 +650,32 @@ class SvFrontendIntegrationTest
             .flatMap(_.findChildElement(tagName("input")))
             .flatMap(_.attribute("value")) should be(Some(sv3PartyId))
           find(id("srarc_updatesvrewardweight-weight")).map(_.text) should be(Some(newWeight))
+        }
+    }
+
+    "can create a valid SRARC_CreateUnallocatedUnclaimedActivityRecord vote request and cast vote on it" in {
+      implicit env =>
+        val testBeneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+        val testAmount = "1000"
+        val testReason = "Granting reward for activity"
+
+        testCreateAndVoteDsoRulesAction("SRARC_CreateUnallocatedUnclaimedActivityRecord") {
+          implicit webDriver =>
+            inside(find(id("create-beneficiary"))) { case Some(field) =>
+              field.underlying.sendKeys(testBeneficiary)
+            }
+            inside(find(id("create-amount"))) { case Some(field) =>
+              field.underlying.sendKeys(testAmount)
+            }
+            inside(find(id("create-reason"))) { case Some(field) =>
+              field.underlying.sendKeys(testReason)
+            }
+        } { implicit webDriver =>
+          find(id("create-beneficiary")).flatMap(_.attribute("value")) should be(
+            Some(testBeneficiary)
+          )
+          find(id("create-amount")).flatMap(_.attribute("value")) should be(Some(testAmount))
+          find(id("create-reason")).flatMap(_.attribute("value")) should be(Some(testReason))
         }
     }
 

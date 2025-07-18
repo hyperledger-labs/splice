@@ -278,6 +278,25 @@ export const ActionView: React.FC<{
           </>
         );
       }
+      case 'SRARC_CreateUnallocatedUnclaimedActivityRecord': {
+        return (
+          <>
+            <ActionValueTable
+              actionType={actionType}
+              actionName={dsoAction.tag}
+              valuesMap={{
+                Beneficiary: <PartyId partyId={dsoAction.value.beneficiary} />,
+                Amount: <Typography>{dsoAction.value.amount}</Typography>,
+                Reason: <Typography>{dsoAction.value.reason}</Typography>,
+                'Must Mint Before': (
+                  <DateWithDurationDisplay datetime={dsoAction.value.expiresAt} />
+                ),
+              }}
+            />
+            {getConfirmationDialog(confirmationDialogProps, expirationInDays)}
+          </>
+        );
+      }
     }
   } else if (action.tag === 'ARC_AmuletRules') {
     const amuletRulesAction = action.value.amuletRulesAction;
