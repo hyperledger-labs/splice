@@ -60,7 +60,7 @@ Upcoming
 
   - Deprecated Daml choices ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule`` and ``AmuletRules_UpdateFutureAmuletConfigSchedule``
 
-    * Governance: new dars
+    * This requires a Daml upgrade to versions
 
           ================== =======
           name               version

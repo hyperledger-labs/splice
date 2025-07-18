@@ -31,11 +31,9 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 
 import java.util.Optional
@@ -43,15 +41,6 @@ import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
-
-  private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.8",
-    amuletNameServiceVersion = "0.1.8",
-    dsoGovernanceVersion = "0.1.11",
-    validatorLifecycleVersion = "0.1.2",
-    walletVersion = "0.1.8",
-    walletPaymentsVersion = "0.1.8",
-  )
 
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
@@ -66,14 +55,6 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           sv3Backend.participantClient,
           sv4Backend.participantClient,
         )
-      )
-      .addConfigTransforms(
-        (_, config) =>
-          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-            _.copy(initialPackageConfig = initialPackageConfig)
-          )(config),
-        // We deliberately change amulet conversion rate votes quickly in this test
-        (_, config) => ConfigTransforms.withNoVoteCooldown(config),
       )
 
   private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
