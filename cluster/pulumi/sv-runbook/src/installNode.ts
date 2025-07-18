@@ -152,6 +152,13 @@ export async function installNode(
             .map(x => x.id.toString()),
         },
       },
+      rateLimit: {
+        scan: {
+          acs: {
+            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
+          },
+        },
+      },
     },
     activeVersion,
     { dependsOn: ingressImagePullDeps.concat([sv, validator]) }

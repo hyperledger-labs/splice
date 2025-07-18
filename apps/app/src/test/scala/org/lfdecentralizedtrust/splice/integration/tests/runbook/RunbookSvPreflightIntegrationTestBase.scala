@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
+import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.{
@@ -9,7 +10,6 @@ import org.lfdecentralizedtrust.splice.util.{
   SvTestUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.topology.SynchronizerId
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*

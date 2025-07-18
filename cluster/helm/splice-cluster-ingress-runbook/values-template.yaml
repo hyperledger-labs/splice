@@ -15,6 +15,10 @@ ingress:
     migrationIds: ["0"]
 spliceDomainNames:
   nameServiceDomain: "ans"
+rateLimit:
+  scan:
+    acs:
+      limit: 10
 
 # k8s affinity for all deployed pods (optional)
 # affinity:
