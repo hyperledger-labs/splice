@@ -161,10 +161,6 @@ class DomainMigrationInitializer(
         config,
         domainMigrationConfig.name,
       )
-      _ <- establishInitialRound(
-        readOnlyConnection,
-        upgradesConfig,
-      )
       migrationInfo =
         DomainMigrationInfo(
           currentMigrationId = config.domainMigrationId,
@@ -245,8 +241,14 @@ class DomainMigrationInitializer(
             loggerFactory,
           ).restoreParticipantUsersData(participantUsersData)
         }
-        case None => Future.unit
+        case None =>
+          logger.info("No participant user data")
+          Future.unit
       }
+      _ <- establishInitialRound(
+        readOnlyConnection,
+        upgradesConfig,
+      )
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

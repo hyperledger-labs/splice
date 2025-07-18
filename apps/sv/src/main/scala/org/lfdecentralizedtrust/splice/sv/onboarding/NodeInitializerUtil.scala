@@ -42,7 +42,11 @@ import scala.jdk.CollectionConverters.*
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{FoundDso, JoinWithKey}
+import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
+  DomainMigration,
+  FoundDso,
+  JoinWithKey,
+}
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -267,37 +271,46 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       httpClient: HttpClient,
       templateDecoder: TemplateJsonDecoder,
       mat: Materializer,
-  ): Future[Long] =
+  ): Future[Long] = {
+    logger.info(s"MY user: ${config.ledgerApiUser}")
     for {
       initialRound <- connection
-        // if simply restarting use the user metadata's initial round
+        // On restarts, use the user's metadata initial round
+        // On resets, the initial SV set it to its configuration, followers learn it from their sponsor
         .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
         .flatMap {
           case Some(round) =>
-            logger.info(s"Initial round $round already set in user's metadata.")
+            logger.info(s"Initial round $round is already set in user's metadata.")
             Future.successful(round.toLong)
           case None =>
-            logger.info(s"No round set in user's metadata, using the one from the configuration.")
             config.onboarding match {
               case Some(onboardingConfig) =>
                 onboardingConfig match {
                   case onboardingConfig: FoundDso =>
+                    logger.info(
+                      s"Setting the configured initial round ${onboardingConfig.initialRound}."
+                    )
                     setInitialRound(connection, onboardingConfig.initialRound)
                   case onboardingConfig: JoinWithKey =>
+                    logger.info("Setting the initial round given by my sponsor.")
                     setInitialRoundFromSponsor(
                       connection,
                       onboardingConfig,
                       upgradesConfig,
                     )
-                  case _ =>
-                    throw new IllegalStateException(
-                      "Only first initial node can set the initial round"
+                  case _: DomainMigration =>
+                    logger.debug(
+                      "No participant users metadata was found, setting the initial round to 0."
                     )
+                    setInitialRound(connection, 0L)
                 }
-              case None => throw new IllegalStateException("No onboarding config set")
+              case None =>
+                logger.debug("No SV onboarding config was found, setting the initial round to 0.")
+                setInitialRound(connection, 0L)
             }
         }
     } yield initialRound
+  }
 
   private def setInitialRound(connection: BaseLedgerConnection, initialRound: Long)(implicit
       ec: ExecutionContext,
@@ -333,11 +346,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
           logger,
         )
       }
-      _ <- SetupUtil.ensureInitialRoundMetadataAnnotation(
-        connection,
-        config,
-        initialRound,
-      )
+      _ <- setInitialRound(connection, initialRound.toLong)
     } yield initialRound.toLong
 
   private def setInitialRoundFromSponsor(
