@@ -15,7 +15,7 @@ Upcoming
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
 
-- Scan
+- Istio Reference Ingress
 
     - Include in the helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints. This will be enabled by default if using the helm charts provided for Istio and the scan ingress is enabled.
       If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
