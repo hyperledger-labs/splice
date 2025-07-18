@@ -19,7 +19,7 @@ COPY --from=xx / /
 RUN xx-apt-get update && \
   xx-apt-get install -y tini
 
-FROM nginx:stable
+FROM nginx:1.28.0@sha256:179f4cd0887d5e2b6ea04e50ef591336a9eeb4cb4f24b3ff854e220c015e0632
 
 COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY default.conf /etc/nginx/conf.d
