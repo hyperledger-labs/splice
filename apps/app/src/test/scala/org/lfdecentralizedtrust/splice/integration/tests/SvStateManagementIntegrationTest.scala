@@ -486,7 +486,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       java.util.Optional.empty(),
     )
 
-    val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
+    val (_, voteRequestCid) = actAndCheck(
       "SV1 create a vote request for a new Amulet Configuration (changing the transfer config)", {
 
         val action: ActionRequiringConfirmation =
@@ -511,7 +511,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         svs.foreach { sv => sv.listVoteRequests() should not be empty }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
         sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
-        (head, sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.futureValues.size())
+        head
       },
     )
 

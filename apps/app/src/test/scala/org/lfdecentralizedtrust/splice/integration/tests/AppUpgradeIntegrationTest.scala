@@ -292,11 +292,9 @@ class AppUpgradeIntegrationTest
             "observing AmuletRules with upgraded config",
             _ => {
               val newAmuletRules = sv1Client.getDsoInfo().amuletRules
-              val configs =
-                newAmuletRules.payload.configSchedule.futureValues.asScala.toList.map(_._2)
-              forExactly(1, configs) { config =>
-                config.packageConfig.amulet should endWith(".123")
-              }
+              val config =
+                newAmuletRules.payload.configSchedule.initialValue
+              config.packageConfig.amulet should endWith(".123")
             },
           )
 
