@@ -333,6 +333,29 @@ class TokenStandardAllocationIntegrationTest
     )
   }
 
+  "Reject an allocation request" in { implicit env =>
+    val allocatedOtcTrade = setupAllocatedOtcTrade()
+    // sanity checks
+    aliceWalletClient.listAmuletAllocations() should have size (1)
+    bobWalletClient.listAmuletAllocations() should have size (1)
+
+    actAndCheck(
+      "Alice rejects the allocation request", {
+        aliceWalletClient.rejectAllocationRequest(
+          allocatedOtcTrade.tradeId.toInterface(allocationrequestv1.AllocationRequest.INTERFACE)
+        )
+      },
+    )(
+      "Allocation request is archived",
+      _ => {
+        val aliceRequests = aliceWalletClient.listAllocationRequests()
+        aliceRequests shouldBe empty
+        val bobRequests = bobWalletClient.listAllocationRequests()
+        bobRequests shouldBe empty
+      },
+    )
+  }
+
   private def setupAllocatedOtcTrade()(implicit env: SpliceTestConsoleEnvironment) = {
     // TODO(DACH-NY/canton-network-node#18561): use external parties for all of them
     val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
