@@ -244,6 +244,23 @@ class JoiningNodeInitializer(
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
+            _ <- retryProvider
+              .ensureThatB(
+                RetryFor.WaitingOnInitDependency,
+                "dso_onboard",
+                show"the DsoRules list the SV party ${dsoStore.key.svParty}",
+                isOnboardedInDsoRules(dsoStore), {
+                  for {
+                    (joiningConfig, svConnection) <- svConnection
+                    _ <- withSvStore.startOnboardingWithDsoPartyHosted(
+                      dsoAutomation,
+                      svConnection,
+                      joiningConfig,
+                    )
+                  } yield ()
+                },
+                logger,
+              )
           } yield dsoAutomation
         } else {
           logger.info(
@@ -297,7 +314,6 @@ class JoiningNodeInitializer(
         decentralizedSynchronizerId,
         dsoAutomation,
         svAutomation,
-        Some(withSvStore),
         packageVersionSupport,
       )
     } yield {
@@ -312,11 +328,11 @@ class JoiningNodeInitializer(
     }
   }
 
+  // Note: This is also used for synchronizer migrations
   def onboard(
       decentralizedSynchronizer: SynchronizerId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
-      withSvStore: Option[WithSvStore],
       packageVersionSupport: PackageVersionSupport,
       skipTrafficReconciliationTriggers: Boolean = false,
   ): Future[Unit] = {
@@ -423,63 +439,15 @@ class JoiningNodeInitializer(
           )
           Future.unit
         }
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+      _ <- checkIsInDecentralizedNamespaceAndStartTrigger(
         dsoAutomationService,
         dsoStore,
         decentralizedSynchronizer,
-        withSvStore,
       )
     } yield {
       ()
     }
   }
-
-  private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-      dsoAutomation: SvDsoAutomationService,
-      dsoStore: SvDsoStore,
-      synchronizerId: SynchronizerId,
-      withSvStore: Option[WithSvStore],
-  ) =
-    (withSvStore match {
-      case None =>
-        retryProvider.waitUntil(
-          RetryFor.WaitingOnInitDependency,
-          "dso_onboard",
-          show"the DsoRules list the SV party ${dsoStore.key.svParty}",
-          isOnboardedInDsoRules(dsoStore).map { onboarded =>
-            if (!onboarded)
-              throw Status.FAILED_PRECONDITION
-                .withDescription("SV is not yet onboarded")
-                .asRuntimeException
-          },
-          logger,
-        )
-      case Some(store) =>
-        retryProvider
-          .ensureThatB(
-            RetryFor.WaitingOnInitDependency,
-            "dso_onboard",
-            show"the DsoRules list the SV party ${dsoStore.key.svParty}",
-            isOnboardedInDsoRules(dsoStore), {
-              for {
-                (joiningConfig, svConnection) <- svConnection
-                _ <- store.startOnboardingWithDsoPartyHosted(
-                  dsoAutomation,
-                  svConnection,
-                  joiningConfig,
-                )
-              } yield ()
-            },
-            logger,
-          )
-    })
-      .flatMap { _ =>
-        checkIsInDecentralizedNamespaceAndStartTrigger(
-          dsoAutomation,
-          dsoStore,
-          synchronizerId,
-        )
-      }
 
   private def waitForSvParticipantToHaveSubmissionRights(
       dsoParty: PartyId,
