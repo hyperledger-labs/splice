@@ -349,7 +349,6 @@ async function installSvAndValidator(
     metrics: {
       enable: true,
     },
-    enableIstioRateLimit: true,
   };
 
   const scanValuesWithFixedTokens = {

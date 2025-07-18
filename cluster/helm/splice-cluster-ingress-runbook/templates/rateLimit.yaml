@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 {{- $scanAppLabel := "scan-app" }}
-{{- if .Values.enableIstioRateLimit }}
+{{- if .Values.ingress.scan }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -14,8 +14,6 @@ metadata:
       proxyStatsMatcher:
         inclusionRegexps:
         - ".*http_local_rate_limit.*"
-  labels:
-    {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 4 }}
 spec:
   workloadSelector:
     labels:

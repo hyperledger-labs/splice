@@ -17,7 +17,7 @@ Upcoming
 
 - Scan
 
-    - Include in the helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints. This can be enabled by setting the value ``enableIstioRateLimit`` to `true` (default `false`).
+    - Include in the helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints. This will be enabled by default if using the helm charts provided for Istio and the scan ingress is enabled.
       If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
       These rate limits will be expanded in the future to more endpoints.
 
