@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as fs from 'fs';
+import { Resource } from '@pulumi/pulumi';
 import { createHash } from 'crypto';
 import {
   approvedSvIdentitiesFile,
@@ -18,7 +19,8 @@ export function installInfo(
   host: string,
   gateway: string,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-  scanUrl: string
+  scanUrl: string,
+  scanDependency: Resource
 ): void {
   function cnChartVerstionToString(version: CnChartVersion): string {
     return version.type === 'remote' ? version.version : 'local';
@@ -89,6 +91,9 @@ export function installInfo(
     'info',
     'splice-info',
     infoValues,
-    decentralizedSynchronizerMigrationConfig.active.version
+    decentralizedSynchronizerMigrationConfig.active.version,
+    {
+      dependsOn: [scanDependency],
+    }
   );
 }
