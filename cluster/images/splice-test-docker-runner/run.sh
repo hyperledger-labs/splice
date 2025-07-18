@@ -18,4 +18,4 @@ if ! docker version &>/dev/null; then
   exit 1
 fi
 
-/home/runner/run-base.sh
+exec /home/runner/run-base.sh "$@"
