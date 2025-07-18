@@ -72,7 +72,7 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
           }
         }
 
-      // ingestion can happen in-between the call `actual=litTransactions()` and the paginated ones,
+      // ingestion can happen in-between the call `actual=listTransactions()` and the paginated ones,
       // so both need to be inside the same `eventually` block
       clue("Paginated result should be equal to non-paginated result") {
         val paginatedResult = Iterator
