@@ -26,9 +26,14 @@
       "required": [ "type", "value" ],
       "additionalProperties": false,
       "properties": {
-        "type": { "type": "string", "enum": ["md5", "sha1", "sha256"] },
-        "value": { "type": "string", "minLength": 1 }
-      }
+        "type": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "oneOf": [
+        { "properties": { "type": { "const": "md5" }, "value": { "pattern": "^[a-fA-F0-9]{32}$" } } },
+        { "properties": { "type": { "const": "sha1" }, "value": { "pattern": "^[a-fA-F0-9]{40}$" } } },
+        { "properties": { "type": { "const": "sha256" }, "value": { "pattern": "^[a-fA-F0-9]{64}$" } } }
+      ]
     }
   },
   "type": "object",
