@@ -125,11 +125,11 @@ export class MultiValidator extends MultiNodeDeployment {
           resources: {
             requests: {
               cpu: '1',
-              memory: '8Gi',
+              memory: '4Gi',
             },
             limits: {
               cpu: '4',
-              memory: '16Gi',
+              memory: '8Gi',
             },
           },
         },
