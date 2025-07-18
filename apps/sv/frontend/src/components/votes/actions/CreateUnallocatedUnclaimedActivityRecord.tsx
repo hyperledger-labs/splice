@@ -131,7 +131,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
         />
       </FormControl>
 
-      <Typography variant="h6">Can be claimed until</Typography>
+      <Typography variant="h6">Must Mint Before</Typography>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DesktopDateTimePicker
           label={`Enter time in local timezone (${getUTCWithOffset()})`}

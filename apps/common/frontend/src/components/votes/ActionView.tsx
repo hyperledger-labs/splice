@@ -288,7 +288,7 @@ export const ActionView: React.FC<{
                 Beneficiary: <PartyId partyId={dsoAction.value.beneficiary} />,
                 Amount: <Typography>{dsoAction.value.amount}</Typography>,
                 Reason: <Typography>{dsoAction.value.reason}</Typography>,
-                'Can be claimed until': (
+                'Must Mint Before': (
                   <DateWithDurationDisplay datetime={dsoAction.value.expiresAt} />
                 ),
               }}
