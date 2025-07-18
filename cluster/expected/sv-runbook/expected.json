@@ -81,6 +81,11 @@
             ]
           }
         },
+        "rateLimit": {
+          "scan": {
+            "acs": {}
+          }
+        },
         "spliceDomainNames": {
           "nameServiceDomain": "cns"
         },

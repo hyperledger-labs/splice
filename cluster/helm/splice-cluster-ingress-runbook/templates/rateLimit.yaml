@@ -92,7 +92,7 @@ spec:
                     - key: header_match
                       value: acs
                   token_bucket:
-                    max_tokens: 10
-                    tokens_per_fill: 10
+                    max_tokens: {{ .Values.rateLimit.scan.acs.limit }}
+                    tokens_per_fill: {{ .Values.rateLimit.scan.acs.limit }}
                     fill_interval: 60s
 {{- end }}
