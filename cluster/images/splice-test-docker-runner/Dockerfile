@@ -15,3 +15,5 @@ RUN sudo ln -s /usr/bin/python3 /usr/bin/python
 ENV COURSIER_CACHE=/cache/coursier
 
 COPY target/LICENSE .
+RUN mv /home/runner/run.sh /home/runner/run-base.sh
+COPY run.sh /home/runner/run.sh

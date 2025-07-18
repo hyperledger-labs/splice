@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.validator.automation
 
 import org.lfdecentralizedtrust.splice.automation.{
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
@@ -185,7 +184,6 @@ class ValidatorAutomationService(
     )
   )
 
-  registerTrigger(new AssignTrigger(triggerContext, store, connection, store.key.validatorParty))
   if (sequencerConnectionFromScan)
     registerTrigger(
       new ReconcileSequencerConnectionsTrigger(

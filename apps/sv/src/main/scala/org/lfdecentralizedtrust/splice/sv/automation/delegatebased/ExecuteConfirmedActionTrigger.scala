@@ -41,6 +41,7 @@ import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.StampedLockWithHandle
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -59,6 +60,12 @@ class ExecuteConfirmedActionTrigger(
     )
     with SvTaskBasedTrigger[AssignedContract[Confirmation.ContractId, Confirmation]] {
 
+  // Lock to avoid contention as any confirmation after the threshold will trigger a conflicting submission.
+  // TODO(tech-debt) Replace single lock by one per action
+  private val lock = new StampedLockWithHandle()
+
+  private val RecheckStalenessDuration = java.time.Duration.ofMillis(200)
+
   private val store = svTaskContext.dsoStore
 
   override def completeTaskAsDsoDelegate(
@@ -73,83 +80,101 @@ class ExecuteConfirmedActionTrigger(
             show"Skipping as the confirmed $action has already been executed"
           )
         )
-      else
-        for {
-          dsoRules <- store.getDsoRules()
-          svs = dsoRules.payload.svs.keySet.asScala
-          requiredNumConfirmations = Thresholds.requiredNumVotes(dsoRules)
-          allConfirmations <- store.listConfirmations(action)
-          now = context.clock.now
-          (unexpiredConfirmations, expiredConfirmations) = allConfirmations.partition(c =>
-            now.toInstant.isBefore(c.payload.expiresAt)
-          )
-          _ = if (expiredConfirmations.nonEmpty) {
-            logger.info(
-              show"Ignoring expired confirmations from ${expiredConfirmations.map(_.payload.confirmer)}"
-            )
-          }
-
-          (confirmationsOfMembers, confirmationsOfNonMembers) = unexpiredConfirmations.partition(
-            c => svs.contains(c.payload.confirmer)
-          )
-          _ = if (confirmationsOfNonMembers.nonEmpty) {
-            logger.info(
-              show"Ignoring confirmations from ${confirmationsOfNonMembers.map(_.payload.confirmer)} as they are no longer an SV"
-            )
-          }
-          uniqueConfirmations = confirmationsOfMembers.distinctBy(_.payload.confirmer)
-          taskOutcome <-
-            if (uniqueConfirmations.size >= requiredNumConfirmations) {
-              for {
-                amuletRules <- store.getAmuletRules()
-                (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-                  controller,
-                  now,
-                )
-                amuletRulesId = amuletRules.contractId
-                cmd = dsoRules.exercise(
-                  _.exerciseDsoRules_ExecuteConfirmedAction(
-                    new DsoRules_ExecuteConfirmedAction(
-                      action,
-                      java.util.Optional.of(amuletRulesId),
-                      uniqueConfirmations
-                        .map(_.contractId)
-                        .asJava, // TODO(DACH-NY/canton-network-node##3300) report duplicated and add test cases to make sure no duplicated confirmations here
-                      controllerArgument,
-                    )
-                  )
-                )
-                res <- for {
-                  outcome <- svTaskContext.connection
-                    .submit(
-                      Seq(store.key.svParty),
-                      Seq(store.key.dsoParty),
-                      cmd,
-                    )
-                    .noDedup
-                    .withPreferredPackage(preferredPackageIds)
-                    .yieldResult()
-                } yield Some(outcome)
-              } yield {
-                res
-                  .map(_ => {
-                    TaskSuccess(
-                      show"executed action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
-                        show" the required $requiredNumConfirmations confirmations."
-                    )
-                  })
-                  .getOrElse(TaskFailed(show"failed to execute action $action."))
-              }
-            } else {
+      else {
+        val beforeLock = context.pollingClock.now
+        lock.withWriteLock {
+          val afterLock = context.pollingClock.now
+          val waitedFor = afterLock - beforeLock
+          logger.debug(s"Acquired lock after $waitedFor")
+          // Recheck for staleness if we waited more than RecheckStalenessDuration as another task may have completed it until we acquired the lock
+          (if (waitedFor.compareTo(RecheckStalenessDuration) < 0) Future.successful(false)
+           else isStaleAction(confirmationContract)).flatMap { isStale =>
+            if (isStale)
               Future.successful(
                 TaskSuccess(
-                  show"not yet executing $action," +
-                    show" as there are only ${uniqueConfirmations.size} out of" +
-                    show" the required $requiredNumConfirmations confirmations."
+                  show"Skipping as the confirmed $action has already been executed"
                 )
               )
-            }
-        } yield taskOutcome
+            else
+              for {
+                dsoRules <- store.getDsoRules()
+                svs = dsoRules.payload.svs.keySet.asScala
+                requiredNumConfirmations = Thresholds.requiredNumVotes(dsoRules)
+                allConfirmations <- store.listConfirmations(action)
+                now = context.clock.now
+                (unexpiredConfirmations, expiredConfirmations) = allConfirmations.partition(c =>
+                  now.toInstant.isBefore(c.payload.expiresAt)
+                )
+                _ = if (expiredConfirmations.nonEmpty) {
+                  logger.info(
+                    show"Ignoring expired confirmations from ${expiredConfirmations.map(_.payload.confirmer)}"
+                  )
+                }
+
+                (confirmationsOfMembers, confirmationsOfNonMembers) = unexpiredConfirmations
+                  .partition(c => svs.contains(c.payload.confirmer))
+                _ = if (confirmationsOfNonMembers.nonEmpty) {
+                  logger.info(
+                    show"Ignoring confirmations from ${confirmationsOfNonMembers.map(_.payload.confirmer)} as they are no longer an SV"
+                  )
+                }
+                uniqueConfirmations = confirmationsOfMembers.distinctBy(_.payload.confirmer)
+                taskOutcome <-
+                  if (uniqueConfirmations.size >= requiredNumConfirmations) {
+                    for {
+                      amuletRules <- store.getAmuletRules()
+                      (controllerArgument, preferredPackageIds) <-
+                        getDelegateLessFeatureSupportArguments(
+                          controller,
+                          now,
+                        )
+                      amuletRulesId = amuletRules.contractId
+                      cmd = dsoRules.exercise(
+                        _.exerciseDsoRules_ExecuteConfirmedAction(
+                          new DsoRules_ExecuteConfirmedAction(
+                            action,
+                            java.util.Optional.of(amuletRulesId),
+                            uniqueConfirmations
+                              .map(_.contractId)
+                              .asJava, // TODO(DACH-NY/canton-network-node##3300) report duplicated and add test cases to make sure no duplicated confirmations here
+                            controllerArgument,
+                          )
+                        )
+                      )
+                      res <- for {
+                        outcome <- svTaskContext.connection
+                          .submit(
+                            Seq(store.key.svParty),
+                            Seq(store.key.dsoParty),
+                            cmd,
+                          )
+                          .noDedup
+                          .withPreferredPackage(preferredPackageIds)
+                          .yieldResult()
+                      } yield Some(outcome)
+                    } yield {
+                      res
+                        .map(_ => {
+                          TaskSuccess(
+                            show"executed action $action as there are ${uniqueConfirmations.size} confirmation(s) which is >=" +
+                              show" the required $requiredNumConfirmations confirmations."
+                          )
+                        })
+                        .getOrElse(TaskFailed(show"failed to execute action $action."))
+                    }
+                  } else {
+                    Future.successful(
+                      TaskSuccess(
+                        show"not yet executing $action," +
+                          show" as there are only ${uniqueConfirmations.size} out of" +
+                          show" the required $requiredNumConfirmations confirmations."
+                      )
+                    )
+                  }
+              } yield taskOutcome
+          }
+        }
+      }
     }
   }
 

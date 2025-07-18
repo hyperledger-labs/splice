@@ -90,6 +90,14 @@ export class MultiValidator extends MultiNodeDeployment {
               name: 'SPLICE_APP_CONTACT_POINT',
               value: daContactPoint,
             },
+            {
+              name: 'LOG_LEVEL_CANTON',
+              value: multiValidatorConfig?.logLevel,
+            },
+            {
+              name: 'LOG_LEVEL_STDOUT',
+              value: multiValidatorConfig?.logLevel,
+            },
           ],
           ports: ports.map(port => ({
             name: port.name,
@@ -117,11 +125,11 @@ export class MultiValidator extends MultiNodeDeployment {
           resources: {
             requests: {
               cpu: '1',
-              memory: '8Gi',
+              memory: '4Gi',
             },
             limits: {
               cpu: '4',
-              memory: '16Gi',
+              memory: '8Gi',
             },
           },
         },

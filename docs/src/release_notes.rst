@@ -11,6 +11,28 @@ Release Notes
 Upcoming
 --------
 
+- Dashboards
+
+  - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
+
+0.4.7
+-----
+
+Note: 0.4.6 had a bug and should be skipped in favor of 0.4.7 which
+fixed a bug where the ``skipSynchronizerInitialization`` option could
+still result in the SV app crashing if its mediator was unreachable
+which can happen in certain cases when the sequencer is down.
+
+- Info (new)
+
+  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accessible.
+    The new `info` endpoint provides:
+
+    - Static information about network, sv, synchronizers, config digests of ip ranges and identities under ``https://info.sv.<YOUR_HOSTNAME>``.
+    - Regularly updated (every minute) copy of DSO information under ``https://info.sv.<YOUR_HOSTNAME>/runtime/dso.json``.
+
+    The relevant documentation is updated at :ref:`sv-helm`.
+
 - Scan
 
   - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:

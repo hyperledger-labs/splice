@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.sv.automation
 
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
   SqlIndexInitializationTrigger,
@@ -61,7 +60,6 @@ class SvSvAutomationService(
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
     SvSvAutomationService
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
-  registerTrigger(new AssignTrigger(triggerContext, svStore, connection, store.key.svParty))
 
   registerTrigger(
     SqlIndexInitializationTrigger(

@@ -1,10 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
-import com.daml.ledger.javaapi.data.CreatedEvent
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
   AllocationSpecification,
   SettlementInfo,
@@ -16,7 +12,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.util.{
-  Contract,
   FrontendLoginUtil,
   SpliceUtil,
   WalletFrontendTestUtil,
@@ -29,6 +24,7 @@ import java.time.{LocalDateTime, ZoneOffset}
 import java.util.Optional
 import scala.util.Random
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.SpliceTokenTestTradingApp_1_0_0
 class AllocationsFrontendIntegrationTest
@@ -143,24 +139,21 @@ class AllocationsFrontendIntegrationTest
     )(
       "the allocation is created",
       _ => {
-        // TODO (#1106): check in the FE as opposed to checking the ledger
-        val allocation =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
-            .of_party(
-              party = sender,
-              filterTemplates = Seq(AmuletAllocation.TEMPLATE_ID).map(TemplateId.fromJavaIdentifier),
-            )
-            .loneElement
+        val allocation = findAll(className("allocation")).toSeq.loneElement
 
-        val specification = Contract
-          .fromCreatedEvent(AmuletAllocation.COMPANION)(
-            CreatedEvent.fromProto(toJavaProto(allocation.event))
-          )
-          .getOrElse(fail(s"Failed to parse allocation contract: $allocation"))
-          .payload
-          .allocation
+        checkSettlementInfo(
+          allocation,
+          wantedAllocation.settlement.settlementRef.id,
+          wantedAllocation.settlement.settlementRef.cid.map(_.contractId).toScala,
+          wantedAllocation.settlement.executor,
+        )
 
-        specification should be(wantedAllocation)
+        checkTransferLegs(
+          allocation,
+          Map(
+            wantedAllocation.transferLegId -> wantedAllocation.transferLeg
+          ),
+        )
       },
     )
   }
@@ -177,7 +170,7 @@ class AllocationsFrontendIntegrationTest
 
   "A wallet UI" should {
 
-    "see and accept allocation requests" in { implicit env =>
+    "see, accept and withdraw allocation requests" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceTransferAmount = BigDecimal(5)
@@ -214,38 +207,14 @@ class AllocationsFrontendIntegrationTest
           eventually() {
             val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
 
-            seleniumText(
-              allocationRequest.childElement(className("allocation-request-id"))
-            ) should be(
-              // hardcoded in daml
-              "SettlementRef id: OTCTradeProposal"
+            checkSettlementInfo(
+              allocationRequest,
+              "OTCTradeProposal", // hardcoded in daml
+              Some(otcTrade.trade.data.tradeCid.contractId),
+              venueParty.toProtoPrimitive,
             )
-            seleniumText(
-              allocationRequest.childElement(className("allocation-request-cid"))
-            ) should be(s"SettlementRef cid: ${otcTrade.trade.data.tradeCid.contractId}")
-            seleniumText(
-              allocationRequest.childElement(className("allocation-executor"))
-            ) should matchText(venueParty.toProtoPrimitive)
 
-            val rows =
-              allocationRequest.findAllChildElements(className("allocation-request-row")).toSeq
-            rows.zip(otcTrade.trade.data.transferLegs.asScala.toSeq.sortBy(_._1)).foreach {
-              case (row, (legId, transferLeg)) =>
-                seleniumText(
-                  row.childElement(className("allocation-legid"))
-                ) should matchText(legId)
-                seleniumText(
-                  row.childElement(className("allocation-amount-instrument"))
-                ) should matchText(
-                  s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
-                )
-                seleniumText(
-                  row.childElement(className("allocation-sender"))
-                ) should matchText(transferLeg.sender)
-                seleniumText(
-                  row.childElement(className("allocation-receiver"))
-                ) should matchText(transferLeg.receiver)
-            }
+            checkTransferLegs(allocationRequest, otcTrade.trade.data.transferLegs.asScala.toMap)
           }
         }
 
@@ -253,23 +222,42 @@ class AllocationsFrontendIntegrationTest
           aliceWalletClient.listAmuletAllocations() shouldBe empty
         }
 
-        actAndCheck(
+        val (_, allocationElement) = actAndCheck(
           "click on accepting the allocation request", {
-            val aliceTransferLeg @ (aliceTransferLegId, _) =
+            val (aliceTransferLegId, _) =
               otcTrade.aliceRequest.transferLegs.asScala
                 .find(_._2.sender == aliceParty.toProtoPrimitive)
                 .valueOrFail("Couldn't find alice's transfer leg")
             click on s"transfer-leg-${otcTrade.trade.id.contractId}-$aliceTransferLegId-accept"
-            aliceTransferLeg
           },
         )(
           "the allocation is shown",
-          { case (aliceTransferLegId, aliceTransferLeg) =>
-            // TODO (#1106): check the allocation is in the FE as opposed to checking the BE
-            val allocation = aliceWalletClient.listAmuletAllocations().loneElement
-            allocation.payload.allocation.settlement should be(otcTrade.aliceRequest.settlement)
-            allocation.payload.allocation.transferLegId should be(aliceTransferLegId)
-            allocation.payload.allocation.transferLeg should be(aliceTransferLeg)
+          { _ =>
+            val allocation = findAll(className("allocation")).toSeq.loneElement
+
+            checkSettlementInfo(
+              allocation,
+              "OTCTradeProposal", // hardcoded in daml
+              Some(otcTrade.trade.data.tradeCid.contractId),
+              venueParty.toProtoPrimitive,
+            )
+
+            checkTransferLegs(allocation, otcTrade.trade.data.transferLegs.asScala.toMap)
+
+            allocation
+          },
+        )
+
+        actAndCheck(
+          "click on withdrawing the allocation", {
+            click on allocationElement
+              .findChildElement(className("allocation-withdraw"))
+              .valueOrFail("Could not find withdraw button for allocation")
+          },
+        )(
+          "the allocation is not shown anymore",
+          _ => {
+            findAll(className("allocation")).toSeq shouldBe empty
           },
         )
       }
@@ -300,5 +288,50 @@ class AllocationsFrontendIntegrationTest
         currentUrl should endWith("/allocations")
       },
     )
+  }
+
+  private def checkSettlementInfo(
+      parent: Element,
+      id: String,
+      cid: Option[String],
+      executor: String,
+  ) = {
+    seleniumText(
+      parent.childElement(className("settlement-id"))
+    ) should be(
+      s"SettlementRef id: $id"
+    )
+    cid.foreach(cid =>
+      seleniumText(
+        parent.childElement(className("settlement-cid"))
+      ) should be(s"SettlementRef cid: $cid")
+    )
+    seleniumText(
+      parent.childElement(className("settlement-executor"))
+    ) should matchText(executor)
+  }
+
+  private def checkTransferLegs(
+      parent: Element,
+      transferLegs: Map[String, TransferLeg],
+  ) = {
+    val rows =
+      parent.findAllChildElements(className("allocation-row")).toSeq
+    rows.zip(transferLegs.toSeq.sortBy(_._1)).foreach { case (row, (legId, transferLeg)) =>
+      seleniumText(
+        row.childElement(className("allocation-legid"))
+      ) should matchText(legId)
+      seleniumText(
+        row.childElement(className("allocation-amount-instrument"))
+      ) should matchText(
+        s"${transferLeg.amount.intValue()} ${transferLeg.instrumentId.id}"
+      )
+      seleniumText(
+        row.childElement(className("allocation-sender"))
+      ) should matchText(transferLeg.sender)
+      seleniumText(
+        row.childElement(className("allocation-receiver"))
+      ) should matchText(transferLeg.receiver)
+    }
   }
 }

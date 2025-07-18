@@ -232,7 +232,6 @@ class DomainMigrationInitializer(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
-        None,
         skipTrafficReconciliationTriggers = true,
         packageVersionSupport = packageVersionSupport,
       )

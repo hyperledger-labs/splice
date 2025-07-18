@@ -440,12 +440,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -873,12 +873,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -1306,12 +1306,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -1739,12 +1739,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -2172,12 +2172,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -2484,6 +2484,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2595,11 +2603,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "8Gi"
+                    "memory": "4Gi"
                   }
                 }
               }
@@ -2866,6 +2874,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2977,11 +2993,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "8Gi"
+                    "memory": "4Gi"
                   }
                 }
               }
@@ -3248,6 +3264,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3359,11 +3383,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "8Gi"
+                    "memory": "4Gi"
                   }
                 }
               }
@@ -3630,6 +3654,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3741,11 +3773,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "8Gi"
+                    "memory": "4Gi"
                   }
                 }
               }
@@ -4012,6 +4044,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4123,11 +4163,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "8Gi"
+                    "memory": "4Gi"
                   }
                 }
               }

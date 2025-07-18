@@ -542,6 +542,7 @@
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -561,6 +562,14 @@
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "8Gi"
+          },
+          "requests": {
+            "memory": "4Gi"
+          }
         },
         "tolerations": [
           {
@@ -858,6 +867,7 @@
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {
           "amuletName": "Amulet",

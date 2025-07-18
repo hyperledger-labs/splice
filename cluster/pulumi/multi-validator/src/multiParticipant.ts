@@ -40,11 +40,11 @@ export class MultiParticipant extends MultiNodeDeployment {
             },
             {
               name: 'LOG_LEVEL_CANTON',
-              value: 'INFO',
+              value: multiValidatorConfig?.logLevel,
             },
             {
               name: 'LOG_LEVEL_STDOUT',
-              value: 'INFO',
+              value: multiValidatorConfig?.logLevel,
             },
           ],
           ports: ports.map(port => ({
@@ -55,11 +55,11 @@ export class MultiParticipant extends MultiNodeDeployment {
           resources: {
             requests: {
               cpu: '1',
-              memory: '12Gi',
+              memory: '8Gi',
             },
             limits: {
-              cpu: '8',
-              memory: '24Gi',
+              cpu: '6',
+              memory: '16Gi',
             },
           },
           readinessProbe: {

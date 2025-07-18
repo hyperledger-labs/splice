@@ -20,7 +20,7 @@ export * from './utils';
 export * from './packageConfig';
 export * from './artifacts';
 export * from './dockerConfig';
-export * from './kms';
+export * from './config/kms';
 export * from './serviceAccount';
 export * from './participantKms';
 export * from './config/migrationSchema';

@@ -496,6 +496,14 @@
           "schema": "participant",
           "secretName": "participant-pg-secrets"
         },
+        "resources": {
+          "limits": {
+            "memory": "8Gi"
+          },
+          "requests": {
+            "memory": "4Gi"
+          }
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -869,6 +877,7 @@
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {
           "amuletName": "Amulet",

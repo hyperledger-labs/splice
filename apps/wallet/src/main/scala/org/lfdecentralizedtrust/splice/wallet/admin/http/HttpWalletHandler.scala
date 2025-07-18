@@ -1130,6 +1130,57 @@ class HttpWalletHandler(
       Codec.encode(SpliceUtil.currentAmount(lockedAmulet.payload.amulet, round)),
     )
 
+  override def withdrawAmuletAllocation(
+      respond: WalletResource.WithdrawAmuletAllocationResponse.type
+  )(
+      contractId: String
+  )(tUser: TracedUser): Future[WalletResource.WithdrawAmuletAllocationResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.withdrawAmuletAllocation") { implicit traceContext => _ =>
+      val allocationCid = Codec.tryDecodeJavaContractId(
+        amuletAllocationCodegen.AmuletAllocation.COMPANION
+      )(
+        contractId
+      )
+      for {
+        wallet <- getUserWallet(user)
+        store = wallet.store
+        allocation <- store.multiDomainAcsStore
+          .getContractById(
+            amuletAllocationCodegen.AmuletAllocation.COMPANION
+          )(allocationCid)
+          .map(
+            _.toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"AmuletAllocation is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        context <- scanConnection.getAllocationWithdrawContext(
+          allocation.contractId.toInterface(allocationv1.Allocation.INTERFACE)
+        )
+        result <- wallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            allocation.exercise(
+              _.toInterface(allocationv1.Allocation.INTERFACE)
+                .exerciseAllocation_Withdraw(context.toExtraArgs())
+            ),
+          )
+          .noDedup
+          .withSynchronizerId(allocation.domain)
+          .withDisclosedContracts(DisclosedContracts.fromProto(context.disclosedContracts))
+          .yieldResult()
+      } yield WalletResource.WithdrawAmuletAllocationResponseOK(
+        d0.AmuletAllocationWithdrawResult(
+          result.exerciseResult.senderHoldingCids.asScala.map(_.contractId).toVector,
+          result.exerciseResult.meta.values.asScala.toMap,
+        )
+      )
+    }
+  }
+
   private[this] def getUserTreasury(user: String)(implicit
       tc: TraceContext
   ): Future[TreasuryService] =
