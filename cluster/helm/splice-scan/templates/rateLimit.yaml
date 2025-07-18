@@ -1,0 +1,100 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{{- $scanAppLabel := "scan-app" }}
+{{- if .Values.enableIstioRateLimit }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: scan-rate-limit
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    # enable metrics for rate limit
+    proxy.istio.io/config: |-
+      proxyStatsMatcher:
+        inclusionRegexps:
+        - ".*http_local_rate_limit.*"
+  labels:
+    {{- include "splice-util-lib.default-labels" (set . "app" $scanAppLabel) | nindent 4 }}
+spec:
+  workloadSelector:
+    labels:
+      app: {{ $scanAppLabel }}
+  configPatches:
+    # This just adds the rate limit filter to the chain
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.local_ratelimit
+          typed_config:
+            "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            value:
+              stat_prefix: http_local_rate_limiter
+
+    - applyTo: HTTP_ROUTE
+      match:
+        context: SIDECAR_INBOUND
+        routeConfiguration:
+          vhost:
+            name: "inbound|http|5012"
+            route:
+              action: ANY
+      patch:
+        operation: MERGE
+        value:
+          route:
+            rate_limits:
+              - actions:
+                  - request_headers:
+                      descriptor_key: client_ip
+                      header_name: x-forwarded-for
+                  - header_value_match:
+                      descriptor_value: acs
+                      expect_match: true
+                      headers:
+                        - name: :path
+                          string_match:
+                            prefix: /api/scan/v0/acs/
+                            ignore_case: true
+          typed_per_filter_config:
+            envoy.filters.http.local_ratelimit:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+              stat_prefix: http_local_rate_limiter
+              # default limit
+              token_bucket:
+                max_tokens: 2147483647
+                tokens_per_fill: 2147483647
+                fill_interval: 10s
+              filter_enabled:
+                runtime_key: local_rate_limit_enabled
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              filter_enforced:
+                runtime_key: local_rate_limit_enforced
+                default_value:
+                  numerator: 100
+                  denominator: HUNDRED
+              response_headers_to_add:
+                - append_action: OVERWRITE_IF_EXISTS_OR_ADD
+                  header:
+                    key: x-local-rate-limit
+                    value: 'true'
+              descriptors:
+                - entries:
+                    - key: "client_ip"
+                    - key: header_match
+                      value: acs
+                  token_bucket:
+                    max_tokens: 10
+                    tokens_per_fill: 10
+                    fill_interval: 60s
+{{- end }}

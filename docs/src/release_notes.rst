@@ -15,6 +15,12 @@ Upcoming
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
 
+- Scan
+
+    - Include in the helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints. This can be enabled by setting the value ``enableIstioRateLimit`` to `true` (default `false`).
+      If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
+      These rate limits will be expanded in the future to more endpoints.
+
 0.4.7
 -----
 

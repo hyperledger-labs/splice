@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.TestCommon
+
 import scala.concurrent.duration.*
 
 trait PreflightIntegrationTestUtil extends TestCommon {

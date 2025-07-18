@@ -559,6 +559,7 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
+    enableIstioRateLimit: true,
     logLevel: config.logging?.appsLogLevel,
     ...updateHistoryBackfillingValues,
   };
