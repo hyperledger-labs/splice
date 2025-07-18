@@ -11,6 +11,13 @@ Release Notes
 Upcoming
 --------
 
+- Deployment
+
+  - Good-to-know but no changes needed: Added new helm values ``persistence.enablePgInitContainer`` and
+    ``extraInitContainers`` allowing configuration around deployment init containers. So far this is implemented only
+    for the validator and participant helm charts. The default values for these won't change your current deployment,
+    so if uninterested you can safely ignore.
+
 - Dashboards
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.

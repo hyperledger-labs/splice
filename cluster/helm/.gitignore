@@ -5,3 +5,4 @@ values.yaml
 /.app-charts
 /.image-digests
 LICENSE
+.debug

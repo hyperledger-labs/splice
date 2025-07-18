@@ -31,6 +31,7 @@ persistence:
   port: 5432
   user: cnadmin
   secretName: "postgres-secrets"
+  enablePgInitContainer: true
 
 migration:
   id: 0
@@ -72,3 +73,5 @@ service:
     port: 80
 # set the poll interval used by the UI in milliseconds (optional)
 # uiPollInterval:
+
+extraInitContainers: []
