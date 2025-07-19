@@ -17,6 +17,40 @@ TMP_DIR="/tmp/blackduck-docker-scan/${index}"
 mkdir -p "${TMP_DIR}"
 export DETECT_JAR_DOWNLOAD_DIR="${TMP_DIR}/detect_jars"
 
+function get_top_base_layer() {
+  base_image=$(cat<<EOF | python -
+from dockerfile_parse import DockerfileParser
+dfp = DockerfileParser(path = "Dockerfile")
+dfp.build_args = {"base_version": "$(get-snapshot-version)", "cometbft_sha": "${COMETBFT_IMAGE_SHA256}", "cometbft_version": "${COMETBFT_RELEASE_VERSION}"}
+print(dfp.baseimage)
+EOF
+)
+
+  if [[ "$base_image" =~ :$(get-snapshot-version) ]]; then
+    base_image="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/${base_image}"
+  fi
+
+  echo "Base image: $base_image"
+
+  if docker buildx imagetools inspect ${base_image} --raw | jq -r '.manifests[]' &> /dev/null; then
+    echo "Base image is a multi-arch image."
+    base_image_digest=$(docker buildx imagetools inspect ${base_image} --raw | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest')
+  else
+    echo "Base image is not a multi-arch image, using the default architecture."
+    base_image_digest=$(docker buildx imagetools inspect ${base_image} --raw | jq -r '.digest')
+  fi
+
+
+
+  echo "Base image digest: $base_image_digest"
+}
+
+echo
+echo
+echo "Image: $image"
+get_top_base_layer
+exit 0
+
 # We blindly retry on failures, as we've seen unexplained failures in the scans that we couldn't resolve.
 for i in {1..10}; do
   set +e
