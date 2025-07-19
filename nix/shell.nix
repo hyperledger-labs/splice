@@ -114,6 +114,7 @@ in pkgs.mkShell {
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
+  COMETBFT_IMAGE_SHA256 = "${cometbftDriverSources.image_sha256}";
   COMETBFT_DRIVER = if use_enterprise then "${pkgs.cometbft_driver}" else "";
   PULUMI_HOME = "${pkgs.pulumi-bin}";
   IS_ENTERPRISE = if use_enterprise then "true" else "false";

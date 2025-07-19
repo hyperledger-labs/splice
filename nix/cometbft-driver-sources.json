@@ -1,4 +1,5 @@
 {
     "version": "3.3.0-snapshot.20250407.15675.0.v7edae7ab-stable-20250408",
-    "sha256": "1dg54xw07yiq8v40as66h1c1m7cgsbbwm540vdiv2wxm6ms66kw5"
+    "sha256": "1dg54xw07yiq8v40as66h1c1m7cgsbbwm540vdiv2wxm6ms66kw5",
+    "image_sha256": "398de715ef2d5c15ab74d54fc5e5956da14b3aa91228025b219e3f80ca2694a2"
 }
