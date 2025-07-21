@@ -74,6 +74,17 @@ const AllocationRequestDisplay: React.FC<{
   userParty: string;
 }> = ({ request, userParty, allocations }) => {
   const { settlement, meta: requestMeta } = request.payload;
+  const { rejectAllocationRequest } = useWalletClient();
+  const rejectAllocationRequestMutation = useMutation({
+    mutationFn: async () => {
+      return await rejectAllocationRequest(request.contractId);
+    },
+    onSuccess: () => {},
+    onError: error => {
+      console.error('Failed to reject allocation request', error);
+    },
+  });
+
   return (
     <Card className="allocation-request" variant="outlined">
       <CardContent
@@ -85,7 +96,18 @@ const AllocationRequestDisplay: React.FC<{
         }}
       >
         <Stack width="100%" spacing={2}>
-          <AllocationSettlementDisplay settlement={settlement} />
+          <Stack direction="row" width="100%" spacing={2}>
+            <AllocationSettlementDisplay settlement={settlement} />
+            <Button
+              onClick={() => rejectAllocationRequestMutation.mutate()}
+              color="error"
+              size="medium"
+              className="allocation-request-reject"
+              sx={{ alignSelf: 'center', height: 'auto', minHeight: 0 }}
+            >
+              Reject
+            </Button>
+          </Stack>
           {Object.keys(requestMeta.values).length > 0 ? (
             <>
               <Typography variant="h5">Request Meta</Typography>
