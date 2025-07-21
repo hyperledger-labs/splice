@@ -4,15 +4,16 @@
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
 import { initDumpConfig } from '../common/src/dump-config-common';
 import { GcpProject } from './src/gcp-project';
-import { SPLICE_ROOT } from '../common';
+import { SPLICE_ROOT, config } from '../common';
 
 async function main() {
   await initDumpConfig();
 
   // Set configs dir to mocks if it doesn't exist
-  process.env.GCP_PROJECT_CONFIGS_DIR = process.env.GCP_PROJECT_CONFIGS_DIR || `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
+  const configsDir = config.optionalEnv('GCP_PROJECT_CONFIGS_DIR') || `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
+
   await import('./src/gcp-project');
-  new GcpProject('project-id');
+  new GcpProject('project-id', configsDir);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
