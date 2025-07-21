@@ -60,3 +60,25 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+multiValidator:
+  postgresPvcSize: '100Gi'
+  resources:
+    participant:
+      requests:
+        cpu: '1'
+        memory: '8Gi'
+      limits:
+        cpu: '6'
+        memory: '16Gi'
+    validator:
+      requests:
+        cpu: '0.5'
+        memory: '2.4Gi'
+      limits:
+        cpu: '4'
+        memory: '8Gi'
+    postgres:
+      requests:
+        memory: '5Gi'
+      limits:
+        memory: '12Gi'

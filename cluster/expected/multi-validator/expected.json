@@ -2606,8 +2606,8 @@
                     "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "4Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -2996,8 +2996,8 @@
                     "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "4Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -3386,8 +3386,8 @@
                     "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "4Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -3776,8 +3776,8 @@
                     "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "4Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -4166,8 +4166,8 @@
                     "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "4Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -4438,10 +4438,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4495,10 +4495,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4552,10 +4552,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4609,10 +4609,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4666,10 +4666,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [

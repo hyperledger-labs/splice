@@ -102,6 +102,7 @@ export interface WalletClient {
 
   listAmuletAllocations: () => Promise<Contract<AmuletAllocation>[]>;
   listAllocationRequests: () => Promise<Contract<AllocationRequest>[]>;
+  rejectAllocationRequest: (allocationRequestCid: ContractId<AllocationRequest>) => Promise<void>;
   createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
   withdrawAllocation: (allocationCid: ContractId<AmuletAllocation>) => Promise<void>;
 
@@ -331,6 +332,9 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         return res.allocation_requests.map(ar =>
           Contract.decodeOpenAPI(ar.contract, AllocationRequest)
         );
+      },
+      rejectAllocationRequest: async allocationRequestCid => {
+        await walletClient.rejectAllocationRequest(allocationRequestCid);
       },
       createAllocation: async allocateAmuletRequest => {
         await walletClient.allocateAmulet(allocateAmuletRequest);

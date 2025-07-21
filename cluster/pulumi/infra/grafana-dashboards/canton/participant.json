@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1208,
+  "id": 2704,
   "links": [],
   "panels": [
     {
@@ -39,7 +39,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Submissions currently running",
+      "description": "Daml commands through the synchronous CommandService currently in flight",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -52,6 +52,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -82,8 +83,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -114,10 +114,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -126,7 +128,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_participant_api_commands_submissions_running{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
+          "expr": "daml_participant_api_commands_max_in_flight_length{namespace=~\"$namespace\",component=\"participant\",job=~\"$job\", node=~\"$participant\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -171,6 +173,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -201,8 +204,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -264,10 +266,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -307,7 +311,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "Submissions currently running",
+      "description": "Sequencer submissions currently running. Note this is at the level of a sequencer submission not a Daml transaction.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -320,6 +324,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -350,8 +355,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -382,10 +386,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -426,6 +432,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -456,8 +463,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -488,10 +494,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -539,6 +547,7 @@
             "mode": "thresholds"
           },
           "custom": {
+            "axisPlacement": "auto",
             "fillOpacity": 70,
             "hideFrom": {
               "legend": false,
@@ -554,8 +563,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -589,10 +597,12 @@
         "rowHeight": 0.9,
         "showValue": "auto",
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -615,19 +625,17 @@
       "type": "state-timeline"
     }
   ],
-  "schemaVersion": 39,
+  "preload": false,
+  "refresh": "",
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": [
       {
-        "allValue": "",
         "current": {
-          "selected": false,
-          "text": [
-            "sv-1"
-          ],
+          "text": "All",
           "value": [
-            "sv-1"
+            "$__all"
           ]
         },
         "datasource": {
@@ -635,7 +643,6 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_health_status{component=\"participant\"},namespace)",
-        "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "namespace",
@@ -647,14 +654,12 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 7,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": false,
           "text": [
             "participant-0"
           ],
@@ -667,7 +672,6 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_health_status{namespace=~\"$namespace\", component=\"participant\"},job)",
-        "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "job",
@@ -679,17 +683,13 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 7,
         "type": "query"
       },
       {
         "allValue": ".*",
         "current": {
-          "selected": false,
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -699,7 +699,6 @@
           "uid": "prometheus"
         },
         "definition": "label_values(daml_health_status{namespace=~\"$namespace\", job=~\"$job\"},node)",
-        "hide": 0,
         "includeAll": true,
         "multi": true,
         "name": "participant",
@@ -711,20 +710,18 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 7,
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Participant",
   "uid": "edkzo5ukgeqyoc",
-  "version": 5,
-  "weekStart": ""
+  "version": 2
 }

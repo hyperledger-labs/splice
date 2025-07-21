@@ -23,6 +23,7 @@ import {
   AllocateAmuletRequest,
   AllocateAmuletResponse,
   AmuletAllocationWithdrawResult,
+  ChoiceExecutionMetadata,
   ListAllocationRequestsResponse,
   ListAllocationsResponse,
 } from 'wallet-openapi';
@@ -390,6 +391,67 @@ describe('Wallet user can', () => {
         }
 
         expect(calledWithdrawArgs).toStrictEqual([allocation.contract_id, allocation.contract_id]);
+      });
+
+      test('reject allocation requests', async () => {
+        const allocationRequestPayload = getAllocationRequest();
+        const allocationRequest = mkContract(AllocationRequest, allocationRequestPayload);
+        const allocationRequests = [allocationRequest];
+
+        const calledRejectArgs: string[] = [];
+
+        server.use(
+          rest.get(
+            `${walletUrl}/v0/wallet/token-standard/allocation-requests`,
+            (_req, res, ctx) => {
+              return res(
+                ctx.json<ListAllocationRequestsResponse>({
+                  allocation_requests: allocationRequests.map(contract => {
+                    return { contract };
+                  }),
+                })
+              );
+            }
+          ),
+          rest.get(`${walletUrl}/v0/allocations`, (_req, res, ctx) => {
+            return res(
+              ctx.json<ListAllocationsResponse>({
+                allocations: [],
+              })
+            );
+          }),
+          rest.post(
+            `${walletUrl}/v0/wallet/token-standard/allocation-requests/:cid/reject`,
+            (req, res, ctx) => {
+              calledRejectArgs.push(req.params.cid.toString());
+              return res(
+                ctx.json<ChoiceExecutionMetadata>({
+                  meta: {},
+                })
+              );
+            }
+          )
+        );
+
+        const user = userEvent.setup();
+        render(
+          <WalletConfigProvider>
+            <App />
+          </WalletConfigProvider>
+        );
+        expect(await screen.findByText('Allocations')).toBeDefined();
+        const allocationsLink = screen.getByRole('link', { name: 'Allocations' });
+        await user.click(allocationsLink);
+
+        // there should be one allocation request with a reject button
+        expect(
+          await screen.findByLabelText(`Allocation Requests ${allocationRequests.length}`)
+        ).toBeDefined();
+
+        const rejectButton = await screen.findByRole('button', { name: 'Reject' });
+        await user.click(rejectButton);
+
+        expect(calledRejectArgs).toStrictEqual([allocationRequest.contract_id]);
       });
     });
   });

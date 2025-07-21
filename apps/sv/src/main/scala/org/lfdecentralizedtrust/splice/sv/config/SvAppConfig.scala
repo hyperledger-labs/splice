@@ -250,9 +250,10 @@ case class SvAppBackendConfig(
     // can always set it to an empty string.
     contactPoint: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
-    // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
+    // If the node does not receive an event for that amount of time, it will request a time proof
+    // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
+      NonNegativeFiniteDuration.ofMinutes(30),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,

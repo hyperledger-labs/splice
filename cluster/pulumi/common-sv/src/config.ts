@@ -94,6 +94,15 @@ export const SvConfigSchema = z.object({
       scan: z
         .object({
           enableImportUpdatesBackfill: z.boolean().optional(),
+          rateLimit: z
+            .object({
+              acs: z
+                .object({
+                  limit: z.number(),
+                })
+                .optional(),
+            })
+            .optional(),
         })
         .optional(),
       synchronizer: z
