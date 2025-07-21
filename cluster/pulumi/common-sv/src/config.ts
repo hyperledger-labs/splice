@@ -28,6 +28,7 @@ export type SvOnboarding =
       type: 'found-dso';
       sv1SvRewardWeightBps: number;
       roundZeroDuration?: string;
+      initialRound?: string;
     }
   | {
       type: 'join-with-key';
@@ -80,6 +81,7 @@ export interface SvConfig extends StaticSvConfig {
   disableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
   cometBftGovernanceKey?: CnInput<SvCometBftGovernanceKey>;
+  initialRound?: string;
 }
 
 export const SvConfigSchema = z.object({
@@ -97,6 +99,7 @@ export const SvConfigSchema = z.object({
         .optional(),
     })
     .optional(),
+  initialRound: z.number().optional(),
 });
 
 export type Config = z.infer<typeof SvConfigSchema>;
@@ -104,6 +107,10 @@ export type Config = z.infer<typeof SvConfigSchema>;
 // eslint-disable-next-line
 // @ts-ignore
 export const svConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
+
+// eslint-disable-next-line
+// @ts-ignore
+export const initialRound = SvConfigSchema.parse(clusterYamlConfig).initialRound;
 
 export const updateHistoryBackfillingValues = svConfig?.scan?.enableImportUpdatesBackfill
   ? {

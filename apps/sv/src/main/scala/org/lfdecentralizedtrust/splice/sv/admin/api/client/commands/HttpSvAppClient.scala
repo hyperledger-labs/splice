@@ -42,6 +42,7 @@ object HttpSvAppClient {
       amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],
       dsoRules: ContractWithState[DsoRules.ContractId, DsoRules],
       svNodeStates: Map[PartyId, ContractWithState[SvNodeState.ContractId, SvNodeState]],
+      initialRound: String,
   )
 
   sealed trait SvOnboardingStatus
@@ -201,6 +202,7 @@ object HttpSvAppClient {
               amuletRules,
               dsoRules,
               svNodeStates,
+              initialRound,
             )
           ) =>
         for {
@@ -232,6 +234,7 @@ object HttpSvAppClient {
           amuletRules,
           dsoRules,
           svNodeStates.toMap,
+          initialRound,
         )
     }
   }

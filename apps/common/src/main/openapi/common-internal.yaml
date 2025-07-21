@@ -215,6 +215,7 @@ components:
         - amulet_rules
         - dso_rules
         - sv_node_states
+        - initial_round
       properties:
         sv_user:
           description: User ID representing the SV
@@ -262,6 +263,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ContractWithState"
+        initial_round:
+          description: |
+            Initial round from which the network bootstraps
+          type: string
 
     BatchListVotesByVoteRequestsRequest:
       type: object

@@ -302,6 +302,7 @@ object ScanStore {
       svNodeStateCacheTtl: NonNegativeFiniteDuration,
       enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
+      initialRound: Long,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -323,6 +324,7 @@ object ScanStore {
             participantId,
             enableImportUpdateBackfill,
             metrics,
+            initialRound,
           ),
           svNodeStateCacheTtl,
           metrics,
