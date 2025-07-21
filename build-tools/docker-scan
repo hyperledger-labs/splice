@@ -23,13 +23,9 @@ EOF
 
   if docker buildx imagetools inspect "${base_image}" --raw | jq -r '.manifests[]' &> /dev/null; then
     # Base image is a multi-arch image
-    # base_image_digest=$(docker buildx imagetools inspect "${base_image}" --raw | jq -r '.manifests[] | select(.platform.architecture == "amd64") | .digest')
-    # layers=$(docker buildx imagetools inspect "${base_image}" --format '{{json .}}' | jq '.image."linux/amd64".rootfs.diff_ids')
     last_layer=$(docker buildx imagetools inspect "${base_image}" --format '{{json .}}' | jq -r '.image."linux/amd64".rootfs.diff_ids[-1]')
   else
     # Base image is not a multi-arch image, using the default architecture
-    # base_image_digest=$(docker buildx imagetools inspect "${base_image}" --raw | jq -r '.config.digest')
-    # layers=$(docker buildx imagetools inspect "${base_image}" --format '{{json .}}' | jq '.image.rootfs.diff_ids')
     last_layer=$(docker buildx imagetools inspect "${base_image}" --format '{{json .}}' | jq -r '.image.rootfs.diff_ids[-1]')
   fi
 
