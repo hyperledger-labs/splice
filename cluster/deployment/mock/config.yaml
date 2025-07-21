@@ -87,3 +87,4 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
+initialRound: 0
