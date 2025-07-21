@@ -15,7 +15,7 @@ export function authorizeServiceAccount(
 ): gcp.projects.IAMMember[] {
   const { serviceAccountEmail, pulumiKeyringProjectId, pulumiKeyringRegion } = config;
 
-  // TODO review carefully
+  // TODO(canton-network-internal#753): review and consider moving to internal
   const roles = [
     'roles/cloudsql.admin',
     'roles/compute.viewer',
