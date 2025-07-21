@@ -39,8 +39,8 @@ export function installPostgres(
       persistence: { secretName },
       db: { volumeSize: config.postgresPvcSize, maxConnections: 1000 },
       resources: {
-        requests: { memory: '10Gi' },
-        limits: { memory: '20Gi' },
+        requests: { memory: '5Gi' },
+        limits: { memory: '12Gi' },
       },
     },
     activeVersion,
