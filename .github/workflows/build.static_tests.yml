@@ -78,6 +78,11 @@ jobs:
         with:
           cmd: ./scripts/check-repo-names.sh
 
+      - name: Check that docker base images are pinned by digest
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-base-images.sh
+
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
