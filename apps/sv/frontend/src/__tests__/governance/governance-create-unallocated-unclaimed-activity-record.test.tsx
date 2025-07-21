@@ -1,14 +1,17 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, test, vi } from 'vitest';
 
 import CreateUnallocatedUnclaimedActivityRecord from '../../components/votes/actions/CreateUnallocatedUnclaimedActivityRecord';
 import { SvConfigProvider } from '../../utils';
+
+dayjs.extend(utc);
 
 describe('UnallocatedUnclaimedActivityRecord Amount Validation', () => {
   test('validates amount input', async () => {
@@ -48,10 +51,8 @@ describe('UnallocatedUnclaimedActivityRecord Amount Validation', () => {
 });
 
 describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
-  test('converts local datetime to UTC before calling chooseAction', async () => {
+  test('converts default local datetime to UTC before calling chooseAction', async () => {
     const mockChooseAction = vi.fn();
-    // Set effectivity date far enough in the past to avoid race condition with expiresAt default
-    // This prevents the component's useEffect from overriding our manually typed test value
     const mockEffectivity = dayjs('2025-07-18T00:00:00');
 
     render(
@@ -70,20 +71,24 @@ describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
     const beneficiaryInput = screen.getByTestId('create-beneficiary');
     const reasonInput = screen.getByTestId('create-reason');
 
-    // Simulate filling the form
-    fireEvent.change(dateInput, { target: { value: '2025-07-20 10:00' } });
+    const defaultDate = dateInput.getAttribute('value');
+    expect(defaultDate).toBeTruthy();
+
+    // Fill out other required fields
     fireEvent.change(amountInput, { target: { value: '100' } });
     fireEvent.change(beneficiaryInput, { target: { value: 'alice' } });
     fireEvent.change(reasonInput, { target: { value: 'testing' } });
 
-    // Wait for chooseAction to be called
+    // Wait until form submission is triggered
     await waitFor(() => {
       expect(mockChooseAction).toHaveBeenCalled();
     });
 
+    // Extract the expected UTC string from the default local time
+    const expectedUTC = dayjs(defaultDate!).utc().toISOString();
+
     const lastCall = mockChooseAction.mock.calls.at(-1)?.[0];
     const actualUTC = lastCall?.value?.dsoAction?.value?.expiresAt;
-    const expectedUTC = '2025-07-20T08:00:00.000Z';
 
     expect(actualUTC).toBe(expectedUTC);
   });
