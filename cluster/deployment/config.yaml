@@ -61,6 +61,7 @@ monitoring:
       loadTester:
         minRate: 0.95
 multiValidator:
+  postgresPvcSize: '100Gi'
   resources:
     participant:
       requests:
