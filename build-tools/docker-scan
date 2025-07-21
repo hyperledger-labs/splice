@@ -5,20 +5,6 @@ set -euo pipefail
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
-image="$(<target/image-tag)"
-image_name="$(basename "$(pwd)")"
-image_version="$(get-snapshot-version)"
-
-
-# Compute a unique index per image name, to be used for tmp directories and port numbers,
-# as otherwise blackduck is unhappy with parallelism
-# shellcheck disable=SC2012,SC2010
-index=$(ls .. | grep -nx "${image_name}" | sed 's/:.*//')
-
-BASE_PORT=9000
-TMP_DIR="/tmp/blackduck-docker-scan/${index}"
-mkdir -p "${TMP_DIR}"
-export DETECT_JAR_DOWNLOAD_DIR="${TMP_DIR}/detect_jars"
 
 function get_top_base_layer() {
   base_image=$(cat<<EOF | python -
@@ -50,75 +36,71 @@ EOF
   echo "$last_layer"
 }
 
+function do_scan() {
+
+  local image="$1"
+  local image_name="$2"
+  local version="$3"
+  local index="$4"
+  local extra_arg="${5:-}"
+
+  # We blindly retry on failures, as we've seen unexplained failures in the scans that we couldn't resolve.
+  success=0
+  for i in {1..10}; do
+    set +e
+    # Run a full scan, including the base image
+    bash <(curl -s https://detect.blackduck.com/detect10.sh) \
+      --blackduck.url=https://digitalasset.blackducksoftware.com/ \
+      --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
+      --detect.docker.image="$image" \
+      --detect.tools=DOCKER,SIGNATURE_SCAN \
+      --detect.tools.excluded=BINARY_SCAN \
+      --detect.project.name="DACH-NY_canton-network-internal_images-${image_name}" \
+      --detect.project.version.name="${version}" \
+      --detect.docker.passthrough.imageinspector.service.port.alpine=$((BASE_PORT + (index*3) + 0)) \
+      --detect.docker.passthrough.imageinspector.service.port.centos=$((BASE_PORT + (index*3) + 1)) \
+      --detect.docker.passthrough.imageinspector.service.port.ubuntu=$((BASE_PORT + (index*3) + 2)) \
+      --detect.output.path="${TMP_DIR}/output" \
+      --detect.tools.output.path="${TMP_DIR}/tool_output" \
+      "${extra_arg}"
+
+    res=$?
+    set -e
+
+    if [ $res -eq 0 ]; then
+      echo "Black Duck scan completed successfully for image: $image"
+      success=1
+      break
+    else
+      echo "Black Duck scan failed (attempt $i), retrying in 10 seconds..."
+      sleep 10
+    fi
+  done
+  if [ $success -eq 0 ]; then
+    echo "Black Duck scan failed after 10 attempts for image: $image"
+    exit 1
+  fi
+
+}
+
+image="$(<target/image-tag)"
+image_name="$(basename "$(pwd)")"
+image_version="$(get-snapshot-version)"
+
+
+# Compute a unique index per image name, to be used for tmp directories and port numbers,
+# as otherwise blackduck is unhappy with parallelism
+# shellcheck disable=SC2012,SC2010
+index=$(ls .. | grep -nx "${image_name}" | sed 's/:.*//')
+
+BASE_PORT=9000
+TMP_DIR="/tmp/blackduck-docker-scan/${index}"
+mkdir -p "${TMP_DIR}"
+export DETECT_JAR_DOWNLOAD_DIR="${TMP_DIR}/detect_jars"
+
+# <version>-full is used to scan the full image, including the base image.
+do_scan "$image" "$image_name" "$image_version"-full "$index"
+
+# <version> is used to scan only the layers added by this image, on top of the base image.
 top_base_layer=$(get_top_base_layer)
-
-# We blindly retry on failures, as we've seen unexplained failures in the scans that we couldn't resolve.
-success=0
-for i in {1..10}; do
-  set +e
-  # Run a full scan, including the base image
-  bash <(curl -s https://detect.blackduck.com/detect10.sh) \
-    --blackduck.url=https://digitalasset.blackducksoftware.com/ \
-    --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
-    --detect.docker.image="$image" \
-    --detect.tools=DOCKER,SIGNATURE_SCAN \
-    --detect.tools.excluded=BINARY_SCAN \
-    --detect.project.name="DACH-NY_canton-network-internal_images-${image_name}" \
-    --detect.project.version.name="${image_version}-full" \
-    --detect.docker.passthrough.imageinspector.service.port.alpine=$((BASE_PORT + (index*3) + 0)) \
-    --detect.docker.passthrough.imageinspector.service.port.centos=$((BASE_PORT + (index*3) + 1)) \
-    --detect.docker.passthrough.imageinspector.service.port.ubuntu=$((BASE_PORT + (index*3) + 2)) \
-    --detect.output.path="${TMP_DIR}/output" \
-    --detect.tools.output.path="${TMP_DIR}/tool_output"
-  res=$?
-  set -e
-
-  if [ $res -eq 0 ]; then
-    echo "Black Duck scan completed successfully for image: $image"
-    success=1
-    break
-  else
-    echo "Black Duck scan failed (attempt $i), retrying in 10 seconds..."
-    sleep 10
-  fi
-done
-if [ $success -eq 0 ]; then
-  echo "Black Duck scan failed after 10 attempts for image: $image"
-  exit 1
-fi
-
-# FIXME: refactor to reduce the duplication here
-success=0
-for i in {1..10}; do
-  set +e
-  # Run a scan only on the layers added by us, excluding the base image
-  bash <(curl -s https://detect.blackduck.com/detect10.sh) \
-    --blackduck.url=https://digitalasset.blackducksoftware.com/ \
-    --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
-    --detect.docker.image="$image" \
-    --detect.tools=DOCKER,SIGNATURE_SCAN \
-    --detect.tools.excluded=BINARY_SCAN \
-    --detect.project.name="DACH-NY_canton-network-internal_images-${image_name}" \
-    --detect.project.version.name="$image_version" \
-    --detect.docker.passthrough.imageinspector.service.port.alpine=$((BASE_PORT + (index*3) + 0)) \
-    --detect.docker.passthrough.imageinspector.service.port.centos=$((BASE_PORT + (index*3) + 1)) \
-    --detect.docker.passthrough.imageinspector.service.port.ubuntu=$((BASE_PORT + (index*3) + 2)) \
-    --detect.output.path="${TMP_DIR}/output" \
-    --detect.tools.output.path="${TMP_DIR}/tool_output" \
-    --detect.docker.platform.top.layer.id="$top_base_layer" \
-  res=$?
-  set -e
-
-  if [ "$res" -eq 0 ]; then
-    echo "Black Duck scan completed successfully for image: $image"
-    success=1
-    break
-  else
-    echo "Black Duck scan failed (attempt $i), retrying in 10 seconds..."
-    sleep 10
-  fi
-done
-if [ $success -eq 0 ]; then
-  echo "Black Duck scan failed after 10 attempts for image: $image"
-  exit 1
-fi
+do_scan "$image" "$image_name" "$image_version" "$index" "--detect.docker.platform.top.layer.id=$top_base_layer"
