@@ -21,6 +21,12 @@ Upcoming
       If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
       These rate limits will be expanded in the future to more endpoints.
 
+- Canton
+
+  Reduced the acknowledgement interval for participants, mediators and
+  sequencers to 10 minutes. This has no impact other than on the
+  acknowlegdement metrics exposed by the sequencer.
+
 0.4.7
 -----
 
