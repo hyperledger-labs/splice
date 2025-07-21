@@ -83,9 +83,7 @@ describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
 
     const lastCall = mockChooseAction.mock.calls.at(-1)?.[0];
     const actualUTC = lastCall?.value?.dsoAction?.value?.expiresAt;
-    // Convert local input to UTC string (reliable in any timezone)
-    const localInput = dayjs('2025-07-20 10:00');
-    const expectedUTC = localInput.toISOString();
+    const expectedUTC = '2025-07-20T08:00:00.000Z';
 
     expect(actualUTC).toBe(expectedUTC);
   });
