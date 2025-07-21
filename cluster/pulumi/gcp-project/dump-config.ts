@@ -9,8 +9,8 @@ import { SPLICE_ROOT } from '../common';
 async function main() {
   await initDumpConfig();
 
-  // Set CONFIGS_DIR to mocks if it doesn't exist
-  process.env.CONFIGS_DIR = process.env.CONFIGS_DIR || `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
+  // Set configs dir to mocks if it doesn't exist
+  process.env.GCP_PROJECT_CONFIGS_DIR = process.env.GCP_PROJECT_CONFIGS_DIR || `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
   await import('./src/gcp-project');
   new GcpProject('project-id');
 }

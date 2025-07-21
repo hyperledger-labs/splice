@@ -6,6 +6,8 @@ import * as fs from 'fs';
 import { Secret } from '@pulumi/gcp/secretmanager';
 import { config, loadYamlFromFile } from 'splice-pulumi-common';
 
+const configsDir = config.requireEnv('GCP_PROJECT_CONFIGS_DIR');
+
 export class GcpProject extends pulumi.ComponentResource {
   gcpProjectId: string;
 
@@ -34,7 +36,7 @@ export class GcpProject extends pulumi.ComponentResource {
   }
 
   private internalWhitelists(): Secret {
-    const whitelistsFile = `${config.requireEnv('CONFIGS_DIR')}/ips.yaml`;
+    const whitelistsFile = `${configsDir}/ips.yaml`;
     const ipsFromFile = loadYamlFromFile(whitelistsFile);
     const ips: string[] = ipsFromFile['All Clusters'].concat(
       this.isMainNet() ? [] : ipsFromFile['Non-MainNet']
@@ -43,7 +45,7 @@ export class GcpProject extends pulumi.ComponentResource {
   }
 
   private userConfigsForTenant(tenant: string): Secret {
-    const userConfigsFile = `${config.requireEnv('CONFIGS_DIR')}/user-configs/${tenant}.us.auth0.com.json`;
+    const userConfigsFile = `${configsDir}/user-configs/${tenant}.us.auth0.com.json`;
     return this.secretAndVersion(
       `user-configs-${tenant}`,
       fs.readFileSync(userConfigsFile, 'utf-8')
@@ -63,7 +65,7 @@ export class GcpProject extends pulumi.ComponentResource {
 
   private letsEncryptEmail(): Secret {
     const val = fs
-      .readFileSync(`${config.requireEnv('CONFIGS_DIR')}/lets-encrypt-email.txt`, 'utf-8')
+      .readFileSync(`${configsDir}/lets-encrypt-email.txt`, 'utf-8')
       .trim();
     return this.secretAndVersion('lets-encrypt-email', val);
   }
