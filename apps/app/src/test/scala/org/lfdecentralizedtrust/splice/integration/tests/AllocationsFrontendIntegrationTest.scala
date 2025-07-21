@@ -203,7 +203,7 @@ class AllocationsFrontendIntegrationTest
         browseToAliceWallet(aliceDamlUser)
         browseToAllocationsPage()
 
-        clue("check that the allocation request is shown") {
+        val allocationRequestElement = clue("check that the allocation request is shown") {
           eventually() {
             val allocationRequest = findAll(className("allocation-request")).toSeq.loneElement
 
@@ -215,6 +215,8 @@ class AllocationsFrontendIntegrationTest
             )
 
             checkTransferLegs(allocationRequest, otcTrade.trade.data.transferLegs.asScala.toMap)
+
+            allocationRequest
           }
         }
 
@@ -258,6 +260,19 @@ class AllocationsFrontendIntegrationTest
           "the allocation is not shown anymore",
           _ => {
             findAll(className("allocation")).toSeq shouldBe empty
+          },
+        )
+
+        actAndCheck(
+          "click on rejecting the allocation request", {
+            click on allocationRequestElement
+              .findChildElement(className("allocation-request-reject"))
+              .valueOrFail("Could not find reject button for allocation request")
+          },
+        )(
+          "the allocation request is not shown anymore",
+          _ => {
+            findAll(className("allocation-request")).toSeq shouldBe empty
           },
         )
       }
