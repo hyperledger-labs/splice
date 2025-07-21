@@ -4,7 +4,7 @@
 package org.lfdecentralizedtrust.splice.sv.migration
 
 import org.lfdecentralizedtrust.splice.http.v0.definitions as http
-import org.lfdecentralizedtrust.splice.migration.Dar
+import org.lfdecentralizedtrust.splice.migration.{Dar, ParticipantUsersData}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.google.protobuf.ByteString
 
@@ -40,14 +40,19 @@ final case class DomainDataSnapshot(
 }
 
 object DomainDataSnapshot {
-  final case class Response(migrationId: Long, dataSnapshot: DomainDataSnapshot) {
+  final case class Response(
+      migrationId: Long,
+      dataSnapshot: DomainDataSnapshot,
+      participantUsers: ParticipantUsersData,
+  ) {
     def createdAt: dataSnapshot.acsTimestamp.type = dataSnapshot.acsTimestamp
   }
 
   object Response {
     def fromHttp(src: http.GetDomainDataSnapshotResponse): Either[String, Response] = for {
       dataSnapshot <- DomainDataSnapshot fromHttp src.dataSnapshot
-    } yield Response(src.migrationId, dataSnapshot)
+      participantUsers = ParticipantUsersData fromHttp src.participantUsers
+    } yield Response(src.migrationId, dataSnapshot, participantUsers)
   }
 
   private val base64Decoder = Base64.getDecoder()

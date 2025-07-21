@@ -252,6 +252,7 @@ class DisasterRecoveryIntegrationTest
         dump.dataSnapshot.acsTimestamp should be(timestampBeforeDisaster)
         dump.createdAt should be(timestampBeforeDisaster)
         dump.migrationId shouldBe 1
+        dump.participantUsers.users should not be empty
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
             writeMigrationDumpFile(sv, ids, dump)
@@ -607,7 +608,8 @@ class DisasterRecoveryIntegrationTest
     clue(s"Waiting for all SVs participants to be caught up to $timestamp") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
         eventuallySucceeds() {
-          svBackend.getDomainDataSnapshot(timestamp, force = true)
+          val snapshot = svBackend.getDomainDataSnapshot(timestamp, force = true)
+          snapshot.participantUsers.users should not be empty
         }
       )
     }
@@ -644,7 +646,7 @@ class DisasterRecoveryIntegrationTest
       migrationId = dump.migrationId,
       ids,
       dump.dataSnapshot,
-      None,
+      Some(dump.participantUsers),
       createdAt = dump.createdAt,
     )
     fullDumpFile.write(fullDump.asJson.spaces2)
