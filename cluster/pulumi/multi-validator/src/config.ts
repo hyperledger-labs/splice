@@ -16,7 +16,7 @@ export type EnvironmentVariable = z.infer<typeof EnvironmentVariableSchema>;
 export const MultiValidatorConfigSchema = z.object({
   multiValidator: z
     .object({
-      postgresPvcSize: z.string(),
+      postgresPvcSize: z.string().optional(),
       requiresOnboardingSecret: z.boolean().default(false),
       extraValidatorEnvVars: z.array(EnvironmentVariableSchema).default([]),
       extraParticipantEnvVars: z.array(EnvironmentVariableSchema).default([]),
