@@ -4,6 +4,7 @@ import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader'
 import { z } from 'zod';
 
 import { LogLevelSchema } from '../../common';
+import { K8sResourceSchema } from '../../common/src/config/configSchema';
 
 export const EnvironmentVariableSchema = z.object({
   name: z.string(),
@@ -20,6 +21,13 @@ export const MultiValidatorConfigSchema = z.object({
       extraValidatorEnvVars: z.array(EnvironmentVariableSchema).default([]),
       extraParticipantEnvVars: z.array(EnvironmentVariableSchema).default([]),
       logLevel: LogLevelSchema.optional().default('INFO'),
+      resources: z
+        .object({
+          postgres: K8sResourceSchema,
+          validator: K8sResourceSchema,
+          participant: K8sResourceSchema,
+        })
+        .optional(),
     })
     .optional(),
 });
