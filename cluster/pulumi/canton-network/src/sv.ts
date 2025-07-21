@@ -310,6 +310,13 @@ export async function installSvNode(
         svNamespace: xns.logicalName,
         svIngressName: config.ingressName,
       },
+      rateLimit: {
+        scan: {
+          acs: {
+            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
+          },
+        },
+      },
     },
     activeVersion,
     { dependsOn: [xns.ns] }
