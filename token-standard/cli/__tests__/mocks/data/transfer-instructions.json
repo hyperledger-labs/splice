@@ -54,7 +54,7 @@
           ],
           "nodeId" : 1,
           "observers" : [
-            "bobExternal::1220961838e732703bd875946ada3b4874558ec6313f9f2385e9cc7769e5c186c958"
+            "bob::normalized"
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",
@@ -128,7 +128,7 @@
           ],
           "nodeId" : 1,
           "observers" : [
-            "alice__wallet__user-529b6786__tc0::12206c42b20621a1f1524e49905776915ff0e546d61c76e2949aff537fcaca7d5336"
+            "alice::normalized"
           ],
           "offset" : 1,
           "packageName" : "splice-amulet",

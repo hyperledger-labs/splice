@@ -728,6 +728,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 nodeId = 1,
                 offset = 1,
                 signatories = active.createdEvent.signatories.map(expectedParties),
+                observers = active.createdEvent.observers.map(expectedParties),
                 witnessParties = active.createdEvent.witnessParties.map(expectedParties),
               ),
               synchronizerId = "sync::normalized",
