@@ -8,7 +8,7 @@
         "expression": "resource.type == \"cloudkms.googleapis.com/CryptoKey\" &&\n            resource.name.startsWith(\"projects/'da-cn-devnet'/locations/'europe-west6'/keyRings/pulumi\")",
         "title": "Pulumi KMS"
       },
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/cloudkms.cryptoKeyEncrypterDecrypter"
     },
@@ -20,7 +20,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/cloudsql.admin"
     },
@@ -32,7 +32,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/compute.viewer"
     },
@@ -44,7 +44,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/container.serviceAgent"
     },
@@ -56,7 +56,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/logging.privateLogViewer"
     },
@@ -73,7 +73,7 @@
         "expression": "\n          resource.name.endsWith(\"-cometbft-keys/versions/latest\")\n          ",
         "title": "CometBft keys"
       },
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/secretmanager.secretAccessor"
     },
@@ -90,7 +90,7 @@
         "expression": "\n          resource.name.endsWith(\"grafana-keys/versions/latest\")\n          ",
         "title": "Grafana keys"
       },
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/secretmanager.secretAccessor"
     },
@@ -107,7 +107,7 @@
         "expression": "resource.name.endsWith(\"secrets/gcp-bucket-sa-key-secret/versions/1\")",
         "title": "SA key secret"
       },
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/secretmanager.secretAccessor"
     },
@@ -124,7 +124,7 @@
         "expression": "\n          resource.name.endsWith(\"-id/versions/latest\")\n          ",
         "title": "SV IDs"
       },
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/secretmanager.secretAccessor"
     },
@@ -136,7 +136,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/storage.objectAdmin"
     },
@@ -148,7 +148,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "member": "serviceAccount:mock-service-account@mock.com",
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
       "project": "project-id",
       "role": "roles/viewer"
     },

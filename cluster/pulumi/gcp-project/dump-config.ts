@@ -3,17 +3,17 @@
 // Need to import this by path and not through the module, so the module is not
 // initialized when we don't want it to (to avoid pulumi configs trying to being read here)
 import { initDumpConfig } from '../common/src/dump-config-common';
-import { GcpProject } from './src/gcp-project';
-import { SPLICE_ROOT, config } from '../common';
+import { SPLICE_ROOT } from '../common';
 
 async function main() {
   await initDumpConfig();
 
-  // Set configs dir to mocks if it doesn't exist
-  const configsDir = config.optionalEnv('GCP_PROJECT_CONFIGS_DIR') || `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
+  // Set configs dir to mocks
+  // eslint-disable-next-line no-process-env
+  process.env.GCP_PROJECT_CONFIGS_DIR = `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
 
-  await import('./src/gcp-project');
-  new GcpProject('project-id', configsDir);
+  const gcpProject = await import('./src/gcp-project');
+  new gcpProject.GcpProject('project-id');
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
