@@ -122,16 +122,7 @@ export class MultiValidator extends MultiNodeDeployment {
             failureThreshold: 5,
             timeoutSeconds: 10,
           },
-          resources: {
-            requests: {
-              cpu: '1',
-              memory: '4Gi',
-            },
-            limits: {
-              cpu: '4',
-              memory: '8Gi',
-            },
-          },
+          resources: multiValidatorConfig?.resources?.validator,
         },
         serviceSpec: { ports },
       },
