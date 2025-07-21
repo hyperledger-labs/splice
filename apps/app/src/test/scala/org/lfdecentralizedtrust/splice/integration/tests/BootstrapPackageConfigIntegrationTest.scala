@@ -180,7 +180,9 @@ class BootstrapPackageConfigIntegrationTest
 
     // 20s picked empirically to be far enough in the future that the voting can go through before that date.
     // it must also leave enough time for the dars to be uploaded and vetting to happen to prevent command failures
-    val scheduledTime = Instant.now().plus(20, ChronoUnit.SECONDS)
+    val expiration = new RelTime(19_000_000)
+    val scheduledTime =
+      Instant.now().plus(expiration.microseconds, ChronoUnit.MICROS).plus(1, ChronoUnit.SECONDS)
     sv2PackageVettingTrigger.pause().futureValue
     sv2ValidatorPackageVettingTrigger.pause().futureValue
 
@@ -226,7 +228,7 @@ class BootstrapPackageConfigIntegrationTest
                 upgradeAction,
                 "url",
                 "description",
-                new RelTime(19_000_000),
+                expiration,
                 Some(scheduledTime),
               )
             },
