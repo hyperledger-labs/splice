@@ -1,5 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { generatePortSequence, numNodesPerInstance } from 'splice-pulumi-common';
 
@@ -52,16 +53,8 @@ export class MultiParticipant extends MultiNodeDeployment {
             containerPort: port.port,
             protocol: 'TCP',
           })),
-          resources: {
-            requests: {
-              cpu: '1',
-              memory: '8Gi',
-            },
-            limits: {
-              cpu: '6',
-              memory: '16Gi',
-            },
-          },
+          resources: multiValidatorConfig?.resources
+            ?.participant as k8s.types.input.core.v1.ResourceRequirements,
           readinessProbe: {
             grpc: {
               port: 5061,
