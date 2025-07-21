@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createProgram } from "../src/token-standard-cli";
 import expectedHoldings from "./expected/holdings.json";
-// import expectedTransferInstructions from "./expected/transfer-instructions.json";
+import expectedTransferInstructions from "./expected/transfer-instructions.json";
 import expectedTxs from "./expected/txs.json";
 import { mockLedgerApiServer } from "./mocks/ledger-api";
 import fs from "fs";
@@ -61,7 +61,9 @@ test("list transfer instructions", async () => {
     actualOutput,
   );
 
-  expect(logSpy).toHaveBeenCalledWith(JSON.stringify([], null, 2));
+  expect(logSpy).toHaveBeenCalledWith(
+    JSON.stringify(expectedTransferInstructions, null, 2),
+  );
 });
 
 test("list txs", async () => {
