@@ -21,28 +21,22 @@ const AllocationSettlementDisplay: React.FC<{
   } = settlement;
 
   return (
-    <>
-      <Stack direction="row">
-        <Stack width="100%">
-          {settlementRef.id ? (
-            <Stack maxWidth="md">
-              <Typography className="settlement-id" variant="body2" noWrap>
-                SettlementRef id: {settlementRef.id}
-              </Typography>
-            </Stack>
-          ) : null}
-          {settlementRef.cid ? (
-            <Stack maxWidth="md">
-              <Typography className="settlement-cid" variant="body2" noWrap>
-                SettlementRef cid: {settlementRef.cid}
-              </Typography>
-            </Stack>
-          ) : null}
-        </Stack>
-        {/*TODO (#1413): uncomment and implement callback*/}
-        {/*<Button variant="pill" size="small" className="allocation-request-reject">*/}
-        {/*  Reject*/}
-        {/*</Button>*/}
+    <Stack>
+      <Stack>
+        {settlementRef.id ? (
+          <Stack maxWidth="md">
+            <Typography className="settlement-id" variant="body2" noWrap>
+              SettlementRef id: {settlementRef.id}
+            </Typography>
+          </Stack>
+        ) : null}
+        {settlementRef.cid ? (
+          <Stack maxWidth="md">
+            <Typography className="settlement-cid" variant="body2" noWrap>
+              SettlementRef cid: {settlementRef.cid}
+            </Typography>
+          </Stack>
+        ) : null}
       </Stack>
       <Stack direction="row" spacing={2}>
         <Stack direction="row" alignItems="center" spacing={1}>
@@ -67,7 +61,7 @@ const AllocationSettlementDisplay: React.FC<{
           <MetaDisplay meta={settlementMeta.values} />
         </>
       ) : null}
-    </>
+    </Stack>
   );
 };
 
