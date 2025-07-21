@@ -272,7 +272,6 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       templateDecoder: TemplateJsonDecoder,
       mat: Materializer,
   ): Future[Long] = {
-    logger.info(s"MY user: ${config.ledgerApiUser}")
     for {
       initialRound <- connection
         // On restarts, use the user's metadata initial round

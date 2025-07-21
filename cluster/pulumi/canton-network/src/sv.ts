@@ -404,6 +404,8 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialRound:
+      config.onboarding.type == 'found-dso' ? config.onboarding.initialRound : undefined,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     ...(useCantonBft
@@ -473,7 +475,6 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
-    initialRound: config.initialRound,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

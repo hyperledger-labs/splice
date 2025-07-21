@@ -19,7 +19,7 @@ import {
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
-import { StaticCometBftConfigWithNodeName, svConfig, svConfigs } from 'splice-pulumi-common-sv';
+import { initialRound, StaticCometBftConfigWithNodeName, svConfigs } from 'splice-pulumi-common-sv';
 import {
   clusterSvsConfiguration,
   SequencerPruningConfig,
@@ -31,7 +31,6 @@ import { InstalledSv, installSvNode } from './sv';
 
 interface DsoArgs {
   dsoSize: number;
-
   auth0Client: Auth0Client;
   approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the sv1
@@ -70,7 +69,6 @@ export class Dso extends pulumi.ComponentResource {
     },
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
-    initialRound?: string,
     isFirstSv = false,
     cometBftGovernanceKey: CnInput<SvCometBftGovernanceKey> | undefined = undefined,
     extraDependsOn: CnInput<pulumi.Resource>[] = []
@@ -114,7 +112,7 @@ export class Dso extends pulumi.ComponentResource {
         onboardingPollingInterval: this.args.onboardingPollingInterval,
         sweep: svConf.sweep,
         cometBftGovernanceKey,
-        initialRound,
+        initialRound: initialRound?.toString(),
       },
       this.args.decentralizedSynchronizerUpgradeConfig,
       extraDependsOn
@@ -176,6 +174,7 @@ export class Dso extends pulumi.ComponentResource {
             type: 'found-dso',
             sv1SvRewardWeightBps,
             roundZeroDuration: config.optionalEnv('ROUND_ZERO_DURATION'),
+            initialRound: initialRound?.toString(),
           },
       {
         sv1: sv1CometBftConf,
@@ -183,7 +182,6 @@ export class Dso extends pulumi.ComponentResource {
       },
       additionalSvIdentities,
       this.args.expectedValidatorOnboardings,
-      svConfig?.initialRound,
       true,
       cometBftGovernanceKeys[sv1Conf.onboardingName]
     );
@@ -217,7 +215,6 @@ export class Dso extends pulumi.ComponentResource {
         cometBft,
         additionalSvIdentities,
         [],
-        svConfig?.initialRound,
         false,
         cometBftGovernanceKeys[conf.onboardingName],
         incrementalOnboarding ? previousSvs.map(sv => sv.svApp) : []

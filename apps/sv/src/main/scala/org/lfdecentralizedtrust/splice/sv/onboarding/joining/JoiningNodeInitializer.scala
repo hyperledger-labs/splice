@@ -198,7 +198,7 @@ class JoiningNodeInitializer(
       )
       // We set the initial round to the one from the sponsor if no initial round is store in the user metadata yet
       // This is needed so that all scans can aggregate and backfill using the same initial round
-      // Note: we accept the risk that sponsors could maliciously set a wrong initialRound
+      // Note: we accept the risk that sponsors could maliciously set a wrong initialRound as this is dev/testnet only.
       _ <- establishInitialRound(
         svAutomation.connection,
         upgradesConfig,
