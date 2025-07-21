@@ -6,7 +6,7 @@
     "@kubernetes/client-node": "^0.18.1",
     "@types/auth0": "^3.3.2",
     "auth0": "^3.4.0",
-    "ip": "^1.1.8",
+    "ip": "^1.1.9",
     "splice-pulumi-common": "1.0.0",
     "splice-pulumi-common-sv": "1.0.0",
     "splice-pulumi-common-validator": "1.0.0",
