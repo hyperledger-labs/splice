@@ -748,15 +748,6 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
       )
 
-      val normalizedTransferInstructions =
-        normalizeActiveContractsResponse(activeTransferInstructionsResponse)
-      replaceOrFail(
-        "transfer-instructions.json",
-        normalizedTransferInstructions,
-        io.circe.Encoder
-          .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
-      )
-
       val normalizedUpdates = getUpdatesResponse
         .map(_.update)
         .collect {
@@ -863,6 +854,15 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         s"eventsByContractIdResponses.json",
         eventByIdResponses.flatten,
         io.circe.Encoder.encodeSeq(JsEventServiceCodecs.jsGetEventsByContractIdResponseRW),
+      )
+
+      val normalizedTransferInstructions =
+        normalizeActiveContractsResponse(activeTransferInstructionsResponse)
+      replaceOrFail(
+        "transfer-instructions.json",
+        normalizedTransferInstructions,
+        io.circe.Encoder
+          .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
       )
     }
   }
