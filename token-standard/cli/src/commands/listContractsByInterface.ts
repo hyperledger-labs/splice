@@ -5,41 +5,49 @@ import {
   ensureInterfaceViewIsPresent,
   filtersByParty,
 } from "../apis/ledger-api-utils";
-import { HoldingInterface } from "../constants";
+import { InterfaceId } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
 import { JsGetActiveContractsResponse } from "canton-json-api-v2-openapi";
 
-export async function listHoldings(
+export async function listContractsByInterface(
+  interfaceId: InterfaceId,
   partyId: string,
   opts: CommandOptions,
 ): Promise<void> {
   try {
     const ledgerClient = createLedgerApiClient(opts);
     const ledgerEnd = await ledgerClient.getV2StateLedgerEnd();
-    const holdings = await ledgerClient.postV2StateActiveContracts({
+    const responses = await ledgerClient.postV2StateActiveContracts({
       filter: {
-        filtersByParty: filtersByParty(partyId, [HoldingInterface], false),
+        filtersByParty: filtersByParty(partyId, [interfaceId], false),
       },
       verbose: false,
       activeAtOffset: ledgerEnd.offset,
     });
-    const prettyHoldings = holdings.map(toPrettyHolding);
-    console.log(JSON.stringify(prettyHoldings, null, 2));
+    const prettyContracts = responses.map((response) =>
+      toPrettyContract(interfaceId, response),
+    );
+    console.log(JSON.stringify(prettyContracts, null, 2));
   } catch (err) {
-    console.error("Failed to list holdings", err);
+    console.error(
+      `Failed to list contracts of interface ${interfaceId.toString()}`,
+      err,
+    );
     throw err;
   }
 }
 
 // Make them nicer to show by excluding stuff useless to users such as the createdEventBlob
-export function toPrettyHolding(holding: JsGetActiveContractsResponse): {
+export function toPrettyContract(
+  interfaceId: InterfaceId,
+  response: JsGetActiveContractsResponse,
+): {
   contractId: string;
   payload: any;
 } {
-  const createdEvent = holding.contractEntry.JsActiveContract.createdEvent;
+  const createdEvent = response.contractEntry.JsActiveContract.createdEvent;
   return {
     contractId: createdEvent.contractId,
-    payload: ensureInterfaceViewIsPresent(createdEvent, HoldingInterface)
-      .viewValue,
+    payload: ensureInterfaceViewIsPresent(createdEvent, interfaceId).viewValue,
   };
 }
