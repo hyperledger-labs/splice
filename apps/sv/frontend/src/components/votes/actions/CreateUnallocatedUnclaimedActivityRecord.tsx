@@ -37,7 +37,8 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
   chooseAction: (action: ActionRequiringConfirmation) => void;
   action?: ActionFromForm;
   effectivity: Dayjs;
-}> = ({ chooseAction, action, effectivity }) => {
+  setIsValidAmount: (isValid: boolean) => void;
+}> = ({ chooseAction, action, effectivity, setIsValidAmount }) => {
   const existing = asCreateUnallocatedUnclaimedActivityRecord(action);
 
   const [beneficiary, setBeneficiary] = useState(existing?.beneficiary ?? '');
@@ -109,11 +110,14 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
               const decimal = new Decimal(newValue);
               if (decimal.lte(0)) {
                 setAmountError('Amount must be a positive number');
+                setIsValidAmount(false);
               } else {
                 setAmountError(null);
+                setIsValidAmount(true);
               }
             } catch {
               setAmountError('Amount must be a positive number');
+              setIsValidAmount(false);
             }
           }}
           error={!!amountError}

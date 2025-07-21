@@ -18,6 +18,7 @@ describe('UnallocatedUnclaimedActivityRecord Amount Validation', () => {
     const user = userEvent.setup();
 
     const dummyChooseAction = () => {};
+    const dummySetIsValidAmount = () => {};
     const mockEffectivity = dayjs();
 
     render(
@@ -26,6 +27,7 @@ describe('UnallocatedUnclaimedActivityRecord Amount Validation', () => {
           <CreateUnallocatedUnclaimedActivityRecord
             chooseAction={dummyChooseAction}
             effectivity={mockEffectivity}
+            setIsValidAmount={dummySetIsValidAmount}
           />
         </SvConfigProvider>
       </MemoryRouter>
@@ -53,6 +55,7 @@ describe('UnallocatedUnclaimedActivityRecord Amount Validation', () => {
 describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
   test('converts default local datetime to UTC before calling chooseAction', async () => {
     const mockChooseAction = vi.fn();
+    const dummySetIsValidAmount = () => {};
     const mockEffectivity = dayjs('2025-07-18T00:00:00');
 
     render(
@@ -61,6 +64,7 @@ describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
           <CreateUnallocatedUnclaimedActivityRecord
             chooseAction={mockChooseAction}
             effectivity={mockEffectivity}
+            setIsValidAmount={dummySetIsValidAmount}
           />
         </SvConfigProvider>
       </MemoryRouter>

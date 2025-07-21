@@ -93,6 +93,7 @@ export const CreateVoteRequest: React.FC = () => {
   );
 
   const [isValidSynchronizerPauseTime, setIsValidSynchronizerPauseTime] = useState<boolean>(true);
+  const [isValidAmount, setIsValidAmount] = useState<boolean>(true);
 
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
@@ -225,6 +226,11 @@ export const CreateVoteRequest: React.FC = () => {
     {
       disabled: !isValidSynchronizerPauseTime,
       reason: 'Synchronizer upgrade time is before the expiry/effective date',
+      severity: 'warning' as AlertColor,
+    },
+    {
+      disabled: !isValidAmount,
+      reason: 'Amount must be a positive number',
       severity: 'warning' as AlertColor,
     },
     // keep this as the last condition
@@ -388,6 +394,7 @@ export const CreateVoteRequest: React.FC = () => {
               chooseAction={chooseAction}
               action={action}
               effectivity={effectivity}
+              setIsValidAmount={setIsValidAmount}
             />
           )}
           <Typography variant="h5">Proposal</Typography>
