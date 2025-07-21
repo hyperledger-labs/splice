@@ -711,9 +711,9 @@ abstract class TopologyAdminConnection(
                     forceChanges = forceChanges,
                   )
                 }
-                .flatMap { _ =>
+                .flatMap { proposal =>
                   logger.debug(
-                    s"Submitted proposal for $description, waiting until the proposal gets accepted"
+                    s"Submitted proposal ${proposal.mapping} for $description, waiting until the proposal gets accepted"
                   )
                   retryProvider.retry(
                     retryFor,
@@ -724,7 +724,9 @@ abstract class TopologyAdminConnection(
                         currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial
                       ) {
                         Status.FAILED_PRECONDITION
-                          .withDescription("Condition is not yet observed.")
+                          .withDescription(
+                            s"Condition is not yet observed. Proposed: ${proposal.mapping}}, found: $currentAuthorizedState."
+                          )
                           .asRuntimeException()
                       } else {
                         AuthorizedStateChanged(
