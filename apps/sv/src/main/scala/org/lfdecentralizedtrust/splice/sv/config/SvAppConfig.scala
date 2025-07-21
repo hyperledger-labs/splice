@@ -3,6 +3,20 @@
 
 package org.lfdecentralizedtrust.splice.sv.config
 
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeLong,
+  NonNegativeNumeric,
+  PositiveInt,
+  PositiveNumeric,
+}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
+import com.digitalasset.canton.topology.PartyId
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -18,20 +32,6 @@ import org.lfdecentralizedtrust.splice.config.{
 }
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{
-  NonNegativeLong,
-  NonNegativeNumeric,
-  PositiveInt,
-  PositiveNumeric,
-}
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
-import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.topology.PartyId
-import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.nio.file.Path
 
@@ -205,7 +205,7 @@ final case class SvParticipantClientConfig(
     override val adminApi: FullClientConfig,
     override val ledgerApi: LedgerApiClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
-      SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
+      SvAppBackendConfig.DefaultParticipantSequencerRequestAmplification,
 ) extends BaseParticipantClientConfig(adminApi, ledgerApi)
 
 case class SvAppBackendConfig(
@@ -250,9 +250,10 @@ case class SvAppBackendConfig(
     // can always set it to an empty string.
     contactPoint: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
-    // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
+    // If the node does not receive an event for that amount of time, it will request a time proof
+    // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
+      NonNegativeFiniteDuration.ofMinutes(30),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
@@ -261,10 +262,16 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
+    topologyChangeDelayDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMillis(0),
     delegatelessAutomation: Boolean = true,
     expectedTaskDuration: Long = 5000, // milliseconds
     expiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
+    // Skip synchronizer initialization and synchronizer config reconciliation.
+    // Can be safely set to true for an SV that has completed onboarding unless you
+    // 1. try to reset one of your sequencers or mediators
+    // 2. change sequencer URLs that need to get published externally.
+    skipSynchronizerInitialization: Boolean = false,
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 
@@ -284,7 +291,12 @@ case class SvAppBackendConfig(
 }
 
 object SvAppBackendConfig {
-  val DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION = SubmissionRequestAmplification(
+  // This is consistent with what the validator sets for a single sequencer connection
+  val DefaultParticipantSequencerRequestAmplification = SubmissionRequestAmplification(
+    PositiveInt.tryCreate(1),
+    NonNegativeFiniteDuration.ofSeconds(10),
+  )
+  val DefaultMediatorSequencerRequestAmplification = SubmissionRequestAmplification(
     PositiveInt.tryCreate(5),
     NonNegativeFiniteDuration.ofSeconds(10),
   )
@@ -343,7 +355,7 @@ final case class SvSequencerConfig(
 final case class SvMediatorConfig(
     adminApi: FullClientConfig,
     sequencerRequestAmplification: SubmissionRequestAmplification =
-      SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION,
+      SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification,
 ) {
 
   def toCantonConfig: RemoteMediatorConfig = RemoteMediatorConfig(

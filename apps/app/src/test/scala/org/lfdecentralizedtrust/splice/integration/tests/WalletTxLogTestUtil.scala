@@ -44,7 +44,7 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
       ignore: TxLogEntry => Boolean = _ => false,
   ): Unit = {
 
-    val (actual, toCompare) = eventually() {
+    eventually() {
       val actual = wallet.listTransactions(None, pageSize = Limit.MaxPageSize)
       val withoutIgnored = actual
         .takeWhile(e => !previousEventId.contains(e.eventId))
@@ -62,31 +62,32 @@ trait WalletTxLogTestUtil extends TestCommon with WalletTestUtil with TimeTestUt
       }
 
       toCompare should have length expected.size.toLong
-      (actual, toCompare)
-    }
 
-    toCompare
-      .zip(expected)
-      .zipWithIndex
-      .foreach { case ((entry, pf), i) =>
-        clue(s"Entry at position $i") {
-          inside(entry)(pf)
+      toCompare
+        .zip(expected)
+        .zipWithIndex
+        .foreach { case ((entry, pf), i) =>
+          clue(s"Entry at position $i") {
+            inside(entry)(pf)
+          }
         }
+
+      // ingestion can happen in-between the call `actual=listTransactions()` and the paginated ones,
+      // so both need to be inside the same `eventually` block
+      clue("Paginated result should be equal to non-paginated result") {
+        val paginatedResult = Iterator
+          .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
+            val page = wallet.listTransactions(beginAfterId, pageSize = 2)
+            if (page.isEmpty)
+              None
+            else
+              Some(page -> Some(page.last.eventId))
+          })
+          .toSeq
+          .flatten
+
+        paginatedResult should contain theSameElementsInOrderAs actual
       }
-
-    clue("Paginated result should be equal to non-paginated result") {
-      val paginatedResult = Iterator
-        .unfold[Seq[TxLogEntry], Option[String]](None)(beginAfterId => {
-          val page = wallet.listTransactions(beginAfterId, pageSize = 2)
-          if (page.isEmpty)
-            None
-          else
-            Some(page -> Some(page.last.eventId))
-        })
-        .toSeq
-        .flatten
-
-      paginatedResult should contain theSameElementsInOrderAs actual
     }
   }
 

@@ -2,21 +2,34 @@ package org.lfdecentralizedtrust.splice.store
 
 import cats.syntax.parallel.*
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.AppPaymentRequest
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent
-import org.lfdecentralizedtrust.splice.store.db.{AcsRowData, IndexColumnValue}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsRowData,
+  IndexColumnValue,
+}
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
-import com.digitalasset.canton.topology.{SynchronizerId, ParticipantId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.MonadUtil
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationrequestv1,
+  allocationv1,
+  holdingv1,
+  metadatav1,
+}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummytwointerfaces.DummyTwoInterfaces
 
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -36,13 +49,23 @@ abstract class MultiDomainAcsStoreTest[
     id
   }
 
-  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData {
+  case class GenericAcsRowData(contract: Contract[_, _]) extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Time.Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq.empty
   }
 
-  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
+  case class GenericInterfaceRowData(
+      override val interfaceId: Identifier,
+      override val interfaceView: DamlRecord[?],
+  ) extends AcsInterfaceViewRowData {
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+  }
+
+  protected val defaultContractFilter: MultiDomainAcsStore.ContractFilter[
+    GenericAcsRowData,
+    GenericInterfaceRowData,
+  ] = {
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -52,6 +75,25 @@ abstract class MultiDomainAcsStoreTest[
           GenericAcsRowData(contract)
         }
       ),
+      interfaceFilters = Map(
+        // will include both Amulet & DummyHolding
+        mkFilterInterface(holdingv1.Holding.INTERFACE) { contract =>
+          contract.payload.instrumentId.admin == dsoParty.toProtoPrimitive
+        }(contract =>
+          GenericInterfaceRowData(
+            contract.identifier,
+            contract.payload,
+          )
+        ),
+        mkFilterInterface(allocationrequestv1.AllocationRequest.INTERFACE) { contract =>
+          contract.payload.settlement.executor == dsoParty.toProtoPrimitive
+        }(contract =>
+          GenericInterfaceRowData(
+            contract.identifier,
+            contract.payload,
+          )
+        ),
+      ),
     )
   }
 
@@ -60,7 +102,10 @@ abstract class MultiDomainAcsStoreTest[
       txLogId: Option[Int] = Some(1),
       domainMigrationId: Long = 0,
       participantId: ParticipantId = ParticipantId("MultiDomainAcsStoreTest"),
-      filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = defaultContractFilter,
+      filter: MultiDomainAcsStore.ContractFilter[
+        GenericAcsRowData,
+        GenericInterfaceRowData,
+      ] = defaultContractFilter,
   ): Store
 
   protected type Store = S
@@ -130,6 +175,59 @@ abstract class MultiDomainAcsStoreTest[
     )
   }
   private val charsetMatchingDbBytes = java.nio.charset.Charset forName "UTF-8"
+
+  protected def dummyHolding(owner: PartyId, amount: BigDecimal, issuer: PartyId) = {
+    val templateId = DummyHolding.TEMPLATE_ID
+    val payload =
+      new DummyHolding(owner.toProtoPrimitive, issuer.toProtoPrimitive, amount.bigDecimal)
+    contract(
+      identifier = templateId,
+      contractId = new DummyHolding.ContractId(nextCid()),
+      payload = payload,
+    )
+  }
+
+  protected def twoInterfaces(
+      owner: PartyId,
+      amount: BigDecimal,
+      issuer: PartyId,
+      date: Instant,
+  ) = {
+    val templateId = DummyTwoInterfaces.TEMPLATE_ID
+    val payload =
+      new DummyTwoInterfaces(owner.toProtoPrimitive, issuer.toProtoPrimitive, numeric(amount), date)
+    contract(
+      identifier = templateId,
+      contractId = new DummyTwoInterfaces.ContractId(nextCid()),
+      payload = payload,
+    )
+  }
+
+  protected val emptyMetadata = new metadatav1.Metadata(java.util.Map.of())
+  protected def holdingView(owner: PartyId, amount: BigDecimal, admin: PartyId, id: String) = {
+    new holdingv1.HoldingView(
+      owner.toProtoPrimitive,
+      new holdingv1.InstrumentId(admin.toProtoPrimitive, id),
+      numeric(amount.bigDecimal),
+      java.util.Optional.empty,
+      emptyMetadata,
+    )
+  }
+
+  protected def allocationRequestView(executor: PartyId, date: Instant) = {
+    new allocationrequestv1.AllocationRequestView(
+      new allocationv1.SettlementInfo(
+        executor.toProtoPrimitive,
+        new allocationv1.Reference("ref", java.util.Optional.empty),
+        date,
+        date,
+        date,
+        emptyMetadata,
+      ),
+      java.util.Map.of(),
+      emptyMetadata,
+    )
+  }
 
   protected def reassignmentContractOrder[AC](
       unordered: Seq[AC],
@@ -264,7 +362,7 @@ abstract class MultiDomainAcsStoreTest[
     "ingestion can be restarted at any time" in {
       implicit val store = mkStore()
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
         _ <- store.ingestionSink.initialize()
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -293,7 +391,7 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(
-          activeContracts = Seq((c(1), d1, 0L))
+          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L))
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -307,7 +405,10 @@ abstract class MultiDomainAcsStoreTest[
       implicit val store = mkStore()
       for {
         _ <- initWithAcs(
-          Seq((c(1), d1, 0L), (cFeatured(2), d1, 0L))
+          Seq(
+            StoreTest.AcsImportEntry(c(1), d1, 0L),
+            StoreTest.AcsImportEntry(cFeatured(2), d1, 0L),
+          )
         )
         _ <- assertList(c(1) -> Some(d1))
         _ <- d1.archive(c(1))
@@ -514,7 +615,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteOut = Seq(
-            (c(1), d1, d2, tf0, 1L)
+            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> None)
@@ -531,7 +632,7 @@ abstract class MultiDomainAcsStoreTest[
       for {
         _ <- initWithAcs(
           incompleteIn = Seq(
-            (c(1), d1, d2, tf0, 1L)
+            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ <- assertList(c(1) -> Some(d2))
@@ -575,7 +676,7 @@ abstract class MultiDomainAcsStoreTest[
       val tf0 = nextReassignmentId
       for {
         _ <- initWithAcs(
-          incompleteOut = Seq((cFeatured(1), d1, d2, tf0, 1L))
+          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(cFeatured(1), d1, d2, tf0, 1L))
         )
         _ <- assertIncompleteReassignments()
       } yield succeed
@@ -591,7 +692,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1), r(2)))
@@ -611,7 +712,7 @@ abstract class MultiDomainAcsStoreTest[
         }
       def r(round: Int) = AssignedContract(c(round), d1)
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L)))
+        _ <- initWithAcs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))
         _ = eventually()(assignedContracts.get() shouldBe Seq(r(1)))
         _ <- d1.create(c(2))
         _ <- store.ingestionSink.initialize()
@@ -640,7 +741,7 @@ abstract class MultiDomainAcsStoreTest[
         // incomplete unassign
         _ <- initWithAcs(
           incompleteOut = Seq(
-            (c(1), d1, d2, tf0, 1L)
+            StoreTest.AcsImportIncompleteEntry(c(1), d1, d2, tf0, 1L)
           )
         )
         _ = eventually()(transfers.get should have length 1)
@@ -682,8 +783,8 @@ abstract class MultiDomainAcsStoreTest[
       }
       for {
         _ <- initWithAcs(
-          activeContracts = Seq((c(1), d1, 0L)),
-          incompleteOut = Seq((c(2), d1, d2, tf2, 3L)),
+          activeContracts = Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)),
+          incompleteOut = Seq(StoreTest.AcsImportIncompleteEntry(c(2), d1, d2, tf2, 3L)),
         )
         _ = assertSize("Initial", 1)
         // unassign before assign
@@ -715,7 +816,12 @@ abstract class MultiDomainAcsStoreTest[
     "reads return contracts from all package versions" in {
       implicit val store = mkStore()
       for {
-        _ <- initWithAcs(Seq((c(1), d1, 0L), (cUpgraded(2), d1, 0L)))
+        _ <- initWithAcs(
+          Seq(
+            StoreTest.AcsImportEntry(c(1), d1, 0L),
+            StoreTest.AcsImportEntry(cUpgraded(2), d1, 0L),
+          )
+        )
         _ <- d1.create(c(3))
         _ <- d1.create(cUpgraded(4))
         results <- store.listContracts(AppRewardCoupon.COMPANION)
@@ -757,18 +863,19 @@ abstract class MultiDomainAcsStoreTest[
       val contractFilter = {
         import MultiDomainAcsStore.mkFilter
 
-        MultiDomainAcsStore.SimpleContractFilter(
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
           dsoParty,
           templateFilters = Map(
             mkFilter(evenCompanion)(_ => true)(GenericAcsRowData(_)),
             mkFilter(oddCompanion)(_ => true)(GenericAcsRowData(_)),
           ),
+          interfaceFilters = Map.empty,
         )
       }
       implicit val store: Store = mkStore(0, Some(0), 0L, sampleParticipantId, contractFilter)
       for {
         _ <- initWithAcs(coids.zipWithIndex.map { case (coid, ix) =>
-          (smallestContract(coid, ix), dummyDomain, 0L)
+          StoreTest.AcsImportEntry(smallestContract(coid, ix), dummyDomain, 0L)
         })
         contracts <- store.listAssignedContractsNotOnDomainN(
           dummy2Domain,
@@ -776,6 +883,634 @@ abstract class MultiDomainAcsStoreTest[
         )
       } yield contracts.map(_.contractId.contractId) shouldBe expectedOrder.map(_.coid)
     }
+
+    "ingest and return interface views for 1 interface 2 implementors" in {
+      implicit val store = mkStore()
+      val aDifferentIssuer = providerParty(42)
+      val includedAmulet =
+        (1 to 3).map(n =>
+          amulet(providerParty(n), BigDecimal(n), n.toLong, BigDecimal(0.00001)) -> holdingView(
+            providerParty(n),
+            BigDecimal(n),
+            dsoParty,
+            "AMT",
+          )
+        )
+      val excludedAmulet = (4 to 6).map(n =>
+        amulet(
+          providerParty(n),
+          BigDecimal(n),
+          n.toLong,
+          BigDecimal(0.00001),
+          dso = aDifferentIssuer, // this is excluded in the interface filter
+        ) -> holdingView(providerParty(n), BigDecimal(n), aDifferentIssuer, "AMT")
+      )
+      val includedDummy = (1 to 3).map(n =>
+        dummyHolding(providerParty(n), BigDecimal(n), dsoParty) -> holdingView(
+          providerParty(n),
+          BigDecimal(n),
+          dsoParty,
+          "DUM",
+        )
+      )
+      val excludedDummy = (4 to 6).map(n =>
+        dummyHolding(
+          providerParty(n),
+          BigDecimal(n),
+          issuer = aDifferentIssuer, // this is excluded in the interface filter
+        ) -> holdingView(providerParty(n), BigDecimal(n), aDifferentIssuer, "DUM")
+      )
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- MonadUtil.sequentialTraverse(
+          includedAmulet ++ excludedAmulet
+        ) { case (contract, interfaceView) =>
+          d1.create(
+            contract,
+            implementedInterfaces =
+              Map(holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> interfaceView.toValue),
+          )
+        }
+        _ <- MonadUtil.sequentialTraverse(
+          includedDummy ++ excludedDummy
+        ) { case (contract, interfaceView) =>
+          d1.create(
+            contract,
+            implementedInterfaces =
+              Map(holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> interfaceView.toValue),
+          )
+        }
+        result <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        result should be((includedAmulet ++ includedDummy).map { case (contract, view) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            view,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
+      }
+    }
+
+    "only include interfaces for the current store id and migration id" in {
+      val storeI1M1 = mkStore(1, domainMigrationId = 1L)
+      val storeI2M1 = mkStore(2, domainMigrationId = 1L)
+      val storeI1M2 = mkStore(1, domainMigrationId = 2L)
+      val contractI1M1 = amulet(providerParty(1), BigDecimal(1), 1.toLong, BigDecimal(0.00001))
+      val viewI1M1 = holdingView(
+        providerParty(1),
+        BigDecimal(1),
+        dsoParty,
+        "Amulet",
+      )
+      val contractI2M1 = amulet(providerParty(2), BigDecimal(2), 2.toLong, BigDecimal(0.00002))
+      val viewI2M1 = holdingView(
+        providerParty(2),
+        BigDecimal(2),
+        dsoParty,
+        "Amulet",
+      )
+      val contractI1M2 = amulet(providerParty(3), BigDecimal(3), 3.toLong, BigDecimal(0.00003))
+      val viewI1M2 = holdingView(
+        providerParty(3),
+        BigDecimal(3),
+        dsoParty,
+        "Amulet",
+      )
+      for {
+        _ <- initWithAcs()(storeI1M1)
+        _ <- initWithAcs()(storeI2M1)
+        _ <- initWithAcs()(storeI1M2)
+        _ <- d1.create(
+          contractI1M1,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> viewI1M1.toValue
+          ),
+        )(storeI1M1)
+        _ <- d1.create(
+          contractI2M1,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> viewI2M1.toValue
+          ),
+        )(storeI2M1)
+        _ <- d1.create(
+          contractI1M2,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> viewI1M2.toValue
+          ),
+        )(storeI1M2)
+        resultStoreI1M1 <- storeI1M1.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        resultStoreI2M1 <- storeI2M1.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        resultStoreI1M2 <- storeI1M2.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        resultStoreI1M1 should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contractI1M1.contractId.contractId),
+              viewI1M1,
+              contractI1M1.createdEventBlob,
+              contractI1M1.createdAt,
+            )
+          )
+        )
+        resultStoreI2M1 should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contractI2M1.contractId.contractId),
+              viewI2M1,
+              contractI2M1.createdEventBlob,
+              contractI2M1.createdAt,
+            )
+          )
+        )
+        resultStoreI1M2 should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contractI1M2.contractId.contractId),
+              viewI1M2,
+              contractI1M2.createdEventBlob,
+              contractI1M2.createdAt,
+            )
+          )
+        )
+      }
+    }
+
+    "filter interfaces by package-id" in {
+      implicit val store = mkStore()
+      val contract = amulet(providerParty(1), BigDecimal(1), 1.toLong, BigDecimal(0.00001))
+      val view = holdingView(
+        providerParty(1),
+        BigDecimal(1),
+        dsoParty,
+        "AMT",
+      )
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          contract,
+          implementedInterfaces = Map(
+            new Identifier(
+              "a package id that is totally different from the original",
+              holdingv1.Holding.INTERFACE_ID.getModuleName,
+              holdingv1.Holding.INTERFACE_ID.getEntityName,
+            ) -> view.toValue
+          ),
+        )
+        result <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        result should be(Seq.empty)
+      }
+    }
+
+    "ingest and return interface views for 2 interfaces 1 implementor" in {
+      implicit val store = mkStore()
+      val aDifferentIssuer = providerParty(42)
+      val included = (1 to 3).map(n => {
+        val date = Instant.EPOCH.plusSeconds(n.toLong)
+        val owner = providerParty(n)
+        (
+          twoInterfaces(
+            owner,
+            BigDecimal(n),
+            dsoParty,
+            date,
+          ),
+          holdingView(owner, BigDecimal(n), dsoParty, "AMT"),
+          allocationRequestView(dsoParty, date),
+        )
+      })
+      val excluded = (4 to 6).map(n => {
+        val date = Instant.EPOCH.plusSeconds(n.toLong)
+        val owner = providerParty(n)
+        (
+          twoInterfaces(
+            owner,
+            BigDecimal(n),
+            aDifferentIssuer, // this is excluded in the interface filter
+            date,
+          ),
+          holdingView(owner, BigDecimal(n), aDifferentIssuer, "AMT"),
+          allocationRequestView(aDifferentIssuer, date),
+        )
+      })
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- MonadUtil.sequentialTraverse(
+          included ++ excluded
+        ) { case (contract, holdingView, allocationRequestView) =>
+          d1.create(
+            contract,
+            implementedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue,
+              allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> allocationRequestView.toValue,
+            ),
+          )
+        }
+        resultHolding <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        resultAllocationRequest <- store.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield {
+        resultHolding should be(included.map { case (contract, holdingView, _) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            holdingView,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
+        resultAllocationRequest should be(included.map {
+          case (contract, _, allocationRequestView) =>
+            Contract(
+              allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID,
+              new allocationrequestv1.AllocationRequest.ContractId(contract.contractId.contractId),
+              allocationRequestView,
+              contract.createdEventBlob,
+              contract.createdAt,
+            )
+        })
+      }
+    }
+
+    "archive ingested interface views" in {
+      implicit val store = mkStore()
+      val dummies = (1 to 3).map { n =>
+        val owner = providerParty(n)
+        (
+          dummyHolding(owner, BigDecimal(n), dsoParty),
+          holdingView(owner, BigDecimal(n), dsoParty, "DUM"),
+        )
+      }
+      val amulets = (4 to 6).map { n =>
+        val owner = providerParty(n)
+        (
+          amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.0001)),
+          holdingView(owner, BigDecimal(n), dsoParty, "AMT"),
+        )
+      }
+      for {
+        _ <- initWithAcs()
+        _ <- MonadUtil.sequentialTraverse(dummies) { case (contract, holdingView) =>
+          d1.create(
+            contract,
+            implementedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+            ),
+          )
+        }
+        _ <- MonadUtil.sequentialTraverse(amulets) { case (contract, holdingView) =>
+          d1.create(
+            contract,
+            implementedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+            ),
+          )
+        }
+        resultBeforeArchive <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        _ <- d1.archive(
+          amulets(1)._1,
+          implementedInterfaces = Seq(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID
+          ),
+        )
+        _ <- d1.archive(
+          dummies(1)._1,
+          implementedInterfaces = Seq(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID
+          ),
+        )
+        resultAfterArchive <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        resultBeforeArchive should be((dummies ++ amulets).map { case (contract, holdingView) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            holdingView,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
+        resultAfterArchive should be(Seq(dummies(0), dummies(2), amulets(0), amulets(2)).map {
+          case (contract, holdingView) =>
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contract.contractId.contractId),
+              holdingView,
+              contract.createdEventBlob,
+              contract.createdAt,
+            )
+        })
+      }
+    }
+
+    "ingest and return interface views for a template that's included as template and interface" in {
+      implicit val store = mkStore(filter = {
+        import MultiDomainAcsStore.mkFilter
+
+        MultiDomainAcsStore.SimpleContractFilter(
+          dsoParty,
+          templateFilters = Map(
+            mkFilter(Amulet.COMPANION)(_.payload.dso == dsoParty.toProtoPrimitive) { contract =>
+              GenericAcsRowData(contract)
+            }
+          ),
+          interfaceFilters = Map(
+            mkFilterInterface(holdingv1.Holding.INTERFACE) { contract =>
+              contract.payload.instrumentId.admin == dsoParty.toProtoPrimitive
+            }(contract =>
+              GenericInterfaceRowData(
+                contract.identifier,
+                contract.payload,
+              )
+            )
+          ),
+        )
+      })
+      val items = (1 to 3).map { n =>
+        val owner = providerParty(n)
+        (
+          amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.001), dso = dsoParty),
+          holdingView(owner, BigDecimal(n), dsoParty, "DUM"),
+        )
+      }
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- MonadUtil.sequentialTraverse(items) { case (contract, holdingView) =>
+          d1.create(
+            contract,
+            implementedInterfaces = Map(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+            ),
+          )
+        }
+        resultHolding <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        resultByTemplate <- store.listAssignedContracts(
+          Amulet.COMPANION
+        )
+      } yield {
+        resultHolding should be(items.map { case (contract, holdingView) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            holdingView,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
+        resultByTemplate.map(_.contract) should be(items.map(_._1))
+      }
+    }
+
+    "ingest interface views as part of an ACS import" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val aHolding = (
+        amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty),
+        holdingView(owner, BigDecimal(10), dsoParty, "AMT"),
+      )
+      val aTwoInterfaces = (
+        twoInterfaces(
+          owner,
+          BigDecimal(10),
+          dsoParty,
+          Instant.EPOCH.plusSeconds(1L),
+        ),
+        holdingView(owner, BigDecimal(10), dsoParty, "AMT"),
+        allocationRequestView(dsoParty, Instant.EPOCH.plusSeconds(1L)),
+      )
+      val anExcludedHolding = (
+        amulet(
+          owner,
+          BigDecimal(10),
+          1L,
+          BigDecimal(0.00001),
+          dso = providerParty(42), // this is excluded in the interface filter
+        ),
+        holdingView(owner, BigDecimal(10), providerParty(42), "AMT"),
+      )
+      val incompleteOutHoldings = (2 to 5).map(n =>
+        amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.00001), dso = dsoParty) ->
+          holdingView(owner, BigDecimal(n.toLong), dsoParty, "AMT")
+      )
+      val incompleteInHolding = (6 to 8).map(n =>
+        amulet(owner, BigDecimal(n), n.toLong, BigDecimal(0.00001), dso = dsoParty) ->
+          holdingView(owner, BigDecimal(n), dsoParty, "AMT")
+      )
+      val acs = Seq(
+        StoreTest.AcsImportEntry(
+          aHolding._1,
+          d1,
+          0L,
+          Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> aHolding._2.toValue
+          ),
+        ),
+        StoreTest.AcsImportEntry(
+          aTwoInterfaces._1,
+          d1,
+          0L,
+          Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> aTwoInterfaces._2.toValue,
+            allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> aTwoInterfaces._3.toValue,
+          ),
+        ),
+        StoreTest.AcsImportEntry(
+          anExcludedHolding._1,
+          d1,
+          0L,
+          Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> anExcludedHolding._2.toValue
+          ),
+        ),
+      )
+      for {
+        _ <- initWithAcs(
+          acs,
+          incompleteOut = incompleteOutHoldings.map { case (contract, holdingView) =>
+            StoreTest.AcsImportIncompleteEntry(
+              contract,
+              d1,
+              d2,
+              nextReassignmentId,
+              1L,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+              ),
+            )
+          },
+          incompleteIn = incompleteInHolding.map { case (contract, holdingView) =>
+            StoreTest.AcsImportIncompleteEntry(
+              contract,
+              d2,
+              d1,
+              nextReassignmentId,
+              1L,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView.toValue
+              ),
+            )
+          },
+        )
+        resultHolding <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+        resultAllocationRequest <- store.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield {
+        val allHoldings = Seq(
+          aHolding,
+          (aTwoInterfaces._1, aTwoInterfaces._2),
+        ) ++ incompleteOutHoldings ++ incompleteInHolding
+        resultHolding should be(allHoldings.map { case (contract, holdingView) =>
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract.contractId.contractId),
+            holdingView,
+            contract.createdEventBlob,
+            contract.createdAt,
+          )
+        })
+        resultAllocationRequest should be(
+          Seq(
+            Contract(
+              allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID,
+              new allocationrequestv1.AllocationRequest.ContractId(
+                aTwoInterfaces._1.contractId.contractId
+              ),
+              aTwoInterfaces._3,
+              aTwoInterfaces._1.createdEventBlob,
+              aTwoInterfaces._1.createdAt,
+            )
+          )
+        )
+      }
+    }
+
+    "ingest interface views in assignment updates" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val assignedHolding = (
+        amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty),
+        holdingView(owner, BigDecimal(10), dsoParty, "AMT"),
+      )
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.assign(
+          assignedHolding._1 -> d1,
+          nextReassignmentId,
+          1,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> assignedHolding._2.toValue
+          ),
+        )
+        result <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield {
+        result should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(assignedHolding._1.contractId.contractId),
+              assignedHolding._2,
+              assignedHolding._1.createdEventBlob,
+              assignedHolding._1.createdAt,
+            )
+          )
+        )
+      }
+    }
+
+    "ingest and return interface views with their contract's state" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val contract1 = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
+      val view1 = holdingView(owner, BigDecimal(10), dsoParty, "AMT")
+      val contract2 = amulet(
+        owner,
+        BigDecimal(20),
+        2L,
+        BigDecimal(0.00002),
+        dso = dsoParty,
+      )
+      val view2 = holdingView(owner, BigDecimal(20), dsoParty, "AMT")
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          contract1,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> view1.toValue
+          ),
+        )
+        _ <- d2.create(
+          contract2,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> view2.toValue
+          ),
+        )
+        result1 <- store.findInterfaceViewByContractId(
+          holdingv1.Holding.INTERFACE
+        )(contract1.contractId.toInterface(holdingv1.Holding.INTERFACE))
+        result2 <- store.findInterfaceViewByContractId(
+          holdingv1.Holding.INTERFACE
+        )(contract2.contractId.toInterface(holdingv1.Holding.INTERFACE))
+      } yield {
+        result1.value.contract should be(
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract1.contractId.contractId),
+            view1,
+            contract1.createdEventBlob,
+            contract1.createdAt,
+          )
+        )
+        result1.value.state.fold(_ should be(d1), fail("should be assigned"))
+
+        result2.value.contract should be(
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract2.contractId.contractId),
+            view2,
+            contract2.createdEventBlob,
+            contract2.createdAt,
+          )
+        )
+        result2.value.state.fold(_ should be(d2), fail("should be assigned"))
+      }
+    }
+
   }
 }
 

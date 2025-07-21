@@ -15,11 +15,8 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   aTrigger,
 }
 import org.lfdecentralizedtrust.splice.automation.{
-  AmuletConfigReassignmentTrigger,
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-  TransferFollowTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
@@ -227,6 +224,7 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
+        config.topologyChangeDelayDuration,
       )
     )
 
@@ -302,7 +300,6 @@ class SvDsoAutomationService(
 
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
-    registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
       new AnsSubscriptionInitialPaymentTrigger(
         triggerContext,
@@ -473,9 +470,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ArchiveClosedMiningRoundsTrigger],
       aTrigger[ElectionRequestTrigger],
       aTrigger[RestartDsoDelegateBasedAutomationTrigger],
-      aTrigger[AmuletConfigReassignmentTrigger],
-      aTrigger[AssignTrigger],
-      aTrigger[TransferFollowTrigger],
       aTrigger[AnsSubscriptionInitialPaymentTrigger],
       aTrigger[SvPackageVettingTrigger],
       aTrigger[SvOffboardingPartyToParticipantProposalTrigger],

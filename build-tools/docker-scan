@@ -1,0 +1,50 @@
+#! /usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/lib/libcli.source"
+
+image="$(<target/image-tag)"
+
+# Compute a unique index per image name, to be used for tmp directories and port numbers,
+# as otherwise blackduck is unhappy with parallelism
+# shellcheck disable=SC2012,SC2010
+index=$(ls .. | grep -nx "$(basename "$(pwd)")" | sed 's/:.*//')
+
+BASE_PORT=9000
+TMP_DIR="/tmp/blackduck-docker-scan/${index}"
+mkdir -p "${TMP_DIR}"
+export DETECT_JAR_DOWNLOAD_DIR="${TMP_DIR}/detect_jars"
+
+# We blindly retry on failures, as we've seen unexplained failures in the scans that we couldn't resolve.
+for i in {1..10}; do
+  set +e
+  bash <(curl -s https://detect.blackduck.com/detect10.sh) \
+    --blackduck.url=https://digitalasset.blackducksoftware.com/ \
+    --blackduck.api.token="$BLACKDUCK_HUBDETECT_TOKEN" \
+    --detect.docker.image="$image" \
+    --detect.tools=DOCKER,SIGNATURE_SCAN \
+    --detect.tools.excluded=BINARY_SCAN \
+    --detect.project.name=DACH-NY_canton-network-internal_images \
+    --detect.project.version.name="$image" \
+    --detect.docker.passthrough.imageinspector.service.port.alpine=$((BASE_PORT + (index*3) + 0)) \
+    --detect.docker.passthrough.imageinspector.service.port.centos=$((BASE_PORT + (index*3) + 1)) \
+    --detect.docker.passthrough.imageinspector.service.port.ubuntu=$((BASE_PORT + (index*3) + 2)) \
+    --detect.output.path="${TMP_DIR}/output" \
+    --detect.tools.output.path="${TMP_DIR}/tool_output"
+  res=$?
+  set -e
+
+  if [ $res -eq 0 ]; then
+    echo "Black Duck scan completed successfully for image: $image"
+    exit 0
+  else
+    echo "Black Duck scan failed (attempt $i), retrying in 10 seconds..."
+    sleep 10
+  fi
+done
+echo "Black Duck scan failed after 10 attempts for image: $image"
+exit 1
+
+#TODO(DACH-NY/canton-network-internal#726): run also with `--detect.docker.platform.top.layer.id=sha256:...`, to detect separately vulnerabilities added by us on top of the base image

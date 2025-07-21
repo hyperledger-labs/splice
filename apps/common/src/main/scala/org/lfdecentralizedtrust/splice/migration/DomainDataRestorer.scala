@@ -42,7 +42,7 @@ class DomainDataRestorer(
         manualConnect = true,
         initializeFromTrustedSynchronizer = true,
         timeTracker = SynchronizerTimeTrackerConfig(
-          timeTrackerMinObservationDuration
+          minObservationDuration = timeTrackerMinObservationDuration
         ),
       )
       // We rely on the calls here being idempotent

@@ -7,6 +7,8 @@ import { GcpProject } from './gcp-project';
 
 const gcpProjectId = pulumi.getStack();
 
+const configsDir = config.requireEnv('GCP_PROJECT_CONFIGS_DIR');
+
 const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
 if (!GCP_PROJECT) {
   throw new Error('CLOUDSDK_CORE_PROJECT is undefined');
@@ -44,7 +46,7 @@ const authorizedServiceAccountConfig = authorizedServiceAccountEmail
     })();
 
 function main() {
-  return new GcpProject(gcpProjectId, authorizedServiceAccountConfig);
+  return new GcpProject(gcpProjectId, configsDir);
 }
 
 main();

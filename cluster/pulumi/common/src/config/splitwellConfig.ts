@@ -1,17 +1,17 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { ValidatorNodeConfigSchema } from 'splice-pulumi-common-validator';
 import { z } from 'zod';
 
-import { clusterYamlConfig } from './configLoader';
+import { clusterSubConfig } from './configLoader';
 
-export const SplitwellConfigSchema = z.object({
-  splitwell: z
-    .object({
-      maxDarVersion: z.string().optional(),
-    })
-    .optional(),
-});
+export const SplitwellConfigSchema = z
+  .object({
+    maxDarVersion: z.string().optional(),
+  })
+  .optional()
+  .and(ValidatorNodeConfigSchema);
 
 export type Config = z.infer<typeof SplitwellConfigSchema>;
 
-export const splitwellConfig = SplitwellConfigSchema.parse(clusterYamlConfig).splitwell;
+export const splitwellConfig = SplitwellConfigSchema.parse(clusterSubConfig('splitwell'));

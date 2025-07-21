@@ -3,6 +3,8 @@
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
+import { LogLevelSchema } from '../../common';
+
 export const EnvironmentVariableSchema = z.object({
   name: z.string(),
   value: z.string(),
@@ -17,6 +19,7 @@ export const MultiValidatorConfigSchema = z.object({
       requiresOnboardingSecret: z.boolean().default(false),
       extraValidatorEnvVars: z.array(EnvironmentVariableSchema).default([]),
       extraParticipantEnvVars: z.array(EnvironmentVariableSchema).default([]),
+      logLevel: LogLevelSchema.optional().default('INFO'),
     })
     .optional(),
 });

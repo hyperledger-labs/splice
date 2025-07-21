@@ -1,6 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { ConfigMap, Namespace, PersistentVolumeClaim, Secret } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { Role } from '@pulumi/kubernetes/rbac/v1';
@@ -13,7 +14,6 @@ import {
   imagePullSecretByNamespaceNameForServiceAccount,
   infraAffinityAndTolerations,
 } from 'splice-pulumi-common';
-import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
 import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
 
 import { createCachePvc } from './cache';
@@ -139,7 +139,7 @@ function installDockerRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.11.0',
+      version: ghaConfig.runnerScaleSetVersion,
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
@@ -169,7 +169,7 @@ function installDockerRunnerScaleSet(
             containers: [
               {
                 name: 'runner',
-                image: `${DOCKER_REPO}/splice-test-docker-runner:0.4.1`,
+                image: `${DOCKER_REPO}/splice-test-docker-runner:${ghaConfig.runnerHookVersion}`,
                 command: ['/home/runner/run.sh'],
                 env: [
                   {
@@ -248,14 +248,6 @@ function installDockerRunnerScaleSet(
                     subPath: 'daemon.json',
                   },
                 ],
-                startupProbe: {
-                  exec: {
-                    command: ['docker', 'version'],
-                  },
-                  initialDelaySeconds: 3,
-                  periodSeconds: 2,
-                  failureThreshold: 20,
-                },
               },
             ],
             volumes: [
@@ -419,10 +411,6 @@ function installK8sRunnerScaleSet(
             containers: [
               {
                 name: '$job',
-                env: [
-                  // TODO (#556): remove from here, already defined in splice-test-ci/Dockerfile
-                  { name: 'CI', value: 'true' },
-                ],
                 volumeMounts: [
                   {
                     name: 'cache',
@@ -474,7 +462,7 @@ function installK8sRunnerScaleSet(
     }
   );
 
-  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:0.3.21`;
+  const runnerImage = `${DOCKER_REPO}/splice-test-runner-hook:${ghaConfig.runnerHookVersion}`;
 
   const repo = ghaConfig.githubRepo;
 
@@ -482,7 +470,7 @@ function installK8sRunnerScaleSet(
     name,
     {
       chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set',
-      version: '0.11.0',
+      version: ghaConfig.runnerScaleSetVersion,
       namespace: runnersNamespace.metadata.name,
       values: {
         githubConfigUrl: repo,
@@ -765,7 +753,9 @@ export function installRunnerScaleSets(controller: k8s.helm.v3.Release): void {
         // for registration, and this endpoint seems to require admin rights.
         // TODO(DACH-NY/canton-network-node#17842): The recommended thing to do is use a GitHub App. See here for a guide
         // on setting it up: https://medium.com/@timburkhardt8/registering-github-self-hosted-runners-using-github-app-9cc952ea6ca
-        github_token: spliceEnvConfig.requireEnv('GITHUB_RUNNERS_ACCESS_TOKEN'),
+        github_token: getSecretVersionOutput({ secret: 'gh-runners-access-token' }).apply(
+          k => k.secretData
+        ),
       },
     },
     {

@@ -5,19 +5,25 @@ package org.lfdecentralizedtrust.splice.sv.automation
 
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
+  SqlIndexInitializationTrigger,
 }
-import org.lfdecentralizedtrust.splice.environment.{SpliceLedgerClient, RetryProvider}
+import org.lfdecentralizedtrust.splice.environment.{
+  ParticipantAdminConnection,
+  RetryProvider,
+  SpliceLedgerClient,
+}
 import org.lfdecentralizedtrust.splice.store.{
   DomainTimeSynchronization,
   DomainUnpausedSynchronization,
 }
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
-import org.lfdecentralizedtrust.splice.sv.store.SvSvStore
+import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
+import org.lfdecentralizedtrust.splice.sv.LocalSynchronizerNode
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
@@ -29,7 +35,11 @@ class SvSvAutomationService(
     domainUnpausedSync: DomainUnpausedSynchronization,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
+    dsoStore: SvDsoStore,
+    storage: Storage,
     ledgerClient: SpliceLedgerClient,
+    participantAdminConnection: ParticipantAdminConnection,
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -50,7 +60,28 @@ class SvSvAutomationService(
   override def companion: org.lfdecentralizedtrust.splice.sv.automation.SvSvAutomationService.type =
     SvSvAutomationService
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))
-  registerTrigger(new AssignTrigger(triggerContext, svStore, connection, store.key.svParty))
+
+  registerTrigger(
+    SqlIndexInitializationTrigger(
+      storage,
+      triggerContext,
+    )
+  )
+
+  config.identitiesDump.foreach { backupConfig =>
+    registerTrigger(
+      new BackupNodeIdentitiesTrigger(
+        config.domains.global.alias,
+        dsoStore,
+        backupConfig,
+        participantAdminConnection,
+        localSynchronizerNode.getOrElse(
+          sys.error("Cannot dump identities with no localSynchronizerNode")
+        ),
+        triggerContext,
+      )
+    )
+  }
 }
 
 object SvSvAutomationService extends AutomationServiceCompanion {

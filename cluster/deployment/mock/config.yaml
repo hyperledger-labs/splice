@@ -15,6 +15,10 @@ multiValidator:
   extraParticipantEnvVars:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
       value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
+sv:
+  synchronizer:
+    skipInitialization: true
+    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
@@ -73,6 +77,16 @@ monitoring:
     alerts:
       cloudSql:
         maintenance: true
+    logAlerts:
+      # These are mock values and in no way recommendations
+      forCometBft: |
+        -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")
+      forNonTAPS: |
+        -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
+        -(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))
+        -(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")
+      missingConfiguredCardinality: |
+        -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
 operatorDeployment:
   reference:
     gitReference: refs/heads/main
@@ -87,3 +101,8 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
+svs:
+  sv-2:
+    logging:
+      appsLogLevel: INFO
+      cantonLogLevel: INFO

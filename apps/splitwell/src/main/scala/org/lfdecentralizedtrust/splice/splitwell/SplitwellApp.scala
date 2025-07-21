@@ -132,6 +132,7 @@ class SplitwellApp(
       config.automation,
       clock,
       store,
+      storage,
       ledgerClient,
       scanConnection,
       retryProvider,

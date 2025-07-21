@@ -47,7 +47,7 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
-import { updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
+import { svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
@@ -152,6 +152,13 @@ export async function installNode(
             .map(x => x.id.toString()),
         },
       },
+      rateLimit: {
+        scan: {
+          acs: {
+            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
+          },
+        },
+      },
     },
     activeVersion,
     { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
@@ -246,7 +253,7 @@ async function installSvAndValidator(
     ? [
         {
           beneficiary: pulumi.Output.create(resolveValidator1PartyId()),
-          weight: '3333',
+          weight: 3333,
         },
       ]
     : [];
@@ -259,6 +266,9 @@ async function installSvAndValidator(
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
+      skipInitialization:
+        svsConfig?.synchronizer?.skipInitialization &&
+        !svsConfig?.synchronizer.forceSvRunbookInitialization,
     },
     cometBFT: {
       ...(valuesFromYamlFile.cometBFT || {}),

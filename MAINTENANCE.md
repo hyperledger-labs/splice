@@ -2,7 +2,14 @@
 
 ## Bumping CometBFT
 
-Update the version in the `nix/cometbft-driver-sources.json` file
+1. Update the version in the `nix/cometbft-driver-sources.json` file
+2. Download the corresponding `canton-drivers-proto-<version>.jar` file from
+   JFrog, at `https://digitalasset.jfrog.io/ui/native/canton-drivers/com/digitalasset/canton/drivers/canton-drivers-proto/<version>/canton-drivers-proto-<version>.jar`,
+   and save it under `nix/vendored`.
+3. Update the symlink from `nix/vendored/canton-drivers-proto.jar` to point to the newly downloaded jar.
+4. Delete the older `canton-drivers-proto-<old-version>.jar` file from `nix/vendored`.
+
+// TODO(#1296): once we pull the file from s3 in nix instead of vendoring it in this repo, update the section above (should be just step 1).
 
 ## Bumping Canton
 
@@ -145,3 +152,11 @@ In the [daml](https://github.com/digital-asset/daml/) repository:
 4. Wait for release to be published.
 
 Once the release is published, update `CantonDependencies.scala`.
+
+## Bumping base docker images
+
+All docker images that we use as base layers are pinned by SHA.
+To update their versions, edit the respective Dockerfiles with the new version to use and its SHA. Note to always use the
+SHA of the multi-arch manifest (docker then resolves that to the correct architecture at build time). A good source of
+official SHAs for images from docker.io is: https://github.com/docker-library/repo-info.
+To inspect a manifest locally, you can run e.g. `docker buildx imagetools inspect nginx:stable`.

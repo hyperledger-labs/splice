@@ -138,19 +138,20 @@ class BootstrapPackageConfigDarUploadIntegrationTest
           .filter { case (name, _) =>
             DarResources.packageResources.map(_.bootstrap.metadata.name).contains(name)
           }
-      val uploadedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
+      val vettedDarNameAndVersions: Seq[(PackageName, PackageVersion)] = {
         vettedPackages
           .flatMap { darDesc =>
             DarResources.lookupPackageId(darDesc.packageId)
           }
           .map(dar => dar.metadata.name -> dar.metadata.version)
       }
-      uploadedPackages should contain theSameElementsAs uploadedDarNameAndVersions
+      uploadedPackages.diff(vettedDarNameAndVersions) should have size 0
+      vettedDarNameAndVersions.diff(uploadedPackages) should have size 0
       darsToCheck.foreach { case (packageResource, upToVersion) =>
         withClue(
           s"${participantAdminConnection.getParticipantId().futureValue} should have all required dars"
         ) {
-          checkDarLatestVersion(uploadedDarNameAndVersions, packageResource, upToVersion)
+          checkDarLatestVersion(vettedDarNameAndVersions, packageResource, upToVersion)
         }
       }
     }

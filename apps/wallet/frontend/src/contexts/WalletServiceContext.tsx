@@ -50,6 +50,9 @@ import {
   Notification,
   ListTokenStandardTransfersResponse,
 } from '../models/models';
+import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
+import { AmuletAllocation } from '@daml.js/splice-amulet/lib/Splice/AmuletAllocation';
+import { ContractId } from '@daml/types';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
@@ -97,7 +100,11 @@ export interface WalletClient {
   rejectTokenStandardTransfer: (transferContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
+  listAmuletAllocations: () => Promise<Contract<AmuletAllocation>[]>;
+  listAllocationRequests: () => Promise<Contract<AllocationRequest>[]>;
+  rejectAllocationRequest: (allocationRequestCid: ContractId<AllocationRequest>) => Promise<void>;
   createAllocation: (allocateAmuletRequest: AllocateAmuletRequest) => Promise<void>;
+  withdrawAllocation: (allocationCid: ContractId<AmuletAllocation>) => Promise<void>;
 
   getAppPaymentRequest: (contractId: string) => Promise<ContractWithState<AppPaymentRequest>>;
   acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
@@ -316,8 +323,24 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           ),
         };
       },
+      listAmuletAllocations: async () => {
+        const res = await walletClient.listAmuletAllocations();
+        return res.allocations.map(all => Contract.decodeOpenAPI(all.contract, AmuletAllocation));
+      },
+      listAllocationRequests: async () => {
+        const res = await walletClient.listAllocationRequests();
+        return res.allocation_requests.map(ar =>
+          Contract.decodeOpenAPI(ar.contract, AllocationRequest)
+        );
+      },
+      rejectAllocationRequest: async allocationRequestCid => {
+        await walletClient.rejectAllocationRequest(allocationRequestCid);
+      },
       createAllocation: async allocateAmuletRequest => {
         await walletClient.allocateAmulet(allocateAmuletRequest);
+      },
+      withdrawAllocation: async allocationCid => {
+        await walletClient.withdrawAmuletAllocation(allocationCid);
       },
       getAppPaymentRequest: async contractId => {
         const response = await walletClient.getAppPaymentRequest(contractId);

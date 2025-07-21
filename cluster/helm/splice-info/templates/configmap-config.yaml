@@ -1,0 +1,15 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ .Release.Namespace }}
+data:
+  staticfile.conf: |
+    add_header Cache-Control no-cache;
+
+    types {
+        {{ .Values.contentType }} html;
+    }

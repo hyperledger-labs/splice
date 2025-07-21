@@ -919,7 +919,7 @@ class ScanAggregatorTest
       ),
       participantId = mkParticipantId("ScanAggregatorTest"),
       enableImportUpdateBackfill = true,
-      new DbScanStoreMetrics(new NoOpMetricsFactory(), logger, ProcessingTimeout()),
+      new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, ProcessingTimeout()),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.testIngestionSink.initialize()

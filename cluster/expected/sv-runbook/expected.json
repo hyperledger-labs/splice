@@ -81,6 +81,11 @@
             ]
           }
         },
+        "rateLimit": {
+          "scan": {
+            "acs": {}
+          }
+        },
         "spliceDomainNames": {
           "nameServiceDomain": "cns"
         },
@@ -537,11 +542,11 @@
             "extraBeneficiaries": [
               {
                 "beneficiary": "mock-validator-1::123456789012345678901234567890123456789012234567890123456789012345678",
-                "weight": "100000"
+                "weight": 100000
               },
               {
                 "beneficiary": "Broadridge-validator-1::1220c89a73e7b47f16dfb48a521eeedfe2a8620ea1b19b815ab427388d9f5427faa5",
-                "weight": "50000"
+                "weight": 50000
               }
             ],
             "name": "SV2",
@@ -570,13 +575,14 @@
             "pruningInterval": "1 hours",
             "retentionPeriod": "30 days"
           },
-          "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com"
+          "sequencerPublicUrl": "https://sequencer-3.sv.mock.global.canton.network.digitalasset.com",
+          "skipInitialization": true
         },
         "enablePostgresMetrics": true,
         "extraBeneficiaries": [
           {
             "beneficiary": "dummy::partyId",
-            "weight": "3333"
+            "weight": 3333
           }
         ],
         "failOnAppVersionMismatch": true,
@@ -716,7 +722,6 @@
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -767,7 +772,6 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
-        "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64553aa683015a9687d9cc2e"

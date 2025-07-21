@@ -4,7 +4,7 @@ export * from './synchronizer/cometbft';
 export * from './synchronizer/cometbftConfig';
 export * from './synchronizer/cometBftNodeConfigs';
 export * from './synchronizer/decentralizedSynchronizerNode';
-export * from './clusterSvConfig';
+export * from './singleSvConfig';
 export * from './config';
 export * from './participant';
 export * from './svConfigs';

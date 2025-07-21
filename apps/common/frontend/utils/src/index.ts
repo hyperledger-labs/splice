@@ -9,3 +9,4 @@ export * from './OpenAPILoggingMiddleware';
 export * from './PollingStrategy';
 export * from './structuralSharing';
 export * from './temporal-fns';
+export * from './sanitizeUrl';

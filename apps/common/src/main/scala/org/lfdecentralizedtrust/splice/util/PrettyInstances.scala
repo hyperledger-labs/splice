@@ -14,6 +14,7 @@ import pprint.Tree
 
 /** Extension of Canton's pretty instances with additional ones for:
   * - java client bindings (com.daml.ledger.javaapi.data)
+  * - interface views' status (com.google.rpc.Status)
   *
   * We recommend importing this PrettyInstances instead of the one from Canton.
   */
@@ -167,6 +168,14 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
 
   implicit def prettyUri: Pretty[Uri] =
     prettyOfString(_.toString)
+
+  implicit def prettyInterfaceStatus: Pretty[com.google.rpc.Status] = {
+    prettyNode(
+      "InterfaceStatus",
+      param("code", status => Tree.Literal(status.getCode.toString)),
+      param("message", status => Tree.Literal(status.getMessage)),
+    )
+  }
 }
 
 object PrettyInstances extends PrettyInstances {
