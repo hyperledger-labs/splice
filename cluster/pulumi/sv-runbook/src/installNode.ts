@@ -47,7 +47,7 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
-import { svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
+import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
@@ -208,6 +208,7 @@ async function installSvAndValidator(
     cometBftGovernanceKey,
   } = config;
 
+  const svConfig = configForSv('sv');
   const auth0Config = auth0Client.getCfg();
   const svNameSpaceAuth0Clients = auth0Config.namespaceToUiToClientId['sv'];
   if (!svNameSpaceAuth0Clients) {
@@ -283,7 +284,16 @@ async function installSvAndValidator(
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
-    initialAmuletPrice,
+    initialAmuletPrice: initialAmuletPrice,
+    logLevel: svConfig.logging?.appsLogLevel,
+    additionalEnvVars: svsConfig?.synchronizer?.topologyChangeDelay
+      ? [
+          {
+            name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
+            value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
+          },
+        ]
+      : undefined,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {

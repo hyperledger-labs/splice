@@ -506,6 +506,12 @@
       "namespace": "sv",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
+            "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+          }
+        ],
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -586,6 +592,7 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true
         },
