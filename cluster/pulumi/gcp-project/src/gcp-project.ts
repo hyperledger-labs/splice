@@ -63,9 +63,7 @@ export class GcpProject extends pulumi.ComponentResource {
   }
 
   private letsEncryptEmail(): Secret {
-    const val = fs
-      .readFileSync(`${this.configsDir}/lets-encrypt-email.txt`, 'utf-8')
-      .trim();
+    const val = fs.readFileSync(`${this.configsDir}/lets-encrypt-email.txt`, 'utf-8').trim();
     return this.secretAndVersion('lets-encrypt-email', val);
   }
 
