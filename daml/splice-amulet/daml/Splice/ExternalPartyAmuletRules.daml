@@ -8,6 +8,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.Optional
 import qualified DA.TextMap as TextMap
+import DA.Time
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as Api.Token.TransferInstructionV1
@@ -18,6 +19,7 @@ import Splice.Amulet.TwoStepTransfer
 import Splice.AmuletAllocation
 import Splice.AmuletTransferInstruction
 import Splice.AmuletRules
+import Splice.MintingDelegation
 import Splice.Types
 import Splice.Util
 
@@ -63,6 +65,24 @@ template ExternalPartyAmuletRules
            description
          pure (ExternalPartyAmuletRules_CreateTransferCommandResult cmd)
 
+
+    nonconsuming choice ExternalPartyAmuletRules_CreateMintingDelegationProposal : ExternalPartyAmuletRules_CreateMintingDelegationProposalResult
+      with
+        beneficiary : Party
+        delegate : Party
+        expiresAt : Time
+      controller beneficiary
+      do assertWithinDeadline "expiresAt" expiresAt
+         -- TODO: Consider making maximum expiration configurable
+         assertDeadlineExceeded "expiresAt" (expiresAt `addRelTime` days (-30))
+         ExternalPartyAmuletRules_CreateMintingDelegationProposalResult <$> create MintingDelegationProposal
+           with
+             dso
+             beneficiary
+             delegate
+             expiresAt
+
+
     interface instance Api.Token.TransferInstructionV1.TransferFactory for ExternalPartyAmuletRules where
       view = Api.Token.TransferInstructionV1.TransferFactoryView with
         admin = dso
@@ -86,6 +106,11 @@ template ExternalPartyAmuletRules
 data ExternalPartyAmuletRules_CreateTransferCommandResult = ExternalPartyAmuletRules_CreateTransferCommandResult
   with
     transferCommandCid : ContractId TransferCommand
+  deriving (Show, Eq)
+
+data ExternalPartyAmuletRules_CreateMintingDelegationProposalResult = ExternalPartyAmuletRules_CreateMintingDelegationProposalResult
+  with
+    mintingDelegationProposalCid : ContractId MintingDelegationProposal
   deriving (Show, Eq)
 
 -- | A contract tracking the number of completed TransferCommands per sender,

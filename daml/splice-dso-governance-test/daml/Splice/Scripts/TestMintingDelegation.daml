@@ -1,0 +1,76 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestMintingDelegation where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.DsoRules
+import Splice.ExternalPartyAmuletRules
+import Splice.MintingDelegation
+import Splice.ValidatorLicense
+
+import Splice.Scripts.DsoTestUtils
+import Splice.Scripts.Util
+
+testMintingDelegation : Script ()
+testMintingDelegation = do
+  (app, dso, (sv1, _, _, _)) <- initMainNet
+
+  delegate <- allocateParty "delegate"
+  beneficiaryUser <- setupUserNoTap app "beneficiary" delegate
+  let beneficiary = beneficiaryUser.primaryParty
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  DsoRules_OnboardValidatorResult validatorLicenseCid <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_OnboardValidator with
+    sponsor = sv1
+    validator = beneficiary
+    version = Some "1.0.0"
+    contactPoint = Some "yolo@example.com"
+
+  [(externalPartyAmuletRulesCid, _)] <- query @ExternalPartyAmuletRules dso
+  now <- getTime
+  ExternalPartyAmuletRules_CreateMintingDelegationProposalResult proposalCid <- submitMulti [beneficiary ] [dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateMintingDelegationProposal with
+    beneficiary
+    delegate
+    expiresAt = now `addRelTime` (days 30)
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+
+  (openRoundCid, _) <- getLatestOpenRound app
+
+  submitMulti [delegate] [beneficiary, dso] $ exerciseCmd mintingDelegationCid MintingDelegation_RecordValidatorLivenessActivity with
+    validatorLicenseCid
+    openRoundCid
+
+  [(livenessActivityRecordCid, _)] <- query @ValidatorLivenessActivityRecord beneficiary
+
+  -- advance twice to get round 1 into issuing state
+  runNextIssuance app
+  runNextIssuance app
+  -- advance again so that we reach the opensAt field of the round
+  runNextIssuance app
+
+  [] <- query @Amulet beneficiary
+
+  context <- getTransferContext app beneficiaryUser None
+  (amuletRules, _) <- getAmuletRules app
+
+  debug context
+
+  submitMulti [delegate] [beneficiary, dso] $ exerciseCmd mintingDelegationCid MintingDelegation_Mint with
+    inputs = [InputValidatorLivenessActivityRecord livenessActivityRecordCid]
+    context = PaymentTransferContext with
+      context
+      amuletRules
+
+  [(_, amulet)] <- query @Amulet beneficiary
+
+  amulet.owner === beneficiary
+
+  pure ()
