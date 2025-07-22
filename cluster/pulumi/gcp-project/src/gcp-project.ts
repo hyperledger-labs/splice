@@ -75,20 +75,10 @@ export class GcpProject extends pulumi.ComponentResource {
       );
       return [];
     }
-    const authorizedServiceAccountEmail = gcpProjectConfig.authorizedServiceAccount.email;
-
-    const pulumiKeyringProjectId = config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT');
-    if (!pulumiKeyringProjectId) {
-      throw new Error('PULUMI_BACKEND_GCPKMS_PROJECT is undefined');
-    }
-    const pulumiKeyringRegion = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
-    if (!pulumiKeyringRegion) {
-      throw new Error('CLOUDSDK_COMPUTE_REGION is undefined');
-    }
     const authorizedServiceAccountConfig = {
-      serviceAccountEmail: authorizedServiceAccountEmail,
-      pulumiKeyringProjectId,
-      pulumiKeyringRegion,
+      serviceAccountEmail: gcpProjectConfig.authorizedServiceAccount.email,
+      pulumiKeyringProjectId: config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT'),
+      pulumiKeyringRegion: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
     };
     return authorizeServiceAccount(this.gcpProjectId, authorizedServiceAccountConfig);
   }
