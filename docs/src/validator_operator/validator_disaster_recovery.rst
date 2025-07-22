@@ -82,6 +82,13 @@ Once the new validator is up and running, you should be able to login as the adm
 and see its balance. Other users hosted on the validator would need to re-onboard, but their
 coin balance and CNS entries should be recovered.
 
+.. warning:: This process preserves all party IDs and all contracts shared
+             with the DSO party.  This means that you *must* keep
+             the same validator party hint and you do not need a new
+             onboarding secret. If you get any errors about needing a
+             new onboarding secret, double check your configuration
+             instead of requesting a new secret.
+
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
 
