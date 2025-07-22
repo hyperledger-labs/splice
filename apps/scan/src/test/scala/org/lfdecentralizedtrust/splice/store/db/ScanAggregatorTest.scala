@@ -25,6 +25,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
@@ -621,6 +622,32 @@ class ScanAggregatorTest
         res <- store.backFillAggregates()
       } yield {
         res shouldBe None
+      }
+    }
+    "not fail on concurrent init of active parties" in {
+      cleanup()
+      val (aggr, store) =
+        mkAggregator(
+          dsoParty,
+          ingestFromParticipantBegin = false,
+          createReader,
+        ).futureValue
+
+      for {
+        _ <- generateRoundPartyTotalsRange(store, Seq(0, 1, 2), Seq(0, 1, 2))
+      } yield {
+        queryActiveParties() should be(empty)
+        aggregateRounds(aggr, 0, 2)
+        // simulate that no active parties exist
+        storage.update_(sqlu"truncate active_parties;", "truncate active_parties").futureValueUS
+        // should not fail at least
+        val actions = (1 to 100).map(_ => sqlu"call initialize_active_parties()")
+        MonadUtil
+          .parTraverseWithLimit(PositiveInt.tryCreate(10))(actions) { action =>
+            storage.update_(action, "initialize_active_parties")
+          }
+          .futureValueUS should have size 100
+        queryActiveParties() should not be (empty)
       }
     }
   }
