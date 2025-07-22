@@ -86,8 +86,8 @@ jobs:
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          # artifactory_user: ${{ vars.ARTIFACTORY_USER }}
+          # artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           cmd: "Test/compile lint printTests"
 
       - name: Verify no changes in SBT test files
