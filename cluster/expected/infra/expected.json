@@ -1853,6 +1853,24 @@
         "repo": "https://istio-release.storage.googleapis.com/charts"
       },
       "values": {
+        "affinity": {
+          "nodeAffinity": {
+            "requiredDuringSchedulingIgnoredDuringExecution": {
+              "nodeSelectorTerms": [
+                {
+                  "matchExpressions": [
+                    {
+                      "key": "cn_infra",
+                      "operator": "Exists"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "autoscaleMax": 20,
+        "autoscaleMin": 2,
         "global": {
           "istioNamespace": "cluster-ingress",
           "logAsJson": true,
@@ -1868,6 +1886,7 @@
         },
         "meshConfig": {
           "accessLogEncoding": "JSON",
+          "accessLogFile": "",
           "defaultConfig": {
             "gatewayTopology": {
               "numTrustedProxies": 1
@@ -1879,32 +1898,6 @@
           },
           "enablePrometheusMerge": false
         },
-        "pilot": {
-          "affinity": {
-            "nodeAffinity": {
-              "requiredDuringSchedulingIgnoredDuringExecution": {
-                "nodeSelectorTerms": [
-                  {
-                    "matchExpressions": [
-                      {
-                        "key": "cn_infra",
-                        "operator": "Exists"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          },
-          "autoscaleMax": 10,
-          "tolerations": [
-            {
-              "effect": "NoSchedule",
-              "key": "cn_infra",
-              "operator": "Exists"
-            }
-          ]
-        },
         "telemetry": {
           "enabled": true,
           "v2": {
@@ -1913,7 +1906,14 @@
               "enabled": true
             }
           }
-        }
+        },
+        "tolerations": [
+          {
+            "effect": "NoSchedule",
+            "key": "cn_infra",
+            "operator": "Exists"
+          }
+        ]
       },
       "version": "1.26.1"
     },
