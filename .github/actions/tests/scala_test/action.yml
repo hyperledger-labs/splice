@@ -96,6 +96,15 @@ runs:
   using: "composite"
   steps:
 
+    - name: Test 1
+      shell: bash
+      run: |
+        echo "Running Scala tests for ${{ inputs.test_suite_name }} on runner ${{ inputs.runner_index }}"
+        echo "OSS_ONLY is ${{ inputs.oss_only }}"
+        echo "save_nix_cache condition: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'wall-clock-time' && !inputs.oss_only }}"
+        exit 1
+
+
     - name: Setup
       uses: ./.github/actions/tests/common_test_setup
       with:
