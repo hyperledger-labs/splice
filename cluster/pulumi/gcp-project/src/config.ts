@@ -15,9 +15,11 @@ const GcpProjectConfigSchema = z.object({
   letsEncrypt: z.object({
     email: z.string(),
   }),
-  authorizedServiceAccount: z.object({
-    email: z.string(),
-  }),
+  authorizedServiceAccount: z
+    .object({
+      email: z.string(),
+    })
+    .optional(),
 });
 
 // eslint-disable-next-line

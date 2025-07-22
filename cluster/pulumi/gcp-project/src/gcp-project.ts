@@ -69,6 +69,12 @@ export class GcpProject extends pulumi.ComponentResource {
   }
 
   private authorizedServiceAccount(): gcp.projects.IAMMember[] {
+    if (!gcpProjectConfig.authorizedServiceAccount) {
+      console.warn(
+        'AUTHORIZED_SERVICE_ACCOUNT is not set; this is only fine for a project never touched by CircleCI flows.'
+      );
+      return [];
+    }
     const authorizedServiceAccountEmail = gcpProjectConfig.authorizedServiceAccount.email;
 
     const pulumiKeyringProjectId = config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT');
@@ -85,10 +91,6 @@ export class GcpProject extends pulumi.ComponentResource {
       pulumiKeyringRegion,
     };
     return authorizeServiceAccount(this.gcpProjectId, authorizedServiceAccountConfig);
-    // console.warn(
-    //   'AUTHORIZED_SERVICE_ACCOUNT is not set; this is only fine for a project never touched by CircleCI flows.'
-    // );
-    // return undefined;
   }
 
   constructor(gcpProjectId: string) {
