@@ -892,6 +892,11 @@ function subcmd_cluster_enable_workload_identity() {
 
     _info "Enabling workload identity for the cluster."
     gcloud container clusters update "${GCP_CLUSTER_NAME}" --workload-pool="${CLOUDSDK_CORE_PROJECT}.svc.id.goog"
+
+    _info "Enabling GKE metadata on the cn-apps node pool."
+    gcloud container node-pools update cn-apps-pool \
+        --cluster "cn-${GCP_CLUSTER_BASENAME}net" \
+        --workload-metadata=GKE_METADATA
 }
 ###
 
