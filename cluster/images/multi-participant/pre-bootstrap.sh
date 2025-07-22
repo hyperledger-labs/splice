@@ -24,6 +24,10 @@ canton.participants.participant_$index = {
         identity.type = manual
     }
 
+    sequencer-client {
+      acknowledgement-interval = 10m
+    }
+
     monitoring.grpc-health-server {
         address = "0.0.0.0"
         port = $health_port
