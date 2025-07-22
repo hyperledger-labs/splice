@@ -56,6 +56,7 @@ template ValidatorLicense with
     faucetState : Optional FaucetState
     metadata : Optional ValidatorLicenseMetadata
     lastActiveAt : Optional Time -- ^ Last time this validator was active. Tracked to get a view on the set of validator nodes that are up and running.
+    weight : Optional Int -- weight of the activity records produced by this license. Determined through SV votes. If not set, weight is 1.0
   where
     signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
     observer validator -- not a signatory to simplify the creation of the license as part of onboarding
@@ -99,6 +100,7 @@ template ValidatorLicense with
           dso
           validator
           round = openRound.round
+          weight
 
         return ValidatorLicense_RecordValidatorLivenessActivityResult with ..
 
@@ -198,6 +200,7 @@ template ValidatorLivenessActivityRecord with
     dso : Party
     validator : Party
     round : Round
+    weight : Optional Int
   where
     signatory dso
     observer validator

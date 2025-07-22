@@ -73,11 +73,13 @@ testUnclaimedRewards_withCoupons = do
     dso = app.dso
     validator = alice.primaryParty
     round = Round 0
+    weight = None
 
   validatorLivenessActivityRecord2 <- submitMulti [app.dso] [] $ createCmd ValidatorLivenessActivityRecord with
     dso = app.dso
     validator = provider1Validator.primaryParty
     round = Round 0
+    weight = None
 
   svRewardCoupon1 <- submitMulti [app.dso, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
     dso = app.dso

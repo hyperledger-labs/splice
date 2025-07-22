@@ -1,0 +1,87 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestValidatorLicenseWeight where
+
+import DA.Assert
+import Daml.Script
+
+import Splice.Amulet
+import Splice.DsoRules
+import Splice.ValidatorLicense
+
+
+import Splice.Scripts.Util
+import Splice.Scripts.DsoTestUtils
+
+
+
+testValidatorLicenseWeight : Script ()
+testValidatorLicenseWeight = do
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNet
+
+  validator <- setupValidator app "validator"
+
+  [(dsoRulesCid, _)] <- query @DsoRules dso
+
+  [(validatorLicenseCid, _)] <- query @ValidatorLicense validator
+
+  (openRoundCid, _) <- getLatestOpenRound app
+  submitMulti [validator] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_RecordValidatorLivenessActivity
+    with
+      openRoundCid
+
+  [(_, amulet)] <- query @Amulet validator
+  amulet.amount.initialAmount === 1.0
+
+  [(_, record)] <- query @ValidatorLivenessActivityRecord validator
+  record.weight === None
+
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+  runAmuletDepositBots app
+  [] <- query @ValidatorLivenessActivityRecord validator
+  [(_, amulet)] <- query @Amulet validator
+  amulet.amount.initialAmount === 3.81994 -- 1.0 from the start + 2.85 from the coupon minus fees
+
+
+  [(validatorLicenseCid, _)] <- query @ValidatorLicense validator
+
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense_ChangeWeight (DsoRules_ValidatorLicense_ChangeWeight validator 10)))
+  [(instructionCid, _)] <- query @ValidatorLicense_ChangeWeight_Instruction dso
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_Execute_ValidatorLicense_ChangeWeight_Instruction with
+    sv = sv1
+    validatorLicenseCid
+    instructionCid
+
+  [(validatorLicenseCid, license)] <- query @ValidatorLicense validator
+  license.weight === Some 10
+
+  (openRoundCid, _) <- getLatestOpenRound app
+  submitMulti [validator] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_RecordValidatorLivenessActivity
+    with
+      openRoundCid
+
+  runNextIssuance app
+  runNextIssuance app
+  runNextIssuance app
+  runAmuletDepositBots app
+  [] <- query @ValidatorLivenessActivityRecord validator
+
+
+  [(_, amulet)] <- query @Amulet validator
+  amulet.amount.initialAmount === 32.28988 -- 1.0 from the start + 2.85 from the first coupon + 10 * 2.85 from the second coupon minus fees
+
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense_Withdraw (DsoRules_ValidatorLicense_Withdraw validator)))
+  [(instructionCid, _)] <- query @ValidatorLicense_Withdraw_Instruction dso
+  [(validatorLicenseCid, _)] <- query @ValidatorLicense validator
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_Execute_ValidatorLicense_Withdraw_Instruction with
+    sv = sv1
+    validatorLicenseCid
+    instructionCid
+
+
+  [] <- query @ValidatorLicense validator
+
+  pure ()
