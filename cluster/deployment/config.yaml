@@ -13,6 +13,8 @@ infra:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+  istio:
+    enableIngressAccessLogging: true
 # configs specific for the pulumi project
 # will be applied to all the stacks in the project
 pulumiProjectConfig:
