@@ -27,7 +27,9 @@ module Splice.Util
   Patchable(..),
   patchScalar,
   patchListAsScalar,
-  patchListAsSet
+  patchListAsSet,
+
+  deprecatedChoice
 ) where
 
 import DA.Action (unless)
@@ -236,3 +238,7 @@ instance Patchable a => Patchable (Optional a) where
         case current of
           None -> None  -- Value got removed by concurrent request
           Some current' -> Some (patch new' base' current') -- Patch the current value
+
+deprecatedChoice : Text -> Text -> Text -> Update a
+deprecatedChoice package version choice =
+  abort ("Choice " <> show choice <> " is no longer supported since " <> show package <> "-" <> show version)

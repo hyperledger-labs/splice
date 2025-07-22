@@ -46,7 +46,7 @@ class MergeValidatorLicenseContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
-      pruneAmuletConfigScheduleFeatureSupport <- svTaskContext.packageVersionSupport
+      supportsMergeDuplicatedValidatorLicense <- svTaskContext.packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
           dsoGovernanceParties = Seq(
             store.key.svParty,
@@ -58,7 +58,7 @@ class MergeValidatorLicenseContractsTrigger(
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
       validatorLicenses <-
-        if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        if (supportsMergeDuplicatedValidatorLicense.supported) {
           store.listValidatorLicensePerValidator(
             validator,
             MAX_VALIDATOR_LICENSE_CONTRACTS,
@@ -76,7 +76,7 @@ class MergeValidatorLicenseContractsTrigger(
             validatorLicenses,
             controller,
           )
-        } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        } else if (supportsMergeDuplicatedValidatorLicense.supported) {
           Future.successful(
             TaskSuccess(s"Only one Validator License contract for $validator, nothing to merge.")
           )

@@ -6,13 +6,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   TransferConfig,
   USD,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddSv,
   SRARC_OffboardSv,
@@ -31,31 +29,20 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   DsoRules_SetConfig,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestConsoleEnvironment
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
-import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.InitialPackageConfig
 import org.lfdecentralizedtrust.splice.util.{Codec, TriggerTestUtil}
 
-import java.time.Instant
 import java.util.Optional
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
-//TODO(#925): adapt this test to work only with SetConfig
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase with TriggerTestUtil {
 
-  // TODO(#925): change tests to work with current version
-  private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.7",
-    amuletNameServiceVersion = "0.1.7",
-    dsoGovernanceVersion = "0.1.10",
-    validatorLifecycleVersion = "0.1.1",
-    walletVersion = "0.1.7",
-    walletPaymentsVersion = "0.1.7",
-  )
-  // TODO(#925): when using the latest version, this can be removed
   override protected def runTokenStandardCliSanityCheck: Boolean = false
 
   override def environmentDefinition: EnvironmentDefinition =
@@ -70,14 +57,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
           sv4Backend.participantClient,
         )
       )
-      .addConfigTransforms(
-        (_, config) =>
-          ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-            _.copy(initialPackageConfig = initialPackageConfig)
-          )(config),
-        // We deliberately change amulet conversion rate votes quickly in this test
-        (_, config) => ConfigTransforms.withNoVoteCooldown(config),
-      )
+      .addConfigTransform((_, config) => ConfigTransforms.withNoVoteCooldown(config))
 
   private def actionRequiring3VotesForEarlyClosing(sv: String) = new ARC_DsoRules(
     new SRARC_OffboardSv(
@@ -485,42 +465,36 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
       }
     }
 
-    val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
+    val initialConfig = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
+    val transferConfig = initialConfig.transferConfig
+    val newTransferConfig = new TransferConfig[USD](
+      transferConfig.createFee,
+      transferConfig.holdingFee,
+      transferConfig.transferFee,
+      transferConfig.lockHolderFee,
+      transferConfig.extraFeaturedAppRewardAmount,
+      42,
+      42,
+      42,
+    )
+
+    val newAmuletConfig = new AmuletConfig[USD](
+      newTransferConfig,
+      initialConfig.issuanceCurve,
+      initialConfig.decentralizedSynchronizer,
+      initialConfig.tickDuration,
+      initialConfig.packageConfig,
+      java.util.Optional.empty(),
+      java.util.Optional.empty(),
+    )
+
+    val (_, voteRequestCid) = actAndCheck(
       "SV1 create a vote request for a new Amulet Configuration (changing the transfer config)", {
-
-        val initialValue = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
-        val transferConfig = initialValue.transferConfig
-        val newTransferConfig = new TransferConfig[USD](
-          transferConfig.createFee,
-          transferConfig.holdingFee,
-          transferConfig.transferFee,
-          transferConfig.lockHolderFee,
-          transferConfig.extraFeaturedAppRewardAmount,
-          42,
-          42,
-          42,
-        )
-
-        val futureValue =
-          new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2[Instant, AmuletConfig[
-            USD
-          ]](
-            Instant.now().plusSeconds(3600),
-            new AmuletConfig[USD](
-              newTransferConfig,
-              initialValue.issuanceCurve,
-              initialValue.decentralizedSynchronizer,
-              initialValue.tickDuration,
-              initialValue.packageConfig,
-              java.util.Optional.empty(),
-              java.util.Optional.empty(),
-            ),
-          )
 
         val action: ActionRequiringConfirmation =
           new ARC_AmuletRules(
-            new CRARC_AddFutureAmuletConfigSchedule(
-              new AmuletRules_AddFutureAmuletConfigSchedule(futureValue)
+            new CRARC_SetConfig(
+              new AmuletRules_SetConfig(newAmuletConfig, initialConfig)
             )
           )
 
@@ -539,7 +513,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         svs.foreach { sv => sv.listVoteRequests() should not be empty }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
         sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
-        (head, sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.futureValues.size())
+        head
       },
     )
 
@@ -548,15 +522,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority did not vote yet, thus the trigger should not change the amulet config futureValues",
+      "The majority did not vote yet, thus the trigger should not change the amulet config",
       _ => {
         sv2Backend
           .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
-          .futureValues
-          .size() shouldBe initialFutureValuesSize
+          .initialValue shouldBe initialConfig
       },
     )
 
@@ -565,15 +538,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
-      "The majority has voted but without an acceptance majority, the trigger should not change the amulet config futureValues",
+      "The majority has voted but without an acceptance majority, the trigger should not change the amulet config",
       _ => {
         sv3Backend
           .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
-          .futureValues
-          .size() shouldBe initialFutureValuesSize
+          .initialValue shouldBe initialConfig
       },
     )
 
@@ -582,15 +554,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase with Trigge
         sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority accepts, the trigger should change the amulet config futureValues",
+      "The majority accepts, the trigger should change the amulet config",
       _ => {
         sv4Backend
           .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
-          .futureValues
-          .size() shouldBe initialFutureValuesSize + 1
+          .initialValue shouldBe newAmuletConfig
       },
     )
 
