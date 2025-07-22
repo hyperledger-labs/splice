@@ -127,12 +127,6 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
     )
 
     testFeatureSupport(
-      "PruneAmuletConfigSchedule",
-      DarResources.dsoGovernance_0_1_5,
-      packageVersionSupport.supportsPruneAmuletConfigSchedule,
-    )
-
-    testFeatureSupport(
       "MergeDuplicatedValidatorLicense",
       DarResources.dsoGovernance_0_1_8,
       // We use the same parties for amulet and dso governance. The interesting part about using different parties is the response from the

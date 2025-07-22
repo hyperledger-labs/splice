@@ -70,6 +70,8 @@ which can happen in certain cases when the sequencer is down.
   - Added a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
     to start without the sequencer being up. This is useful for long-running sequencer database migrations.
 
+  - Retired deprecated code for old Daml choices ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule`` and ``AmuletRules_UpdateFutureAmuletConfigSchedule``
+
 - Sequencer
 
   - Fix a sequential scan in a pruning query. This requires a
@@ -87,6 +89,23 @@ which can happen in certain cases when the sequencer is down.
   - Fix an issue in sequencer BFT connections where the node got
     completely disconnected on certain failures even if only one
     sequencer reported those failures.
+
+- Daml
+
+  - Deprecated Daml choices ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule`` and ``AmuletRules_UpdateFutureAmuletConfigSchedule``
+
+    * This requires a Daml upgrade to versions
+
+          ================== =======
+          name               version
+          ================== =======
+          amulet             0.1.12
+          amuletNameService  0.1.12
+          dsoGovernance      0.1.16
+          validatorLifecycle 0.1.5
+          wallet             0.1.12
+          walletPayments     0.1.12
+          ================== =======
 
 0.4.5
 -----

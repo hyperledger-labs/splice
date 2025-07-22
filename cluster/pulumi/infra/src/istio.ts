@@ -21,7 +21,7 @@ import {
   MOCK_SPLICE_ROOT,
   SPLICE_ROOT,
 } from '../../common';
-import { clusterBasename, loadIPRanges } from './config';
+import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
 export const istioVersion = {
   istio: '1.26.1',
@@ -79,7 +79,11 @@ function configureIstiod(
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
+      // https://artifacthub.io/packages/helm/istio-official/istiod
       values: {
+        autoscaleMin: 2,
+        autoscaleMax: 20,
+        ...infraAffinityAndTolerations,
         global: {
           istioNamespace: ingressNs.metadata.name,
           logAsJson: true,
@@ -94,14 +98,12 @@ function configureIstiod(
             },
           },
         },
-        pilot: {
-          autoscaleMax: 10,
-          ...infraAffinityAndTolerations,
-        },
+        // https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/
         meshConfig: {
           // Uncomment to turn on access logging across the entire cluster (we disabled it by default to reduce cost):
           // accessLogFile: '/dev/stdout',
           // taken from https://github.com/istio/istio/issues/37682
+          accessLogFile: '',
           accessLogEncoding: 'JSON',
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging  disable as we don't use annotations
           enablePrometheusMerge: false,
@@ -425,31 +427,33 @@ function configureGatewayService(
       }),
     }
   );
-  // Turn on envoy access logging on the ingress gateway
-  new k8s.apiextensions.CustomResource(`access-logging${suffix}`, {
-    apiVersion: 'telemetry.istio.io/v1alpha1',
-    kind: 'Telemetry',
-    metadata: {
-      name: `access-logging${suffix}`,
-      namespace: ingressNs.metadata.name,
-    },
-    spec: {
-      accessLogging: [
-        {
-          providers: [
-            {
-              name: 'envoy',
-            },
-          ],
-        },
-      ],
-      selector: {
-        matchLabels: {
-          app: `istio-ingress${suffix}`,
+  if (infraConfig.istio.enableIngressAccessLogging) {
+    // Turn on envoy access logging on the ingress gateway
+    new k8s.apiextensions.CustomResource(`access-logging${suffix}`, {
+      apiVersion: 'telemetry.istio.io/v1alpha1',
+      kind: 'Telemetry',
+      metadata: {
+        name: `access-logging${suffix}`,
+        namespace: ingressNs.metadata.name,
+      },
+      spec: {
+        accessLogging: [
+          {
+            providers: [
+              {
+                name: 'envoy',
+              },
+            ],
+          },
+        ],
+        selector: {
+          matchLabels: {
+            app: `istio-ingress${suffix}`,
+          },
         },
       },
-    },
-  });
+    });
+  }
   return gateway;
 }
 
