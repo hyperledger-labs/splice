@@ -8,9 +8,10 @@ import { SPLICE_ROOT } from '../common';
 async function main() {
   await initDumpConfig();
 
-  // Set configs dir to mocks
-  // eslint-disable-next-line no-process-env
-  process.env.GCP_PROJECT_CONFIGS_DIR = `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
+  // Set configs dir to mocks if it isn't already set.
+  if (!process.env.GCP_PROJECT_CONFIGS_DIR) {
+    process.env.GCP_PROJECT_CONFIGS_DIR = `${SPLICE_ROOT}/cluster/configs/gcp-project-mock`;
+  }
 
   const gcpProject = await import('./src/gcp-project');
   new gcpProject.GcpProject('project-id');
