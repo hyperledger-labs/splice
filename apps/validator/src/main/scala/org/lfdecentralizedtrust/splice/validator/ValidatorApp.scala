@@ -255,7 +255,6 @@ class ValidatorApp(
                       migrationDump.participantUsers
                     )
                   }
-
                 } yield ()
               case None =>
                 if (config.svValidator)
