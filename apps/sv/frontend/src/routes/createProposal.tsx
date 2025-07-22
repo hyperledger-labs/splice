@@ -1,157 +1,201 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+import { useSearchParams } from 'react-router-dom';
+import { createProposalActions } from '../utils/governance';
+import { SelectAction } from '../components/forms/SelectAction';
 import {
   Box,
-  Button,
-  FormControl,
-  MenuItem,
+  FormControlLabel,
   Paper,
-  Select,
-  SelectChangeEvent,
+  Radio,
+  RadioGroup,
+  TextField,
   Typography,
 } from '@mui/material';
 import { useForm } from '@tanstack/react-form';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-
-const actionNameTable = [
-  { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
-  { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
-  { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
-  { name: 'Set Dso Rules Configuration', value: 'SRARC_SetConfig' },
-  { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
-  { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
-];
+import { DesktopDateTimePicker } from '@mui/x-date-pickers';
+import dayjs from 'dayjs';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { useState } from 'react';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
   const action = searchParams.get('action');
-  const selectedAction = actionNameTable.find(a => a.value === action);
+  const selectedAction = createProposalActions.find(a => a.value === action);
   if (selectedAction) {
-    return <CreateProposalForm action={selectedAction.value} />;
+    return <CreateProposalForm action={selectedAction} />;
   } else {
     return <SelectAction />;
   }
 };
 
+type CreateProposalAction = (typeof createProposalActions)[number];
+
 interface CreateProposalFormProps {
-  action: string;
+  action: CreateProposalAction;
 }
 
-const CreateProposalForm: React.FC<CreateProposalFormProps> = () => {
+const CreateProposalForm: React.FC<CreateProposalFormProps> = ({ action }) => {
   const [searchParams, _] = useSearchParams();
-  return (
-    <>
-      <h1>Create Proposal Form</h1>
-      <p>Action: {searchParams.get('action')}</p>
-    </>
-  );
-};
-
-const SelectAction: React.FC = () => {
-  const navigate = useNavigate();
+  const actionFromParams = searchParams.get('action');
+  const [effectivityType, setEffectivityType] = useState('custom');
 
   const form = useForm({
     defaultValues: {
-      action: '',
-    },
-    onSubmit: async ({ value }) => {
-      navigate(`/governance-beta/proposals/create?action=${value.action}`);
+      action: action.name,
+      expiryDate: dayjs(),
+      effectiveDate: dayjs().add(1, 'day'),
     },
   });
 
-  const handleCancel = () => {
-    form.reset();
-    navigate('/governance-beta/proposals');
-  };
+  if (actionFromParams !== action.value) {
+    return <Typography variant="h3">Invalid action selected: {actionFromParams}</Typography>;
+  }
 
   return (
-    <Box sx={{ mt: 10 }}>
-      <Paper
-        sx={{
-          bgcolor: 'background.paper',
-          p: 4,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Box sx={{ minWidth: '60%' }}>
-          <Typography sx={{ mb: 2 }} variant="h3">
-            Select an Action
-          </Typography>
-
-          <form
-            onSubmit={e => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <form.Field
-              name="action"
-              validators={{
-                onMount: ({ value }) => {
-                  const res = actionNameTable.find(a => a.value === value);
-                  return res ? undefined : 'Invalid action';
-                },
+    <>
+      <Box sx={{ mt: 10 }}>
+        <Paper
+          sx={{
+            bgcolor: 'background.paper',
+            p: 4,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Box sx={{ minWidth: '80%' }}>
+            <form
+              onSubmit={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                form.handleSubmit();
               }}
-              children={field => (
-                <FormControl fullWidth>
-                  <Select
-                    labelId="select-action-label"
-                    id="select-action"
-                    data-testid="select-action"
-                    value={field.state.value}
-                    onChange={(e: SelectChangeEvent) =>
-                      field.handleChange(e.target.value as string)
-                    }
-                    onBlur={field.handleBlur}
-                    placeholder="Select an action"
-                  >
-                    {actionNameTable.map(actionName => (
-                      <MenuItem
-                        key={actionName.value}
-                        value={actionName.value}
-                        data-testid={actionName.value}
-                      >
-                        {actionName.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              )}
-            />
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Typography variant="h3">[Work In Progress]</Typography>
+                <form.Field
+                  name="action"
+                  children={field => {
+                    return (
+                      <>
+                        <Box>
+                          <Typography variant="h5" gutterBottom>
+                            Action
+                          </Typography>
+                          <TextField
+                            fullWidth
+                            variant="outlined"
+                            name={field.name}
+                            value={field.state.value}
+                            onBlur={field.handleBlur}
+                            disabled
+                          />
+                        </Box>
+                      </>
+                    );
+                  }}
+                />
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 4 }}>
-              <form.Subscribe
-                selector={state => state.canSubmit}
-                children={canSubmit => (
-                  <>
-                    <Button
-                      variant="outlined"
-                      data-testid="cancel-button"
-                      onClick={handleCancel}
-                      type="button"
-                    >
-                      Cancel
-                    </Button>
+                <form.Field
+                  name="expiryDate"
+                  children={field => {
+                    return (
+                      <>
+                        <Box>
+                          <Typography variant="h5" gutterBottom>
+                            Vote Proposal Expiration
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" gutterBottom>
+                            This is the last day voters can vote on this proposal
+                          </Typography>
+                          <DesktopDateTimePicker
+                            value={field.state.value}
+                            format={dateTimeFormatISO}
+                            onChange={newDate => field.handleChange(newDate!)}
+                            slotProps={{
+                              textField: {
+                                fullWidth: true,
+                                variant: 'outlined',
+                              },
+                            }}
+                          />
+                        </Box>
+                      </>
+                    );
+                  }}
+                />
 
-                    <Button
-                      variant="contained"
-                      data-testid="next-button"
-                      type="submit"
-                      disabled={!canSubmit}
-                    >
-                      Next
-                    </Button>
-                  </>
-                )}
-              />
-            </Box>
-          </form>
-        </Box>
-      </Paper>
-    </Box>
+                <form.Field
+                  name="effectiveDate"
+                  children={field => {
+                    return (
+                      <>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          <Typography variant="h5" gutterBottom>
+                            Vote Proposal Effectivity
+                          </Typography>
+
+                          <RadioGroup
+                            value={effectivityType}
+                            onChange={e => setEffectivityType(e.target.value)}
+                          >
+                            <FormControlLabel
+                              value="custom"
+                              control={<Radio />}
+                              label={
+                                <Box>
+                                  <Typography>Custom</Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    Select the date and time the proposal will take effect
+                                  </Typography>
+                                </Box>
+                              }
+                            />
+
+                            {effectivityType === 'custom' && (
+                              <DesktopDateTimePicker
+                                value={field.state.value}
+                                onChange={newDate => field.handleChange(newDate!)}
+                                sx={{
+                                  width: '100%',
+                                  mt: 1,
+                                  mb: 2,
+                                }}
+                                slotProps={{
+                                  textField: {
+                                    fullWidth: false,
+                                    variant: 'outlined',
+                                  },
+                                }}
+                              />
+                            )}
+
+                            <FormControlLabel
+                              value="threshold"
+                              control={<Radio />}
+                              label={
+                                <Box>
+                                  <Typography>Make effective at threshold</Typography>
+                                  <Typography variant="body2" color="text.secondary">
+                                    This will allow the vote proposal to take effect immediately
+                                    when 2/3 vote in favor
+                                  </Typography>
+                                </Box>
+                              }
+                            />
+                          </RadioGroup>
+                        </Box>
+                      </>
+                    );
+                  }}
+                />
+              </Box>
+            </form>
+          </Box>
+        </Paper>
+      </Box>
+    </>
   );
 };

@@ -40,7 +40,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   const hasExpired = dayjs(votingInformation.votingCloses).isBefore(now());
   const isEffective =
     votingInformation.voteTakesEffect && dayjs(votingInformation.voteTakesEffect).isBefore(now());
-  const isClosed = hasExpired || isEffective || votingInformation.status === 'Rejected';
+  const isClosed =
+    !proposalDetails.isVoteRequest ||
+    hasExpired ||
+    isEffective ||
+    votingInformation.status === 'Rejected';
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
 
