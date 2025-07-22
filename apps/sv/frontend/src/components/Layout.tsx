@@ -13,7 +13,7 @@ import { Box, Button, Divider, Stack, Typography } from '@mui/material';
 import Container from '@mui/material/Container';
 import Link from '@mui/material/Link';
 
-import { useElectionContext, useFeatureSupport } from '../contexts/SvContext';
+import { useFeatureSupport } from '../contexts/SvContext';
 import { useNetworkInstanceName } from '../hooks/index';
 import { useSvConfig } from '../utils';
 
@@ -35,8 +35,6 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
   const actionsPending = listVoteRequestsQuery.data?.filter(
     vr => vr.payload.votes.entriesArray().find(e => e[1].sv === svPartyId) === undefined
   );
-  const electionContextQuery = useElectionContext();
-  const hasElectionRequest = (electionContextQuery?.data?.ranking?.length ?? 0) > 0;
 
   if (featureSupport.isLoading) {
     return <Loading />;
@@ -53,7 +51,6 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
         { name: 'Information', path: 'dso' },
         { name: 'Validator Onboarding', path: 'validator-onboarding' },
         { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
-        { name: 'Delegate Election', path: 'delegate', hasAlert: hasElectionRequest },
         { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
       ];
 

@@ -6,7 +6,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { SvNodeState } from '@daml.js/splice-dso-governance/lib/Splice/DSO/SvState';
-import { ElectionRequest, DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';
 
@@ -29,20 +29,6 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   });
 };
 
-export const useElectionContext = ():
-  | UseQueryResult<{ ranking: Contract<ElectionRequest>[] }>
-  | undefined => {
-  const { getElectionRequest } = useSvAdminClient();
-  return useQuery({
-    queryKey: ['getElectionRequest'],
-    queryFn: async () => {
-      const { ranking } = await getElectionRequest();
-      return {
-        ranking: ranking.map(c => Contract.decodeOpenAPI(c, ElectionRequest)),
-      };
-    },
-  });
-};
 
 export const useFeatureSupport = (): UseQueryResult<{
   newGovernanceFlow: boolean;
