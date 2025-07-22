@@ -51,7 +51,7 @@ object Dependencies {
 
   lazy val jaxb_abi = "javax.xml.bind" % "jaxb-api" % "2.3.1"
 
-  lazy val commons_compress = "org.apache.commons" % "commons-compress" % "1.23.0"
+  lazy val commons_compress = "org.apache.commons" % "commons-compress" % "1.27.1"
 
   lazy val kubernetes_client = "io.fabric8" % "kubernetes-client" % "6.8.1" % "provided"
 
