@@ -22,6 +22,7 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -252,7 +253,8 @@ class DisasterRecoveryIntegrationTest
         dump.dataSnapshot.acsTimestamp should be(timestampBeforeDisaster)
         dump.createdAt should be(timestampBeforeDisaster)
         dump.migrationId shouldBe 1
-        dump.participantUsers.users should not be empty
+        dump.participantUsers.users
+          .find(_.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)) should not be empty
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
             writeMigrationDumpFile(sv, ids, dump)
@@ -609,7 +611,8 @@ class DisasterRecoveryIntegrationTest
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
         eventuallySucceeds() {
           val snapshot = svBackend.getDomainDataSnapshot(timestamp, force = true)
-          snapshot.participantUsers.users should not be empty
+          snapshot.participantUsers.users
+            .find(_.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)) should not be empty
         }
       )
     }
