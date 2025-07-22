@@ -1142,7 +1142,7 @@ components:
         - migration_id
         - identities
         - data_snapshot
-        # TODO(tech-debt) make `participant_users` required once HDM base version is at 0.3.15 or higher
+        - participant_users
         - created_at
       properties:
         migration_id:
