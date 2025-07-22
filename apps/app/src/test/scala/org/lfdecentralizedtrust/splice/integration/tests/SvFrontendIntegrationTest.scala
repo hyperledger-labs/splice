@@ -10,7 +10,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
-
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_SetConfig,
@@ -21,7 +20,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultDsoRulesConfig
 import org.lfdecentralizedtrust.splice.util.*
-import org.openqa.selenium.By
+import org.openqa.selenium.{By, Keys}
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
@@ -670,10 +669,17 @@ class SvFrontendIntegrationTest
             inside(find(id("create-reason"))) { case Some(field) =>
               field.underlying.sendKeys(testReason)
             }
-        } { _ =>
+        } { implicit webDriver =>
           // Skipping form field assertions — values can't be reliably queried after submission,
           // and correctness is already covered via the confirmation modal in testCreateAndVoteDsoRulesAction.
-          ()
+
+          // Clean up dropdown overlays before next test starts
+          webDriver.switchTo().activeElement().sendKeys(Keys.ESCAPE)
+          webDriver.findElement(By.tagName("body")).click()
+          eventually() {
+            val overlays = webDriver.findElements(By.className("MuiPopover-root")).asScala
+            assert(overlays.forall(!_.isDisplayed), "All dropdown/popover overlays should be gone")
+          }
         }
     }
 
