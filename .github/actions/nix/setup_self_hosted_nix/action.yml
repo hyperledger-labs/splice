@@ -57,6 +57,15 @@ runs:
           set -exuo pipefail
           echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
           if [ -f ~/.config/nix/nix.conf ]; then
+            echo "nix.conf already exists, skipping Nix setup"
+            echo "nix.conf contents:"
+            cat ~/.config/nix/nix.conf
+            echo "/etc/nix/netrc contents:"
+            if [ -f /etc/nix/netrc ]; then
+              cat /etc/nix/netrc
+            else
+              echo "No /etc/nix/netrc file found"
+            fi
             exit 0
           else
             # Disabling sandbox because:
