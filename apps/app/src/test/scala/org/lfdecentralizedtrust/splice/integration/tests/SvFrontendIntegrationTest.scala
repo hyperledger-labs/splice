@@ -670,7 +670,7 @@ class SvFrontendIntegrationTest
             inside(find(id("create-reason"))) { case Some(field) =>
               field.underlying.sendKeys(testReason)
             }
-        } { implicit webDriver =>
+        } { _ =>
           // Skipping form field assertions — values can't be reliably queried after submission,
           // and correctness is already covered via the confirmation modal in testCreateAndVoteDsoRulesAction.
           ()

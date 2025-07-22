@@ -47,7 +47,6 @@ import { useSvConfig } from '../../utils';
 import { hasConflictingFields } from '../../utils/configDiffs';
 import { isValidUrl } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
-import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import CreateUnallocatedUnclaimedActivityRecord from './actions/CreateUnallocatedUnclaimedActivityRecord';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
