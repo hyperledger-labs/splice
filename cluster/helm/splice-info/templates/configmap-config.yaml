@@ -8,7 +8,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   staticfile.conf: |
+    server_tokens off;
+
     add_header Cache-Control no-cache;
+
+    gzip on;
+    gzip_types {{ .Values.contentType }};
 
     types {
         {{ .Values.contentType }} html;
