@@ -310,6 +310,15 @@ data ElectionRequestReason
   deriving (Eq, Ord, Show)
 
 -- | __Deprecated__ in favor of delegateless automation.
+data VotingState a = VotingState with
+   rankings : Map.Map a [[a]]
+     -- ^ Candidate and the remaining rankings in case that candidate is eliminated.
+   loosers : Set.Set a
+     -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
+     -- that would result from filtering the remaining rankings eagerly.
+ deriving (Eq, Show)
+
+-- | __Deprecated__ in favor of delegateless automation.
 --
 -- A request to elect a new DSO delegate.
 template ElectionRequest with

@@ -29,7 +29,6 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
   });
 };
 
-
 export const useFeatureSupport = (): UseQueryResult<{
   newGovernanceFlow: boolean;
   delegatelessAutomation: boolean;
