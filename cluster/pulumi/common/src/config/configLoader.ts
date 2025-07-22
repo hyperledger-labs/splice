@@ -22,7 +22,7 @@ function loadClusterYamlConfig(): unknown {
   return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
 }
 
-function readAndParseYaml(filePath: string): unknown {
+export function readAndParseYaml(filePath: string): unknown {
   try {
     const fileContents = fs.readFileSync(filePath, 'utf8');
     return yaml.load(fileContents);
