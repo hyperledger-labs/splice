@@ -50,6 +50,9 @@ export const InfraConfigSchema = z.object({
       retentionDuration: z.string(),
       retentionSize: z.string(),
     }),
+    istio: z.object({
+      enableIngressAccessLogging: z.boolean(),
+    }),
   }),
   monitoring: MonitoringConfigSchema,
 });
