@@ -89,6 +89,41 @@ The output is a JSON array of holdings, each of which has two relevant fields:
 - `contractId`: The contract id of the holding
 - `payload`: An object containing the same fields as the [`HoldingView` Daml interface](splice-api-token-holding-v1/daml/Splice/Api/Token/HoldingV1.daml#L49).
 
+
+#### List transfer instructions
+
+```
+> npm run cli -- list-transfer-instructions
+
+Usage: main list-transfer-instructions [options] <partyId>
+
+List all transfer instructions where the provided party is a stakeholder of
+
+Arguments:
+  partyId                   The party for which to list the transfer
+                            instructions
+
+Options:
+  -l, --ledger-url <value>  The ledger JSON API base URL, e.g.
+                            http://localhost:6201
+  -a, --auth-token <value>  The ledger JSON API auth token
+  -h, --help                display help for command
+```
+
+Example:
+
+```shell
+npm run cli -- list-transfer-instructions a::partyid -l http://localhost:6201 -a an-auth-token
+```
+
+Output:
+
+You can find an example output in [`token-standard/cli/__tests__/expected/transfer-instructions.json`](cli/__tests__/expected/transfer-instructions.json).
+
+The output is a JSON array of transfer instructions, each of which has two relevant fields:
+- `contractId`: The contract id of the transfer instruction
+- `payload`: An object containing the same fields as the [`TransferInstruction` Daml interface](splice-api-token-transfer-instruction-v1/daml/Splice/Api/Token/TransferInstructionV1.daml#L115).
+
 #### List holding transactions
 
 ```
