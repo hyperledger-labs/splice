@@ -34,6 +34,15 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
 });
 
+export const createProposalActions = [
+  { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
+  { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
+  { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
+  { name: 'Set Dso Rules Configuration', value: 'SRARC_SetConfig' },
+  { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
+  { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
+];
+
 export const getVoteResultStatus = (
   outcome: VoteRequestOutcome | undefined
 ): ProposalListingStatus => {

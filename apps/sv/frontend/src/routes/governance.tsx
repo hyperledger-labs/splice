@@ -165,7 +165,7 @@ export const Governance: React.FC = () => {
         <Typography variant="h2" gutterBottom data-testid="governance-page-title">
           Governance
         </Typography>
-        <Button variant="contained" component={RouterLink} to={`/governance-beta/proposals/create`}>
+        <Button variant="pill" component={RouterLink} to={`/governance-beta/proposals/create`}>
           Initiate Proposal
         </Button>
       </Box>
