@@ -229,7 +229,7 @@ npm run cli -- accept-transfer-instruction --help
 
 Usage: main accept-transfer-instruction [options] <transferInstructionCid>
 
-Execute the choice TransferInstruction_Accept on the provide transfer instruction
+Execute the choice TransferInstruction_Accept on the provided transfer instruction
 
 Arguments:
   transferInstructionCid                      The contract ID of the transfer instruction to accept
@@ -264,5 +264,5 @@ from the output of the `list-transfer-instructions` command.
 
 Output:
 
-If the output is `{}`, the transfer was successful.
+If the output is `{ "status": "success" }`, the acceptance of the transfer instruction was successful.
 TODO (#908): record_time and update_id will be added to the output.

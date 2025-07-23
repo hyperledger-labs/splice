@@ -105,7 +105,7 @@ export function createProgram(): Command {
     program
       .command("accept-transfer-instruction")
       .description(
-        "Execute the choice TransferInstruction_Accept on the provide transfer instruction",
+        "Execute the choice TransferInstruction_Accept on the provided transfer instruction",
       )
       .argument(
         "transferInstructionCid",

@@ -106,7 +106,8 @@ class TokenStandardCliIntegrationTest
               aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
               "-u",
               "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
-            )
+            ),
+            io.circe.Json.obj(),
           )
         },
       )(
@@ -144,7 +145,8 @@ class TokenStandardCliIntegrationTest
               aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
               "-u",
               "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
-            )
+            ),
+            io.circe.Json.obj("status" -> io.circe.Json.fromString("success")),
           )
         },
       )(
@@ -174,7 +176,7 @@ class TokenStandardCliIntegrationTest
 
   }
 
-  private def runCommand(args: Seq[String]) = {
+  private def runCommand(args: Seq[String], expectedOutput: io.circe.Json) = {
     val readLines = mutable.Buffer[String]()
     val logProcessor = ProcessLogger { line =>
       {
@@ -188,8 +190,11 @@ class TokenStandardCliIntegrationTest
 
     val exitCode = Process(args, cwd).!(logProcessor)
     // TODO (#908): check that recordtime and updateid are present
-    inside(readLines) { case _ :+ last =>
-      last should be("{}")
+    val start = readLines.indexWhere(_.startsWith("{"))
+    val end = readLines.lastIndexWhere(_.endsWith("}"))
+    val jsonSlice = readLines.slice(start, end + 1)
+    inside(jsonSlice) { jsonLines =>
+      io.circe.parser.parse(jsonLines.mkString("")) should be(Right(expectedOutput))
     }
     if (exitCode != 0) {
       logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
