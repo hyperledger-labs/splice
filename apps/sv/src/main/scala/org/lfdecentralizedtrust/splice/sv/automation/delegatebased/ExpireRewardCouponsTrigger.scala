@@ -49,7 +49,9 @@ class ExpireRewardCouponsTrigger(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
       )
-      .map(seq => Random.shuffle(seq).take(svTaskContext.expiredRewardCouponBatchSize))
+      .map(seq =>
+        Random.shuffle(seq).take(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize)
+      )
   } yield batches
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit

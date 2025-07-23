@@ -20,8 +20,7 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
   protected implicit val tracer: Tracer
 
   def readFeatureSupport(
-      party: PartyId,
-      delegateAutomationEnvironmentFlag: Boolean = true,
+      party: PartyId
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
@@ -45,7 +44,7 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
           )
       } yield FeatureSupportResponse(
         newGovernanceFlow.supported,
-        delegatelessAutomation.supported && delegateAutomationEnvironmentFlag,
+        delegatelessAutomation.supported,
       )
     }
 

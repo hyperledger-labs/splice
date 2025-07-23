@@ -27,6 +27,27 @@ Upcoming
   sequencers to 10 minutes. This has no impact other than on the
   acknowlegdement metrics exposed by the sequencer.
 
+- SV
+
+  - Fully remove automation and logic around DSO delegate elections.
+
+- Daml
+
+  - Deprecated Daml choices related to DSO delegate elections
+
+    * This requires a Daml upgrade to versions
+
+          ================== =======
+          name               version
+          ================== =======
+          amulet             0.1.12
+          amuletNameService  0.1.12
+          dsoGovernance      0.1.17
+          validatorLifecycle 0.1.5
+          wallet             0.1.12
+          walletPayments     0.1.12
+          ================== =======
+
 0.4.7
 -----
 

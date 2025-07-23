@@ -29,7 +29,7 @@ module Splice.Util
   patchListAsScalar,
   patchListAsSet,
 
-  deprecatedChoice,
+  deprecatedChoice
 ) where
 
 import DA.Action (unless)

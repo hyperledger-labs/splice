@@ -5,7 +5,6 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 export const useFeatureSupport = (): UseQueryResult<{
   newGovernanceFlow: boolean;
-  delegatelessAutomation: boolean;
 }> => {
   const scanClient = useScanClient();
   return useQuery({

@@ -7,15 +7,13 @@ import { z } from 'zod';
 export const AutomationSchema = z.object({
   automation: z
     .object({
-      delegatelessAutomation: z.boolean().default(true),
-      expectedTaskDuration: z.number().default(5000),
-      expiredRewardCouponBatchSize: z.number().default(100),
+      delegatelessAutomationExpectedTaskDuration: z.number().default(5000),
+      delegatelessAutomationExpiredRewardCouponBatchSize: z.number().default(100),
     })
     .optional()
     .default({
-      delegatelessAutomation: true,
-      expectedTaskDuration: 5000,
-      expiredRewardCouponBatchSize: 100,
+      delegatelessAutomationExpectedTaskDuration: 5000,
+      delegatelessAutomationExpiredRewardCouponBatchSize: 100,
     }),
 });
 
@@ -24,6 +22,7 @@ export type Config = z.infer<typeof AutomationSchema>;
 // eslint-disable-next-line
 // @ts-ignore
 const fullConfig = AutomationSchema.parse(clusterYamlConfig);
-export const delegatelessAutomation = fullConfig.automation.delegatelessAutomation;
-export const expectedTaskDuration = fullConfig.automation.expectedTaskDuration;
-export const expiredRewardCouponBatchSize = fullConfig.automation.expiredRewardCouponBatchSize;
+export const delegatelessAutomationExpectedTaskDuration =
+  fullConfig.automation.delegatelessAutomationExpectedTaskDuration;
+export const delegatelessAutomationExpiredRewardCouponBatchSize =
+  fullConfig.automation.delegatelessAutomationExpiredRewardCouponBatchSize;

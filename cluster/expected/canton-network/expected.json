@@ -819,7 +819,8 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "delegatelessAutomation": true,
+        "delegatelessAutomationExpectedTaskDuration": 5000,
+        "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -833,7 +834,6 @@
           "skipInitialization": true
         },
         "enablePostgresMetrics": true,
-        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -856,7 +856,6 @@
             }
           }
         ],
-        "expiredRewardCouponBatchSize": 100,
         "failOnAppVersionMismatch": true,
         "identitiesExport": {
           "bucket": {

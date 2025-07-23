@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.DelayUtil
 import org.lfdecentralizedtrust.splice.automation.*
@@ -30,8 +29,12 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
 
   override final val taskRetry: RetryFor =
     RetryFor.Automation.copy(
-      initialDelay = FiniteDuration.apply(svTaskContext.expectedTaskDuration, MILLISECONDS),
-      maxDelay = FiniteDuration.apply(2 * svTaskContext.expectedTaskDuration, MILLISECONDS),
+      initialDelay = FiniteDuration
+        .apply(svTaskContext.delegatelessAutomationExpectedTaskDuration, MILLISECONDS),
+      maxDelay = FiniteDuration.apply(
+        2 * svTaskContext.delegatelessAutomationExpectedTaskDuration,
+        MILLISECONDS,
+      ),
     )
   protected implicit def ec: ExecutionContext
 
@@ -92,7 +95,9 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
     // and helps to distribute the load between nodes.
     val upperBound =
       Math.min(
-        dsoRules.payload.svs.size().toLong * svTaskContext.expectedTaskDuration,
+        dsoRules.payload.svs
+          .size()
+          .toLong * svTaskContext.delegatelessAutomationExpectedTaskDuration,
         pollingTriggerInterval,
       )
     val delay = Random.nextLong(upperBound)
@@ -146,11 +151,9 @@ object SvTaskBasedTrigger {
   case class Context(
       dsoStore: SvDsoStore,
       connection: SpliceLedgerConnection,
-      dsoDelegate: PartyId,
       epoch: Long,
-      delegatelessAutomation: Boolean,
-      expectedTaskDuration: Long,
-      expiredRewardCouponBatchSize: Int,
+      delegatelessAutomationExpectedTaskDuration: Long,
+      delegatelessAutomationExpiredRewardCouponBatchSize: Int,
       packageVersionSupport: PackageVersionSupport,
   )
 }

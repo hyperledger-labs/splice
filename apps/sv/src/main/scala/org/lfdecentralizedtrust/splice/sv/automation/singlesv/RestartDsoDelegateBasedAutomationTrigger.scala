@@ -26,7 +26,6 @@ import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.SvTaskBasedTr
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -102,7 +101,6 @@ class RestartDsoDelegateBasedAutomationTrigger(
 
       synchronized {
         val currentEpoch = dsoRules.payload.epoch
-        val currentDsoDelegate = PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate)
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
         epochStateVar match {
@@ -112,7 +110,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
           case Some(state) =>
             if (state.epoch != currentEpoch) {
               logger.info(
-                show"Noticed an DsoRules epoch change (from ${state.epoch} with delegate ${state.dsoDelegate} to $currentEpoch with delegate ${currentDsoDelegate})."
+                show"Noticed an DsoRules epoch change (from ${state.epoch} to $currentEpoch)."
               )
               logger.debug(
                 s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
@@ -132,14 +130,12 @@ class RestartDsoDelegateBasedAutomationTrigger(
       ec: ExecutionContext
   ): TaskOutcome = {
     val svTaskContext =
-      new SvTaskBasedTrigger.Context(
+      SvTaskBasedTrigger.Context(
         store,
         connection,
-        PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
         epoch,
-        config.delegatelessAutomation,
-        config.expectedTaskDuration,
-        config.expiredRewardCouponBatchSize,
+        config.delegatelessAutomationExpectedTaskDuration,
+        config.delegatelessAutomationExpiredRewardCouponBatchSize,
         packageVersionSupport,
       )
 
@@ -174,7 +170,6 @@ class RestartDsoDelegateBasedAutomationTrigger(
        epochStateVar = Some(
          EpochState(
            epoch,
-           PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
            dsoDelegateBasedAutomation,
            retryProvider,
          )
@@ -205,7 +200,6 @@ class RestartDsoDelegateBasedAutomationTrigger(
 
 case class EpochState(
     epoch: Long,
-    dsoDelegate: PartyId,
     dsoDelegateBasedAutomation: DsoDelegateBasedAutomationService,
     retryProvider: RetryProvider,
 ) {}
