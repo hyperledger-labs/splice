@@ -1,4 +1,4 @@
-name: CI on PRs (Splice Contributors)
+name: WIP
 on:
   pull_request:
     types: [ opened, synchronize, reopened ]
