@@ -253,13 +253,19 @@ export async function submitExerciseCommand(
     deduplicationPeriod,
   });
 
-  return await awaitCompletion(
+  const completionPromise = awaitCompletion(
     ledgerClient,
     ledgerEnd.offset,
     partyId,
     userId,
     commandId,
     submissionId,
+  );
+  return promiseWithTimeout(
+    completionPromise,
+    60_000 * 2, // 2m
+    `Timed out getting completion.
+    The submission might have succeeded or failed, but it couldn't be determined in time.`,
   );
 }
 
@@ -343,6 +349,8 @@ interface Completion {
   recordTime?: string;
 }
 
+const COMPLETIONS_LIMIT = 100;
+const COMPLETIONS_STREAM_IDLE_TIMEOUT_MS = 1000;
 /**
  * Polls the completions endpoint until
  * the completion with the given (userId, commandId, submissionId) is returned.
@@ -362,8 +370,8 @@ async function awaitCompletion(
       parties: [partyId],
       beginExclusive: ledgerEnd,
     },
-    100,
-    1000,
+    COMPLETIONS_LIMIT,
+    COMPLETIONS_STREAM_IDLE_TIMEOUT_MS,
   );
   const completions = responses.filter(
     (response) => !!response.completionResponse.Completion,
@@ -372,7 +380,7 @@ async function awaitCompletion(
   const wantedCompletion = completions.find((response) => {
     const completion = response.completionResponse.Completion;
     return (
-      completion.value.userId == userId &&
+      completion.value.userId === userId &&
       completion.value.commandId === commandId &&
       completion.value.submissionId === submissionId
     );
@@ -400,5 +408,24 @@ async function awaitCompletion(
       commandId,
       submissionId,
     );
+  }
+}
+
+async function promiseWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorMessage: string,
+): Promise<T> {
+  let timeoutPid: NodeJS.Timeout | null = null;
+  const timeoutPromise: Promise<T> = new Promise((_resolve, reject) => {
+    timeoutPid = setTimeout(() => reject(errorMessage), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutPid) {
+      clearTimeout(timeoutPid);
+    }
   }
 }
