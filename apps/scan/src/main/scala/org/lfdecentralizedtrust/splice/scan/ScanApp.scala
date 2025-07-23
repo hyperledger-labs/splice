@@ -293,7 +293,15 @@ class ScanApp(
                 .withMetrics(httpService)(operation)
                 .tflatMap(_ =>
                   HttpErrorHandler(loggerFactory)(traceContext).tflatMap { _ =>
-                    provide(traceContext)
+                    // custom HTTP timeouts
+                    (httpService, config.customTimeouts.get(operation)) match {
+                      case ("scan", Some(customTimeout)) =>
+                        withRequestTimeout(customTimeout.duration).tflatMap { _ =>
+                          provide(traceContext)
+                        }
+                      case _ =>
+                        provide(traceContext)
+                    }
                   }
                 )
             }
