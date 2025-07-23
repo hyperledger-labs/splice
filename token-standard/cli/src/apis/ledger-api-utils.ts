@@ -388,7 +388,7 @@ async function awaitCompletion(
 
   if (wantedCompletion) {
     const status = wantedCompletion.completionResponse.Completion.value.status;
-    if (status && status.code) {
+    if (status && status.code !== 0) {
       // status.code is 0 for success
       throw new Error(
         `Command failed with status: ${JSON.stringify(wantedCompletion.completionResponse.Completion.value.status)}`,
