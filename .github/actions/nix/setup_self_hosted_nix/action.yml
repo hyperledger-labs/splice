@@ -160,11 +160,11 @@ runs:
         set -euxo pipefail
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
-        mkdir /cache/nix/upload
-        tar -czf "/cache/nix/upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
+        mkdir /tmp/nix-upload
+        tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
 
     - name: Upload nix cache
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: nix-cache
-        path: /cache/nix/upload"
+        path: /tmp/nix-upload"
