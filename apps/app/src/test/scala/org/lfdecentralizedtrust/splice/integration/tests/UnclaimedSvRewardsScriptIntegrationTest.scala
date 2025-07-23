@@ -162,14 +162,20 @@ class UnclaimedSvRewardsScriptIntegrationTest
             (co.payload.round.number.longValue(), BigDecimal(co.payload.issuancePerSvRewardCoupon))
           )
       )
-      val weight = sv1TotalWeight / 2
-      val rewardExpiredTotalAmount = getTotalAmount(svRewardCouponsExpired, roundInfo, weight)
-      val rewardClaimedTotalAmount = getTotalAmount(svRewardCouponsClaimed, roundInfo, weight)
-      val sv1Party = sv1Backend.getDsoInfo().svParty
 
+      val sv1Party = sv1Backend.getDsoInfo().svParty
       val readLines = mutable.Buffer[String]()
-      clue("Run unclaimed_sv_rewards.py with invalid weight and check warnings") {
+      clue("Run unclaimed_sv_rewards.py with invalid weight and check warnings and results") {
         val errorProcessor = ProcessLogger(line => readLines.append(line))
+        val inputWeight = sv1TotalWeight - 1
+        val alreadyMintedWeight = 2
+        val effectiveWeight = sv1TotalWeight - alreadyMintedWeight
+
+        val rewardExpiredTotalAmount =
+          getTotalAmount(svRewardCouponsExpired, roundInfo, effectiveWeight)
+        val rewardClaimedTotalAmount =
+          getTotalAmount(svRewardCouponsClaimed, roundInfo, effectiveWeight)
+
         try {
           val exitCode = scala.sys.process
             .Process(
@@ -189,18 +195,34 @@ class UnclaimedSvRewardsScriptIntegrationTest
                 beginRecordTime.toString,
                 "--end-record-time",
                 endRecordTime.toString,
-                // Invalid weight: weight > sv1TotalWeight - already-minted-weight
                 "--weight",
-                (sv1TotalWeight - 1).toString,
+                inputWeight.toString,
                 "--already-minted-weight",
-                2.toString,
+                alreadyMintedWeight.toString,
               )
             )
             .!(errorProcessor)
 
           assert(exitCode == 0, s"Script exited with code $exitCode")
+          readLines.filter(_.startsWith("ERROR:")) shouldBe empty
           forExactly(6, readLines) {
             _ should include("WARNING:global:Invalid weight input for round")
+          }
+
+          forExactly(1, readLines) {
+            _ should include(s"reward_expired_count = $svRewardCouponsExpiredCount")
+          }
+          forExactly(1, readLines) {
+            _ should include(s"reward_expired_total_amount = $rewardExpiredTotalAmount")
+          }
+          forExactly(1, readLines) {
+            _ should include(s"reward_claimed_count = $svRewardCouponsClaimedCount")
+          }
+          forExactly(1, readLines) {
+            _ should include(s"reward_claimed_total_amount = $rewardClaimedTotalAmount")
+          }
+          forExactly(1, readLines) {
+            _ should include(s"reward_unclaimed_count = $svRewardCouponsUnclaimedCount")
           }
         } catch {
           case NonFatal(ex) =>
@@ -210,6 +232,15 @@ class UnclaimedSvRewardsScriptIntegrationTest
       }
 
       clue("Run unclaimed_sv_rewards.py with valid inputs and check results") {
+        val inputWeight = sv1TotalWeight / 2
+        val alreadyMintedWeight = inputWeight
+        val effectiveWeight = inputWeight
+
+        val rewardExpiredTotalAmount =
+          getTotalAmount(svRewardCouponsExpired, roundInfo, effectiveWeight)
+        val rewardClaimedTotalAmount =
+          getTotalAmount(svRewardCouponsClaimed, roundInfo, effectiveWeight)
+
         readLines.clear()
         val errorProcessor = ProcessLogger(line => readLines.append(line))
         try {
@@ -232,9 +263,9 @@ class UnclaimedSvRewardsScriptIntegrationTest
                 "--end-record-time",
                 endRecordTime.toString,
                 "--weight",
-                weight.toString,
+                inputWeight.toString,
                 "--already-minted-weight",
-                weight.toString, // Note: weight = sv1TotalWeight / 2
+                alreadyMintedWeight.toString,
               )
             )
             .!(errorProcessor)

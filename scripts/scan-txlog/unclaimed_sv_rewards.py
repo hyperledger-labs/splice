@@ -651,21 +651,18 @@ class State:
         self.process_events(transaction, event.child_event_ids)
 
     def _calculate_amount(self, reward, mining_round_info):
-        return (
-            self.weight * mining_round_info.issuance_per_sv_reward
-            if self._is_weight_ok(reward)
-            else 0
-        )
+        return self._calculate_weight(reward) * mining_round_info.issuance_per_sv_reward
 
-    def _is_weight_ok(self, reward):
+    def _calculate_weight(self, reward):
         available_weight = reward.weight - self.already_minted_weight
         if self.weight > available_weight:
             LOG.warning(
                 f"Invalid weight input for round <{reward.round}>: "
                 f"{self.weight} must be less than or equal to {available_weight}."
+                f"The amount corresponding to {available_weight} will be computed."
             )
-            return False
-        return True
+            return available_weight
+        return self.weight
 
     def _fail_with_missing_round(self, reward):
         self._fail(
