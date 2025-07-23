@@ -1,10 +1,20 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.crypto.SigningPrivateKey
+import com.daml.ledger.api.v2.transaction.TreeEvent.Kind
+import com.daml.ledger.javaapi.data.codegen.Choice
+import com.digitalasset.canton.crypto.{PrivateKey, SigningPrivateKey, SigningPublicKey}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.{
+  TransferFactory,
+  TransferInstruction,
+}
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.io.FileOutputStream
@@ -26,39 +36,33 @@ class TokenStandardCliIntegrationTest
     "execute transfers between external parties" in { implicit env =>
       val onboardingAlice @ OnboardingResult(aliceParty, alicePublicKey, alicePrivateKey) =
         onboardExternalParty(aliceValidatorBackend, Some("aliceExternal"))
-      Using(new FileOutputStream(s"${tempDirectory.path}/alice.pub")) { out =>
-        alicePublicKey.key.writeTo(out)
-      }
-      Using(new FileOutputStream(s"${tempDirectory.path}/alice.priv")) { out =>
-        alicePrivateKey
-          .asInstanceOf[SigningPrivateKey]
-          .key
-          .writeTo(out)
-      }
+      val (alicePublicKeyPath, alicePrivateKeyPath) =
+        writeKeysToTempFile("alice", alicePublicKey, alicePrivateKey)
 
-      val onboardingBob @ OnboardingResult(bobParty, _, _) =
+      val onboardingBob @ OnboardingResult(bobParty, bobPublicKey, bobPrivateKey) =
         onboardExternalParty(aliceValidatorBackend, Some("bobExternal"))
+      val (bobPublicKeyPath, bobPrivateKeyPath) =
+        writeKeysToTempFile("bob", bobPublicKey, bobPrivateKey)
 
       aliceValidatorWalletClient.tap(5000.0)
 
-      Seq(onboardingAlice, onboardingBob).foreach { onboarding =>
-        aliceValidatorBackend.participantClient.parties
-          .hosted(filterParty = onboarding.party.filterString) should not be empty
+      // only alice will have a transfer preapproval
+      aliceValidatorBackend.participantClient.parties
+        .hosted(filterParty = onboardingAlice.party.filterString) should not be empty
 
-        createAndAcceptExternalPartySetupProposal(
-          aliceValidatorBackend,
-          onboarding,
-          verboseHashing = true,
-        )
+      createAndAcceptExternalPartySetupProposal(
+        aliceValidatorBackend,
+        onboardingAlice,
+        verboseHashing = true,
+      )
 
-        eventually() {
-          aliceValidatorBackend.lookupTransferPreapprovalByParty(
-            onboarding.party
-          ) should not be empty
-          aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
-            onboarding.party
-          ) should not be empty
-        }
+      eventually() {
+        aliceValidatorBackend.lookupTransferPreapprovalByParty(
+          onboardingAlice.party
+        ) should not be empty
+        aliceValidatorBackend.scanProxy.lookupTransferPreapprovalByParty(
+          onboardingAlice.party
+        ) should not be empty
       }
 
       // Transfers from non-external parties are not supported by the CLI
@@ -81,68 +85,183 @@ class TokenStandardCliIntegrationTest
         },
       )
 
-      actAndCheck(
+      val (_, (transferInstructionCid, _)) = actAndCheck(
         "Transfer 10.0 from Alice to Bob using Token Standard CLI", {
-          val readLines = mutable.Buffer[String]()
-          val logProcessor = ProcessLogger { line =>
-            {
-              logger.debug(s"CLI output: $line")
-              readLines.append(line)
-            }
-          }
-          val cwd = new java.io.File("token-standard/cli")
-          // npm ci (CI's install) is required for anything to run
-          Process(Seq("npm", "ci"), cwd).!(logProcessor)
-          val args = Seq(
-            "npm",
-            "run",
-            "cli",
-            "--",
-            "transfer",
-            "-s",
-            aliceParty.toProtoPrimitive,
-            "-r",
-            bobParty.toProtoPrimitive,
-            "--amount",
-            "10.0",
-            "-e",
-            dsoParty.toProtoPrimitive,
-            "-d",
-            "Amulet",
-            "--public-key",
-            s"${tempDirectory.path}/alice.pub",
-            "--private-key",
-            s"${tempDirectory.path}/alice.priv",
-            "-R",
-            s"http://localhost:${sv1ScanBackend.config.adminApi.port.toString}",
-            "-l",
-            "http://localhost:6501", // not available in any config
-            "-a",
-            aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
-            "-u",
-            "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
+          runCommand(
+            Seq(
+              "npm",
+              "run",
+              "cli",
+              "--",
+              "transfer",
+              "-s",
+              aliceParty.toProtoPrimitive,
+              "-r",
+              bobParty.toProtoPrimitive,
+              "--amount",
+              "10.0",
+              "-e",
+              dsoParty.toProtoPrimitive,
+              "-d",
+              "Amulet",
+              "--public-key",
+              alicePublicKeyPath,
+              "--private-key",
+              alicePrivateKeyPath,
+              "-R",
+              s"http://localhost:${sv1ScanBackend.config.adminApi.port.toString}",
+              "-l",
+              "http://localhost:6501", // not available in any config
+              "-a",
+              aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+              "-u",
+              "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
+            ),
+            aliceParty,
+            TransferFactory.CHOICE_TransferFactory_Transfer,
           )
-          val exitCode = Process(args, cwd).!(logProcessor)
-          // TODO (#908): check that recordtime and updateid are present
-          inside(readLines) { case _ :+ last =>
-            last should be("{}")
-          }
-          if (exitCode != 0) {
-            logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
-            readLines.foreach(logger.error(_)(TraceContext.empty))
-            throw new RuntimeException(s"$args failed.")
-          }
         },
       )(
-        "Bob's has the 10.0",
+        "Bob sees the transfer instruction",
         _ => {
+          val instructions = listTransferInstructions(
+            aliceValidatorBackend.participantClientWithAdminToken,
+            bobParty,
+          )
+          instructions.loneElement
+        },
+      )
+
+      actAndCheck(
+        "Bob accepts the transfer via CLI", {
+          runCommand(
+            Seq(
+              "npm",
+              "run",
+              "cli",
+              "--",
+              "accept-transfer-instruction",
+              transferInstructionCid.contractId,
+              "-p",
+              bobParty.toProtoPrimitive,
+              "--public-key",
+              bobPublicKeyPath,
+              "--private-key",
+              bobPrivateKeyPath,
+              "-R",
+              s"http://localhost:${sv1ScanBackend.config.adminApi.port.toString}",
+              "-l",
+              "http://localhost:6501", // not available in any config
+              "-a",
+              aliceValidatorBackend.participantClientWithAdminToken.adminToken.value,
+              "-u",
+              "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
+            ),
+            bobParty,
+            TransferInstruction.CHOICE_TransferInstruction_Accept,
+          )
+        },
+      )(
+        "Bob doesn't see the transfer instruction anymore",
+        _ => {
+          listTransferInstructions(
+            aliceValidatorBackend.participantClientWithAdminToken,
+            bobParty,
+          ) shouldBe empty
+        },
+      )
+
+      // necessary to call the balance endpoint after
+      createAndAcceptExternalPartySetupProposal(
+        aliceValidatorBackend,
+        onboardingBob,
+        verboseHashing = true,
+      )
+      clue("Bob's balance has been updated") {
+        eventually() {
           aliceValidatorBackend
             .getExternalPartyBalance(bobParty)
             .totalUnlockedCoin shouldBe "10.0000000000"
-        },
-      )
+        }
+      }
     }
 
   }
 
+  private def runCommand(
+      args: Seq[String],
+      checkingPartyId: PartyId,
+      expectedChoice: Choice[?, ?, ?],
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
+    val readLines = mutable.Buffer[String]()
+    val logProcessor = ProcessLogger { line =>
+      {
+        logger.debug(s"CLI output: $line")
+        readLines.append(line)
+      }
+    }
+    val cwd = new java.io.File("token-standard/cli")
+    // npm ci (CI's install) is required for anything to run
+    Process(Seq("npm", "ci"), cwd).!(logProcessor)
+
+    val exitCode = Process(args, cwd).!(logProcessor)
+
+    if (exitCode != 0) {
+      logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
+      readLines.foreach(logger.error(_)(TraceContext.empty))
+      throw new RuntimeException(s"$args failed.")
+    }
+
+    val start = readLines.indexWhere(_.startsWith("{"))
+    val end = readLines.lastIndexWhere(_.endsWith("}"))
+    val jsonSlice = readLines.slice(start, end + 1)
+    inside(io.circe.parser.parse(jsonSlice.mkString(""))) { case Right(json) =>
+      val output = json
+        .as[CommandOutput](io.circe.generic.semiauto.deriveDecoder)
+        .valueOrFail(s"Failed to decode output: $json")
+
+      output.status should be("success")
+      output.synchronizerId should be(decentralizedSynchronizerId.toProtoPrimitive)
+
+      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
+        .by_id(Set(checkingPartyId), output.updateId)
+        .valueOrFail(s"No transaction tree found for output: $output")
+
+      inside(txTree.eventsById) { events =>
+        forExactly(1, events.map(_._2.kind)) {
+          case Kind.Exercised(value) =>
+            value.choice should be(expectedChoice.name)
+          case _ => fail("not an exercised event")
+        }
+      }
+    }
+  }
+
+  private def writeKeysToTempFile(
+      fileName: String,
+      publicKey: SigningPublicKey,
+      privateKey: PrivateKey,
+  ) = {
+    val pubPath = s"${tempDirectory.path}/$fileName.pub"
+    val privPath = s"${tempDirectory.path}/$fileName.priv"
+    Using(new FileOutputStream(pubPath)) { out =>
+      publicKey.key.writeTo(out)
+    }
+    Using(new FileOutputStream(privPath)) { out =>
+      privateKey
+        .asInstanceOf[SigningPrivateKey]
+        .key
+        .writeTo(out)
+    }
+    (pubPath, privPath)
+  }
+
+  case class CommandOutput(
+      status: String,
+      updateId: String,
+      synchronizerId: String,
+      recordTime: String,
+  )
 }

@@ -81,7 +81,8 @@ export function createStackCR(
   envRefs: EnvRefs,
   gcpSecret: k8s.core.v1.Secret,
   extraEnvs: { [key: string]: string } = {},
-  dependsOn: pulumi.Resource[] = []
+  dependsOn: pulumi.Resource[] = [],
+  parallelism: number = 64
 ): CustomResource {
   const sa = new k8s.core.v1.ServiceAccount(`${name}-sa`, {
     metadata: {
@@ -208,6 +209,11 @@ export function createStackCR(
           useLocalStackOnly: true,
           // retry if the stack is locked by another operation
           retryOnUpdateConflict: true,
+          updateTemplate: {
+            spec: {
+              parallel: parallelism,
+            },
+          },
           // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
             metadata: {

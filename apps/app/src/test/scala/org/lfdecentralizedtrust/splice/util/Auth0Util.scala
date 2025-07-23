@@ -50,20 +50,26 @@ class Auth0Util(
     user.setVerifyEmail(false) // avoid auth0 trying to send mails
     user.setConnection("Username-Password-Authentication")
     logger.debug(s"Creating user with username $username email $email and password $password")
-    val id =
-      try {
-        executeManagementApiRequest(api.users().create(user)).getId
-      } catch {
-        case e: Throwable =>
-          // A "user already exists" error may be caused by our retries, try finding the user by email
-          val users = executeManagementApiRequest(api.users().listByEmail(email, null))
-          if (users.isEmpty) throw e
-          logger.debug("Error caught, but found the user by email, so trying to use it", e)
-          users.get(0).getId
-      }
+    val id = executeManagementApiRequest(
+      api.users().create(user),
+      Function unlift (inferNewUserByEmail(email, _)),
+    ).getId
     logger.debug(s"Created user ${email} with password ${password} (id: ${id})")
     new Auth0User(id, email, password, this)
   }
+
+  private[this] def inferNewUserByEmail(email: String, e: Throwable)(implicit
+      tc: TraceContext
+  ): Option[User] =
+    // A "user already exists" error may be caused by our retries, try finding the user by email
+    executeManagementApiRequest(api.users().listByEmail(email, null)).asScala match {
+      case user +: _ =>
+        logger.debug("Error caught, but found the user by email, so trying to use it", e)
+        Some(user)
+      case _ =>
+        logger.debug(s"Failed to create user with email $email, but no user found by that email")
+        None
+    }
 
   def deleteUser(id: String): Unit = {
     // Called from AutoCloseable.close, which doesn't propagate the trace context
@@ -86,8 +92,9 @@ class Auth0Util(
     auth.requestToken(s"${domain}/api/v2/").execute().getAccessToken()
   }
 
-  private def executeManagementApiRequest[T](
-      req: com.auth0.net.Request[T]
+  private[this] def executeManagementApiRequest[T](
+      req: com.auth0.net.Request[T],
+      recover: retry.Recover[T] = PartialFunction.empty,
   )(implicit traceContext: TraceContext) =
     retry.retryAuth0CallsForTests {
       // Auth0 management API calls are rate limited, with limits much lower than
@@ -96,14 +103,18 @@ class Auth0Util(
       // wait before each management API call
       Threading.sleep(500)
       req.execute()
-    }
+    }(recover)
 
 }
 
 object Auth0Util {
 
   trait Auth0Retry {
-    def retryAuth0CallsForTests[T](f: => T)(implicit traceContext: TraceContext): T
+    final type Recover[T] = PartialFunction[Throwable, T]
+
+    def retryAuth0CallsForTests[T](f: => T)(recover: Recover[T])(implicit
+        traceContext: TraceContext
+    ): T
   }
 
   trait WithAuth0Support {
@@ -133,8 +144,11 @@ object Auth0Util {
         clientSecret,
         loggerFactory,
         new Auth0Retry {
-          def handleExceptions(e: Throwable)(implicit traceContext: TraceContext): Nothing =
+          def handleExceptions[T](e: Throwable, recover: Recover[T])(implicit
+              traceContext: TraceContext
+          ): T =
             e match {
+              case recover(t) => t
               case auth0Exception: Auth0Exception => {
                 logger.debug("Auth0 exception raised, triggering retry...", auth0Exception)
                 fail(auth0Exception)
@@ -148,14 +162,14 @@ object Auth0Util {
 
           override def retryAuth0CallsForTests[T](
               f: => T
-          )(implicit traceContext: TraceContext): T = {
+          )(recover: Recover[T])(implicit traceContext: TraceContext): T = {
             eventually() {
               try {
                 f
               } catch {
                 // the sync client wraps the exceptions because why not
-                case failsafe: FailsafeException => handleExceptions(failsafe.getCause)
-                case cause: Throwable => handleExceptions(cause)
+                case failsafe: FailsafeException => handleExceptions(failsafe.getCause, recover)
+                case NonFatal(cause) => handleExceptions(cause, recover)
               }
             }
           }

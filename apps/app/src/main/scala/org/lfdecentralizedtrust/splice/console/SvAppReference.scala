@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{
   DsoDelegateBasedAutomationService,
+  SvSvAutomationService,
   SvDsoAutomationService,
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
@@ -321,6 +322,13 @@ class SvAppBackendReference(
   )
   def dsoAutomation: SvDsoAutomationService = {
     appState.dsoAutomation
+  }
+
+  @Help.Summary(
+    "Returns the current SV automation."
+  )
+  def svAutomation: SvSvAutomationService = {
+    appState.svAutomation
   }
 
   @Help.Summary("Return SV app config")

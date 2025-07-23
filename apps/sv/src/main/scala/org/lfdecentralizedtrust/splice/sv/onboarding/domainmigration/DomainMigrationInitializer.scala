@@ -172,7 +172,10 @@ class DomainMigrationInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        Some(localSynchronizerNode),
       )
       _ <- SetupUtil
         .grantSvUserRightActAsDso(
@@ -229,7 +232,6 @@ class DomainMigrationInitializer(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
-        None,
         skipTrafficReconciliationTriggers = true,
         packageVersionSupport = packageVersionSupport,
       )

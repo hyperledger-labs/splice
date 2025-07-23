@@ -47,14 +47,12 @@ import { useSvConfig } from '../../utils';
 import { hasConflictingFields } from '../../utils/configDiffs';
 import { isValidUrl } from '../../utils/validations';
 import SvListVoteRequests from './SvListVoteRequests';
-import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
+import CreateUnallocatedUnclaimedActivityRecord from './actions/CreateUnallocatedUnclaimedActivityRecord';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardSv from './actions/OffboardSv';
-import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetAmuletRulesConfig from './actions/SetAmuletRulesConfig';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
-import UpdateFutureAmuletConfigSchedule from './actions/UpdateFutureAmuletConfigSchedule';
 import UpdateSvRewardWeight from './actions/UpdateSvRewardWeight';
 
 dayjs.extend(utc);
@@ -94,6 +92,7 @@ export const CreateVoteRequest: React.FC = () => {
   );
 
   const [isValidSynchronizerPauseTime, setIsValidSynchronizerPauseTime] = useState<boolean>(true);
+  const [isValidAmount, setIsValidAmount] = useState<boolean>(true);
 
   useEffect(() => {
     setExpiration(expirationFromVoteRequestTimeout);
@@ -125,6 +124,10 @@ export const CreateVoteRequest: React.FC = () => {
     { name: 'Set Dso Rules Configuration', value: 'SRARC_SetConfig' },
     { name: 'Set Amulet Rules Configuration', value: 'CRARC_SetConfig' },
     { name: 'Update SV Reward Weight', value: 'SRARC_UpdateSvRewardWeight' },
+    {
+      name: 'Create Unclaimed Activity Record',
+      value: 'SRARC_CreateUnallocatedUnclaimedActivityRecord',
+    },
   ];
 
   const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
@@ -222,6 +225,11 @@ export const CreateVoteRequest: React.FC = () => {
     {
       disabled: !isValidSynchronizerPauseTime,
       reason: 'Synchronizer upgrade time is before the expiry/effective date',
+      severity: 'warning' as AlertColor,
+    },
+    {
+      disabled: !isValidAmount,
+      reason: 'Amount must be a positive number',
       severity: 'warning' as AlertColor,
     },
     // keep this as the last condition
@@ -377,19 +385,17 @@ export const CreateVoteRequest: React.FC = () => {
             />
           )}
           {actionName === 'CRARC_SetConfig' && <SetAmuletRulesConfig chooseAction={chooseAction} />}
-          {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
-            <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
-          )}
-          {actionName === 'CRARC_RemoveFutureAmuletConfigSchedule' && (
-            <RemoveFutureAmuletConfigSchedule chooseAction={chooseAction} />
-          )}
-          {actionName === 'CRARC_UpdateFutureAmuletConfigSchedule' && (
-            <UpdateFutureAmuletConfigSchedule chooseAction={chooseAction} />
-          )}
           {actionName === 'SRARC_UpdateSvRewardWeight' && (
             <UpdateSvRewardWeight chooseAction={chooseAction} action={action} />
           )}
-
+          {actionName === 'SRARC_CreateUnallocatedUnclaimedActivityRecord' && (
+            <CreateUnallocatedUnclaimedActivityRecord
+              chooseAction={chooseAction}
+              action={action}
+              effectivity={effectivity}
+              setIsValidAmount={setIsValidAmount}
+            />
+          )}
           <Typography variant="h5">Proposal</Typography>
 
           <Stack direction="column" mb={4} spacing={1}>

@@ -40,9 +40,14 @@ import {
   ansDomainPrefix,
   failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
-import { installParticipant } from 'splice-pulumi-common-validator';
+import {
+  installParticipant,
+  ValidatorNodeConfig,
+  ValidatorNodeConfigSchema,
+} from 'splice-pulumi-common-validator';
 import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
+import { clusterSubConfig } from '../../common/src/config/configLoader';
 import {
   VALIDATOR_MIGRATE_PARTY,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
@@ -137,6 +142,10 @@ type ValidatorConfig = {
   nodeIdentifier: string;
 };
 
+export const validatorNodeConfig: ValidatorNodeConfig = ValidatorNodeConfigSchema.parse(
+  clusterSubConfig('validator')
+);
+
 async function installValidator(validatorConfig: ValidatorConfig): Promise<InstalledHelmChart> {
   const {
     xns,
@@ -170,14 +179,13 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     supportsValidatorRunbookReset
   );
   const participantAddress = installParticipant(
+    validatorNodeConfig,
     DecentralizedSynchronizerUpgradeConfig.active.id,
     xns,
     auth0Client.getCfg(),
     validatorConfig.nodeIdentifier,
-    undefined,
     activeVersion,
     postgres,
-    undefined,
     {
       dependsOn: imagePullDeps.concat([postgres]),
       // aliases and ignore can be removed once base version > 0.2.1

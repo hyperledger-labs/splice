@@ -1,0 +1,62 @@
+[
+  {
+    "contractId": "51",
+    "payload": {
+      "meta": {
+        "values": {}
+      },
+      "originalInstructionCid": null,
+      "status": {
+        "tag": "TransferPendingReceiverAcceptance",
+        "value": {}
+      },
+      "transfer": {
+        "amount": "1000.0000000000",
+        "executeBefore": "2025-06-18T00:00:00.000000Z",
+        "inputHoldingCids": [
+          "0"
+        ],
+        "instrumentId": {
+          "admin": "dso::normalized",
+          "id": "Amulet"
+        },
+        "meta": {
+          "values": {}
+        },
+        "receiver": "bob::normalized",
+        "requestedAt": "2025-06-18T00:00:00.000000Z",
+        "sender": "alice::normalized"
+      }
+    }
+  },
+  {
+    "contractId": "68",
+    "payload": {
+      "meta": {
+        "values": {}
+      },
+      "originalInstructionCid": null,
+      "status": {
+        "tag": "TransferPendingReceiverAcceptance",
+        "value": {}
+      },
+      "transfer": {
+        "amount": "200.0000000000",
+        "executeBefore": "2025-06-18T00:00:00.000000Z",
+        "inputHoldingCids": [
+          "69"
+        ],
+        "instrumentId": {
+          "admin": "dso::normalized",
+          "id": "Amulet"
+        },
+        "meta": {
+          "values": {}
+        },
+        "receiver": "alice::normalized",
+        "requestedAt": "2025-06-18T00:00:00.000000Z",
+        "sender": "bob::normalized"
+      }
+    }
+  }
+]

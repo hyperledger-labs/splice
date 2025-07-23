@@ -8,10 +8,10 @@ import {
   CLUSTER_BASENAME,
   DomainMigrationIndex,
   ExactNamespace,
+  GcpServiceAccount,
   KmsConfig,
   loadYamlFromFile,
   SPLICE_ROOT,
-  GcpServiceAccount,
 } from 'splice-pulumi-common';
 
 export type ParticipantKmsHelmResources = {

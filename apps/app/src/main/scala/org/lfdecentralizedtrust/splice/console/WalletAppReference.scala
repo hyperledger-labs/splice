@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.console
 
 import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletallocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -31,6 +32,7 @@ import com.digitalasset.canton.console.Help
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationv1,
   transferinstructionv1,
@@ -559,6 +561,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("Withdraws an AmuletAllocation")
+  @Help.Description(
+    "Withdraw an AmuletAllocation, which is an implementation of the Allocation Token Standard for Amulet."
+  )
+  def withdrawAmuletAllocation(contractId: amuletallocationCodegen.AmuletAllocation.ContractId) = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.WithdrawAmuletAllocation(contractId))
+    }
+  }
+
   @Help.Summary("Lists all AmuletAllocations")
   @Help.Description(
     "Lists all AmuletAllocation contracts, which are an implementation of the Allocation Token Standard for Amulet."
@@ -576,6 +588,16 @@ abstract class WalletAppReference(
   def listAllocationRequests() = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.ListAllocationRequests)
+    }
+  }
+
+  @Help.Summary("Reject AllocationRequest")
+  @Help.Description(
+    "Exercises the choice AllocationRequest_Reject from the Token Standard on the passed contract id."
+  )
+  def rejectAllocationRequest(id: AllocationRequest.ContractId) = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.RejectAllocationRequest(id))
     }
   }
 }

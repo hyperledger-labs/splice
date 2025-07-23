@@ -3,7 +3,7 @@ validator1:
     type: gcp
     locationId: us-central1
     projectId: da-cn-devnet
-    keyRingId: validator1_test
+    keyRingId: validator1_mock
 multiValidator:
   postgresPvcSize: '100Gi'
   # Dummy values for testing
@@ -15,6 +15,10 @@ multiValidator:
   extraParticipantEnvVars:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
       value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
+sv:
+  synchronizer:
+    skipInitialization: true
+    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
@@ -74,19 +78,14 @@ monitoring:
       cloudSql:
         maintenance: true
     logAlerts:
+      # These are mock values and in no way recommendations
       forCometBft: |
-        -- TODO(DACH-NY/canton-network-internal#475): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3
         -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")
       forNonTAPS: |
-        -- TODO(#979): Can happen due to random disconnects/reconnects but also in other contexts
         -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
-        -- TODO(DACH-NY/canton-network-node#17025): Stop ignoring these again once we have topology-aware package selection
         -(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))
         -(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")
-      # making this condition more complicated causes GCP to be unable to parse
-      # the query because there's too many filters
       missingConfiguredCardinality: |
-        -- TODO(#447): remove this once configured cardinality is respected
         -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
 operatorDeployment:
   reference:
@@ -102,3 +101,14 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
+svs:
+  # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
+  sv-2:
+    logging:
+      appsLogLevel: INFO
+      cantonLogLevel: INFO
+  sv-3:
+    participant:
+      kms:
+        keyRingId: sv-3_participant_mock
+        locationId: us-central1

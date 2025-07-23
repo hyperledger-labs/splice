@@ -40,7 +40,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
   const hasExpired = dayjs(votingInformation.votingCloses).isBefore(now());
   const isEffective =
     votingInformation.voteTakesEffect && dayjs(votingInformation.voteTakesEffect).isBefore(now());
-  const isClosed = hasExpired || isEffective || votingInformation.status === 'Rejected';
+  const isClosed =
+    !proposalDetails.isVoteRequest ||
+    hasExpired ||
+    isEffective ||
+    votingInformation.status === 'Rejected';
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
 
@@ -104,11 +108,6 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
         </Box>
 
         <Paper sx={{ bgcolor: 'background.paper', p: 6 }}>
-          {/* Proposal Details Section */}
-          {/* <Typography variant="h6" component="h2" gutterBottom sx={{ mb: 3 }}> */}
-          {/*   Proposal Details */}
-          {/* </Typography> */}
-
           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
             <DetailItem
               label="Action"

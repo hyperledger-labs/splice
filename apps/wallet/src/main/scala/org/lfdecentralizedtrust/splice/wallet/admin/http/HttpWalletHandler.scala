@@ -35,6 +35,7 @@ import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
 import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
 import org.lfdecentralizedtrust.splice.util.{
+  ChoiceContextWithDisclosures,
   Codec,
   ContractWithState,
   DisclosedContracts,
@@ -64,8 +65,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationi
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.AnyContract
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
-  allocationv1,
   allocationrequestv1,
+  allocationv1,
   holdingv1,
   metadatav1,
   transferinstructionv1,
@@ -1130,6 +1131,57 @@ class HttpWalletHandler(
       Codec.encode(SpliceUtil.currentAmount(lockedAmulet.payload.amulet, round)),
     )
 
+  override def withdrawAmuletAllocation(
+      respond: WalletResource.WithdrawAmuletAllocationResponse.type
+  )(
+      contractId: String
+  )(tUser: TracedUser): Future[WalletResource.WithdrawAmuletAllocationResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.withdrawAmuletAllocation") { implicit traceContext => _ =>
+      val allocationCid = Codec.tryDecodeJavaContractId(
+        amuletAllocationCodegen.AmuletAllocation.COMPANION
+      )(
+        contractId
+      )
+      for {
+        wallet <- getUserWallet(user)
+        store = wallet.store
+        allocation <- store.multiDomainAcsStore
+          .getContractById(
+            amuletAllocationCodegen.AmuletAllocation.COMPANION
+          )(allocationCid)
+          .map(
+            _.toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"AmuletAllocation is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        context <- scanConnection.getAllocationWithdrawContext(
+          allocation.contractId.toInterface(allocationv1.Allocation.INTERFACE)
+        )
+        result <- wallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            allocation.exercise(
+              _.toInterface(allocationv1.Allocation.INTERFACE)
+                .exerciseAllocation_Withdraw(context.toExtraArgs())
+            ),
+          )
+          .noDedup
+          .withSynchronizerId(allocation.domain)
+          .withDisclosedContracts(DisclosedContracts.fromProto(context.disclosedContracts))
+          .yieldResult()
+      } yield WalletResource.WithdrawAmuletAllocationResponseOK(
+        d0.AmuletAllocationWithdrawResult(
+          result.exerciseResult.senderHoldingCids.asScala.map(_.contractId).toVector,
+          result.exerciseResult.meta.values.asScala.toMap,
+        )
+      )
+    }
+  }
+
   private[this] def getUserTreasury(user: String)(implicit
       tc: TraceContext
   ): Future[TreasuryService] =
@@ -1234,6 +1286,56 @@ class HttpWalletHandler(
           .map(_.toHttp)
           .toVector
           .map(d0.AllocationRequest(_))
+      )
+    }
+  }
+
+  override def rejectAllocationRequest(
+      respond: WalletResource.RejectAllocationRequestResponse.type
+  )(
+      contractId: String
+  )(tUser: TracedUser): Future[WalletResource.RejectAllocationRequestResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    withSpan(s"$workflowId.rejectAllocationRequest") { implicit traceContext => _ =>
+      val allocationRequestCid = Codec.tryDecodeJavaContractIdInterface(
+        allocationrequestv1.AllocationRequest.INTERFACE
+      )(
+        contractId
+      )
+      for {
+        wallet <- getUserWallet(user)
+        store = wallet.store
+        allocationRequest <- store.multiDomainAcsStore
+          .findInterfaceViewByContractId(
+            allocationrequestv1.AllocationRequest.INTERFACE
+          )(allocationRequestCid)
+          .map(
+            _.getOrElse(
+              throw Status.NOT_FOUND
+                .withDescription(s"No AllocationRequest with contract id $contractId found.")
+                .asRuntimeException()
+            ).toAssignedContract.getOrElse(
+              throw Status.Code.FAILED_PRECONDITION.toStatus
+                .withDescription(s"AmuletAllocation is not assigned to a synchronizer.")
+                .asRuntimeException()
+            )
+          )
+        result <- wallet.connection
+          .submit(
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            Seq.empty,
+            allocationRequest.exercise(
+              _.exerciseAllocationRequest_Reject(
+                store.key.endUserParty.toProtoPrimitive,
+                ChoiceContextWithDisclosures.emptyExtraArgs,
+              )
+            ),
+          )
+          .noDedup
+          .withSynchronizerId(allocationRequest.domain)
+          .yieldResult()
+      } yield WalletResource.RejectAllocationRequestResponseOK(
+        d0.ChoiceExecutionMetadata(result.exerciseResult.meta.values.asScala.toMap)
       )
     }
   }

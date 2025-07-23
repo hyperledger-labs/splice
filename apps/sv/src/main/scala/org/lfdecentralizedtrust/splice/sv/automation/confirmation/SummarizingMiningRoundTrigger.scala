@@ -90,6 +90,7 @@ class SummarizingMiningRoundTrigger(
   override def completeTask(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val round = task.summarizingRound.contract.payload.round.number
     for {
       dsoRules <- store.getDsoRules()
       action = amuletRulesStartIssuingAction(
@@ -107,7 +108,7 @@ class SummarizingMiningRoundTrigger(
         case QueryResult(_, Some(_)) =>
           Future.successful(
             TaskSuccess(
-              s"skipping as confirmation from ${svParty} is already created for such action"
+              s"skipping as confirmation from ${svParty} is already created for summarizing round ${round}"
             )
           )
         case QueryResult(offset, None) =>
@@ -128,7 +129,7 @@ class SummarizingMiningRoundTrigger(
             .yieldUnit()
             .map { _ =>
               TaskSuccess(
-                s"created confirmation for summarizing mining round"
+                s"created confirmation for summarizing mining round ${round}"
               )
             }
       }

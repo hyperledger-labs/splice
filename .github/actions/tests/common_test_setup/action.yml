@@ -14,10 +14,10 @@ inputs:
     default: "false"
   artifactory_user:
     description: "The Artifactory user"
-    required: true
+    required: false
   artifactory_password:
     description: "The Artifactory password"
-    required: true
+    required: false
   oss_only:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
@@ -31,6 +31,13 @@ outputs:
 runs:
   using: "composite"
   steps:
+
+    - name: Validate input
+      if: inputs.oss_only != 'true' && (inputs.artifactory_password == '' || inputs.artifactory_user == '')
+      shell: bash
+      run: |
+        echo "artifactory_user and artifactory_password must be provided if not using OSS only dependencies."
+        exit 1
 
     - name: Publish test name metric
       uses: miguelteixeiraa/action-run-in-background@e28f036c202e9066287e6a50ce8b80749627cc7d # v1.0.0

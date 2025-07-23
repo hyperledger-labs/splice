@@ -52,10 +52,7 @@ class DsoDelegateBasedAutomationService(
     if (config.automation.enableDsoGovernance) {
       registerTrigger(
         new ExecuteConfirmedActionTrigger(
-          // `ExecuteConfirmedActionTrigger` attempts multiple times the same action when these rely on a threshold of
-          // confirmations. As it does not need a high throughput (mostly runs every 10 minutes), we lower the parallelism
-          // to 1 to avoid such contention.
-          triggerContext.copy(config = triggerContext.config.copy(parallelism = 1)),
+          triggerContext,
           svTaskContext,
         )
       )
@@ -84,9 +81,6 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new ExpiredAnsSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new MergeSvRewardStateContractsTrigger(triggerContext, svTaskContext))
-    registerTrigger(
-      new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext)
-    )
 
     registerTrigger(
       new MergeValidatorLicenseContractsTrigger(
@@ -149,7 +143,6 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredAnsSubscriptionTrigger],
     aTrigger[TerminatedSubscriptionTrigger],
     aTrigger[MergeSvRewardStateContractsTrigger],
-    aTrigger[PruneAmuletConfigScheduleTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
     aTrigger[FeaturedAppActivityMarkerTrigger],
     aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],

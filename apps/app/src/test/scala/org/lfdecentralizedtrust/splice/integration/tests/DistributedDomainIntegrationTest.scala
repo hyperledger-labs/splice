@@ -46,9 +46,9 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
     }
 
     clue("SV participants are connected to all sequencers") {
-      eventually(60.seconds) {
-        forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-          clue(s"sv ${sv.name} is connected to all sequencers") {
+      forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
+        clue(s"sv ${sv.name} is connected to all sequencers") {
+          eventually(60.seconds) {
             val synchronizerConfig = sv.participantClient.synchronizers
               .config(decentralizedSynchronizer)
               .value

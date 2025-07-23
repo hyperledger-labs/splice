@@ -3,13 +3,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
-import {
-  config,
-  loadJsonFromFile,
-  PRIVATE_CONFIGS_PATH,
-  clusterDirectory,
-} from 'splice-pulumi-common';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
+import { config, loadJsonFromFile, externalIpRangesFile } from 'splice-pulumi-common';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
@@ -24,6 +18,9 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      delegatelessContention: z.object({
+        thresholdPerNamespace: z.number(),
+      }),
       trafficWaste: z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
@@ -38,7 +35,7 @@ const MonitoringConfigSchema = z.object({
         minRate: z.number(),
       }),
     }),
-    logAlerts: z.object({}).catchall(z.string()),
+    logAlerts: z.object({}).catchall(z.string()).default({}),
   }),
 });
 export const InfraConfigSchema = z.object({
@@ -52,6 +49,9 @@ export const InfraConfigSchema = z.object({
       storageSize: z.string(),
       retentionDuration: z.string(),
       retentionSize: z.string(),
+    }),
+    istio: z.object({
+      enableIngressAccessLogging: z.boolean(),
     }),
   }),
   monitoring: MonitoringConfigSchema,
@@ -82,17 +82,8 @@ function extractIpRanges(x: IpRangesDict): string[] {
 }
 
 export function loadIPRanges(): pulumi.Output<string[]> {
-  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !PRIVATE_CONFIGS_PATH) {
-    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
-  }
-
-  const externalIpRanges = spliceConfig.pulumiProjectConfig.isExternalCluster
-    ? extractIpRanges(
-        loadJsonFromFile(
-          `${PRIVATE_CONFIGS_PATH}/configs/${clusterDirectory}/allowed-ip-ranges.json`
-        )
-      )
-    : [];
+  const file = externalIpRangesFile();
+  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file)) : [];
 
   const internalWhitelistedIps = getSecretVersionOutput({
     secret: 'pulumi-internal-whitelists',

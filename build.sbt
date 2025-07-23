@@ -1022,7 +1022,9 @@ lazy val `apps-common-frontend` = {
           (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
           (`splice-dso-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
-          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
+          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
+          // not implemented by any daml code above
+          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
@@ -1187,7 +1189,7 @@ lazy val `apps-common-frontend` = {
         )
           BuildCommon.TS.runWorkspaceCommand(npmRootDir.value, "build", workspace, log)
         runCommand(
-          Seq("npm-run-parallel", "test:sbt"),
+          Seq("npm", "run", "test:sbt", "--workspaces", "--if-present"),
           log,
           None,
           Some(npmRootDir.value),
@@ -1802,6 +1804,7 @@ printTests := {
   def isFrontEndTest(name: String): Boolean = name.contains("Frontend")
   def isNonDevNetTest(name: String): Boolean = name.contains("NonDevNet")
   def isPreflightIntegrationTest(name: String): Boolean = name.contains("PreflightIntegrationTest")
+  def isEnterpriseIntegrationTest(name: String): Boolean = name.contains("Enterprise")
 
   def isIntegrationTest(name: String): Boolean =
     name.contains("org.lfdecentralizedtrust.splice.integration.tests") || name.contains(
@@ -1964,6 +1967,11 @@ printTests := {
       "tests with wall clock time using CometBFT",
       "test-cometbft-full-class-names.log",
       (t: String) => !isTimeBasedTest(t) && !isFrontEndTest(t) && isCometBftTest(t),
+    ),
+    (
+      "tests requiring Canton Enterprise",
+      "test-full-class-names-canton-enterprise.log",
+      (t: String) => isEnterpriseIntegrationTest(t),
     ),
     (
       "tests with wall clock time",

@@ -1,5 +1,5 @@
 # Note that we don't currently support arm64 runners, so we build this only for amd64
-FROM --platform=$BUILDPLATFORM ubuntu:24.04
+FROM --platform=$BUILDPLATFORM ubuntu:24.04@sha256:440dcf6a5640b2ae5c77724e68787a906afb8ddee98bf86db94eea8528c2c076
 
 LABEL org.opencontainers.image.base.name="ubuntu:24.04"
 # TODO(#495): consider whether we can move some of the things installed here (and with pip below) into nix

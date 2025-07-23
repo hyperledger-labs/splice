@@ -40,14 +40,8 @@ interface BaseAnsFieldProps extends AnsFieldProps {
   ansEntry: UseQueryResult<AnsEntry>;
 }
 
-export const BaseAnsField: React.FC<BaseAnsFieldProps> = ({
-  userInput,
-  updateUserInput,
-  onPartyChanged,
-  ansEntries,
-  ansEntry,
-  ...props
-}) => {
+export const BaseAnsField: React.FC<BaseAnsFieldProps> = propas => {
+  const { userInput, updateUserInput, onPartyChanged, ansEntries, ansEntry, ...props } = propas;
   const [resolvedPartyId, setResolvedPartyId] = React.useState<string>('');
   const nameServiceAcronym =
     window.splice_config.spliceInstanceNames?.nameServiceNameAcronym.toLowerCase();
@@ -60,8 +54,11 @@ export const BaseAnsField: React.FC<BaseAnsFieldProps> = ({
       setResolvedPartyId(party);
     };
     const ansEntryParty = ansEntry.data?.user || userInput.value;
-    setPartyAndNotify(ansEntryParty);
-  }, [userInput, ansEntry, onPartyChanged]);
+    if (resolvedPartyId !== ansEntryParty) {
+      // prevent infinite loop
+      setPartyAndNotify(ansEntryParty);
+    }
+  }, [userInput, ansEntry, resolvedPartyId, onPartyChanged]);
 
   const onInputChange = async (_: React.SyntheticEvent, newValue: string, reason: string) => {
     if (reason === 'reset') {
