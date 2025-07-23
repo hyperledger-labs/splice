@@ -24,6 +24,7 @@ runs:
   using: 'composite'
   steps:
     - name: Restore nix
+      id: restore_nix
       shell: bash
       run: |
         set -euxo pipefail
@@ -51,6 +52,8 @@ runs:
           sudo chown $(whoami):$(whoami) "/cache/nix/$cache_key"
           sudo chown $(whoami):$(whoami) "/cache/nix"
         fi
+
+        echo "cache_key=$cache_key" >> $GITHUB_OUTPUT
     - name: Setup Nix
       shell: bash
       run: |
@@ -151,18 +154,8 @@ runs:
             echo "done" > "/cache/nix/$cache_key/cached"
           fi
 
-    - name: Print cache sizes
-      shell: bash
-      run: |
-          set -euxo pipefail
-          echo "Nix cache size:"
-          du -sh /cache/nix/binary_cache || true
-          echo "Nix store size:"
-          du -sh /nix/store || true
-          echo "Nix var size:"
-          du -sh /nix/var || true
-          echo "Nix home size:"
-          du -sh $HOME/.nix-profile || true
-          cache_key=($(md5sum "/tmp/nix-cache-key"))
-          echo "nix cache for key $cache_key size:"
-          du -sh "/cache/nix/$cache_key" || true
+    - name: Upload nix cache
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: nix-cache
+        path: /cache/nix/${{ steps.restore_nix.outputs.cache_key }}

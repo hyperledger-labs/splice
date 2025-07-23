@@ -15,9 +15,16 @@ permissions:
   # actions: write # To cancel itself if not opted in
 
 jobs:
-  static_tests:
-    uses: ./.github/workflows/build.static_tests.yml
-    secrets: inherit
-    with:
-      commit_sha: '' # FIXME: do we ever need a different value here?
-      runs_on: ubuntu-24.04
+
+  no_op:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No-op job
+        run: echo "This is a no-op job for WIP PRs."
+
+  # static_tests:
+  #   uses: ./.github/workflows/build.static_tests.yml
+  #   secrets: inherit
+  #   with:
+  #     commit_sha: '' # FIXME: do we ever need a different value here?
+  #     runs_on: ubuntu-24.04
