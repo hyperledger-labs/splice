@@ -704,7 +704,7 @@ Refer to the Canton documentation for more details on participant pruning:
     :end-before: PARTICIPANT_PRUNING_SCHEDULE_END
 
 Configuring init containers
--------------------
+---------------------------
 
 If you need to configure init containers on the participant or validator deployments, you can use the following helm
 values for ``splice-participant`` or ``splice-validator``:
