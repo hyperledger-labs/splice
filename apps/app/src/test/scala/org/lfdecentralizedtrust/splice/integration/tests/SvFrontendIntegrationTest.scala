@@ -1121,6 +1121,92 @@ class SvFrontendIntegrationTest
 
       }
     }
+
+    "can create valid SRARC_CreateUnallocatedUnclaimedActivityRecord vote requests" in {
+      implicit env =>
+        val requestReasonUrl = "https://vote-request-url.com"
+        val requestReasonBody = "This is a request reason."
+
+        val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+        val amount = "1000"
+        val reason = "Granting reward for activity"
+
+        withFrontEnd("sv1") { implicit webDriver =>
+          actAndCheck(
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
+            },
+          )(
+            "sv1 can see the create vote request button",
+            _ => {
+              find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
+            },
+          )
+
+          click on "tab-panel-in-progress"
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+
+          actAndCheck(
+            "sv1 operator can create a new vote request", {
+              changeAction("SRARC_CreateUnallocatedUnclaimedActivityRecord")
+
+              inside(find(id("create-beneficiary"))) { case Some(element) =>
+                element.underlying.sendKeys(beneficiary)
+              }
+              inside(find(id("create-amount"))) { case Some(element) =>
+                element.underlying.sendKeys(amount)
+              }
+              inside(find(id("create-reason"))) { case Some(element) =>
+                element.underlying.sendKeys(reason)
+              }
+
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+              clue("sv1 operator can't click submit before adding a summary") {
+                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
+              }
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+
+              clickVoteRequestSubmitButtonOnceEnabled()
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              click on "tab-panel-in-progress"
+
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              inside(tbody) { case Some(tb) =>
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+                rows.size shouldBe previousVoteRequestsInProgress + 1
+                (
+                  rows.head.text,
+                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
+                )
+              }
+            },
+          )
+
+          actAndCheck(
+            "sv1 operator can see the vote request detail by clicking review button", {
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
+            },
+          )(
+            "sv1 can see the new vote request detail",
+            _ => {
+              inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                tb.text
+              }
+            },
+          )
+        }
+    }
   }
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
