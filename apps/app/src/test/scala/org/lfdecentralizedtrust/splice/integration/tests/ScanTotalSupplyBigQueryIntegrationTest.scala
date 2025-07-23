@@ -373,7 +373,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     case INTEGER => TFS.Type.INT64
     case TIMESTAMP => TFS.Type.TIMESTAMP
     case BOOLEAN => TFS.Type.BOOL
-    case JSON => TFS.Type.STRING
+    case JSON => TFS.Type.JSON
     case _ => throw new IllegalArgumentException(s"Unsupported type: $legacyType")
   }
 
