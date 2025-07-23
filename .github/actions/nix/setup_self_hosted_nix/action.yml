@@ -170,3 +170,4 @@ runs:
       with:
         name: nix-cache
         path: /tmp/nix-upload
+        retention-days: 1
