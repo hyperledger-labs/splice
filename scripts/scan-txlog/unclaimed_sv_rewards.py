@@ -53,6 +53,12 @@ def _default_logger(name, loglevel):
 # Global logger, always accessible
 LOG = _default_logger("global", "INFO")
 
+def non_negative_int(value):
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"{value} is invalid: must be a non-negative integer")
+    return ivalue
+
 def _parse_cli_args() -> argparse.Namespace:
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -106,8 +112,14 @@ def _parse_cli_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--weight",
-        type=int,
+        type=non_negative_int,
         help="Weight of sv coupon rewards to consider",
+        required=True,
+    )
+    parser.add_argument(
+        "--already-minted-weight",
+        type=non_negative_int,
+        help="Weight already minted for the time range provided",
         required=True,
     )
     return parser.parse_args()
@@ -471,6 +483,7 @@ class State:
     create_sv_reward_end_record_time: datetime
     pagination_key: PaginationKey
     weight: int
+    already_minted_weight: int
     reward_summary: RewardSummary
 
     @classmethod
@@ -503,6 +516,7 @@ class State:
             create_sv_reward_end_record_time = datetime.fromisoformat(args.end_record_time),
             pagination_key=pagination_key,
             weight = args.weight,
+            already_minted_weight = args.already_minted_weight,
             reward_summary = reward_summary,
         )
 
@@ -639,8 +653,9 @@ class State:
         self.process_events(transaction, event.child_event_ids)
 
     def _verify_weight(self, reward):
-        if self.weight > reward.weight:
-            msg = f"Invalid weight input: {self.weight} must be less than or equal to {reward.weight}"
+        available_weight = reward.weight - self.already_minted_weight
+        if self.weight > available_weight:
+            msg = f"Invalid weight input: {self.weight} must be less than or equal to {available_weight}"
             self._fail(msg)
 
     def _fail_with_missing_round(self, reward):

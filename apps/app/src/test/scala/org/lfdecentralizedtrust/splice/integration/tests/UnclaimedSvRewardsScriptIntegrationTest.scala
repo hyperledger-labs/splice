@@ -191,8 +191,11 @@ class UnclaimedSvRewardsScriptIntegrationTest
                 beginRecordTime.toString,
                 "--end-record-time",
                 endRecordTime.toString,
+                // Invalid weight: weight > sv1TotalWeight - already-minted-weight
                 "--weight",
-                (sv1TotalWeight + 1).toString, // Invalid weight
+                (sv1TotalWeight - 1).toString,
+                "--already-minted-weight",
+                2.toString,
               )
             )
             .run(errorProcessor)
@@ -233,6 +236,8 @@ class UnclaimedSvRewardsScriptIntegrationTest
                 endRecordTime.toString,
                 "--weight",
                 weight.toString,
+                "--already-minted-weight",
+                weight.toString, // Note: weight = sv1TotalWeight / 2
               )
             )
             .!(errorProcessor)
