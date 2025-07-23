@@ -3,7 +3,6 @@
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
-// TODO(#459): remove unused flags
 export const AutomationSchema = z.object({
   automation: z
     .object({

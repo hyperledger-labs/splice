@@ -32,12 +32,12 @@ class BootstrapPackageConfigDarUploadIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.8",
-    amuletNameServiceVersion = "0.1.8",
-    dsoGovernanceVersion = "0.1.11",
-    validatorLifecycleVersion = "0.1.2",
-    walletVersion = "0.1.8",
-    walletPaymentsVersion = "0.1.8",
+    amuletVersion = "0.1.9",
+    amuletNameServiceVersion = "0.1.9",
+    dsoGovernanceVersion = "0.1.13",
+    validatorLifecycleVersion = "0.1.3",
+    walletVersion = "0.1.9",
+    walletPaymentsVersion = "0.1.9",
   )
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
