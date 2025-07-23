@@ -2,8 +2,10 @@ module Splice.MintingDelegation where
 
 import DA.Assert
 import DA.Time
+import Splice.AmuletConfig
 import Splice.AmuletRules
 import Splice.Round
+import Splice.Schedule
 import Splice.Types
 import Splice.Util
 import Splice.ValidatorLicense
@@ -19,12 +21,17 @@ template MintingDelegationProposal
     observer delegate
 
     choice MintingDelegationProposal_Accept : MintingDelegationProposal_AcceptResult
+      with
+        amuletRulesCid : ContractId AmuletRules
       controller delegate
-      do MintingDelegationProposal_AcceptResult <$> create MintingDelegation with
+      do now <- getTime
+         amuletRules <- fetchReferenceData (ForDso dso) amuletRulesCid
+         let config = getValueAsOf now amuletRules.configSchedule
+         MintingDelegationProposal_AcceptResult <$> create MintingDelegation with
            dso
            beneficiary
            delegate
-           expiresAt
+           expiresAt = now `addRelTime` getMintingDelegationLifetime config
 
     choice MiningDelegationProposal_Reject : ()
       controller delegate
@@ -65,13 +72,11 @@ template MintingDelegation
         context : PaymentTransferContext
       controller delegate
       do assertWithinDeadline "expiresAt" expiresAt
-         -- require "Minting is unfeatured" (context.context.featuredAppRightCid == None)
-         -- TODO: do we want to allow amulet inputs? Seems like other than contention there is no real downside and merging
-         -- usually is still reasonable.
+         require "Minting is unfeatured" (context.context.featuredAppRight == None)
          exercise context.amuletRules AmuletRules_Transfer with
            transfer = Transfer with
              sender = beneficiary
-             provider = beneficiary -- TODO: consider whether the provider should be the delegate, perhaps irrelevant if fees go to zero
+             provider = delegate
              inputs
              outputs = []
              beneficiaries = None
@@ -98,13 +103,14 @@ template MintingDelegation
     -- and force paying traffic to renew them to protect against attacks.
     choice MintingDelegation_Renew : ContractId MintingDelegation
       with
-        renewalDuration : RelTime
+        amuletRulesCid : ContractId AmuletRules
       controller delegate
-      do require ("renewalDuration " <> show renewalDuration <> " must be positive") (renewalDuration > seconds 0)
-         -- TODO: Consider making maximum renewalDuration configurable
-         require ("renewalDuration must not be more than 30 days " <> show renewalDuration <> " must be positive") (renewalDuration <= days 30)
-         -- TODO: Consider enforcing that this is "close" to expiry, e.g., not more than 10 days before expiry
-         create this with expiresAt = this.expiresAt `addRelTime` renewalDuration
+      do now <- getTime
+         amuletRules <- fetchReferenceData (ForDso dso) amuletRulesCid
+         let config = getValueAsOf now amuletRules.configSchedule
+         let mintingDelegationLifetime = getMintingDelegationLifetime config
+         assertDeadlineExceeded "earliest allowed renewal time" (expiresAt `addRelTime` microseconds (floor $ (-0.5) * intToDecimal (convertRelTimeToMicroseconds mintingDelegationLifetime)))
+         create this with expiresAt = this.expiresAt `addRelTime` getMintingDelegationLifetime config
 
 data MintingDelegationProposal_AcceptResult = MintingDelegationProposal_AcceptResult
   with

@@ -73,8 +73,10 @@ template ExternalPartyAmuletRules
         expiresAt : Time
       controller beneficiary
       do assertWithinDeadline "expiresAt" expiresAt
-         -- TODO: Consider making maximum expiration configurable
-         assertDeadlineExceeded "expiresAt" (expiresAt `addRelTime` days (-30))
+         -- We hardcode the maximum here as we want to avoid a dependency on
+         -- AmuletRules which has some contention on config changes
+         -- which works poorly with external parties.
+         assertDeadlineExceeded "expiresAt" (expiresAt `addRelTime` days (-7))
          ExternalPartyAmuletRules_CreateMintingDelegationProposalResult <$> create MintingDelegationProposal
            with
              dso

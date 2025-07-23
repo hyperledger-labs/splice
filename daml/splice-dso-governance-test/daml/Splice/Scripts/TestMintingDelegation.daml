@@ -40,7 +40,9 @@ testMintingDelegation = do
     delegate
     expiresAt = now `addRelTime` (days 30)
 
-  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept
+  (amuletRules, _) <- getAmuletRules app
+
+  MintingDelegationProposal_AcceptResult mintingDelegationCid <- submit delegate $ exerciseCmd proposalCid MintingDelegationProposal_Accept with amuletRulesCid = amuletRules
 
   (openRoundCid, _) <- getLatestOpenRound app
 
@@ -59,7 +61,6 @@ testMintingDelegation = do
   [] <- query @Amulet beneficiary
 
   context <- getTransferContext app beneficiaryUser None
-  (amuletRules, _) <- getAmuletRules app
 
   debug context
 

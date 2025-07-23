@@ -3,6 +3,7 @@
 
 module Splice.AmuletConfig where
 
+import DA.Optional
 import DA.Time
 
 import Splice.Fees
@@ -45,11 +46,19 @@ data AmuletConfig unit = AmuletConfig with
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
+    mintingDelegationLifetime : Optional RelTime
   deriving (Eq, Show)
 
 -- $1/year specified as a daily rate
 defaultTransferPreapprovalFee : Decimal
 defaultTransferPreapprovalFee = 0.00274
+
+defaultMintingDelegationLifetime : RelTime
+defaultMintingDelegationLifetime = days 30
+
+getMintingDelegationLifetime : AmuletConfig a -> RelTime
+getMintingDelegationLifetime AmuletConfig{mintingDelegationLifetime} =
+  fromOptional defaultMintingDelegationLifetime mintingDelegationLifetime
 
 -- Check constraints on config params on which the implementation of the choices rely.
 validAmuletConfig : AmuletConfig unit -> Bool
@@ -61,7 +70,8 @@ validAmuletConfig AmuletConfig
     , tickDuration
     , packageConfig
     , transferPreapprovalFee
-    , featuredAppActivityMarkerAmount}
+    , featuredAppActivityMarkerAmount
+    , mintingDelegationLifetime }
   =
     validTransferConfig transferConfig &&
     validIssuanceCurve issuanceCurve &&
@@ -69,7 +79,8 @@ validAmuletConfig AmuletConfig
     tickDuration > days 0 &&
     validPackageConfig packageConfig &&
     optional True (>= 0.0) transferPreapprovalFee &&
-    optional True (>= 0.0) featuredAppActivityMarkerAmount
+    optional True (>= 0.0) featuredAppActivityMarkerAmount &&
+    optional True (>= days 0) mintingDelegationLifetime
 
 validTransferConfig : TransferConfig unit -> Bool
 validTransferConfig TransferConfig
@@ -120,6 +131,7 @@ instance Patchable (AmuletConfig USD) where
     packageConfig = patch new.packageConfig base.packageConfig current.packageConfig
     transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
+    mintingDelegationLifetime = patch new.mintingDelegationLifetime base.mintingDelegationLifetime current.mintingDelegationLifetime
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with
