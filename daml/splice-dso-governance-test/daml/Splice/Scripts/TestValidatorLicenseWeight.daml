@@ -48,7 +48,7 @@ testValidatorLicenseWeight = do
 
   [(validatorLicenseCid, _)] <- query @ValidatorLicense validator
 
-  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense_ChangeWeight (DsoRules_ValidatorLicense_ChangeWeight validator 10)))
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] (ARC_DsoRules (SRARC_ValidatorLicense_ChangeWeight (DsoRules_ValidatorLicense_ChangeWeight validator 10.0)))
   [(instructionCid, _)] <- query @ValidatorLicense_ChangeWeight_Instruction dso
   submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_Execute_ValidatorLicense_ChangeWeight_Instruction with
     sv = sv1
@@ -56,7 +56,7 @@ testValidatorLicenseWeight = do
     instructionCid
 
   [(validatorLicenseCid, license)] <- query @ValidatorLicense validator
-  license.weight === Some 10
+  license.weight === Some 10.0
 
   (openRoundCid, _) <- getLatestOpenRound app
   submitMulti [validator] [dso] $ exerciseCmd validatorLicenseCid ValidatorLicense_RecordValidatorLivenessActivity

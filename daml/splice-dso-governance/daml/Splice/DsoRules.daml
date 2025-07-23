@@ -1501,7 +1501,7 @@ template DsoRules with
     nonconsuming choice DsoRules_ValidatorLicense_ChangeWeight : DsoRules_ValidatorLicense_ChangeWeightResult
       with
         validator : Party
-        weight : Int
+        weight : Decimal
       controller dso
       do DsoRules_ValidatorLicense_ChangeWeightResult <$> create ValidatorLicense_ChangeWeight_Instruction
            with
@@ -1858,10 +1858,10 @@ template ValidatorLicense_ChangeWeight_Instruction
   with
     dso : Party
     validator : Party
-    weight : Int
+    weight : Decimal
     -- TODO: expiry
   where
-    ensure weight >= 0
+    ensure weight >= 0.0
     signatory dso
 
 template ValidatorLicense_Withdraw_Instruction

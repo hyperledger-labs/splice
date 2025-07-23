@@ -57,11 +57,17 @@ data OpenMiningRoundSummary = OpenMiningRoundSummary with
     totalUnfeaturedAppRewardCoupons : Decimal
     totalSvRewardWeight : Int
     optTotalValidatorFaucetCoupons : Optional Int
+    optTotalValidatorLivenessActivityRecords : Optional Decimal -- ^ Replaces optTotalValidatorFaucetCoupons
       -- ^ Introduced as part of CIP-3.
   deriving (Eq, Show)
 
-getTotalValidatorFaucetCoupons : OpenMiningRoundSummary -> Int
-getTotalValidatorFaucetCoupons = fromOptional 0 . (.optTotalValidatorFaucetCoupons)
+getTotalValidatorFaucetCoupons : OpenMiningRoundSummary -> Decimal
+getTotalValidatorFaucetCoupons OpenMiningRoundSummary{optTotalValidatorLivenessActivityRecords, optTotalValidatorFaucetCoupons} =
+  case (optTotalValidatorLivenessActivityRecords, optTotalValidatorFaucetCoupons) of
+    (Some _, Some _) -> error "Only optTotalValidatorLivenessActivityRecords or optTotalValidatorFaucetCoupons must be set but not both"
+    (Some a, None) -> a
+    (None, Some a) -> intToDecimal a
+    (None, None) -> 0.0
 
 -- | Parameters to use in a round that issues amulet as rewards for collected coupons.
 data IssuingRoundParameters = IssuingRoundParameters with
@@ -80,7 +86,7 @@ validateOpenMiningRoundSummary summary = do
     require "totalValidatorRewardCoupons >= 0.0" (summary.totalValidatorRewardCoupons >= 0.0)
     require "totalFeaturedAppRewardCoupons >= 0.0" (summary.totalFeaturedAppRewardCoupons >= 0.0)
     require "totalUnfeaturedAppRewardCoupons >= 0.0" (summary.totalUnfeaturedAppRewardCoupons >= 0.0)
-    require "totalValidatorFaucetCoupons >= 0" (getTotalValidatorFaucetCoupons summary >= 0)
+    require "totalValidatorFaucetCoupons >= 0" (getTotalValidatorFaucetCoupons summary >= 0.0)
 
 computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
 computeIssuingRoundParameters tickDuration amuletPrice config summary =
@@ -123,7 +129,7 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
     validatorFaucetIssuance = computeIssuanceTranche
       validatorRewardIssuance.unclaimedRewards
       (getValidatorFaucetCap config / amuletPrice)
-      (intToDecimal $ getTotalValidatorFaucetCoupons summary)
+      (getTotalValidatorFaucetCoupons summary)
 
     unfeaturedAppIssuance = computeIssuanceTranche
       (amuletsToIssueInRound * config.appRewardPercentage)
