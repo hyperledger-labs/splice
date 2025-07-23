@@ -36,6 +36,7 @@ import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCod
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 
+import scala.concurrent.{Future, blocking}
 import scala.util.{Success, Try}
 
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
@@ -741,6 +742,25 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     sequencer.url should be("http://testUrl:8081")
     sequencer.migrationId should be(0)
     sequencer.id shouldBe sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
+  }
+
+  "respect rate limit" in { implicit env =>
+    import env.{actorSystem, executionContext}
+
+    val results = SpliceRateLimiterTest
+      .runRateLimited(
+        3,
+        30,
+      ) {
+        Future {
+          blocking {
+            sv1ScanBackend.forceAcsSnapshotNow()
+          }
+        }
+      } futureValue
+
+    results.count(identity) should be(20 +- 1)
+
   }
 
   def expectedSenderFee(amount: BigDecimal) = {
