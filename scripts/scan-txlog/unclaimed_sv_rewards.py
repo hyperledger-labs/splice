@@ -718,6 +718,11 @@ async def main():
         f"active_closed_rounds count: {len(app_state.active_closed_rounds)}"
     )
 
+    assert not app_state.active_rewards, (
+        "Some rewards remain unclaimed. The provided grace-period-for-mining-rounds-in-minutes "
+        "might be too short to include all relevant mining rounds."
+    )
+
     reward_summary = app_state.reward_summary
 
     LOG.info(f"reward_expired_count = {reward_summary.reward_expired_count}")

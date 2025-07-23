@@ -68,8 +68,8 @@ class UnclaimedSvRewardsScriptIntegrationTest
 
       val svRewardCouponsCount = 6L
       val svRewardCouponsExpiredCount = 3L
-      val svRewardCouponsClaimedCount = 1L
-      val svRewardCouponsUnclaimedCount = 2L
+      val svRewardCouponsClaimedCount = 3L
+      val svRewardCouponsUnclaimedCount = 0L
 
       val sv1Name = sv1Backend.config.onboarding.map(_.name).getOrElse(fail("sv1 name not found"))
       val sv1TotalWeight: Long =
@@ -99,6 +99,9 @@ class UnclaimedSvRewardsScriptIntegrationTest
           svRewardCoupons
         },
       )
+      // The script will consider all reward coupons created
+      val endRecordTime = Instant.now()
+
       receiveSvRewardCouponTrigger.pause().futureValue
 
       // Expire
@@ -128,10 +131,10 @@ class UnclaimedSvRewardsScriptIntegrationTest
         triggersToResumeAtStart = Seq(sv1CollectRewardsAndMergeAmuletsTrigger),
       ) {
         actAndCheck(
-          "Advance round to allow claiming one sv reward coupon",
-          advanceRoundsByOneTickViaAutomation(),
+          "Advance rounds to allow claiming the remaining SV reward coupons",
+          Range(0, 3).foreach(_ => advanceRoundsByOneTickViaAutomation()),
         )(
-          "Coupon for round 3 gets claimed",
+          "Coupons for rounds 3, 4 and 5 get claimed",
           _ =>
             sv1WalletClient
               .listSvRewardCoupons() should have size
@@ -163,11 +166,6 @@ class UnclaimedSvRewardsScriptIntegrationTest
       val rewardExpiredTotalAmount = getTotalAmount(svRewardCouponsExpired, roundInfo, weight)
       val rewardClaimedTotalAmount = getTotalAmount(svRewardCouponsClaimed, roundInfo, weight)
       val sv1Party = sv1Backend.getDsoInfo().svParty
-
-      // Add some minutes in case discrepancies with ledger time
-      val endRecordTime = Instant
-        .now()
-        .plus(5, ChronoUnit.MINUTES)
 
       val readLines = mutable.Buffer[String]()
       clue("Run unclaimed_sv_rewards.py with invalid weight and check failure") {
