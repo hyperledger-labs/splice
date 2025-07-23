@@ -322,8 +322,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
                             new JSONArray(a.toSeq.asJava)
                           case e => fail(s"$e not a text array")
                         }
-                      else
-                        new JSONObject(raw)
+                      else {
+                        // the only supported way to pass a JSON object within a
+                        // JSON object property is in the form of the string that
+                        // parses to that JSON
+                        raw
+                      }
                     } catch {
                       case e: org.json.JSONException =>
                         fail(s"error parsing JSON field $n, contents $raw", e)
