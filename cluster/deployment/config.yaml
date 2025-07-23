@@ -5,9 +5,6 @@ svs:
       appsLogLevel: DEBUG
       cantonLogLevel: DEBUG
       cometbftLogLevel: debug
-#  sv-1:
-#    cometbft:
-#      snapshotName: "nicu-test-cometbft-cloning"
 infra:
   prometheus:
     retentionDuration: "1y"
