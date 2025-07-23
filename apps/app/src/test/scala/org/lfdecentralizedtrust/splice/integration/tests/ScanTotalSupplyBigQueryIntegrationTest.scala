@@ -454,6 +454,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def parseQueryResults(result: bq.TableResult) = {
     // We expect the final query to return a single row with all metrics
     val row = result.iterateAll().iterator().next()
+    logger.debug(s"Query row: $row; schema ${result.getSchema}")
 
     ExpectedMetrics(
       locked = BigDecimal(row.get("locked").getStringValue),
