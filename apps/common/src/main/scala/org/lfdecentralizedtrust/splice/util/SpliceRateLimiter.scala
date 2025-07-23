@@ -5,14 +5,13 @@ package org.lfdecentralizedtrust.splice.util
 
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
 import com.daml.metrics.api.MetricQualification.Saturation
-import com.daml.metrics.api.MetricsContext.Implicits.empty
 import com.daml.metrics.api.{MetricHandle, MetricInfo, MetricsContext}
 import com.google.common.util.concurrent.RateLimiter
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
 import scala.concurrent.Future
 
-case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory) {
+case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext) {
 
   val meter: MetricHandle.Meter = otelFactory.meter(
     MetricInfo(
@@ -37,16 +36,24 @@ class SpliceRateLimiter(
   // noinspection UnstableApiUsage
   private val rateLimiter = RateLimiter.create(config.ratePerSecond.toDouble)
 
-  def runWithLimit[T](f: => Future[T]): Future[T] = {
-    if (rateLimiter.tryAcquire()) {
+  def markRun(): Boolean = {
+    val canRun = rateLimiter.tryAcquire()
+    if (canRun) {
       metrics.meter.mark()(
         MetricsContext("result" -> "accepted", "limiter" -> name)
       )
-      f
     } else {
       metrics.meter.mark()(
         MetricsContext("result" -> "rejected", "limiter" -> name)
       )
+    }
+    canRun
+  }
+
+  def runWithLimit[T](f: => Future[T]): Future[T] = {
+    if (markRun()) {
+      f
+    } else {
       Future.failed(
         io.grpc.Status.RESOURCE_EXHAUSTED
           .withDescription("Rate limit exceeded")

@@ -1,10 +1,14 @@
 package org.lfdecentralizedtrust.splice.util
 
+import com.daml.metrics.api.MetricsContext
 import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.console.CommandFailure
 import io.grpc.{Status, StatusRuntimeException}
+import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.stream.testkit.StreamSpec
+import org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest.runRateLimited
 
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
@@ -71,26 +75,18 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
   }
 
   private def runThroughRateLimiter(rateLimiter: SpliceRateLimiter, runRate: Int) = {
-    Source
-      .repeat(())
-      .throttle(runRate, 1.second)
-      .take(elementsToRun.longValue())
-      .mapAsync(50)(_ =>
-        rateLimiter
-          .runWithLimit(Future.successful(true))
-          .recover {
-            case rejection: StatusRuntimeException
-                if rejection.getStatus.getCode == Status.Code.RESOURCE_EXHAUSTED =>
-              false
-          }(system.dispatcher)
-      )
-      .runWith(Sink.seq)
-      .futureValue
+    runRateLimited(
+      runRate,
+      elementsToRun,
+    ) {
+      rateLimiter
+        .runWithLimit(Future.successful(true))
+    } futureValue
   }
 
   private def newRateLimiter = {
     val metricsFactory = new InMemoryMetricsFactory()
-    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory)
+    val rateLimitMetrics = SpliceRateLimitMetrics(metricsFactory)(MetricsContext.Empty)
     val rateLimiter = new SpliceRateLimiter(
       "test",
       SpliceRateLimitConfig(10),
@@ -98,4 +94,32 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
     )
     rateLimitMetrics -> rateLimiter
   }
+}
+
+object SpliceRateLimiterTest {
+
+  def runRateLimited(runRate: Int, elementsToRun: Int)(
+      run: => Future[?]
+  )(implicit
+      mat: Materializer
+  ): Future[Seq[Boolean]] = {
+    import mat.executionContext
+    Source
+      .repeat(())
+      .throttle(runRate, 1.second)
+      .take(elementsToRun.longValue())
+      .mapAsync(elementsToRun)(_ =>
+        run
+          .map(_ => true)
+          .recover {
+            case rejection: StatusRuntimeException
+                if rejection.getStatus.getCode == Status.Code.RESOURCE_EXHAUSTED =>
+              false
+            case failure: CommandFailure if failure.getMessage.contains("HTTP 429") =>
+              false
+          }
+      )
+      .runWith(Sink.seq)
+  }
+
 }
