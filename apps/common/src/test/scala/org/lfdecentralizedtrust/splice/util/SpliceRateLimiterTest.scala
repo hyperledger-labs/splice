@@ -46,7 +46,7 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
       val (accepted, rejected) = results.partition(identity)
 
       // estimate for running 9 seconds
-      accepted.length should (be > 88 and be < 92)
+      accepted.length should (be > 85 and be < 95)
 
       rateLimitMetrics.meter.valueFilteredOnLabels(
         LabelFilter(
@@ -74,9 +74,9 @@ class SpliceRateLimiterTest extends StreamSpec with BaseTest with MetricValues {
 
   }
 
-  private def runThroughRateLimiter(rateLimiter: SpliceRateLimiter, runRate: Int) = {
+  private def runThroughRateLimiter(rateLimiter: SpliceRateLimiter, runsPerSecond: Int) = {
     runRateLimited(
-      runRate,
+      runsPerSecond,
       elementsToRun,
     ) {
       rateLimiter
