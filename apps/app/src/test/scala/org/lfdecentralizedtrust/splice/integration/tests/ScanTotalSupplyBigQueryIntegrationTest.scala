@@ -319,7 +319,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
                       if (field.pgIsTextArray)
                         r.rs.getArray(n).getArray match {
                           case a: Array[String] =>
-                            new JSONArray(a.toSeq.asJava)
+                            new JSONArray(a.toSeq.asJava).toString
                           case e => fail(s"$e not a text array")
                         }
                       else {
