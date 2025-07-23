@@ -387,6 +387,11 @@ async function awaitCompletion(
   });
 
   if (wantedCompletion) {
+    if (wantedCompletion.completionResponse.Completion.value.status) {
+      throw new Error(
+        `Command failed with status: ${wantedCompletion.completionResponse.Completion.value.status}`,
+      );
+    }
     return {
       synchronizerId:
         wantedCompletion.completionResponse.Completion.value.synchronizerTime
