@@ -16,7 +16,6 @@ import com.digitalasset.daml.lf.data.Time.Timestamp as LfTimestamp
 import com.google.cloud.bigquery as bq
 import bq.{Field, JobInfo, Schema, TableId}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
-import bq.storage.v1.TableFieldSchema.Mode
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 
 import java.nio.file.Paths
@@ -119,12 +118,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
     }
   }
 
-  import bq.storage.v1.TableFieldSchema.Type as BQSType
+  import bq.storage.v1.TableFieldSchema as TFS
 
   private case class ConvertibleColumn(
       name: String,
       bqType: bq.LegacySQLTypeName,
-      bqStreamType: BQSType,
+      bqStreamType: TFS.Type,
       pgIsTextArray: Boolean,
   ) {
     def bqSchemaField =
@@ -138,7 +137,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
         .newBuilder()
         .setName(name)
         .setType(bqStreamType)
-        .setMode(Mode.NULLABLE)
+        .setMode(TFS.Mode.NULLABLE)
         .build()
   }
 
@@ -369,12 +368,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   private def convertToBigQueryStorageType(
       legacyType: bq.LegacySQLTypeName
-  ): BQSType = legacyType match {
-    case STRING => BQSType.STRING
-    case INTEGER => BQSType.INT64
-    case TIMESTAMP => BQSType.TIMESTAMP
-    case BOOLEAN => BQSType.BOOL
-    case JSON => BQSType.STRING
+  ): TFS.Type = legacyType match {
+    case STRING => TFS.Type.STRING
+    case INTEGER => TFS.Type.INT64
+    case TIMESTAMP => TFS.Type.TIMESTAMP
+    case BOOLEAN => TFS.Type.BOOL
+    case JSON => TFS.Type.STRING
     case _ => throw new IllegalArgumentException(s"Unsupported type: $legacyType")
   }
 
