@@ -299,8 +299,8 @@ case class SvAppBackendConfig(
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMillis(250),
-    expectedTaskDuration: Long = 5000, // milliseconds
-    expiredRewardCouponBatchSize: Int = 100,
+    delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
+    delegatelessAutomationExpiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you
