@@ -5,6 +5,7 @@ import { transfer } from "./commands/transfer";
 import { Command } from "commander";
 import { HoldingInterface, TransferInstructionInterface } from "./constants";
 import { listContractsByInterface } from "./commands/listContractsByInterface";
+import { acceptTransferInstruction } from "./commands/acceptTransferInstruction";
 
 export interface CommandOptions {
   ledgerUrl: string;
@@ -97,6 +98,35 @@ export function createProgram(): Command {
       )
       .action((partyId, opts) =>
         listContractsByInterface(TransferInstructionInterface, partyId, opts),
+      ),
+  );
+
+  addSharedOptions(
+    program
+      .command("accept-transfer-instruction")
+      .description(
+        "Execute the choice TransferInstruction_Accept on the provided transfer instruction",
+      )
+      .argument(
+        "transferInstructionCid",
+        "The contract ID of the transfer instruction to accept",
+      )
+      .requiredOption(
+        "-p, --party <value>",
+        "The party as which to accept the transfer instruction. Must be usable by the auth token's user.",
+      )
+      .requiredOption(
+        "-u, --user-id <value>",
+        "The user id, must match the user in the token",
+      )
+      .requiredOption("--public-key <value>", "Path to the public key file")
+      .requiredOption("--private-key <value>", "Path to the private key file")
+      .requiredOption(
+        "-R --transfer-factory-registry-url <value>",
+        "The URL to a transfer registry.",
+      )
+      .action((transferInstructionCid, opts) =>
+        acceptTransferInstruction(transferInstructionCid, opts),
       ),
   );
 

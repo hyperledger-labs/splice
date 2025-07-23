@@ -3,22 +3,15 @@
 import {
   createLedgerApiClient,
   filtersByParty,
+  submitExerciseCommand,
 } from "../apis/ledger-api-utils";
 import { HoldingInterface } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
-import {
-  Command,
-  DeduplicationPeriod2,
-  PartySignatures,
-} from "canton-json-api-v2-openapi";
-import * as crypto from "crypto";
+import { ExerciseCommand } from "canton-json-api-v2-openapi";
 import dayjs from "dayjs";
-import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import {
   createConfiguration,
   DefaultApi as TransferFactoryAPI,
-  DisclosedContract,
   ServerConfiguration,
 } from "transfer-instruction-openapi";
 
@@ -44,6 +37,7 @@ export async function transfer(
     amount,
     privateKey,
     publicKey,
+    userId,
     instrumentAdmin,
     instrumentId,
     transferFactoryRegistryUrl,
@@ -96,137 +90,22 @@ export async function transfer(
   choiceArgs.extraArgs.context =
     transferFactory.choiceContext.choiceContextData;
 
-  const command = new Command();
-  command.ExerciseCommand = {
+  const exercise: ExerciseCommand = {
     templateId:
       "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferFactory",
     contractId: transferFactory.factoryId,
     choice: "TransferFactory_Transfer",
     choiceArgument: choiceArgs,
   };
-
-  const disclosedContracts = transferFactory.choiceContext.disclosedContracts;
-
-  const synchronizerId =
-    getSynchronizerIdFromDisclosedContracts(disclosedContracts);
-
-  const prepared = await ledgerClient.postV2InteractiveSubmissionPrepare({
-    actAs: [sender],
-    readAs: [sender],
-    userId: opts.userId,
-    commandId: `tscli-${randomUUID()}`,
-    synchronizerId,
-    commands: [command],
-    disclosedContracts,
-    verboseHashing: true,
-    packageIdSelectionPreference: [],
-  });
-
-  const signed = signTransaction(
+  const result = await submitExerciseCommand(
+    ledgerClient,
+    exercise,
+    transferFactory.choiceContext.disclosedContracts,
+    sender,
+    userId,
     publicKey,
     privateKey,
-    prepared.preparedTransactionHash,
   );
-  const partySignatures: PartySignatures = {
-    signatures: [
-      {
-        party: sender,
-        signatures: [
-          {
-            signature: signed.signedHash,
-            signedBy: signed.signedBy,
-            format: "SIGNATURE_FORMAT_RAW",
-            signingAlgorithmSpec: "SIGNING_ALGORITHM_SPEC_ED25519",
-          },
-        ],
-      },
-    ],
-  };
 
-  const deduplicationPeriod = new DeduplicationPeriod2();
-  deduplicationPeriod.Empty = {};
-  const result = await ledgerClient.postV2InteractiveSubmissionExecute({
-    userId: opts.userId,
-    submissionId: "",
-    preparedTransaction: prepared.preparedTransaction,
-    hashingSchemeVersion: prepared.hashingSchemeVersion,
-    partySignatures,
-    deduplicationPeriod,
-  });
-
-  // TODO (#908): this is currently '{}'. It should include record_time and update_id, which require usage of completions API
   console.log(JSON.stringify(result, null, 2));
-}
-
-// The synchronizer id is mandatory, so we derive it from the disclosed contracts,
-// expecting that they'll all be in the same synchronizer
-function getSynchronizerIdFromDisclosedContracts(
-  disclosedContracts: DisclosedContract[],
-): string {
-  const synchronizerId = disclosedContracts[0].synchronizerId;
-  const differentSynchronizerId = disclosedContracts.find(
-    (dc) => dc.synchronizerId !== synchronizerId,
-  );
-  if (differentSynchronizerId) {
-    throw new Error(
-      `Contract is in a different domain so can't submit to the correct synchronizer: ${JSON.stringify(
-        differentSynchronizerId,
-      )}`,
-    );
-  }
-  return synchronizerId;
-}
-
-interface SignTransactionResult {
-  signedBy: string;
-  // base64 encoded
-  signedHash: string;
-}
-function signTransaction(
-  publicKeyPath: string,
-  privateKeyPath: string,
-  preparedTransactionHash: string,
-): SignTransactionResult {
-  const publicKey = readFileSync(publicKeyPath);
-  const nodePublicKey = crypto.createPublicKey({
-    key: publicKey,
-    format: "der",
-    type: "spki", // pycryptodome exports public keys as SPKI
-  });
-
-  const privateKey = readFileSync(privateKeyPath);
-  const nodePrivateKey = crypto.createPrivateKey({
-    key: privateKey,
-    format: "der",
-    type: "pkcs8",
-  });
-
-  const keyFingerprint = crypto
-    .createHash("sha256")
-    .update(
-      Buffer.from(
-        `0000000C${nodePublicKey
-          .export({ format: "der", type: "spki" })
-          // Ed25519 public key is the last 32 bytes of the SPKI DER key
-          .subarray(-32)
-          .toString("hex")}`,
-        "hex",
-      ),
-    )
-    .digest("hex");
-  const fingerprintPreFix = "1220"; // 12 PublicKeyFingerprint, 20 is a special length encoding
-  const signedBy = `${fingerprintPreFix}${keyFingerprint}`;
-
-  const hashBuffer = Buffer.from(preparedTransactionHash, "base64");
-  const signedHash = crypto
-    .sign(null, hashBuffer, {
-      key: nodePrivateKey,
-      dsaEncoding: "ieee-p1363",
-    })
-    .toString("base64");
-
-  return {
-    signedBy,
-    signedHash,
-  };
 }
