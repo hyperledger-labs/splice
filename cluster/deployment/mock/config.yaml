@@ -3,7 +3,7 @@ validator1:
     type: gcp
     locationId: us-central1
     projectId: da-cn-devnet
-    keyRingId: validator1_test
+    keyRingId: validator1_mock
 multiValidator:
   postgresPvcSize: '100Gi'
   # Dummy values for testing
@@ -102,7 +102,13 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
 svs:
+  # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
+  sv-3:
+    participant:
+      kms:
+        keyRingId: sv-3_participant_mock
+        locationId: us-central1

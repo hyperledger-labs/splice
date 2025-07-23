@@ -57,6 +57,7 @@ runs:
           set -exuo pipefail
           echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
           if [ -f ~/.config/nix/nix.conf ]; then
+            echo "nix.conf already exists, skipping Nix setup"
             exit 0
           else
             # Disabling sandbox because:

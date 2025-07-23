@@ -109,12 +109,12 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
-        "title": "\"validator1_test\" keyring"
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock\")",
+        "title": "\"validator1_mock\" keyring"
       },
       "role": "roles/cloudkms.admin"
     },
-    "name": "mock-validator1-kms-roles/cloudkms.admin-\"validator1_test\"-keyring-iam",
+    "name": "mock-validator1-kms-roles/cloudkms.admin-\"validator1_mock\"-keyring-iam",
     "provider": "",
     "type": "gcp:projects/iAMMember:IAMMember"
   },
@@ -124,12 +124,12 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
-        "title": "\"validator1_test\" keyring"
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock\")",
+        "title": "\"validator1_mock\" keyring"
       },
       "role": "roles/cloudkms.cryptoOperator"
     },
-    "name": "mock-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_test\"-keyring-iam",
+    "name": "mock-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_mock\"-keyring-iam",
     "provider": "",
     "type": "gcp:projects/iAMMember:IAMMember"
   },
@@ -537,7 +537,7 @@
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "kms": {
-          "keyRingId": "validator1_test",
+          "keyRingId": "validator1_mock",
           "locationId": "us-central1",
           "projectId": "da-cn-devnet",
           "type": "gcp"
@@ -905,13 +905,13 @@
   },
   {
     "custom": true,
-    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test",
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock",
     "inputs": {
       "location": "us-central1",
-      "name": "validator1_test",
+      "name": "validator1_mock",
       "project": "da-cn-devnet"
     },
-    "name": "validator1_test_keyring",
+    "name": "validator1_mock_keyring",
     "provider": "",
     "type": "gcp:kms/keyRing:KeyRing"
   },

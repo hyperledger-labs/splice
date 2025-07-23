@@ -134,10 +134,13 @@ class SvOffboardingIntegrationTest
             .filterJava(Confirmation.COMPANION)(
               sv1Backend.getDsoInfo().dsoParty,
               c =>
-                inside(c.data.action) { case arcDsoRules: ARC_DsoRules =>
-                  inside(arcDsoRules.dsoAction) { case _: SRARC_CreateTransferCommandCounter =>
-                    true
-                  }
+                c.data.action match {
+                  case arcDsoRules: ARC_DsoRules =>
+                    arcDsoRules.dsoAction match {
+                      case _: SRARC_CreateTransferCommandCounter => true
+                      case _ => false
+                    }
+                  case _ => false
                 },
             )
           confirmations should have size (4)

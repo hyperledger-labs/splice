@@ -35,10 +35,7 @@ export class GcpServiceAccount extends pulumi.ComponentResource {
     this.name = account.name;
 
     const iamMappings = roles.map(role =>
-      _addRoleToGcpServiceAccount(name, account.project, account.member, role, {
-        parent: this,
-        dependsOn: [account],
-      })
+      _addRoleToGcpServiceAccount(name, account.project, account.member, role, opts)
     );
     this.registerOutputs({ account, iamMappings });
   }

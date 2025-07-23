@@ -93,7 +93,8 @@ CREATE TEMP FUNCTION sum_bignumeric_acs(
     AND c.template_id_entity_name = entity_name
     AND (c.migration_id < migration_id
       OR (c.migration_id = migration_id
-        AND c.record_time <= UNIX_MICROS(as_of_record_time)))));
+        AND c.record_time <= UNIX_MICROS(as_of_record_time)))))
+    AND c.record_time != -62135596800000000;
 
 
 -- Total unspent but locked Amulet amount.
@@ -254,7 +255,8 @@ CREATE TEMP FUNCTION burned(
               AND c.template_id_entity_name = 'Amulet'
               AND (e.migration_id < migration_id_arg
                 OR (e.migration_id = migration_id_arg
-                    AND e.record_time <= UNIX_MICROS(as_of_record_time)))))));
+                    AND e.record_time <= UNIX_MICROS(as_of_record_time)))))))
+              AND c.record_time != -62135596800000000;
 
 
 -- using the functions

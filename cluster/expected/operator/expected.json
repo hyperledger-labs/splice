@@ -206,6 +206,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "deployment-sa",
         "stack": "organization/deployment/deployment.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {

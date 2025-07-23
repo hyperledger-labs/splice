@@ -210,6 +210,7 @@ npm run cli -- transfer \
   -d TheInstrumentId \
   --public-key sender-key.pub \
   --private-key sender-key.priv \
+  -u a-user-id \
   -R http://localhost:5012 \
   -l http://localhost:6201 \
   -a an-auth-token
@@ -218,4 +219,50 @@ npm run cli -- transfer \
 Output:
 
 If the output is `{}`, the transfer was successful.
+TODO (#908): record_time and update_id will be added to the output.
+
+
+#### Accept transfer instruction
+
+```
+npm run cli -- accept-transfer-instruction --help
+
+Usage: main accept-transfer-instruction [options] <transferInstructionCid>
+
+Execute the choice TransferInstruction_Accept on the provided transfer instruction
+
+Arguments:
+  transferInstructionCid                      The contract ID of the transfer instruction to accept
+
+Options:
+  -p, --party <value>                         The party as which to accept the transfer instruction. Must be usable by the auth token's user.
+  -u, --user-id <value>                       The user id, must match the user in the token
+  --public-key <value>                        Path to the public key file
+  --private-key <value>                       Path to the private key file
+  -R --transfer-factory-registry-url <value>  The URL to a transfer registry.
+  -l, --ledger-url <value>                    The ledger JSON API base URL, e.g. http://localhost:6201
+  -a, --auth-token <value>                    The ledger JSON API auth token
+  -h, --help                                  display help for command
+```
+
+Example:
+
+```shell
+npm run cli -- accept-transfer-instruction \
+  aTransferInstructionCid \
+  -p acting::party \
+  --public-key sender-key.pub \
+  --private-key sender-key.priv \
+  -R http://localhost:5012 \
+  -l http://localhost:6201 \
+  -u a-user-id \
+  -a an-auth-token
+```
+
+You can list all transfer instructions, including their contract id,
+from the output of the `list-transfer-instructions` command.
+
+Output:
+
+If the output is `{ "status": "success" }`, the acceptance of the transfer instruction was successful.
 TODO (#908): record_time and update_id will be added to the output.
