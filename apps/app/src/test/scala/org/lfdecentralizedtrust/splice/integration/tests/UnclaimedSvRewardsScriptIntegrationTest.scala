@@ -168,10 +168,10 @@ class UnclaimedSvRewardsScriptIntegrationTest
       val sv1Party = sv1Backend.getDsoInfo().svParty
 
       val readLines = mutable.Buffer[String]()
-      clue("Run unclaimed_sv_rewards.py with invalid weight and check failure") {
+      clue("Run unclaimed_sv_rewards.py with invalid weight and check warnings") {
         val errorProcessor = ProcessLogger(line => readLines.append(line))
         try {
-          val process = scala.sys.process
+          val exitCode = scala.sys.process
             .Process(
               Seq(
                 "python",
@@ -196,12 +196,11 @@ class UnclaimedSvRewardsScriptIntegrationTest
                 2.toString,
               )
             )
-            .run(errorProcessor)
+            .!(errorProcessor)
 
-          val exitCode = process.exitValue()
-          exitCode should not be 0
-          forExactly(1, readLines) {
-            _ should include("Invalid weight input:")
+          assert(exitCode == 0, s"Script exited with code $exitCode")
+          forExactly(6, readLines) {
+            _ should include("WARNING:global:Invalid weight input for round")
           }
         } catch {
           case NonFatal(ex) =>
@@ -260,7 +259,7 @@ class UnclaimedSvRewardsScriptIntegrationTest
         } catch {
           case NonFatal(ex) =>
             readLines.foreach(logger.error(_))
-            throw new RuntimeException("Failed to run unclaimed_sv_rewards.py", ex)
+            throw new RuntimeException("Unexpected failure running script", ex)
         }
       }
   }

@@ -630,8 +630,7 @@ class State:
                             case None:
                                 self._fail_with_missing_round(reward)
                             case mining_round_info:
-                                self._verify_weight(reward)
-                                amount = self.weight * mining_round_info.issuance_per_sv_reward
+                                amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
                                     f"Updating expired summary with amount {amount}, corresponding to contract {event.contract_id}"
                                 )
@@ -642,8 +641,7 @@ class State:
                             case None:
                                 self._fail_with_missing_round(reward)
                             case mining_round_info:
-                                self._verify_weight(reward)
-                                amount = self.weight * mining_round_info.issuance_per_sv_reward
+                                amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
                                     f"Updating claimed summary with amount {amount}, corresponding to contract {event.contract_id}"
                                 )
@@ -652,11 +650,22 @@ class State:
 
         self.process_events(transaction, event.child_event_ids)
 
-    def _verify_weight(self, reward):
+    def _calculate_amount(self, reward, mining_round_info):
+        return (
+            self.weight * mining_round_info.issuance_per_sv_reward
+            if self._is_weight_ok(reward)
+            else 0
+        )
+
+    def _is_weight_ok(self, reward):
         available_weight = reward.weight - self.already_minted_weight
         if self.weight > available_weight:
-            msg = f"Invalid weight input: {self.weight} must be less than or equal to {available_weight}"
-            self._fail(msg)
+            LOG.warning(
+                f"Invalid weight input for round <{reward.round}>: "
+                f"{self.weight} must be less than or equal to {available_weight}."
+            )
+            return False
+        return True
 
     def _fail_with_missing_round(self, reward):
         self._fail(
