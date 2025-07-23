@@ -163,5 +163,6 @@ runs:
           du -sh /nix/var || true
           echo "Nix home size:"
           du -sh $HOME/.nix-profile || true
+          cache_key=($(md5sum "/tmp/nix-cache-key"))
           echo "nix cache for key $cache_key size:"
           du -sh "/cache/nix/$cache_key" || true
