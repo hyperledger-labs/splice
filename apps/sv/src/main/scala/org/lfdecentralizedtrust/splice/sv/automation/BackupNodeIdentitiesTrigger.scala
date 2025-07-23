@@ -48,8 +48,10 @@ final class BackupNodeIdentitiesTrigger(
     val filename = Paths.get(
       s"sv_identities_${now}.json"
     )
+    val fileDesc =
+      s"node identities to ${backupConfig.locationDescription} at path: $filename"
     logger.info(
-      s"Attempting to write node identities to ${backupConfig.locationDescription} at path: $filename"
+      s"Attempting to write $fileDesc"
     )
     for {
       identities <- SynchronizerNodeIdentities.getSynchronizerNodeIdentities(
@@ -60,7 +62,7 @@ final class BackupNodeIdentitiesTrigger(
         loggerFactory,
       )
       _ <- Future {
-        blocking {
+        val _ = blocking {
           BackupDump.write(
             backupConfig,
             filename,
@@ -68,6 +70,7 @@ final class BackupNodeIdentitiesTrigger(
             loggerFactory,
           )
         }
+        logger.info(s"Wrote $fileDesc")
       }
       _ = taskCompleted.set(true)
     } yield TaskSuccess("Backup dumps created")
