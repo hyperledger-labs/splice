@@ -109,11 +109,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
       exportPostgresToBigQuery()
     }
 
-    withClue("running total supply queries in BigQuery") {
-      // Run total supply queries from the SQL file
-      val results = runTotalSupplyQueries()
+    val results = withClue("running total supply queries in BigQuery") {
+      runTotalSupplyQueries()
+    }
 
-      // Verify that results match our expected values
+    withClue(s"verify total supply results") {
       verifyResults(results)
     }
   }
