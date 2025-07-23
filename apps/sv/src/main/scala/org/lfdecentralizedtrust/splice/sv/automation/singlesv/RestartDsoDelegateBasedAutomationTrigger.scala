@@ -146,13 +146,9 @@ class RestartDsoDelegateBasedAutomationTrigger(
        closeRetryProvider()
        closeService()
 
-       val leaderLoggerFactory = loggerFactory.appendUnnamedKey(
-         "isLeader",
-         (dsoRules.contract.payload.dsoDelegate == store.key.svParty.toProtoPrimitive).toString,
-       )
        val retryProvider =
          RetryProvider(
-           leaderLoggerFactory,
+           loggerFactory,
            timeouts,
            appLevelRetryProvider.futureSupervisor,
            context.metricsFactory,
@@ -164,7 +160,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
          config,
          svTaskContext,
          retryProvider,
-         leaderLoggerFactory,
+         loggerFactory,
        )
 
        epochStateVar = Some(

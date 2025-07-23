@@ -54,7 +54,7 @@ class AdvanceOpenMiningRoundTrigger(
     for {
       dsoRules <- store.getDsoRules()
       _ = logger.debug(
-        s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
+        s"Starting work as for ${task.work}"
       )
       (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
         controller,

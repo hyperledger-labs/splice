@@ -182,11 +182,6 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     clue("The four SV apps are all SVs and there are no other SVs") {
       sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet() should equal(svParties.toSet.asJava)
     }
-    clue("The sv1 app (sv1) is the first delegate") {
-      sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate should equal(
-        dsoRules.svParty.toProtoPrimitive
-      )
-    }
     clue("initial open mining rounds are created") {
       eventually() {
         sv1Backend.listOpenMiningRounds() should have size 3
