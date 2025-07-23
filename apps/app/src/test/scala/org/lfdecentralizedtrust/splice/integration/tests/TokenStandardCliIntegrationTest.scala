@@ -207,7 +207,6 @@ class TokenStandardCliIntegrationTest
     Process(Seq("npm", "ci"), cwd).!(logProcessor)
 
     val exitCode = Process(args, cwd).!(logProcessor)
-    // TODO (#908): check that recordtime and updateid are present
     val start = readLines.indexWhere(_.startsWith("{"))
     val end = readLines.lastIndexWhere(_.endsWith("}"))
     val jsonSlice = readLines.slice(start, end + 1)
