@@ -14,8 +14,8 @@ jobs:
   static_tests:
     runs-on: ${{ inputs.runs_on }}
     timeout-minutes: 35
-    # container:
-    #   image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
 
     steps:
 
