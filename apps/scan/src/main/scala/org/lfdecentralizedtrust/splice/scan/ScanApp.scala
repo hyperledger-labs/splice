@@ -291,19 +291,24 @@ class ScanApp(
             def buildRouteForOperation(operation: String, httpService: String) = {
               nodeMetrics.httpServerMetrics
                 .withMetrics(httpService)(operation)
-                .tflatMap(_ =>
-                  HttpErrorHandler(loggerFactory)(traceContext).tflatMap { _ =>
-                    // custom HTTP timeouts
-                    (httpService, config.customTimeouts.get(operation)) match {
-                      case ("scan", Some(customTimeout)) =>
-                        withRequestTimeout(customTimeout.duration).tflatMap { _ =>
-                          provide(traceContext)
-                        }
-                      case _ =>
-                        provide(traceContext)
-                    }
+                .tflatMap { _ =>
+                  val httpErrorHandler = new HttpErrorHandler(loggerFactory)
+                  val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
+                    provide(traceContext)
                   }
-                )
+                  (httpService, config.customTimeouts.get(operation)) match {
+                    // custom HTTP timeouts
+                    case ("scan", Some(customTimeout)) =>
+                      withRequestTimeout(
+                        customTimeout.duration,
+                        httpErrorHandler.timeoutHandler(customTimeout.duration, _),
+                      ).tflatMap { _ =>
+                        base
+                      }
+                    case _ =>
+                      base
+                  }
+                }
             }
 
             requestLogger(traceContext) {
