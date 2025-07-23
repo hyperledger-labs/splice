@@ -47,6 +47,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   FoundDso,
   JoinWithKey,
 }
+import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -297,12 +298,23 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                       onboardingConfig,
                       upgradesConfig,
                     )
-                  case _: DomainMigration =>
-                    logger.debug(
-                      "No participant users metadata was found, setting the initial round to 0."
+                  case domainMigrationConfig: DomainMigration =>
+                    val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
+                    val initialRound = migrationDump.participantUsers.users
+                      .collectFirst {
+                        case user if user.id == config.ledgerApiUser =>
+                          user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
+                      }
+                      .flatten
+                      .getOrElse(
+                        throw new IllegalStateException(
+                          s"Key `INITIAL_ROUND_USER_METADATA_KEY` was not found in user's metadata dump."
+                        )
+                      )
+                    logger.info(
+                      s"Setting the initial round to $initialRound from migration user's metadata dump."
                     )
-                    // TODO(#1580): set it to initial round from user's metadata
-                    setInitialRound(connection, 0L)
+                    setInitialRound(connection, initialRound.toLong)
                 }
               case None =>
                 logger.debug("No SV onboarding config was found, setting the initial round to 0.")

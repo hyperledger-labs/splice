@@ -242,22 +242,18 @@ class ValidatorApp(
                       migrationDump.acsSnapshot,
                     )
                   }
-                  _ <- migrationDump.participantUsers match {
-                    case Some(participantUsersData) =>
-                      appInitStep("Restoring participant users data") {
-                        val readWriteConnection = ledgerClient.connection(
-                          this.getClass.getSimpleName,
-                          loggerFactory,
-                        )
-                        val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
-                          readWriteConnection,
-                          loggerFactory,
-                        )
-                        participantUsersDataRestorer.restoreParticipantUsersData(
-                          participantUsersData
-                        )
-                      }
-                    case None => Future.unit
+                  _ <- appInitStep("Restoring participant users data") {
+                    val readWriteConnection = ledgerClient.connection(
+                      this.getClass.getSimpleName,
+                      loggerFactory,
+                    )
+                    val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
+                      readWriteConnection,
+                      loggerFactory,
+                    )
+                    participantUsersDataRestorer.restoreParticipantUsersData(
+                      migrationDump.participantUsers
+                    )
                   }
                 } yield ()
               case None =>
