@@ -66,6 +66,7 @@ in pkgs.mkShell {
                                              doCheck = false;
                                              doInstallCheck = false;
                                      }))
+    python3Packages.dockerfile-parse
     python3Packages.flask
     python3Packages.GitPython
     python3Packages.gql
