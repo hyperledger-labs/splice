@@ -285,6 +285,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
         )
         .futureValueUS
 
+      logger.debug(
+        s"Sending ${rows.size} rows to BigQuery $targetTable. Sample JSON row prepared for BigQuery: ${rows.headOption
+            .map(_.toString(2))
+            .getOrElse("empty")}"
+      )
+
       // Stream rows to BigQuery in batches
       val batchSize = 500
       Future
