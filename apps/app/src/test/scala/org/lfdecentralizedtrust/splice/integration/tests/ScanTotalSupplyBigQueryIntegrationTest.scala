@@ -3,12 +3,13 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import org.lfdecentralizedtrust.splice.util.*
+import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.BaseTest.getResourcePath
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -224,12 +225,27 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(aliceParty: PartyId, bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    aliceParty shouldBe aliceParty // TODO (#1095) use it
-    // mint for Alice
+    // TODO (#1095) use a realistic minting method; best not to support tap in the SQL
     aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
 
     // TODO (#1095) Lock a portion of Amulet (lockedAmount)
-
+    val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    actAndCheck(
+      "Lock amulet",
+      lockAmulets(
+        aliceValidatorBackend,
+        aliceParty,
+        aliceValidatorParty,
+        aliceWalletClient.list().amulets,
+        lockedAmount,
+        sv1ScanBackend,
+        java.time.Duration.ofHours(1),
+        CantonTimestamp.now(),
+      ),
+    )(
+      "Wait for locked amulet to appear",
+      _ => aliceWalletClient.list().lockedAmulets.loneElement,
+    )
     // TODO (#1095) Ensure some unminted exists (unmintedAmount)
     // TODO (#1095) Create UnclaimedReward contracts
 
@@ -484,10 +500,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // TODO (#1095) use expected ranges instead
     // Verify individual metrics
+    results.minted shouldBe mintedAmount withClue "minted"
     results.locked shouldBe lockedAmount withClue "locked"
     results.unlocked shouldBe unlockedAmount withClue "unlocked"
     results.unminted shouldBe unmintedAmount withClue "unminted"
-    results.minted shouldBe mintedAmount withClue "minted"
     results.burned shouldBe burnedAmount withClue "burned"
 
     // Verify derived metrics
