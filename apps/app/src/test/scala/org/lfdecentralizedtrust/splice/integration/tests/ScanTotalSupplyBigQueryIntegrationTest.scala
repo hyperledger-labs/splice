@@ -462,14 +462,22 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val row = result.iterateAll().iterator().next()
     logger.debug(s"Query row: $row; schema ${result.getSchema}")
 
+    def bd(column: String) = {
+      val field = row get column
+      if (field.isNull)
+        fail(s"Column '$column' in total-supply results is null")
+      else
+        BigDecimal(field.getStringValue)
+    }
+
     ExpectedMetrics(
-      locked = BigDecimal(row.get("locked").getStringValue),
-      unlocked = BigDecimal(row.get("unlocked").getStringValue),
-      currentSupplyTotal = BigDecimal(row.get("current_supply_total").getStringValue),
-      unminted = BigDecimal(row.get("unminted").getStringValue),
-      minted = BigDecimal(row.get("minted").getStringValue),
-      allowedMint = BigDecimal(row.get("allowed_mint").getStringValue),
-      burned = BigDecimal(row.get("burned").getStringValue),
+      locked = bd("locked"),
+      unlocked = bd("unlocked"),
+      currentSupplyTotal = bd("current_supply_total"),
+      unminted = bd("unminted"),
+      minted = bd("minted"),
+      allowedMint = bd("allowed_mint"),
+      burned = bd("burned"),
     )
   }
 
