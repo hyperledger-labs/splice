@@ -34,13 +34,13 @@ export class GcpServiceAccount extends pulumi.ComponentResource {
     const account = new gcp.serviceaccount.Account(`${name}-sa`, gcpArgs, opts);
     this.name = account.name;
 
-    const iamMappings = roles.map(role =>
+    roles.forEach(role =>
       _addRoleToGcpServiceAccount(name, account.project, account.member, role, {
         parent: this,
         dependsOn: [account],
       })
     );
-    this.registerOutputs({ account, iamMappings });
+    this.registerOutputs({ account });
   }
 }
 
