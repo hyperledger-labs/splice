@@ -20,7 +20,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.SpliceTestC
 import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.CloseVoteRequestTrigger
 import org.lfdecentralizedtrust.splice.util.SpliceUtil.defaultDsoRulesConfig
 import org.lfdecentralizedtrust.splice.util.*
-import org.openqa.selenium.{By, Keys}
+import org.openqa.selenium.By
 import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
