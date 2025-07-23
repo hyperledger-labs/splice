@@ -6,6 +6,9 @@ on:
         type: string
         required: true
 
+permissions:
+  contents: read
+  issues: read # used by the TODO checker
 
 jobs:
   static_tests:
@@ -57,8 +60,6 @@ jobs:
           additional_nix_args: "--keep GH_USER --keep GH_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
         env:
           # The script assumes CCI env vars, so we map GHA ones to CCI ones here
-          GH_USER: ${{ github.actor }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CIRCLE_BRANCH: ${{ github.ref }}
           CIRCLE_PULL_REQUEST: ${{ github.event.pull_request.number }}
 

@@ -4,9 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 set -e
-# hub CLI used in checkTodos.sc requires GITHUB_USER and GITHUB_TOKEN
-export GITHUB_TOKEN=$GH_TOKEN
-export GITHUB_USER=$GH_USER
 
 SPLICE_ROOT=$( git rev-parse --show-toplevel )
 
