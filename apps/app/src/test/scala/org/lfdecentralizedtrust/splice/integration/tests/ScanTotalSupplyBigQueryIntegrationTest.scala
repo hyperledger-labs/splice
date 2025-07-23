@@ -476,14 +476,16 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // TODO (#1095) use expected ranges instead
     // Verify individual metrics
-    results.locked shouldBe lockedAmount
-    results.unlocked shouldBe unlockedAmount
-    results.unminted shouldBe unmintedAmount
-    results.minted shouldBe mintedAmount
-    results.burned shouldBe burnedAmount
+    results.locked shouldBe lockedAmount withClue "locked"
+    results.unlocked shouldBe unlockedAmount withClue "unlocked"
+    results.unminted shouldBe unmintedAmount withClue "unminted"
+    results.minted shouldBe mintedAmount withClue "minted"
+    results.burned shouldBe burnedAmount withClue "burned"
 
     // Verify derived metrics
-    results.currentSupplyTotal should be(lockedAmount + unlockedAmount)
-    results.allowedMint should be(unmintedAmount + mintedAmount)
+    results.currentSupplyTotal should be(
+      lockedAmount + unlockedAmount
+    ) withClue "current_supply_total"
+    results.allowedMint should be(unmintedAmount + mintedAmount) withClue "allowed_mint"
   }
 }
