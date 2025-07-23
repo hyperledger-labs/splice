@@ -291,6 +291,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
         .traverse(rows grouped batchSize) { batch =>
           import org.json.JSONArray
           Future(writer.append(new JSONArray(batch.asJava)).get())
+            .recoverWith(reportAppendSerializationErrors)
         }
         .futureValue
     } finally {
@@ -386,6 +387,23 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
     // Create the JSON writer
     JsonStreamWriter.newBuilder(fullTableId, tableSchema).build()
+  }
+
+  private def reportAppendSerializationErrors: PartialFunction[Throwable, Future[Nothing]] = {
+    case e: bq.storage.v1.Exceptions.AppendSerializationError =>
+      val maxErrors = 20
+      Future fromTry util.Try(
+        fail(
+          e.getRowIndexToErrorMessage.asScala
+            .to(collection.immutable.SortedMap)
+            .take(maxErrors)
+            .map { case (rowIndex, errorMessage) =>
+              s"Row $rowIndex: $errorMessage"
+            }
+            .mkString("\n"),
+          e,
+        )
+      )
   }
 
   /** Runs the total supply queries from the SQL file
