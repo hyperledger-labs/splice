@@ -51,7 +51,7 @@ object DomainDataSnapshot {
   object Response {
     def fromHttp(src: http.GetDomainDataSnapshotResponse): Either[String, Response] = for {
       dataSnapshot <- DomainDataSnapshot fromHttp src.dataSnapshot
-      participantUsers = ParticipantUsersData fromHttp src.participantUsers
+      participantUsers = ParticipantUsersData.fromHttp(src.participantUsers)
     } yield Response(src.migrationId, dataSnapshot, participantUsers)
   }
 
