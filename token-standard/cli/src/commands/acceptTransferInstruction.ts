@@ -52,7 +52,7 @@ export async function acceptTransferInstruction(
     },
   };
 
-  await submitExerciseCommand(
+  const completion = await submitExerciseCommand(
     ledgerClient,
     exercise,
     choiceContext.disclosedContracts,
@@ -61,8 +61,7 @@ export async function acceptTransferInstruction(
     publicKey,
     privateKey,
   );
-  // TODO (#908): this should include record_time and update_id
-  const result = { status: "success" };
+  const result = { ...completion, status: "success" };
 
   console.log(JSON.stringify(result, null, 2));
 }

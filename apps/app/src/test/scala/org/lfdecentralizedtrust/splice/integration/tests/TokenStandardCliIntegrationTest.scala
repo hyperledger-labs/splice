@@ -1,10 +1,20 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.crypto.{SigningPrivateKey, SigningPublicKey, PrivateKey}
+import com.daml.ledger.api.v2.transaction.TreeEvent.Kind
+import com.daml.ledger.javaapi.data.codegen.Choice
+import com.digitalasset.canton.crypto.{PrivateKey, SigningPrivateKey, SigningPublicKey}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{HasExecutionContext, HasTempDirectory}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.{
+  TransferFactory,
+  TransferInstruction,
+}
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import java.io.FileOutputStream
@@ -107,7 +117,8 @@ class TokenStandardCliIntegrationTest
               "-u",
               "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
             ),
-            io.circe.Json.obj(),
+            aliceParty,
+            TransferFactory.CHOICE_TransferFactory_Transfer,
           )
         },
       )(
@@ -146,7 +157,8 @@ class TokenStandardCliIntegrationTest
               "-u",
               "dummyUser", // Doesn't actually matter what we put here as the admin token ignores the user.
             ),
-            io.circe.Json.obj("status" -> io.circe.Json.fromString("success")),
+            bobParty,
+            TransferInstruction.CHOICE_TransferInstruction_Accept,
           )
         },
       )(
@@ -176,7 +188,13 @@ class TokenStandardCliIntegrationTest
 
   }
 
-  private def runCommand(args: Seq[String], expectedOutput: io.circe.Json) = {
+  private def runCommand(
+      args: Seq[String],
+      checkingPartyId: PartyId,
+      expectedChoice: Choice[?, ?, ?],
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ) = {
     val readLines = mutable.Buffer[String]()
     val logProcessor = ProcessLogger { line =>
       {
@@ -193,8 +211,25 @@ class TokenStandardCliIntegrationTest
     val start = readLines.indexWhere(_.startsWith("{"))
     val end = readLines.lastIndexWhere(_.endsWith("}"))
     val jsonSlice = readLines.slice(start, end + 1)
-    inside(jsonSlice) { jsonLines =>
-      io.circe.parser.parse(jsonLines.mkString("")) should be(Right(expectedOutput))
+    inside(io.circe.parser.parse(jsonSlice.mkString(""))) { case Right(json) =>
+      val output = json
+        .as[CommandOutput](io.circe.generic.semiauto.deriveDecoder)
+        .valueOrFail(s"Failed to decode output: $json")
+
+      output.status should be("success")
+      output.synchronizerId should be(decentralizedSynchronizerId.toProtoPrimitive)
+
+      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
+        .by_id(Set(checkingPartyId), output.updateId)
+        .valueOrFail(s"No transaction tree found for output: $output")
+
+      inside(txTree.eventsById) { events =>
+        forExactly(1, events.map(_._2.kind)) {
+          case Kind.Exercised(value) =>
+            value.choice should be(expectedChoice.name)
+          case _ => fail("not an exercised event")
+        }
+      }
     }
     if (exitCode != 0) {
       logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
@@ -221,4 +256,11 @@ class TokenStandardCliIntegrationTest
     }
     (pubPath, privPath)
   }
+
+  case class CommandOutput(
+      status: String,
+      updateId: String,
+      synchronizerId: String,
+      recordTime: String,
+  )
 }

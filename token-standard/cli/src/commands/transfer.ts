@@ -97,7 +97,7 @@ export async function transfer(
     choice: "TransferFactory_Transfer",
     choiceArgument: choiceArgs,
   };
-  const result = await submitExerciseCommand(
+  const completion = await submitExerciseCommand(
     ledgerClient,
     exercise,
     transferFactory.choiceContext.disclosedContracts,
@@ -106,6 +106,7 @@ export async function transfer(
     publicKey,
     privateKey,
   );
+  const result = { ...completion, status: "success" };
 
   console.log(JSON.stringify(result, null, 2));
 }

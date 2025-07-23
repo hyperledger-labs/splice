@@ -218,8 +218,11 @@ npm run cli -- transfer \
 
 Output:
 
-If the output is `{}`, the transfer was successful.
-TODO (#908): record_time and update_id will be added to the output.
+The output will include ` "status": "success" `, when the transfer was successful.
+Additionally, it will also include:
+- `updateId`: the update id identifying the transfer in the ledger.
+- `recordTime`: the time in the ledger at which the transfer happened.
+- `synchronizerId`: the synchronizer id in which the transfer was executed.
 
 
 #### Accept transfer instruction
@@ -264,5 +267,8 @@ from the output of the `list-transfer-instructions` command.
 
 Output:
 
-If the output is `{ "status": "success" }`, the acceptance of the transfer instruction was successful.
-TODO (#908): record_time and update_id will be added to the output.
+The output will include ` "status": "success" `, when the instruction acceptance  was successful.
+Additionally, it will also include:
+- `updateId`: the update id identifying the instruction acceptance in the ledger.
+- `recordTime`: the time in the ledger at which the instruction acceptance happened.
+- `synchronizerId`: the synchronizer id in which the instruction acceptance was executed.

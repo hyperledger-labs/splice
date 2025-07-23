@@ -8,19 +8,19 @@ import {
 } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
 import {
+  ArchivedEvent as LedgerApiArchivedEvent,
+  Command,
   createConfiguration,
   CreatedEvent as LedgerApiCreatedEvent,
-  ExercisedEvent as LedgerApiExercisedEvent,
-  ArchivedEvent as LedgerApiArchivedEvent,
+  DeduplicationPeriod2,
   DefaultApi as LedgerJsonApi,
+  ExerciseCommand,
+  ExercisedEvent as LedgerApiExercisedEvent,
   HttpAuthAuthentication,
   JsInterfaceView,
+  PartySignatures,
   ServerConfiguration,
   TransactionFilter,
-  ExerciseCommand,
-  Command,
-  DeduplicationPeriod2,
-  PartySignatures,
 } from "canton-json-api-v2-openapi";
 import { DisclosedContract } from "transfer-instruction-openapi";
 import { randomUUID } from "node:crypto";
@@ -196,7 +196,10 @@ export async function submitExerciseCommand(
   userId: string,
   publicKeyPath: string,
   privateKeyPath: string,
-): Promise<unknown> {
+): Promise<Completion> {
+  const submissionId = randomUUID();
+  const commandId = `tscli-${randomUUID()}`;
+
   const command = new Command();
   command.ExerciseCommand = exerciseCommand;
 
@@ -207,7 +210,7 @@ export async function submitExerciseCommand(
     actAs: [partyId],
     readAs: [partyId],
     userId: userId,
-    commandId: `tscli-${randomUUID()}`,
+    commandId,
     synchronizerId,
     commands: [command],
     disclosedContracts,
@@ -239,15 +242,25 @@ export async function submitExerciseCommand(
   const deduplicationPeriod = new DeduplicationPeriod2();
   deduplicationPeriod.Empty = {};
 
-  // TODO (#908): this is currently '{}'. It should include record_time and update_id, which require usage of completions API
-  return await ledgerClient.postV2InteractiveSubmissionExecute({
+  const ledgerEnd = await ledgerClient.getV2StateLedgerEnd();
+
+  await ledgerClient.postV2InteractiveSubmissionExecute({
     userId,
-    submissionId: "",
+    submissionId,
     preparedTransaction: prepared.preparedTransaction,
     hashingSchemeVersion: prepared.hashingSchemeVersion,
     partySignatures,
     deduplicationPeriod,
   });
+
+  return await awaitCompletion(
+    ledgerClient,
+    ledgerEnd.offset,
+    partyId,
+    userId,
+    commandId,
+    submissionId,
+  );
 }
 
 // The synchronizer id is mandatory, so we derive it from the disclosed contracts,
@@ -321,4 +334,71 @@ function signTransaction(
     signedBy,
     signedHash,
   };
+}
+
+interface Completion {
+  updateId: string;
+  // the openAPI definition claims these two can be null
+  synchronizerId?: string;
+  recordTime?: string;
+}
+
+/**
+ * Polls the completions endpoint until
+ * the completion with the given (userId, commandId, submissionId) is returned.
+ * Then returns the updateId, synchronizerId and recordTime of that completion.
+ */
+async function awaitCompletion(
+  ledgerClient: LedgerJsonApi,
+  ledgerEnd: number,
+  partyId: string,
+  userId: string,
+  commandId: string,
+  submissionId: string,
+): Promise<Completion> {
+  const responses = await ledgerClient.postV2CommandsCompletions(
+    {
+      userId,
+      parties: [partyId],
+      beginExclusive: ledgerEnd,
+    },
+    100,
+    1000,
+  );
+  const completions = responses.filter(
+    (response) => !!response.completionResponse.Completion,
+  );
+
+  const wantedCompletion = completions.find((response) => {
+    const completion = response.completionResponse.Completion;
+    return (
+      completion.value.userId == userId &&
+      completion.value.commandId === commandId &&
+      completion.value.submissionId === submissionId
+    );
+  });
+
+  if (wantedCompletion) {
+    return {
+      synchronizerId:
+        wantedCompletion.completionResponse.Completion.value.synchronizerTime
+          ?.synchronizerId,
+      recordTime:
+        wantedCompletion.completionResponse.Completion.value.synchronizerTime
+          ?.recordTime,
+      updateId: wantedCompletion.completionResponse.Completion.value.updateId,
+    };
+  } else {
+    const lastCompletion = completions[completions.length - 1];
+    const newLedgerEnd =
+      lastCompletion?.completionResponse.Completion.value.offset;
+    return awaitCompletion(
+      ledgerClient,
+      newLedgerEnd || ledgerEnd, // !newLedgerEnd implies response was empty
+      partyId,
+      userId,
+      commandId,
+      submissionId,
+    );
+  }
 }
