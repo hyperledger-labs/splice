@@ -102,21 +102,35 @@ class AnsSubscriptionInitialPaymentTrigger(
                         s"entry already exists and owned by ${entry.payload.user}."
                       )
                     case QueryResult(offset, None) => {
-                      // check if a confirmation by us for this entry already exists
-                      getConflictingInitialPaymentConfirmation(entryName, payment.contractId)
+                      // check if we confirmed a different initial payment for the same entry already
+                      getExistingInitialPaymentConfirmation(
+                        entryName,
+                        _ != payment.contractId,
+                      )
                         .flatMap {
                           case Some(c) =>
                             confirmToReject(
-                              s"other initial payment collection has been confirmed for the same ans name ($entryName) with confirmation ${c}."
+                              s"other initial payment collection has been confirmed for the same ans name ($entryName) with confirmation ${c}"
                             )
                           case None =>
-                            confirmCollectPayment(
-                              ansContext.contract.contractId,
-                              payment.contractId,
+                            // check if we confirmed the same initial payment for the same entry already
+                            getExistingInitialPaymentConfirmation(
                               entryName,
-                              transferContext,
-                              offset,
-                            )
+                              _ == payment.contractId,
+                            ).flatMap {
+                              case Some(c) =>
+                                TaskSuccess(
+                                  s"skipping as collection of this initial payment has already been confirmed with confirmation ${c}"
+                                ).pure[Future]
+                              case None =>
+                                confirmCollectPayment(
+                                  ansContext.contract.contractId,
+                                  payment.contractId,
+                                  entryName,
+                                  transferContext,
+                                  offset,
+                                )
+                            }
                         }
                     }
                   }
@@ -145,9 +159,9 @@ class AnsSubscriptionInitialPaymentTrigger(
     }
   }
 
-  private def getConflictingInitialPaymentConfirmation(
+  private def getExistingInitialPaymentConfirmation(
       entryName: String,
-      paymentId: SubscriptionInitialPayment.ContractId,
+      filterCondition: SubscriptionInitialPayment.ContractId => Boolean,
   )(implicit
       tc: TraceContext
   ): Future[Option[Confirmation.ContractId]] =
@@ -160,7 +174,7 @@ class AnsSubscriptionInitialPaymentTrigger(
               case arcAnsEntryContext: ARC_AnsEntryContext =>
                 arcAnsEntryContext.ansEntryContextAction match {
                   case a: ANSRARC_CollectInitialEntryPayment =>
-                    a.ansEntryContext_CollectInitialEntryPaymentValue.paymentCid != paymentId
+                    filterCondition(a.ansEntryContext_CollectInitialEntryPaymentValue.paymentCid)
                   case _ =>
                     false
                 }
