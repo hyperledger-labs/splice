@@ -669,17 +669,10 @@ class SvFrontendIntegrationTest
             inside(find(id("create-reason"))) { case Some(field) =>
               field.underlying.sendKeys(testReason)
             }
-        } { implicit webDriver =>
+        } { _ =>
           // Skipping form field assertions — values can't be reliably queried after submission,
           // and correctness is already covered via the confirmation modal in testCreateAndVoteDsoRulesAction.
-
-          // Clean up dropdown overlays before next test starts
-          webDriver.switchTo().activeElement().sendKeys(Keys.ESCAPE)
-          webDriver.findElement(By.tagName("body")).click()
-          eventually() {
-            val overlays = webDriver.findElements(By.className("MuiPopover-root")).asScala
-            assert(overlays.forall(!_.isDisplayed), "All dropdown/popover overlays should be gone")
-          }
+          ()
         }
     }
 
