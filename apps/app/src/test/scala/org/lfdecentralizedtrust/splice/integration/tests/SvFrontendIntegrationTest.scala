@@ -123,7 +123,7 @@ class SvFrontendIntegrationTest
           "observe information on party information",
           _ => {
             val valueCells = findAll(className("general-dso-value-name")).toSeq
-            valueCells should have length 9
+            valueCells should have length 8
             forExactly(1, valueCells)(cell =>
               seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
             )

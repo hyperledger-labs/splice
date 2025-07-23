@@ -51,19 +51,16 @@ import Splice.CometBft()
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once 2/3 of all SV'ss confirmations* are visible to the DSO it executes them.
+--    Once 2/3 of all SV's confirmations* are visible to the DSO delegate it executes them.
 --
 -- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
 -- Process 2 is an optimization of Process 1 for the case where no disagreement to the
--- action is expected. It avoids the extra round-trip and the complications of having
--- the DSO to reliably initiate the vote when it is time to execute an automated action
--- that requires confirmation.
+-- action is expected.
 --
 -- We expect honest SV nodes to only create confirmations for actions
 -- whose preconditions are met. We also rely on the execution of these actions to be
--- idempotent, as more than the required number of confirmations can be created and the DSO could
--- thus in principle execute the corresponding action multiple times.
+-- idempotent, as more than the required number of confirmations can be created.
 --
 -- Note also that having these two processes also aids in distinguishing between manually initiated
 -- ad-hoc votes and the regular confirmations that need to happen during standard DSO.
@@ -328,7 +325,7 @@ template ElectionRequest with
     signatory dso
 
 
--- | A confirmation for the DSO to take action as part of standard DSO.
+-- | A confirmation for the SVs to take action as part of standard DSO.
 -- Used for executing automated actions in a shortened process.
 -- See the comments on `ActionRequiringConfirmation` for details.
 template Confirmation with
@@ -443,7 +440,7 @@ data TrafficState = TrafficState with
 
 template DsoRules with
     dso : Party
-    epoch : Int        -- ^ The number of DSO delegates that have already been elected.
+    epoch : Int
     svs : Map.Map Party SvInfo
     offboardedSvs : Map.Map Party OffboardedSvInfo
     dsoDelegate : Party
@@ -1092,8 +1089,8 @@ template DsoRules with
         return DsoRules_ExpireSvOnboardingConfirmedResult with ..
 
 
-    -- Amulet management driven directly by the DSO
-    -----------------------------------------------
+    -- Amulet management driven directly by the DSO delegates
+    ---------------------------------------------------------
 
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with
@@ -1120,8 +1117,8 @@ template DsoRules with
           expireSum = result.expireSum
 
 
-    -- Round management driven directly by the DSO
-    ----------------------------------------------
+    -- Round management driven directly by the DSO delegates
+    --------------------------------------------------------
 
     nonconsuming choice DsoRules_AdvanceOpenMiningRounds : DsoRules_AdvanceOpenMiningRoundsResult
       with
@@ -1141,8 +1138,8 @@ template DsoRules with
           openRound = result.openRoundCid
 
 
-    -- ANS entry and payment management driven directly by the DSO
-    --------------------------------------------------------------
+    -- ANS entry and payment management driven directly by the DSO delegates
+    ------------------------------------------------------------------------
 
     nonconsuming choice DsoRules_CollectEntryRenewalPayment : DsoRules_CollectEntryRenewalPaymentResult
       with
@@ -1193,8 +1190,8 @@ template DsoRules with
         pure DsoRules_TerminateSubscriptionResult
 
 
-    -- Reward management driven directly by the DSO
-    -----------------------------------------------
+    -- Reward management driven directly by the DSO delegates
+    ---------------------------------------------------------
 
     nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
       with
