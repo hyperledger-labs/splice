@@ -23,6 +23,7 @@ import {
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  LogLevel,
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
@@ -75,6 +76,7 @@ type BasicValidatorConfig = {
   dependencies: CnInput<pulumi.Resource>[];
   participantPruningConfig?: ParticipantPruningConfig;
   deduplicationDuration?: string;
+  logLevel?: LogLevel;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -181,9 +183,7 @@ export async function installValidatorApp(
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      decentralizedSynchronizerUrl: config.svValidator
-        ? config.decentralizedSynchronizerUrl
-        : undefined,
+      decentralizedSynchronizerUrl: undefined,
       scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
       validatorWalletUsers: config.validatorWalletUsers,
@@ -208,7 +208,7 @@ export async function installValidatorApp(
           ? { secretName: participantBootstrapDumpSecretName }
           : undefined,
       svValidator: config.svValidator,
-      useSequencerConnectionsFromScan: !config.svValidator,
+      useSequencerConnectionsFromScan: true,
       metrics: {
         enable: true,
       },
@@ -227,6 +227,17 @@ export async function installValidatorApp(
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
+      logLevel: config.logLevel,
+      resources: baseConfig.svValidator
+        ? {
+            requests: {
+              memory: '2Gi',
+            },
+            limits: {
+              memory: '4Gi',
+            },
+          }
+        : {},
       ...spliceInstanceNames,
     },
     chartVersion,

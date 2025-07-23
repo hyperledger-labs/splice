@@ -1,9 +1,11 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { listHoldingTransactions } from "./commands/listHoldingTransactions";
-import { listHoldings } from "./commands/listHoldings";
 import { transfer } from "./commands/transfer";
 import { Command } from "commander";
+import { HoldingInterface, TransferInstructionInterface } from "./constants";
+import { listContractsByInterface } from "./commands/listContractsByInterface";
+import { acceptTransferInstruction } from "./commands/acceptTransferInstruction";
 
 export interface CommandOptions {
   ledgerUrl: string;
@@ -22,7 +24,9 @@ export function createProgram(): Command {
       .command("list-holdings")
       .description("List the holdings of a party")
       .argument("partyId", "The party for which to list the holdings"),
-  ).action(listHoldings);
+  ).action((partyId, opts) =>
+    listContractsByInterface(HoldingInterface, partyId, opts),
+  );
 
   addSharedOptions(
     program
@@ -80,6 +84,50 @@ export function createProgram(): Command {
         "The user id, must match the user in the token",
       )
       .action(transfer),
+  );
+
+  addSharedOptions(
+    program
+      .command("list-transfer-instructions")
+      .description(
+        "List all transfer instructions where the provided party is a stakeholder of",
+      )
+      .argument(
+        "partyId",
+        "The party for which to list the transfer instructions",
+      )
+      .action((partyId, opts) =>
+        listContractsByInterface(TransferInstructionInterface, partyId, opts),
+      ),
+  );
+
+  addSharedOptions(
+    program
+      .command("accept-transfer-instruction")
+      .description(
+        "Execute the choice TransferInstruction_Accept on the provided transfer instruction",
+      )
+      .argument(
+        "transferInstructionCid",
+        "The contract ID of the transfer instruction to accept",
+      )
+      .requiredOption(
+        "-p, --party <value>",
+        "The party as which to accept the transfer instruction. Must be usable by the auth token's user.",
+      )
+      .requiredOption(
+        "-u, --user-id <value>",
+        "The user id, must match the user in the token",
+      )
+      .requiredOption("--public-key <value>", "Path to the public key file")
+      .requiredOption("--private-key <value>", "Path to the private key file")
+      .requiredOption(
+        "-R --transfer-factory-registry-url <value>",
+        "The URL to a transfer registry.",
+      )
+      .action((transferInstructionCid, opts) =>
+        acceptTransferInstruction(transferInstructionCid, opts),
+      ),
   );
 
   return program;

@@ -61,6 +61,10 @@ spec:
         {{- end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}
+        {{- with .Values.maxDarVersion }}
+        - name: ADDITIONAL_CONFIG_MAX_DAR_VERSION
+          value: canton.splitwell-apps.splitwell_backend.required-dar-version = {{ . | quote }}
+        {{- end }}
         {{- include "splice-util-lib.additional-env-vars" .Values.additionalEnvVars | indent 8}}
         {{- include "splice-util-lib.log-level" .Values | indent 8}}
         ports:

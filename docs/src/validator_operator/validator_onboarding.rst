@@ -75,6 +75,16 @@ from the same egress IP from which you want to deploy your validator,
 e.g., from the VM that you want to run your docker compose setup on,
 or from within your Kubernetes cluster.
 
+First, please confirm that your egress IP in the terminal in which you are
+running the command is indeed the one you provided for whitelisting by running:
+
+.. parsed-literal::
+
+   curl -sSL http://checkip.amazonaws.com
+
+and confirming that the IP matches what you have provided for whitelisting. If it does,
+run the following command to check to which instance of Scan you can connect.
+
 Note that the following snippet requires installing `jq <https://jqlang.org/>`_.
 
 .. parsed-literal::

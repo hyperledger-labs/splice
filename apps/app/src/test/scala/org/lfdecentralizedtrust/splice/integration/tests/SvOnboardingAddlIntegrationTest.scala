@@ -79,23 +79,23 @@ class SvOnboardingAddlIntegrationTest
     }
 
     val (token, svOnboardingRequestCid) =
-      clue("Checking that SV4's `SvOnboarding` contract was created correctly by SV1") {
-        eventually(40.seconds)(
+      clue("Checking that SV4's `SvOnboardingRequest` contract was created correctly by SV1") {
+        eventually(60.seconds)(
           // The onboarding is requested by SV4 during SvApp init.
           inside(
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty)
           ) {
-            case Seq(svOnboarding) => {
-              svOnboarding.data.candidateName shouldBe getSvName(4)
-              svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
-              svOnboarding.data.candidateParticipantId shouldBe sv4Backend.participantClient.id.toProtoPrimitive
-              svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
-              svOnboarding.data.dso shouldBe dsoParty.toProtoPrimitive
+            case Seq(svOnboardingRequest) => {
+              svOnboardingRequest.data.candidateName shouldBe getSvName(4)
+              svOnboardingRequest.data.candidateParty shouldBe sv4Party.toProtoPrimitive
+              svOnboardingRequest.data.candidateParticipantId shouldBe sv4Backend.participantClient.id.toProtoPrimitive
+              svOnboardingRequest.data.sponsor shouldBe sv1Party.toProtoPrimitive
+              svOnboardingRequest.data.dso shouldBe dsoParty.toProtoPrimitive
               // if this check fails:
               // make sure that the values (especially the key) are in sync with sv1's and sv4's config files
               SvOnboardingToken
-                .verifyAndDecode(svOnboarding.data.token)
+                .verifyAndDecode(svOnboardingRequest.data.token)
                 .value shouldBe SvOnboardingToken(
                 getSvName(4),
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA==",
@@ -103,7 +103,7 @@ class SvOnboardingAddlIntegrationTest
                 sv4Backend.participantClient.id,
                 dsoParty,
               )
-              (svOnboarding.data.token, svOnboarding.id)
+              (svOnboardingRequest.data.token, svOnboardingRequest.id)
             }
           }
         )
@@ -200,23 +200,16 @@ class SvOnboardingAddlIntegrationTest
           .connections
           .forgetNE
 
-        val localSequencerUrl = inside(sequencerConnections) {
-          case Seq(
-                GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)
-              ) =>
-            defaultSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
-          case Seq(
-                GrpcSequencerConnection(_, _, _, _),
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _),
-              ) =>
-            localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
+        val localSequencerUrls: Seq[String] = sequencerConnections.map {
+          inside(_) { case GrpcSequencerConnection(endpoints, _, _, _) =>
+            endpoints.map(_.toURI(false)).forgetNE.loneElement.toString
+          }
         }
-
         val nodeState = sv1NodeStates.get(svParty).value.payload
-        forAll(nodeState.state.synchronizerNodes.values()) { synchronizerNode =>
-          synchronizerNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
-          synchronizerNode.mediator.toScala.value.mediatorId should not be empty
-        }
+        val synchronizerNode = nodeState.state.synchronizerNodes.values.loneElement
+        val localSequencerUrl: String = synchronizerNode.sequencer.toScala.value.url
+        localSequencerUrls should contain(localSequencerUrl)
+        synchronizerNode.mediator.toScala.value.mediatorId should not be empty
 
         clue("published sequencer information can be seen via scan") {
           inside(sv1ScanBackend.listDsoSequencers()) { case Seq(domainSequencers) =>

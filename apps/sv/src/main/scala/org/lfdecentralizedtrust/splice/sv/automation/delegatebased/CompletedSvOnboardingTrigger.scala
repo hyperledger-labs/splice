@@ -44,7 +44,10 @@ class CompletedSvOnboardingTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svOnboardings <- store.listSvOnboardingRequestsBySvs(dsoRules)
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       cmds = svOnboardings.map(co =>
         dsoRules.exercise(
           _.exerciseDsoRules_ArchiveSvOnboardingRequest(
@@ -62,6 +65,7 @@ class CompletedSvOnboardingTrigger(
               cmd,
             )
             .noDedup
+            .withPreferredPackage(preferredPackageIds)
             .yieldUnit()
         )
       )

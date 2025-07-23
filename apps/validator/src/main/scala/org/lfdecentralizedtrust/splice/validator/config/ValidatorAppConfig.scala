@@ -186,15 +186,17 @@ case class ValidatorAppBackendConfig(
     // We don't make this optional to encourage users to think about it at least. They
     // can always set it to an empty string.
     contactPoint: String,
-    // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
+    // If the node does not receive an event for that amount of time, it will request a time proof
+    // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
+      NonNegativeFiniteDuration.ofMinutes(30),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[ValidatorCantonIdentifierConfig] = None,
     participantPruningSchedule: Option[ParticipantPruningConfig] = None,
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
+    disableSvValidatorBftSequencerConnection: Boolean = false,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

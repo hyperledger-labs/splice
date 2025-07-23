@@ -83,6 +83,7 @@ testUsageFees = do
                   ]
         beneficiaries = None
       context = context.context
+      expectedDso = Some app.dso
 
   let config = scaleFees 1.0 defaultTransferConfig
       expectedTransferFee = 0.03 + chargeSteppedRate config.transferFee 10.0
@@ -167,6 +168,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
                       receiverFeeRatio = 0.4 ]
         beneficiaries = None -- test code, no beneficiaries
       context = contextWithRound1.context
+      expectedDso = Some app.dso
 
   -- Input amount is exactly 100.0.
   -- There is no negative amount of holding fee
@@ -180,7 +182,6 @@ testAmuletUsedAfterHoldingFeeChanged: Script ()
 testAmuletUsedAfterHoldingFeeChanged = do
   defaultAppWithUsers <- setupDefaultAppWithUsers
   let DefaultAppWithUsers{..} = defaultAppWithUsers
-  now <- getTime
 
   let holdingFee = 0.00002
       smallerHoldingFee = 0.00005
@@ -188,13 +189,11 @@ testAmuletUsedAfterHoldingFeeChanged = do
 
   Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
-  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
-    newScheduleItem = (
-          addRelTime now (minutes 1),
-          amuletRules.configSchedule.initialValue with
-            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
-              holdingFee = RatePerRound smallerHoldingFee
-        )
+  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_SetConfig with
+    newConfig = amuletRules.configSchedule.initialValue with
+                            transferConfig = amuletRules.configSchedule.initialValue.transferConfig with
+                              holdingFee = RatePerRound smallerHoldingFee
+    baseConfig = amuletRules.configSchedule.initialValue
 
   runNextIssuance app
   amuletRound2Cid <- tap app alice 100.0
@@ -254,6 +253,7 @@ submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amou
                         receiverFeeRatio = 1.0]
           beneficiaries = None -- test code, no beneficiaries
         context = transferContext
+        expectedDso = Some app.dso
 
 testSenderChangeAndOutput: Script ()
 testSenderChangeAndOutput = do
@@ -299,6 +299,8 @@ testSenderChangeAndOutput = do
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
+    expectedDso = Some app.dso
+
   assertMsg "senderChangeAmount > 0"
     (transferResult.summary.senderChangeAmount > 0.0)
   aliceNormalizedBalanceAfter <- getNormalizedBalance alice.primaryParty
@@ -351,6 +353,8 @@ testSenderNoChange = do
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
+    expectedDso = Some app.dso
+
   assertMsg "senderChangeAmount == 0"
     (transferResult.summary.senderChangeAmount == 0.0)
 
@@ -395,6 +399,8 @@ testSenderNoChangeNoSenderOutput = do
                 ]
       beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
+    expectedDso = Some app.dso
+
   assertMsg "senderChangeAmount == 0"
     (transferResult.summary.senderChangeAmount == 0.0)
 
@@ -436,6 +442,7 @@ testAppRewardBeneficiaries = do
                 ]
       beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2]
     context = context.context
+    expectedDso = Some app.dso
 
   -- length beneficiaries > 20
 
@@ -453,6 +460,7 @@ testAppRewardBeneficiaries = do
                 ]
       beneficiaries = Some (AppRewardBeneficiary alice.primaryParty 0.8 :: replicate 20 (AppRewardBeneficiary alice.primaryParty 0.01))
     context = context.context
+    expectedDso = Some app.dso
 
   forA_ [False, True] $ \featured -> do
 
@@ -477,6 +485,7 @@ testAppRewardBeneficiaries = do
                   ]
         beneficiaries = None
       context = context.context
+      expectedDso = Some app.dso
 
     [(rewardCid, aliceAppRewardCouponUnfeaturedNoBeneficiary)] <- query @AppRewardCoupon alice.primaryParty
     -- archive to simplify test queries
@@ -499,6 +508,7 @@ testAppRewardBeneficiaries = do
                     ]
           beneficiaries = Some [AppRewardBeneficiary alice.primaryParty 0.2, AppRewardBeneficiary bob.primaryParty 0.7, AppRewardBeneficiary bob.primaryParty 0.1]
         context = context.context
+        expectedDso = Some app.dso
 
     [(rewardCid1, aliceAppRewardCouponUnfeaturedBeneficiary)] <- queryFilter @AppRewardCoupon alice.primaryParty (\r -> r.beneficiary == Some alice.primaryParty)
 
@@ -522,10 +532,10 @@ testUnclaimedActivityRecordTransferInput : Script ()
 testUnclaimedActivityRecordTransferInput = do
   defaultAppWithUsers@DefaultAppWithUsers{..}  <- setupDefaultAppWithUsers
   now <- getTime
-  let 
+  let
     amountToMint = 10.0
     expiresAt = addRelTime now (days 2)
-    unclaimedActivityRecord = UnclaimedActivityRecord with 
+    unclaimedActivityRecord = UnclaimedActivityRecord with
       dso = app.dso
       beneficiary = alice.primaryParty
       amount = amountToMint
@@ -537,32 +547,34 @@ testUnclaimedActivityRecordTransferInput = do
   runNextIssuance app
 
   -- Unhappy path - UnclaimedActivityRecord has expired
-  expiredUnclaimedActivityRecordCid <- submit app.dso $ 
+  expiredUnclaimedActivityRecordCid <- submit app.dso $
     createCmd unclaimedActivityRecord with expiresAt = addRelTime now (- hours 1)
-  submitMultiMustFail [alice.primaryParty] [app.dso] $ 
+  submitMultiMustFail [alice.primaryParty] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
         inputs = [InputUnclaimedActivityRecord expiredUnclaimedActivityRecordCid]
         outputs = []
-        beneficiaries = None 
+        beneficiaries = None
       context = context.context
+      expectedDso = Some app.dso
 
-  -- Happy path 
-  unclaimedActivityRecordCid <- submit app.dso $ 
+  -- Happy path
+  unclaimedActivityRecordCid <- submit app.dso $
     createCmd unclaimedActivityRecord
   transferResult <-
     checkTransferMetadata app TxKind_MergeSplit alice.primaryParty $
-    checkBalanceChanges defaultAppWithUsers $ 
+    checkBalanceChanges defaultAppWithUsers $
       submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
           provider = alice.primaryParty
           inputs = [InputUnclaimedActivityRecord unclaimedActivityRecordCid]
           outputs = []
-          beneficiaries = None 
+          beneficiaries = None
         context = context.context
+        expectedDso = Some app.dso
   (_, openRound) <- getLatestActiveOpenRound app
   let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
   transferResult.summary.senderChangeAmount === amountToMint - createFee

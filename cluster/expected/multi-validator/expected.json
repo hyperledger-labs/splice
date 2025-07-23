@@ -174,12 +174,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-0-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -436,12 +440,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -603,12 +607,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-1-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -865,12 +873,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -1032,12 +1040,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-2-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -1294,12 +1306,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -1461,12 +1473,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -1723,12 +1739,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -1890,12 +1906,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-participant-4-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -2152,12 +2172,12 @@
                 },
                 "resources": {
                   "limits": {
-                    "cpu": "8",
-                    "memory": "24Gi"
+                    "cpu": "6",
+                    "memory": "16Gi"
                   },
                   "requests": {
                     "cpu": "1",
-                    "memory": "12Gi"
+                    "memory": "8Gi"
                   }
                 }
               }
@@ -2319,12 +2339,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-0-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -2460,6 +2484,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2571,11 +2603,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "8Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -2697,12 +2729,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-1-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -2838,6 +2874,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -2949,11 +2993,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "8Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -3075,12 +3119,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-2-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -3216,6 +3264,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3327,11 +3383,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "8Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -3453,12 +3509,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-3-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -3594,6 +3654,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -3705,11 +3773,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "8Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -3831,12 +3899,16 @@
       "apiVersion": "monitoring.coreos.com/v1",
       "kind": "ServiceMonitor",
       "metadata": {
+        "labels": {
+          "release": "prometheus-grafana-monitoring"
+        },
         "name": "multi-validator-4-service-monitor",
         "namespace": "multi-validator"
       },
       "spec": {
         "endpoints": [
           {
+            "honorLabels": true,
             "port": "metrics"
           }
         ],
@@ -3972,6 +4044,14 @@
                     "value": "sv-support@digitalasset.com"
                   },
                   {
+                    "name": "LOG_LEVEL_CANTON",
+                    "value": "INFO"
+                  },
+                  {
+                    "name": "LOG_LEVEL_STDOUT",
+                    "value": "INFO"
+                  },
+                  {
                     "name": "NUM_NODES",
                     "value": "10"
                   },
@@ -4083,11 +4163,11 @@
                 "resources": {
                   "limits": {
                     "cpu": "4",
-                    "memory": "16Gi"
+                    "memory": "8Gi"
                   },
                   "requests": {
-                    "cpu": "1",
-                    "memory": "8Gi"
+                    "cpu": "0.5",
+                    "memory": "2.4Gi"
                   }
                 }
               }
@@ -4358,10 +4438,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4415,10 +4495,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4472,10 +4552,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4529,10 +4609,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [
@@ -4586,10 +4666,10 @@
         },
         "resources": {
           "limits": {
-            "memory": "20Gi"
+            "memory": "12Gi"
           },
           "requests": {
-            "memory": "10Gi"
+            "memory": "5Gi"
           }
         },
         "tolerations": [

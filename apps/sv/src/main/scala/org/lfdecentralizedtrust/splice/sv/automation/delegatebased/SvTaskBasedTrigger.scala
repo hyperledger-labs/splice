@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.UnlessShutdown
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.topology.PartyId
@@ -45,20 +46,23 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
   private val store = svTaskContext.dsoStore
   private val packageVersionSupport = svTaskContext.packageVersionSupport
 
-  final protected def supportsDelegateLessAutomation()(implicit
+  final protected def supportsDelegateLessAutomation(clock: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] =
     packageVersionSupport.supportsDelegatelessAutomation(
       Seq(store.key.svParty, store.key.dsoParty),
-      context.clock.now,
+      clock,
     )
 
-  final protected def getSvControllerArgument(controller: String)(implicit
+  final protected def getDelegateLessFeatureSupportArguments(
+      controller: String,
+      clock: CantonTimestamp,
+  )(implicit
       tc: TraceContext
-  ): Future[java.util.Optional[String]] = {
+  ): Future[(java.util.Optional[String], Seq[String])] = {
     for {
-      supportsDelegateLessAutomation <- supportsDelegateLessAutomation()
-    } yield Option.when(supportsDelegateLessAutomation.supported)(controller).toJava
+      featureSupport <- supportsDelegateLessAutomation(clock)
+    } yield (Option.when(featureSupport.supported)(controller).toJava, featureSupport.packageIds)
   }
 
   final protected override def completeTask(
@@ -70,7 +74,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
       dsoDelegate = dsoRules.payload.dsoDelegate
       svParty = store.key.svParty.toProtoPrimitive
       isLeader = dsoDelegate == svParty
-      supportsDelegateLessAutomation <- supportsDelegateLessAutomation()
+      supportsDelegateLessAutomation <- supportsDelegateLessAutomation(context.clock.now)
       result <-
         if (sameEpoch) {
           if (svTaskContext.delegatelessAutomation && supportsDelegateLessAutomation.supported) {
@@ -168,28 +172,43 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
         pollingTriggerInterval,
       )
     val delay = Random.nextLong(upperBound)
-    DelayUtil
-      .delayIfNotClosing(
-        "dso-delegate-task-delay",
-        FiniteDuration.apply(delay, TimeUnit.MILLISECONDS),
-        this,
-      )
-      .onShutdown(logger.debug(s"Closing after waiting $delay ms"))
-      .flatMap(_ =>
-        isStaleTask(task).flatMap {
-          case true =>
-            Future.successful(
-              TaskSuccess(
-                s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
-              )
-            )
-          case false =>
-            logger.info(
-              s"Completing dso delegate task ${task.toString} after waiting a delay of $delay ms"
-            )
-            completeTaskAsDsoDelegate(task, svParty)
-        }
-      )
+    // Check for staleness first so we can quickly move on to other tasks.
+    // Otherwise we might block an execution slot for the wait time for a a stale task.
+    // If tasks get produced faster than our wait time this will lead to falling further and further behind.
+    isStaleTask(task).flatMap {
+      if (_) {
+        Future.successful(
+          TaskSuccess(
+            s"Skipping because task ${task.toString} is already completed"
+          )
+        )
+      } else {
+        DelayUtil
+          .delayIfNotClosing(
+            "dso-delegate-task-delay",
+            FiniteDuration.apply(delay, TimeUnit.MILLISECONDS),
+            this,
+          )
+          .onShutdown(logger.debug(s"Closing after waiting $delay ms"))
+          .flatMap(_ =>
+            // Check for staleness again, another SV may have completed it in the wait time.
+            isStaleTask(task).flatMap {
+              if (_) {
+                Future.successful(
+                  TaskSuccess(
+                    s"Skipping because task ${task.toString} is already completed after waiting a delay of $delay ms"
+                  )
+                )
+              } else {
+                logger.info(
+                  s"Completing dso delegate task ${task.toString} after waiting a delay of $delay ms"
+                )
+                completeTaskAsDsoDelegate(task, svParty)
+              }
+            }
+          )
+      }
+    }
   }
 
   protected def completeTaskAsDsoDelegate(

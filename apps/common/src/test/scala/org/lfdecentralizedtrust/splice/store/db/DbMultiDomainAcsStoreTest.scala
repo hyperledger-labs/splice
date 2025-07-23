@@ -1,17 +1,21 @@
 package org.lfdecentralizedtrust.splice.store.db
 
-import com.daml.ledger.javaapi.data.OffsetCheckpoint
+import com.daml.ledger.javaapi.data.{DamlRecord, Identifier, OffsetCheckpoint}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
-import org.lfdecentralizedtrust.splice.environment.ledger.api.TreeUpdateOrOffsetCheckpoint
+import org.lfdecentralizedtrust.splice.environment.ledger.api.{
+  TransactionTreeUpdate,
+  TreeUpdateOrOffsetCheckpoint,
+}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.store.StoreTest.testTxLogConfig
 import org.lfdecentralizedtrust.splice.store.{
   HardLimit,
   MultiDomainAcsStore,
   MultiDomainAcsStoreTest,
+  StoreTest,
   TestTxLogEntry,
 }
 import org.lfdecentralizedtrust.splice.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -19,13 +23,23 @@ import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationrequestv1,
+  holdingv1,
+}
+
 import java.util.Collections
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
+import org.slf4j.event.Level
 import slick.jdbc.JdbcProfile
+
+import java.time.Instant
+import scala.concurrent.Future
 
 class DbMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -84,14 +98,17 @@ class DbMultiDomainAcsStoreTest
         txLogId = Some(1),
         migrationId = 0,
         participantId = mkParticipantId("DbMultiDomainAcsStoreTest"),
-        filter = MultiDomainAcsStore.SimpleContractFilter(
-          dsoParty,
-          templateFilters = Map(
-            mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
+        filter =
+          MultiDomainAcsStore.SimpleContractFilter[BobbyTablesRowData, GenericInterfaceRowData](
+            dsoParty,
+            templateFilters = Map(
+              mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
+            ),
+            Map.empty,
           ),
-        ),
         acsTableName = "scan_acs_store", // to have extra columns
         txLogTableName = Some("txlog_store_template"),
+        interfaceViewsTableNameOpt = None,
       )
       val coupon = c(1)
       for {
@@ -135,8 +152,8 @@ class DbMultiDomainAcsStoreTest
         val store = mkStore(acsId = 0, txLogId = Some(0))
         for {
           _ <- store.ingestionSink.initialize()
-          _ <- acs(Seq((c(1), d1, 0L)))(store)
-          error <- acs(Seq((c(1), d1, 0L)))(store).failed
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store)
+          error <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store).failed
           _ = error.getMessage should include("already ingested")
         } yield succeed
       }
@@ -207,7 +224,7 @@ class DbMultiDomainAcsStoreTest
         val store1 = mkStore(acsId = 0, txLogId = Some(0))
         for {
           _ <- store0.ingestionSink.initialize()
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -229,7 +246,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           _ <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -252,7 +269,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -275,7 +292,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           tx <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -297,7 +314,7 @@ class DbMultiDomainAcsStoreTest
         for {
           r0 <- store0.ingestionSink.initialize()
           _ = r0 shouldBe IngestionStart.InitializeAcsAtLatestOffset
-          _ <- acs(Seq((c(1), d1, 0L)))(store0)
+          _ <- acs(Seq(StoreTest.AcsImportEntry(c(1), d1, 0L)))(store0)
           _ <- d1.create(c(2))(store0)
 
           r1 <- store1.ingestionSink.initialize()
@@ -336,6 +353,216 @@ class DbMultiDomainAcsStoreTest
       }
     }
 
+    "log view failures" in {
+      implicit val store = mkStore()
+      val contractsToFailedViews = (1 to 3).map { n =>
+        val contract = dummyHolding(providerParty(n), BigDecimal(n), dsoParty)
+        val failedView = com.google.rpc.Status
+          .newBuilder()
+          .setCode(n * 100)
+          .setMessage(s"test entry num $n")
+          .build()
+        contract -> failedView
+      }
+
+      for {
+        _ <- initWithAcs()
+        _ <- MonadUtil.sequentialTraverse(contractsToFailedViews) { case (contract, failedView) =>
+          ingestExpectingFailedInterfacesLog(
+            store,
+            Seq(
+              (
+                contract,
+                Map.empty[Identifier, DamlRecord],
+                Map(
+                  holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+                ),
+              )
+            ),
+          )
+        }
+        // nothing should be returned since they can't be parsed
+        expectedEmpty <- store.listInterfaceViews(
+          holdingv1.Holding.INTERFACE
+        )
+      } yield expectedEmpty shouldBe empty
+    }
+
+    "ingest successful interface views and ignore failed ones" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val contract = twoInterfaces(owner, BigDecimal(10.0), dsoParty, Instant.now())
+      val successfulView = holdingView(owner, BigDecimal(10.0), dsoParty, "id")
+      val failedView = com.google.rpc.Status
+        .newBuilder()
+        .setCode(500)
+        .setMessage("Failed view")
+        .build()
+
+      for {
+        _ <- initWithAcs()
+        _ <- ingestExpectingFailedInterfacesLog(
+          store,
+          Seq(
+            (
+              contract,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> successfulView.toValue
+              ),
+              Map(
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> failedView
+              ),
+            )
+          ),
+        )
+        result1 <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        result2 <- store.listInterfaceViews(allocationrequestv1.AllocationRequest.INTERFACE)
+      } yield {
+        result1 should be(
+          Seq(
+            Contract(
+              holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+              new holdingv1.Holding.ContractId(contract.contractId.contractId),
+              successfulView,
+              contract.createdEventBlob,
+              contract.createdAt,
+            )
+          )
+        )
+        result2 shouldBe empty
+      }
+    }
+
+    "ingest several contracts in a single transaction with mixed successful / failed interface views" in {
+      implicit val store = mkStore()
+      val contract1 = twoInterfaces(providerParty(1), BigDecimal(10.0), dsoParty, Instant.now())
+      val contract2 = twoInterfaces(providerParty(2), BigDecimal(20.0), dsoParty, Instant.now())
+      val contract3 = twoInterfaces(providerParty(3), BigDecimal(30.0), dsoParty, Instant.now())
+      val contract4 = twoInterfaces(providerParty(4), BigDecimal(40.0), dsoParty, Instant.now())
+
+      for {
+        _ <- initWithAcs()
+        // 1 -> all good; 2 -> holding failed; 3 -> allocation request failed; 4 -> both failed
+        _ <- ingestExpectingFailedInterfacesLog(
+          store,
+          Seq[
+            (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
+          ](
+            (
+              contract1,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView(
+                  providerParty(1),
+                  BigDecimal(10.0),
+                  dsoParty,
+                  "1",
+                ).toValue,
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> allocationRequestView(
+                  dsoParty,
+                  Instant.now(),
+                ).toValue,
+              ),
+              Map(
+              ),
+            ),
+            (
+              contract2,
+              Map(
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> allocationRequestView(
+                  dsoParty,
+                  Instant.now(),
+                ).toValue
+              ),
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed holding view"
+                )
+              ),
+            ),
+            (
+              contract3,
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> holdingView(
+                  providerParty(3),
+                  BigDecimal(30.0),
+                  dsoParty,
+                  "3",
+                ).toValue
+              ),
+              Map(
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed allocation request view"
+                )
+              ),
+            ),
+            (
+              contract4,
+              Map(
+              ),
+              Map(
+                holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed holding view"
+                ),
+                allocationrequestv1.AllocationRequest.INTERFACE_ID_WITH_PACKAGE_ID -> failedViewStatus(
+                  "Failed allocation request view"
+                ),
+              ),
+            ),
+          ),
+        )
+        resultHolding <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        resultAllocationRequest <- store.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield {
+        resultHolding.map(_.contractId.contractId) should be(
+          Seq(contract1.contractId.contractId, contract3.contractId.contractId)
+        )
+        resultAllocationRequest.map(_.contractId.contractId) should be(
+          Seq(contract1.contractId.contractId, contract2.contractId.contractId)
+        )
+      }
+    }
+
+  }
+
+  private def failedViewStatus(msg: String) = {
+    com.google.rpc.Status
+      .newBuilder()
+      .setCode(500)
+      .setMessage(msg)
+      .build()
+  }
+
+  private def ingestExpectingFailedInterfacesLog(
+      store: DbMultiDomainAcsStore[?],
+      contracts: Seq[
+        (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
+      ],
+  ): Future[Unit] = {
+    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+      // using `d1.create` has an inner log assertion that breaks the one above
+      store.testIngestionSink.underlying.ingestUpdate(
+        d1,
+        TransactionTreeUpdate(
+          mkCreateTxWithInterfaces(
+            nextOffset(),
+            contracts,
+            defaultEffectiveAt,
+            Seq(dsoParty),
+            d1,
+            "",
+          )
+        ),
+      ),
+      entries => {
+        forAll(entries) { entry =>
+          entry.message should include(
+            "Found failed interface views that match an interface id in a filter"
+          ).or(include(RepeatedIngestionWarningMessage))
+        }
+      },
+    )
   }
 
   private def storeDescriptor(id: Int, participantId: ParticipantId) =
@@ -354,7 +581,10 @@ class DbMultiDomainAcsStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
+      filter: MultiDomainAcsStore.ContractFilter[
+        GenericAcsRowData,
+        GenericInterfaceRowData,
+      ],
   ) = {
     mkStoreWithAcsRowDataF(
       acsId,
@@ -364,6 +594,7 @@ class DbMultiDomainAcsStoreTest
       filter,
       "acs_store_template",
       txLogId.map(_ => "txlog_store_template"),
+      Some("interface_views_template"),
     )
   }
 
@@ -372,12 +603,15 @@ class DbMultiDomainAcsStoreTest
       txLogId: Option[Int],
       migrationId: Long,
       participantId: ParticipantId,
-      filter: MultiDomainAcsStore.ContractFilter[R],
+      filter: MultiDomainAcsStore.ContractFilter[R, GenericInterfaceRowData],
       acsTableName: String,
       txLogTableName: Option[String],
+      interfaceViewsTableNameOpt: Option[String],
   ) = {
     val packageSignatures =
-      ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.amulet.all)
+      ResourceTemplateDecoder.loadPackageSignaturesFromResources(
+        DarResources.amulet.all ++ DarResources.TokenStandard.allPackageResources.flatMap(_.all)
+      )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
@@ -385,6 +619,7 @@ class DbMultiDomainAcsStoreTest
       storage,
       acsTableName,
       txLogTableName,
+      interfaceViewsTableNameOpt,
       storeDescriptor(acsId, participantId),
       txLogId.map(storeDescriptor(_, participantId)),
       loggerFactory,
@@ -407,7 +642,8 @@ class DbMultiDomainAcsStoreTest
     } yield ()
   }
 
-  case class BobbyTablesRowData(contract: Contract[?, ?]) extends AcsRowData {
+  case class BobbyTablesRowData(contract: Contract[?, ?])
+      extends AcsRowData.AcsRowDataFromContract {
     override def contractExpiresAt: Option[Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq(

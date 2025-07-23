@@ -10,6 +10,9 @@ template TransferPreapprovalProposal
   with
     receiver: Party
     provider: Party
+    expectedDso : Optional Party
+      -- ^ The DSO party that the receiver expects to bet set on the transfer preapproval.
+      -- Must be set. It is only optional due to being introduced as part of a smart-contract upgrade.
   where
     signatory receiver
     observer provider
@@ -30,6 +33,7 @@ template TransferPreapprovalProposal
             receiver
             provider
             expiresAt
+            expectedDso
         return TransferPreapprovalProposal_AcceptResult with ..
 
 data TransferPreapprovalProposal_AcceptResult = TransferPreapprovalProposal_AcceptResult with

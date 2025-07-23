@@ -17,6 +17,7 @@ import { SweepConfig } from 'splice-pulumi-common-validator';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
+import { SingleSvConfiguration } from './singleSvConfig';
 import {
   StaticCometBftConfig,
   StaticCometBftConfigWithNodeName,
@@ -61,7 +62,7 @@ export type SequencerPruningConfig = {
   retentionPeriod?: string;
 };
 
-export interface SvConfig extends StaticSvConfig {
+export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
   isFirstSv: boolean;
   auth0Client: Auth0Client;
   nodeConfigs: {
@@ -95,6 +96,23 @@ export const SvConfigSchema = z.object({
       scan: z
         .object({
           enableImportUpdatesBackfill: z.boolean().optional(),
+          rateLimit: z
+            .object({
+              acs: z
+                .object({
+                  limit: z.number(),
+                })
+                .optional(),
+            })
+            .optional(),
+        })
+        .optional(),
+      synchronizer: z
+        .object({
+          skipInitialization: z.boolean().default(false),
+          // This can be used on clusters like CILR where we usually would expect to skip initialization but the sv runbook gets reset periodically.
+          forceSvRunbookInitialization: z.boolean().default(false),
+          topologyChangeDelay: z.string().optional(),
         })
         .optional(),
     })
@@ -106,13 +124,13 @@ export type Config = z.infer<typeof SvConfigSchema>;
 
 // eslint-disable-next-line
 // @ts-ignore
-export const svConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
+export const svsConfig = SvConfigSchema.parse(clusterYamlConfig).sv;
 
 // eslint-disable-next-line
 // @ts-ignore
 export const initialRound = SvConfigSchema.parse(clusterYamlConfig).initialRound;
 
-export const updateHistoryBackfillingValues = svConfig?.scan?.enableImportUpdatesBackfill
+export const updateHistoryBackfillingValues = svsConfig?.scan?.enableImportUpdatesBackfill
   ? {
       updateHistoryBackfilling: {
         enabled: true,

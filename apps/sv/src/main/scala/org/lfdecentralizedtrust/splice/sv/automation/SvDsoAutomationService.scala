@@ -15,11 +15,8 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   aTrigger,
 }
 import org.lfdecentralizedtrust.splice.automation.{
-  AmuletConfigReassignmentTrigger,
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-  TransferFollowTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
@@ -227,6 +224,7 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
+        config.topologyChangeDelayDuration,
       )
     )
 
@@ -302,7 +300,6 @@ class SvDsoAutomationService(
 
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
-    registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
       new AnsSubscriptionInitialPaymentTrigger(
         triggerContext,
@@ -394,18 +391,20 @@ class SvDsoAutomationService(
       )
     )
 
-  localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
-    registerTrigger(
-      new LocalSequencerConnectionsTrigger(
-        triggerContext,
-        participantAdminConnection,
-        internalClientConfig.decentralizedSynchronizerAlias,
-        dsoStore,
-        internalClientConfig.sequencerInternalConfig,
-        config.participantClient.sequencerRequestAmplification,
-        config.domainMigrationId,
+  if (!config.bftSequencerConnection) {
+    localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
+      registerTrigger(
+        new LocalSequencerConnectionsTrigger(
+          triggerContext,
+          participantAdminConnection,
+          internalClientConfig.decentralizedSynchronizerAlias,
+          dsoStore,
+          internalClientConfig.sequencerInternalConfig,
+          config.participantClient.sequencerRequestAmplification,
+          config.domainMigrationId,
+        )
       )
-    )
+    }
   }
 
   localSequencerClientContext.foreach { sequencerContext =>
@@ -471,9 +470,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ArchiveClosedMiningRoundsTrigger],
       aTrigger[ElectionRequestTrigger],
       aTrigger[RestartDsoDelegateBasedAutomationTrigger],
-      aTrigger[AmuletConfigReassignmentTrigger],
-      aTrigger[AssignTrigger],
-      aTrigger[TransferFollowTrigger],
       aTrigger[AnsSubscriptionInitialPaymentTrigger],
       aTrigger[SvPackageVettingTrigger],
       aTrigger[SvOffboardingPartyToParticipantProposalTrigger],

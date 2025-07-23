@@ -1854,6 +1854,14 @@
           "schema": "participant",
           "secretName": "participant-3-pg-secrets"
         },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
+        },
         "serviceAccountName": "sv-canton-migration-3",
         "tolerations": [
           {
@@ -1997,6 +2005,14 @@
           "postgresName": "participant-4-pg",
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
         },
         "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [
@@ -2681,7 +2697,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26306
         },
-        "logLevel": "info",
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "labels": [
@@ -2778,7 +2794,7 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": 26406
         },
-        "logLevel": "info",
+        "logLevel": "debug",
         "metrics": {
           "enable": true,
           "labels": [
@@ -2995,7 +3011,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "INFO",
+        "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_3",
@@ -3082,7 +3098,7 @@
         },
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "INFO",
+        "logLevel": "DEBUG",
         "mediator": {
           "persistence": {
             "databaseName": "mediator_4",
@@ -3635,7 +3651,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "INFO",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -3655,6 +3671,14 @@
           "postgresName": "participant-3-pg",
           "schema": "participant",
           "secretName": "participant-3-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
         },
         "serviceAccountName": "sv-canton-migration-3",
         "tolerations": [
@@ -3779,7 +3803,7 @@
         "enableHealthProbes": true,
         "enablePostgresMetrics": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "logLevel": "INFO",
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -3799,6 +3823,14 @@
           "postgresName": "participant-4-pg",
           "schema": "participant",
           "secretName": "participant-4-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "18Gi"
+          },
+          "requests": {
+            "memory": "12Gi"
+          }
         },
         "serviceAccountName": "sv-canton-migration-4",
         "tolerations": [

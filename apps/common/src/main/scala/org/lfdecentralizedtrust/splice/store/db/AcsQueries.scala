@@ -376,7 +376,11 @@ object AcsQueries {
 
   object SelectFromAcsTableWithStateResult {
     def sqlColumnsCommaSeparated(qualifier: String = "") =
-      SelectFromAcsTableResult.sqlColumnsCommaSeparated(qualifier) + s""",
+      SelectFromAcsTableResult.sqlColumnsCommaSeparated(
+        qualifier
+      ) + "," + stateColumnsCommaSeparated(qualifier)
+
+    def stateColumnsCommaSeparated(qualifier: String = "") = s"""
         ${qualifier}state_number,
         ${qualifier}assigned_domain,
         ${qualifier}reassignment_counter,

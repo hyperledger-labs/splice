@@ -13,7 +13,12 @@ import org.lfdecentralizedtrust.splice.splitwell.config.SplitwellSynchronizerCon
 import org.lfdecentralizedtrust.splice.splitwell.store.SplitwellStore
 import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import org.lfdecentralizedtrust.splice.store.{LimitHelpers, MultiDomainAcsStore}
-import org.lfdecentralizedtrust.splice.store.db.{AcsQueries, AcsTables, DbAppStore}
+import org.lfdecentralizedtrust.splice.store.db.{
+  AcsInterfaceViewRowData,
+  AcsQueries,
+  AcsTables,
+  DbAppStore,
+}
 import org.lfdecentralizedtrust.splice.util.{
   AssignedContract,
   Contract,
@@ -47,6 +52,7 @@ class DbSplitwellStore(
 ) extends DbAppStore(
       storage = storage,
       acsTableName = SplitwellTables.acsTableName,
+      interfaceViewsTableNameOpt = None,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
@@ -72,7 +78,8 @@ class DbSplitwellStore(
   import MultiDomainAcsStore.*
   override lazy val acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
+        org.lfdecentralizedtrust.splice.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] = SplitwellStore.contractFilter(key)
 
   import multiDomainAcsStore.waitUntilAcsIngested

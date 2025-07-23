@@ -49,7 +49,10 @@ class TerminatedSubscriptionTrigger(
         task.contract.payload.reference
       )
       dsoRules <- svTaskContext.dsoStore.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
 
       _ <- ansEntryContextO match {
         case None =>
@@ -59,20 +62,22 @@ class TerminatedSubscriptionTrigger(
             )
             .asRuntimeException()
         case Some(ansEntryContext) =>
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_TerminateSubscription(
+              ansEntryContext.contractId,
+              task.contractId,
+              controllerArgument,
+            )
+          )
           for {
             _ <- svTaskContext.connection
               .submit(
                 Seq(svParty),
                 Seq(dsoParty),
-                dsoRules.exercise(
-                  _.exerciseDsoRules_TerminateSubscription(
-                    ansEntryContext.contractId,
-                    task.contractId,
-                    controllerArgument,
-                  )
-                ),
+                cmd,
               )
               .noDedup
+              .withPreferredPackage(preferredPackageIds)
               .yieldUnit()
           } yield ()
       }

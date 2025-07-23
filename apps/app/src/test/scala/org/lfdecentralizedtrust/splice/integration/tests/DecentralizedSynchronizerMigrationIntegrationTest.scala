@@ -19,6 +19,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.HexString
 import org.apache.pekko.http.scaladsl.model.Uri
+import org.lfdecentralizedtrust.splice.automation.Trigger
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
@@ -452,6 +453,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       },
     )
 
+    val triggersBefore = (sv2Backend.dsoAutomation.triggers[Trigger] ++ sv2Backend.svAutomation
+      .triggers[Trigger]).map(_.getClass.getCanonicalName)
+
     clue("All sequencers are registered") {
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
@@ -747,12 +751,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             checkMigrateDomainOnNodes(majorityUpgradeNodes, testDsoParty)
 
-            clue("SvNamespaceMembershipTrigger is running") {
-              loggerFactory.assertEventuallyLogsSeq_(SuppressionRule.LevelAndAbove(Level.DEBUG))(
-                logs =>
-                  forAtLeast(1, logs) {
-                    _.loggerName should include("SvNamespaceMembershipTrigger")
-                  }
+            clue("Triggers are the same as before migration") {
+              val triggersAfter =
+                (sv2LocalBackend.dsoAutomation.triggers[Trigger] ++ sv2LocalBackend.svAutomation
+                  .triggers[Trigger]).map(_.getClass.getCanonicalName)
+              triggersAfter should contain theSameElementsAs triggersBefore.filter(t =>
+                t != "org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger"
               )
             }
 

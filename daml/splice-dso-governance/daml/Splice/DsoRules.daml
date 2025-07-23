@@ -1202,6 +1202,7 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
+        _ <- getAndValidateSvParty this sv
         result <- exercise subscriptionIdleStateCid choiceArg
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso result.terminatedSubscription)
         pure DsoRules_ExpireSubscriptionResult
@@ -1358,19 +1359,14 @@ template DsoRules with
          cid <- create $ maximumOn (\state -> state.state.lastRoundCollected) rewardStates
          pure $ DsoRules_MergeSvRewardStateResult cid
 
+    -- __Deprecated__ AmuletConfigSchedule futureValues is not used anymore.
     nonconsuming choice DsoRules_PruneAmuletConfigSchedule : DsoRules_PruneAmuletConfigScheduleResult
       with
         amuletRulesCid : ContractId AmuletRules
         sv : Optional Party
       controller sv
       do _ <- getAndValidateSvParty this sv
-         now <- getTime
-         amuletRules <- fetchAndArchive (ForDso dso) amuletRulesCid
-         case pruneAtLeastOne now amuletRules.configSchedule of
-           None -> abort ("Must have at least one scheduled config in futureValues with a timestamp <= " <> show now)
-           Some newSchedule -> do
-             newAmuletRules <- create amuletRules with configSchedule = newSchedule
-             pure $ DsoRules_PruneAmuletConfigScheduleResult newAmuletRules
+         deprecatedChoice "splice-dso-governance" "0.1.16" "DsoRules_PruneAmuletConfigSchedule"
 
     -- external party
     -----------------

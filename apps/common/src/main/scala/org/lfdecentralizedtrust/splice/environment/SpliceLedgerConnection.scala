@@ -3,18 +3,44 @@
 
 package org.lfdecentralizedtrust.splice.environment
 
-import org.apache.pekko.{Done, NotUsed}
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
-import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
-import cats.syntax.traverse.*
+import com.daml.ledger.api.v2 as lapi
+import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
+import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
+import com.daml.ledger.api.v2.package_reference.PackageReference
+import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
+import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
 import com.digitalasset.base.error.ErrorResource
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.base.error.utils.ErrorDetails.ResourceInfoDetail
-import com.daml.ledger.api.v2.admin.{ObjectMetaOuterClass, UserManagementServiceOuterClass}
-import com.daml.ledger.api.v2.admin.identity_provider_config_service.IdentityProviderConfig
-import com.daml.ledger.javaapi.data.{Command, CreatedEvent, ExercisedEvent, TransactionTree, User}
-import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.admin.api.client.data.PartyDetails
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.error.LedgerApiErrors
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  FutureUnlessShutdown,
+  SyncCloseable,
+}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
+import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
+import com.digitalasset.daml.lf.data.Ref
+import com.google.protobuf.field_mask.FieldMask
+import io.grpc.{Status, StatusRuntimeException}
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
+import org.apache.pekko.{Done, NotUsed}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
   DedupConfig,
@@ -30,27 +56,7 @@ import org.lfdecentralizedtrust.splice.util.{
   ContractWithState,
   DisclosedContracts,
 }
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  FutureUnlessShutdown,
-  SyncCloseable,
-}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.InactiveContracts
-import com.daml.ledger.api.v2 as lapi
-import com.daml.ledger.api.v2.package_reference.PackageReference
-import com.digitalasset.canton.admin.api.client.data.PartyDetails
-import com.digitalasset.canton.topology.{Namespace, PartyId, SynchronizerId, UniqueIdentifier}
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.{LoggerUtil, PekkoUtil}
-import com.digitalasset.canton.util.ShowUtil.*
-import com.google.protobuf.field_mask.FieldMask
-import io.grpc.{Status, StatusRuntimeException}
+import shapeless.<:!<
 
 import java.security.MessageDigest
 import java.util.UUID
@@ -60,11 +66,6 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Pro
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
-import shapeless.<:!<
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.daml.lf.data.Ref
 
 /** BaseLedgerConnection is a read-only ledger connection, typically used during initialization when we don't
   * want to allow command submissions yet.
@@ -559,8 +560,10 @@ class BaseLedgerConnection(
       identityProviderIds: Seq[Option[String]] = Seq(None) ++ identityProviderConfigs.map(
         (c: IdentityProviderConfig) => Some(c.identityProviderId)
       )
-      allUsers <- identityProviderIds.traverse(listAllUsersProto(None, 1000, _)).map(_.flatten)
-      allUserData <- allUsers.traverse { user =>
+      allUsers <- MonadUtil
+        .sequentialTraverse(identityProviderIds)(listAllUsersProto(None, 1000, _))
+        .map(_.flatten)
+      allUserData <- MonadUtil.sequentialTraverse(allUsers) { user =>
         for {
           rights <- client.listUserRights(
             user.getId,
@@ -612,19 +615,26 @@ class BaseLedgerConnection(
 
   def getSupportedPackageVersion(
       synchronizerId: SynchronizerId,
-      parties: Seq[PartyId],
-      packageName: String,
+      packageRequirements: Seq[(String, Seq[PartyId])],
       vettingAsOfTime: CantonTimestamp,
-  )(implicit tc: TraceContext): Future[Option[PackageReference]] = {
+  )(implicit tc: TraceContext): Future[Seq[PackageReference]] = {
     retryProvider.retryForClientCalls(
       "get_supported_package_version",
-      s"Get the supported package version for package $packageName on synchronizer $synchronizerId and parties $parties with vetting time ${vettingAsOfTime}",
-      client.getSupportedPackageVersion(
-        synchronizerId,
-        parties,
-        packageName,
-        vettingAsOfTime,
-      ),
+      s"Get the supported package version for packageRequirements $packageRequirements on synchronizer $synchronizerId with vetting time ${vettingAsOfTime}",
+      client
+        .getSupportedPackageVersion(
+          synchronizerId,
+          packageRequirements,
+          vettingAsOfTime,
+        )
+        .recover {
+          case ex: StatusRuntimeException
+              if ErrorDetails.matches(ex, LedgerApiErrors.NoPreferredPackagesFound) =>
+            logger.info(
+              s"No preferred packages found for packageRequirements $packageRequirements on synchronizer $synchronizerId with vetting time $vettingAsOfTime"
+            )
+            Seq.empty
+        },
       logger,
     )
   }
@@ -988,7 +998,8 @@ class SpliceLedgerConnection(
       verifyEnoughExtraTrafficRemains(synchronizerId, priority)
         .map(_ => commandOut.run(update).toList)
         .flatMap { commands =>
-          import SubmitResult.*, LedgerClient.SubmitAndWaitFor as WF
+          import LedgerClient.SubmitAndWaitFor as WF
+          import SubmitResult.*
           val (commandId, deduplicationConfig) = dedup.split(commandIdDeduplicationOffset)
 
           def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (Long, U)): Future[U] =

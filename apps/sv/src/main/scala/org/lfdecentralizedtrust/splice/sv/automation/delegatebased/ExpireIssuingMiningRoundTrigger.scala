@@ -43,10 +43,14 @@ class ExpireIssuingMiningRoundTrigger(
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
+    val roundNumber = round.payload.round.number
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_MiningRound_Close(
           amuletRules.contractId,
@@ -57,8 +61,9 @@ class ExpireIssuingMiningRoundTrigger(
       cid <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
-    } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
+    } yield TaskSuccess(s"successfully created the closed mining round $roundNumber with cid $cid")
   }
 }
 

@@ -48,7 +48,7 @@ import {
   SvParticipant,
   updateHistoryBackfillingValues,
 } from 'splice-pulumi-common-sv';
-import { SvConfig } from 'splice-pulumi-common-sv/src/config';
+import { svsConfig, SvConfig } from 'splice-pulumi-common-sv/src/config';
 import {
   installValidatorApp,
   installValidatorSecrets,
@@ -65,6 +65,7 @@ import {
 } from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
+import { installInfo } from './info';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -255,14 +256,22 @@ export async function installSvNode(
 
   const scan = installScan(
     xns,
-    config.isFirstSv,
+    config,
     decentralizedSynchronizerUpgradeConfig,
-    config.nodeName,
     dependsOn,
     canton.decentralizedSynchronizer,
     svApp,
     canton.participant,
     appsPostgres
+  );
+
+  installInfo(
+    xns,
+    `info.${config.ingressName}.${CLUSTER_HOSTNAME}`,
+    'cluster-ingress/cn-http-gateway',
+    decentralizedSynchronizerUpgradeConfig,
+    `http://scan-app.${config.nodeName}:5012`,
+    scan
   );
 
   if (baseConfig.scanBigQuery && appsPostgres instanceof postgres.CloudPostgres) {
@@ -300,6 +309,13 @@ export async function installSvNode(
         hostname: CLUSTER_HOSTNAME,
         svNamespace: xns.logicalName,
         svIngressName: config.ingressName,
+      },
+      rateLimit: {
+        scan: {
+          acs: {
+            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
+          },
+        },
       },
     },
     activeVersion,
@@ -370,6 +386,7 @@ async function installValidator(
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
+    logLevel: svConfig.logging?.appsLogLevel,
   });
 
   return validator;
@@ -436,6 +453,7 @@ function installSvApp(
               enableBftSequencer: true,
             }
           : {}),
+        skipInitialization: svsConfig?.synchronizer?.skipInitialization,
       },
     scan: {
       publicUrl: `https://scan.${config.ingressName}.${CLUSTER_HOSTNAME}`,
@@ -475,6 +493,15 @@ function installSvApp(
     delegatelessAutomation: delegatelessAutomation,
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    logLevel: config.logging?.appsLogLevel,
+    additionalEnvVars: svsConfig?.synchronizer?.topologyChangeDelay
+      ? [
+          {
+            name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
+            value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
+          },
+        ]
+      : undefined,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -503,9 +530,8 @@ function installSvApp(
 
 function installScan(
   xns: ExactNamespace,
-  isFirstSv: boolean,
+  config: SvConfig,
   decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
-  nodename: string,
   dependsOn: CnInput<Resource>[],
   decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: pulumi.Resource,
@@ -513,7 +539,7 @@ function installScan(
   postgres: Postgres
 ) {
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
-  const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
+  const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
   const externalSequencerP2pAddress = (
     decentralizedSynchronizerNode as unknown as CantonBftSynchronizerNode
   ).externalSequencerP2pAddress;
@@ -522,7 +548,7 @@ function installScan(
     metrics: {
       enable: true,
     },
-    isFirstSv: isFirstSv,
+    isFirstSv: config.isFirstSv,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch,
@@ -543,6 +569,7 @@ function installScan(
         }
       : {}),
     enablePostgresMetrics: true,
+    logLevel: config.logging?.appsLogLevel,
     ...updateHistoryBackfillingValues,
   };
 

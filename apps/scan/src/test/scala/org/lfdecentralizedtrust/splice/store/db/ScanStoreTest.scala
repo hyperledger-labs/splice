@@ -1399,6 +1399,7 @@ abstract class ScanStoreTest
             transferCmd.payload.expiresAt,
             transferCmd.payload.nonce,
             transferCmd.payload.description,
+            Optional.of(dsoParty.toProtoPrimitive),
           ).toValue,
           new splice.externalpartyamuletrules.ExternalPartyAmuletRules_CreateTransferCommandResult(
             transferCmd.contractId
@@ -1978,12 +1979,14 @@ trait AmuletTransferUtil { self: StoreTest =>
     new splice.amuletrules.AmuletRules_Transfer(
       transfer,
       mkTransferContext(),
+      Optional.of(dsoParty.toProtoPrimitive),
     ).toValue
 
   def mkAmuletRulesTransfer(receiver: PartyId, amount: Double) =
     new splice.amuletrules.AmuletRules_Transfer(
       mkTransfer(receiver, amount),
       mkTransferContext(),
+      Optional.of(dsoParty.toProtoPrimitive),
     ).toValue
 
   def mkTransferSummary(
@@ -2120,6 +2123,7 @@ trait AmuletTransferUtil { self: StoreTest =>
           dummyDomain.toProtoPrimitive,
           domainMigrationId,
           extraTraffic,
+          Optional.of(dsoParty.toProtoPrimitive),
         ).toValue,
         mkAmuletRules_BuyMemberTrafficResult(
           round = round,
@@ -2350,7 +2354,7 @@ class DbScanStoreTest
       ),
       participantId = mkParticipantId("ScanStoreTest"),
       enableImportUpdateBackfill = true,
-      new DbScanStoreMetrics(new NoOpMetricsFactory()),
+      new DbScanStoreMetrics(new NoOpMetricsFactory(), loggerFactory, timeouts),
       initialRound = 0,
     )(parallelExecutionContext, implicitly, implicitly)
 

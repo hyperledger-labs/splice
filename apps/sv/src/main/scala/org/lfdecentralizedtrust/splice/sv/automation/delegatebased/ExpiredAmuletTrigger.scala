@@ -37,7 +37,10 @@ class ExpiredAmuletTrigger(
     for {
       latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_Amulet_Expire(
           co.work.contractId,
@@ -54,6 +57,7 @@ class ExpiredAmuletTrigger(
           update = cmd,
         )
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess("archived expired amulet")
 }

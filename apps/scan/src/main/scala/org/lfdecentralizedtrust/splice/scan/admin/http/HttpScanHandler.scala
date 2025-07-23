@@ -4,10 +4,9 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.{NonEmptyVector, OptionT}
-import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -1114,8 +1113,8 @@ class HttpScanHandler(
           nonce,
           HttpScanHandler.MAX_TRANSFER_COMMAND_CONTRACTS,
         )
-        filteredMap <- txLogEntryMap.view.toList
-          .traverseFilter { case (cid, entry) =>
+        filteredMap <- MonadUtil
+          .sequentialTraverse(txLogEntryMap.view.toList) { case (cid, entry) =>
             // The update history ingests independently so this lookup can return None temporarily.
             // We just filter out those contracts.
             store.updateHistory
@@ -1129,7 +1128,7 @@ class HttpScanHandler(
                 )
               )
           }
-          .map(_.toMap)
+          .map(_.flatten.toMap)
       } yield {
         if (filteredMap.isEmpty) {
           v0.ScanResource.LookupTransferCommandStatusResponseNotFound(
@@ -2040,8 +2039,8 @@ class HttpScanHandler(
   ): Future[ScanResource.ListSvBftSequencersResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listSvBftSequencers") { _ => _ =>
-      bftSequencers
-        .traverse { case (sequencerAdminConnection, bftSequencer) =>
+      MonadUtil
+        .sequentialTraverse(bftSequencers) { case (sequencerAdminConnection, bftSequencer) =>
           for {
             sequencerId <- sequencerAdminConnection.getSequencerId
           } yield {

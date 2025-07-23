@@ -6,13 +6,24 @@ package org.lfdecentralizedtrust.splice.scan.store.db
 import com.daml.metrics.api.MetricHandle.{Gauge, LabeledMetricsFactory}
 import com.daml.metrics.api.MetricQualification.Latency
 import com.daml.metrics.api.{MetricInfo, MetricName, MetricsContext}
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.{FlagCloseable, LifeCycle, UnlessShutdown}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.CacheMetrics
+import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 import org.lfdecentralizedtrust.splice.store.HistoryMetrics
 
 class DbScanStoreMetrics(
-    metricsFactory: LabeledMetricsFactory
-) extends AutoCloseable {
+    metricsFactory: LabeledMetricsFactory,
+    val loggerFactory: NamedLoggerFactory,
+    val timeouts: ProcessingTimeout,
+) extends FlagCloseable
+    with NamedLogging {
+
+  // storing the caches as they have to be closed so that all the created gauges are closed
+  private val cacheOfMetrics = scala.collection.concurrent
+    .TrieMap[String, CacheMetrics]()
 
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "scan_store"
 
@@ -38,14 +49,32 @@ class DbScanStoreMetrics(
       -1L,
     )(MetricsContext.Empty)
 
-  val totalAmuletBalanceCache =
-    new CacheMetrics(prefix :+ "total_amulet_balance_cache", metricsFactory)
-  val svNodeStateCache = new CacheMetrics(prefix :+ "sv_node_state_cache", metricsFactory)
+  def registerNewCacheMetrics(
+      cacheName: String
+  )(implicit tc: TraceContext): UnlessShutdown[CacheMetrics] =
+    performUnlessClosing(s"register cache $cacheName") {
+      cacheOfMetrics.getOrElseUpdate(
+        cacheName, {
+          logger.info(s"Registering new cache metrics for $cacheName")
+          new CacheMetrics(cacheName, metricsFactory)
+        },
+      )
+    }
 
   val history = new HistoryMetrics(metricsFactory)(MetricsContext.Empty)
 
-  override def close() = {
-    try earliestAggregatedRound.close()
-    finally latestAggregatedRound.close()
+  override protected def onClosed(): Unit = {
+    LifeCycle.close(
+      (Seq(earliestAggregatedRound, latestAggregatedRound, history) ++
+        cacheOfMetrics.values
+          .map(cache =>
+            new AutoCloseable {
+              override def close(): Unit = cache.closeAcquired()
+            }
+          )
+          .toSeq)*
+    )(logger)
+    cacheOfMetrics.clear()
   }
+
 }

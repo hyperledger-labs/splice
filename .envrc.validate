@@ -13,7 +13,7 @@ function expect_envvar() {
     done
 
     if (( ${#missing[@]} != 0 )); then
-        msg="Expected private environment variable(s) undefined:"
+        msg="Some private environment variable(s) undefined and may cause certain tests to not succeed locally:"
         for varname in "${missing[@]}"; do
             msg="${msg}\n*  ${varname}"
         done
@@ -37,4 +37,9 @@ if [[ -z "$IGNORE_PRIVATE_ENVRC" ]]; then
         AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET \
         ARTIFACTORY_USER \
         ARTIFACTORY_PASSWORD
+fi
+
+if [ "$IS_ENTERPRISE" != "true" ]; then
+    echo ""
+    _warning "Note: Using Canton community instead of Canton enterprise. Certain tests which rely on Enterprise features will fail locally."
 fi

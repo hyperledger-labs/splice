@@ -87,9 +87,6 @@ unexpected exception: Task slick.*rejected from slick.util.AsyncExecutorWithMetr
 # TODO (#944): investigate what task is it still running and see if we can somehow fix it
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
-# TODO (#939): we don't close cache metrics created by DbScanStoreMetrics
-Instrument daml.cache.* has recorded multiple values for the same attributes
-
 Consensus not reached.*BftScanConnection:BftScanConnectionTest.*
 
 # internal selenium error. Potentially intermittent
@@ -120,6 +117,6 @@ Failed to connect to scan of .*DisasterRecoveryIntegrationTest
 Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 
 # Log suppression doesn't seem to work here as the tests use a different logger
-topup interval 1 second must not be smaller than the polling interval 30 seconds.*SpliceConfigTest
+GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
 # Make sure to have a trailing newline

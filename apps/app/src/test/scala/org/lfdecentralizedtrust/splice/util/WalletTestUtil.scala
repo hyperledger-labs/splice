@@ -12,15 +12,13 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
   subscriptions as subsCodegen,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
-
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferOutput
-
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{AmuletRules, TransferOutput}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.IssuingMiningRound
 import org.lfdecentralizedtrust.splice.console.{ValidatorAppBackendReference, *}
 import org.lfdecentralizedtrust.splice.http.v0.definitions as d0
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  TestCommon,
   SpliceTestConsoleEnvironment,
+  TestCommon,
 }
 import org.lfdecentralizedtrust.splice.scan.dso.DsoAnsResolver
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractState
@@ -29,11 +27,13 @@ import org.lfdecentralizedtrust.splice.wallet.admin.api.client.commands.HttpWall
 import org.lfdecentralizedtrust.splice.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
+import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport}
 import org.scalatest.Assertion
 
 import java.time.Duration
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -48,9 +48,9 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
   val defaultWalletAmuletPrice = SpliceUtil.damlDecimal(0.005)
   def walletAmuletPrice = defaultWalletAmuletPrice
 
-  def walletUsdToAmulet(usd: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice) =
+  def walletUsdToAmulet(usd: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice): BigDecimal =
     (usd / amuletPrice).setScale(10, RoundingMode.HALF_UP)
-  def walletAmuletToUsd(cc: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice) =
+  def walletAmuletToUsd(cc: BigDecimal, amuletPrice: BigDecimal = walletAmuletPrice): BigDecimal =
     (cc * amuletPrice).setScale(10, RoundingMode.HALF_UP)
 
   lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(SpliceUtil.defaultHoldingFee.rate)
@@ -992,6 +992,31 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       appRewardBalance -> validatorRewardBalance
     }
 
+  /** Directly creates a new unclaimed reward. */
+  def createUnclaimedReward(
+      participantClient: ParticipantClientReference,
+      userId: String,
+      amount: BigDecimal = BigDecimal(10),
+      synchronizerId: Option[SynchronizerId] = None,
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): amuletCodegen.UnclaimedReward.ContractId = {
+    val unclaimedReward =
+      new amuletCodegen.UnclaimedReward(
+        dsoParty.toProtoPrimitive,
+        amount.bigDecimal,
+      ).create
+    val created = participantClient.ledger_api_extensions.commands
+      .submitWithResult(
+        userId = userId,
+        actAs = Seq(dsoParty),
+        readAs = Seq.empty,
+        update = unclaimedReward,
+        synchronizerId = synchronizerId,
+      )
+    created.contractId
+  }
+
   protected def retryCommandSubmission[T](f: => T) = {
     eventually() {
       try {
@@ -1152,6 +1177,10 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       val transferContext = scan.getUnfeaturedAppTransferContext(ledgerTime)
       val openRound = scan.getLatestOpenMiningRound(ledgerTime)
 
+      val supportsExpectedDsoParty =
+        validatorSupportsExpectedDsoParty(amuletRules, userValidator, env.environment.clock.now)(
+          env.executionContext
+        )
       userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
         commands = transferContext.amuletRules
@@ -1182,6 +1211,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
               // note: we don't provide a featured app right as sender == provider
               None.toJava,
             ),
+            Option.when(supportsExpectedDsoParty)(amuletRules.payload.dso).toJava,
           )
           .commands
           .asScala
@@ -1190,6 +1220,88 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
           DisclosedContracts.forTesting(amuletRules, openRound).toLedgerApiDisclosedContracts,
       )
     }
+
+  /** Directly exercises the AmuletRules_Transfer choice.
+    * Note that all parties participating in the transfer need to be hosted on the same participant
+    */
+  def rawTransfer(
+      userValidator: ValidatorAppBackendReference,
+      userId: String,
+      userParty: PartyId,
+      validatorParty: PartyId,
+      amulet: HttpWalletAppClient.AmuletPosition,
+      outputs: Seq[splice.amuletrules.TransferOutput],
+      now: CantonTimestamp,
+  )(implicit env: SpliceTestConsoleEnvironment) = {
+    val amuletRules = sv1ScanBackend.getAmuletRules()
+    val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
+    val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
+    val supportsExpectedDsoParty =
+      validatorSupportsExpectedDsoParty(amuletRules, userValidator, now)(
+        env.executionContext
+      )
+    val authorizers =
+      Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
+
+    val disclosure = DisclosedContracts.forTesting(amuletRules, openRound)
+
+    userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+      userId = userId,
+      actAs = authorizers.distinct,
+      readAs = Seq.empty,
+      commands = transferContext.amuletRules
+        .exerciseAmuletRules_Transfer(
+          new splice.amuletrules.Transfer(
+            userParty.toProtoPrimitive,
+            userParty.toProtoPrimitive,
+            Seq[splice.amuletrules.TransferInput](
+              new splice.amuletrules.transferinput.InputAmulet(
+                amulet.contract.contractId
+              )
+            ).asJava,
+            outputs.asJava,
+            java.util.Optional.empty(),
+          ),
+          new splice.amuletrules.TransferContext(
+            transferContext.openMiningRound,
+            Map.empty[Round, IssuingMiningRound.ContractId].asJava,
+            Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
+            // note: we don't provide a featured app right as sender == provider
+            None.toJava,
+          ),
+          Option.when(supportsExpectedDsoParty)(amuletRules.payload.dso).toJava,
+        )
+        .commands
+        .asScala
+        .toSeq,
+      synchronizerId = Some(disclosure.assignedDomain),
+      disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
+    )
+  }
+
+  def validatorSupportsExpectedDsoParty(
+      amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],
+      userValidator: ValidatorAppBackendReference,
+      now: CantonTimestamp,
+  )(implicit ec: ExecutionContext): Boolean = {
+    val synchronizerId = amuletRules.state.fold(
+      synchronizerId => synchronizerId,
+      fail("Expected AmuletRules to be assigned to a synchronizer."),
+    )
+    val packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+      synchronizerId,
+      userValidator.validatorAutomation.connection,
+    )
+    val partiesOfInterest = Seq(
+      userValidator.getValidatorPartyId(),
+      PartyId.tryFromProtoPrimitive(amuletRules.contract.payload.dso),
+    )
+    packageVersionSupport
+      .supportsExpectedDsoParty(partiesOfInterest, now)
+      .futureValue
+      .supported
+  }
+
 }
 
 object WalletTestUtil {

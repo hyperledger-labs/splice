@@ -19,13 +19,8 @@ import {
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
-import { initialRound, StaticCometBftConfigWithNodeName, svConfigs } from 'splice-pulumi-common-sv';
-import {
-  clusterSvsConfiguration,
-  SequencerPruningConfig,
-  StaticSvConfig,
-  SvOnboarding,
-} from 'splice-pulumi-common-sv';
+import {configForSv, initialRound, StaticCometBftConfigWithNodeName, svConfigs} from 'splice-pulumi-common-sv';
+import { SequencerPruningConfig, StaticSvConfig, SvOnboarding } from 'splice-pulumi-common-sv';
 
 import { InstalledSv, installSvNode } from './sv';
 
@@ -113,6 +108,7 @@ export class Dso extends pulumi.ComponentResource {
         sweep: svConf.sweep,
         cometBftGovernanceKey,
         initialRound: initialRound?.toString(),
+        ...configForSv(svConf.nodeName),
       },
       this.args.decentralizedSynchronizerUpgradeConfig,
       extraDependsOn
@@ -131,7 +127,7 @@ export class Dso extends pulumi.ComponentResource {
     }, {});
 
     const cometBftGovernanceKeys = relevantSvConfs
-      .filter(conf => clusterSvsConfiguration[conf.nodeName]?.participant?.kms)
+      .filter(conf => configForSv(conf.nodeName)?.participant?.kms)
       .reduce<Record<string, pulumi.Output<SvCometBftGovernanceKey>>>((acc, conf) => {
         return {
           ...acc,

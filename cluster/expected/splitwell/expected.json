@@ -496,6 +496,14 @@
           "schema": "participant",
           "secretName": "participant-pg-secrets"
         },
+        "resources": {
+          "limits": {
+            "memory": "8Gi"
+          },
+          "requests": {
+            "memory": "4Gi"
+          }
+        },
         "tolerations": [
           {
             "effect": "NoSchedule",
@@ -611,6 +619,7 @@
         },
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "maxDarVersion": "0.1.8",
         "metrics": {
           "enable": true
         },
@@ -868,6 +877,7 @@
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {
           "amuletName": "Amulet",

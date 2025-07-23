@@ -34,23 +34,18 @@ trait PackageVersionSupport {
     isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_3)
   }
 
-  def supportsPruneAmuletConfigSchedule(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+  def supportsMergeDuplicatedValidatorLicense(
+      dsoGovernanceParties: Seq[PartyId],
+      amuletParties: Seq[PartyId],
+      now: CantonTimestamp,
+  )(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
     isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance_0_1_5,
-    )
-  }
-
-  def supportsMergeDuplicatedValidatorLicense(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
+      Seq(
+        (PackageIdResolver.Package.SpliceDsoGovernance -> dsoGovernanceParties),
+        (PackageIdResolver.Package.SpliceAmulet -> amuletParties),
+      ),
       now,
       DarResources.dsoGovernance_0_1_8,
     )
@@ -119,20 +114,38 @@ trait PackageVersionSupport {
     )
   }
 
+  def supportsExpectedDsoParty(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      // this is when the expectedDsoParty was added to all choices granted to users on AmuletRules and ExternalAmuletRules
+      DarResources.amulet_0_1_11,
+    )
+  }
+
   private def isDarSupported(
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,
       at: CantonTimestamp,
       dar: DarResource,
-  )(implicit tc: TraceContext) = {
-    require(packageId.packageName == dar.metadata.name)
-    require(parties.nonEmpty)
-    isPackageSupported(parties, packageId, at, dar.metadata)
+  )(implicit tc: TraceContext): Future[FeatureSupport] =
+    isDarSupported(Seq(packageId -> parties), at, dar)
+
+  private def isDarSupported(
+      packageRequirements: Seq[(PackageIdResolver.Package, Seq[PartyId])],
+      at: CantonTimestamp,
+      dar: DarResource,
+  )(implicit tc: TraceContext): Future[FeatureSupport] = {
+    require(packageRequirements.exists(_._1.packageName == dar.metadata.name))
+    require(packageRequirements.forall(_._2.nonEmpty))
+    isPackageSupported(packageRequirements, at, dar.metadata)
   }
 
   def isPackageSupported(
-      parties: Seq[PartyId],
-      packageId: PackageIdResolver.Package,
+      packageRequirements: Seq[(PackageIdResolver.Package, Seq[PartyId])],
       at: CantonTimestamp,
       metadata: Ast.PackageMetadata,
   )(implicit
@@ -148,25 +161,25 @@ class TopologyAwarePackageVersionSupport private[environment] (
     extends PackageVersionSupport {
 
   override def isPackageSupported(
-      parties: Seq[PartyId],
-      packageId: PackageIdResolver.Package,
+      packageRequirements: Seq[(PackageIdResolver.Package, Seq[PartyId])],
       at: CantonTimestamp,
       metadata: Ast.PackageMetadata,
   )(implicit tc: TraceContext): Future[FeatureSupport] = {
     connection
       .getSupportedPackageVersion(
         synchronizerId,
-        parties,
-        packageId.packageName,
+        packageRequirements.map({ case (k, v) => k.packageName -> v }),
         at,
       )
-      .map { optionalPackageReference =>
-        val isFeatureSupported = optionalPackageReference.exists { packageReference =>
-          PackageVersion.assertFromString(packageReference.packageVersion) >= metadata.version
+      .map { packageReferences =>
+        val isFeatureSupported = packageReferences.exists { packageReference =>
+          PackageVersion.assertFromString(
+            packageReference.packageVersion
+          ) >= metadata.version && packageReference.packageName == metadata.name
         }
         FeatureSupport(
           supported = isFeatureSupported,
-          optionalPackageReference.map(_.packageId).toList,
+          packageReferences.map(_.packageId).toList,
         )
       }
   }

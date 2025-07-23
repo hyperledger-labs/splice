@@ -10,6 +10,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.TransferPreapproval
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.{
@@ -25,6 +26,7 @@ import org.lfdecentralizedtrust.splice.http.v0.wallet.{
   CreateTokenStandardTransferResponse,
   GetAppPaymentRequestResponse,
   GetSubscriptionRequestResponse,
+  ListAllocationRequestsResponse,
   ListTokenStandardTransfersResponse,
   WalletClient,
 }
@@ -41,7 +43,9 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
+  allocationrequestv1,
   allocationv1,
   transferinstructionv1,
 }
@@ -1200,14 +1204,18 @@ object HttpWalletAppClient {
         client.allocateAmulet(
           definitions.AllocateAmuletRequest(
             definitions.AllocateAmuletRequest.Settlement(
-              spec.settlement.executor,
-              definitions.AllocateAmuletRequest.Settlement.SettlementRef(
+              executor = spec.settlement.executor,
+              settlementRef = definitions.AllocateAmuletRequest.Settlement.SettlementRef(
                 spec.settlement.settlementRef.id,
                 spec.settlement.settlementRef.cid.map(_.contractId).toScala,
               ),
-              Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.allocateBefore)),
-              Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.settleBefore)),
-              Some(spec.settlement.meta.values.asScala.toMap),
+              requestedAt =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.requestedAt)),
+              allocateBefore =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.allocateBefore)),
+              settleBefore =
+                Codec.encode(CantonTimestamp.assertFromInstant(spec.settlement.settleBefore)),
+              meta = Some(spec.settlement.meta.values.asScala.toMap),
             ),
             spec.transferLegId,
             definitions.AllocateAmuletRequest.TransferLeg(
@@ -1228,5 +1236,128 @@ object HttpWalletAppClient {
         Right(value)
       }
     }
+
+    final case class WithdrawAmuletAllocation(
+        contractId: amuletAllocationCodegen.AmuletAllocation.ContractId
+    ) extends InternalBaseCommand[
+          http.WithdrawAmuletAllocationResponse,
+          definitions.AmuletAllocationWithdrawResult,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.WithdrawAmuletAllocationResponse] =
+        client.withdrawAmuletAllocation(contractId.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.WithdrawAmuletAllocationResponse, Either[
+        String,
+        definitions.AmuletAllocationWithdrawResult,
+      ]] = { case http.WithdrawAmuletAllocationResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
+    final case object ListAmuletAllocations
+        extends InternalBaseCommand[
+          http.ListAmuletAllocationsResponse,
+          Seq[
+            Contract[
+              amuletAllocationCodegen.AmuletAllocation.ContractId,
+              amuletAllocationCodegen.AmuletAllocation,
+            ]
+          ],
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAmuletAllocationsResponse] =
+        client.listAmuletAllocations(headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.ListAmuletAllocationsResponse, Either[
+        String,
+        Seq[
+          Contract[
+            amuletAllocationCodegen.AmuletAllocation.ContractId,
+            amuletAllocationCodegen.AmuletAllocation,
+          ]
+        ],
+      ]] = { case http.ListAmuletAllocationsResponse.OK(allocationRequestsResponse) =>
+        allocationRequestsResponse.allocations
+          .traverse(ar =>
+            Contract
+              .fromHttp(amuletAllocationCodegen.AmuletAllocation.COMPANION)(
+                ar.contract
+              )
+          )
+          .leftMap(_.toString)
+      }
+    }
+
+    final case object ListAllocationRequests
+        extends InternalBaseCommand[
+          http.ListAllocationRequestsResponse,
+          Seq[
+            Contract[
+              allocationrequestv1.AllocationRequest.ContractId,
+              allocationrequestv1.AllocationRequestView,
+            ]
+          ],
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAllocationRequestsResponse] =
+        client.listAllocationRequests(headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.ListAllocationRequestsResponse, Either[
+        String,
+        Seq[
+          Contract[
+            allocationrequestv1.AllocationRequest.ContractId,
+            allocationrequestv1.AllocationRequestView,
+          ]
+        ],
+      ]] = { case ListAllocationRequestsResponse.OK(allocationRequestsResponse) =>
+        allocationRequestsResponse.allocationRequests
+          .traverse(ar =>
+            Contract
+              .fromHttp(allocationrequestv1.AllocationRequest.INTERFACE)(
+                ar.contract
+              )
+          )
+          .leftMap(_.toString)
+      }
+    }
+
+    case class RejectAllocationRequest(id: AllocationRequest.ContractId)
+        extends InternalBaseCommand[
+          http.RejectAllocationRequestResponse,
+          Unit,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectAllocationRequestResponse] =
+        client.rejectAllocationRequest(id.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.RejectAllocationRequestResponse, Either[
+        String,
+        Unit,
+      ]] = { case http.RejectAllocationRequestResponse.OK(_) =>
+        Right(())
+      }
+    }
   }
+
 }

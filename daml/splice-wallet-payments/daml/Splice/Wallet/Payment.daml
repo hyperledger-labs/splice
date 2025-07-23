@@ -110,14 +110,14 @@ template AppPaymentRequest
         walletProvider : Party
       controller sender, walletProvider
       do now <- getTime
-         contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
+         contextRound <- fetchPublicReferenceData (ForDso with dso) context.context.openMiningRound (OpenMiningRound_Fetch provider)
 
          -- Convert from USD to Amulet amounts
          amuletReceiverAmounts <- forA receiverAmounts $ \rq ->
            receiverAmountToAmuletReceiverAmount dso contextRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
-         outputFees <- exerciseComputeFees context sender (map mkReceiverOutput amuletReceiverAmounts)
+         outputFees <- exerciseComputeFees dso context sender (map mkReceiverOutput amuletReceiverAmounts)
 
          -- We know that the contextRound (=latest Round) won't be archived before
          -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
@@ -140,7 +140,7 @@ template AppPaymentRequest
                     receiverFeeRatio = 0.0
                 ]
               beneficiaries = None -- no beneficiaries for the locking step
-         result <- exercisePaymentTransfer context transfer
+         result <- exercisePaymentTransfer dso context transfer
          let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
          let round = result.round
          acceptedPayment <- create AcceptedAppPayment
@@ -213,7 +213,7 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller signatory this
       do
-        contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
+        contextRound <- fetchPublicReferenceData (ForDso with dso) context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock amulet and transfer the remainder to the receiver
         result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
@@ -223,7 +223,7 @@ template AcceptedAppPayment
               inputs = [InputAmulet result.amuletSum.amulet]
               outputs = map mkReceiverOutput amuletReceiverAmounts
               beneficiaries = None -- not set for now, could extend later but we probably prefer investment in allocations through the token standard.
-        result <- exerciseAppTransfer context transfer
+        result <- exerciseAppTransfer dso context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let amulets = map (\(TransferResultAmulet amuletCid) -> amuletCid) result.createdAmulets
         let receivers = map (\r -> r.receiver) amuletReceiverAmounts

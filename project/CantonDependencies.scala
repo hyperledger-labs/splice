@@ -6,7 +6,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.3.0-snapshot.20250528.13806.0.v3cd439fb"
+  val version: String = "3.3.0-snapshot.20250624.13835.0.v78d74d4a"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   // Defined in `./daml-compiler-sources.json`, as the compiler version is also used by
@@ -30,7 +30,7 @@ object CantonDependencies {
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
   lazy val grpc_version = "1.67.1"
-  lazy val logback_version = "1.4.5"
+  lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
   lazy val ammonite_version = "3.0.0"

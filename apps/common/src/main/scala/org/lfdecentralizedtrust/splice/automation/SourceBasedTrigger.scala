@@ -111,17 +111,27 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
   private var waitForResumePromise: Promise[Unit] = Promise.successful(())
 
   override def pause(): Future[Unit] = blocking {
-    synchronized {
-      if (waitForResumePromise.isCompleted) {
-        waitForResumePromise = Promise()
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.info("Pausing trigger.")
+      blocking {
+        synchronized {
+          if (waitForResumePromise.isCompleted) {
+            waitForResumePromise = Promise()
+          }
+          Future.successful(())
+        }
       }
-      Future.successful(())
     }
   }
 
   override def resume(): Unit = blocking {
-    synchronized {
-      val _ = waitForResumePromise.trySuccess(())
+    withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
+      logger.info("Resuming trigger.")
+      blocking {
+        synchronized {
+          val _ = waitForResumePromise.trySuccess(())
+        }
+      }
     }
   }
 

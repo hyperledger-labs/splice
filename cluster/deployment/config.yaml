@@ -1,13 +1,17 @@
 # Reference configuration options
-#svs:
-#  sv-1:
-#    cometbft:
-#      snapshotName: "nicu-test-cometbft-cloning"
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      cantonLogLevel: DEBUG
+      cometbftLogLevel: debug
 infra:
   prometheus:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+  istio:
+    enableIngressAccessLogging: true
 # configs specific for the pulumi project
 # will be applied to all the stacks in the project
 pulumiProjectConfig:
@@ -28,9 +32,13 @@ pulumiProjectConfig:
       tier: 'db-custom-2-7680'
       # enable enterprise plus for better performance and faster maintenance
       enterprisePlus: false
+    skipSynchronizerInitialization: true
   sv-runbook:
     cloudSql:
       enabled: false
+validator1:
+  logging:
+    level: DEBUG
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:
@@ -40,6 +48,8 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      delegatelessContention:
+        thresholdPerNamespace: 0.05
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
@@ -49,3 +59,25 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+multiValidator:
+  postgresPvcSize: '100Gi'
+  resources:
+    participant:
+      requests:
+        cpu: '1'
+        memory: '8Gi'
+      limits:
+        cpu: '6'
+        memory: '16Gi'
+    validator:
+      requests:
+        cpu: '0.5'
+        memory: '2.4Gi'
+      limits:
+        cpu: '4'
+        memory: '8Gi'
+    postgres:
+      requests:
+        memory: '5Gi'
+      limits:
+        memory: '12Gi'

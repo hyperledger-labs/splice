@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 import cats.implicits.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome, TaskSuccess}
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
@@ -32,7 +33,9 @@ class SequencerBftPeerAddReconciler(
         s"Adding bft peers. Current peers [${task.currentPeers}]. Adding: [${task.toAdd}]"
       )
       for {
-        _ <- task.toAdd.toList.traverse(sequencerAdminConnection.addPeerEndpoint)
+        _ <- MonadUtil.sequentialTraverse(task.toAdd.toList)(
+          sequencerAdminConnection.addPeerEndpoint
+        )
       } yield TaskSuccess(s"Finished bft peer addition: $task")
     }
   }

@@ -3,7 +3,7 @@ validator1:
     type: gcp
     locationId: us-central1
     projectId: da-cn-devnet
-    keyRingId: validator1_test
+    keyRingId: validator1_mock
 multiValidator:
   postgresPvcSize: '100Gi'
   # Dummy values for testing
@@ -15,6 +15,10 @@ multiValidator:
   extraParticipantEnvVars:
     - name: MULTI_PARTICIPANT_ADDITIONAL_CONFIG_MAX_CONNECTIONS
       value: canton.participants.participant_INDEX.storage.parameters.max-connections = 33
+sv:
+  synchronizer:
+    skipInitialization: true
+    topologyChangeDelay: 250ms
 splitwell:
   maxDarVersion: '0.1.8'
 synchronizerMigration:
@@ -73,6 +77,16 @@ monitoring:
     alerts:
       cloudSql:
         maintenance: true
+    logAlerts:
+      # These are mock values and in no way recommendations
+      forCometBft: |
+        -(resource.labels.container_name="multi-validator" AND jsonPayload.message=~"wallet/transfer-offers.* resulted in a timeout")
+      forNonTAPS: |
+        -(resource.labels.container_name="multi-participant" AND jsonPayload.message=~"The sequencer clock timestamp.*is already past the max sequencing time")
+        -(jsonPayload."span-name"="MergeValidatorLicenseContractsTrigger" AND (severity=WARNING OR "has not vetted"))
+        -(jsonPayload."error-code"=~"ACS_COMMITMENT_MISMATCH" AND jsonPayload.remote=~"tw-cn-testnet-participant")
+      missingConfiguredCardinality: |
+        -(jsonPayload.message="Instrument splice.trigger.latency.duration.seconds has exceeded the maximum allowed cardinality (1999).")
 operatorDeployment:
   reference:
     gitReference: refs/heads/main
@@ -88,3 +102,14 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
 initialRound: 0
+svs:
+  # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
+  sv-2:
+    logging:
+      appsLogLevel: INFO
+      cantonLogLevel: INFO
+  sv-3:
+    participant:
+      kms:
+        keyRingId: sv-3_participant_mock
+        locationId: us-central1

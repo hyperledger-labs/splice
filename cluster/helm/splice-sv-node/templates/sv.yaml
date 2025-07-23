@@ -350,6 +350,10 @@ spec:
             - name: SPLICE_APP_EXPIRED_REWARD_COUPON_BATCH_SIZE
               value: {{ .Values.expiredRewardCouponBatchSize | quote }}
             {{- end }}
+            {{- if .Values.domain.skipInitialization }}
+            - name: ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION
+              value: canton.sv-apps.sv.skip-synchronizer-initialization = true
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

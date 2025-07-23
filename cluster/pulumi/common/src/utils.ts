@@ -3,14 +3,12 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
-import * as semver from 'semver';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config, isDevNet, isMainNet } from './config';
 import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
-import { splitwellConfig } from './config/splitwellConfig';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
@@ -26,6 +24,8 @@ export const PRIVATE_CONFIGS_PATH = config.optionalEnv('PRIVATE_CONFIGS_PATH');
 
 export const HELM_REPO = spliceEnvConfig.requireEnv('OCI_DEV_HELM_REGISTRY');
 export const DOCKER_REPO = spliceEnvConfig.requireEnv('CACHE_DEV_DOCKER_REGISTRY');
+
+export const ObservabilityReleaseName = 'prometheus-grafana-monitoring';
 
 export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
   const daUrlScheme = 'global.canton.network.digitalasset.com';
@@ -58,8 +58,6 @@ export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING',
 export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
-
-export type LogLevel = 'INFO' | 'DEBUG';
 
 export type ApprovedSvIdentity = {
   name: string;
@@ -181,20 +179,67 @@ export function fixedTokens(): boolean {
   return _fixedTokens;
 }
 
-export const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
+export const clusterNetwork = isDevNet ? 'dev' : isMainNet ? 'main' : 'test';
+
+function getClusterDirectory(): string {
+  const net = {
+    dev: 'DevNet',
+    main: 'MainNet',
+    test: 'TestNet',
+  }[clusterNetwork];
+
+  if (!net) {
+    throw new Error(`Unknown cluster network: ${clusterNetwork}`);
+  }
+
+  return net;
+}
+
+export const clusterDirectory = getClusterDirectory();
+
+function getPathToPrivateConfigFile(fileName: string): string | undefined {
+  const path = PRIVATE_CONFIGS_PATH;
+
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
+    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
+  }
+
+  if (!path) {
+    return undefined;
+  }
+
+  return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+function getPathToPublicConfigFile(fileName: string): string | undefined {
+  const path = PUBLIC_CONFIGS_PATH;
+
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
+    throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
+  }
+
+  if (!path) {
+    return undefined;
+  }
+
+  return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+export function externalIpRangesFile(): string | undefined {
+  if (!spliceConfig.pulumiProjectConfig.isExternalCluster) {
+    return undefined;
+  }
+
+  return getPathToPrivateConfigFile('allowed-ip-ranges.json');
+}
+
+export function approvedSvIdentitiesFile(): string | undefined {
+  return getPathToPublicConfigFile('approved-sv-id-values.yaml');
+}
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  if (PUBLIC_CONFIGS_PATH) {
-    const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
-    return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
-      .approvedSvIdentities;
-  } else {
-    if (spliceConfig.pulumiProjectConfig.isExternalCluster) {
-      throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
-    }
-
-    return [];
-  }
+  const file = approvedSvIdentitiesFile();
+  return file ? loadYamlFromFile(file).approvedSvIdentities : [];
 }
 
 // Typically used for overriding chart values.
@@ -220,17 +265,3 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
-
-export const splitwellDarPaths = fs
-  .readdirSync(`${SPLICE_ROOT}/daml/dars`)
-  .filter(file => {
-    const match = file.match(/splitwell-(\d+\.\d+\.\d+)\.dar/);
-    if (match) {
-      const darVersion = match[1];
-      return splitwellConfig?.maxDarVersion
-        ? semver.gte(splitwellConfig.maxDarVersion, darVersion)
-        : true;
-    }
-    return false;
-  })
-  .map(file => `splice-node/dars/${file}`);

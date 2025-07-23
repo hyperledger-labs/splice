@@ -50,7 +50,15 @@ template BuyTrafficRequest
       do
         now <- getTime
         require "Contract has not expired" (now < expiresAt)
-        result <- exercise context.amuletRules (AmuletRules_BuyMemberTraffic inputs context.context endUserParty memberId synchronizerId migrationId trafficAmount)
+        result <- exercise context.amuletRules AmuletRules_BuyMemberTraffic with
+          inputs
+          context = context.context
+          provider = endUserParty
+          memberId
+          synchronizerId
+          migrationId
+          trafficAmount
+          expectedDso = Some dso
         let trackingInfo = BuyTrafficRequestTrackingInfo with ..
         pure BuyTrafficRequest_CompleteResult with
           purchasedTraffic = result.purchasedTraffic

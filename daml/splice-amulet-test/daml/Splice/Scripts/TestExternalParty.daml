@@ -91,6 +91,7 @@ createExternalPartySetupProposal app validator user = do
       user
       validator = validator.primaryParty
       preapprovalExpiresAt
+      expectedDso = Some app.dso
 
   Some proposal <- queryContractId app.dso proposalCid
   pure (proposalCid, proposal)

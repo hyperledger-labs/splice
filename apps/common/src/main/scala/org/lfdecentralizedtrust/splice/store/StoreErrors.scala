@@ -3,10 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 
 trait StoreErrors {
-  def roundNotAggregated() = {
+  def roundNotAggregated(): StatusRuntimeException = {
     Status.NOT_FOUND.withDescription("Round has not been aggregated yet").asRuntimeException
   }
 
