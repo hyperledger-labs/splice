@@ -150,3 +150,18 @@ runs:
 
             echo "done" > "/cache/nix/$cache_key/cached"
           fi
+
+    - name: Print cache sizes
+      shell: bash
+      run: |
+          set -euxo pipefail
+          echo "Nix cache size:"
+          du -sh /cache/nix/binary_cache || true
+          echo "Nix store size:"
+          du -sh /nix/store || true
+          echo "Nix var size:"
+          du -sh /nix/var || true
+          echo "Nix home size:"
+          du -sh $HOME/.nix-profile || true
+          echo "nix cache for key $cache_key size:"
+          du -sh "/cache/nix/$cache_key" || true
