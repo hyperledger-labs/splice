@@ -749,17 +749,20 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
     val results = SpliceRateLimiterTest
       .runRateLimited(
-        3,
+        6,
         30,
       ) {
         Future {
           blocking {
-            sv1ScanBackend.forceAcsSnapshotNow()
+            sv1ScanBackend.getAcsSnapshot(
+              dsoParty,
+              None,
+            )
           }
         }
       } futureValue
 
-    results.count(identity) should be(20 +- 1)
+    results.count(identity) should be(25 +- 1)
 
   }
 
