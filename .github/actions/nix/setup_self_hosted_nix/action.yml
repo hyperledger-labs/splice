@@ -162,6 +162,8 @@ runs:
         echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
         mkdir /tmp/nix-upload
         tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
+        echo "Cache compressed to /tmp/nix-upload/${cache_key}.tar.gz"
+        ls /tmp/nix-upload
 
     - name: Upload nix cache
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
