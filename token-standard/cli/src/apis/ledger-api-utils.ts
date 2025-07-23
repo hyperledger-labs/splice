@@ -387,9 +387,11 @@ async function awaitCompletion(
   });
 
   if (wantedCompletion) {
-    if (wantedCompletion.completionResponse.Completion.value.status) {
+    const status = wantedCompletion.completionResponse.Completion.value.status;
+    if (status && status.code) {
+      // status.code is 0 for success
       throw new Error(
-        `Command failed with status: ${wantedCompletion.completionResponse.Completion.value.status}`,
+        `Command failed with status: ${JSON.stringify(wantedCompletion.completionResponse.Completion.value.status)}`,
       );
     }
     return {

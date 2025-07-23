@@ -207,6 +207,13 @@ class TokenStandardCliIntegrationTest
     Process(Seq("npm", "ci"), cwd).!(logProcessor)
 
     val exitCode = Process(args, cwd).!(logProcessor)
+
+    if (exitCode != 0) {
+      logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
+      readLines.foreach(logger.error(_)(TraceContext.empty))
+      throw new RuntimeException(s"$args failed.")
+    }
+
     val start = readLines.indexWhere(_.startsWith("{"))
     val end = readLines.lastIndexWhere(_.endsWith("}"))
     val jsonSlice = readLines.slice(start, end + 1)
@@ -229,11 +236,6 @@ class TokenStandardCliIntegrationTest
           case _ => fail("not an exercised event")
         }
       }
-    }
-    if (exitCode != 0) {
-      logger.error(s"Failed to run $args. Dumping output.")(TraceContext.empty)
-      readLines.foreach(logger.error(_)(TraceContext.empty))
-      throw new RuntimeException(s"$args failed.")
     }
   }
 
