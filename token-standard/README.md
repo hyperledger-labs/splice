@@ -224,6 +224,9 @@ Additionally, it will also include:
 - `recordTime`: the time in the ledger at which the transfer happened.
 - `synchronizerId`: the synchronizer id in which the transfer was executed.
 
+Any error will be logged with  "Failed to execute transfer:", followed by error details.
+These can happen due to any intermediate request failing, or timing out.
+
 
 #### Accept transfer instruction
 
@@ -272,3 +275,6 @@ Additionally, it will also include:
 - `updateId`: the update id identifying the instruction acceptance in the ledger.
 - `recordTime`: the time in the ledger at which the instruction acceptance happened.
 - `synchronizerId`: the synchronizer id in which the instruction acceptance was executed.
+
+Any error will be logged with  "Failed to accept transfer instruction:", followed by error details.
+These can happen due to any intermediate request failing, or timing out.

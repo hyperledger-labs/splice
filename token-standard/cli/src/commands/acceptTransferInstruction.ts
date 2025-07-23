@@ -26,42 +26,48 @@ export async function acceptTransferInstruction(
   transferInstructionCid: string,
   opts: CommandOptions & AcceptTransferInstructionCommandOptions,
 ): Promise<void> {
-  const { privateKey, publicKey, party, userId, transferFactoryRegistryUrl } =
-    opts;
-  const ledgerClient = createLedgerApiClient(opts);
-  const transferRegistryConfig = createConfiguration({
-    baseServer: new ServerConfiguration(transferFactoryRegistryUrl, {}),
-  });
-  const transferRegistryClient = new TransferFactoryAPI(transferRegistryConfig);
-
-  const choiceContext =
-    await transferRegistryClient.getTransferInstructionAcceptContext(
-      transferInstructionCid,
-      {},
+  try {
+    const { privateKey, publicKey, party, userId, transferFactoryRegistryUrl } =
+      opts;
+    const ledgerClient = createLedgerApiClient(opts);
+    const transferRegistryConfig = createConfiguration({
+      baseServer: new ServerConfiguration(transferFactoryRegistryUrl, {}),
+    });
+    const transferRegistryClient = new TransferFactoryAPI(
+      transferRegistryConfig,
     );
 
-  const exercise: ExerciseCommand = {
-    templateId: TransferInstructionInterface.toString(),
-    contractId: transferInstructionCid,
-    choice: "TransferInstruction_Accept",
-    choiceArgument: {
-      extraArgs: {
-        context: choiceContext.choiceContextData,
-        meta: { values: {} },
+    const choiceContext =
+      await transferRegistryClient.getTransferInstructionAcceptContext(
+        transferInstructionCid,
+        {},
+      );
+
+    const exercise: ExerciseCommand = {
+      templateId: TransferInstructionInterface.toString(),
+      contractId: transferInstructionCid,
+      choice: "TransferInstruction_Accept",
+      choiceArgument: {
+        extraArgs: {
+          context: choiceContext.choiceContextData,
+          meta: { values: {} },
+        },
       },
-    },
-  };
+    };
 
-  const completion = await submitExerciseCommand(
-    ledgerClient,
-    exercise,
-    choiceContext.disclosedContracts,
-    party,
-    userId,
-    publicKey,
-    privateKey,
-  );
-  const result = { ...completion, status: "success" };
+    const completion = await submitExerciseCommand(
+      ledgerClient,
+      exercise,
+      choiceContext.disclosedContracts,
+      party,
+      userId,
+      publicKey,
+      privateKey,
+    );
+    const result = { ...completion, status: "success" };
 
-  console.log(JSON.stringify(result, null, 2));
+    console.log(JSON.stringify(result, null, 2));
+  } catch (e) {
+    console.error("Failed to accept transfer instruction:", e);
+  }
 }

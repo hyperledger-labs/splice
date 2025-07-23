@@ -263,8 +263,8 @@ export async function submitExerciseCommand(
   );
   return promiseWithTimeout(
     completionPromise,
-    60_000 * 2, // 2m
-    `Timed out getting completion.
+    45_000 * 2, // 45s
+    `Timed out getting completion for submission with userId=${userId}, commandId=${commandId}, submissionId=${submissionId}.
     The submission might have succeeded or failed, but it couldn't be determined in time.`,
   );
 }
