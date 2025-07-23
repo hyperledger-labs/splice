@@ -1173,9 +1173,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               }
 
               withClueAndLog(s"SVs have $initialRound as initial round") {
-                Seq(sv1LocalBackend, sv2LocalBackend).map(
-                  _.getDsoInfo().initialRound
-                ) shouldBe initialRound
+                Seq(sv1LocalBackend, sv2LocalBackend).foreach { sv =>
+                  sv.getDsoInfo().initialRound shouldBe initialRound
+                }
               }
 
               withClueAndLog("sv1 restarts without any onboarding type") {
