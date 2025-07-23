@@ -8,19 +8,19 @@ import {
 } from "../constants";
 import { CommandOptions } from "../token-standard-cli";
 import {
+  ArchivedEvent as LedgerApiArchivedEvent,
+  Command,
   createConfiguration,
   CreatedEvent as LedgerApiCreatedEvent,
-  ExercisedEvent as LedgerApiExercisedEvent,
-  ArchivedEvent as LedgerApiArchivedEvent,
+  DeduplicationPeriod2,
   DefaultApi as LedgerJsonApi,
+  ExerciseCommand,
+  ExercisedEvent as LedgerApiExercisedEvent,
   HttpAuthAuthentication,
   JsInterfaceView,
+  PartySignatures,
   ServerConfiguration,
   TransactionFilter,
-  ExerciseCommand,
-  Command,
-  DeduplicationPeriod2,
-  PartySignatures,
 } from "canton-json-api-v2-openapi";
 import { DisclosedContract } from "transfer-instruction-openapi";
 import { randomUUID } from "node:crypto";
@@ -196,7 +196,10 @@ export async function submitExerciseCommand(
   userId: string,
   publicKeyPath: string,
   privateKeyPath: string,
-): Promise<unknown> {
+): Promise<Completion> {
+  const submissionId = randomUUID();
+  const commandId = `tscli-${randomUUID()}`;
+
   const command = new Command();
   command.ExerciseCommand = exerciseCommand;
 
@@ -207,7 +210,7 @@ export async function submitExerciseCommand(
     actAs: [partyId],
     readAs: [partyId],
     userId: userId,
-    commandId: `tscli-${randomUUID()}`,
+    commandId,
     synchronizerId,
     commands: [command],
     disclosedContracts,
@@ -239,15 +242,31 @@ export async function submitExerciseCommand(
   const deduplicationPeriod = new DeduplicationPeriod2();
   deduplicationPeriod.Empty = {};
 
-  // TODO (#908): this is currently '{}'. It should include record_time and update_id, which require usage of completions API
-  return await ledgerClient.postV2InteractiveSubmissionExecute({
+  const ledgerEnd = await ledgerClient.getV2StateLedgerEnd();
+
+  await ledgerClient.postV2InteractiveSubmissionExecute({
     userId,
-    submissionId: "",
+    submissionId,
     preparedTransaction: prepared.preparedTransaction,
     hashingSchemeVersion: prepared.hashingSchemeVersion,
     partySignatures,
     deduplicationPeriod,
   });
+
+  const completionPromise = awaitCompletion(
+    ledgerClient,
+    ledgerEnd.offset,
+    partyId,
+    userId,
+    commandId,
+    submissionId,
+  );
+  return promiseWithTimeout(
+    completionPromise,
+    45_000 * 2, // 45s
+    `Timed out getting completion for submission with userId=${userId}, commandId=${commandId}, submissionId=${submissionId}.
+    The submission might have succeeded or failed, but it couldn't be determined in time.`,
+  );
 }
 
 // The synchronizer id is mandatory, so we derive it from the disclosed contracts,
@@ -321,4 +340,99 @@ function signTransaction(
     signedBy,
     signedHash,
   };
+}
+
+interface Completion {
+  updateId: string;
+  // the openAPI definition claims these two can be null
+  synchronizerId?: string;
+  recordTime?: string;
+}
+
+const COMPLETIONS_LIMIT = 100;
+const COMPLETIONS_STREAM_IDLE_TIMEOUT_MS = 1000;
+/**
+ * Polls the completions endpoint until
+ * the completion with the given (userId, commandId, submissionId) is returned.
+ * Then returns the updateId, synchronizerId and recordTime of that completion.
+ */
+async function awaitCompletion(
+  ledgerClient: LedgerJsonApi,
+  ledgerEnd: number,
+  partyId: string,
+  userId: string,
+  commandId: string,
+  submissionId: string,
+): Promise<Completion> {
+  const responses = await ledgerClient.postV2CommandsCompletions(
+    {
+      userId,
+      parties: [partyId],
+      beginExclusive: ledgerEnd,
+    },
+    COMPLETIONS_LIMIT,
+    COMPLETIONS_STREAM_IDLE_TIMEOUT_MS,
+  );
+  const completions = responses.filter(
+    (response) => !!response.completionResponse.Completion,
+  );
+
+  const wantedCompletion = completions.find((response) => {
+    const completion = response.completionResponse.Completion;
+    return (
+      completion.value.userId === userId &&
+      completion.value.commandId === commandId &&
+      completion.value.submissionId === submissionId
+    );
+  });
+
+  if (wantedCompletion) {
+    const status = wantedCompletion.completionResponse.Completion.value.status;
+    if (status && status.code !== 0) {
+      // status.code is 0 for success
+      throw new Error(
+        `Command failed with status: ${JSON.stringify(wantedCompletion.completionResponse.Completion.value.status)}`,
+      );
+    }
+    return {
+      synchronizerId:
+        wantedCompletion.completionResponse.Completion.value.synchronizerTime
+          ?.synchronizerId,
+      recordTime:
+        wantedCompletion.completionResponse.Completion.value.synchronizerTime
+          ?.recordTime,
+      updateId: wantedCompletion.completionResponse.Completion.value.updateId,
+    };
+  } else {
+    const lastCompletion = completions[completions.length - 1];
+    const newLedgerEnd =
+      lastCompletion?.completionResponse.Completion.value.offset;
+    return awaitCompletion(
+      ledgerClient,
+      newLedgerEnd || ledgerEnd, // !newLedgerEnd implies response was empty
+      partyId,
+      userId,
+      commandId,
+      submissionId,
+    );
+  }
+}
+
+async function promiseWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorMessage: string,
+): Promise<T> {
+  let timeoutPid: NodeJS.Timeout | null = null;
+  const timeoutPromise: Promise<T> = new Promise((_resolve, reject) => {
+    timeoutPid = setTimeout(() => reject(errorMessage), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutPid) {
+      clearTimeout(timeoutPid);
+    }
+  }
 }
