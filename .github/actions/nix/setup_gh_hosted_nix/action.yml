@@ -21,6 +21,7 @@ runs:
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
         echo "oss_only: true" >> /tmp/nix-cache-key
+        cat /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
 
