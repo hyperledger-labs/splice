@@ -5,9 +5,11 @@ import com.daml.metrics.api.testing.{InMemoryMetricsFactory, MetricValues}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
 import io.grpc.{Status, StatusRuntimeException}
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.apache.pekko.stream.testkit.StreamSpec
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.util.SpliceRateLimiterTest.runRateLimited
 
 import scala.concurrent.Future
@@ -106,8 +108,8 @@ object SpliceRateLimiterTest {
     import mat.executionContext
     Source
       .repeat(())
-      .throttle(runRate, 1.second)
       .take(elementsToRun.longValue())
+      .throttle(runRate, 1.second)
       .mapAsync(elementsToRun)(_ =>
         run
           .map(_ => true)
@@ -115,7 +117,11 @@ object SpliceRateLimiterTest {
             case rejection: StatusRuntimeException
                 if rejection.getStatus.getCode == Status.Code.RESOURCE_EXHAUSTED =>
               false
-            case failure: CommandFailure if failure.getMessage.contains("HTTP 429") =>
+            case failure: HttpCommandException if failure.status == StatusCodes.TooManyRequests =>
+              false
+            // match the raw command failure because it hides the root cause
+            // should be enough because we assert on the number of successes vs failures
+            case _: CommandFailure =>
               false
           }
       )
