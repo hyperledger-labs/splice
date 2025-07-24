@@ -17,6 +17,7 @@ runs:
         ls -al "/cache/nix/$cache_key"
         sudo mkdir -p /nix/store
         sudo mkdir -p /nix/var
+        sudo chown -R $(whoami):$(whoami) /nix
         # we use rsync here because it's simply faster to install
         rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
         rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
