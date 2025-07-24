@@ -8,6 +8,16 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- SV Application
+
+  - Status reports are now submitted every 2min rather than every
+    1min. This has no impact other than on monitoring infrastructure
+    so you may need to adjust some alerts to be slightly less
+    aggressive.
+
 0.4.8
 -----
 
