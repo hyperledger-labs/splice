@@ -14,7 +14,7 @@ jobs:
     runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-small' || 'ubuntu-24.04' }}
     timeout-minutes: 35
     container:
-      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
+      image: ${{ inputs.self_hosted && 'us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12' || '' }}
 
     steps:
 
