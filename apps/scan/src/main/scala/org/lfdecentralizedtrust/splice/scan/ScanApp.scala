@@ -123,10 +123,6 @@ class ScanApp(
       dsoParty <- appInitStep("Get DSO party from user metadata") {
         appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
       }
-      initialRound <- appInitStep("Get initial round from user metadata") {
-        appInitConnection.getInitialRoundFromUserMetadata(config.svUser)
-      }
-      _ = logger.debug(s"Started with initial round $initialRound")
       scanAggregatesReaderContext = new ScanAggregatesReaderContext(
         clock,
         ledgerClient,
@@ -178,7 +174,6 @@ class ScanApp(
         config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
-        initialRound.toLong,
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
@@ -207,7 +202,6 @@ class ScanApp(
         serviceUserPrimaryParty,
         svName,
         amuletAppParameters.upgradesConfig,
-        initialRound.toLong,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
@@ -265,7 +259,6 @@ class ScanApp(
         loggerFactory,
         packageVersionSupport,
         bftSequencersWithAdminConnections,
-        initialRound,
       )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(

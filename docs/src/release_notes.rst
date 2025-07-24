@@ -28,6 +28,12 @@ Upcoming
     for the validator and participant helm charts. The default values for these won't change your current deployment,
     so if uninterested you can safely ignore.
 
+- SV Application
+
+  - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
+    This should have a slight impact on improving the performance of the sequencer.
+    Until a majority of nodes upgrade to ``0.4.8`` the ``ReconcileDynamicSynchronizerParametersTrigger`` might produce warnings.
+
 - Dashboards
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
@@ -44,31 +50,6 @@ Upcoming
   Reduced the acknowledgement interval for participants, mediators and
   sequencers to 10 minutes. This has no impact other than on the
   acknowlegdement metrics exposed by the sequencer.
-
-- SV Application
-
-  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_.
-    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
-  - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
-    This should have a slight impact on improving the performance of the sequencer.
-    Until a majority of nodes upgrade to ``0.4.8`` the ``ReconcileDynamicSynchronizerParametersTrigger`` might produce warnings.
-
-- Daml
-
-  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
-
-     These Daml changes requires an upgrade to the following Daml versions:
-
-     ================== =======
-     name               version
-     ================== =======
-     amulet             0.1.13
-     amuletNameService  0.1.13
-     dsoGovernance      0.1.17
-     validatorLifecycle 0.1.5
-     wallet             0.1.13
-     walletPayments     0.1.13
-     ================== =======
 
 0.4.7
 -----
