@@ -5,14 +5,13 @@ on:
       commit_sha:
         type: string
         required: true
-      runs_on:
-        type: string
-        default: self-hosted-k8s-small # Default to DA self-hosted (FIXME: keep this?)
-
+      self_hosted:
+        type: boolean
+        default: true
 
 jobs:
   static_tests:
-    runs-on: ${{ inputs.runs_on }}
+    runs-on: ${{ inputs.self_hosted && 'self-hosted-k8s-small' || 'ubuntu-24.04' }}
     timeout-minutes: 35
     container:
       image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
@@ -30,6 +29,7 @@ jobs:
         with:
           test_name: static_tests
           oss_only: true
+          self_hosted: ${{ inputs.self_hosted }}
 
       - name: Check trailing whitespace
         uses: ./.github/actions/nix/run_bash_command_in_nix

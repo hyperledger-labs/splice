@@ -22,9 +22,9 @@ jobs:
       - name: No-op job
         run: echo "This is a no-op job for WIP PRs."
 
-  # static_tests:
-  #   uses: ./.github/workflows/build.static_tests.yml
-  #   secrets: inherit
-  #   with:
-  #     commit_sha: '' # FIXME: do we ever need a different value here?
-  #     runs_on: ubuntu-24.04
+  static_tests:
+    uses: ./.github/workflows/build.static_tests.yml
+    secrets: inherit
+    with:
+      commit_sha: '' # FIXME: do we ever need a different value here?
+      self_hosted: false

@@ -22,6 +22,10 @@ inputs:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
     default: "false"
+  self_hosted:
+    description: "Whether this is a self-hosted runner (to use the self-hosted Nix cache)"
+    required: false
+    default: "true"
 
 outputs:
   sbt_cache_hits:
@@ -48,7 +52,8 @@ runs:
       shell: bash
       run: ./.github/actions/scripts/common_setup.sh
 
-    - name: Set up Nix
+    - name: Set up Nix (Self hosted)
+      if: ${{ inputs.self_hosted == 'true' }}
       uses: ./.github/actions/nix/setup_self_hosted_nix
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
@@ -56,6 +61,10 @@ runs:
         cache_version: 4
         should_save: ${{ inputs.save_nix_cache }}
         oss_only: ${{ inputs.oss_only }}
+
+    - name: Set up Nix (GH hosted)
+      if: ${{ inputs.self_hosted != 'true' }}
+      uses: ./.github/actions/nix/setup_gh_hosted_nix
 
     - name: Set up SBT
       if: inputs.with_sbt == 'true'
