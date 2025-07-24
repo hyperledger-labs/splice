@@ -15,6 +15,8 @@ runs:
         sudo mkdir -p /cache/nix/${cache_key}
         sudo tar -xzf ${cache_key}.tar.gz -C /cache/nix/${cache_key}
         ls -al "/cache/nix/$cache_key"
+        sudo mkdir -p /nix/store
+        sudo mkdir -p /nix/var
         # we use rsync here because it's simply faster to install
         rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
         rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
