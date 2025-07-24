@@ -79,6 +79,7 @@ export class GcpProject extends pulumi.ComponentResource {
       serviceAccountEmail: gcpProjectConfig.authorizedServiceAccount.email,
       pulumiKeyringProjectId: config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT'),
       pulumiKeyringRegion: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
+      dnsSaKeySecretName: config.requireEnv('DNS01_SA_KEY_SECRET'),
     };
     return authorizeServiceAccount(this.gcpProjectId, authorizedServiceAccountConfig);
   }
