@@ -9,7 +9,16 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        cache_key="69c04df5151a8da969d5b501a60d4cd2"
+
+        # FIXME: refactor the cache key generation to a separate action
+
+        git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
+        uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
+        echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
+        echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
+        cache_key=($(md5sum "/tmp/nix-cache-key"))
+        touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
+
         wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz"
         # unzip it to /cache/nix
         sudo mkdir -p /cache/nix/${cache_key}
@@ -23,7 +32,6 @@ runs:
         rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
         rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
         sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
-        touch /tmp/oss-only
 
     # FIXME: reuse with self_hosted (this is an exact copy ATM)
     - name: Setup Nix
