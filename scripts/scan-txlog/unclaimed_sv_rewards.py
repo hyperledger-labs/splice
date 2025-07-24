@@ -102,12 +102,12 @@ def _parse_cli_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--begin-record-time",
-        help="Start of the record time range to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T10:30:00Z.",
+        help="Start of the record time range (exclusive) to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T10:30:00Z.",
         required=True,
     )
     parser.add_argument(
         "--end-record-time",
-        help="End of the record time range to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T12:30:00Z",
+        help="End of the record time range (inclusive) to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T12:30:00Z",
         required=True,
     )
     parser.add_argument(
