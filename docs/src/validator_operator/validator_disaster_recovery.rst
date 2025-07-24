@@ -174,7 +174,7 @@ of at least one of the parties hosted on your node. To address this, you can usu
 2. If your parties are still on the original node that you took identity dumps from, you can use your existing dump.
    If your parties have been migrated already, take a new dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id``
    field in your identity dump to the participant id of the new node.
-   You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump again on a fresh node with a different ``<new_participant_id>``.
+   You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different ``<new_participant_id>``.
 
 .. _validator_recover_external_party:
 
