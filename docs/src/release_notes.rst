@@ -18,6 +18,12 @@ Release Notes
     for the validator and participant helm charts. The default values for these won't change your current deployment,
     so if uninterested you can safely ignore.
 
+- SV Application
+
+  - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
+    This should have a slight impact on improving the performance of the sequencer.
+    Until a majority of nodes upgrade to ``0.4.8`` the ``ReconcileDynamicSynchronizerParametersTrigger`` might produce warnings.
+
 - Dashboards
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
