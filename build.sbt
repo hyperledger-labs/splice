@@ -1766,6 +1766,8 @@ lazy val `apps-app`: Project =
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
       libraryDependencies += kubernetes_client,
+      libraryDependencies +=
+        "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,
@@ -1943,6 +1945,11 @@ printTests := {
       "app upgrade tests",
       "test-full-class-names-app-upgrade.log",
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
+    ),
+    (
+      "BigQuery-accessing tests",
+      "test-full-class-names-bigquery.log",
+      (t: String) => t contains "BigQuery",
     ),
     (
       "resource intensive tests",
