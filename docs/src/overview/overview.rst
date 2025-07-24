@@ -50,8 +50,6 @@ A Validator in the Global Synchronizer ecosystem primary roles are to:
 * Facilitate network connectivity
 * Coordinate upgrades and migrations
 
-
-
 Tokenomics
 ###########################
 
