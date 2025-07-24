@@ -94,7 +94,7 @@ Validators
 
     So the submission of the confirmation request cost 6093 bytes of traffic, and the submission of the confirmation response cost 651 bytes of traffic.
 
-    The read cost accounts for the cost of delivering the envolopes to all the recipients. It is computed as
+    The read cost accounts for the cost of delivering the envelopes to all the recipients. It is computed as
     ``readCost = writeCost * #recipients * costMultiplier / 10_000``
     (`code <https://github.com/digital-asset/canton/blob/1f7d0513843ae791f870ac2caeb4402f73109f86/community/base/src/main/scala/com/digitalasset/canton/sequencing/traffic/EventCostCalculator.scala#L118-L123>`_).
 
