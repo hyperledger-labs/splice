@@ -6,6 +6,7 @@
       "walletBaseUrl": "$K6_WALLET_BASE_URL",
       "auth": {
         "kind": "oauth",
+        "audience": "$OIDC_AUTHORITY_VALIDATOR_AUDIENCE",
         "oauthDomain": "$K6_OAUTH_DOMAIN",
         "oauthClientId": "$K6_OAUTH_CLIENT_ID",
         "usersPassword": "$K6_USERS_PASSWORD",
