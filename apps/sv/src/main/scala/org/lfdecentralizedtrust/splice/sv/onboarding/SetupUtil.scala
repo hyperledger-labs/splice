@@ -62,18 +62,6 @@ private[onboarding] object SetupUtil {
       RetryFor.WaitingOnInitDependency,
     )
 
-  def ensureInitialRoundMetadataAnnotation(
-      connection: BaseLedgerConnection,
-      config: SvAppBackendConfig,
-      initialRound: String,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    connection.ensureUserMetadataAnnotation(
-      config.ledgerApiUser,
-      BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY,
-      initialRound,
-      RetryFor.WaitingOnInitDependency,
-    )
-
   // We just need readAs for command submissions since they always act as
   // the SV party but reassignments for contracts with only the DSO as a stakeholder
   // require actAs.

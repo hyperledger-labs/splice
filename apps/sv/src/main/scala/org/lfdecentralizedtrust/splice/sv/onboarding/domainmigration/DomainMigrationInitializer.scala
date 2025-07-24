@@ -235,14 +235,16 @@ class DomainMigrationInitializer(
         skipTrafficReconciliationTriggers = true,
         packageVersionSupport = packageVersionSupport,
       )
-      _ <- new ParticipantUsersDataRestorer(
-        svAutomation.connection,
-        loggerFactory,
-      ).restoreParticipantUsersData(migrationDump.participantUsers)
-      _ <- establishInitialRound(
-        readOnlyConnection,
-        upgradesConfig,
-      )
+      _ <- migrationDump.participantUsers match {
+        case Some(participantUsersData) => {
+          logger.info("Restoring participant users data")
+          new ParticipantUsersDataRestorer(
+            svAutomation.connection,
+            loggerFactory,
+          ).restoreParticipantUsersData(participantUsersData)
+        }
+        case None => Future.unit
+      }
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

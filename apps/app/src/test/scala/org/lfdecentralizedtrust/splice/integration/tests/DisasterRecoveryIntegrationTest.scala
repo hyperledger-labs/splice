@@ -22,7 +22,6 @@ import org.lfdecentralizedtrust.splice.console.{
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
-import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TransactionHistoryRequest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
@@ -243,20 +242,18 @@ class DisasterRecoveryIntegrationTest
     runTest(
       "lost-all-sequencers-most-participants",
       (identities, timestampBeforeDisaster) => {
+        val dump =
+          sv2Backend
+            .getDomainDataSnapshot(
+              timestampBeforeDisaster,
+              Some(identities.head.dsoPartyId),
+              force = true,
+            )
+        dump.dataSnapshot.acsTimestamp should be(timestampBeforeDisaster)
+        dump.createdAt should be(timestampBeforeDisaster)
+        dump.migrationId shouldBe 1
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
-            val dump =
-              sv
-                .getDomainDataSnapshot(
-                  timestampBeforeDisaster,
-                  Some(identities.head.dsoPartyId),
-                  force = true,
-                )
-            dump.dataSnapshot.acsTimestamp should be(timestampBeforeDisaster)
-            dump.createdAt should be(timestampBeforeDisaster)
-            dump.migrationId shouldBe 1
-            dump.participantUsers.users
-              .find(_.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)) should not be empty
             writeMigrationDumpFile(sv, ids, dump)
         }
       },
@@ -610,9 +607,7 @@ class DisasterRecoveryIntegrationTest
     clue(s"Waiting for all SVs participants to be caught up to $timestamp") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
         eventuallySucceeds() {
-          val snapshot = svBackend.getDomainDataSnapshot(timestamp, force = true)
-          snapshot.participantUsers.users
-            .find(_.annotations.contains(INITIAL_ROUND_USER_METADATA_KEY)) should not be empty
+          svBackend.getDomainDataSnapshot(timestamp, force = true)
         }
       )
     }
@@ -649,7 +644,7 @@ class DisasterRecoveryIntegrationTest
       migrationId = dump.migrationId,
       ids,
       dump.dataSnapshot,
-      dump.participantUsers,
+      None,
       createdAt = dump.createdAt,
     )
     fullDumpFile.write(fullDump.asJson.spaces2)

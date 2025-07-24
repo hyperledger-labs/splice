@@ -60,7 +60,6 @@ class HttpSvHandler(
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
     isBftSequencer: Boolean,
-    initialRound: String,
 )(implicit
     ec: ExecutionContext,
     protected val tracer: Tracer,
@@ -360,7 +359,6 @@ class HttpSvHandler(
         amuletRules = amuletRules.toContractWithState.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
-        initialRound = initialRound,
       )
     }
   }
