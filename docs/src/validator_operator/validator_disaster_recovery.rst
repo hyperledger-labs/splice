@@ -156,7 +156,7 @@ of at least one of the parties hosted on your node. To address this, you can usu
    common case is that either the parties are still on the old node
    with the old participant id or they have been migrated to the new
    node. You can check by opening a :ref:`Canton console
-   <console_access>` to any participant on the network and running the
+   <console_access>` to any participant on the network (i.e., you can also ask another validator or SV operator for this information) and running the
    following query where <namespace> is the part after the ``::`` in
    your participant id.
 
