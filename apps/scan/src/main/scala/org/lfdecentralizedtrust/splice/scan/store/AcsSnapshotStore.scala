@@ -241,7 +241,7 @@ class AcsSnapshotStore(
                  contract_key
               from snapshot
               join update_history_creates creates on creates.row_id = snapshot.create_id
-              order by snapshot.row_id limit ${sqlLimit(limit)}
+              order by snapshot.row_id
             """).toActionBuilder
             .as[(Long, SelectFromCreateEvents)],
           "queryAcsSnapshot.getCreatedEvents",
