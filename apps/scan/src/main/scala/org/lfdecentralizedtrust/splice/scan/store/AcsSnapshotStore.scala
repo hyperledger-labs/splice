@@ -218,6 +218,12 @@ class AcsSnapshotStore(
                   where row_id between $begin and $end
                """ ++ partyIdsFilter ++ templatesFilter ++ sql"""
                   group by create_id
+                  order by row_id asc
+                  -- this CTE already will contain all snapshot rows (filtered by party id and template, if necessary).
+                  -- They just need to be joined with u_h_creates.
+                  -- Applying the limit later yields a worse query plan, where it requires fetching all snapshots first.
+                  -- See #1685
+                  limit ${sqlLimit(limit)}
                )
                select
                  snapshot.row_id,
