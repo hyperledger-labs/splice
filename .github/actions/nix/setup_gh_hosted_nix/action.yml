@@ -23,8 +23,9 @@ runs:
         rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
         rsync -avi "/cache/nix/$cache_key/nix_store/var/" /nix/var
         sudo mount --bind /cache/nix/$cache_key/nix_store/store /nix/store
+        touch /tmp/oss-only
 
-    # FIXME: reuse with self_hosted
+    # FIXME: reuse with self_hosted (this is an exact copy ATM)
     - name: Setup Nix
       shell: bash
       run: |
