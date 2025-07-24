@@ -15,14 +15,20 @@ class HttpRateLimiter(
     metricsFactory: LabeledMetricsFactory,
 ) {
 
+  // need to cache it as the pekko reoutes get evaluated for each request
+  private val rateLimiters = scala.collection.concurrent.TrieMap[String, SpliceRateLimiter]()
+
   def withRateLimit(service: String)(operation: String): Directive0 = {
-    val rateLimiter = new SpliceRateLimiter(
+    val rateLimiter = rateLimiters.getOrElseUpdate(
       operation,
-      config.forRateLimiter(operation),
-      SpliceRateLimitMetrics(metricsFactory)(
-        MetricsContext(
-          "http_service" -> service
-        )
+      new SpliceRateLimiter(
+        operation,
+        config.forRateLimiter(operation),
+        SpliceRateLimitMetrics(metricsFactory)(
+          MetricsContext(
+            "http_service" -> service
+          )
+        ),
       ),
     )
 
@@ -34,7 +40,7 @@ class HttpRateLimiter(
       complete(
         StatusCodes.TooManyRequests,
         HttpEntity(
-          "Server is busy, please try again later."
+          "Too Many Requests: Server is busy, please try again later."
         ),
       )
     }
