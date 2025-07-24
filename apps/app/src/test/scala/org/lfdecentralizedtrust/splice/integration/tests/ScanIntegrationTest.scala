@@ -749,8 +749,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
     val results = SpliceRateLimiterTest
       .runRateLimited(
-        20,
-        100,
+        30,
+        120,
       ) {
         Future {
           blocking {
@@ -762,7 +762,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         }
       } futureValue
 
-    results.count(identity) should be(25 +- 1)
+    results.count(identity) should be(80 +- 5)
 
   }
 
