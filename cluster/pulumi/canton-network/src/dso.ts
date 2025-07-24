@@ -19,7 +19,12 @@ import {
   config,
   approvedSvIdentities,
 } from 'splice-pulumi-common';
-import {configForSv, initialRound, StaticCometBftConfigWithNodeName, svConfigs} from 'splice-pulumi-common-sv';
+import {
+  configForSv,
+  initialRound,
+  StaticCometBftConfigWithNodeName,
+  svConfigs,
+} from 'splice-pulumi-common-sv';
 import { SequencerPruningConfig, StaticSvConfig, SvOnboarding } from 'splice-pulumi-common-sv';
 
 import { InstalledSv, installSvNode } from './sv';
