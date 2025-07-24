@@ -60,9 +60,6 @@ case class AutomationConfig(
     /** Only intended for testing. Disables the expiration of Amulet.
       */
     enableExpireAmulet: Boolean = false,
-    /** Only intended for testing. Allows disabling delegate elections based on inactivity detection for simtime tests so elections are not triggered unexpectedly.
-      */
-    enableDsoDelegateReplacementTrigger: Boolean = true,
     /** Only intended for testing. Allows disabling governance automation.
       */
     enableDsoGovernance: Boolean = true,

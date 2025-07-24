@@ -793,30 +793,6 @@ trait SvDsoStore
     QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ]
 
-  def listElectionRequests(
-      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[
-    Seq[Contract[splice.dsorules.ElectionRequest.ContractId, splice.dsorules.ElectionRequest]]
-  ]
-
-  def lookupElectionRequestByRequesterWithOffset(
-      requester: PartyId,
-      epoch: Long,
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[
-      Contract[splice.dsorules.ElectionRequest.ContractId, splice.dsorules.ElectionRequest]
-    ]]
-  ]
-
-  def listExpiredElectionRequests(
-      epoch: Long,
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Contract[
-    splice.dsorules.ElectionRequest.ContractId,
-    splice.dsorules.ElectionRequest,
-  ]]]
-
   def lookupAnsEntryByNameWithOffset(name: String, now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[
@@ -1054,13 +1030,6 @@ object SvDsoStore {
           actionAnsEntryContextCid = actionAnsEntryContextCid,
           actionAnsEntryContextPaymentId = actionAnsEntryContextPaymentId,
           actionAnsEntryContextArcType = actionAnsEntryContextArcType,
-        )
-      },
-      mkFilter(splice.dsorules.ElectionRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
-          electionRequestEpoch = Some(contract.payload.epoch),
         )
       },
       mkFilter(splice.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>

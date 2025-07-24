@@ -1,5 +1,4 @@
 org.lfdecentralizedtrust.splice.integration.tests.DisabledWalletTimeBasedIntegrationTest
-org.lfdecentralizedtrust.splice.integration.tests.DsoElectionTimeBasedIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ExternallySignedTxsTimeBasedIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ScanTimeBasedIntegrationTest
 org.lfdecentralizedtrust.splice.integration.tests.ScanWithGradualStartsTimeBasedIntegrationTest

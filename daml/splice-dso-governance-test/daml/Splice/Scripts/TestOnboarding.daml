@@ -386,9 +386,6 @@ testSvOverwriteInDevNet = do
   (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
   svX <- allocateParty "svX"
 
-  -- Failing the template precondition check if the existing sv being overwritten is the current DSO delegate.
-  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv1" 19 "sv1-participant-id" (Round 3)
-
   -- overwriting existing sv successfully (using a new participant node)
   submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "svX-participant-id" (Round 3)
 

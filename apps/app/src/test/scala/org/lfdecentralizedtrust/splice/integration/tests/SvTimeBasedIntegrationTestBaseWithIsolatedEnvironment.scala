@@ -103,7 +103,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
   }
 }
 
-abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections
+abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     extends IntegrationTest
     with SvTimeBasedIntegrationTestUtil {
   protected val baseEnvironmentDefinition: EnvironmentDefinition = EnvironmentDefinition
@@ -128,12 +128,6 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     baseEnvironmentDefinition
 }
 
-abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
-    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElections {
-  override def environmentDefinition: EnvironmentDefinition =
-    baseEnvironmentDefinition.withoutDsoDelegateReplacement
-}
-
 abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
     extends IntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil {
@@ -142,5 +136,4 @@ abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging
-      .withoutDsoDelegateReplacement
 }
