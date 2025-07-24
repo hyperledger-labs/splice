@@ -23,6 +23,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import io.grpc.StatusRuntimeException
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round as roundCodegen
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingRequirement
 import org.scalatest.Succeeded
 
@@ -411,31 +412,34 @@ class AcsSnapshotStoreTest
         }
       }
 
+      def queryRecursive(
+          store: AcsSnapshotStore,
+          after: Option[Long],
+          acc: Vector[String],
+          partyIds: Seq[PartyId],
+          templates: Seq[PackageQualifiedName],
+      ): Future[Vector[String]] = {
+        store
+          .queryAcsSnapshot(
+            DefaultMigrationId,
+            timestamp1,
+            after,
+            PageLimit.tryCreate(1),
+            partyIds,
+            templates,
+          )
+          .flatMap { result =>
+            val newAcc = acc ++ result.createdEventsInPage.map(_.event.getContractId)
+            result.afterToken match {
+              case Some(value) => queryRecursive(store, Some(value), newAcc, partyIds, templates)
+              case None => Future.successful(newAcc)
+            }
+          }
+      }
+
       "paginate" in {
         val contracts = (1 to 10).map { i =>
           openMiningRound(dsoParty, i.toLong, 1.0)
-        }
-        def queryRecursive(
-            store: AcsSnapshotStore,
-            after: Option[Long],
-            acc: Vector[String],
-        ): Future[Vector[String]] = {
-          store
-            .queryAcsSnapshot(
-              DefaultMigrationId,
-              timestamp1,
-              after,
-              PageLimit.tryCreate(1),
-              Seq.empty,
-              Seq.empty,
-            )
-            .flatMap { result =>
-              val newAcc = acc ++ result.createdEventsInPage.map(_.event.getContractId)
-              result.afterToken match {
-                case Some(value) => queryRecursive(store, Some(value), newAcc)
-                case None => Future.successful(newAcc)
-              }
-            }
         }
         for {
           updateHistory <- mkUpdateHistory()
@@ -449,9 +453,57 @@ class AcsSnapshotStoreTest
             )
           }
           _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
-          result <- queryRecursive(store, None, Vector.empty)
+          result <- queryRecursive(store, None, Vector.empty, Seq.empty, Seq.empty)
         } yield {
           result should be(contracts.map(_.contractId.contractId))
+        }
+      }
+
+      "paginate with filters by both party and template" in {
+        val okParty = providerParty(1)
+        val ok = (1 to 10).map(n => openMiningRound(okParty, n.toLong, n.toDouble))
+        val badParty = providerParty(2)
+        val differentParty =
+          (1 to 10).map(n => openMiningRound(badParty, n.toLong, n.toDouble * 10))
+        val differentTemplate = (1 to 10).map(n => closedMiningRound(okParty, n.toLong))
+        for {
+          updateHistory <- mkUpdateHistory()
+          store = mkStore(updateHistory)
+          // t1
+          _ <- MonadUtil.sequentialTraverse(ok.zipWithIndex) { case (contract, i) =>
+            ingestCreate(
+              updateHistory,
+              contract,
+              timestamp1.minusSeconds(100L - i.toLong),
+              signatories = Seq(okParty, dsoParty),
+            )
+          }
+          _ <- MonadUtil.sequentialTraverse(differentParty.zipWithIndex) { case (contract, i) =>
+            ingestCreate(
+              updateHistory,
+              contract,
+              timestamp1.minusSeconds(100L - i.toLong),
+              signatories = Seq(badParty, dsoParty),
+            )
+          }
+          _ <- MonadUtil.sequentialTraverse(differentTemplate.zipWithIndex) { case (contract, i) =>
+            ingestCreate(
+              updateHistory,
+              contract,
+              timestamp1.minusSeconds(100L - i.toLong),
+              signatories = Seq(okParty, dsoParty),
+            )
+          }
+          _ <- store.insertNewSnapshot(None, DefaultMigrationId, timestamp1)
+          result <- queryRecursive(
+            store,
+            None,
+            Vector.empty,
+            Seq(providerParty(1)),
+            Seq(PackageQualifiedName(roundCodegen.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID)),
+          )
+        } yield {
+          result should be(ok.map(_.contractId.contractId))
         }
       }
 
