@@ -165,7 +165,10 @@ class UnclaimedSvRewardsScriptIntegrationTest
 
       val sv1Party = sv1Backend.getDsoInfo().svParty
       val readLines = mutable.Buffer[String]()
-      clue("Run unclaimed_sv_rewards.py with invalid weight and check warnings and results") {
+      clue(
+        "Run unclaimed_sv_rewards.py with invalid weight inputs (effective weight < input weight) " +
+          "and check warnings and results"
+      ) {
         val errorProcessor = ProcessLogger(line => readLines.append(line))
         val inputWeight = sv1TotalWeight - 1
         val alreadyMintedWeight = 2
@@ -213,13 +216,13 @@ class UnclaimedSvRewardsScriptIntegrationTest
             _ should include(s"reward_expired_count = $svRewardCouponsExpiredCount")
           }
           forExactly(1, readLines) {
-            _ should include(s"reward_expired_total_amount = $rewardExpiredTotalAmount")
+            _ should include(f"reward_expired_total_amount = $rewardExpiredTotalAmount%.10f")
           }
           forExactly(1, readLines) {
             _ should include(s"reward_claimed_count = $svRewardCouponsClaimedCount")
           }
           forExactly(1, readLines) {
-            _ should include(s"reward_claimed_total_amount = $rewardClaimedTotalAmount")
+            _ should include(f"reward_claimed_total_amount = $rewardClaimedTotalAmount%.10f")
           }
           forExactly(1, readLines) {
             _ should include(s"reward_unclaimed_count = $svRewardCouponsUnclaimedCount")
@@ -231,7 +234,79 @@ class UnclaimedSvRewardsScriptIntegrationTest
         }
       }
 
-      clue("Run unclaimed_sv_rewards.py with valid inputs and check results") {
+      clue(
+        "Run unclaimed_sv_rewards.py with invalid weight inputs (effective weight == 0) " +
+          "and check warnings and results"
+      ) {
+        val inputWeight = 1
+        val alreadyMintedWeight = sv1TotalWeight + 1
+        val effectiveWeight = 0L // max(0, sv1TotalWeight - alreadyMintedWeight)
+
+        val rewardExpiredTotalAmount =
+          getTotalAmount(svRewardCouponsExpired, roundInfo, effectiveWeight)
+        val rewardClaimedTotalAmount =
+          getTotalAmount(svRewardCouponsClaimed, roundInfo, effectiveWeight)
+
+        readLines.clear()
+        val errorProcessor = ProcessLogger(line => readLines.append(line))
+        try {
+          val exitCode = scala.sys.process
+            .Process(
+              Seq(
+                "python",
+                "scripts/scan-txlog/unclaimed_sv_rewards.py",
+                sv1ScanBackend.httpClientConfig.url.toString(),
+                "--grace-period-for-mining-rounds-in-minutes",
+                "30",
+                "--loglevel",
+                "DEBUG",
+                "--beneficiary",
+                sv1Party.toProtoPrimitive,
+                "--begin-migration-id",
+                "0",
+                "--begin-record-time",
+                beginRecordTime.toString,
+                "--end-record-time",
+                endRecordTime.toString,
+                "--weight",
+                inputWeight.toString,
+                "--already-minted-weight",
+                alreadyMintedWeight.toString,
+              )
+            )
+            .!(errorProcessor)
+
+          assert(exitCode == 0, s"Script exited with code $exitCode")
+          readLines.filter(_.startsWith("ERROR:")) shouldBe empty
+          forExactly(6, readLines) {
+            _ should include("WARNING:global:Invalid weight input for round")
+          }
+
+          forExactly(1, readLines) {
+            _ should include(s"reward_expired_count = $svRewardCouponsExpiredCount")
+          }
+          forExactly(1, readLines) {
+            _ should include(f"reward_expired_total_amount = $rewardExpiredTotalAmount%.10f")
+          }
+          forExactly(1, readLines) {
+            _ should include(s"reward_claimed_count = $svRewardCouponsClaimedCount")
+          }
+          forExactly(1, readLines) {
+            _ should include(f"reward_claimed_total_amount = $rewardClaimedTotalAmount%.10f")
+          }
+          forExactly(1, readLines) {
+            _ should include(s"reward_unclaimed_count = $svRewardCouponsUnclaimedCount")
+          }
+        } catch {
+          case NonFatal(ex) =>
+            readLines.foreach(logger.error(_))
+            fail("Unexpected failure running script", ex)
+        }
+      }
+
+      clue(
+        "Run unclaimed_sv_rewards.py with valid inputs (effective weight == input weight) and check results"
+      ) {
         val inputWeight = sv1TotalWeight / 2
         val alreadyMintedWeight = inputWeight
         val effectiveWeight = inputWeight
@@ -276,13 +351,13 @@ class UnclaimedSvRewardsScriptIntegrationTest
             _ should include(s"reward_expired_count = $svRewardCouponsExpiredCount")
           }
           forExactly(1, readLines) {
-            _ should include(s"reward_expired_total_amount = $rewardExpiredTotalAmount")
+            _ should include(f"reward_expired_total_amount = $rewardExpiredTotalAmount%.10f")
           }
           forExactly(1, readLines) {
             _ should include(s"reward_claimed_count = $svRewardCouponsClaimedCount")
           }
           forExactly(1, readLines) {
-            _ should include(s"reward_claimed_total_amount = $rewardClaimedTotalAmount")
+            _ should include(f"reward_claimed_total_amount = $rewardClaimedTotalAmount%.10f")
           }
           forExactly(1, readLines) {
             _ should include(s"reward_unclaimed_count = $svRewardCouponsUnclaimedCount")

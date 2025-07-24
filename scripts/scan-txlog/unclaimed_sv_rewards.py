@@ -654,7 +654,7 @@ class State:
         return self._calculate_weight(reward) * mining_round_info.issuance_per_sv_reward
 
     def _calculate_weight(self, reward):
-        available_weight = reward.weight - self.already_minted_weight
+        available_weight = max(0, reward.weight - self.already_minted_weight)
         if self.weight > available_weight:
             LOG.warning(
                 f"Invalid weight input for round <{reward.round}>: "
