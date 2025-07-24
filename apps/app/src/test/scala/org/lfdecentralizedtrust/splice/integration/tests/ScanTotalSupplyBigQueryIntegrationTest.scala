@@ -1,14 +1,9 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.AdvanceOpenMiningRoundTrigger
 import org.lfdecentralizedtrust.splice.util.*
-import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.BaseTest.getResourcePath
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
 import com.digitalasset.canton.resource.DbStorage
@@ -26,8 +21,10 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import slick.jdbc.GetResult
 
+import java.time.Duration
+
 class ScanTotalSupplyBigQueryIntegrationTest
-    extends IntegrationTest
+    extends SpliceTests.IntegrationTest
     with WalletTestUtil
     with SplitwellTestUtil
     with TimeTestUtil
@@ -41,22 +38,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // TODO (#1095) copied verbatim from UpdateHistoryIntegrationTest, maybe diverge or factor
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
-      .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withAdditionalSetup(implicit env => {
-        aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-      })
-      .addConfigTransforms((_, config) =>
-        updateAutomationConfig(ConfigurableApp.Sv)(
-          _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
-        )(config)
-      )
-      .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialTickDuration = NonNegativeFiniteDuration.ofMillis(500))
-        )(config)
-      )
-      .withTrafficTopupsDisabled
+      .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
 
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
@@ -226,6 +208,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
       env: FixtureParam
   ): Unit = {
     // TODO (#1095) use a realistic minting method; best not to support tap in the SQL
+    withClue("step forward to an open round") {
+      advanceTimeAndWaitForRoundAutomation(Duration.ofDays(10))
+      advanceTimeToRoundOpen
+    }
     aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
 
     // TODO (#1095) Lock a portion of Amulet (lockedAmount)
