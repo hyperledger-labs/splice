@@ -19,7 +19,7 @@ final case class DomainMigrationDump(
     domainId: SynchronizerId,
     migrationId: Long,
     participant: NodeIdentitiesDump,
-    participantUsers: ParticipantUsersData,
+    participantUsers: Option[ParticipantUsersData],
     acsSnapshot: ByteString,
     acsTimestamp: Instant,
     dars: Seq[Dar],
@@ -40,7 +40,7 @@ final case class DomainMigrationDump(
 
   def toHttp: http.DomainMigrationDump = http.DomainMigrationDump(
     participant = participant.toHttp,
-    participantUsers = participantUsers.toHttp,
+    participantUsers = participantUsers.map(_.toHttp),
     acsSnapshot = Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
     acsTimestamp = acsTimestamp.toString,
     dars = dars.map { dar =>
@@ -66,7 +66,7 @@ object DomainMigrationDump {
     participant <- NodeIdentitiesDump
       .fromHttp(ParticipantId.tryFromProtoPrimitive, response.participant)
       .leftMap(_ => "Failed to parse Participant Node Identities")
-    participantUsers = ParticipantUsersData.fromHttp(response.participantUsers)
+    participantUsers = response.participantUsers.map(ParticipantUsersData.fromHttp)
     domainId <- SynchronizerId fromString response.domainId
     migrationId = response.migrationId
     acsSnapshot = {

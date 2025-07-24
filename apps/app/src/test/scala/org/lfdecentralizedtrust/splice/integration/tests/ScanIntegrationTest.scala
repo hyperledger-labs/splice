@@ -84,7 +84,6 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
             amuletRules,
             dsoRules,
             svNodeStates,
-            _,
           ) =>
         scan.svUser should be(svUser)
         scan.svPartyId should be(svParty.toProtoPrimitive)

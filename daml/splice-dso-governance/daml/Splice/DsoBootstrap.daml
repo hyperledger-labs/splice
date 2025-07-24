@@ -5,7 +5,6 @@ module Splice.DsoBootstrap where
 
 import qualified DA.Map as Map
 import DA.Time
-import DA.Optional (fromOptional)
 
 import Splice.AmuletConfig
 import Splice.AmuletRules
@@ -34,7 +33,6 @@ template DsoBootstrap with
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState
     isDevNet : Bool
-    initialRound : Optional Int
   where
     signatory dso
     observer sv1Party
@@ -54,14 +52,13 @@ template DsoBootstrap with
           dso
           config = ansRulesConfig
         -- bootstrap rounds
-        result <- exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
+        exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
           round0Duration
           amuletPrice
-          initialRound
         -- create the DSO rules with the SV1 as the sole sv
         let sv1SvInfo = SvInfo with
               name = sv1Name
-              joinedAsOfRound = fromOptional (Round 0) result.initialRound
+              joinedAsOfRound = Round 0
               svRewardWeight = sv1RewardWeight
               participantId = sv1ParticipantId
         let dsoRules = DsoRules with
@@ -79,7 +76,7 @@ template DsoBootstrap with
               newSvParty = sv1Party
               newSvName = sv1Name
               newSvParticipantId = sv1ParticipantId
-              joinedAsOfRound = fromOptional (Round 0) result.initialRound
+              joinedAsOfRound = Round 0
               newSvRewardWeight = sv1RewardWeight
         createPerSvContracts dsoRules addSvChoiceArgs
         createPerSvPartyContracts dso sv1Party sv1Name sv1SynchronizerNodes (Some amuletPrice) (getVoteCooldownTime config)
