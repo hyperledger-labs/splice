@@ -60,6 +60,7 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
 
 /** Class representing a Scan app instance.
   *
@@ -283,6 +284,10 @@ class ScanApp(
         clock,
         loggerFactory,
       )
+      httpRateLimiter = new HttpRateLimiter(
+        config.parameters.rateLimiting,
+        nodeMetrics.openTelemetryMetricsFactory,
+      )
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
       ) {
@@ -292,8 +297,11 @@ class ScanApp(
               nodeMetrics.httpServerMetrics
                 .withMetrics(httpService)(operation)
                 .tflatMap(_ =>
-                  HttpErrorHandler(loggerFactory)(traceContext).tflatMap { _ =>
-                    provide(traceContext)
+                  // rate limit after the metrics to capture the result in the http metrics
+                  httpRateLimiter.withRateLimit(httpService)(operation).tflatMap { _ =>
+                    HttpErrorHandler(loggerFactory)(traceContext).tflatMap { _ =>
+                      provide(traceContext)
+                    }
                   }
                 )
             }
