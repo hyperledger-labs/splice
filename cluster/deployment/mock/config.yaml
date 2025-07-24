@@ -101,7 +101,6 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
-initialRound: 0
 svs:
   # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
