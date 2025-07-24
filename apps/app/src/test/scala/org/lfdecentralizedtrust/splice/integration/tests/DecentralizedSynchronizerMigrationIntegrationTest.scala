@@ -113,6 +113,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     with StandaloneCanton
     with SplitwellTestUtil {
 
+  private val initialRound = 481516L
+
   override def dbsSuffix = "domain_migration"
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
@@ -409,6 +411,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(initialRound = initialRound)
+        )(config)
       )
       .withManualStart
       // TODO (#965) remove and fix test failures
@@ -1042,7 +1049,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       "Bob",
                       SvUtil.DefaultSV1Weight,
                       "bob-participant-id",
-                      new Round(42),
+                      new Round(initialRound + 42),
                     )
                   )
                 ),
@@ -1167,6 +1174,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               withClueAndLog("sv1 restarts with dump onboarding type") {
                 sv1LocalBackend.stop()
                 sv1LocalBackend.startSync()
+              }
+
+              withClueAndLog(s"SVs have $initialRound as initial round") {
+                Seq(sv1LocalBackend, sv2LocalBackend).foreach { sv =>
+                  sv.getDsoInfo().initialRound shouldBe initialRound.toString
+                }
               }
 
               withClueAndLog("sv1 restarts without any onboarding type") {

@@ -869,6 +869,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "initialAmuletPrice": "0.0517",
         "initialPackageConfigJson": "{\"amuletVersion\": \"0.1.4\",\"amuletNameServiceVersion\": \"0.1.4\",\"dsoGovernanceVersion\": \"0.1.7\",\"validatorLifecycleVersion\": \"0.1.1\",\"walletVersion\": \"0.1.4\",\"walletPaymentsVersion\": \"0.1.4\"}",
+        "initialRound": "0",
         "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 200000,
           "baseRateBurstWindowMins": 20,

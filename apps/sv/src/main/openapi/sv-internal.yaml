@@ -1089,7 +1089,7 @@ components:
         - migration_id
         - identities
         - data_snapshot
-        # TODO(tech-debt) make `participant_users` required once HDM base version is at 0.3.15 or higher
+        - participant_users
         - created_at
       properties:
         migration_id:
@@ -1118,6 +1118,7 @@ components:
         - created_at
         - migration_id
         - data_snapshot
+        - participant_users
       properties:
         created_at:
           description: |
@@ -1128,3 +1129,5 @@ components:
           format: int64
         data_snapshot:
           $ref: "#/components/schemas/DomainDataSnapshot"
+        participant_users:
+          "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ParticipantUsersData"

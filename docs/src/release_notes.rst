@@ -11,6 +11,13 @@ Release Notes
 Upcoming
 --------
 
+- Deployment
+
+  - Good-to-know but no changes needed: Added new helm values ``persistence.enablePgInitContainer`` and
+    ``extraInitContainers`` allowing configuration around deployment init containers. So far this is implemented only
+    for the validator and participant helm charts. The default values for these won't change your current deployment,
+    so if uninterested you can safely ignore.
+
 - Dashboards
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
@@ -27,26 +34,29 @@ Upcoming
   sequencers to 10 minutes. This has no impact other than on the
   acknowlegdement metrics exposed by the sequencer.
 
-- SV
+- SV Application
 
-  - Fully remove automation and logic around DSO delegate elections.
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
+  - Fully removes the automation and logic around DSO delegate elections.
 
 - Daml
 
-  - Deprecated Daml choices related to DSO delegate elections
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+  - Deprecates Daml choices related to DSO delegate elections.
 
-    * This requires a Daml upgrade to versions
+     These Daml changes requires an upgrade to the following Daml versions:
 
-          ================== =======
-          name               version
-          ================== =======
-          amulet             0.1.12
-          amuletNameService  0.1.12
-          dsoGovernance      0.1.17
-          validatorLifecycle 0.1.5
-          wallet             0.1.12
-          walletPayments     0.1.12
-          ================== =======
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.17
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
 
 0.4.7
 -----

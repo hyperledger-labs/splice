@@ -702,3 +702,22 @@ Refer to the Canton documentation for more details on participant pruning:
     :language: yaml
     :start-after: PARTICIPANT_PRUNING_SCHEDULE_START
     :end-before: PARTICIPANT_PRUNING_SCHEDULE_END
+
+Configuring init containers
+---------------------------
+
+If you need to configure init containers on the participant or validator deployments, you can use the following helm
+values for ``splice-participant`` or ``splice-validator``:
+
+.. code-block:: yaml
+
+    # if you want to disable the default postgres init container:
+    persistence:
+      enablePgInitContainer: false
+
+    # if you want additional init containers:
+    extraInitContainers:
+      - name: my-extra-container
+        image: busybox
+        command: [ "sh", "-c", "echo 'example extra container'" ]
+
