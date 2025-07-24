@@ -199,13 +199,6 @@ class JoiningNodeInitializer(
           onboardingConfig.name,
         )
       )
-      // We set the initial round to the one from the sponsor if no initial round is store in the user metadata yet
-      // This is needed so that all scans can aggregate and backfill using the same initial round
-      // Note: we accept the risk that sponsors could maliciously set a wrong initialRound as this is dev/testnet only.
-      _ <- establishInitialRound(
-        svAutomation.connection,
-        upgradesConfig,
-      )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any

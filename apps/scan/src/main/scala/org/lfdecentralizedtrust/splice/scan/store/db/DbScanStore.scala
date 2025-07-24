@@ -98,7 +98,6 @@ class DbScanStore(
     participantId: ParticipantId,
     enableImportUpdateBackfill: Boolean,
     storeMetrics: DbScanStoreMetrics,
-    initialRound: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -190,7 +189,6 @@ class DbScanStore(
         loggerFactory,
         domainMigrationId,
         timeouts,
-        initialRound.toInt,
       )
     )
 

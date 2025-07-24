@@ -114,7 +114,6 @@ initialize config = do
   submit registry.dso $ exerciseCmd amuletRulesCid AmuletRules_Bootstrap_Rounds with
       amuletPrice = config.initialAmuletPrice
       round0Duration = minutes 10 -- no special setup for normal tests
-      initialRound = None
 
   -- return the off-ledger reference to the registry for later script steps
   return registry

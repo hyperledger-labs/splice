@@ -20,13 +20,10 @@ import Splice.DSO.SvState
 import Splice.Scripts.DsoTestUtils
 import Splice.Util
 
-test_SvRewards_With_InitialRound_In_FirstIssuanceCurve : Script ()
-test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
+test_SvRewards : Script ()
+test_SvRewards = do
 
-    let initialRound = 0
-    let expectedIssuancePerSvRewardCoupon = 4.6832923545
-
-    (app, dso, (sv1, sv2, sv3, sv4)) <- initDecentralizedSynchronizerWithNonZeroRound False initialRound
+    (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
 
     -- extra party to represent beneficiary
     extraBeneficiary <- allocateParty "beneficiary"
@@ -114,7 +111,6 @@ test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
     checkBalance sv1 sv1Balance0
     checkBalance sv2 sv2Balance
 
-    require (show round.issuancePerSvRewardCoupon <> " initIssuancePerSvRewardCoupon: expected ") (round.issuancePerSvRewardCoupon == expectedIssuancePerSvRewardCoupon)
 
     -- also collect the round 1
     runNextIssuance app
@@ -149,159 +145,14 @@ test_SvRewards_With_InitialRound_In_FirstIssuanceCurve = do
     sv1State.state === RewardState with
       numRoundsMissed = 2
       numRoundsCollected = 3
-      lastRoundCollected = Round (initialRound + 4)
+      lastRoundCollected = Round 4
       numCouponsIssued = 6
 
     [(_, sv2State)] <- queryFilter @SvRewardState dso (\s -> s.svName == "sv2")
     sv2State.state === RewardState with
       numRoundsMissed = 3
       numRoundsCollected = 2
-      lastRoundCollected = Round (initialRound + 4)
-      numCouponsIssued = 4
-
-    -- round2 can no longer be received
-    receiveSvRewardCouponFails sv1 round2 rulesCid
-    receiveSvRewardCouponFails sv2 round2 rulesCid
-
-    return ()
-
-test_SvRewards_With_InitialRound_In_SecondIssuanceCurve : Script ()
-test_SvRewards_With_InitialRound_In_SecondIssuanceCurve = do
-    -- The 50k's round is falling in the second issuance curve (approx. 1 year after bootstrap)
-    let initialRound = 50000
-    let expectedIssuancePerSvRewardCoupon = 1.4049877064
-
-    (app, dso, (sv1, sv2, sv3, sv4)) <- initDecentralizedSynchronizerWithNonZeroRound False initialRound
-
-    -- extra party to represent beneficiary
-    extraBeneficiary <- allocateParty "beneficiary"
-
-    -- create validator rights for sv1-4, so that runAmuletDepositBots can collect the rewards
-    forA_ [sv1, sv2, sv3, sv4] $ \sv -> do
-      submit sv $ createCmd ValidatorRight with
-        dso
-        user = sv
-        validator = sv
-
-    let checkSvRewardCouponsDoNotExist round = do
-          [] <- queryFilter @SvRewardCoupon app.dso (\co -> co.round == round && co.beneficiary /= extraBeneficiary)
-          pure ()
-    let checkBalance sv amount = do
-          [(_, amulet)] <- query @Amulet sv
-          require (show sv <> " balance: expected " <> show amount <> " == " <> show amulet.amount.initialAmount)
-            (amulet.amount.initialAmount == amount)
-    let getSvRewardWeightAndState sv = do
-          info <- getSvInfoByParty app sv
-          [(rewardStateCid, _)] <- queryFilter @SvRewardState dso (\s -> s.svName == info.name)
-          pure (info.svRewardWeight, rewardStateCid)
-
-    let receiveSvRewardCouponFails sv round rulesCid = do
-          (weight, rewardStateCid) <- getSvRewardWeightAndState sv
-          -- check that collecting the reward coupon fails
-          void $ submitMultiMustFail [sv] [dso] $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
-            openRoundCid = round._1
-            rewardStateCid
-            beneficiaries = [(sv, weight)]
-            sv = sv
-    let receiveSvRewardCoupon : Party -> (ContractId OpenMiningRound, OpenMiningRound) -> ContractId DsoRules -> Script ()
-        receiveSvRewardCoupon sv round rulesCid = do
-          (weight, rewardStateCid) <- getSvRewardWeightAndState sv
-          -- collect reward coupon
-          void $ submitMulti [sv] [dso] $ exerciseCmd rulesCid DsoRules_ReceiveSvRewardCoupon with
-            openRoundCid = round._1
-            rewardStateCid
-            beneficiaries = [(sv, weight - 1), (extraBeneficiary, 1)]
-            sv = sv
-          -- check that the coupon exists and has the right weight
-          coupons <- queryFilter @SvRewardCoupon sv (\co -> co.round == round._2.round)
-          sortOn (.weight) (map (._2) coupons) === sortOn (.weight)
-            [SvRewardCoupon with
-                dso = app.dso
-                sv
-                beneficiary
-                weight
-                round = round._2.round
-              | (beneficiary, weight) <- [(sv, weight - 1), (extraBeneficiary, 1)]]
-
-    [(rulesCid, _)] <- query @DsoRules dso
-
-    [round0, round1, _round2] <- getActiveOpenRoundsSorted app
-    [(_, openRound)] <- queryFilter @OpenMiningRound app.dso (\r -> r.round == round0._2.round)
-    let createFee = openRound.transferConfigUsd.createFee.fee * openRound.amuletPrice
-
-    -- round0 can be received by both SV1 and SV2
-    passTime (hours 1)
-    receiveSvRewardCoupon sv1 round0 rulesCid
-    receiveSvRewardCoupon sv2 round0 rulesCid
-
-    -- but not twice
-    receiveSvRewardCouponFails sv1 round0 rulesCid
-    receiveSvRewardCouponFails sv2 round0 rulesCid
-
-    -- round1 can be received (intentionally skipping receiving it for SV2)
-    receiveSvRewardCoupon sv1 round1 rulesCid
-
-    -- let's collect the rewards for Round 0: requires two issuing round advances
-    -- (create the issuing round and advance time for it to become open)
-    runNextIssuance app
-    runNextIssuance app
-
-    runAmuletDepositBots app
-
-    -- checking that the rewards are gone and the balances are right
-    -- Note: SV1 weight is 10 and SV2 weight is 3
-    checkSvRewardCouponsDoNotExist round0._2.round
-    [(_, round)] <- queryFilter @IssuingMiningRound app.dso (\r -> r.round == round0._2.round)
-    let sv1Weight = intToDecimal $ bpsMultiplier * 10 - 1
-    let sv2Weight = intToDecimal $ bpsMultiplier * 3 - 1
-    let sv1Balance0 = round.issuancePerSvRewardCoupon * sv1Weight - createFee
-    let sv2Balance = round.issuancePerSvRewardCoupon * sv2Weight - createFee
-    checkBalance sv1 sv1Balance0
-    checkBalance sv2 sv2Balance
-
-    require (show round.issuancePerSvRewardCoupon <> " initIssuancePerSvRewardCoupon: expected ") (round.issuancePerSvRewardCoupon == expectedIssuancePerSvRewardCoupon)
-
-    -- also collect the round 1
-    runNextIssuance app
-    runAmuletDepositBots app
-    checkSvRewardCouponsDoNotExist round1._2.round
-
-    [(_, round)] <- queryFilter @IssuingMiningRound app.dso (\r -> r.round == round1._2.round)
-    let sv1Balance1 =
-            round.issuancePerSvRewardCoupon * sv1Weight - createFee - openRound.transferConfigUsd.holdingFee.rate
-            + sv1Balance0
-    checkBalance sv1 sv1Balance1
-    checkBalance sv2 sv2Balance -- no balance change for SV2 as it did not collect round 1
-
-
-    -- testing skipping
-    -------------------
-
-    -- get the new active rounds
-    [round2, round3, _] <- getActiveOpenRoundsSorted app
-
-    -- skip one day
-    passTime (days 1)
-
-    -- round3 can be received despite round 2 not yet being recieved, i.e., we can skip rounds
-    receiveSvRewardCoupon sv1 round3 rulesCid
-    receiveSvRewardCoupon sv2 round3 rulesCid
-
-    checkSvRewardCouponsDoNotExist round2._2.round
-
-    -- check that the coupons for round 2 and 3 are marked as not collected
-    [(_, sv1State)] <- queryFilter @SvRewardState dso (\s -> s.svName == "sv1")
-    sv1State.state === RewardState with
-      numRoundsMissed = 2
-      numRoundsCollected = 3
-      lastRoundCollected = Round (initialRound + 4)
-      numCouponsIssued = 6
-
-    [(_, sv2State)] <- queryFilter @SvRewardState dso (\s -> s.svName == "sv2")
-    sv2State.state === RewardState with
-      numRoundsMissed = 3
-      numRoundsCollected = 2
-      lastRoundCollected = Round (initialRound + 4)
+      lastRoundCollected = Round 4
       numCouponsIssued = 4
 
     -- round2 can no longer be received
