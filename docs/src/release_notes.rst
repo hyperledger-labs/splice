@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.8
+-----
 
 - Deployment
 
@@ -24,9 +24,10 @@ Upcoming
 
 - Istio Reference Ingress
 
-    - Include in the helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints. This will be enabled by default if using the helm charts provided for Istio and the scan ingress is enabled.
-      If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
-      These rate limits will be expanded in the future to more endpoints.
+  - Include in the ``splice-cluster-ingress-runbook`` helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints in Scan.
+    This will be enabled by default if using the helm charts provided for Istio and the Scan ingress is enabled.
+    If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
+    These rate limits will be expanded in the future to more endpoints.
 
 - Canton
 
@@ -38,6 +39,9 @@ Upcoming
 
   - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
     Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
+  - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
+    This should have a slight impact in improving the performance of the sequencer.
+    Until a majority of nodes upgrade to ``0.4.8`` the ``ReconcileDynamicSynchronizerParametersTrigger`` might produce warnings.
 
 - Daml
 
