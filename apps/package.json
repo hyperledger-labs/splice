@@ -21,13 +21,8 @@
     "wallet/external-openapi-ts-client"
   ],
   "dependencies": {
-<<<<<<< HEAD
-    "@daml.js/ans": "file:common/frontend/daml.js/splice-amulet-name-service-0.1.12",
-    "@daml.js/splice-amulet": "file:common/frontend/daml.js/splice-amulet-0.1.12",
-=======
     "@daml.js/ans": "file:common/frontend/daml.js/splice-amulet-name-service-0.1.13",
     "@daml.js/splice-amulet": "file:common/frontend/daml.js/splice-amulet-0.1.13",
->>>>>>> e6323a8bfe6fd4377d5a320fe550784a07728b34
     "@daml.js/splice-dso-governance": "file:common/frontend/daml.js/splice-dso-governance-0.1.17",
     "@daml.js/splice-validator-lifecycle": "file:common/frontend/daml.js/splice-validator-lifecycle-0.1.5",
     "@daml.js/splice-wallet": "file:common/frontend/daml.js/splice-wallet-0.1.13",
