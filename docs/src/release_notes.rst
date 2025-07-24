@@ -37,7 +37,7 @@ Release Notes
 
 - SV Application
 
-  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_.
     Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
   - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
     This should have a slight impact on improving the performance of the sequencer.
