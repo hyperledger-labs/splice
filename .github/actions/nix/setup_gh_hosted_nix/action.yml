@@ -2,6 +2,11 @@
 name: 'Setup self-hosted Nix'
 description: 'Setup self-hosted Nix'
 
+inputs:
+  cache_version:
+    description: 'The cache version'
+    required: true
+
 runs:
   using: 'composite'
   steps:
@@ -15,7 +20,7 @@ runs:
         git ls-files nix/ | grep -v '[.]md$' | LC_ALL=C sort | xargs sha256sum -b > /tmp/nix-cache-key
         uname -m >> /tmp/nix-cache-key # Add architecture to the cache key
         echo "gh_cache_version: ${{ inputs.cache_version }}" >> /tmp/nix-cache-key # Add cache version to the cache key
-        echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
+        echo "oss_only: true" >> /tmp/nix-cache-key
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
 
