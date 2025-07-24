@@ -48,6 +48,8 @@ case class ScanAppBackendConfig(
     txLogBackfillBatchSize: Int = 100,
     bftSequencers: Seq[BftSequencerConfig] = Seq.empty,
     cache: ScanCacheConfig = ScanCacheConfig(),
+    customTimeouts: Map[String, NonNegativeFiniteDuration] =
+      ScanAppBackendConfig.DefaultCustomTimeouts,
     // TODO(#1164): Enable by default
 ) extends SpliceBackendConfig
     with BaseScanAppConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
@@ -55,6 +57,14 @@ case class ScanAppBackendConfig(
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
+}
+
+object ScanAppBackendConfig {
+
+  val DefaultCustomTimeouts: Map[String, NonNegativeFiniteDuration] = Map(
+    "getAcsSnapshot" -> NonNegativeFiniteDuration.ofMinutes(1L)
+  )
+
 }
 
 final case class ScanCacheConfig(

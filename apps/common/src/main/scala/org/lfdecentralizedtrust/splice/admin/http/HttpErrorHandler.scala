@@ -6,6 +6,7 @@ package org.lfdecentralizedtrust.splice.admin.http
 import org.apache.pekko.http.scaladsl.model.{
   ContentTypes,
   HttpEntity,
+  HttpRequest,
   HttpResponse,
   MediaTypes,
   StatusCode,
@@ -30,6 +31,7 @@ import io.circe.Printer
 import io.circe.syntax.*
 import io.grpc.{Status, StatusRuntimeException}
 
+import scala.concurrent.duration.Duration
 import scala.util.{Failure, Success, Try}
 
 final case class HttpErrorWithGrpcStatus(status: Status, message: String)
@@ -182,24 +184,28 @@ final class HttpErrorHandler(
   def timeoutDirective(implicit traceContext: TraceContext): Directive0 = {
     extractRequestTimeout.flatMap { timeout =>
       withRequestTimeoutResponse(request => {
-        logger.warn(s"Request to ${request.uri} resulted in a timeout after $timeout.")
-        val contentType = MediaTypes.`application/json`
-        val errorResponse =
-          d0.ErrorResponse(
-            s"The server is taking too long to respond to the request at ${request.uri}"
-          )
-        val responseEntity = HttpEntity(
-          contentType = contentType,
-          ByteString(
-            Printer.noSpaces
-              .printToByteBuffer(errorResponse.asJson, contentType.charset.nioCharset())
-          ),
-        )
-        HttpResponse(
-          StatusCodes.ServiceUnavailable,
-          entity = responseEntity,
-        )
+        timeoutHandler(timeout, request)
       })
     }
+  }
+
+  def timeoutHandler(timeout: Duration, request: HttpRequest)(implicit tc: TraceContext) = {
+    logger.warn(s"Request to ${request.uri} resulted in a timeout after $timeout.")
+    val contentType = MediaTypes.`application/json`
+    val errorResponse =
+      d0.ErrorResponse(
+        s"The server is taking too long to respond to the request at ${request.uri}"
+      )
+    val responseEntity = HttpEntity(
+      contentType = contentType,
+      ByteString(
+        Printer.noSpaces
+          .printToByteBuffer(errorResponse.asJson, contentType.charset.nioCharset())
+      ),
+    )
+    HttpResponse(
+      StatusCodes.ServiceUnavailable,
+      entity = responseEntity,
+    )
   }
 }
