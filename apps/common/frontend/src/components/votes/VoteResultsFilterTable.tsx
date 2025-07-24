@@ -309,7 +309,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
         rows={rows}
         columns={columns}
         initialState={{
-          pagination: { paginationModel: { pageSize: 10 } },
+          pagination: { paginationModel: { pageSize: 25 } },
           columns: {
             columnVisibilityModel: { votedAt: false, accepted: false },
           },

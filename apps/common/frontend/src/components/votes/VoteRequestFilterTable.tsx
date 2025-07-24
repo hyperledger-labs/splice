@@ -141,7 +141,7 @@ export const VoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
         rows={rows}
         columns={columns}
         initialState={{
-          pagination: { paginationModel: { pageSize: 10 } },
+          pagination: { paginationModel: { pageSize: 25 } },
           columns: {
             columnVisibilityModel: { createdAt: false },
           },
