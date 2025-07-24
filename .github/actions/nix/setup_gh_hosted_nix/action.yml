@@ -9,7 +9,7 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        curl https://storage.googleapis.com/splice-nix-cache-public/69c04df5151a8da969d5b501a60d4cd2.tar.gz
+        wget https://storage.googleapis.com/splice-nix-cache-public/69c04df5151a8da969d5b501a60d4cd2.tar.gz
         # unzip it to /cache/nix
         sudo tar -xzf 69c04df5151a8da969d5b501a60d4cd2.tar.gz -C /cache/nix
         # we use rsync here because it's simply faster to install
