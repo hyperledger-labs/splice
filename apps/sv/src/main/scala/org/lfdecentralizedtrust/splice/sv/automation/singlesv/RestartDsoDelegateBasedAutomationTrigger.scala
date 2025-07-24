@@ -106,7 +106,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
         epochStateVar match {
           case None =>
             logger.debug(s"Learned first epoch $currentEpoch")
-            restartAutomation(currentEpoch, dsoRules)
+            restartAutomation(currentEpoch)
           case Some(state) =>
             if (state.epoch != currentEpoch) {
               logger.info(
@@ -115,7 +115,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
               logger.debug(
                 s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
               )
-              restartAutomation(currentEpoch, dsoRules)
+              restartAutomation(currentEpoch)
             } else {
               TaskSuccess(
                 s"DsoRules changed, but the epoch stayed the same (epoch $lastKnownEpoch)"
@@ -126,7 +126,7 @@ class RestartDsoDelegateBasedAutomationTrigger(
     }
   }
 
-  private def restartAutomation(epoch: Long, dsoRules: DsoRulesContract)(implicit
+  private def restartAutomation(epoch: Long)(implicit
       ec: ExecutionContext
   ): TaskOutcome = {
     val svTaskContext =

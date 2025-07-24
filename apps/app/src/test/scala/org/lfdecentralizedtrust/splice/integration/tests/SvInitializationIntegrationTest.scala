@@ -172,9 +172,6 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
   "The DSO is bootstrapped correctly" in { implicit env =>
     initDso()
-    val dsoRules = clue("An DsoRules contract exists") {
-      sv1Backend.getDsoInfo()
-    }
     val svParties = clue("We have four sv parties and their apps are online") {
       svs.map(_.getDsoInfo().svParty.toProtoPrimitive)
     }
