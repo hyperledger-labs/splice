@@ -106,6 +106,7 @@ class HttpScanHandler(
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
+    initialRound: String,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -146,6 +147,7 @@ class HttpScanHandler(
         amuletRules = amuletRules.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
+        initialRound = initialRound,
       )
     }
   }
