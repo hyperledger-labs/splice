@@ -9,9 +9,12 @@ runs:
       shell: bash
       run: |
         set -euxo pipefail
-        wget https://storage.googleapis.com/splice-nix-cache-public/69c04df5151a8da969d5b501a60d4cd2.tar.gz
+        cache_key="69c04df5151a8da969d5b501a60d4cd2"
+        wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz"
         # unzip it to /cache/nix
+        sudo mkdir -p /cache/nix
         sudo tar -xzf 69c04df5151a8da969d5b501a60d4cd2.tar.gz -C /cache/nix
+        ls -al "/cache/nix/$cache_key"
         # we use rsync here because it's simply faster to install
         rsync -avi /cache/nix/$cache_key/.nix-* $HOME/
         rsync -avi "/cache/nix/$cache_key/nix" $HOME/.config/
