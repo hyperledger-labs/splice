@@ -6,7 +6,7 @@ groups:
     interval: 1m
     rules:
       - uid: adw5rd048zf9ca
-        title: Wasted Traffic
+        title: Wasted Traffic (Burst)
         condition: wasted_traffic_threshold
         data:
           - refId: wasted_traffic
@@ -16,7 +16,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
+              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"}[$WASTED_TRAFFIC_ALERT_BURST_TIME_RANGE]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto
@@ -32,7 +32,7 @@ groups:
               conditions:
                 - evaluator:
                     params:
-                      - $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES
+                      - $WASTED_TRAFFIC_ALERT_BURST_THRESHOLD_BYTES
                     type: gt
                   operator:
                     type: and
@@ -40,7 +40,7 @@ groups:
                     params:
                       - C
                   reducer:
-                    params: []
+                    params: [ ]
                     type: last
                   type: query
               datasource:
@@ -59,8 +59,73 @@ groups:
         annotations:
           __dashboardUid__: fdnphvrryfq4gf
           __panelId__: "6"
-          description: The rate of traffic wasted by member {{ $labels.member }} exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm
+          description: The rate of traffic wasted by member {{ $labels.member }} exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $WASTED_TRAFFIC_ALERT_BURST_TIME_RANGE
           severity: critical
-          summary: Traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm)
-        labels: {}
+          summary: Traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 $WASTED_TRAFFIC_ALERT_BURST_THRESHOLD_BYTES }}b over $WASTED_TRAFFIC_ALERT_BURST_TIME_RANGE)
+        labels: { }
+        isPaused: false
+      - uid: adw5rd048zf9cb
+        title: Wasted Traffic (Sustained)
+        condition: wasted_traffic_threshold
+        data:
+          - refId: wasted_traffic
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              # The PromQL expression `f(g[r1])[r2:r3]` means:
+              # - evaluate the function `f` over the range `r2`, taking samples of the inner expression at `r3` intervals
+              # - evaluate the inner function `g` over the range `r1`
+              # In the expression below, r1 = r3. This means we have an outer interval $WASTED_TRAFFIC_ALERT_SUSTAINED_TIME_RANGE that we divide
+              # into consecutive subintervals of $WASTED_TRAFFIC_ALERT_SUSTAINED_SAMPLE_TIME_RANGE. For each subinterval, we compute the
+              # amount of traffic wasted in that subinterval, and then we compute the quantile of those values over the outer interval.
+              expr: quantile_over_time($WASTED_TRAFFIC_ALERT_SUSTAINED_QUANTILE, (max by (member) (increase(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"}[$WASTED_TRAFFIC_ALERT_SUSTAINED_SAMPLE_TIME_RANGE])))[$WASTED_TRAFFIC_ALERT_SUSTAINED_TIME_RANGE:$WASTED_TRAFFIC_ALERT_SUSTAINED_SAMPLE_TIME_RANGE])
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: wasted_traffic
+          - refId: wasted_traffic_threshold
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - $WASTED_TRAFFIC_ALERT_SUSTAINED_THRESHOLD_BYTES
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: [ ]
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: wasted_traffic
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: wasted_traffic_threshold
+              type: threshold
+        dashboardUid: fdnphvrryfq4gf
+        panelId: 6
+        noDataState: OK
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          __dashboardUid__: fdnphvrryfq4gf
+          __panelId__: "6"
+          description: The $WASTED_TRAFFIC_ALERT_SUSTAINED_QUANTILE quantile of traffic wasted by member {{ $labels.member }} in $TRAFFIC_ALERT_SUSTAINED_SAMPLE_TIME_RANGE intervals exceeded the threshold with a value of {{ humanize1024 $values.wasted_traffic.Value }} in the last $TRAFFIC_ALERT_SUSTAINED_TIME_RANGE
+          severity: critical
+          summary: Sustained traffic wasted by {{ $labels.member }} exceeded threshold ({{ humanize1024 $TRAFFIC_ALERT_SUSTAINED_THRESHOLD_BYTES }}b over $TRAFFIC_ALERT_SUSTAINED_TIME_RANGE)
+        labels: { }
         isPaused: false

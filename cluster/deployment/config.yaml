@@ -51,8 +51,16 @@ monitoring:
       delegatelessContention:
         thresholdPerNamespace: 0.05
       trafficWaste:
-        kilobytes: 1
-        overMinutes: 5
+        burst:
+          # Waste of 25kb/h over 4 hours
+          kilobytes: 100
+          timeRange: 4h
+        sustained:
+          # Median waste of 10kb/h over 4 days
+          kilobytes: 40
+          sampleTimeRange: 4h
+          timeRange: 4d
+          quantile: 0.5
       cloudSql:
         maintenance: false
       cometbft:
