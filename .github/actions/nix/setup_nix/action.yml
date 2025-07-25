@@ -19,6 +19,11 @@ inputs:
     description: 'If the nix cache should be saved'
     # this should be run just from one job to ensure we avoid multi write conflicts, which makes everything worse
     default: 'false'
+  should_upload:
+    description: 'Whether the nix cache should also be uploaded to the public GCS bucket'
+    # this should be run just from one job, and also only on main
+    # FIXME: for testing, we didn't rely on github.ref, but consider replacing this with a `should_save == 'true' && github.ref == 'refs/heads/main'` condition
+    default: 'false'
   self_hosted:
     description: 'Whether this is a self-hosted runner (to use the self-hosted Nix cache)'
     default: 'true'
@@ -153,7 +158,7 @@ runs:
     # The nix cache does not change in the workflow, so we can save it immediately, rather than splitting it into pre-&post- steps
     - name: Save nix cache
       shell: bash
-      if: ${{ inputs.should_save == 'true' }}
+      if: ${{ inputs.should_save == 'true' && github.ref == 'refs/heads/main' }}
       run: |
           set -euxo pipefail
           echo ~
@@ -184,20 +189,31 @@ runs:
             echo "done" > "/cache/nix/$cache_key/cached"
           fi
 
-    # FIXME: Cleanup, replace with uploading to GCP
-    # - name: tar-gz the cache
-    #   shell: bash
-    #   run: |
-    #     set -euxo pipefail
-    #     echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
-    #     mkdir /tmp/nix-upload
-    #     tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
-    #     echo "Cache compressed to /tmp/nix-upload/${cache_key}.tar.gz"
-    #     ls /tmp/nix-upload
+    - name: Authenticate to GCP
+      id: auth
+      if: ${{ inputs.should_upload == 'true' }}
+      uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
+      with:
+        workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}'
+        service_account: '${{ secrets.CACHE_UPLOADER_SA }}'
 
-    # - name: Upload nix cache
-    #   uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-    #   with:
-    #     name: nix-cache
-    #     path: /tmp/nix-upload
-    #     retention-days: 1
+    # FIXME: would be faster if not taken from nfs
+    - name: tar-gz the cache
+      shell: bash
+      id: prep_cache_upload
+      run: |
+        set -euxo pipefail
+        echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
+        mkdir /tmp/nix-upload
+        tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
+        echo "Cache compressed to /tmp/nix-upload/${cache_key}.tar.gz"
+        ls /tmp/nix-upload
+        echo "cache_file=/tmp/nix-upload/${cache_key}.tar.gz" >> $GITHUB_OUTPUT
+
+    - name: Upload nix cache
+      if: ${{ inputs.should_upload == 'true' }}
+      uses: google-github-actions/upload-cloud-storage@v2
+      with:
+        destination: splice-nix-cache-public
+        path: "${{ steps.prep_cache_upload.outputs.cache_file }}"
+        parent: false # upload to root of the bucket

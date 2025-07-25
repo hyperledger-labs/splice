@@ -354,3 +354,18 @@ jobs:
           jobs: ${{ env.JOBS }}
           # Allow skipping the enterprise-only jobs
           allowed-skips: scala_test_with_cometbft, scala_test_docker_compose, scala_test_local_net, scala_test_canton_enterprise
+
+  test:
+    runs-on: self-hosted-k8s-small
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: test nix upload
+        uses: ./.github/actions/nix/setup_nix
+        with:
+          oss_only: true
+          self_hosted: true
+          should_upload: true
+          artifactory_user: ""
+          artifactory_password: ""
+          cache_version: 4
