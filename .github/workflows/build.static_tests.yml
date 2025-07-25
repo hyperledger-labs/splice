@@ -4,7 +4,8 @@ on:
     inputs:
       commit_sha:
         type: string
-        required: true
+        required: false
+        default: ''
       self_hosted:
         type: boolean
         default: true
