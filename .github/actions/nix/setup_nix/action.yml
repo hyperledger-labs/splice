@@ -215,6 +215,9 @@ runs:
         service_account: '${{ inputs.upload_service_account }}'
 
     # FIXME: would be faster if not taken from nfs
+    # FIXME: also consider not tarring it at all, the tar/untar takes a couple of minutes each
+    # (actually tar much longer, about 8 minutes, but I suspect that ATM it's nfs slowing it down). The
+    # upload itself may also be faster if not tarred, as it will parallelize the upload of the files.
     - name: tar-gz the cache
       shell: bash
       if: ${{ inputs.should_upload == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
@@ -236,3 +239,4 @@ runs:
         path: "${{ steps.prep_cache_upload.outputs.cache_file }}"
         parent: false # upload to root of the bucket
         process_gcloudignore: false # no gcloud ignore file in this repo, must set this to false
+        gzip: false # FIXME: if we stop tarring it, then we probably want this to be true
