@@ -38,12 +38,12 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
   action?: ActionFromForm;
   effectivity: Dayjs;
   setIsValidAmount: (isValid: boolean) => void;
-}> = ({ chooseAction, action, effectivity, setIsValidAmount }) => {
+  summary: string;
+}> = ({ chooseAction, action, effectivity, setIsValidAmount, summary }) => {
   const existing = asCreateUnallocatedUnclaimedActivityRecord(action);
 
   const [beneficiary, setBeneficiary] = useState(existing?.beneficiary ?? '');
   const [amount, setAmount] = useState(existing?.amount ?? '');
-  const [reason, setReason] = useState(existing?.reason ?? '');
   const [expiresAt, setExpiresAt] = useState<Dayjs>(dayjs());
   const [amountError, setAmountError] = useState<string | null>(null);
 
@@ -56,7 +56,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
   }, [existing?.expiresAt, effectivity]);
 
   const updateAction = useCallback(
-    (beneficiary: string, amount: string, reason: string, expiresAt: Dayjs) => {
+    (beneficiary: string, amount: string, expiresAt: Dayjs) => {
       chooseAction({
         tag: 'ARC_DsoRules',
         value: {
@@ -65,21 +65,21 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
             value: {
               beneficiary,
               amount,
-              reason,
+              reason: summary,
               expiresAt: expiresAt.toISOString(),
             },
           },
         },
       });
     },
-    [chooseAction]
+    [chooseAction, summary]
   );
 
   useEffect(() => {
-    if (beneficiary && amount && reason && expiresAt && !amountError) {
-      updateAction(beneficiary, amount, reason, expiresAt);
+    if (beneficiary && amount && summary && expiresAt && !amountError) {
+      updateAction(beneficiary, amount, expiresAt);
     }
-  }, [beneficiary, amount, reason, expiresAt, amountError, updateAction]);
+  }, [beneficiary, amount, summary, expiresAt, amountError, updateAction]);
 
   return (
     <Stack direction="column" mb={4} spacing={1}>
@@ -122,16 +122,6 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
           }}
           error={!!amountError}
           helperText={amountError}
-        />
-      </FormControl>
-
-      <Typography variant="h6">Reason</Typography>
-      <FormControl fullWidth>
-        <TextField
-          id="create-reason"
-          inputProps={{ 'data-testid': 'create-reason' }}
-          value={reason}
-          onChange={e => setReason(e.target.value)}
         />
       </FormControl>
 
