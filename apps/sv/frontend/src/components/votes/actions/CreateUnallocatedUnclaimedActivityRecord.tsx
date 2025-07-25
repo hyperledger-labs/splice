@@ -51,7 +51,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
     if (existing?.expiresAt) {
       setExpiresAt(dayjs(existing.expiresAt));
     } else {
-      setExpiresAt(effectivity.add(1, 'day'));
+      setExpiresAt(effectivity.add(2, 'day'));
     }
   }, [existing?.expiresAt, effectivity]);
 
