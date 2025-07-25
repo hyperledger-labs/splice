@@ -1,4 +1,4 @@
-name: WIP
+name: CI on PRs from forks (no approval required)
 on:
   pull_request:
     types: [ opened, synchronize, reopened ]
@@ -8,11 +8,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  # id-token: write # Required for GCP Workload Identity for failure notifications
   contents: read
   pull-requests: read # Required for the static tests
   issues: read # Required for the static tests
-  # actions: write # To cancel itself if not opted in
 
 jobs:
 

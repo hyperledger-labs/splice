@@ -203,6 +203,7 @@ runs:
       shell: bash
       run: |
         if curl -Isf https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz &> /dev/null; then
+          echo "Cache with key ${cache_key} already exists in GCP, not uploading again"
           echo "already_exists=true" >> $GITHUB_OUTPUT;
         fi
 
