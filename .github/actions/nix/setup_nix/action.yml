@@ -166,7 +166,7 @@ runs:
     # The nix cache does not change in the workflow, so we can save it immediately, rather than splitting it into pre-&post- steps
     - name: Save nix cache
       shell: bash
-      if: ${{ inputs.should_save == 'true' && github.ref == 'refs/heads/main' }}
+      if: ${{ inputs.should_save == 'true' }}
       run: |
           set -euxo pipefail
           echo ~
@@ -197,9 +197,18 @@ runs:
             echo "done" > "/cache/nix/$cache_key/cached"
           fi
 
+    - name: Check if cache already exists in GCP
+      id: already_exists
+      if: ${{ inputs.should_upload == 'true' }}
+      shell: bash
+      run: |
+        if curl -Isf https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz &> /dev/null; then
+          echo "already_exists=true" >> $GITHUB_OUTPUT;
+        fi
+
     - name: Authenticate to GCP
       id: auth
-      if: ${{ inputs.should_upload == 'true' }}
+      if: ${{ inputs.should_upload == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
       uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
       with:
         workload_identity_provider: '${{ inputs.upload_workload_identity_provider }}'
@@ -208,6 +217,7 @@ runs:
     # FIXME: would be faster if not taken from nfs
     - name: tar-gz the cache
       shell: bash
+      if: ${{ inputs.should_upload == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
       id: prep_cache_upload
       run: |
         set -euxo pipefail
@@ -219,9 +229,10 @@ runs:
         echo "cache_file=/tmp/nix-upload/${cache_key}.tar.gz" >> $GITHUB_OUTPUT
 
     - name: Upload nix cache
-      if: ${{ inputs.should_upload == 'true' }}
+      if: ${{ inputs.should_upload == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
       uses: google-github-actions/upload-cloud-storage@v2
       with:
         destination: splice-nix-cache-public
         path: "${{ steps.prep_cache_upload.outputs.cache_file }}"
         parent: false # upload to root of the bucket
+        process_gcloudignore: false # no gcloud ignore file in this repo, must set this to false
