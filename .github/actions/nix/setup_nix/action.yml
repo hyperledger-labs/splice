@@ -24,6 +24,14 @@ inputs:
     # this should be run just from one job, and also only on main
     # FIXME: for testing, we didn't rely on github.ref, but consider replacing this with a `should_save == 'true' && github.ref == 'refs/heads/main'` condition
     default: 'false'
+  upload_workload_identity_provider:
+    description: 'The workload identity provider to use for uploading the cache'
+    required: false
+    default: ''
+  upload_service_account:
+    description: 'The service account to use for uploading the cache'
+    required: false
+    default: ''
   self_hosted:
     description: 'Whether this is a self-hosted runner (to use the self-hosted Nix cache)'
     default: 'true'
@@ -194,8 +202,8 @@ runs:
       if: ${{ inputs.should_upload == 'true' }}
       uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
       with:
-        workload_identity_provider: '${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}'
-        service_account: '${{ secrets.CACHE_UPLOADER_SA }}'
+        workload_identity_provider: '${{ inputs.upload_workload_identity_provider }}'
+        service_account: '${{ inputs.upload_service_account }}'
 
     # FIXME: would be faster if not taken from nfs
     - name: tar-gz the cache

@@ -357,6 +357,8 @@ jobs:
 
   test:
     runs-on: self-hosted-k8s-small
+    container:
+      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
     steps:
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -369,3 +371,5 @@ jobs:
           artifactory_user: ""
           artifactory_password: ""
           cache_version: 4
+          upload_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}
+          upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
