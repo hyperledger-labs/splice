@@ -594,9 +594,9 @@ const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
             <Typography
               variant="body1"
               sx={{ minWidth: 200 }}
-              data-testid="config-change-field-name"
+              data-testid="config-change-field-label"
             >
-              {change.fieldName}
+              {change.label}
             </Typography>
 
             <Box
