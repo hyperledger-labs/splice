@@ -433,10 +433,18 @@ class ScanTotalSupplyBigQueryIntegrationTest
     val sqlContent = java.nio.file.Files
       .readString(Paths get totalSupplySqlPath, java.nio.charset.StandardCharsets.UTF_8)
 
-    // Replace prod dataset name with test dataset name
-    val modifiedSql = sqlContent.replace("mainnet_da2_scan", datasetName)
-    modifiedSql should not be sqlContent withClue "expected dataset name absent"
-    // TODO (#1095) substitute migrationId SQL var binding
+    val modifiedSql = Seq(
+      ("mainnet_da2_scan".r, datasetName), // Replace prod dataset name with test dataset name
+      (raw"SET migration_id = \d+".r, "SET migration_id = 0"), // migration ID with 0
+      (
+        raw"SET as_of_record_time = iso_timestamp\('\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z'\)".r,
+        "SET as_of_record_time = iso_timestamp('1971-01-01T00:00:00Z')",
+      ), // as-of time with later canton timestamp
+    ).foldLeft(sqlContent) { case (sqlContent, (origin, replacement)) =>
+      val modifiedSql = origin.replaceAllIn(sqlContent, replacement)
+      modifiedSql should not be sqlContent withClue s"inserting $replacement"
+      modifiedSql
+    }
 
     // Execute the query
     val queryConfig = bq.QueryJobConfiguration
