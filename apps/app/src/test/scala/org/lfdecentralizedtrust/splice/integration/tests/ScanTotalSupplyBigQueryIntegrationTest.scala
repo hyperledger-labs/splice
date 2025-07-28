@@ -205,7 +205,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(aliceParty: PartyId, bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    // TODO (#1095) use a realistic minting method; best not to support tap in the SQL
+    // TODO (#1713) use a realistic minting method; best not to support tap in the SQL
     withClue("step forward to an open round") {
       advanceTimeAndWaitForRoundAutomation(Duration.ofDays(10))
       advanceTimeToRoundOpen
@@ -494,7 +494,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // Verify individual metrics
-    val expectedMinted = BigDecimal(0) // mintedAmount
+    val expectedMinted = BigDecimal(0) // TODO (#1713) use mintedAmount
     results.minted shouldBe expectedMinted withClue "minted"
     results.locked shouldBe lockedAmount withClue "locked"
     results.unlocked shouldBe unlockedAmount withClue "unlocked"
