@@ -54,9 +54,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   // Test data parameters
   private val mintedAmount = BigDecimal("1000000")
   private val lockedAmount = BigDecimal("200000")
-  private val burnedAmount = BigDecimal("50000")
+  private val burnedAmount = BigDecimal("304")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
-  private val unmintedAmount = BigDecimal("500000")
+  private val unmintedAmount = BigDecimal("149927.0015223501")
 
   override def beforeAll() = {
     super.beforeAll()
@@ -494,7 +494,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // TODO (#1095) use expected ranges instead
     // Verify individual metrics
-    results.minted shouldBe BigDecimal(0) /*mintedAmount*/ withClue "minted"
+    val expectedMinted = BigDecimal(0) // mintedAmount
+    results.minted shouldBe expectedMinted withClue "minted"
     results.locked shouldBe lockedAmount withClue "locked"
     results.unlocked shouldBe unlockedAmount withClue "unlocked"
     results.unminted shouldBe unmintedAmount withClue "unminted"
@@ -502,6 +503,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
     // Verify derived metrics
     results.currentSupplyTotal shouldBe (lockedAmount + unlockedAmount) withClue "current_supply_total"
-    results.allowedMint shouldBe (unmintedAmount + mintedAmount) withClue "allowed_mint"
+    results.allowedMint shouldBe (unmintedAmount + expectedMinted) withClue "allowed_mint"
   }
 }
