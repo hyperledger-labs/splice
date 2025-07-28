@@ -102,6 +102,11 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
 svs:
+  default:
+    svApp:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
   # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
     logging:
