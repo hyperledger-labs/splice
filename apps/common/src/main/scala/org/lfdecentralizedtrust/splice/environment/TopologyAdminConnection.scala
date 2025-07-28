@@ -159,6 +159,25 @@ abstract class TopologyAdminConnection(
       )
     )
 
+  def listPartyToParticipantFromAllStores(
+      filterParty: String
+  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] = {
+    runCmd(
+      TopologyAdminCommands.Read.ListPartyToParticipant(
+        BaseQuery(
+          store = None,
+          proposals = false,
+          timeQuery = TimeQuery.HeadState,
+          ops = None,
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterParty,
+        "",
+      )
+    ).map(_.map(result => TopologyResult(result.context, result.item)))
+  }
+
   def listPartyToParticipant(
       store: Option[TopologyStoreId] = None,
       // list only active (non-removed) mappings by default; this matches the Canton console defaults
