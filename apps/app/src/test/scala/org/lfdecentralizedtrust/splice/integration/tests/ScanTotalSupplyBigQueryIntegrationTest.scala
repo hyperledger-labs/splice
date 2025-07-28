@@ -213,7 +213,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
     }
     aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
 
-    // TODO (#1095) Lock a portion of Amulet (lockedAmount)
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     actAndCheck(
       "Lock amulet",
@@ -231,15 +230,10 @@ class ScanTotalSupplyBigQueryIntegrationTest
       "Wait for locked amulet to appear",
       _ => aliceWalletClient.list().lockedAmulets.loneElement,
     )
-    // TODO (#1095) Ensure some unminted exists (unmintedAmount)
-    // TODO (#1095) Create UnclaimedReward contracts
 
     // burn fees
     val transferAmount = BigDecimal("100000")
     p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, transferAmount)
-
-    // maybe more burns
-    // TODO (#1095) find expected non-zero burnedAmount
   }
 
   // copy from PostgreSQL tables to BigQuery
@@ -500,7 +494,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   private def verifyResults(results: ExpectedMetrics): Unit = {
-    // TODO (#1095) use expected ranges instead
     // Verify individual metrics
     val expectedMinted = BigDecimal(0) // mintedAmount
     results.minted shouldBe expectedMinted withClue "minted"
