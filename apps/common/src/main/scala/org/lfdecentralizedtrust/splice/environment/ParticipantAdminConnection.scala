@@ -605,7 +605,10 @@ class ParticipantAdminConnection(
             .map { result =>
               val newHostingParticipants = participantChange(result.mapping.participants)
               Either.cond(
-                result.mapping.participants == newHostingParticipants,
+                result.mapping.participants == newHostingParticipants && result.mapping.threshold == Thresholds
+                  .partyToParticipantThreshold(
+                    newHostingParticipants
+                  ),
                 result,
                 result,
               )
