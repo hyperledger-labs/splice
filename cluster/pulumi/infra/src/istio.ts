@@ -183,18 +183,11 @@ function configureInternalGatewayService(
     c.nodePools.map(p => p.networkConfigs.map(c => c.podIpv4CidrBlock)).flat()
   );
   const externalIPRanges = loadIPRanges();
-  // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
-    .map(m => m.id)
-    .flatMap((domain: number) => {
-      return Array.from(Array(10).keys()).map(node => {
-        return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
-      });
-    });
   return configureGatewayService(
     ingressNs,
     ingressIp,
     pulumi.all([externalIPRanges, internalIPRanges]).apply(([a, b]) => a.concat(b)),
+    pulumi.output(['0.0.0.0/0']),
     [
       ingressPort('grpc-cd-pub-api', 5008),
       ingressPort('grpc-cs-p2p-api', 5010),
@@ -212,9 +205,39 @@ function configureInternalGatewayService(
       ingressPort('grpc-sw-lg', 5201),
       ingressPort('sw-metrics', 10213),
       ingressPort('sw-lg-gw', 6201),
-    ].concat(cometBftIngressPorts),
+    ],
     istiod,
     ''
+  );
+}
+
+
+function configureCometBFTGatewayService(
+  ingressNs: k8s.core.v1.Namespace,
+  ingressIp: pulumi.Output<string>,
+  istiod: k8s.helm.v3.Release
+) {
+  const cluster = gcp.container.getCluster({
+    name: CLUSTER_NAME,
+    project: GCP_PROJECT,
+  });
+  const externalIPRanges = loadIPRanges(true);
+  // see notes when installing a CometBft node in the full deployment
+  const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
+    .map(m => m.id)
+    .flatMap((domain: number) => {
+      return Array.from(Array(10).keys()).map(node => {
+        return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
+      });
+    });
+  return configureGatewayService(
+    ingressNs,
+    ingressIp,
+    pulumi.output(['0.0.0.0/0']),
+    externalIPRanges,
+    cometBftIngressPorts,
+    istiod,
+    '-cometbft'
   );
 }
 
@@ -288,18 +311,18 @@ function configurePublicGatewayService(
       ).concat(
         spliceConfig.pulumiProjectConfig.hasPublicDocs
           ? [
-              {
-                to: [
-                  {
-                    operation: {
-                      hosts: [
-                        ...new Set([getDnsNames().cantonDnsName, getDnsNames().daDnsName]),
-                      ].map(host => `docs.${host}`),
-                    },
+            {
+              to: [
+                {
+                  operation: {
+                    hosts: [
+                      ...new Set([getDnsNames().cantonDnsName, getDnsNames().daDnsName]),
+                    ].map(host => `docs.${host}`),
                   },
-                ],
-              },
-            ]
+                },
+              ],
+            },
+          ]
           : []
       ),
     },
@@ -307,6 +330,7 @@ function configurePublicGatewayService(
   return configureGatewayService(
     ingressNs,
     ingressIp,
+    pulumi.output(['0.0.0.0/0']),
     pulumi.output(['0.0.0.0/0']),
     [],
     istiod,
@@ -371,12 +395,22 @@ function istioAccessPolicies(
 function configureGatewayService(
   ingressNs: k8s.core.v1.Namespace,
   ingressIp: pulumi.Output<string>,
-  externalIPRanges: pulumi.Output<string[]>,
+  externalIPRangesInIstio: pulumi.Output<string[]>,
+  externalIPRangesInLB: pulumi.Output<string[]>,
   ingressPorts: IngressPort[],
   istiod: k8s.helm.v3.Release,
   suffix: string
 ) {
-  const istioPolicies = istioAccessPolicies(ingressNs, externalIPRanges, suffix);
+
+  // We limit source IPs in two ways:
+  // - For most traffic, we use istio instead of through loadBalancerSourceRanges as the latter has a size limit.
+  //   These IPs should be provided in externalIPRangesInIstio.
+  //   See https://github.com/DACH-NY/canton-network-internal/issues/626
+  // - For cometbft traffic, which is tcp traffic, we failed to use istio policies, so we route it through a dedicated
+  //   LaodBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
+  //   These IPs should be provided in externalIPRangesInLB.
+
+  const istioPolicies = istioAccessPolicies(ingressNs, externalIPRangesInIstio, suffix);
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
@@ -406,9 +440,7 @@ function configureGatewayService(
         },
         service: {
           loadBalancerIP: ingressIp,
-          // We limit IPs using istio instead of through loadBalancerSourceRanges as the latter has a size limit.
-          // See https://github.com/DACH-NY/canton-network-internal/issues/626
-          loadBalancerSourceRanges: ['0.0.0.0/0'],
+          loadBalancerSourceRanges: externalIPRangesInLB,
           // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
           // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
           // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
@@ -425,10 +457,10 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: istioPolicies.apply(policies => {
+      dependsOn: istioPolicies ? istioPolicies.apply(policies => {
         const base: pulumi.Resource[] = [ingressNs, istiod];
         return base.concat(policies);
-      }),
+      }) : [ingressNs, istiod],
     }
   );
   if (infraConfig.istio.enableIngressAccessLogging) {
@@ -464,6 +496,7 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
+  cometBftSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
   // TODO(#1766): remove this once we migrated to this everywhere
@@ -647,7 +680,7 @@ function configureDocsAndReleases(
     match: { port: number; uri?: { prefix: string } }[];
     route: { destination: { port: { number: number }; host: string } }[];
   }[] = enableGcsProxy
-    ? [
+      ? [
         {
           match: [
             {
@@ -669,7 +702,7 @@ function configureDocsAndReleases(
           ],
         },
       ]
-    : [];
+      : [];
   const nonPublic = new k8s.apiextensions.CustomResource(
     'cluster-docs-releases',
     {
@@ -757,6 +790,7 @@ function configureDocsAndReleases(
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
+  cometBftIngressIp: pulumi.Output<string>,
   publicIngressIp: pulumi.Output<string>
 ): pulumi.Resource[] {
   const nsName = 'istio-system';
@@ -768,8 +802,9 @@ export function configureIstio(
   const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
+  const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
   const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
-  const gateways = configureGateway(ingressNs, gwSvc, publicGwSvc);
+  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc, publicGwSvc);
   const docsAndReleases = configureDocsAndReleases(
     true,
     spliceConfig.pulumiProjectConfig.hasPublicDocs,
