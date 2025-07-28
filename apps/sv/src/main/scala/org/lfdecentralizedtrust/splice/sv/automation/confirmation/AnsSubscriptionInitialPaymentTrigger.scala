@@ -22,7 +22,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycont
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ActionRequiringConfirmation
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
+  ActionRequiringConfirmation,
+  Confirmation,
+}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.SubscriptionInitialPayment
 import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
@@ -90,48 +93,45 @@ class AnsSubscriptionInitialPaymentTrigger(
               } else if (!ansUtil.isValidEntryDescription(entryDescription)) {
                 confirmToReject(s"entry description ($entryDescription) is not valid")
               } else {
+                // check if the entry already exists
                 dsoStore
-                  .listInitialPaymentConfirmationByAnsName(
-                    svParty,
-                    entryName,
-                  )
-                  .flatMap { confirmations =>
-                    val otherPaymentAcceptedConfirmations = confirmations.filter { c =>
-                      c.payload.action match {
-                        case arcAnsEntryContext: ARC_AnsEntryContext =>
-                          arcAnsEntryContext.ansEntryContextAction match {
-                            case a: ANSRARC_CollectInitialEntryPayment =>
-                              a.ansEntryContext_CollectInitialEntryPaymentValue.paymentCid != payment.contractId
-                            case _ =>
-                              false
-                          }
-                        case _ => false
-                      }
-                    }
-                    // if there are existing accepted confirmation of other payment and with the same ans entry name, we will reject this payment.
-                    if (otherPaymentAcceptedConfirmations.isEmpty)
-                      dsoStore
-                        .lookupAnsEntryByNameWithOffset(entryName, context.clock.now)
-                        .flatMap {
-                          case QueryResult(offset, None) =>
-                            // confirm to collect the payment and create the entry
-                            confirmCollectPayment(
-                              ansContext.contract.contractId,
-                              payment.contractId,
-                              entryName,
-                              transferContext,
-                              offset,
-                            )
-                          case QueryResult(_, Some(entry)) =>
-                            confirmToReject(
-                              s"entry already exists and owned by ${entry.payload.user}."
-                            )
-                        }
-                    else {
+                  .lookupAnsEntryByNameWithOffset(entryName, context.clock.now)
+                  .flatMap {
+                    case QueryResult(_, Some(entry)) =>
                       confirmToReject(
-                        s"other initial payment collection has been confirmed for the same ans name ($entryName) with confirmation ${otherPaymentAcceptedConfirmations
-                            .map(_.contractId)}"
+                        s"entry already exists and owned by ${entry.payload.user}."
                       )
+                    case QueryResult(offset, None) => {
+                      // check if we confirmed a different initial payment for the same entry already
+                      getExistingInitialPaymentConfirmation(
+                        entryName,
+                        _ != payment.contractId,
+                      )
+                        .flatMap {
+                          case Some(c) =>
+                            confirmToReject(
+                              s"other initial payment collection has been confirmed for the same ans name ($entryName) with confirmation ${c}"
+                            )
+                          case None =>
+                            // check if we confirmed the same initial payment for the same entry already
+                            getExistingInitialPaymentConfirmation(
+                              entryName,
+                              _ == payment.contractId,
+                            ).flatMap {
+                              case Some(c) =>
+                                TaskSuccess(
+                                  s"skipping as collection of this initial payment has already been confirmed with confirmation ${c}"
+                                ).pure[Future]
+                              case None =>
+                                confirmCollectPayment(
+                                  ansContext.contract.contractId,
+                                  payment.contractId,
+                                  entryName,
+                                  transferContext,
+                                  offset,
+                                )
+                            }
+                        }
                     }
                   }
               }
@@ -158,6 +158,31 @@ class AnsSubscriptionInitialPaymentTrigger(
           .asRuntimeException()
     }
   }
+
+  private def getExistingInitialPaymentConfirmation(
+      entryName: String,
+      filterCondition: SubscriptionInitialPayment.ContractId => Boolean,
+  )(implicit
+      tc: TraceContext
+  ): Future[Option[Confirmation.ContractId]] =
+    dsoStore
+      .listInitialPaymentConfirmationByAnsName(svParty, entryName)
+      .map { confirmations =>
+        confirmations
+          .find { c =>
+            c.payload.action match {
+              case arcAnsEntryContext: ARC_AnsEntryContext =>
+                arcAnsEntryContext.ansEntryContextAction match {
+                  case a: ANSRARC_CollectInitialEntryPayment =>
+                    filterCondition(a.ansEntryContext_CollectInitialEntryPaymentValue.paymentCid)
+                  case _ =>
+                    false
+                }
+              case _ => false
+            }
+          }
+          .map { _.contractId }
+      }
 
   private def ansCollectInitialEntryPaymentAction(
       paymentId: SubscriptionInitialPayment.ContractId,
@@ -206,46 +231,33 @@ class AnsSubscriptionInitialPaymentTrigger(
       ansRules.contractId,
       ansContextCId,
     )
-    ansInitialPaymentConfirmationByAnsName <- dsoStore
-      .listInitialPaymentConfirmationByAnsName(
-        svParty,
-        entryName,
-      )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ConfirmAction(
         svParty.toProtoPrimitive,
         action,
       )
     )
-    taskOutcome <- ansInitialPaymentConfirmationByAnsName match {
-      case Seq() =>
-        connection
-          .submit(
-            actAs = Seq(svParty),
-            readAs = Seq(dsoParty),
-            update = cmd,
-          )
-          .withDedup(
-            commandId = SpliceLedgerConnection.CommandId(
-              "org.lfdecentralizedtrust.splice.sv.createAnsCollectInitialEntryPaymentConfirmation",
-              Seq(svParty, dsoParty),
-              entryName,
-            ),
-            // we can safely assume that `ansEntryNameOffset` is smaller than the offset from the ansInitialPaymentConfirmation
-            deduplicationOffset = ansEntryNameOffset,
-          )
-          .yieldUnit()
-          .map { _ =>
-            TaskSuccess(
-              s"confirmed to create ans entry $entryName by collecting payment $paymentCid"
-            )
-          }
-      case _ =>
+    taskOutcome <- connection
+      .submit(
+        actAs = Seq(svParty),
+        readAs = Seq(dsoParty),
+        update = cmd,
+      )
+      .withDedup(
+        commandId = SpliceLedgerConnection.CommandId(
+          "org.lfdecentralizedtrust.splice.sv.createAnsCollectInitialEntryPaymentConfirmation",
+          Seq(svParty, dsoParty),
+          entryName,
+        ),
+        // we can safely assume that `ansEntryNameOffset` is smaller than the offset from the ansInitialPaymentConfirmation
+        deduplicationOffset = ansEntryNameOffset,
+      )
+      .yieldUnit()
+      .map { _ =>
         TaskSuccess(
-          s"skipping as confirmation (either acceptance or rejection) from $svParty is already created for this payment $paymentCid"
-        ).pure[Future]
-
-    }
+          s"confirmed to create ans entry $entryName by collecting payment $paymentCid"
+        )
+      }
   } yield taskOutcome
 
   private def confirmRejectPayment(

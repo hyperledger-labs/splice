@@ -11,39 +11,43 @@ import { ConfigChange } from './types';
 
 export function buildAmuletConfigChanges(
   before: Optional<AmuletConfig<'USD'>>,
-  after: Optional<AmuletConfig<'USD'>>
+  after: Optional<AmuletConfig<'USD'>>,
+  showAllFields: boolean = false
 ): ConfigChange[] {
   const changes = [
     {
-      fieldName: 'Tick Duration (microseconds)',
+      fieldName: 'tickDuration',
+      label: 'Tick Duration (microseconds)',
       currentValue: before?.tickDuration.microseconds || '',
       newValue: after?.tickDuration.microseconds || '',
     },
     {
-      fieldName: 'Transfer Preapproval Fee',
+      fieldName: 'transferPreapprovalFee',
+      label: 'Transfer Preapproval Fee',
       currentValue: before?.transferPreapprovalFee || '',
       newValue: after?.transferPreapprovalFee || '',
     },
     {
-      fieldName: 'Featured App Activity Marker Amount',
+      fieldName: 'featuredAppActivityMarkerAmount',
+      label: 'Featured App Activity Marker Amount',
       currentValue: before?.featuredAppActivityMarkerAmount || '',
       newValue: after?.featuredAppActivityMarkerAmount || '',
     },
-
     {
-      fieldName: 'Transfer (Create Fee)',
+      fieldName: 'transferConfigCreateFee',
+      label: 'Transfer (Create Fee)',
       currentValue: before?.transferConfig.createFee.fee || '',
       newValue: after?.transferConfig.createFee.fee || '',
     },
-
     {
-      fieldName: 'Transfer (Holding Fee Rate)',
+      fieldName: 'transferConfigHoldingFeeRate',
+      label: 'Transfer (Holding Fee Rate)',
       currentValue: before?.transferConfig.holdingFee?.rate || '',
       newValue: after?.transferConfig.holdingFee?.rate || '',
     },
-
     {
-      fieldName: 'Transfer Fee (Initial Rate)',
+      fieldName: 'transferConfigTransferFeeInitialRate',
+      label: 'Transfer Fee (Initial Rate)',
       currentValue: before?.transferConfig.transferFee?.initialRate || '',
       newValue: after?.transferConfig.transferFee?.initialRate || '',
     },
@@ -54,27 +58,32 @@ export function buildAmuletConfigChanges(
     ),
 
     {
-      fieldName: 'Lock Holder Fee',
+      fieldName: 'transferConfigLockHolderFee',
+      label: 'Lock Holder Fee',
       currentValue: before?.transferConfig.lockHolderFee.fee || '',
       newValue: after?.transferConfig.lockHolderFee.fee || '',
     },
     {
-      fieldName: 'Extra Featured App Reward Amount',
+      fieldName: 'transferConfigExtraFeaturedAppRewardAmount',
+      label: 'Extra Featured App Reward Amount',
       currentValue: before?.transferConfig.extraFeaturedAppRewardAmount || '',
       newValue: after?.transferConfig.extraFeaturedAppRewardAmount || '',
     },
     {
-      fieldName: 'Max Num Inputs',
+      fieldName: 'transferConfigMaxNumInputs',
+      label: 'Max Num Inputs',
       currentValue: before?.transferConfig.maxNumInputs || '',
       newValue: after?.transferConfig.maxNumInputs || '',
     },
     {
-      fieldName: 'Max Num Outputs',
+      fieldName: 'transferConfigMaxNumOutputs',
+      label: 'Max Num Outputs',
       currentValue: before?.transferConfig.maxNumOutputs || '',
       newValue: after?.transferConfig.maxNumOutputs || '',
     },
     {
-      fieldName: 'Max Num Lock Holders',
+      fieldName: 'transferConfigMaxNumLockHolders',
+      label: 'Max Num Lock Holders',
       currentValue: before?.transferConfig.maxNumLockHolders || '',
       newValue: after?.transferConfig.maxNumLockHolders || '',
     },
@@ -89,7 +98,7 @@ export function buildAmuletConfigChanges(
     ...buildPackageConfigChanges(before?.packageConfig, after?.packageConfig),
   ] as ConfigChange[];
 
-  return changes.filter(c => c.currentValue !== c.newValue);
+  return showAllFields ? changes : changes.filter(c => c.currentValue !== c.newValue);
 }
 
 function buildPackageConfigChanges(
@@ -99,32 +108,38 @@ function buildPackageConfigChanges(
   if (!before && !after) return [];
   return [
     {
-      fieldName: 'Package Config (Amulet)',
+      fieldName: 'packageConfigAmulet',
+      label: 'Package Config (Amulet)',
       currentValue: before?.amulet || '',
       newValue: after?.amulet || '',
     },
     {
-      fieldName: 'Package Config (Amulet Name Service)',
+      fieldName: 'packageConfigAmuletNameService',
+      label: 'Package Config (Amulet Name Service)',
       currentValue: before?.amuletNameService || '',
       newValue: after?.amuletNameService || '',
     },
     {
-      fieldName: 'Package Config (DSO Governance)',
+      fieldName: 'packageConfigDsoGovernance',
+      label: 'Package Config (DSO Governance)',
       currentValue: before?.dsoGovernance || '',
       newValue: after?.dsoGovernance || '',
     },
     {
-      fieldName: 'Package Config (Validator Lifecycle)',
+      fieldName: 'packageConfigValidatorLifecycle',
+      label: 'Package Config (Validator Lifecycle)',
       currentValue: before?.validatorLifecycle || '',
       newValue: after?.validatorLifecycle || '',
     },
     {
-      fieldName: 'Package Config (Wallet)',
+      fieldName: 'packageConfigWallet',
+      label: 'Package Config (Wallet)',
       currentValue: before?.wallet || '',
       newValue: after?.wallet || '',
     },
     {
-      fieldName: 'Package Config (Wallet Payments)',
+      fieldName: 'packageConfigWalletPayments',
+      label: 'Package Config (Wallet Payments)',
       currentValue: before?.walletPayments || '',
       newValue: after?.walletPayments || '',
     },
@@ -141,12 +156,14 @@ function buildTransferFeeStepsChanges(
         const a = after?.[idx];
         return [
           {
-            fieldName: `Transfer Fee Step ${idx}`,
+            fieldName: `transferFeeSteps${idx}_1`,
+            label: `Transfer Fee Step ${idx}`,
             currentValue: b._1,
             newValue: a?._1,
           },
           {
-            fieldName: `Transfer Fee Step ${idx}`,
+            fieldName: `transferFeeSteps${idx}_2`,
+            label: `Transfer Fee Step ${idx}`,
             currentValue: b._2,
             newValue: a?._2,
           },
@@ -164,37 +181,44 @@ function buildIssuanceCurveChanges(
 
   const initialValues = [
     {
-      fieldName: 'Issuance Curve Initial Value (Amulet to Issue Per Year)',
+      fieldName: 'issuanceCurveInitialValueAmuletToIssuePerYear',
+      label: 'Issuance Curve Initial Value (Amulet to Issue Per Year)',
       currentValue: before?.initialValue?.amuletToIssuePerYear || '',
       newValue: after?.initialValue?.amuletToIssuePerYear || '',
     },
     {
-      fieldName: 'Issuance Curve Initial Value (Validator Reward Percentage)',
+      fieldName: 'issuanceCurveInitialValueValidatorRewardPercentage',
+      label: 'Issuance Curve Initial Value (Validator Reward Percentage)',
       currentValue: before?.initialValue?.validatorRewardPercentage || '',
       newValue: after?.initialValue?.validatorRewardPercentage || '',
     },
     {
-      fieldName: 'Issuance Curve Initial Value (App Reward Percentage)',
+      fieldName: 'issuanceCurveInitialValueAppRewardPercentage',
+      label: 'Issuance Curve Initial Value (App Reward Percentage)',
       currentValue: before?.initialValue?.appRewardPercentage || '',
       newValue: after?.initialValue?.appRewardPercentage || '',
     },
     {
-      fieldName: 'Issuance Curve Initial Value (Validator Reward Cap)',
+      fieldName: 'issuanceCurveInitialValueValidatorRewardCap',
+      label: 'Issuance Curve Initial Value (Validator Reward Cap)',
       currentValue: before?.initialValue?.validatorRewardCap || '',
       newValue: after?.initialValue?.validatorRewardCap || '',
     },
     {
-      fieldName: 'Issuance Curve Initial Value (Featured App Reward Cap)',
+      fieldName: 'issuanceCurveInitialValueFeaturedAppRewardCap',
+      label: 'Issuance Curve Initial Value (Featured App Reward Cap)',
       currentValue: before?.initialValue?.featuredAppRewardCap || '',
       newValue: after?.initialValue?.featuredAppRewardCap || '',
     },
     {
-      fieldName: 'Issuance Curve Initial Value (Unfeatured App Reward Cap)',
+      fieldName: 'issuanceCurveInitialValueUnfeaturedAppRewardCap',
+      label: 'Issuance Curve Initial Value (Unfeatured App Reward Cap)',
       currentValue: before?.initialValue?.unfeaturedAppRewardCap || '',
       newValue: after?.initialValue?.unfeaturedAppRewardCap || '',
     },
     {
-      fieldName: 'Issuance Curve Initial Value (Validator Faucet Cap)',
+      fieldName: 'issuanceCurveInitialValueOptValidatorFaucetCap',
+      label: 'Issuance Curve Initial Value (Validator Faucet Cap)',
       currentValue: before?.initialValue?.optValidatorFaucetCap || '',
       newValue: after?.initialValue?.optValidatorFaucetCap || '',
     },
@@ -205,42 +229,50 @@ function buildIssuanceCurveChanges(
       .map((fv, idx) => {
         return [
           {
-            fieldName: `Issuance Curve Future Value (microseconds) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}`,
+            label: `Issuance Curve Future Value (microseconds) (${idx})`,
             currentValue: fv._1.microseconds || '',
             newValue: after?.futureValues[idx]._1.microseconds || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (Amulet to Issue Per Year) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}AmuletToIssuePerYear`,
+            label: `Issuance Curve Future Value (Amulet to Issue Per Year) (${idx})`,
             currentValue: fv._2.amuletToIssuePerYear || '',
             newValue: after?.futureValues[idx]._2.amuletToIssuePerYear || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (Validator Reward Percentage) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}ValidatorRewardPercentage`,
+            label: `Issuance Curve Future Value (Validator Reward Percentage) (${idx})`,
             currentValue: fv._2.validatorRewardPercentage || '',
             newValue: after?.futureValues[idx]._2.validatorRewardPercentage || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (App Reward Percentage) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}AppRewardPercentage`,
+            label: `Issuance Curve Future Value (App Reward Percentage) (${idx})`,
             currentValue: fv._2.appRewardPercentage || '',
             newValue: after?.futureValues[idx]._2.appRewardPercentage || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (Validator Reward Cap) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}ValidatorRewardCap`,
+            label: `Issuance Curve Future Value (Validator Reward Cap) (${idx})`,
             currentValue: fv._2.validatorRewardCap || '',
             newValue: after?.futureValues[idx]._2.validatorRewardCap || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (Featured App Reward Cap) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}FeaturedAppRewardCap`,
+            label: `Issuance Curve Future Value (Featured App Reward Cap) (${idx})`,
             currentValue: fv._2.featuredAppRewardCap || '',
             newValue: after?.futureValues[idx]._2.featuredAppRewardCap || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (Unfeatured App Reward Cap) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}UnfeaturedAppRewardCap`,
+            label: `Issuance Curve Future Value (Unfeatured App Reward Cap) (${idx})`,
             currentValue: fv._2.unfeaturedAppRewardCap || '',
             newValue: after?.futureValues[idx]._2.unfeaturedAppRewardCap || '',
           },
           {
-            fieldName: `Issuance Curve Future Value (Validator Faucet Cap) (${idx})`,
+            fieldName: `issuanceCurveFutureValues${idx}OptValidatorFaucetCap`,
+            label: `Issuance Curve Future Value (Validator Faucet Cap) (${idx})`,
             currentValue: fv._2.optValidatorFaucetCap || '',
             newValue: after?.futureValues[idx]._2.optValidatorFaucetCap || '',
           },
@@ -259,33 +291,39 @@ function buildDecentralizedSynchronizerChanges(
 
   return [
     {
-      fieldName: 'Decentralized Synchronizer (Active Synchronizer)',
+      fieldName: 'decentralizedSynchronizerActiveSynchronizer',
+      label: 'Decentralized Synchronizer (Active Synchronizer)',
       currentValue: before?.activeSynchronizer || '',
       newValue: after?.activeSynchronizer || '',
       isId: true,
     },
     {
-      fieldName: 'Decentralized Synchronizer Fees (Base rate Traffic Limits Burst Amount)',
+      fieldName: 'decentralizedSynchronizerFeesBaseRateTrafficLimitsBurstAmount',
+      label: 'Decentralized Synchronizer Fees (Base rate Traffic Limits Burst Amount)',
       currentValue: before?.fees.baseRateTrafficLimits.burstAmount || '',
       newValue: after?.fees.baseRateTrafficLimits.burstAmount || '',
     },
     {
-      fieldName: 'Decentralized Synchronizer Fees (Base rate Traffic Limits Burst Window)',
+      fieldName: 'decentralizedSynchronizerFeesBaseRateTrafficLimitsBurstWindow',
+      label: 'Decentralized Synchronizer Fees (Base rate Traffic Limits Burst Window)',
       currentValue: before?.fees.baseRateTrafficLimits.burstWindow.microseconds || '',
       newValue: after?.fees.baseRateTrafficLimits.burstWindow.microseconds || '',
     },
     {
-      fieldName: 'Decentralized Synchronizer Fees (Extra Traffic Price)',
+      fieldName: 'decentralizedSynchronizerFeesExtraTrafficPrice',
+      label: 'Decentralized Synchronizer Fees (Extra Traffic Price)',
       currentValue: before?.fees.extraTrafficPrice || '',
       newValue: after?.fees.extraTrafficPrice || '',
     },
     {
-      fieldName: 'Decentralized Synchronizer Fees (Read/Write Scaling Factor)',
+      fieldName: 'decentralizedSynchronizerFeesReadVsWriteScalingFactor',
+      label: 'Decentralized Synchronizer Fees (Read/Write Scaling Factor)',
       currentValue: before?.fees.readVsWriteScalingFactor || '',
       newValue: after?.fees.readVsWriteScalingFactor || '',
     },
     {
-      fieldName: 'Decentralized Synchronizer Fees (Min Topup Amount)',
+      fieldName: 'decentralizedSynchronizerFeesMinTopupAmount',
+      label: 'Decentralized Synchronizer Fees (Min Topup Amount)',
       currentValue: before?.fees.minTopupAmount || '',
       newValue: after?.fees.minTopupAmount || '',
     },

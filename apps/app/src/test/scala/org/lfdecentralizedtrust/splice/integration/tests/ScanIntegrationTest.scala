@@ -36,7 +36,7 @@ import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCod
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 
-import scala.util.Success
+import scala.util.{Success, Try}
 
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
   private val defaultPageSize = Limit.MaxPageSize
@@ -61,7 +61,14 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
                 config.sequencerAdminClient,
                 "http://testUrl:8081",
               )
-            )
+            ),
+            parameters =
+              config.parameters.copy(customTimeouts = config.parameters.customTimeouts.map {
+                // guaranteeing a timeout for first test below
+                case (key @ "getAcsSnapshot", _) =>
+                  key -> NonNegativeFiniteDuration.ofMillis(1L)
+                case other => other
+              }),
           )
         )(config)
       )
@@ -71,6 +78,16 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         )(config)
       )
       .withTrafficTopupsEnabled
+
+  "getAcsSnapshot respects custom timeout" in { implicit env =>
+    loggerFactory.assertLogsUnordered(
+      Try(sv1ScanBackend.getAcsSnapshot(dsoParty, None)).isFailure should be(true),
+      _.warningMessage should include("resulted in a timeout after 1 millisecond"),
+      _.errorMessage should include(
+        "Command failed, message: The server is taking too long to respond to the request"
+      ),
+    )
+  }
 
   "return dso info same as the sv app" in { implicit env =>
     val scan = sv1ScanBackend.getDsoInfo()

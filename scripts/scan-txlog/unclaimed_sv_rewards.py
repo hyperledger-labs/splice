@@ -5,7 +5,7 @@
 
 """
 Summarizes claimed, expired, and unclaimed minting rewards for a given beneficiary
-within a specified time range, based on SvRewardCoupon activity.
+within a specified time range and weight, based on SvRewardCoupon activity.
 """
 
 import aiohttp
@@ -53,6 +53,12 @@ def _default_logger(name, loglevel):
 # Global logger, always accessible
 LOG = _default_logger("global", "INFO")
 
+def non_negative_int(value):
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"{value} is invalid: must be a non-negative integer")
+    return ivalue
+
 def _parse_cli_args() -> argparse.Namespace:
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -96,12 +102,24 @@ def _parse_cli_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--begin-record-time",
-        help="Start of the record time range to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T10:30:00Z.",
+        help="Start of the record time range (exclusive) to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T10:30:00Z.",
         required=True,
     )
     parser.add_argument(
         "--end-record-time",
-        help="End of the record time range to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T12:30:00Z",
+        help="End of the record time range (inclusive) to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T12:30:00Z",
+        required=True,
+    )
+    parser.add_argument(
+        "--weight",
+        type=non_negative_int,
+        help="Weight of sv coupon rewards to consider",
+        required=True,
+    )
+    parser.add_argument(
+        "--already-minted-weight",
+        type=non_negative_int,
+        help="Weight already minted for the time range provided",
         required=True,
     )
     return parser.parse_args()
@@ -464,6 +482,8 @@ class State:
     grace_period_for_mining_rounds_in_minutes: datetime
     create_sv_reward_end_record_time: datetime
     pagination_key: PaginationKey
+    weight: int
+    already_minted_weight: int
     reward_summary: RewardSummary
 
     @classmethod
@@ -495,6 +515,8 @@ class State:
             grace_period_for_mining_rounds_in_minutes = grace_period_for_mining_rounds_in_minutes,
             create_sv_reward_end_record_time = datetime.fromisoformat(args.end_record_time),
             pagination_key=pagination_key,
+            weight = args.weight,
+            already_minted_weight = args.already_minted_weight,
             reward_summary = reward_summary,
         )
 
@@ -608,7 +630,7 @@ class State:
                             case None:
                                 self._fail_with_missing_round(reward)
                             case mining_round_info:
-                                amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                                amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
                                     f"Updating expired summary with amount {amount}, corresponding to contract {event.contract_id}"
                                 )
@@ -619,7 +641,7 @@ class State:
                             case None:
                                 self._fail_with_missing_round(reward)
                             case mining_round_info:
-                                amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                                amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
                                     f"Updating claimed summary with amount {amount}, corresponding to contract {event.contract_id}"
                                 )
@@ -627,6 +649,20 @@ class State:
                                 self.reward_summary.reward_claimed_total_amount += amount
 
         self.process_events(transaction, event.child_event_ids)
+
+    def _calculate_amount(self, reward, mining_round_info):
+        return self._calculate_weight(reward) * mining_round_info.issuance_per_sv_reward
+
+    def _calculate_weight(self, reward):
+        available_weight = max(0, reward.weight - self.already_minted_weight)
+        if self.weight > available_weight:
+            LOG.warning(
+                f"Invalid weight input for round <{reward.round}>: "
+                f"{self.weight} must be less than or equal to {available_weight}."
+                f"The amount corresponding to {available_weight} will be computed."
+            )
+            return available_weight
+        return self.weight
 
     def _fail_with_missing_round(self, reward):
         self._fail(
@@ -636,7 +672,6 @@ class State:
         )
 
     def _fail(self, message, cause=None):
-        LOG.error(message)
         raise Exception(
             f"Stopping script (error: {message})"
         ) from cause
@@ -687,6 +722,11 @@ async def main():
     )
     LOG.debug(
         f"active_closed_rounds count: {len(app_state.active_closed_rounds)}"
+    )
+
+    assert not app_state.active_rewards, (
+        "Some rewards remain unclaimed. The provided grace-period-for-mining-rounds-in-minutes "
+        "might be too short to include all relevant mining rounds."
     )
 
     reward_summary = app_state.reward_summary
