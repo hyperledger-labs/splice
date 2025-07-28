@@ -462,7 +462,7 @@ class ParticipantAdminConnection(
           store,
           partyId,
           Seq(participantId),
-        ).map(_ => ()),
+        ).map(_.mapping),
         logger,
       )
     } yield ()
