@@ -956,7 +956,7 @@ class JoiningNodeInitializer(
           TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
-          proposals = TopologyTransactionType.ProposalSignedByOwnKey,
+          topologyTransactionType = TopologyTransactionType.ProposalSignedByOwnKey,
         )
         _ <-
           if (proposals.nonEmpty) {

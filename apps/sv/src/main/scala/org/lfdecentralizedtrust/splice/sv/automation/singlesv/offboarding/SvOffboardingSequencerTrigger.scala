@@ -17,6 +17,7 @@ import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -46,7 +47,8 @@ class SvOffboardingSequencerTrigger(
     for {
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       currentSequencerState <- participantAdminConnection.getSequencerSynchronizerState(
-        rulesAndStates.dsoRules.domain
+        rulesAndStates.dsoRules.domain,
+        AuthorizedState,
       )
     } yield {
       val dsoRulesCurrentSequencers = getSequencerIds(
@@ -96,11 +98,12 @@ class SvOffboardingSequencerTrigger(
     for {
       // TODO(tech-debt): pass through the domain id from the task, and double-check staleness check for races
       dsoRules <- dsoStore.getDsoRules()
-      SequencerSynchronizerState <- participantAdminConnection.getSequencerSynchronizerState(
-        dsoRules.domain
+      sequencerSyncState <- participantAdminConnection.getSequencerSynchronizerState(
+        dsoRules.domain,
+        AuthorizedState,
       )
     } yield {
-      !SequencerSynchronizerState.mapping.active.contains(task)
+      !sequencerSyncState.mapping.active.contains(task)
     }
   }
 
