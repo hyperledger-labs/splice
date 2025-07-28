@@ -296,7 +296,7 @@ class ScanApp(
                   val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
                     provide(traceContext)
                   }
-                  (httpService, config.customTimeouts.get(operation)) match {
+                  (httpService, config.parameters.customTimeouts.get(operation)) match {
                     // custom HTTP timeouts
                     case ("scan", Some(customTimeout)) =>
                       withRequestTimeout(

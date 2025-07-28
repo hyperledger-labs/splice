@@ -62,12 +62,13 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
                 "http://testUrl:8081",
               )
             ),
-            customTimeouts = config.customTimeouts.map {
-              // guaranteeing a timeout for first test below
-              case (key @ "getAcsSnapshot", _) =>
-                key -> NonNegativeFiniteDuration.ofMillis(1L)
-              case other => other
-            },
+            parameters =
+              config.parameters.copy(customTimeouts = config.parameters.customTimeouts.map {
+                // guaranteeing a timeout for first test below
+                case (key @ "getAcsSnapshot", _) =>
+                  key -> NonNegativeFiniteDuration.ofMillis(1L)
+                case other => other
+              }),
           )
         )(config)
       )
