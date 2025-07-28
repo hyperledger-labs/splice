@@ -21,8 +21,6 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import slick.jdbc.GetResult
 
-import java.time.Duration
-
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
     with WalletTestUtil
@@ -39,6 +37,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
+      // prevent ReceiveFaucetCouponTrigger from seeing stale caches
+      .withScanDisabledMiningRoundsCache()
 
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
@@ -53,11 +53,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("1000000")
-  private val lockedAmount = BigDecimal("200000")
-  private val burnedAmount = BigDecimal("50000")
+  private val mintedAmount = BigDecimal("2255.9885844600")
+  private val lockedAmount = BigDecimal("500")
+  private val burnedAmount = BigDecimal("22.2")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
-  private val unmintedAmount = BigDecimal("500000")
+  private val unmintedAmount = BigDecimal("11.1")
 
   override def beforeAll() = {
     super.beforeAll()
@@ -83,6 +83,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
   "test bigquery queries" in { implicit env =>
     withClue("create test data on Splice ledger") {
       val (aliceParty, bobParty) = onboardAliceAndBob()
+      waitForWalletUser(aliceValidatorWalletClient)
 
       // Create test data with more-or-less known amounts
       createTestData(aliceParty, bobParty)
@@ -207,12 +208,20 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def createTestData(aliceParty: PartyId, bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    // TODO (#1095) use a realistic minting method; best not to support tap in the SQL
-    withClue("step forward to an open round") {
-      advanceTimeAndWaitForRoundAutomation(Duration.ofDays(10))
-      advanceTimeToRoundOpen
-    }
-    aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
+    actAndCheck(
+      "step forward many rounds", {
+        advanceTimeToRoundOpen
+        (1 to 5).foreach { _ =>
+          advanceRoundsByOneTick
+        }
+      },
+    )(
+      "alice validator receives rewards",
+      _ => {
+        aliceValidatorWalletClient.balance().unlockedQty shouldBe mintedAmount
+      },
+    )
+    // TODO (#1095) aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
 
     // TODO (#1095) Lock a portion of Amulet (lockedAmount)
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
