@@ -147,6 +147,35 @@ To do so, you can set the ``parties-to-migrate`` :ref:`configuration option <con
 A migration will be attempted for each party that you pass to this option.
 The initialization of the validator app will be interrupted on the first failed migration attempt.
 
+If you still observe issues, in particular you observe
+``ACS_COMMITMENT_MISMATCH`` warnings in your participant logs,
+something has likely gone wrong while importing the active contracts
+of at least one of the parties hosted on your node. To address this, you can usually:
+
+1. First make sure all parties are on a consistent node. The most
+   common case is that either the parties are still on the old node
+   with the old participant id or they have been migrated to the new
+   node. You can check by opening a :ref:`Canton console
+   <console_access>` to any participant on the network (i.e., you can also ask another validator or SV operator for this information) and running the
+   following query where <namespace> is the part after the ``::`` in
+   your participant id.
+
+   .. code::
+
+      val syncId = participant.synchronizers.list_connected().head.synchronizerId
+      participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
+
+   If all parties are on the same node, proceed with the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node through (adjust the parameters as required for your parties):
+
+   .. code::
+
+      participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((<participant-id>, <participant-permission>)), store = syncId)
+
+2. If your parties are still on the original node that you took identity dumps from, you can use your existing dump.
+   If your parties have been migrated already, take a new dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id``
+   field in your identity dump to the participant id of the new node.
+   You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different ``<new_participant_id>``.
+
 .. _validator_recover_external_party:
 
 Recover the Coin balance of an external party

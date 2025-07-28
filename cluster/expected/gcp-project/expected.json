@@ -87,6 +87,23 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
+        "expression": "\n          resource.name.endsWith(\"dns01-sa-key-secret/versions/latest\")\n          ",
+        "title": "DNS SA key secret"
+      },
+      "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",
+      "project": "project-id",
+      "role": "roles/secretmanager.secretAccessor"
+    },
+    "name": "authorized-sa-roles/secretmanager.secretAccessor-dns-sa-key-secret-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
         "expression": "\n          resource.name.endsWith(\"grafana-keys/versions/latest\")\n          ",
         "title": "Grafana keys"
       },
@@ -104,7 +121,7 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.name.endsWith(\"secrets/gcp-bucket-sa-key-secret/versions/1\")",
+        "expression": "resource.name.endsWith(\"secrets/gcp-bucket-sa-key-secret/versions/latest\")",
         "title": "SA key secret"
       },
       "member": "serviceAccount:mock-sa@somewhere.mockoogle.com",

@@ -7,6 +7,7 @@ export type ServiceAccountAuthorizationConfig = {
   serviceAccountEmail: string;
   pulumiKeyringProjectId: string;
   pulumiKeyringRegion: string;
+  dnsSaKeySecretName: string;
 };
 
 export function authorizeServiceAccount(
@@ -23,6 +24,16 @@ export function authorizeServiceAccount(
     'roles/logging.privateLogViewer',
     'roles/storage.objectAdmin',
     'roles/viewer',
+    {
+      id: 'roles/secretmanager.secretAccessor',
+      condition: {
+        title: 'DNS SA key secret',
+        description: '(managed by Pulumi)',
+        expression: `
+          resource.name.endsWith("${config.dnsSaKeySecretName}/versions/latest")
+          `,
+      },
+    },
     {
       id: 'roles/secretmanager.secretAccessor',
       condition: {
@@ -58,7 +69,7 @@ export function authorizeServiceAccount(
       condition: {
         title: 'SA key secret',
         description: '(managed by Pulumi)',
-        expression: `resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/1")`,
+        expression: `resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/latest")`,
       },
     },
     {
