@@ -63,7 +63,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
     logger.info(s"Creating BigQuery dataset: $datasetName")
 
     // Create a temporary BigQuery dataset for testing; 1hr is the minimum
-    // TODO (#1095) consider setting ACL to private
     val datasetInfo =
       bq.DatasetInfo.newBuilder(datasetName).setDefaultTableLifetime(1.hour.toMillis).build()
     bigquery.create(datasetInfo)
