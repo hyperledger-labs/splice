@@ -7,6 +7,7 @@ import com.digitalasset.canton.config.{
   BatchingConfig,
   CachingConfigs,
   LocalNodeParametersConfig,
+  NonNegativeFiniteDuration,
   SessionSigningKeysConfig,
   WatchdogConfig,
 }
@@ -14,6 +15,7 @@ import com.digitalasset.canton.config.{
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
+    customTimeouts: Map[String, NonNegativeFiniteDuration] = Map.empty,
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 
