@@ -33,7 +33,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
     with UpdateHistoryTestUtil {
   private val totalSupplySqlPath = getResourcePath("total-supply-bigquery.sql")
 
-  // TODO (#1095) copied verbatim from UpdateHistoryIntegrationTest, maybe diverge or factor
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
@@ -303,6 +302,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       )
 
       // Stream rows to BigQuery in batches
+      // see AppendRows request size on https://cloud.google.com/bigquery/quotas#write-api-limits
       val batchSize = 500
       Future
         .traverse(rows grouped batchSize) { batch =>
