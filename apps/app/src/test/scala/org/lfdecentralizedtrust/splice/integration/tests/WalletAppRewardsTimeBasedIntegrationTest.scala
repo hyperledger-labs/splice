@@ -1,9 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 // Split out from WalletTimeBasedIntegrationTest due to test-isolation woes making the test in here flaky.
 class WalletAppRewardsTimeBasedIntegrationTest
@@ -20,8 +22,12 @@ class WalletAppRewardsTimeBasedIntegrationTest
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
-      // prevent ReceiveFaucetCouponTrigger from seeing stale caches
-      .withScanDisabledMiningRoundsCache()
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(
+          // prevent ReceiveFaucetCouponTrigger from seeing stale caches
+          _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
+        )(config)
+      )
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 

@@ -357,14 +357,6 @@ case class EnvironmentDefinition(
         )(conf),
     )
 
-  /** e.g. to prevent ReceiveFaucetCouponTrigger from seeing stale caches */
-  def withScanDisabledMiningRoundsCache(): EnvironmentDefinition =
-    addConfigTransforms((_, config) =>
-      ConfigTransforms.updateAllScanAppConfigs_(
-        _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
-      )(config)
-    )
-
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
 
