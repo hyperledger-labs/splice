@@ -1,42 +1,45 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.PartyId
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.util.*
-import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
-  AdvanceOpenMiningRoundTrigger,
-  ExpireIssuingMiningRoundTrigger,
-}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   BalanceChange,
   TransactionHistoryRequest,
   TransactionHistoryResponseItem,
 }
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
+import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
-
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
+import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.TopupMemberTrafficTrigger
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
 import scala.concurrent.{Future, blocking}
+import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.util.{Success, Try}
 
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
@@ -747,7 +750,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   "respect rate limit" in { implicit env =>
     import env.{actorSystem, executionContext}
 
-    Thread.sleep(1000) // wait for the rate limiter to have full available capacity
+    Threading.sleep(1000) // wait for the rate limiter to have full available capacity
     val results = SpliceRateLimiterTest
       .runRateLimited(
         30,
