@@ -15,10 +15,10 @@ const SvParticipantConfigSchema = z.object({
 const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
-})
+});
 const SvAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
-})
+});
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
 const SingleSvConfigSchema = z.object({
