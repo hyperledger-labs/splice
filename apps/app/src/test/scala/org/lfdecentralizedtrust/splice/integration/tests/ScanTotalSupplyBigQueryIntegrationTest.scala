@@ -62,7 +62,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
     super.beforeAll()
     logger.info(s"Creating BigQuery dataset: $datasetName")
 
-    // Create a temporary BigQuery dataset for testing; 1hr is the minimum
+    // Create a temporary BigQuery dataset for testing
+    // 1hr is the minimum per https://github.com/googleapis/java-bigquery/blob/v2.53.0/google-cloud-bigquery/src/main/java/com/google/cloud/bigquery/DatasetInfo.java#L97-L108
     val datasetInfo =
       bq.DatasetInfo.newBuilder(datasetName).setDefaultTableLifetime(1.hour.toMillis).build()
     bigquery.create(datasetInfo)
