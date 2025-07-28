@@ -300,22 +300,21 @@ class ScanApp(
                   // rate limit after the metrics to capture the result in the http metrics
                   httpRateLimiter.withRateLimit(httpService)(operation).tflatMap { _ =>
                     val httpErrorHandler = new HttpErrorHandler(loggerFactory)
-                  val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
+                    val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
                       provide(traceContext)
                     }
-                  (httpService, config.parameters.customTimeouts.get(operation)) match {
-                    // custom HTTP timeouts
-                    case ("scan", Some(customTimeout)) =>
-                      withRequestTimeout(
-                        customTimeout.duration,
-                        httpErrorHandler.timeoutHandler(customTimeout.duration, _),
-                      ).tflatMap { _ =>
+                    (httpService, config.parameters.customTimeouts.get(operation)) match {
+                      // custom HTTP timeouts
+                      case ("scan", Some(customTimeout)) =>
+                        withRequestTimeout(
+                          customTimeout.duration,
+                          httpErrorHandler.timeoutHandler(customTimeout.duration, _),
+                        ).tflatMap { _ =>
+                          base
+                        }
+                      case _ =>
                         base
-                      }
-                    case _ =>
-                      base
-                  }
-                }
+                    }
                   }
                 )
             }

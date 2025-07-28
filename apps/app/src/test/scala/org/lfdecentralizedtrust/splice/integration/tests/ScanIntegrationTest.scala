@@ -754,9 +754,11 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       ) {
         Future {
           blocking {
-            sv1ScanBackend.getAcsSnapshot(
-              dsoParty,
-              None,
+            loggerFactory.suppressErrors(
+              sv1ScanBackend.getAcsSnapshot(
+                dsoParty,
+                None,
+              )
             )
           }
         }

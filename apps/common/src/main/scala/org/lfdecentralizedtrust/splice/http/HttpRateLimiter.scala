@@ -34,16 +34,17 @@ class HttpRateLimiter(
 
     import org.apache.pekko.http.scaladsl.server.Directives.*
 
-    if (rateLimiter.markRun()) {
-      pass
-    } else {
-      complete(
-        StatusCodes.TooManyRequests,
-        HttpEntity(
-          "Too Many Requests: Server is busy, please try again later."
-        ),
-      )
+    extractRequestContext.flatMap { _ =>
+      if (rateLimiter.markRun()) {
+        pass
+      } else {
+        complete(
+          StatusCodes.TooManyRequests,
+          HttpEntity(
+            "Too Many Requests: Server is busy, please try again later."
+          ),
+        )
+      }
     }
-
   }
 }
