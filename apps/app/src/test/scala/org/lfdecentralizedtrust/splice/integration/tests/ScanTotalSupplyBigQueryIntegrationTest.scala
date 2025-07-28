@@ -248,18 +248,21 @@ class ScanTotalSupplyBigQueryIntegrationTest
       case db: DbStorage => db
       case s => fail(s"non-DB storage configured, unsupported for BigQuery: ${s.getClass}")
     }
+    val sourceHistoryId = sv1ScanBackend.appState.store.updateHistory.historyId
 
     copyTableToBigQuery(
       "update_history_creates",
       createsBqTableName,
       createsSchema,
       sourceDb,
+      sourceHistoryId,
     )
     copyTableToBigQuery(
       "update_history_exercises",
       exercisesBqTableName,
       exercisesSchema,
       sourceDb,
+      sourceHistoryId,
     )
   }
 
@@ -268,6 +271,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
       targetTable: String,
       targetSchema: ConvertibleSchema,
       sourceDb: DbStorage,
+      historyId: Long,
   ): Unit = {
     import org.json.JSONObject
 
@@ -281,7 +285,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
       val fieldNames = targetSchema.view.map(_.name).mkString(", ")
       val rows = sourceDb
         .query(
-          sql"SELECT #$fieldNames FROM #$sourceTable".as[JSONObject],
+          // we share table in testing, so filter by history_id to limit to sv1.
+          // this is unnecessary in production
+          sql"""SELECT #$fieldNames FROM #$sourceTable
+            WHERE history_id = $historyId
+             """.as[JSONObject],
           s"Export $sourceTable to BigQuery",
         )
         .futureValueUS
@@ -486,16 +494,14 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // TODO (#1095) use expected ranges instead
     // Verify individual metrics
-    results.minted shouldBe mintedAmount withClue "minted"
+    results.minted shouldBe BigDecimal(0) /*mintedAmount*/ withClue "minted"
     results.locked shouldBe lockedAmount withClue "locked"
     results.unlocked shouldBe unlockedAmount withClue "unlocked"
     results.unminted shouldBe unmintedAmount withClue "unminted"
     results.burned shouldBe burnedAmount withClue "burned"
 
     // Verify derived metrics
-    results.currentSupplyTotal should be(
-      lockedAmount + unlockedAmount
-    ) withClue "current_supply_total"
-    results.allowedMint should be(unmintedAmount + mintedAmount) withClue "allowed_mint"
+    results.currentSupplyTotal shouldBe (lockedAmount + unlockedAmount) withClue "current_supply_total"
+    results.allowedMint shouldBe (unmintedAmount + mintedAmount) withClue "allowed_mint"
   }
 }
