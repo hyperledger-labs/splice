@@ -753,8 +753,8 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     Threading.sleep(1000) // wait for the rate limiter to have full available capacity
     val results = SpliceRateLimiterTest
       .runRateLimited(
-        30,
-        120,
+        60,
+        300,
       ) {
         Future {
           blocking {
@@ -768,7 +768,9 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
         }
       } futureValue
 
-    results.count(identity) should be(80 +- 5)
+    results.count(identity) should be(
+      110 +- 20
+    ) // 5 seconds * 20 +- 20 to account for burst capacity
 
   }
 
