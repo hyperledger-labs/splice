@@ -747,6 +747,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   "respect rate limit" in { implicit env =>
     import env.{actorSystem, executionContext}
 
+    Thread.sleep(1000) // wait for the rate limiter to have full available capacity
     val results = SpliceRateLimiterTest
       .runRateLimited(
         30,

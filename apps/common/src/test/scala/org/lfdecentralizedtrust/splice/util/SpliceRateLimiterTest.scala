@@ -109,7 +109,6 @@ object SpliceRateLimiterTest {
     Source
       .repeat(())
       .take(elementsToRun.longValue())
-      .throttle(runRate, 1.second)
       .mapAsync(elementsToRun)(_ =>
         run
           .map(_ => true)
@@ -125,6 +124,7 @@ object SpliceRateLimiterTest {
               false
           }
       )
+      .throttle(runRate, 1.second)
       .runWith(Sink.seq)
   }
 
