@@ -1068,23 +1068,38 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
       entryUrl: String = testEntryUrl,
       entryDescription: String = testEntryDescription,
   )(implicit env: SpliceTestConsoleEnvironment) = {
+    requestAndPayForEntryWithoutWaiting(
+      refs,
+      entryName,
+      entryUrl,
+      entryDescription,
+    )
+    clue("Wait for the payment to be accepted or rejected.") {
+      eventually()(
+        refs.wallet.listSubscriptionInitialPayments() shouldBe empty
+      )
+    }
+  }
+
+  protected def requestAndPayForEntryWithoutWaiting(
+      refs: DynamicUserRefs,
+      entryName: String,
+      entryUrl: String = testEntryUrl,
+      entryDescription: String = testEntryDescription,
+  )(implicit env: SpliceTestConsoleEnvironment) = {
     // for paying the ans entry initial payment.
     refs.wallet.tap(5.0)
 
     val subscriptionRequest = requestEntry(refs, entryName, entryUrl, entryDescription)
 
-    actAndCheck(
-      s"Wait for subscription request to be ingested into store and accept it.",
+    clue("Wait for subscription request to be ingested into store and accept it.") {
       eventually() {
         inside(refs.wallet.listSubscriptionRequests()) { case Seq(storeRequest) =>
           storeRequest.contractId shouldBe subscriptionRequest
           refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
         }
-      },
-    )(
-      s" Wait for the payment to be accepted or rejected.",
-      _ => refs.wallet.listSubscriptionInitialPayments() shouldBe empty,
-    )
+      }
+    }
   }
 
   def ensureValidatorLivenessActivityRecordReceivedForCurrentRound(

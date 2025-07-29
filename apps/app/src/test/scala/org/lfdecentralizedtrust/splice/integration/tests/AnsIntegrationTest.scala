@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans as codegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules as dsorules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions as subCodegen
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
@@ -10,6 +11,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
   SpliceTestConsoleEnvironment,
 }
 import org.lfdecentralizedtrust.splice.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.ExecuteConfirmedActionTrigger
 import org.lfdecentralizedtrust.splice.sv.config.InitialAnsConfig
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -71,6 +73,83 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
   )
 
   "ans" should {
+
+    "reject if a conflicting entry was confirmed" in { implicit env =>
+      // Setup alice
+      val aliceStaticRefs =
+        StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
+      val aliceRefs = setupUser(aliceStaticRefs)
+
+      // Setup bob
+      val bobStaticRefs = StaticUserRefs(bobValidatorBackend, bobWalletClient)
+      val bobRefs = setupUser(bobStaticRefs)
+
+      clue("Pause automation for acting on confirmations") {
+        sv1Backend.dsoDelegateBasedAutomation
+          .trigger[ExecuteConfirmedActionTrigger]
+          .pause()
+          .futureValue
+      }
+
+      def confirmedCollects = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(dsorules.Confirmation.COMPANION)(dsoParty)
+        .filter(_.data.action match {
+          case arcAnsEntryContext: dsorules.actionrequiringconfirmation.ARC_AnsEntryContext =>
+            arcAnsEntryContext.ansEntryContextAction match {
+              case a: dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment =>
+                true
+              case _ =>
+                false
+            }
+          case _ => false
+        })
+      def confirmedRejects = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(dsorules.Confirmation.COMPANION)(dsoParty)
+        .filter(_.data.action match {
+          case arcAnsEntryContext: dsorules.actionrequiringconfirmation.ARC_AnsEntryContext =>
+            arcAnsEntryContext.ansEntryContextAction match {
+              case a: dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_RejectEntryInitialPayment =>
+                true
+              case _ =>
+                false
+            }
+          case _ => false
+        })
+      clue("sanity check") {
+        confirmedCollects shouldBe empty
+        confirmedRejects shouldBe empty
+      }
+      actAndCheck(
+        "request an entry as alice, and pay for it",
+        requestAndPayForEntryWithoutWaiting(aliceRefs, testEntryName),
+      )(
+        "confirmation is there",
+        _ => {
+          confirmedCollects should have size 1
+          confirmedRejects shouldBe empty
+        },
+      )
+      actAndCheck(
+        "request an entry as bob, and pay for it",
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          requestAndPayForEntryWithoutWaiting(bobRefs, testEntryName),
+          lines => {
+            forAll(lines) { line =>
+              line.message should include(
+                s"other initial payment collection has been confirmed for the same ans name"
+              )
+            }
+          },
+        ),
+      )(
+        "there is one rejection confirmation now",
+        _ => {
+          confirmedCollects should have size 1
+          confirmedRejects should have size 1
+        },
+      )
+    }
+
     "allocate unique ans entries, even when multiple parties race for them" in { implicit env =>
       implicit val ec: ExecutionContext = env.executionContext
       // Setup alice
