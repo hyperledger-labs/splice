@@ -35,6 +35,7 @@ Global Synchronizer for the Canton Network
 
 
    app_dev/overview/index
+   app_dev/app_val_tokenomics/index
    app_dev/overview/version_information
    app_dev/testing/index
    app_dev/ledger_api/index
