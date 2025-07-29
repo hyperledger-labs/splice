@@ -56,7 +56,7 @@ runs:
       run: |
           set -exuo pipefail
           echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
-          if [ -f ~/.config/nix/nix.conf && -f ~/.nix-profile/etc/profile.d/nix.sh ]; then
+          if [[ -f ~/.config/nix/nix.conf && -f ~/.nix-profile/etc/profile.d/nix.sh ]]; then
             cat ~/.config/nix/nix.conf
             ls -l ~/.config/nix/nix.conf
             echo "nix.conf already exists, skipping Nix setup"
