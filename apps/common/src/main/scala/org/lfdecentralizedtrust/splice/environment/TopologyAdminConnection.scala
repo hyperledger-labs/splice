@@ -779,7 +779,7 @@ abstract class TopologyAdminConnection(
                               .leftMap { res =>
                                 Status.FAILED_PRECONDITION
                                   .withDescription(
-                                    s"Condition is not yet observed. Waiting for proposal: $proposal}, found: $res."
+                                    s"Condition is not yet observed. Waiting for proposal: $proposal, found: $res."
                                   )
                                   .asRuntimeException()
                               }
@@ -787,7 +787,7 @@ abstract class TopologyAdminConnection(
                             EitherT.leftT(
                               Status.FAILED_PRECONDITION
                                 .withDescription(
-                                  s"Condition is not yet observed. Proposed: $proposal}, found: $currentAuthorizedState."
+                                  s"Condition is not yet observed. Proposed: $proposal, found: $currentAuthorizedState."
                                 )
                                 .asRuntimeException()
                             )
