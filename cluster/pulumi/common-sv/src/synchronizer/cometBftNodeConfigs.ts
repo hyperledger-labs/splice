@@ -86,6 +86,6 @@ export class CometBftNodeConfigs {
   }
 
   private p2pExternalAddress(nodeIndex: number): string {
-    return `${CLUSTER_HOSTNAME}:${cometBFTExternalPort(this._domainMigrationId, nodeIndex)}`;
+    return `cometbft.${CLUSTER_HOSTNAME}:${cometBFTExternalPort(this._domainMigrationId, nodeIndex)}`;
   }
 }
