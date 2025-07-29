@@ -752,40 +752,41 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     import env.{actorSystem, executionContext}
 
     def doCall() = {
-      loggerFactory.suppressErrors(
-        sv1ScanBackend.getAcsSnapshot(
-          dsoParty,
-          None,
-        )
+      sv1ScanBackend.getAcsSnapshot(
+        dsoParty,
+        None,
       )
     }
 
-    // ignore timeout failures
-    Try {
-      doCall()
-    }.discard
+    loggerFactory.suppressErrors {
+      // ignore timeout failures
+      Try {
+        doCall()
+      }.discard
 
-    Threading.sleep(1000) // wait for the rate limiter to start
+      Threading.sleep(1000) // wait for the rate limiter to start
 
-    val results = SpliceRateLimiterTest
-      .runRateLimited(
-        40,
-        200,
-      ) {
-        Future {
-          blocking {
-            doCall()
+      val results = SpliceRateLimiterTest
+        .runRateLimited(
+          40,
+          200,
+        ) {
+          Future {
+            blocking {
+              doCall()
+            }
           }
-        }
-      } futureValue
+        } futureValue
 
-    results.count(identity) should be(
-      // 20 is the limit from where the rate limiter starts to kick in
-      // then 20 every second
-      // first second is 20 (full capacity) + 10 (capacity added after consumption)
-      // then 20 every second
-      110 +- 20
-    )
+      results.count(identity) should be(
+        // 20 is the limit from where the rate limiter starts to kick in
+        // then 20 every second
+        // first second is 20 (full capacity) + 10 (capacity added after consumption)
+        // then 20 every second
+        110 +- 20
+      )
+
+    }
 
   }
 
