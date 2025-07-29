@@ -122,7 +122,7 @@ class WalletTxLogTimeBasedIntegrationTest
             }
             logEntry.appRewardsUsed shouldBe appRewardAmount
             logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
-            logEntry.senderHoldingFees should be > BigDecimal(0)
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
             logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
@@ -223,9 +223,6 @@ class WalletTxLogTimeBasedIntegrationTest
         3 * amuletConfig.amuletCreateFee * receiverFeeRatio - // one amuletCreateFee for each output
         amuletConfig.lockHolderFee * receiverFeeRatio // one lockHolderFee for each lock holder that is not the receiver
 
-      // This test advances 2 rounds between the tap and the transfer
-      val expectedHoldingFees = 2 * amuletConfig.holdingFee
-
       // Note: there are 3 places where we multiply fixed digit numbers:
       // - In our daml code, computing actual balance changes
       // - In the tx log parser, computing reported balance changes
@@ -243,8 +240,7 @@ class WalletTxLogTimeBasedIntegrationTest
               receiver.amount should beEqualUpTo(expectedCharlieBalanceChange, 9)
               receiver.amount.scale shouldBe scale
             }
-            logEntry.senderHoldingFees shouldBe expectedHoldingFees
-            logEntry.senderHoldingFees.scale shouldBe scale
+            logEntry.senderHoldingFees shouldBe BigDecimal(0)
           }
         ),
       )

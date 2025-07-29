@@ -5,10 +5,12 @@ module Splice.Scripts.TestComputeFees where
 
 import DA.Assert
 import DA.Time
+import DA.TextMap as TextMap
 import Daml.Script
 
 import Splice.Scripts.Util
 
+import Splice.Api.Token.MetadataV1
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Expiry
@@ -115,24 +117,35 @@ testScaledHoldingFees = do
   [(curAmuletCid, curAmulet)] <- queryFilter @Amulet alice.primaryParty (\c -> c.owner == alice.primaryParty)
   curAmulet.amount.ratePerRound.rate === scaledHoldingFee
 
-  -- Make a transfer, so that holding fees will be charged
-  context <- getPaymentTransferContext app alice
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
-    exerciseCmd context.amuletRules AmuletRules_Transfer with
-      transfer = Transfer with
-        sender = alice.primaryParty
-        provider = alice.primaryParty
-        inputs = [InputAmulet curAmuletCid]
-        outputs = [ TransferOutput with
-                      receiver = bob.primaryParty
-                      amount = 10.0
-                      lock = None
-                      receiverFeeRatio = 1.0]
-        beneficiaries = None
-      context = context.context
-      expectedDso = Some app.dso
+  -- skip 202 rounds so that the amulet expires
+  skipNRounds app 202
 
-  -- Actual holding fee should be based on the amulet price when the amulet was created, not the current one
-  transferResult.summary.holdingFees === scaledHoldingFee
+  openRoundCid <- getLatestActiveOpenRound app
+  result <- submit app.dso $ exerciseCmd curAmuletCid Amulet_Expire with
+    roundCid = openRoundCid._1
+
+  -- Check the expire result. In particular, actual holding fee should be based
+  -- on the amulet price when the amulet was created, not the current one.
+  let expectedResult = Amulet_ExpireResult with
+        expireSum = AmuletExpireSummary with
+          owner = alice.primaryParty
+          round = curAmulet.amount.createdAt
+          changeToInitialAmountAsOfRoundZero = negate (getValueAsOfRound0 curAmulet.amount)
+          changeToHoldingFeesRate = negate scaledHoldingFee
+        meta = Some $ Metadata $ TextMap.fromList
+          [ ("splice.lfdecentralizedtrust.org/burned", show curAmulet.amount.initialAmount)
+          , ("splice.lfdecentralizedtrust.org/tx-kind","expire-dust")
+          ]
+  expectedResult === result
 
   pure ()
+
+
+-- locally add missing instance for this test
+-- TODO(#2249): add these instances to the actual declarations in Splice.Amulet
+
+deriving instance Eq AmuletExpireSummary
+deriving instance Show AmuletExpireSummary
+
+deriving instance Eq Amulet_ExpireResult
+deriving instance Show Amulet_ExpireResult
