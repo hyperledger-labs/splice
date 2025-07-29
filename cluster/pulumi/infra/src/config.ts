@@ -55,6 +55,7 @@ export const InfraConfigSchema = z.object({
     }),
   }),
   monitoring: MonitoringConfigSchema,
+  extraCustomResources: z.object({}).catchall(z.any()).default({}),
 });
 
 export type Config = z.infer<typeof InfraConfigSchema>;
@@ -72,6 +73,7 @@ console.error(
 
 export const infraConfig = fullConfig.infra;
 export const monitoringConfig = fullConfig.monitoring;
+export const extraCustomResourcesConfig = fullConfig.extraCustomResources;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 

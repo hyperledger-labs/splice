@@ -2932,6 +2932,42 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "security.istio.io/v1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "deny-onboard-prepare-endpoint",
+        "namespace": "sv-1"
+      },
+      "spec": {
+        "action": "DENY",
+        "rules": [
+          {
+            "to": [
+              {
+                "operation": {
+                  "paths": [
+                    "/api/sv/v0/devnet/onboard/validator/prepare"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "sv-app"
+          }
+        }
+      }
+    },
+    "name": "sv-1-deny-onboard-prepare-endpoint",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "authenticationMethod": "none",
       "clientId": "SV10 UI (Pulumi managed, test-stack)_id"
     },

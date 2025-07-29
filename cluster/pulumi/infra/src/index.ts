@@ -5,7 +5,13 @@ import { config } from 'splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
-import { clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
+import {
+  clusterBaseDomain,
+  clusterBasename,
+  extraCustomResourcesConfig,
+  monitoringConfig,
+} from './config';
+import { installExtraCustomResources } from './extraCustomResources';
 import {
   getNotificationChannel,
   installCloudSQLMaintenanceUpdateAlerts,
@@ -39,6 +45,8 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
+
+installExtraCustomResources(extraCustomResourcesConfig);
 
 let configuredAuth0;
 if (config.envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
