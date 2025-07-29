@@ -124,8 +124,8 @@ infra:
       kind: AuthorizationPolicy
       metadata:
         name: deny-onboard-prepare-endpoint
-        # note that we can use multiple namespaces in CR specs here; pulumi will multiply the CR for us
-        namespace: sv-1 sv-2
+        # if we pass a list here, pulumi will multiply the CR for us
+        namespace: [ sv-1, sv-2 ]
       spec:
         selector:
           matchLabels:
