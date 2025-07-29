@@ -18,6 +18,14 @@ Upcoming
     so you may need to adjust some alerts to be slightly less
     aggressive.
 
+- Canton
+
+  - Fix an issue where topology transaction signatures where
+    duplicated based on the actual signature as opposed to the public
+    key of the signature. This caused transactions with thousands of
+    signatures on DevNet due to an SV with KMS enabled using a non-deterministic
+    signature scheme which slowed down onboarding of new nodes to an unusable level.
+
 - Documentation
 
   - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
