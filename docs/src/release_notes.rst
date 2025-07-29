@@ -18,6 +18,10 @@ Upcoming
     so you may need to adjust some alerts to be slightly less
     aggressive.
 
+- Documentation
+
+  - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
+
 0.4.8
 -----
 
