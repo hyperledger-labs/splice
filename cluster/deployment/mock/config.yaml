@@ -135,3 +135,12 @@ infra:
           - to:
               - operation:
                   paths: ["/api/sv/v0/devnet/onboard/validator/prepare"]
+    mock-cr:
+      apiVersion: mock.example.com/v1
+      kind: MockResource
+      metadata:
+        name: mock-resource
+        namespace: validator1
+      spec:
+        key: value
+        anotherKey: anotherValue
