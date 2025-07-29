@@ -116,7 +116,7 @@ class AnsSubscriptionInitialPaymentTrigger(
                             // check if we confirmed the same initial payment for the same entry already
                             getExistingInitialPaymentConfirmation(
                               entryName,
-                              _ == payment.contractId,
+                              _ => true,
                             ).flatMap {
                               case Some(c) =>
                                 TaskSuccess(
