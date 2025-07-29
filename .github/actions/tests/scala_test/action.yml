@@ -202,6 +202,21 @@ runs:
         echo "Setting max_user_watches..."
         echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
 
+    # Make sure the directory "$HOME/.docker" has the right permissions (this
+    # is needed when the runner mounts file to inside the folder and created
+    # .docker with root permissions)
+    # See https://github.com/hyperledger-labs/splice/blob/f11ef2ba697be68cad218decd09a9fd9d4e41444/cluster/pulumi/gha/src/runners.ts#L196
+    - name: Make sure .docker directory is owned by the current user
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      shell: bash
+      run: |
+        [[ -d "$HOME/.docker" ]] && sudo chown "$(whoami):$(whoami)" "$HOME/.docker"
+
+    # Install QEMU to support building multi-arch images
+    - name: Set up QEMU
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      uses: docker/setup-qemu-action@v3
+
     - name: Build Docker images
       if: ${{ fromJson(inputs.with_docker_images) }}
       uses: ./.github/actions/nix/run_bash_command_in_nix
