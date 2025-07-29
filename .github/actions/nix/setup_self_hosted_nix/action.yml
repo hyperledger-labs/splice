@@ -56,8 +56,8 @@ runs:
       run: |
           set -exuo pipefail
           echo 'source ~/.nix-profile/etc/profile.d/nix.sh' > nix.rc
-          if [ -f ~/.config/nix/nix.conf ]; then
-            echo "nix.conf already exists, skipping Nix setup"
+          if [[ -f ~/.config/nix/nix.conf && -f ~/.nix-profile/etc/profile.d/nix.sh ]]; then
+            echo "nix.conf or nix.sh already exists, skipping Nix setup"
             exit 0
           else
             # Disabling sandbox because:
@@ -84,7 +84,7 @@ runs:
               max-jobs = 16
           EOF
             fi
-            sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.30.2/install) --no-daemon
+            sh <(curl -fsSL --retry 8 https://releases.nixos.org/nix/nix-2.13.3/install) --no-daemon
             sudo mkdir -p /etc/nix
             sudo chmod a+rw /etc/nix
             if [[ "${{ inputs.oss_only }}" == true ]]; then
