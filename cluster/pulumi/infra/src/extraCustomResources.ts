@@ -1,9 +1,25 @@
 import * as k8s from '@pulumi/kubernetes';
 
-export function installExtraCustomResources(
-  extraCrs: Record<string, k8s.apiextensions.CustomResourceArgs>
-): void {
+import { infraConfig } from './config';
+
+// Automatically duplicates CRs if multiple namespaces given
+export function installExtraCustomResources(): void {
+  const extraCrs = infraConfig.extraCustomResources;
   Object.entries(extraCrs).forEach(([name, spec]) => {
-    new k8s.apiextensions.CustomResource(name, spec);
+    if (spec.metadata && spec.metadata.namespace) {
+      spec.metadata.namespace.split(' ').forEach((ns: string) => {
+        const patchedName = `${ns}-${name}`;
+        const patchedSpec = {
+          ...spec,
+          metadata: {
+            ...spec.metadata,
+            namespace: ns,
+          },
+        };
+        new k8s.apiextensions.CustomResource(patchedName, patchedSpec);
+      });
+    } else {
+      new k8s.apiextensions.CustomResource(name, spec);
+    }
   });
 }

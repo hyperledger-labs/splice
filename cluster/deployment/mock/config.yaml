@@ -117,19 +117,21 @@ svs:
       kms:
         keyRingId: sv-3_participant_mock
         locationId: us-central1
-extraCustomResources:
-  sv-1-deny-onboard-prepare-endpoint:
-    apiVersion: security.istio.io/v1
-    kind: AuthorizationPolicy
-    metadata:
-      name: deny-onboard-prepare-endpoint
-      namespace: sv-1
-    spec:
-      selector:
-        matchLabels:
-          app: sv-app
-      action: DENY
-      rules:
-        - to:
-            - operation:
-                paths: ["/api/sv/v0/devnet/onboard/validator/prepare"]
+infra:
+  extraCustomResources:
+    deny-onboard-prepare-endpoint:
+      apiVersion: security.istio.io/v1
+      kind: AuthorizationPolicy
+      metadata:
+        name: deny-onboard-prepare-endpoint
+        # note that we can use multiple namespaces in CR specs here; pulumi will multiply the CR for us
+        namespace: sv-1 sv-2
+      spec:
+        selector:
+          matchLabels:
+            app: sv-app
+        action: DENY
+        rules:
+          - to:
+              - operation:
+                  paths: ["/api/sv/v0/devnet/onboard/validator/prepare"]
