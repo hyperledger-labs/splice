@@ -168,7 +168,7 @@ abstract class TopologyAdminConnection(
           store = None,
           proposals = false,
           timeQuery = TimeQuery.HeadState,
-          ops = None,
+          ops = Some(TopologyChangeOp.Replace),
           filterSigningKey = "",
           protocolVersion = None,
         ),
@@ -1462,7 +1462,6 @@ abstract class TopologyAdminConnection(
       s"Remove party to participant for $partyId on $synchronizerId",
       listPartyToParticipant(
         TopologyStoreId.SynchronizerStore(synchronizerId).some,
-        Some(TopologyChangeOp.Replace),
         filterParty = partyId.filterString,
         filterParticipant = participant.filterString,
       ).map {
