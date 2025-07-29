@@ -6,7 +6,7 @@
 Scan APIs
 =========
 
-The Scan APIs are a collection of APIs that for querying the state of the Global Synchronizer.
+The Scan APIs are a collection of APIs for querying the state of the Global Synchronizer.
 See :ref:`app_dev_scan_api` for their documentation.
 
 The Scan APIs are a subset of the APIs available to interact with nodes on the Canton Network.
