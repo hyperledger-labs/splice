@@ -2051,6 +2051,25 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "mock.example.com/v1",
+      "kind": "MockResource",
+      "metadata": {
+        "name": "mock-resource",
+        "namespace": "validator1"
+      },
+      "spec": {
+        "anotherKey": "anotherValue",
+        "key": "value"
+      }
+    },
+    "name": "mock-cr",
+    "provider": "",
+    "type": "kubernetes:mock.example.com/v1:MockResource"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "displayName": "mock Slack Alert Notification Channel",
       "labels": {
         "channel_name": "#mock-slack-channel"
@@ -2927,6 +2946,78 @@
     "name": "slack-alert-notification-channel",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "deny-onboard-prepare-endpoint",
+        "namespace": "sv-1"
+      },
+      "spec": {
+        "action": "DENY",
+        "rules": [
+          {
+            "to": [
+              {
+                "operation": {
+                  "paths": [
+                    "/api/sv/v0/devnet/onboard/validator/prepare"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "sv-app"
+          }
+        }
+      }
+    },
+    "name": "sv-1-deny-onboard-prepare-endpoint",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1:AuthorizationPolicy"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "deny-onboard-prepare-endpoint",
+        "namespace": "sv-2"
+      },
+      "spec": {
+        "action": "DENY",
+        "rules": [
+          {
+            "to": [
+              {
+                "operation": {
+                  "paths": [
+                    "/api/sv/v0/devnet/onboard/validator/prepare"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "app": "sv-app"
+          }
+        }
+      }
+    },
+    "name": "sv-2-deny-onboard-prepare-endpoint",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1:AuthorizationPolicy"
   },
   {
     "custom": true,

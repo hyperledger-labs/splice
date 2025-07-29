@@ -53,6 +53,7 @@ export const InfraConfigSchema = z.object({
     istio: z.object({
       enableIngressAccessLogging: z.boolean(),
     }),
+    extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
   monitoring: MonitoringConfigSchema,
 });
