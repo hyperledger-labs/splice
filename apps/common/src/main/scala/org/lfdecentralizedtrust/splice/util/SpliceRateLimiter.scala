@@ -24,7 +24,8 @@ case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit m
 }
 
 case class SpliceRateLimitConfig(
-    ratePerSecond: Long
+    enabled: Boolean = true,
+    ratePerSecond: Long,
 )
 
 class SpliceRateLimiter(

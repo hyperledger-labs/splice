@@ -17,7 +17,8 @@ final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
     customTimeouts: Map[String, NonNegativeFiniteDuration] = Map.empty,
-    rateLimiting: RateLimitersConfig = RateLimitersConfig(SpliceRateLimitConfig(200), Map.empty),
+    rateLimiting: RateLimitersConfig =
+      RateLimitersConfig(SpliceRateLimitConfig(enabled = true, ratePerSecond = 200), Map.empty),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 
