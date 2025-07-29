@@ -211,16 +211,11 @@ function configureInternalGatewayService(
   );
 }
 
-
 function configureCometBFTGatewayService(
   ingressNs: k8s.core.v1.Namespace,
   ingressIp: pulumi.Output<string>,
   istiod: k8s.helm.v3.Release
 ) {
-  const cluster = gcp.container.getCluster({
-    name: CLUSTER_NAME,
-    project: GCP_PROJECT,
-  });
   const externalIPRanges = loadIPRanges(true);
   // see notes when installing a CometBft node in the full deployment
   const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
@@ -401,7 +396,6 @@ function configureGatewayService(
   istiod: k8s.helm.v3.Release,
   suffix: string
 ) {
-
   // We limit source IPs in two ways:
   // - For most traffic, we use istio instead of through loadBalancerSourceRanges as the latter has a size limit.
   //   These IPs should be provided in externalIPRangesInIstio.
@@ -457,10 +451,12 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: istioPolicies ? istioPolicies.apply(policies => {
-        const base: pulumi.Resource[] = [ingressNs, istiod];
-        return base.concat(policies);
-      }) : [ingressNs, istiod],
+      dependsOn: istioPolicies
+        ? istioPolicies.apply(policies => {
+          const base: pulumi.Resource[] = [ingressNs, istiod];
+          return base.concat(policies);
+        })
+        : [ingressNs, istiod],
     }
   );
   if (infraConfig.istio.enableIngressAccessLogging) {
