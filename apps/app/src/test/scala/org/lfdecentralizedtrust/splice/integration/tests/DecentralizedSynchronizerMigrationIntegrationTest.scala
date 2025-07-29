@@ -415,7 +415,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           conf.copy(cache =
             conf.cache.copy(cachedByParty =
               CacheConfig(
-                ttl = NonNegativeFiniteDuration.ofMillis(10),
+                ttl = NonNegativeFiniteDuration.ofMillis(1),
                 maxSize = 2000,
               )
             )
