@@ -38,17 +38,19 @@ class SpliceRateLimiter(
   private val rateLimiter = RateLimiter.create(config.ratePerSecond.toDouble)
 
   def markRun(): Boolean = {
-    val canRun = rateLimiter.tryAcquire()
-    if (canRun) {
-      metrics.meter.mark()(
-        MetricsContext("result" -> "accepted", "limiter" -> name)
-      )
-    } else {
-      metrics.meter.mark()(
-        MetricsContext("result" -> "rejected", "limiter" -> name)
-      )
-    }
-    canRun
+    if (config.enabled) {
+      val canRun = rateLimiter.tryAcquire()
+      if (canRun) {
+        metrics.meter.mark()(
+          MetricsContext("result" -> "accepted", "limiter" -> name)
+        )
+      } else {
+        metrics.meter.mark()(
+          MetricsContext("result" -> "rejected", "limiter" -> name)
+        )
+      }
+      canRun
+    } else true
   }
 
   def runWithLimit[T](f: => Future[T]): Future[T] = {
