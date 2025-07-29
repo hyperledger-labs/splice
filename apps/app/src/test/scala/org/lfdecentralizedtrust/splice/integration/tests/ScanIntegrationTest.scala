@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
@@ -749,25 +750,37 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
   "respect rate limit" in { implicit env =>
     import env.{actorSystem, executionContext}
 
+    def doCall() = {
+      sv1ScanBackend.getAcsSnapshot(
+        dsoParty,
+        None,
+      )
+    }
+
+    doCall()
+
+    Threading.sleep(1000) // wait for the rate limiter to start
+
     val results = SpliceRateLimiterTest
       .runRateLimited(
-        100,
-        500,
+        40,
+        200,
       ) {
         Future {
           blocking {
             loggerFactory.suppressErrors(
-              sv1ScanBackend.getAcsSnapshot(
-                dsoParty,
-                None,
-              )
+              doCall()
             )
           }
         }
       } futureValue
 
     results.count(identity) should be(
-      100 +- 20
+      // 20 is the limit from where the rate limiter starts to kick in
+      // then 20 every second
+      // first second is 20 (full capacity) + 10 (capacity added after consumption)
+      // then 20 every second
+      110 +- 20
     )
 
   }
