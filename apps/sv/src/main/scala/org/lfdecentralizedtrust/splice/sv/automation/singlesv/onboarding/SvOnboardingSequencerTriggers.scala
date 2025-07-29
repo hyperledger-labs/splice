@@ -6,12 +6,13 @@ package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 import cats.implicits.showInterpolator
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{SynchronizerId, SequencerId}
+import com.digitalasset.canton.topology.{SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{TaskOutcome, TaskSuccess, TriggerContext}
 import org.lfdecentralizedtrust.splice.config.Thresholds
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{ParticipantAdminConnection, RetryFor}
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore.DsoRulesWithSvNodeStates
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SequencerOnboarding.SequencerToOnboard
@@ -34,7 +35,7 @@ class SequencerOnboarding(
       dsoRulesAndState: DsoRulesWithSvNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {
     val dsoRules = dsoRulesAndState.dsoRules
-    participantAdminConnection.getSequencerSynchronizerState(dsoRules.domain).map {
+    participantAdminConnection.getSequencerSynchronizerState(dsoRules.domain, AuthorizedState).map {
       SequencerSynchronizerState =>
         val currentSynchronizerConfigs = dsoRulesAndState.currentSynchronizerNodeConfigs()
         val configuredSequencers =

@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.V
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
@@ -559,6 +560,7 @@ class HttpSvHandler(
           .listSequencerSynchronizerState(
             decentralizedSynchronizer,
             store.TimeQuery.Range(None, None),
+            AuthorizedState,
           )
           .map { result =>
             result

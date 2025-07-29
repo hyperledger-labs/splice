@@ -72,7 +72,7 @@ multiValidator:
     validator:
       requests:
         cpu: '0.5'
-        memory: '2.4Gi'
+        memory: '2400Mi'
       limits:
         cpu: '4'
         memory: '8Gi'

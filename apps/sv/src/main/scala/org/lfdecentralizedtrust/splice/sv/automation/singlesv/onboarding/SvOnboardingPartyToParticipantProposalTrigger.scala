@@ -67,7 +67,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
             dsoPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
               store = TopologyStoreId.SynchronizerStore(dsoRules.domain).some,
               filterParty = dsoParty.filterString,
-              proposals = AllProposals,
+              topologyTransactionType = AllProposals,
             )
             _ = dsoPartyHostingProposals.foreach { proposal =>
               if (

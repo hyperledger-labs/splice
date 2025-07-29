@@ -756,6 +756,10 @@
       "values": {
         "additionalEnvVars": [
           {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          },
+          {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
             "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
           }

@@ -34,6 +34,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.jdk.CollectionConverters.*
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -271,6 +272,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                 .asRuntimeException()
             ),
           svcStore.key.dsoParty.uid.namespace,
+          AuthorizedState,
         )
         .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
   } yield isMemberOfDecentralizedNamespace

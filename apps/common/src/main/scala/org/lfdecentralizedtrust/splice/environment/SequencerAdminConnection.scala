@@ -33,6 +33,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection.TrafficState
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -60,7 +61,7 @@ class SequencerAdminConnection(
 
   override protected type Status = SequencerStatus
 
-  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[SequencerStatus]] =
+  override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[SequencerStatus]] =
     SequencerAdminCommands.Health.SequencerStatusCommand()
 
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
@@ -184,7 +185,7 @@ class SequencerAdminConnection(
   ): Future[TopologyResult[SequencerSynchronizerState]] = {
     for {
       synchronizerId <- getStatus.map(_.trySuccess.synchronizerId)
-      sequencerState <- getSequencerSynchronizerState(synchronizerId)
+      sequencerState <- getSequencerSynchronizerState(synchronizerId, AuthorizedState)
     } yield sequencerState
   }
 
