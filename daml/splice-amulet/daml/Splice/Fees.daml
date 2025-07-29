@@ -133,15 +133,6 @@ validExpiringAmount e =
   e.ratePerRound.rate >= 0.0 &&
   e.createdAt >= Round 0
 
-actualAmount : Round -> ExpiringAmount -> Decimal
-actualAmount t e
-  | e.ratePerRound.rate <= 0.0 = error $ "Round rate must be positive: " <> show e.ratePerRound.rate
-  | t <= e.createdAt = e.initialAmount
-  | otherwise =
-      let roundsPassed = t `subRound` e.createdAt
-      in
-        max 0.0 (e.initialAmount - chargeRatePerRound e.ratePerRound roundsPassed)
-
 -- | Smart constructor for an expiring amount.
 expiringAmount : RatePerRound -> Decimal -> Round -> ExpiringAmount
 expiringAmount ratePerRound initialAmount createdAt

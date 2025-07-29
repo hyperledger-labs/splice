@@ -115,24 +115,14 @@ testScaledHoldingFees = do
   [(curAmuletCid, curAmulet)] <- queryFilter @Amulet alice.primaryParty (\c -> c.owner == alice.primaryParty)
   curAmulet.amount.ratePerRound.rate === scaledHoldingFee
 
-  -- Make a transfer, so that holding fees will be charged
-  context <- getPaymentTransferContext app alice
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
-    exerciseCmd context.amuletRules AmuletRules_Transfer with
-      transfer = Transfer with
-        sender = alice.primaryParty
-        provider = alice.primaryParty
-        inputs = [InputAmulet curAmuletCid]
-        outputs = [ TransferOutput with
-                      receiver = bob.primaryParty
-                      amount = 10.0
-                      lock = None
-                      receiverFeeRatio = 1.0]
-        beneficiaries = None
-      context = context.context
-      expectedDso = Some app.dso
+  -- skip 202 rounds so that the amulet expires
+  skipNRounds app 202
+
+  openRoundCid <- getLatestActiveOpenRound app
+  result <- submit app.dso $ exerciseCmd curAmuletCid Amulet_Expire with
+    roundCid = openRoundCid._1
 
   -- Actual holding fee should be based on the amulet price when the amulet was created, not the current one
-  transferResult.summary.holdingFees === scaledHoldingFee
+  negate result.expireSum.changeToHoldingFeesRate === scaledHoldingFee
 
   pure ()
