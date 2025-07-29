@@ -98,7 +98,7 @@ testUsageFees = do
       outputAmuletHoldingFees = config.holdingFee.rate * 4.0  -- there are 4 input amulets
       outputFees = [config.createFee.fee, expectedLockFee1, expectedTransferFee, expectedLockFee3]
       senderChangeFee =
-        100.0 - inputAmuletHoldingFees - outputAmount1 - outputAmount2 - outputAmount2 - outputAmount3
+        100.0 - outputAmount1 - outputAmount2 - outputAmount2 - outputAmount3
         - config.createFee.fee - expectedLockFee1 - expectedSenderTransferFee
         - expectedSenderLockFee3
 
@@ -112,7 +112,7 @@ testUsageFees = do
     inputSvRewardAmount = 0.0
     inputAmuletAmount = 100.0
     balanceChanges = Map.empty
-    holdingFees = inputAmuletHoldingFees
+    holdingFees = 0.0 -- no holding fees charged on transfer
     outputFees
     senderChangeFee
     senderChangeAmount = 0.0
@@ -229,13 +229,9 @@ testAmuletUsedAfterHoldingFeeChanged = do
     submitTransfer context.amuletRules context.context app alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
 
   -- Both amulets are used as transfer input at round 7
-
-  -- Actual amount of a amulet created before holding fee change will be computed using the old holding fee
-  -- even if it is used as transfer input at a round with conifig that holding fee is reduced.
-  transferResult2.summary.holdingFees === holdingFee * (7.0 - 2.0)
-
-  -- Smaller holding fee is used as the amulet is created in round 3 when holding fee is redueced
-  transferResult3.summary.holdingFees === smallerHoldingFee * (7.0 - 3.0)
+  -- no holding fees are charged on transfer
+  transferResult2.summary.holdingFees === 0.0
+  transferResult3.summary.holdingFees === 0.0
 
 submitTransfer: ContractId AmuletRules -> TransferContext -> AmuletApp -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
 submitTransfer amuletRulesCid transferContext app sender receiver amuletCid amount =
