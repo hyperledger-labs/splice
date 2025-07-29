@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.topology.PartyId
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
@@ -751,13 +752,18 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     import env.{actorSystem, executionContext}
 
     def doCall() = {
-      sv1ScanBackend.getAcsSnapshot(
-        dsoParty,
-        None,
+      loggerFactory.suppressErrors(
+        sv1ScanBackend.getAcsSnapshot(
+          dsoParty,
+          None,
+        )
       )
     }
 
-    doCall()
+    // ignore timeout failures
+    Try {
+      doCall()
+    }.discard
 
     Threading.sleep(1000) // wait for the rate limiter to start
 
@@ -768,9 +774,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       ) {
         Future {
           blocking {
-            loggerFactory.suppressErrors(
-              doCall()
-            )
+            doCall()
           }
         }
       } futureValue
