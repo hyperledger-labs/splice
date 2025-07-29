@@ -5,7 +5,7 @@ LABEL org.opencontainers.image.base.name="ghcr.io/actions/actions-runner:2.326.0
 #Ideally, we'd reduce duplication between this and splice-test-ci, but we're not tackling that right now
 
 RUN sudo apt-get update && \
-    sudo apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip moreutils && \
+    sudo apt-get install -y sudo git curl xz-utils pigz rsync jq unzip python3-pip moreutils qemu-user-static && \
     sudo rm -rf /var/lib/apt/lists/*
 
 RUN sudo pip3 install GitPython gql humanize marshmallow-dataclass requests requests_toolbelt prometheus_client
