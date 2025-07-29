@@ -10,6 +10,8 @@ import org.apache.pekko.http.scaladsl.server.Directive0
 import org.lfdecentralizedtrust.splice.config.RateLimitersConfig
 import org.lfdecentralizedtrust.splice.util.{SpliceRateLimitMetrics, SpliceRateLimiter}
 
+import java.time.Instant
+
 class HttpRateLimiter(
     config: RateLimitersConfig,
     metricsFactory: LabeledMetricsFactory,
@@ -29,6 +31,9 @@ class HttpRateLimiter(
             "http_service" -> service
           )
         ),
+        // the rate limiter has a cold start, to avoid the first request being rejected
+        // we enforce the rate limit only after 1 second
+        Instant.now().plusSeconds(1),
       ),
     )
 

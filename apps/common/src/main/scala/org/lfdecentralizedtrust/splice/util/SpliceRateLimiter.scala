@@ -9,6 +9,7 @@ import com.daml.metrics.api.{MetricHandle, MetricInfo, MetricsContext}
 import com.google.common.util.concurrent.RateLimiter
 import org.lfdecentralizedtrust.splice.environment.SpliceMetrics
 
+import java.time.Instant
 import scala.concurrent.Future
 
 case class SpliceRateLimitMetrics(otelFactory: LabeledMetricsFactory)(implicit mc: MetricsContext) {
@@ -32,13 +33,14 @@ class SpliceRateLimiter(
     name: String,
     config: SpliceRateLimitConfig,
     metrics: SpliceRateLimitMetrics,
+    enforceAfter: Instant = Instant.now(),
 ) {
 
   // noinspection UnstableApiUsage
   private val rateLimiter = RateLimiter.create(config.ratePerSecond.toDouble)
 
   def markRun(): Boolean = {
-    if (config.enabled) {
+    if (config.enabled && Instant.now().isAfter(enforceAfter)) {
       val canRun = rateLimiter.tryAcquire()
       if (canRun) {
         metrics.meter.mark()(
