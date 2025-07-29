@@ -588,13 +588,14 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
-  if (grafanaPublicVirtualService) {
-    createGrafanaServiceAccount(
-      namespaceName,
-      adminPassword,
-      dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
-    );
-  }
+  // FIXME: uncomment (or get rid of this)
+  // if (grafanaPublicVirtualService) {
+  //   createGrafanaServiceAccount(
+  //     namespaceName,
+  //     adminPassword,
+  //     dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
+  //   );
+  // }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
   return prometheusStack;
