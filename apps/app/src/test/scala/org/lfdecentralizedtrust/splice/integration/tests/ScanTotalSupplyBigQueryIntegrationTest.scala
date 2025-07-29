@@ -505,17 +505,25 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // Verify individual metrics
     val expectedMinted = BigDecimal(0) // TODO (#1713) use mintedAmount
-    results.minted shouldBe expectedMinted withClue "minted"
-    results.locked shouldBe lockedAmount withClue "locked"
-    results.unlocked shouldBe unlockedAmount withClue "unlocked"
-    results.unminted shouldBe unmintedAmount withClue "unminted"
-    results.burned shouldBe burnedAmount withClue "burned"
+    forEvery(
+      Seq(
+        // base metrics
+        ("minted", results.minted, expectedMinted),
+        ("locked", results.locked, lockedAmount),
+        ("unlocked", results.unlocked, unlockedAmount),
+        ("unminted", results.unminted, unmintedAmount),
+        ("burned", results.burned, burnedAmount),
+        // internally-derived metrics
+        ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
+        ("allowed_mint", results.allowedMint, unmintedAmount + expectedMinted),
+      )
+    ) { case (clue, actual, expected) =>
+      actual shouldBe expected withClue clue
+    }
 
-    // Verify derived metrics
+    // other derived metrics
     (mintedAmount - burnedAmount) shouldBe (
       lockedAmount + unlockedAmount
     ) withClue "separate paths to total supply match"
-    results.currentSupplyTotal shouldBe (lockedAmount + unlockedAmount) withClue "current_supply_total"
-    results.allowedMint shouldBe (unmintedAmount + expectedMinted) withClue "allowed_mint"
   }
 }
