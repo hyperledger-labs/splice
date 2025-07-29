@@ -503,6 +503,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
     results.burned shouldBe burnedAmount withClue "burned"
 
     // Verify derived metrics
+    (mintedAmount - burnedAmount) shouldBe (
+      lockedAmount + unlockedAmount
+    ) withClue "separate paths to total supply match"
     results.currentSupplyTotal shouldBe (lockedAmount + unlockedAmount) withClue "current_supply_total"
     results.allowedMint shouldBe (unmintedAmount + expectedMinted) withClue "allowed_mint"
   }
