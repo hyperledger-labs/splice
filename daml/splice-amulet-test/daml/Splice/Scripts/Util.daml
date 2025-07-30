@@ -132,10 +132,15 @@ setupUserWithoutValidatorRight app name = do
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]
   return (AmuletUser userId user)
 
-setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
-setupUser app name validator = do
+setupUserNoTap : AmuletApp -> Text -> Party -> Script AmuletUser
+setupUserNoTap app name validator = do
   user <- setupUserWithoutValidatorRight app name
   recordValidatorOf app user.primaryParty validator
+  return user
+
+setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
+setupUser app name validator = do
+  user <- setupUserNoTap app name validator
   tap app user 1.0
   return user
 

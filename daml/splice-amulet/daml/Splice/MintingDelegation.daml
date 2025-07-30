@@ -1,0 +1,118 @@
+module Splice.MintingDelegation where
+
+import DA.Assert
+import DA.Time
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Schedule
+import Splice.Types
+import Splice.Util
+import Splice.ValidatorLicense
+
+template MintingDelegationProposal
+  with
+    dso : Party
+    beneficiary : Party
+    delegate : Party
+    expiresAt : Time
+  where
+    signatory dso, beneficiary
+    observer delegate
+
+    choice MintingDelegationProposal_Accept : MintingDelegationProposal_AcceptResult
+      with
+        amuletRulesCid : ContractId AmuletRules
+      controller delegate
+      do now <- getTime
+         amuletRules <- fetchReferenceData (ForDso dso) amuletRulesCid
+         let config = getValueAsOf now amuletRules.configSchedule
+         MintingDelegationProposal_AcceptResult <$> create MintingDelegation with
+           dso
+           beneficiary
+           delegate
+           expiresAt = now `addRelTime` getMintingDelegationLifetime config
+
+    choice MiningDelegationProposal_Reject : ()
+      controller delegate
+      do pure ()
+
+    choice MiningDelegationProposal_Withdraw : ()
+      controller beneficiary
+      do pure ()
+
+    choice MintingDelegationProposal_Expire : ()
+      with
+        p : Party
+      controller p
+      do require ("Controller " <> show p <> " must be one of the stakeholders" <> show (stakeholder this)) (p `elem` stakeholder this)
+         assertDeadlineExceeded "expiresAt" expiresAt
+         pure ()
+
+template MintingDelegation
+  with
+    dso : Party
+    beneficiary : Party
+    delegate : Party
+    expiresAt : Time
+  where
+    signatory dso, beneficiary, delegate
+
+    nonconsuming choice MintingDelegation_RecordValidatorLivenessActivity : ValidatorLicense_RecordValidatorLivenessActivityResult
+      with
+        validatorLicenseCid : ContractId ValidatorLicense
+        openRoundCid : ContractId OpenMiningRound
+      controller delegate
+      do _ <- fetchChecked (ForOwner with dso, owner = beneficiary) validatorLicenseCid
+         exercise validatorLicenseCid (ValidatorLicense_RecordValidatorLivenessActivity openRoundCid)
+
+    nonconsuming choice MintingDelegation_Mint : TransferResult
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+      controller delegate
+      do assertWithinDeadline "expiresAt" expiresAt
+         require "Minting is unfeatured" (context.context.featuredAppRight == None)
+         exercise context.amuletRules AmuletRules_Transfer with
+           transfer = Transfer with
+             sender = beneficiary
+             provider = delegate
+             inputs
+             outputs = []
+             beneficiaries = None
+           context = context.context
+           expectedDso = Some dso
+
+    choice MiningDelegation_Reject : ()
+      controller delegate
+      do pure ()
+
+    choice MiningDelegation_Withdraw : ()
+      controller beneficiary
+      do pure ()
+
+    choice MintingDelegation_Expire : ()
+      with
+        p : Party
+      controller p
+      do require ("Controller " <> show p <> " must be one of the stakeholders" <> show (stakeholder this)) (p `elem` stakeholder this)
+         assertDeadlineExceeded "expiresAt" expiresAt
+         pure ()
+
+    -- We do not charge a fee for MiningDelegation but we make them expire
+    -- and force paying traffic to renew them to protect against attacks.
+    choice MintingDelegation_Renew : ContractId MintingDelegation
+      with
+        amuletRulesCid : ContractId AmuletRules
+      controller delegate
+      do now <- getTime
+         amuletRules <- fetchReferenceData (ForDso dso) amuletRulesCid
+         let config = getValueAsOf now amuletRules.configSchedule
+         let mintingDelegationLifetime = getMintingDelegationLifetime config
+         assertDeadlineExceeded "earliest allowed renewal time" (expiresAt `addRelTime` microseconds (floor $ (-0.5) * intToDecimal (convertRelTimeToMicroseconds mintingDelegationLifetime)))
+         create this with expiresAt = this.expiresAt `addRelTime` getMintingDelegationLifetime config
+
+data MintingDelegationProposal_AcceptResult = MintingDelegationProposal_AcceptResult
+  with
+    mintingDelegationCid : ContractId MintingDelegation
+  deriving (Show, Eq)
