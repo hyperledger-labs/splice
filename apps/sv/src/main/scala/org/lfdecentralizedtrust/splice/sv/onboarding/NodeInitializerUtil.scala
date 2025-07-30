@@ -318,11 +318,11 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                             s"is only possible from dsoGovernance=0.1.17, so setting it to 0 for good."
                         )
                         "0"
-                      case Some(round) =>
+                      case Some(rnd) =>
                         logger.info(
-                          s"Setting the initial round to $initialRound from migration user's metadata dump."
+                          s"Setting the initial round to $rnd from migration user's metadata dump."
                         )
-                        round
+                        rnd
                     }
                     setInitialRound(connection, initialRound.toLong)
                 }
