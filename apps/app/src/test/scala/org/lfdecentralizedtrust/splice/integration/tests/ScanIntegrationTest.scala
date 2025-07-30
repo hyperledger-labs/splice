@@ -1,41 +1,46 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.config.ConfigTransforms
-import ConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.topology.PartyId
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvNodeState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
-import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
-  IntegrationTest,
-  SpliceTestConsoleEnvironment,
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
 }
-import org.lfdecentralizedtrust.splice.util.*
-import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
-import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
-  AdvanceOpenMiningRoundTrigger,
-  ExpireIssuingMiningRoundTrigger,
-}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{
   BalanceChange,
   TransactionHistoryRequest,
   TransactionHistoryResponseItem,
 }
+import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTest,
+  SpliceTestConsoleEnvironment,
+}
+import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.Limit
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.HttpSvAppClient
-
-import scala.math.BigDecimal.javaBigDecimal2bigDecimal
+import org.lfdecentralizedtrust.splice.sv.automation.delegatebased.{
+  AdvanceOpenMiningRoundTrigger,
+  ExpireIssuingMiningRoundTrigger,
+}
+import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.TopupMemberTrafficTrigger
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.client.RequestBuilding.{Get, Post}
-import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
-import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
+import org.lfdecentralizedtrust.splice.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 
+import scala.concurrent.{Future, blocking}
+import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.util.{Success, Try}
 
 class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeTestUtil {
@@ -742,6 +747,49 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     sequencer.url should be("http://testUrl:8081")
     sequencer.migrationId should be(0)
     sequencer.id shouldBe sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
+  }
+
+  "respect rate limit" in { implicit env =>
+    import env.{actorSystem, executionContext}
+
+    def doCall() = {
+      sv1ScanBackend.getAcsSnapshot(
+        PartyId.tryCreate("rate-limit-party", dsoParty.namespace),
+        None,
+      )
+    }
+
+    loggerFactory.suppressWarningsAndErrors {
+      // ignore timeout failures
+      Try {
+        doCall()
+      }.discard
+
+      Threading.sleep(1000) // wait for the rate limiter to start
+
+      val results = SpliceRateLimiterTest
+        .runRateLimited(
+          40,
+          200,
+        ) {
+          Future {
+            blocking {
+              doCall()
+            }
+          }
+        } futureValue
+
+      // 20 is the limit from where the rate limiter starts to kick in
+      // then 20 every second
+      // first second is 20 (full capacity) + 20 (capacity added after consumption)
+      // then 20 every second
+      val maxAccepted = 120
+      // account for bursts in the stream used to rate limit the calls in `runRateLimited`
+      val minAccepted = 80
+      results.count(identity) should (be >= minAccepted and be <= maxAccepted)
+
+    }
+
   }
 
   def expectedSenderFee(amount: BigDecimal) = {

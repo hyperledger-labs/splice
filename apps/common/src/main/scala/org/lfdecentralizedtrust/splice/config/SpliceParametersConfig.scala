@@ -11,11 +11,14 @@ import com.digitalasset.canton.config.{
   SessionSigningKeysConfig,
   WatchdogConfig,
 }
+import org.lfdecentralizedtrust.splice.util.SpliceRateLimitConfig
 
 final case class SpliceParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
     customTimeouts: Map[String, NonNegativeFiniteDuration] = Map.empty,
+    rateLimiting: RateLimitersConfig =
+      RateLimitersConfig(SpliceRateLimitConfig(enabled = true, ratePerSecond = 200), Map.empty),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false
 

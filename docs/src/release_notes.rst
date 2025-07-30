@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.9
+-----
 
 - SV Application
 
@@ -29,6 +29,11 @@ Upcoming
 - Documentation
 
   - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
+
+- Scan
+
+  - Added basic rate limits to the HTTP APIs. There are configured by default to allow up to 200 req/s per endpoint. The values can be adjusted under the keys `canton.scan-apps.scan-app.parameters.rate-limiting`.
+
 
 0.4.8
 -----
