@@ -1,6 +1,8 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# FIXME: Add a comment that this is deprecated, and also update the docs
+
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:

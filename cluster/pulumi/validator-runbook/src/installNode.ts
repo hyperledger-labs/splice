@@ -89,7 +89,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
+  const loopback = installLoopback(xns, CLUSTER_HOSTNAME);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -137,7 +137,7 @@ type ValidatorConfig = {
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
   otherDeps: CnInput<pulumi.Resource>[];
-  loopback: InstalledHelmChart | null;
+  loopback: pulumi.Resource[] | null;
   backupConfigSecret?: pulumi.Resource;
   nodeIdentifier: string;
 };
@@ -305,7 +305,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     throw new Error('No validator ui client id in auth0 config');
   }
   const dependsOn = imagePullDeps
-    .concat(loopback ? [loopback] : [])
+    .concat(loopback ? loopback : [])
     .concat([validatorAppSecret, validatorUISecret])
     .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])

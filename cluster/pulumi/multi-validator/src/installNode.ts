@@ -5,7 +5,6 @@ import {
   CLUSTER_HOSTNAME,
   installLoopback,
   numInstances,
-  activeVersion,
   imagePullSecret,
 } from 'splice-pulumi-common';
 
@@ -15,7 +14,7 @@ import { installPostgres } from './postgres';
 
 export async function installNode(): Promise<void> {
   const namespace = exactNamespace('multi-validator', true);
-  installLoopback(namespace, CLUSTER_HOSTNAME, activeVersion);
+  installLoopback(namespace, CLUSTER_HOSTNAME);
 
   const imagePullDeps = imagePullSecret(namespace);
 
