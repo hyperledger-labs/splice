@@ -32,6 +32,7 @@ import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.environment.DarResources
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.integration.plugins.TokenStandardCliSanityCheckPlugin
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
 import org.slf4j.event.Level
@@ -323,9 +324,9 @@ class SvTimeBasedRewardCouponIntegrationTest
       "Alice's participant has unvetted the latest amulet package, and SV4 is aware of that",
       _ => {
         sv4ValidatorBackend.appState.participantAdminConnection
-          .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+          .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId, AuthorizedState)
           .futureValue
-          .flatMap(_.item.packages.map(_.packageId)) should not contain latestAmuletPackageId
+          .flatMap(_.mapping.packages.map(_.packageId)) should not contain latestAmuletPackageId
       },
     )
 
@@ -372,9 +373,9 @@ class SvTimeBasedRewardCouponIntegrationTest
       "Alice's participant has vetted the latest amulet package",
       _ => {
         aliceValidatorBackend.appState.participantAdminConnection
-          .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId)
+          .listVettedPackages(aliceParticipantId, decentralizedSynchronizerId, AuthorizedState)
           .futureValue
-          .flatMap(_.item.packages.map(_.packageId)) should contain(latestAmuletPackageId)
+          .flatMap(_.mapping.packages.map(_.packageId)) should contain(latestAmuletPackageId)
       },
     )
 

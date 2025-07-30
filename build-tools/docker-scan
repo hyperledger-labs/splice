@@ -19,8 +19,6 @@ EOF
     base_image="ghcr.io/digital-asset/decentralized-canton-sync-dev/docker/${base_image}"
   fi
 
-  echo "Base image: $base_image"
-
   if docker buildx imagetools inspect "${base_image}" --raw | jq -r '.manifests[]' &> /dev/null; then
     # Base image is a multi-arch image
     last_layer=$(docker buildx imagetools inspect "${base_image}" --format '{{json .}}' | jq -r '.image."linux/amd64".rootfs.diff_ids[-1]')

@@ -588,17 +588,25 @@ class SvApp(
               concat(
                 SvResource.routes(
                   handler,
-                  _ => provide(traceContext),
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("sv")(operation)
+                      .tflatMap(_ => provide(traceContext)),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
-                  AdminAuthExtractor(
-                    verifier,
-                    svStore.key.svParty,
-                    svAutomation.connection,
-                    loggerFactory,
-                    "splice sv admin realm",
-                  )(traceContext),
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("svAdmin")(operation)
+                      .tflatMap(_ =>
+                        AdminAuthExtractor(
+                          verifier,
+                          svStore.key.svParty,
+                          svAutomation.connection,
+                          loggerFactory,
+                          "splice sv admin realm",
+                        )(traceContext)(operation)
+                      ),
                 ),
               )
             }

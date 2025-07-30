@@ -47,7 +47,9 @@ trait SvTestUtil extends TestCommon {
 
   def allocateRandomSvParty(name: String)(implicit env: SpliceTestConsoleEnvironment) = {
     val id = (new scala.util.Random).nextInt().toHexString
-    sv1Backend.participantClient.ledger_api.parties.allocate(s"$name-$id").party
+    eventuallySucceeds() {
+      sv1Backend.participantClient.ledger_api.parties.allocate(s"$name-$id").party
+    }
   }
 
   def median(values: Seq[BigDecimal]): Option[BigDecimal] = {

@@ -353,12 +353,12 @@ describe('Proposal Details Content', () => {
       proposal: {
         configChanges: [
           {
-            fieldName: 'Transfer (Create Fee)',
+            label: 'Transfer (Create Fee)',
             currentValue: '0.03',
             newValue: '0.04',
           },
           {
-            fieldName: 'Max Num Inputs',
+            label: 'Max Num Inputs',
             currentValue: '3',
             newValue: '4',
           },
@@ -389,7 +389,7 @@ describe('Proposal Details Content', () => {
     const changes = within(configChangeContainer).getAllByTestId('config-change');
     expect(changes.length).toBe(2);
 
-    const transferCreateFeeFieldName = within(changes[0]).getByTestId('config-change-field-name');
+    const transferCreateFeeFieldName = within(changes[0]).getByTestId('config-change-field-label');
     expect(transferCreateFeeFieldName.textContent).toBe('Transfer (Create Fee)');
 
     const transferCreateFee = within(changes[0]).getByTestId('config-change-current-value');
@@ -398,7 +398,7 @@ describe('Proposal Details Content', () => {
     const newTransferCreateFee = within(changes[0]).getByTestId('config-change-new-value');
     expect(newTransferCreateFee.textContent).toBe('0.04');
 
-    const maxNumInputsFieldName = within(changes[1]).getByTestId('config-change-field-name');
+    const maxNumInputsFieldName = within(changes[1]).getByTestId('config-change-field-label');
     expect(maxNumInputsFieldName.textContent).toBe('Max Num Inputs');
 
     const maxNumInputsCurrentValue = within(changes[1]).getByTestId('config-change-current-value');
@@ -415,13 +415,13 @@ describe('Proposal Details Content', () => {
       proposal: {
         configChanges: [
           {
-            fieldName: 'Decentralized Synchronizer (Active Synchronizer)',
+            label: 'Decentralized Synchronizer (Active Synchronizer)',
             currentValue: 'global-domain::12',
             newValue: 'global-domain::13',
             isId: true,
           },
           {
-            fieldName: 'Number of Unclaimed Rewards Threshold',
+            label: 'Number of Unclaimed Rewards Threshold',
             currentValue: '10',
             newValue: '20',
           },
@@ -453,7 +453,7 @@ describe('Proposal Details Content', () => {
     expect(changes.length).toBe(2);
 
     const dsoActiveSynchronizerFieldName = within(changes[0]).getByTestId(
-      'config-change-field-name'
+      'config-change-field-label'
     );
     expect(dsoActiveSynchronizerFieldName.textContent).toBe(
       'Decentralized Synchronizer (Active Synchronizer)'
@@ -470,7 +470,7 @@ describe('Proposal Details Content', () => {
     expect(dsoActiveSynchronizerNewValue.getAttribute('value')).toBe('global-domain::13');
 
     const dsoNumUnclaimedRewardsThresholdFieldName = within(changes[1]).getByTestId(
-      'config-change-field-name'
+      'config-change-field-label'
     );
     expect(dsoNumUnclaimedRewardsThresholdFieldName.textContent).toBe(
       'Number of Unclaimed Rewards Threshold'

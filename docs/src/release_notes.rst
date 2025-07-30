@@ -11,15 +11,51 @@ Release Notes
 Upcoming
 --------
 
+- SV Application
+
+  - Status reports are now submitted every 2min rather than every
+    1min. This has no impact other than on monitoring infrastructure
+    so you may need to adjust some alerts to be slightly less
+    aggressive.
+
+- Canton
+
+  - Fix an issue where topology transaction signatures where
+    duplicated based on the actual signature as opposed to the public
+    key of the signature. This caused transactions with thousands of
+    signatures on DevNet due to an SV with KMS enabled using a non-deterministic
+    signature scheme which slowed down onboarding of new nodes to an unusable level.
+
+- Documentation
+
+  - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
+
+0.4.8
+-----
+
+- Deployment
+
+  - Good-to-know but no changes needed: Added new helm values ``persistence.enablePgInitContainer`` and
+    ``extraInitContainers`` allowing configuration around deployment init containers. So far this is implemented only
+    for the validator and participant helm charts. The default values for these won't change your current deployment,
+    so if uninterested you can safely ignore.
+
+- SV Application
+
+  - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
+    This should have a slight impact on improving the performance of the sequencer.
+    Until a majority of nodes upgrade to ``0.4.8`` the ``ReconcileDynamicSynchronizerParametersTrigger`` might produce warnings.
+
 - Dashboards
 
   - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
 
 - Istio Reference Ingress
 
-    - Include in the helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints. This will be enabled by default if using the helm charts provided for Istio and the scan ingress is enabled.
-      If not using Istio the included EnvoyFilter can be used as an inspiration to add rate limits.
-      These rate limits will be expanded in the future to more endpoints.
+  - Include in the ``splice-cluster-ingress-runbook`` helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints in Scan.
+    This will be enabled by default if using the helm charts provided for Istio and the Scan ingress is enabled.
+    If not using Istio, the included EnvoyFilter can be used as an inspiration to add rate limits.
+    These rate limits will be expanded in the future to more endpoints.
 
 - Canton
 

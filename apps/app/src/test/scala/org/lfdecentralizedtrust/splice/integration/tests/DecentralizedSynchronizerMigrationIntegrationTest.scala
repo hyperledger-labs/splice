@@ -61,7 +61,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanAppClientConfig}
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellDomains,
@@ -413,8 +413,18 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           )(conf),
       )
       .addConfigTransforms((_, config) =>
-        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
-          _.copy(initialRound = initialRound)
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(_.copy(initialRound = initialRound))(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(conf =>
+          conf.copy(cache =
+            conf.cache.copy(cachedByParty =
+              CacheConfig(
+                ttl = NonNegativeFiniteDuration.ofMillis(1),
+                maxSize = 2000,
+              )
+            )
+          )
         )(config)
       )
       .withManualStart

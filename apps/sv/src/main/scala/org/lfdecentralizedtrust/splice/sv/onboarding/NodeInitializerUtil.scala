@@ -48,6 +48,7 @@ import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.{
   JoinWithKey,
 }
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer.loadDomainMigrationDump
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -402,6 +403,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                 .asRuntimeException()
             ),
           svcStore.key.dsoParty.uid.namespace,
+          AuthorizedState,
         )
         .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
   } yield isMemberOfDecentralizedNamespace
