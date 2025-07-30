@@ -160,7 +160,8 @@ CREATE TEMP FUNCTION minted(
     migration_id int64
   ) RETURNS bignumeric AS ((
   SELECT
-    SUM(PARSE_BIGNUMERIC(JSON_VALUE(e.result,
+    COALESCE(SUM(
+      PARSE_BIGNUMERIC(JSON_VALUE(e.result,
                                     -- .inputAppRewardAmount
                                     TransferResult_summary(0)))
       + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
@@ -168,7 +169,8 @@ CREATE TEMP FUNCTION minted(
                                     TransferResult_summary(1)))
       + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
                                     -- .inputSvRewardAmount
-                                    TransferResult_summary(2))))
+                                    TransferResult_summary(2)))),
+      0)
   FROM
     mainnet_da2_scan.scan_sv_1_update_history_exercises e
   WHERE
