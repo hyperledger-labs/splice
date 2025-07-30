@@ -321,11 +321,13 @@
                 ]
               }
             ],
-            "route": {
-              "destination": {
-                "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
               }
-            }
+            ]
           }
         ],
         "tls": [
@@ -350,11 +352,13 @@
                 ]
               }
             ],
-            "route": {
-              "destination": {
-                "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
               }
-            }
+            ]
           }
         ]
       }

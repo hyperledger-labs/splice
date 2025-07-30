@@ -111,11 +111,13 @@ export function installLoopback(
               sniHosts: allHosts,
             },
           ],
-          route: {
-            destination: {
-              host: 'istio-ingress.cluster-ingress.svc.cluster.local',
+          route: [
+            {
+              destination: {
+                host: 'istio-ingress.cluster-ingress.svc.cluster.local',
+              },
             },
-          },
+          ],
         },
       ],
       tcp: [
@@ -125,11 +127,13 @@ export function installLoopback(
               gateways: ['mesh'],
             },
           ],
-          route: {
-            destination: {
-              host: 'istio-ingress.cluster-ingress.svc.cluster.local',
+          route: [
+            {
+              destination: {
+                host: 'istio-ingress.cluster-ingress.svc.cluster.local',
+              },
             },
-          },
+          ],
         },
       ],
     },

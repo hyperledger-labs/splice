@@ -636,7 +636,6 @@
         "servers": [
           {
             "hosts": [
-              "public.mock.network.canton.global",
               "public.mock.global.canton.network.digitalasset.com"
             ],
             "port": {
@@ -650,7 +649,6 @@
           },
           {
             "hosts": [
-              "public.mock.network.canton.global",
               "public.mock.global.canton.network.digitalasset.com"
             ],
             "port": {
@@ -659,7 +657,7 @@
               "protocol": "HTTPS"
             },
             "tls": {
-              "credentialName": "cn-test-stacknet-public-tls",
+              "credentialName": "cn-test-stacknet-tls",
               "mode": "SIMPLE"
             }
           }

@@ -10,6 +10,7 @@ import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
+  CLUSTER_HOSTNAME,
   CLUSTER_NAME,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
@@ -555,13 +556,9 @@ function configureGateway(
     }
   );
 
-  const publicHosts = [
-    `public.${getDnsNames().cantonDnsName}`,
-    `public.${getDnsNames().daDnsName}`,
-  ].concat(
-    spliceConfig.pulumiProjectConfig.hasPublicDocs
-      ? [`docs.${getDnsNames().cantonDnsName}`, `docs.${getDnsNames().daDnsName}`]
-      : []
+  const clusterHostname = CLUSTER_HOSTNAME;
+  const publicHosts = [`public.${clusterHostname}`].concat(
+    spliceConfig.pulumiProjectConfig.hasPublicDocs ? [`docs.${clusterHostname}`] : []
   );
   const publicGw = new k8s.apiextensions.CustomResource(
     'cn-public-http-gateway',
@@ -598,7 +595,7 @@ function configureGateway(
             },
             tls: {
               mode: 'SIMPLE',
-              credentialName: `cn-${clusterBasename}net-public-tls`,
+              credentialName: `cn-${clusterBasename}net-tls`,
             },
           },
         ],
