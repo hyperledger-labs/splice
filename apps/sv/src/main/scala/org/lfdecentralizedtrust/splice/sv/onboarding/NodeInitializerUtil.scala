@@ -308,20 +308,22 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                     )
                   case domainMigrationConfig: DomainMigration =>
                     val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
-                    val initialRound = migrationDump.participantUsers.users
-                      .collectFirst {
-                        case user if user.id == config.ledgerApiUser =>
-                          user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
-                      }
-                      .flatten
-                      .getOrElse(
-                        throw new IllegalStateException(
-                          s"Key `INITIAL_ROUND_USER_METADATA_KEY` was not found in user's metadata dump."
+                    val initialRound = migrationDump.participantUsers.users.collectFirst {
+                      case user if user.id == config.ledgerApiUser =>
+                        user.annotations.get(INITIAL_ROUND_USER_METADATA_KEY)
+                    }.flatten match {
+                      case None =>
+                        logger.info(
+                          s"Initial round not found in user's metadata dump as resetting networks with non-zero round " +
+                            s"is only possible from dsoGovernance=0.1.17, so setting it to 0 for good."
                         )
-                      )
-                    logger.info(
-                      s"Setting the initial round to $initialRound from migration user's metadata dump."
-                    )
+                        "0"
+                      case Some(round) =>
+                        logger.info(
+                          s"Setting the initial round to $initialRound from migration user's metadata dump."
+                        )
+                        round
+                    }
                     setInitialRound(connection, initialRound.toLong)
                 }
               case None =>
