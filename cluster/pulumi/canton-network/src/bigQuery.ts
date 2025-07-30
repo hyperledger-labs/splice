@@ -5,13 +5,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
-import * as nodePath from 'path';
-import {
-  InstalledHelmChart,
-  installPostgresPasswordSecret,
-  MOCK_SPLICE_ROOT,
-  SPLICE_ROOT,
-} from 'splice-pulumi-common';
+import { InstalledHelmChart, installPostgresPasswordSecret } from 'splice-pulumi-common';
 import { config } from 'splice-pulumi-common/src/config';
 import {
   Postgres,
@@ -20,7 +14,11 @@ import {
   privateNetwork,
   protectCloudSql,
 } from 'splice-pulumi-common/src/postgres';
-import { ExactNamespace, CLUSTER_BASENAME } from 'splice-pulumi-common/src/utils';
+import {
+  ExactNamespace,
+  CLUSTER_BASENAME,
+  commandScriptPath,
+} from 'splice-pulumi-common/src/utils';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -347,8 +345,7 @@ function createPublicationAndReplicationSlots(
 ) {
   const dbName = scanAppDatabaseName(postgres);
   const schemaName = dbName;
-  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${nodePath.relative(process.cwd(), root)}/cluster/pulumi/canton-network/bigquery-cloudsql.sh`;
+  const path = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
   const scriptArgs = pulumi.interpolate`\\
       --private-network-project="${privateNetwork.project}" \\
       --compute-region="${cloudsdkComputeRegion()}" \\
