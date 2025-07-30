@@ -3,6 +3,7 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as nodePath from 'path';
 import { local } from '@pulumi/command';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
@@ -38,7 +39,7 @@ function configureIstioBase(
   istioDNamespace: k8s.core.v1.Namespace
 ): k8s.helm.v3.Release {
   const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/infra/migrate-istio.sh`;
+  const path = `${nodePath.relative(process.cwd(), root)}/cluster/pulumi/infra/migrate-istio.sh`;
   const migration = new local.Command(`migrate-istio-crds`, {
     create: path,
   });
