@@ -758,7 +758,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
       )
     }
 
-    loggerFactory.suppressErrors {
+    loggerFactory.suppressWarningsAndErrors {
       // ignore timeout failures
       Try {
         doCall()
