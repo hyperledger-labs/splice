@@ -4,9 +4,9 @@ import { Lifted, OutputInstance } from '@pulumi/pulumi';
 import { CLUSTER_HOSTNAME } from 'splice-pulumi-common/src/utils';
 
 import {
-  cometBFTExternalPort,
   StaticCometBftConfig,
   StaticCometBftConfigWithNodeName,
+  cometBFTExternalPort,
 } from './cometbftConfig';
 
 export interface CometBftNodeConfig extends Omit<StaticCometBftConfig, 'nodeIndex'> {

@@ -3,9 +3,9 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
+import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 
 import { isDevNet } from '../../common';
-import { cometBFTExternalPort } from '../../common-sv';
 import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';
 import { ExactNamespace } from './utils';
 
