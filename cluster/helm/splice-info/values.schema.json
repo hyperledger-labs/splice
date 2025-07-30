@@ -62,7 +62,7 @@
       "properties": {
         "network": {
           "type": "string",
-          "enum": ["dev", "test", "main"]
+          "enum": ["localdev", "scratch", "dev", "test", "main"]
         },
         "configDigest": {
           "type": "object",

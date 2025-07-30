@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
   PackageResource,
@@ -128,7 +129,11 @@ class BootstrapPackageConfigDarUploadIntegrationTest
   ): Unit = {
     eventually() {
       val vettedPackages: Seq[VettedPackage] =
-        participantAdminConnection.getVettingState(domainId).futureValue.mapping.packages
+        participantAdminConnection
+          .getVettingState(domainId, AuthorizedState)
+          .futureValue
+          .mapping
+          .packages
       val uploadedPackages =
         participantAdminConnection
           .listDars()

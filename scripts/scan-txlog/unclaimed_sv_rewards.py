@@ -5,7 +5,7 @@
 
 """
 Summarizes claimed, expired, and unclaimed minting rewards for a given beneficiary
-within a specified time range, based on SvRewardCoupon activity.
+within a specified time range and weight, based on SvRewardCoupon activity.
 """
 
 import aiohttp
@@ -15,9 +15,12 @@ from decimal import *
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
+import hashlib
+import json
 import logging
 import colorlog
-from typing import Optional, TextIO, Self, Any
+import os
+from typing import Optional, Self
 import time
 import sys
 
@@ -53,6 +56,12 @@ def _default_logger(name, loglevel):
 # Global logger, always accessible
 LOG = _default_logger("global", "INFO")
 
+def non_negative_int(value):
+    ivalue = int(value)
+    if ivalue < 0:
+        raise argparse.ArgumentTypeError(f"{value} is invalid: must be a non-negative integer")
+    return ivalue
+
 def _parse_cli_args() -> argparse.Namespace:
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -85,6 +94,17 @@ def _parse_cli_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--cache-file-path",
+        help="File path to save application state to. "
+        "If the file exists, processing will resume from the persisted state."
+        "Otherwise, processing will start from begin-record-time provided.",
+    )
+    parser.add_argument(
+        "--rebuild-cache",
+        action="store_true",
+        help="Force the cache to be rebuilt from scratch.",
+    )
+    parser.add_argument(
         "--beneficiary",
         help="The party for which unclaimed rewards should be calculated.",
         required=True,
@@ -96,12 +116,24 @@ def _parse_cli_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--begin-record-time",
-        help="Start of the record time range to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T10:30:00Z.",
+        help="Start of the record time range (exclusive) to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T10:30:00Z.",
         required=True,
     )
     parser.add_argument(
         "--end-record-time",
-        help="End of the record time range to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T12:30:00Z",
+        help="End of the record time range (inclusive) to consider SvRewardCoupon creation. Expected in ISO format: 2025-07-01T12:30:00Z",
+        required=True,
+    )
+    parser.add_argument(
+        "--weight",
+        type=non_negative_int,
+        help="Weight of sv coupon rewards to consider",
+        required=True,
+    )
+    parser.add_argument(
+        "--already-minted-weight",
+        type=non_negative_int,
+        help="Weight already minted for the time range provided",
         required=True,
     )
     return parser.parse_args()
@@ -178,6 +210,13 @@ class DamlDecimal:
             self.decimal = decimal.quantize(
                 Decimal("0.0000000001"), rounding=ROUND_HALF_EVEN
             )
+
+    def to_json(self) -> str:
+        return format(self.decimal, ".10f")
+
+    @classmethod
+    def from_json(cls, json_str: str):
+        return cls(Decimal(json_str))
 
     def __mul__(self, other):
         return DamlDecimal(self.decimal * other.decimal)
@@ -415,12 +454,42 @@ class LfValueParseException(Exception):
         self.message = message
         super().__init__(message)
 
+def _relevant_args_fingerprint(args: argparse.Namespace) -> str:
+    """Compute a fingerprint based on relevant args that affect state validity"""
+    relevant = {
+        "beneficiary": args.beneficiary,
+        "begin_record_time": args.begin_record_time,
+        "end_record_time": args.end_record_time,
+        "begin_migration_id": args.begin_migration_id,
+        "weight": args.weight,
+        "already_minted_weight": args.already_minted_weight,
+    }
+    serialized = json.dumps(relevant, sort_keys=True)
+    return hashlib.sha256(serialized.encode()).hexdigest()
+
 @dataclass
 class RewardSummary:
     reward_expired_count: int
     reward_claimed_count: int
     reward_expired_total_amount: DamlDecimal
     reward_claimed_total_amount: DamlDecimal
+
+    def to_json(self):
+        return {
+            "reward_expired_count": self.reward_expired_count,
+            "reward_claimed_count": self.reward_claimed_count,
+            "reward_expired_total_amount": self.reward_expired_total_amount.to_json(),
+            "reward_claimed_total_amount": self.reward_claimed_total_amount.to_json(),
+        }
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(
+            reward_expired_count=json["reward_expired_count"],
+            reward_claimed_count=json["reward_claimed_count"],
+            reward_expired_total_amount=DamlDecimal(json["reward_expired_total_amount"]),
+            reward_claimed_total_amount=DamlDecimal(json["reward_claimed_total_amount"]),
+        )
 
 class RewardStatus(Enum):
     CLAIMED = "claimed"
@@ -434,17 +503,66 @@ class Reward:
     beneficiary: str
     contract_id: str
 
+    def to_json(self):
+        return {
+            "round": self.round,
+            "weight": self.weight,
+            "sv": self.sv,
+            "beneficiary": self.beneficiary,
+            "contract_id": self.contract_id,
+        }
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(
+            round=json["round"],
+            weight=json["weight"],
+            sv=json["sv"],
+            beneficiary=json["beneficiary"],
+            contract_id=json["contract_id"],
+        )
+
 @dataclass
 class IssuingRound:
     round: int
     record_time: datetime
     issuance_per_sv_reward: DamlDecimal
 
+    def to_json(self):
+        return {
+            "round": self.round,
+            "record_time": self.record_time.isoformat(),
+            "issuance_per_sv_reward": self.issuance_per_sv_reward.to_json(),
+        }
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(
+            round=json["round"],
+            record_time=datetime.fromisoformat(json["record_time"]),
+            issuance_per_sv_reward=DamlDecimal(json["issuance_per_sv_reward"]),
+        )
+
 @dataclass
 class ClosedRound:
     round: int
     record_time: datetime
     issuance_per_sv_reward: DamlDecimal
+
+    def to_json(self):
+        return {
+            "round": self.round,
+            "record_time": self.record_time.isoformat(),
+            "issuance_per_sv_reward": self.issuance_per_sv_reward.to_json(),
+        }
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(
+            round=json["round"],
+            record_time=datetime.fromisoformat(json["record_time"]),
+            issuance_per_sv_reward=DamlDecimal(json["issuance_per_sv_reward"]),
+        )
 
 @dataclass
 class State:
@@ -461,10 +579,46 @@ class State:
     active_closed_rounds: dict[int, ClosedRound]
     begin_record_time: datetime
     end_record_time: datetime
-    grace_period_for_mining_rounds_in_minutes: datetime
+    grace_period_for_mining_rounds_in_minutes: int
     create_sv_reward_end_record_time: datetime
     pagination_key: PaginationKey
+    weight: int
+    already_minted_weight: int
     reward_summary: RewardSummary
+    # Hash of relevant CLI arguments to validate cache compatibility across runs
+    args_fingerprint: str
+
+    @classmethod
+    def create_or_restore_from_cache(cls, args):
+        if args.cache_file_path is None:
+            LOG.info(f"Caching disabled, creating new app state")
+            return cls.from_args(args)
+
+        if args.rebuild_cache:
+            LOG.info(f"Rebuilding cache, creating new app state")
+            return cls.from_args(args)
+
+        if not os.path.exists(args.cache_file_path):
+            LOG.info(
+                f"File {args.cache_file_path} does not exist, creating new app state"
+            )
+            return cls.from_args(args)
+
+        try:
+            with open(args.cache_file_path, "r") as file:
+                data = json.load(file)
+
+            current_fingerprint = _relevant_args_fingerprint(args)
+            cached_fingerprint = data.get("args_fingerprint")
+            if cached_fingerprint != current_fingerprint:
+                LOG.warning("Cached fingerprint mismatch, creating new app state")
+                return cls.from_args(args)
+
+            LOG.info(f"Restoring app state from {args.cache_file_path}")
+            return cls.from_json(data)
+
+        except Exception as e:
+            cls._fail(f"Could not read app state from {args.cache_file_path}: {e}")
 
     @classmethod
     def from_args(cls, args: argparse.Namespace):
@@ -495,8 +649,88 @@ class State:
             grace_period_for_mining_rounds_in_minutes = grace_period_for_mining_rounds_in_minutes,
             create_sv_reward_end_record_time = datetime.fromisoformat(args.end_record_time),
             pagination_key=pagination_key,
+            weight = args.weight,
+            already_minted_weight = args.already_minted_weight,
             reward_summary = reward_summary,
+            args_fingerprint = _relevant_args_fingerprint(args),
         )
+
+    def to_json(self):
+        return {
+            "beneficiary": self.beneficiary,
+            "active_rewards": {
+                cid: reward.to_json()
+                for cid, reward in self.active_rewards.items()
+            },
+            "active_issuing_rounds_cid_to_round_number": self.active_issuing_rounds_cid_to_round_number,
+            "active_issuing_rounds": {
+                str(round_number): issuing_round.to_json()
+                for round_number, issuing_round in self.active_issuing_rounds.items()
+            },
+            "active_closed_rounds_cid_to_round_number": self.active_closed_rounds_cid_to_round_number,
+            "active_closed_rounds": {
+                str(round_number): closed_round.to_json()
+                for round_number, closed_round in self.active_closed_rounds.items()
+            },
+            "begin_record_time": self.begin_record_time.isoformat(),
+            "end_record_time": self.end_record_time.isoformat(),
+            "grace_period_for_mining_rounds_in_minutes": self.grace_period_for_mining_rounds_in_minutes,
+            "create_sv_reward_end_record_time": self.create_sv_reward_end_record_time.isoformat(),
+            "pagination_key": self.pagination_key.to_json(),
+            "weight": self.weight,
+            "already_minted_weight": self.already_minted_weight,
+            "reward_summary": self.reward_summary.to_json(),
+            "args_fingerprint": self.args_fingerprint,
+        }
+
+    @classmethod
+    def from_json(cls, data):
+        return cls(
+            beneficiary=data["beneficiary"],
+            active_rewards={
+                cid: Reward.from_json(reward_json)
+                for cid, reward_json in data["active_rewards"].items()
+            },
+            active_issuing_rounds_cid_to_round_number=data["active_issuing_rounds_cid_to_round_number"],
+            active_issuing_rounds={
+                int(round_number): IssuingRound.from_json(round_data)
+                for round_number, round_data in data["active_issuing_rounds"].items()
+            },
+            active_closed_rounds_cid_to_round_number=data["active_closed_rounds_cid_to_round_number"],
+            active_closed_rounds={
+                int(round_number): ClosedRound.from_json(round_data)
+                for round_number, round_data in data["active_closed_rounds"].items()
+            },
+            begin_record_time=datetime.fromisoformat(data["begin_record_time"]),
+            end_record_time=datetime.fromisoformat(data["end_record_time"]),
+            grace_period_for_mining_rounds_in_minutes=data["grace_period_for_mining_rounds_in_minutes"],
+            create_sv_reward_end_record_time=datetime.fromisoformat(data["create_sv_reward_end_record_time"]),
+            pagination_key=PaginationKey.from_json(data["pagination_key"]),
+            weight=int(data["weight"]),
+            already_minted_weight=int(data["already_minted_weight"]),
+            reward_summary=RewardSummary.from_json(data["reward_summary"]),
+            args_fingerprint=data["args_fingerprint"],
+        )
+
+    def _save_to_cache(self, args):
+        if args.cache_file_path:
+            backup = None
+            try:
+                if os.path.exists(args.cache_file_path):
+                    backup = _rename_to_backup(args.cache_file_path)
+                with open(args.cache_file_path, "w") as file:
+                    data = self.to_json()
+                    json.dump(data, file)
+                    LOG.debug(f"Saved app state to {args.cache_file_path}")
+            except Exception as e:
+                LOG.error(f"Could not save app state to {args.cache_file_path}: {e}")
+                os.replace(backup, args.cache_file_path)  # overwrite if present
+                backup = None
+            if backup:
+                os.remove(backup)
+
+    def finalize_batch(self, args):
+        self._save_to_cache(args)
 
     def should_process(self, tx: dict):
         return datetime.fromisoformat(tx["record_time"]) < self.end_record_time
@@ -608,7 +842,7 @@ class State:
                             case None:
                                 self._fail_with_missing_round(reward)
                             case mining_round_info:
-                                amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                                amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
                                     f"Updating expired summary with amount {amount}, corresponding to contract {event.contract_id}"
                                 )
@@ -619,7 +853,7 @@ class State:
                             case None:
                                 self._fail_with_missing_round(reward)
                             case mining_round_info:
-                                amount = reward.weight * mining_round_info.issuance_per_sv_reward
+                                amount = self._calculate_amount(reward, mining_round_info)
                                 LOG.debug(
                                     f"Updating claimed summary with amount {amount}, corresponding to contract {event.contract_id}"
                                 )
@@ -627,6 +861,21 @@ class State:
                                 self.reward_summary.reward_claimed_total_amount += amount
 
         self.process_events(transaction, event.child_event_ids)
+
+    def _calculate_amount(self, reward, mining_round_info):
+        return self._calculate_weight(reward) * mining_round_info.issuance_per_sv_reward
+
+    def _calculate_weight(self, reward):
+        available_weight = max(0, reward.weight - self.already_minted_weight)
+        if self.weight > available_weight:
+            LOG.warning(
+                f"Invalid weight input for round <{reward.round}>: "
+                f"{self.weight} must be less than or equal to {available_weight}."
+                f"The amount corresponding to {available_weight} will be computed."
+            )
+            return available_weight
+        return self.weight
+
 
     def _fail_with_missing_round(self, reward):
         self._fail(
@@ -636,10 +885,30 @@ class State:
         )
 
     def _fail(self, message, cause=None):
-        LOG.error(message)
         raise Exception(
             f"Stopping script (error: {message})"
         ) from cause
+
+
+def _rename_to_backup(filename):
+    """Rename FILENAME to a unique name in the same folder with leading and
+    trailing `#`.
+
+    We do this instead of using a tempfile for output and then renaming after
+    because if tempfiles are on a different filesystem, the copy can fail in
+    progress, which would destroy the old file if it was still in place."""
+    target = os.path.join(os.path.dirname(filename), f"#{os.path.basename(filename)}")
+    while True:
+        target = f"{target}#"
+        if not os.path.lexists(target):
+            try:
+                os.rename(filename, target)
+                return target
+            # lexists is 99%; deal with race conditions
+            except FileExistsError:
+                pass
+            except IsADirectoryError:
+                pass
 
 
 async def main():
@@ -651,7 +920,7 @@ async def main():
 
     LOG.info(f"Starting unclaimed_sv_rewards with arguments: {args}")
 
-    app_state: State = State.from_args(args)
+    app_state = State.create_or_restore_from_cache(args)
 
     begin_t = time.time()
     tx_count = 0
@@ -674,6 +943,7 @@ async def main():
                 app_state.pagination_key = PaginationKey(
                     last.migration_id, last.record_time.isoformat()
                 )
+                app_state.finalize_batch(args)
             if len(batch) < scan_client.page_size:
                 LOG.debug(f"Reached end of stream at {app_state.pagination_key}")
                 break
@@ -687,6 +957,11 @@ async def main():
     )
     LOG.debug(
         f"active_closed_rounds count: {len(app_state.active_closed_rounds)}"
+    )
+
+    assert not app_state.active_rewards, (
+        "Some rewards remain unclaimed. The provided grace-period-for-mining-rounds-in-minutes "
+        "might be too short to include all relevant mining rounds."
     )
 
     reward_summary = app_state.reward_summary

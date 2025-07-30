@@ -28,6 +28,7 @@ describe('UnallocatedUnclaimedActivityRecord Amount Validation', () => {
             chooseAction={dummyChooseAction}
             effectivity={mockEffectivity}
             setIsValidAmount={dummySetIsValidAmount}
+            summary="Alice is doing great"
           />
         </SvConfigProvider>
       </MemoryRouter>
@@ -65,6 +66,7 @@ describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
             chooseAction={mockChooseAction}
             effectivity={mockEffectivity}
             setIsValidAmount={dummySetIsValidAmount}
+            summary="Alice is doing great"
           />
         </SvConfigProvider>
       </MemoryRouter>
@@ -73,7 +75,6 @@ describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
     const dateInput = screen.getByTestId('datetime-picker-unallocated-expires-at');
     const amountInput = screen.getByTestId('create-amount');
     const beneficiaryInput = screen.getByTestId('create-beneficiary');
-    const reasonInput = screen.getByTestId('create-reason');
 
     const defaultDate = dateInput.getAttribute('value');
     expect(defaultDate).toBeTruthy();
@@ -81,7 +82,6 @@ describe('CreateUnallocatedUnclaimedActivityRecord - UTC Conversion', () => {
     // Fill out other required fields
     fireEvent.change(amountInput, { target: { value: '100' } });
     fireEvent.change(beneficiaryInput, { target: { value: 'alice' } });
-    fireEvent.change(reasonInput, { target: { value: 'testing' } });
 
     // Wait until form submission is triggered
     await waitFor(() => {

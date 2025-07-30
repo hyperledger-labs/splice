@@ -1080,7 +1080,6 @@ class SvFrontendIntegrationTest
 
         val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
         val amount = "1000"
-        val reason = "Granting reward for activity"
 
         withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
@@ -1108,9 +1107,6 @@ class SvFrontendIntegrationTest
               }
               inside(find(id("create-amount"))) { case Some(element) =>
                 element.underlying.sendKeys(amount)
-              }
-              inside(find(id("create-reason"))) { case Some(element) =>
-                element.underlying.sendKeys(reason)
               }
 
               inside(find(id("create-reason-url"))) { case Some(element) =>

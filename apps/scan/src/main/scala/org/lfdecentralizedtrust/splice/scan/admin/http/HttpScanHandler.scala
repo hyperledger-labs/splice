@@ -85,6 +85,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
@@ -106,7 +107,6 @@ class HttpScanHandler(
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
-    initialRound: String,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -147,7 +147,6 @@ class HttpScanHandler(
         amuletRules = amuletRules.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
-        initialRound = initialRound,
       )
     }
   }
@@ -1959,7 +1958,11 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
         }
-        response <- sequencerAdminConnection.getPartyToParticipant(domain, party)
+        response <- sequencerAdminConnection.getPartyToParticipant(
+          domain,
+          party,
+          topologyTransactionType = AuthorizedState,
+        )
         participantId <- response.mapping.participantIds match {
           case Seq() =>
             Future.failed(

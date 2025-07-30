@@ -38,25 +38,25 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
   action?: ActionFromForm;
   effectivity: Dayjs;
   setIsValidAmount: (isValid: boolean) => void;
-}> = ({ chooseAction, action, effectivity, setIsValidAmount }) => {
+  summary: string;
+}> = ({ chooseAction, action, effectivity, setIsValidAmount, summary }) => {
   const existing = asCreateUnallocatedUnclaimedActivityRecord(action);
 
   const [beneficiary, setBeneficiary] = useState(existing?.beneficiary ?? '');
   const [amount, setAmount] = useState(existing?.amount ?? '');
-  const [reason, setReason] = useState(existing?.reason ?? '');
-  const [expiresAt, setExpiresAt] = useState<Dayjs>(dayjs());
+  const [mustMintBefore, setMustMintBefore] = useState<Dayjs>(dayjs());
   const [amountError, setAmountError] = useState<string | null>(null);
 
   useEffect(() => {
     if (existing?.expiresAt) {
-      setExpiresAt(dayjs(existing.expiresAt));
+      setMustMintBefore(dayjs(existing.expiresAt));
     } else {
-      setExpiresAt(effectivity.add(1, 'day'));
+      setMustMintBefore(effectivity.add(2, 'day'));
     }
   }, [existing?.expiresAt, effectivity]);
 
   const updateAction = useCallback(
-    (beneficiary: string, amount: string, reason: string, expiresAt: Dayjs) => {
+    (beneficiary: string, amount: string, mustMintBefore: Dayjs) => {
       chooseAction({
         tag: 'ARC_DsoRules',
         value: {
@@ -65,21 +65,21 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
             value: {
               beneficiary,
               amount,
-              reason,
-              expiresAt: expiresAt.toISOString(),
+              reason: summary,
+              expiresAt: mustMintBefore.toISOString(),
             },
           },
         },
       });
     },
-    [chooseAction]
+    [chooseAction, summary]
   );
 
   useEffect(() => {
-    if (beneficiary && amount && reason && expiresAt && !amountError) {
-      updateAction(beneficiary, amount, reason, expiresAt);
+    if (beneficiary && amount && summary && mustMintBefore && !amountError) {
+      updateAction(beneficiary, amount, mustMintBefore);
     }
-  }, [beneficiary, amount, reason, expiresAt, amountError, updateAction]);
+  }, [beneficiary, amount, summary, mustMintBefore, amountError, updateAction]);
 
   return (
     <Stack direction="column" mb={4} spacing={1}>
@@ -125,26 +125,16 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
         />
       </FormControl>
 
-      <Typography variant="h6">Reason</Typography>
-      <FormControl fullWidth>
-        <TextField
-          id="create-reason"
-          inputProps={{ 'data-testid': 'create-reason' }}
-          value={reason}
-          onChange={e => setReason(e.target.value)}
-        />
-      </FormControl>
-
       <Typography variant="h6">Must Mint Before</Typography>
       <LocalizationProvider dateAdapter={AdapterDayjs}>
         <DesktopDateTimePicker
           label={`Enter time in local timezone (${getUTCWithOffset()})`}
-          value={expiresAt}
+          value={mustMintBefore}
           ampm={false}
           format="YYYY-MM-DD HH:mm"
           minDateTime={dayjs()}
           readOnly={false}
-          onChange={d => setExpiresAt(d ?? dayjs())}
+          onChange={d => setMustMintBefore(d ?? dayjs())}
           slotProps={{
             textField: {
               id: 'datetime-picker-unallocated-expires-at',
@@ -158,7 +148,7 @@ const CreateUnallocatedUnclaimedActivityRecord: React.FC<{
       </LocalizationProvider>
       <Typography variant="body2" mt={1}>
         Expires{' '}
-        <DateWithDurationDisplay datetime={expiresAt.toDate()} enableDuration onlyDuration />
+        <DateWithDurationDisplay datetime={mustMintBefore.toDate()} enableDuration onlyDuration />
       </Typography>
     </Stack>
   );

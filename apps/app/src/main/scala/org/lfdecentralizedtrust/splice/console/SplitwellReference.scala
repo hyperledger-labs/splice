@@ -112,7 +112,7 @@ final class SplitwellAppClientReference(
       case Seq((domain, domainRules)) => (domain, domainRules)
       case Seq() =>
         throw new IllegalStateException(
-          s"Expected exactly one SplitwellRules contract for user $userParty but got $rules"
+          s"Expected exactly one SplitwellRules contract for user $userParty but got $rules for connected domains $connectedDomains"
         )
       case multipleRules =>
         val domains = getSplitwellSynchronizerIds()

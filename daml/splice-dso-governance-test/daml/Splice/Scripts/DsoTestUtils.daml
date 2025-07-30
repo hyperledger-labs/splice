@@ -42,20 +42,17 @@ initMainNet = initDecentralizedSynchronizer False
 
 
 initMainNetWithAmuletPrice : Decimal -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initMainNetWithAmuletPrice = initDecentralizedSynchronizerWithAmuletPrice False 0
+initMainNetWithAmuletPrice = initDecentralizedSynchronizerWithAmuletPrice False
 
 initDevNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
 initDevNet = initDecentralizedSynchronizer True
 
 
 initDecentralizedSynchronizer : Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizer isDevNet = initDecentralizedSynchronizerWithAmuletPrice isDevNet 0 1.0
+initDecentralizedSynchronizer isDevNet = initDecentralizedSynchronizerWithAmuletPrice isDevNet 1.0
 
-initDecentralizedSynchronizerWithNonZeroRound : Bool -> Int -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizerWithNonZeroRound isDevNet initialRound = initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound 1.0
-
-initDecentralizedSynchronizerWithAmuletPrice : Bool -> Int -> Decimal -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice = do
+initDecentralizedSynchronizerWithAmuletPrice : Bool -> Decimal -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizerWithAmuletPrice isDevNet amuletPrice = do
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
   dso <- allocateParty "dso-party"
@@ -118,7 +115,6 @@ initDecentralizedSynchronizerWithAmuletPrice isDevNet initialRound amuletPrice =
       config
       initialTrafficState = Map.empty
       isDevNet
-      initialRound = Some initialRound
     DsoBootstrap_Bootstrap
 
   dsoUserId <- validateUserId "dso-user"

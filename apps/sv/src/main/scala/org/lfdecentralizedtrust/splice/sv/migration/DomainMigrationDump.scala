@@ -30,14 +30,14 @@ case class DomainMigrationDump(
     migrationId: Long,
     nodeIdentities: SynchronizerNodeIdentities,
     domainDataSnapshot: DomainDataSnapshot,
-    participantUsers: ParticipantUsersData,
+    participantUsers: Option[ParticipantUsersData],
     createdAt: Instant,
 ) {
   def toHttp: http.GetDomainMigrationDumpResponse = http.GetDomainMigrationDumpResponse(
     migrationId,
     nodeIdentities.toHttp(),
     domainDataSnapshot.toHttp,
-    participantUsers.toHttp,
+    participantUsers.map(_.toHttp),
     createdAt.toString,
   )
 }
@@ -59,7 +59,7 @@ object DomainMigrationDump {
   ): Either[String, DomainMigrationDump] = for {
     identities <- SynchronizerNodeIdentities.fromHttp(response.identities)
     snapshot <- DomainDataSnapshot.fromHttp(response.dataSnapshot)
-    participantUsers = ParticipantUsersData.fromHttp(response.participantUsers)
+    participantUsers = response.participantUsers.map(ParticipantUsersData.fromHttp)
     timestamp <- Try(Instant.parse(response.createdAt)).toEither.leftMap(_.getMessage)
   } yield DomainMigrationDump(
     response.migrationId,
@@ -97,7 +97,7 @@ object DomainMigrationDump {
       migrationId,
       identities,
       snapshot,
-      participantUsersData,
+      Some(participantUsersData),
       Instant.now(),
     )
   }

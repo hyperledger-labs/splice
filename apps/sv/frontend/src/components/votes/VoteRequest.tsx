@@ -394,6 +394,7 @@ export const CreateVoteRequest: React.FC = () => {
               action={action}
               effectivity={effectivity}
               setIsValidAmount={setIsValidAmount}
+              summary={summary}
             />
           )}
           <Typography variant="h5">Proposal</Typography>

@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 2420,
+  "id": 3407,
   "links": [],
   "panels": [
     {
@@ -50,22 +50,21 @@
             "neutral": 0
           },
           "mappings": [],
-          "max": 180,
+          "max": 260,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "yellow",
-                "value": 90
+                "value": 180
               },
               {
                 "color": "red",
-                "value": 180
+                "value": 260
               }
             ]
           },
@@ -96,7 +95,7 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -151,9 +150,9 @@
             "lineWidth": 1,
             "pointSize": 5,
             "scaleDistribution": {
-              "type": "symlog",
+              "linearThreshold": 260,
               "log": 2,
-              "linearThreshold": 180
+              "type": "symlog"
             },
             "showPoints": "auto",
             "spanNulls": false,
@@ -171,16 +170,15 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "orange",
-                "value": 90
+                "value": 180
               },
               {
                 "color": "red",
-                "value": 180
+                "value": 260
               }
             ]
           },
@@ -203,11 +201,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -246,8 +245,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "green",
@@ -255,7 +253,7 @@
               },
               {
                 "color": "purple",
-                "value": 1.5
+                "value": 3
               }
             ]
           },
@@ -286,7 +284,7 @@
         "sizing": "auto",
         "text": {}
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -326,7 +324,7 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "axisSoftMax": 2,
+            "axisSoftMax": 4,
             "axisSoftMin": 0,
             "barAlignment": 0,
             "barWidthFactor": 0.6,
@@ -360,16 +358,15 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "green",
-                "value": 0.5
+                "value": 1.5
               },
               {
                 "color": "purple",
-                "value": 1.5
+                "value": 3
               }
             ]
           },
@@ -392,11 +389,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -478,8 +476,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -590,8 +587,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -694,8 +690,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "orange",
@@ -809,8 +804,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -910,8 +904,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "dark-red",
-                    "value": null
+                    "color": "dark-red"
                   },
                   {
                     "color": "orange",
@@ -1038,8 +1031,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "red",
@@ -1142,8 +1134,7 @@
                 "mode": "absolute",
                 "steps": [
                   {
-                    "color": "green",
-                    "value": null
+                    "color": "green"
                   },
                   {
                     "color": "orange",
@@ -1202,7 +1193,7 @@
   ],
   "preload": false,
   "refresh": "30s",
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": [
@@ -1290,6 +1281,5 @@
   "timezone": "",
   "title": "SV Status Reports",
   "uid": "caffa6f7-c421-4579-a839-b026d3b76826",
-  "version": 1,
-  "weekStart": ""
+  "version": 1
 }

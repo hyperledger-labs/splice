@@ -96,7 +96,6 @@ object SvOnboardingConfig {
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
-      initialRound: Long = 0L,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -272,7 +271,7 @@ case class SvAppBackendConfig(
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
+      NonNegativeFiniteDuration.ofMinutes(2),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,

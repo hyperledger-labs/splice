@@ -40,6 +40,7 @@ Global Synchronizer for the Canton Network
    app_dev/overview/version_information
    app_dev/testing/index
    app_dev/ledger_api/index
+   app_dev/scan_api/toc_proxy
    app_dev/overview/splice_app_apis
    app_dev/daml_api/index
    app_dev/daml_models/index
