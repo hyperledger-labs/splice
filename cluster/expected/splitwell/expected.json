@@ -167,7 +167,7 @@
         "resolution": "DNS"
       }
     },
-    "name": "loopback-service-entry",
+    "name": "loopback-service-entry-splitwell",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:ServiceEntry"
   },
@@ -270,7 +270,7 @@
         ]
       }
     },
-    "name": "loopback-virtual-service",
+    "name": "loopback-virtual-service-splitwell",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
   },

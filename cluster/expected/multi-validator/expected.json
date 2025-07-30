@@ -181,7 +181,7 @@
         "resolution": "DNS"
       }
     },
-    "name": "loopback-service-entry",
+    "name": "loopback-service-entry-multi-validator",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:ServiceEntry"
   },
@@ -284,7 +284,7 @@
         ]
       }
     },
-    "name": "loopback-virtual-service",
+    "name": "loopback-virtual-service-multi-validator",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
   },

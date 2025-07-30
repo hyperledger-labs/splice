@@ -25,7 +25,7 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
 
   const clusterHostname = CLUSTER_HOSTNAME;
   const serviceEntry = new k8s.apiextensions.CustomResource(
-    'loopback-service-entry',
+    `loopback-service-entry-${namespace.logicalName}`,
     {
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'ServiceEntry',
@@ -77,7 +77,7 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   ].concat(svHosts);
 
   const virtualService = new k8s.apiextensions.CustomResource(
-    'loopback-virtual-service',
+    `loopback-virtual-service-${namespace.logicalName}`,
     {
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'VirtualService',
