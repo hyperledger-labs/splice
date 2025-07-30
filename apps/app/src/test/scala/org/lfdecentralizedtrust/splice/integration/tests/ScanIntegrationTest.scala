@@ -753,7 +753,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
     def doCall() = {
       sv1ScanBackend.getAcsSnapshot(
-        dsoParty,
+        PartyId.tryCreate("rate-limit-party", dsoParty.namespace),
         None,
       )
     }
