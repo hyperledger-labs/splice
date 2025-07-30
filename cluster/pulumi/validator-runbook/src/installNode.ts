@@ -89,7 +89,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const onboardingSecret = preApproveValidatorRunbook ? 'validatorsecret' : undefined;
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME);
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 

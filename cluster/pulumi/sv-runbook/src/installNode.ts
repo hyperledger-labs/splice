@@ -99,7 +99,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME);
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   exactNamespace,
-  CLUSTER_HOSTNAME,
   installLoopback,
   numInstances,
   imagePullSecret,
@@ -14,7 +13,7 @@ import { installPostgres } from './postgres';
 
 export async function installNode(): Promise<void> {
   const namespace = exactNamespace('multi-validator', true);
-  installLoopback(namespace, CLUSTER_HOSTNAME);
+  installLoopback(namespace);
 
   const imagePullDeps = imagePullSecret(namespace);
 
