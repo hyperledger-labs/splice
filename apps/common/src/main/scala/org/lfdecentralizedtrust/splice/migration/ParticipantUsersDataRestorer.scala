@@ -48,7 +48,6 @@ class ParticipantUsersDataRestorer(
       _ <- Future.sequence(users.map { user =>
         {
           logger.info(s"Restoring user ${user.id}")
-          logger.info(s"user's annotations: ${user.annotations}")
           ledgerConnection.ensureUserCreated(
             user.id,
             user.primaryParty,
