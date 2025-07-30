@@ -5,6 +5,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
+import * as nodePath from 'path';
 import {
   InstalledHelmChart,
   installPostgresPasswordSecret,
@@ -347,7 +348,7 @@ function createPublicationAndReplicationSlots(
   const dbName = scanAppDatabaseName(postgres);
   const schemaName = dbName;
   const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/canton-network/bigquery-cloudsql.sh`;
+  const path = `${nodePath.relative(process.cwd(), root)}/cluster/pulumi/canton-network/bigquery-cloudsql.sh`;
   const scriptArgs = pulumi.interpolate`\
       --private-network-project="${privateNetwork.project}" \
       --compute-region="${cloudsdkComputeRegion()}" \
