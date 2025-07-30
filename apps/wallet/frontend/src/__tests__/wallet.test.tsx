@@ -538,7 +538,9 @@ describe('Wallet user can', () => {
       .getAllByRole('combobox')
       .find(e => e.id === 'create-offer-receiver')!;
     fireEvent.change(receiverInput, { target: { value: 'bob::preapproval' } });
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })), { timeout: 2000 });
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Send' })).toBeEnabled(), {
+      timeout: 2000,
+    });
 
     await user.click(screen.getByRole('checkbox'));
 
