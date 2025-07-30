@@ -11,7 +11,7 @@ import com.digitalasset.canton.metrics.DeclarativeApiMetrics
 import org.lfdecentralizedtrust.splice.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.digitalasset.canton.environment.BaseMetrics
 import com.digitalasset.canton.metrics.{DbStorageHistograms, DbStorageMetrics}
-import org.lfdecentralizedtrust.splice.metrics.HttpServerMetrics
+import org.lfdecentralizedtrust.splice.http.HttpServerMetrics
 
 /** A shared trait to capture the commonalities across our amulet node metrics. */
 trait SpliceMetrics extends BaseMetrics {
