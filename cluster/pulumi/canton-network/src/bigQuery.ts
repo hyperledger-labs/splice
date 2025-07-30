@@ -349,20 +349,20 @@ function createPublicationAndReplicationSlots(
   const schemaName = dbName;
   const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
   const path = `${nodePath.relative(process.cwd(), root)}/cluster/pulumi/canton-network/bigquery-cloudsql.sh`;
-  const scriptArgs = pulumi.interpolate`\
-      --private-network-project="${privateNetwork.project}" \
-      --compute-region="${cloudsdkComputeRegion()}" \
-      --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \
-      --tables-to-replicate-length="${tablesToReplicate.length}" \
-      --db-name="${dbName}" \
-      --schema-name="${schemaName}" \
-      --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}" \
-      --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \
-      --postgres-user-name="${postgres.user.name}" \
-      --publication-name="${publicationName}" \
-      --replication-slot-name="${replicationSlotName}" \
-      --replicator-user-name="${replicatorUserName}" \
-      --postgres-instance-name="${postgres.databaseInstance.name}" \
+  const scriptArgs = pulumi.interpolate`\\
+      --private-network-project="${privateNetwork.project}"\\
+      --compute-region="${cloudsdkComputeRegion()}"\\
+      --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}"\\
+      --tables-to-replicate-length="${tablesToReplicate.length}"\\
+      --db-name="${dbName}"\\
+      --schema-name="${schemaName}"\\
+      --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}"\\
+      --tables-to-replicate-joined="${tablesToReplicate.join(', ')}"\\
+      --postgres-user-name="${postgres.user.name}"\\
+      --publication-name="${publicationName}"\\
+      --replication-slot-name="${replicationSlotName}"\\
+      --replicator-user-name="${replicatorUserName}"\\
+      --postgres-instance-name="${postgres.databaseInstance.name}"\\
       --scan-app-database-name="${scanAppDatabaseName(postgres)}"`;
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,
