@@ -62,19 +62,26 @@ abstract class ResetTopologyStatePlugin
         .find(_.synchronizerAlias == globalDomainAlias)
     }
 
+    def isSynchronizerRegistered(client: ParticipantClientReference) = {
+      client.synchronizers
+        .list_registered()
+        .exists(_._1.synchronizerAlias == globalDomainAlias)
+    }
+
     allSvs.foreach(backend => {
-      if (connectedGlobalSync(backend.participantClientWithAdminToken).isEmpty) {
-        // reconnect just in case the participant was left disconnected after the test
-        backend.participantClientWithAdminToken.synchronizers.reconnect(
-          globalDomainAlias
-        )
-      }
-      eventually() {
-        val connectedDomain = connectedGlobalSync(backend.participantClientWithAdminToken)
-          .getOrElse(
-            fail(s"${backend.name} not connected to the global sync")
+      if (isSynchronizerRegistered(backend.participantClientWithAdminToken)) {
+        if (connectedGlobalSync(backend.participantClientWithAdminToken).isEmpty) {
+          // reconnect just in case the participant was left disconnected after the test
+          backend.participantClientWithAdminToken.synchronizers.reconnect(
+            globalDomainAlias
           )
-        connectedDomain.synchronizerId
+        }
+        eventually() {
+          connectedGlobalSync(backend.participantClientWithAdminToken)
+            .getOrElse(
+              fail(s"${backend.name} not connected to the global sync")
+            )
+        }
       }
 
     })
