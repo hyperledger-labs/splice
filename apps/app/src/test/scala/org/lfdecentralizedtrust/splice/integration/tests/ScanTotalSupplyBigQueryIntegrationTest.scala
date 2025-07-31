@@ -38,6 +38,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // prevent ReceiveFaucetCouponTrigger from seeing stale caches
       .withScanDisabledMiningRoundsCache()
+      .withAmuletPrice(walletAmuletPrice)
+
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(0.00001)
 
   override protected def runTokenStandardCliSanityCheck = false
 
