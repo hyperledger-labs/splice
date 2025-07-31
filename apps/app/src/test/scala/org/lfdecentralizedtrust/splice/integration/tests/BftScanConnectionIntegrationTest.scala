@@ -1,9 +1,11 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.console.CommandFailure
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
 import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
@@ -57,5 +59,36 @@ class BftScanConnectionIntegrationTest extends IntegrationTest with WalletTestUt
     eventuallySucceeds() {
       aliceAnsExternalClient.listAnsEntries()
     }
+  }
+
+  "agree on failed HttpCommandException" in { implicit env =>
+    startAllSync(
+      sv1ScanBackend,
+      sv1Backend,
+      sv2ScanBackend,
+      sv2Backend,
+      sv3ScanBackend,
+      sv3Backend,
+      sv4ScanBackend,
+      sv4Backend,
+    )
+
+    aliceValidatorBackend.startSync()
+
+    val fakeCid = "00" + s"01" * 31 + "42"
+
+    loggerFactory.assertThrowsAndLogsSeq[CommandFailure](
+      aliceValidatorWalletClient.acceptTokenStandardTransfer(
+        new TransferInstruction.ContractId(fakeCid)
+      ),
+      entries => {
+        forAll(entries)(_.message should not include "Consensus not reached")
+        forExactly(1, entries)(
+          _.message should include(
+            "HTTP 404 Not Found"
+          ).and(include(s"AmuletTransferInstruction '$fakeCid' not found"))
+        )
+      },
+    )
   }
 }
