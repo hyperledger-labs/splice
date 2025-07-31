@@ -314,8 +314,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
                     }.flatten match {
                       case None =>
                         logger.info(
-                          s"Initial round not found in user's metadata dump as resetting networks with non-zero round " +
-                            s"is only possible from dsoGovernance=0.1.17, so setting it to 0 for good."
+                          "Initial round not found in user's metadata dump, defaulting to 0."
                         )
                         "0"
                       case Some(rnd) =>
