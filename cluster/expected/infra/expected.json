@@ -570,6 +570,17 @@
         "servers": [
           {
             "hosts": [
+              "mock.network.canton.global",
+              "mock.global.canton.network.digitalasset.com"
+            ],
+            "port": {
+              "name": "grpc-swd-pub",
+              "number": 5108,
+              "protocol": "GRPC"
+            }
+          },
+          {
+            "hosts": [
               "*"
             ],
             "port": {

@@ -548,7 +548,16 @@ function configureGateway(
           app: 'istio-ingress',
           istio: 'ingress',
         },
-        servers,
+        servers: [
+          {
+            hosts: [getDnsNames().cantonDnsName, getDnsNames().daDnsName],
+            port: {
+              name: 'grpc-swd-pub',
+              number: 5108,
+              protocol: 'GRPC',
+            },
+          },
+        ].concat(servers),
       },
     },
     {
