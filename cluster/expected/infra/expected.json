@@ -481,7 +481,7 @@
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "VirtualService",
       "metadata": {
-        "name": "cluster-docs-releases-pulumi",
+        "name": "cluster-docs-releases",
         "namespace": "cluster-ingress"
       },
       "spec": {
@@ -559,7 +559,7 @@
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "Gateway",
       "metadata": {
-        "name": "cn-apps-gateway-pulumi",
+        "name": "cn-apps-gateway",
         "namespace": "cluster-ingress"
       },
       "spec": {
@@ -632,7 +632,7 @@
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "Gateway",
       "metadata": {
-        "name": "cn-http-gateway-pulumi",
+        "name": "cn-http-gateway",
         "namespace": "cluster-ingress"
       },
       "spec": {
@@ -693,7 +693,7 @@
       },
       "spec": {
         "selector": {
-          "app": "istio-ingress-public-pulumi",
+          "app": "istio-ingress-public",
           "istio": "ingress-public"
         },
         "servers": [

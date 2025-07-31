@@ -477,7 +477,7 @@ function configureGateway(
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'Gateway',
       metadata: {
-        name: 'cn-http-gateway-pulumi',
+        name: 'cn-http-gateway',
         namespace: ingressNs.ns.metadata.name,
       },
       spec: {
@@ -540,7 +540,7 @@ function configureGateway(
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'Gateway',
       metadata: {
-        name: 'cn-apps-gateway-pulumi',
+        name: 'cn-apps-gateway',
         namespace: ingressNs.ns.metadata.name,
       },
       spec: {
@@ -571,7 +571,7 @@ function configureGateway(
       },
       spec: {
         selector: {
-          app: 'istio-ingress-public-pulumi',
+          app: 'istio-ingress-public',
           istio: 'ingress-public',
         },
         servers: [
@@ -641,7 +641,7 @@ function configureDocsAndReleases(enableGcsProxy: boolean, publicDocs: boolean):
     apiVersion: 'networking.istio.io/v1alpha3',
     kind: 'VirtualService',
     metadata: {
-      name: 'cluster-docs-releases-pulumi',
+      name: 'cluster-docs-releases',
       namespace: 'cluster-ingress',
     },
     spec: {
@@ -676,7 +676,7 @@ function configureDocsAndReleases(enableGcsProxy: boolean, publicDocs: boolean):
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'VirtualService',
       metadata: {
-        name: 'cluster-docs-public-pulumi',
+        name: 'cluster-docs-public',
         namespace: 'cluster-ingress',
       },
       spec: {
