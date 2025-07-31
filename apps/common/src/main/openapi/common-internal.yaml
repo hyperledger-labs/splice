@@ -262,6 +262,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ContractWithState"
+        initial_round:
+          description: |
+            Initial round from which the network bootstraps
+          type: string
 
     BatchListVotesByVoteRequestsRequest:
       type: object

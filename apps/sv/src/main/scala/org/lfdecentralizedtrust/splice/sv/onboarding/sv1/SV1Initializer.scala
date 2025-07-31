@@ -91,6 +91,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -270,6 +271,10 @@ class SV1Initializer(
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
+      initialRound <- establishInitialRound(
+        svAutomation.connection,
+        upgradesConfig,
+      )
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
       // is allocated, as a stand-in for all of these actions.
@@ -315,7 +320,7 @@ class SV1Initializer(
         "bootstrap_dso_rules",
         show"the DsoRules and AmuletRules are bootstrapped",
         dsoStore.lookupDsoRules().map(_.isDefined), {
-          withDsoStore.foundDso()
+          withDsoStore.foundDso(initialRound)
         },
         logger,
       )
@@ -579,13 +584,13 @@ class SV1Initializer(
     /** The one and only entry-point: found a fresh DSO, given a properly
       * allocated DSO party
       */
-    def foundDso()(implicit
+    def foundDso(initialRound: Long)(implicit
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "bootstrap_dso",
       "bootstrapping DSO",
-      bootstrapDso(),
+      bootstrapDso(initialRound),
       logger,
     )
 
@@ -605,7 +610,7 @@ class SV1Initializer(
     }
 
     // Create DsoRules and AmuletRules and open the first mining round
-    private def bootstrapDso()(implicit
+    private def bootstrapDso(initialRound: Long)(implicit
         tc: TraceContext
     ): Future[Unit] = {
       val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId, sv1Config.voteCooldownTime)
@@ -651,7 +656,7 @@ class SV1Initializer(
                   )
                   _ = logger
                     .info(
-                      s"Bootstrapping DSO as $dsoParty and BFT nodes $sv1SynchronizerNodes"
+                      s"Bootstrapping DSO as $dsoParty and BFT nodes $sv1SynchronizerNodes at round $initialRound"
                     )
                   _ <- dsoStoreWithIngestion.connection
                     .submit(
@@ -689,6 +694,7 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
+                        if (initialRound > 0) Optional.of(initialRound) else Optional.empty,
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
