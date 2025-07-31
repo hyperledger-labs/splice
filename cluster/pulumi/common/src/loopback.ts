@@ -171,5 +171,40 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     { dependsOn: [namespace.ns, dummyLoopbackRelease] }
   );
 
-  return [serviceEntry, virtualService];
+
+  const cometBftVirtualService = new k8s.apiextensions.CustomResource(
+    `loopback-cometbft-${namespace.logicalName}`,
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'VirtualService',
+      metadata: {
+        name: 'cometbft-loopback',
+        namespace: namespace.ns.metadata.name,
+      },
+      spec: {
+        hosts: `cometbft.${clusterHostname}`,
+        exportTo: ['.'],
+        gateways: ['mesh'],
+        tcp: [
+          {
+            match: [
+              {
+                gateways: ['mesh'],
+              },
+            ],
+            route: [
+              {
+                destination: {
+                  host: 'istio-ingress-cometbft.cluster-ingress.svc.cluster.local',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    { dependsOn: [namespace.ns] }
+  );
+
+  return [serviceEntry, virtualService, cometBftVirtualService];
 }
