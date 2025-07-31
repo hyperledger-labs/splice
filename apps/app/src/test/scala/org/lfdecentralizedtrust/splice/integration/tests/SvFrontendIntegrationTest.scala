@@ -127,7 +127,7 @@ class SvFrontendIntegrationTest
             forExactly(1, valueCells)(cell =>
               seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
             )
-            forExactly(3, valueCells)(cell =>
+            forExactly(2, valueCells)(cell =>
               seleniumText(cell) should matchText(
                 sv1Backend.getDsoInfo().svParty.toProtoPrimitive
               )
