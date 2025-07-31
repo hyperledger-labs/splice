@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+
 import java.util.Optional
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.{
@@ -58,6 +59,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.migration.ParticipantUsersDataExporter
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 
@@ -563,7 +565,10 @@ class HttpSvAdminHandler(
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
     val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
-      domainDataSnapshotGenerator
+      for {
+        participantUsersData <- new ParticipantUsersDataExporter(svStoreWithIngestion.connection)
+          .exportParticipantUsersData()
+      } yield domainDataSnapshotGenerator
         .getDomainDataSnapshot(
           Instant.parse(timestamp),
           partyId.map(Codec.tryDecode(Codec.Party)(_)),
@@ -577,11 +582,12 @@ class HttpSvAdminHandler(
                 responseHttp.acsTimestamp,
                 migrationId getOrElse (config.domainMigrationId + 1),
                 responseHttp,
+                participantUsersData.toHttp,
               )
           )
         }
     }(traceContext, tracer)
-  }
+  }.flatten
 
   override def getSynchronizerNodeIdentitiesDump(
       respond: v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse.type

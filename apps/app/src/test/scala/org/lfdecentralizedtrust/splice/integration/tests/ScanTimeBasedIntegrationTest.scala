@@ -5,6 +5,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.AnsEntry
+import org.lfdecentralizedtrust.splice.config.ConfigTransforms
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
@@ -28,6 +29,8 @@ class ScanTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
+  val initialRound = 4815L
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
@@ -40,14 +43,19 @@ class ScanTimeBasedIntegrationTest
           _.withPausedTrigger[ScanAggregationTrigger]
         )(config)
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(
+          _.copy(initialRound = initialRound)
+        )(config)
+      )
 
   "report correct reference data" in { implicit env =>
     def roundNum() =
       sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
-    roundNum() shouldBe 1
+    roundNum() shouldBe initialRound + 1
 
     advanceRoundsByOneTick
-    roundNum() shouldBe 2
+    roundNum() shouldBe initialRound + 2
   }
 
   "return correct amulet configs" in { implicit env =>
@@ -58,9 +66,9 @@ class ScanTimeBasedIntegrationTest
 
     advanceRoundsByOneTick
 
-    clue("Get config for round 3") {
+    clue(s"Get config for round ${initialRound + 3}") {
       val cfg = eventuallySucceeds() {
-        sv1ScanBackend.getAmuletConfigForRound(3)
+        sv1ScanBackend.getAmuletConfigForRound(initialRound + 3)
       }
       cfg.amuletCreateFee.bigDecimal.setScale(10) should be(
         SpliceUtil.defaultCreateFee.fee divide walletAmuletPrice setScale 10
@@ -84,10 +92,10 @@ class ScanTimeBasedIntegrationTest
       )
     }
 
-    clue("Try to get config for round 4 which does not yet exist") {
+    clue(s"Try to get config for round ${initialRound + 4} which does not yet exist") {
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.getAmuletConfigForRound(4),
-        _.errorMessage should include("Round 4 not found"),
+        sv1ScanBackend.getAmuletConfigForRound(initialRound + 4),
+        _.errorMessage should include(s"Round ${initialRound + 4} not found"),
       )
     }
 
@@ -118,9 +126,9 @@ class ScanTimeBasedIntegrationTest
       }
       advanceRoundsByOneTick
     }
-    clue("Round 4 should now be open, and have the new configuration") {
+    clue(s"Round ${initialRound + 4} should now be open, and have the new configuration") {
       eventuallySucceeds() {
-        sv1ScanBackend.getAmuletConfigForRound(4).holdingFee should be(
+        sv1ScanBackend.getAmuletConfigForRound(initialRound + 4).holdingFee should be(
           walletUsdToAmulet(newHoldingFee)
         )
       }
@@ -164,7 +172,9 @@ class ScanTimeBasedIntegrationTest
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
     })
-    clue("Some more transfers collect more rewards in round 5 (issued in round 1)")({
+    clue(
+      s"Some more transfers collect more rewards in round ${initialRound + 5} (issued in round ${initialRound + 1})"
+    )({
       advanceRoundsByOneTick
       p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobUserParty, 10.0)
       p2pTransfer(bobValidatorWalletClient, aliceWalletClient, aliceUserParty, 10.0)
@@ -183,7 +193,7 @@ class ScanTimeBasedIntegrationTest
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
       sv1ScanBackend.getRoundOfLatestData() shouldBe (expectedLastRound, ledgerTime)
       sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(
-        0,
+        initialRound,
         expectedLastRound,
       )
     }
@@ -218,7 +228,7 @@ class ScanTimeBasedIntegrationTest
       "Advance four more rounds, for the previous rounds to close (where rewards were collected)",
       Range(0, 4).foreach(_ => advanceRoundsByOneTick),
     )(
-      "Test leaderboards for ends of rounds 4 and 5",
+      s"Test leaderboards for ends of rounds ${initialRound + 4} and ${initialRound + 5}",
       _ => {
         val ledgerTime = getLedgerTime.toInstant
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
@@ -230,7 +240,7 @@ class ScanTimeBasedIntegrationTest
         val validatorRewardsBobR3 = BigDecimal(1.4000000000)
         val validatorRewardsAliceR3 = BigDecimal(1.2800000000)
 
-        (0 to baseRoundWithLatestData.toInt + 3).map { round =>
+        (baseRoundWithLatestData.toInt to baseRoundWithLatestData.toInt + 3).map { round =>
           sv1ScanBackend.getRewardsCollectedInRound(round.toLong)
         }.sum shouldBe appRewardsAliceR3 + appRewardsBobR3 + validatorRewardsAliceR3 + validatorRewardsBobR3
         val aliceValidatorWalletClientParty =
@@ -240,7 +250,7 @@ class ScanTimeBasedIntegrationTest
 
         clue("Compare leaderboard getTopProvidersByAppRewards + 3") {
           sv1ScanBackend
-            .listRoundPartyTotals(0, baseRoundWithLatestData + 3)
+            .listRoundPartyTotals(initialRound, baseRoundWithLatestData + 3)
             .map { rpt =>
               rpt.party -> (rpt.closedRound, BigDecimal(rpt.cumulativeAppRewards))
             }
@@ -262,7 +272,7 @@ class ScanTimeBasedIntegrationTest
         }
         clue("Compare leaderboard getTopValidatorsByValidatorRewards + 3") {
           sv1ScanBackend
-            .listRoundPartyTotals(0, baseRoundWithLatestData + 3)
+            .listRoundPartyTotals(initialRound + 0, baseRoundWithLatestData + 3)
             .map { rpt =>
               rpt.party -> (rpt.closedRound, BigDecimal(rpt.cumulativeValidatorRewards))
             }
@@ -311,41 +321,52 @@ class ScanTimeBasedIntegrationTest
 
     def roundNum() =
       sv1ScanBackend.getLatestOpenMiningRound(getLedgerTime).contract.payload.round.number
-    roundNum() shouldBe 1
+    roundNum() shouldBe (initialRound + 1)
 
     val tapRound1Amount = BigDecimal(500.0)
-    clue("Tap in round 1") {
+    clue(s"Tap in round ${initialRound + 1}") {
       aliceWalletClient.tap(tapRound1Amount)
     }
 
     advanceRoundsByOneTick
 
-    roundNum() shouldBe 2
+    roundNum() shouldBe (initialRound + 2)
 
     val tapRound2Amount = BigDecimal(500.0)
-    clue("Tap in round 2") {
+    clue(s"Tap in round ${initialRound + 2}") {
       bobWalletClient.tap(tapRound2Amount)
     }
 
     actAndCheck(
-      "advance to close round 2",
+      s"advance to close round ${initialRound + 2}",
       (0 to 4).foreach(_ => advanceRoundsByOneTick),
     )(
-      "check round 2 is closed",
+      s"check round ${initialRound + 2} is closed",
       _ => {
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
-        sv1ScanBackend.getRoundOfLatestData()._1 shouldBe 2
-        sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(0, 2)
+        sv1ScanBackend.getRoundOfLatestData()._1 shouldBe initialRound + 2
+        sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(
+          initialRound + 0,
+          initialRound + 2,
+        )
       },
     )
 
-    clue("Get total balances for round 0, 1 and 2") {
+    clue(
+      s"Get total balances for round ${initialRound + 0}, ${initialRound + 1} and ${initialRound + 2}"
+    ) {
       val total0 =
-        sv1ScanBackend.getTotalAmuletBalance(0).valueOrFail("Amulet balance not yet computed")
+        sv1ScanBackend
+          .getTotalAmuletBalance(initialRound + 0)
+          .valueOrFail("Amulet balance not yet computed")
       val total1 =
-        sv1ScanBackend.getTotalAmuletBalance(1).valueOrFail("Amulet balance not yet computed")
+        sv1ScanBackend
+          .getTotalAmuletBalance(initialRound + 1)
+          .valueOrFail("Amulet balance not yet computed")
       val total2 =
-        sv1ScanBackend.getTotalAmuletBalance(2).valueOrFail("Amulet balance not yet computed")
+        sv1ScanBackend
+          .getTotalAmuletBalance(initialRound + 2)
+          .valueOrFail("Amulet balance not yet computed")
 
       val holdingFeeAfterOneRound = 1 * defaultHoldingFeeAmulet
       val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeAmulet
@@ -356,20 +377,23 @@ class ScanTimeBasedIntegrationTest
         walletUsdToAmulet(tapRound1Amount) - holdingFeeAfterTwoRounds +
           walletUsdToAmulet(tapRound2Amount) - holdingFeeAfterOneRound
       )
-      sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(0, 2)
+      sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(
+        initialRound + 0,
+        initialRound + 2,
+      )
       sv1ScanBackend
-        .listRoundTotals(0, 2)
+        .listRoundTotals(initialRound + 0, initialRound + 2)
         .map(rt => (rt.closedRound, BigDecimal(rt.totalAmuletBalance))) shouldBe List(
-        0L -> total0,
-        1L -> total1,
-        2L -> total2,
+        initialRound + 0L -> total0,
+        initialRound + 1L -> total1,
+        initialRound + 2L -> total2,
       )
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundTotals(1, 3),
+        sv1ScanBackend.listRoundTotals(initialRound + 1, initialRound + 3),
         _.errorMessage should include("is outside of the available rounds range"),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundPartyTotals(1, 3),
+        sv1ScanBackend.listRoundPartyTotals(initialRound + 1, initialRound + 3),
         _.errorMessage should include("is outside of the available rounds range"),
       )
     }
@@ -396,29 +420,33 @@ class ScanTimeBasedIntegrationTest
     }
     clue("Try to get round totals for range where end is smaller than start") {
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundTotals(10, 9),
-        _.errorMessage should include("end_round 9 must be >= start_round 10"),
+        sv1ScanBackend.listRoundTotals(initialRound + 10, initialRound + 9),
+        _.errorMessage should include(
+          s"end_round ${initialRound + 9} must be >= start_round ${initialRound + 10}"
+        ),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundPartyTotals(10, 9),
-        _.errorMessage should include("end_round 9 must be >= start_round 10"),
+        sv1ScanBackend.listRoundPartyTotals(initialRound + 10, initialRound + 9),
+        _.errorMessage should include(
+          s"end_round ${initialRound + 9} must be >= start_round ${initialRound + 10}"
+        ),
       )
     }
     clue("Try to get too many round totals or round party totals") {
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundTotals(0, 200),
+        sv1ScanBackend.listRoundTotals(initialRound + 0, initialRound + 200),
         _.errorMessage should include(s"Cannot request more than 200 rounds at a time"),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundTotals(1, 201),
+        sv1ScanBackend.listRoundTotals(initialRound + 1, initialRound + 201),
         _.errorMessage should include(s"Cannot request more than 200 rounds at a time"),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundPartyTotals(0, 50),
+        sv1ScanBackend.listRoundPartyTotals(initialRound + 0, initialRound + 50),
         _.errorMessage should include(s"Cannot request more than 50 rounds at a time"),
       )
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.listRoundPartyTotals(1, 51),
+        sv1ScanBackend.listRoundPartyTotals(initialRound + 1, initialRound + 51),
         _.errorMessage should include(s"Cannot request more than 50 rounds at a time"),
       )
     }

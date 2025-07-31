@@ -8,6 +8,7 @@ import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
 import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
+import { commandScriptPath } from 'splice-pulumi-common/src/utils';
 
 import {
   chartPath,
@@ -23,8 +24,6 @@ import {
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   isDevNet,
-  MOCK_SPLICE_ROOT,
-  SPLICE_ROOT,
 } from '../../common';
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
@@ -41,8 +40,7 @@ function configureIstioBase(
   ns: k8s.core.v1.Namespace,
   istioDNamespace: k8s.core.v1.Namespace
 ): k8s.helm.v3.Release {
-  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/infra/migrate-istio.sh`;
+  const path = commandScriptPath('cluster/pulumi/infra/migrate-istio.sh');
   const migration = new local.Command(`migrate-istio-crds`, {
     create: path,
   });

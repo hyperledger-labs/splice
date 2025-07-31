@@ -29,13 +29,6 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
   ): Future[FeatureSupportResponse] = {
     withSpan(s"$workflowId.featureSupport") { implicit tc => _ =>
       for {
-        newGovernanceFlow <- packageVersionSupport
-          .supportsNewGovernanceFlow(
-            Seq(
-              party
-            ),
-            CantonTimestamp.now(),
-          )
         delegatelessAutomation <- packageVersionSupport
           .supportsDelegatelessAutomation(
             Seq(
@@ -44,8 +37,7 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
             CantonTimestamp.now(),
           )
       } yield FeatureSupportResponse(
-        newGovernanceFlow.supported,
-        delegatelessAutomation.supported && delegateAutomationEnvironmentFlag,
+        delegatelessAutomation.supported && delegateAutomationEnvironmentFlag
       )
     }
 
