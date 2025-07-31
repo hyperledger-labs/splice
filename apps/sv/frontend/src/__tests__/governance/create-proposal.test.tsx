@@ -8,6 +8,8 @@ import { ThemeProvider } from '@emotion/react';
 import { theme } from '../../../../../common/frontend/lib/theme';
 import { CreateProposal } from '../../routes/createProposal';
 import userEvent from '@testing-library/user-event';
+import { Wrapper } from '../helpers';
+import { createProposalActions } from '../../utils/governance';
 
 const TestWrapper: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
@@ -43,6 +45,34 @@ describe('Create Proposal', () => {
       expect(screen.getByText('Set Amulet Rules Configuration')).toBeTruthy();
       expect(screen.getByText('Update SV Reward Weight')).toBeTruthy();
     });
+  });
+
+  test('Update Reward Weight Form is rendered after action selection', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Wrapper>
+        <CreateProposal />
+      </Wrapper>
+    );
+
+    const actionDropdown = screen.getByTestId('select-action');
+
+    const selectInput = actionDropdown.querySelector('[role="combobox"]') as HTMLElement;
+    await user.click(selectInput);
+
+    await waitFor(async () => {
+      const actionToSelect = screen.getByText('Update SV Reward Weight');
+      expect(actionToSelect).toBeDefined();
+      await user.click(actionToSelect);
+    });
+
+    const nextButton = screen.getByText('Next');
+    await user.click(nextButton);
+
+    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
+    const action = createProposalActions.find(a => a.value === 'SRARC_UpdateSvRewardWeight');
+    expect(actionInput.getAttribute('value')).toBe(action!.value);
   });
 
   test('Display cancel and next buttons', () => {
