@@ -15,12 +15,10 @@
       }
     ]
   },
-  "description": "",
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "gnetId": 19665,
   "graphTooltip": 1,
-  "id": 94,
+  "id": 3423,
   "links": [
     {
       "asDropdown": false,
@@ -35,7 +33,6 @@
       "url": "https://k6.io/docs/results-output/real-time/prometheus-remote-write/"
     }
   ],
-  "liveNow": false,
   "panels": [
     {
       "collapsed": false,
@@ -66,8 +63,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -86,6 +82,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -97,7 +94,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -134,8 +131,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -158,6 +154,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -169,7 +166,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -207,8 +204,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -228,6 +224,7 @@
         "graphMode": "none",
         "justifyMode": "auto",
         "orientation": "auto",
+        "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [],
           "fields": "",
@@ -237,7 +234,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -278,6 +275,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -310,8 +308,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
-                "value": null
+                "color": "blue"
               }
             ]
           },
@@ -347,10 +344,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -374,12 +373,12 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(k6_accept_offer_latency_seconds[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_offer_sync_latency_seconds[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "accept",
+          "legendFormat": "sync",
           "range": true,
-          "refId": "B"
+          "refId": "C"
         },
         {
           "datasource": {
@@ -387,12 +386,12 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum(rate(k6_complete_transfer_latency_seconds[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_accept_offer_latency_seconds[$__rate_interval])))",
           "hide": false,
           "instant": false,
-          "legendFormat": "complete",
+          "legendFormat": "accept",
           "range": true,
-          "refId": "C"
+          "refId": "B"
         },
         {
           "datasource": {
@@ -428,8 +427,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
-                "value": null
+                "color": "red"
               },
               {
                 "color": "orange",
@@ -466,7 +464,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -508,6 +506,7 @@
             "axisSoftMax": 2,
             "axisSoftMin": 0,
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -541,8 +540,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -565,10 +563,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -591,8 +591,9 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "5s",
-  "schemaVersion": 39,
+  "schemaVersion": 41,
   "tags": [
     "prometheus",
     "k6"
@@ -601,33 +602,23 @@
     "list": [
       {
         "current": {
-          "selected": false,
           "text": "Prometheus",
           "value": "prometheus"
         },
         "description": "Choose a Prometheus Data Source",
-        "hide": 0,
         "includeAll": false,
         "label": "Prometheus DS",
-        "multi": false,
         "name": "DS_PROMETHEUS",
         "options": [],
         "query": "prometheus",
-        "queryValue": "",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
         "type": "datasource"
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "All"
-          ],
-          "value": [
-            "$__all"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
@@ -635,7 +626,6 @@
         },
         "definition": "label_values(testid)",
         "description": "Filter by \"testid\" tag. Define it by tagging: k6 run --tag testid=xyz",
-        "hide": 0,
         "includeAll": true,
         "label": "Test ID",
         "multi": true,
@@ -647,15 +637,11 @@
         },
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "isNone": true,
-          "selected": false,
-          "text": "None",
+          "text": "",
           "value": ""
         },
         "datasource": {
@@ -664,10 +650,8 @@
         },
         "definition": "metrics(k6_http_req_duration_)",
         "description": "Statistic for Trend Metrics Queries. The available options depend on the values of the K6_PROMETHEUS_RW_TREND_STATS setting.",
-        "hide": 0,
         "includeAll": false,
         "label": "Trend Metrics Query",
-        "multi": false,
         "name": "quantile_stat",
         "options": [],
         "query": {
@@ -676,21 +660,19 @@
         },
         "refresh": 2,
         "regex": "/http_req_duration_(min|max|count|sum|avg|med|p[0-9]+)/g",
-        "skipUrlSync": false,
         "sort": 2,
         "type": "query"
       },
       {
+        "baseFilters": [],
         "datasource": {
           "type": "prometheus",
           "uid": "${DS_PROMETHEUS}"
         },
         "description": "Adhoc filters are applied to all panels. To enable it, go to Dashboard Settings / Variables / adhoc_filter and select the target Prometheus data source.",
         "filters": [],
-        "hide": 0,
         "label": "AdhocFilter",
         "name": "adhoc_filter",
-        "skipUrlSync": false,
         "type": "adhoc"
       }
     ]
@@ -703,6 +685,5 @@
   "timezone": "",
   "title": "k6 Load Tester (custom metrics)",
   "uid": "ccbb2351-2ae2-462f-ae0e-f2c893ad1028",
-  "version": 5,
-  "weekStart": ""
+  "version": 1
 }
