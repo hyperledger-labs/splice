@@ -8,6 +8,16 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Helm
+
+  - The `splice-istio-gateway` Helm chart has been deprecated, and will be removed in a future release.
+    It has been replaced with explicit instructions in the :ref:`validator docs <helm-validator-ingress>`
+    and :ref:`SV docs <helm-sv-ingress>` on how to set up Istio ingress for the validator and SV nodes.
+
+
 0.4.9
 -----
 
