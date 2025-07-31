@@ -297,7 +297,7 @@ object SpliceUtil {
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingRequestTimeout
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
-    new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout
+    new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout (deprecated)
     new SynchronizerNodeConfigLimits(
       new CometBftConfigLimits(
         maxNumCometBftNodes, // maxNumCometBftNodes

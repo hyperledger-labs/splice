@@ -176,29 +176,6 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class CreateElectionRequest(
-      requester: String,
-      ranking: scala.collection.immutable.Vector[java.lang.String],
-  ) extends BaseCommand[http.CreateElectionRequestResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateElectionRequestResponse] =
-      client.createElectionRequest(
-        body = definitions.CreateElectionRequest(
-          requester,
-          ranking,
-        ),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.CreateElectionRequestResponse.OK =>
-      Right(())
-    }
-  }
   case class CreateVoteRequest(
       requester: String,
       action: ActionRequiringConfirmation,

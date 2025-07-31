@@ -48,7 +48,7 @@ class TriggerMetrics(
       name = prefix :+ "attempted",
       summary = "Number of trigger tasks that were attempted",
       description =
-        "This metric measures the total number of tasks attempted by the trigger, labeled with statusCode, errorCodeId and isDsoDelegateTrigger.",
+        "This metric measures the total number of tasks attempted by the trigger, labeled with statusCode, and errorCodeId.",
       qualification = Traffic,
     )
   )(MetricsContext.Empty)

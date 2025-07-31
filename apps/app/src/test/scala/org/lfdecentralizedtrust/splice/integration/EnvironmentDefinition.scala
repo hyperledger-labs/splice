@@ -206,13 +206,6 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withoutDsoDelegateReplacement: EnvironmentDefinition =
-    addConfigTransform((_, config) =>
-      ConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.enableDsoDelegateReplacementTrigger).replace(false)
-      )(config)
-    )
-
   def withHttpSettingsForHigherThroughput: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       config.copy(pekkoConfig =

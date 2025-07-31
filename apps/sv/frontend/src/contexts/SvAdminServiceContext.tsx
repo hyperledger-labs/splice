@@ -11,9 +11,7 @@ import React, { useContext, useMemo } from 'react';
 import {
   CastVoteRequest,
   createConfiguration,
-  CreateElectionRequest,
   CreateVoteRequest,
-  GetElectionRequestResponse,
   ListAmuletPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
@@ -43,8 +41,6 @@ export interface SvAdminProps {
 
 export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
-  getElectionRequest: () => Promise<GetElectionRequestResponse>;
-  createElectionRequest: (requester: string, ranking: string[]) => Promise<void>;
   createVoteRequest: (
     requester: string,
     action: ActionRequiringConfirmation,
@@ -106,16 +102,6 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
     return {
       isAuthorized: async (): Promise<void> => {
         return await svAdminClient.isAuthorized();
-      },
-      getElectionRequest: async (): Promise<GetElectionRequestResponse> => {
-        return await svAdminClient.getElectionRequest();
-      },
-      createElectionRequest: async (requester, ranking: string[]): Promise<void> => {
-        const request: CreateElectionRequest = {
-          requester,
-          ranking,
-        };
-        return await svAdminClient.createElectionRequest(request);
       },
       createVoteRequest: async (
         requester,

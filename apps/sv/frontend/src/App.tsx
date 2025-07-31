@@ -30,7 +30,6 @@ import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import { SvAppVotesHooksProvider } from './contexts/SvAppVotesHooksContext';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
-import Delegate from './routes/delegate';
 import Dso from './routes/dso';
 import Root from './routes/root';
 import ValidatorOnboarding from './routes/validatorOnboarding';
@@ -99,7 +98,6 @@ const App: React.FC = () => {
           <Route path="governance-beta/proposals" element={<Governance />} />
           <Route path="governance-beta/proposals/create" element={<CreateProposal />} />
           <Route path="governance-beta/proposals/:contractId" element={<VoteRequestDetails />} />
-          <Route path="delegate" element={<Delegate />} />
         </Route>
       </Route>
     )

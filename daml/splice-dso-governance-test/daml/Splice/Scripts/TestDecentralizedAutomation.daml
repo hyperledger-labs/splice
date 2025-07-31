@@ -5,13 +5,13 @@ module Splice.Scripts.TestDecentralizedAutomation where
 
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.List
+import DA.List()
 import qualified DA.Map as Map
-import qualified DA.Set as Set
+import DA.Set()
 import Daml.Script
 import DA.Time
 
-import Splice.Round
+import Splice.Round()
 import Splice.Types
 import Splice.Amulet
 import Splice.AmuletRules
@@ -27,104 +27,6 @@ import Splice.Ans
 import Splice.Scripts.AnsRulesParameters
 import Splice.Scripts.TestTransferPreapproval
 import Splice.Wallet.Subscriptions
-
-
--- Automation DSO delegate election
------------------------------
-
-unitTestDsoDelegateElectionVoting : Script ()
-unitTestDsoDelegateElectionVoting = do
-  let rankings =
-        [ ("A",   ["A",   "D", "B", "bad"])
-        , ("B",   ["B",   "D", "A", "bad"])
-        , ("bad", ["bad", "D", "A", "B"  ])
-        ]
-  let votes = tallyVotes (map snd rankings) (VotingState Map.empty Set.empty)
-  let candidates = sortOn snd
-        [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList votes.rankings ]
-  let winner = instantRunOffVoting 2 2 rankings
-  trace (votes, candidates, winner) $
-    instantRunOffVoting 2 2 rankings === "B"
-
-
-testDsoDelegateElection : Script ()
-testDsoDelegateElection = do
-
-  (app, dso, (mallory, sv2, sv3, sv4)) <- initMainNet
-
-  -- run an issuance
-  runNextIssuanceD app 1.0
-
-  -- mallory stops acting, which the others detect; they thus request a re-election
-  [(dsoRulesCid, _)] <- query @DsoRules dso
-  req1 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
-    requester = sv2
-    ranking = [sv2, sv3, sv4, mallory]
-    reason = ERR_DsoDelegateUnavailable
-  req2 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
-    requester = sv3
-    ranking = [sv3, sv4, sv2, mallory]
-    reason = ERR_DsoDelegateUnavailable
-  req3 <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
-    requester = sv4
-    ranking = [sv4, sv3, sv2, mallory]
-    reason = ERR_DsoDelegateUnavailable
-  -- mallory tries to get himself re-elected
-  req4 <- submitMulti [mallory] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
-    requester = mallory
-    ranking = [mallory, sv2, sv3, sv4]
-    reason = ERR_DsoDelegateUnavailable
-  -- mallory does not get re-elected, as sv1 reaches a weak majority first
-  _ <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectDsoDelegate with
-    actor = sv3
-    requestCids = [req1.electionRequestCid, req2.electionRequestCid, req3.electionRequestCid, req4.electionRequestCid]
-
-  [(_, dsoRules)] <- query @DsoRules dso
-  require "SV2 got elected" (dsoRules.dsoDelegate == sv2)
-
-  -- run a few more issuances
-  runNextIssuanceD app 1.1
-  runNextIssuanceD app 1.2
-
-  openRounds <- map snd <$> query @OpenMiningRound app.dso
-
-  -- wow! stuff works :D
-  trace openRounds $ return ()
-
-
--- | An example of an impersonation attack on the DSO delegate election protected for
--- via checked fetches.
-testDsoDelegateElection_ImpersonationAttack : Script ()
-testDsoDelegateElection_ImpersonationAttack = do
-  (_app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
-
-  -- SV2 attempts to get himself elected w/o any action from the others
-  -- by impersonating the DSO party
-  [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
-  let epoch = dsoRules.epoch
-  req1 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
-    dso = sv2
-    epoch
-    requester = sv2
-    ranking = [sv2, sv3, sv4, sv1]
-    reason = ERR_DsoDelegateUnavailable
-  req2 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
-    dso = sv2
-    epoch
-    requester = sv3
-    ranking = [sv2, sv3, sv4, sv1]
-    reason = ERR_DsoDelegateUnavailable
-  req3 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
-    dso = sv2
-    epoch
-    requester = sv4
-    ranking = [sv2, sv4, sv3, sv1]
-    reason = ERR_DsoDelegateUnavailable
-
-  -- sv2 has created enough requests and submits them
-  submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectDsoDelegate with
-    actor = sv2
-    requestCids = [req1, req2, req3]
 
 
 testUnclaimedRewardsMerging : Script ()

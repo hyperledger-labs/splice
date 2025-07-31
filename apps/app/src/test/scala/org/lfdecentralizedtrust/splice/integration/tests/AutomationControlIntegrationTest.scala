@@ -49,7 +49,7 @@ class AutomationControlIntegrationTest
         .max
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    // Note: using `def`, as the trigger may be destroyed and recreated
     def trigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 

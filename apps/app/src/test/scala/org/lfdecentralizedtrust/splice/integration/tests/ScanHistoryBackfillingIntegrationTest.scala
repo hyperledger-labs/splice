@@ -81,7 +81,7 @@ class ScanHistoryBackfillingIntegrationTest
     val tapAmount = com.digitalasset.daml.lf.data.Numeric.assertFromString("42.0")
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    // Note: using `def`, as the trigger may be destroyed and recreated
     def advanceRoundsTrigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 

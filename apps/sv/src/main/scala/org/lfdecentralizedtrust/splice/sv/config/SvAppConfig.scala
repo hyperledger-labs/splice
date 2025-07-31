@@ -142,12 +142,12 @@ object SvOnboardingConfig {
         )
       }
 
-      assertPackageVersion(amuletVersion, DarResources.amulet_0_1_8)
-      assertPackageVersion(amuletNameServiceVersion, DarResources.amuletNameService_0_1_8)
-      assertPackageVersion(dsoGovernanceVersion, DarResources.dsoGovernance_0_1_11)
-      assertPackageVersion(validatorLifecycleVersion, DarResources.validatorLifecycle_0_1_2)
-      assertPackageVersion(walletVersion, DarResources.wallet_0_1_8)
-      assertPackageVersion(walletPaymentsVersion, DarResources.walletPayments_0_1_8)
+      assertPackageVersion(amuletVersion, DarResources.amulet_0_1_9)
+      assertPackageVersion(amuletNameServiceVersion, DarResources.amuletNameService_0_1_9)
+      assertPackageVersion(dsoGovernanceVersion, DarResources.dsoGovernance_0_1_13)
+      assertPackageVersion(validatorLifecycleVersion, DarResources.validatorLifecycle_0_1_3)
+      assertPackageVersion(walletVersion, DarResources.wallet_0_1_9)
+      assertPackageVersion(walletPaymentsVersion, DarResources.walletPayments_0_1_9)
 
       new InitialPackageConfig(
         amuletVersion,
@@ -299,9 +299,8 @@ case class SvAppBackendConfig(
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
     topologyChangeDelayDuration: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMillis(250),
-    delegatelessAutomation: Boolean = true,
-    expectedTaskDuration: Long = 5000, // milliseconds
-    expiredRewardCouponBatchSize: Int = 100,
+    delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
+    delegatelessAutomationExpiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
     // Skip synchronizer initialization and synchronizer config reconciliation.
     // Can be safely set to true for an SV that has completed onboarding unless you

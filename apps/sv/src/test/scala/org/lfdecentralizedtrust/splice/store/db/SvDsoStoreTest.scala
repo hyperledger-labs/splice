@@ -27,7 +27,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycont
   ANSRARC_RejectEntryInitialPayment,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.electionrequestreason.ERR_OtherReason
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddSv,
   SRARC_OffboardSv,
@@ -166,16 +165,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       noise = Seq(svOnboardingConfirmed("bad", userParty(2), "bad-pid")),
     )(
       _.lookupSvOnboardingConfirmedByNameWithOffset("good")
-    )
-    lookupTests("lookupElectionRequestByRequesterWithOffset")(
-      create = electionRequest(userParty(1), epoch = 1),
-      noise = Seq(
-        electionRequest(userParty(2), epoch = 2),
-        electionRequest(userParty(1), epoch = 2),
-        electionRequest(userParty(2), epoch = 1),
-      ),
-    )(
-      _.lookupElectionRequestByRequesterWithOffset(userParty(1), epoch = 1)
     )
     val now = Instant.now()
     val timeInThePast = now.truncatedTo(ChronoUnit.MICROS).minusSeconds(3600)
@@ -969,59 +958,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listElectionRequests" should {
-
-      "return all election requests for the given dsoRules" in {
-        import scala.jdk.CollectionConverters.*
-        val goodDsoRules = dsoRules(
-          svs = (1 to 3)
-            .map { n =>
-              userParty(n).toProtoPrimitive -> svInfo(n.toString)
-            }
-            .toMap
-            .asJava,
-          epoch = 1,
-        )
-        val goodElectionRequests =
-          (1 to 3).map(n => electionRequest(userParty(n) /*member of good dsorules*/, epoch = 1))
-        val electionRequestOtherMember = electionRequest(userParty(666), epoch = 1)
-        val electionRequestOtherEpoch = electionRequest(userParty(1), epoch = 2)
-
-        for {
-          store <- mkStore()
-          _ <- MonadUtil.sequentialTraverse(
-            goodElectionRequests :+ electionRequestOtherMember :+ electionRequestOtherEpoch
-          )(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.listElectionRequests(AssignedContract(goodDsoRules, dummyDomain))(
-            traceContext
-          )
-        } yield {
-          result should contain theSameElementsAs goodElectionRequests
-        }
-      }
-
-    }
-
-    "listExpiredElectionRequests" should {
-
-      "return all election requests with a smaller epoch than provided" in {
-        val electionRequests = (1 to 5).map(n => electionRequest(userParty(n), epoch = n.toLong))
-
-        for {
-          store <- mkStore()
-          _ <- MonadUtil.sequentialTraverse(electionRequests)(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.listExpiredElectionRequests(epoch = 4)(traceContext)
-        } yield {
-          result should contain theSameElementsAs electionRequests.take(3)
-        }
-      }
-
-    }
-
     "listExpiredAnsSubscriptions" should {
 
       "return all entries where subscription_next_payment_due_at < now" in {
@@ -1332,15 +1268,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def svInfo(name: String) = {
-    new SvInfo(
-      name,
-      new Round(1L),
-      789L,
-      s"PAR::${name}::12345",
-    )
-  }
-
   private def memberTraffic(
       member: Member,
       synchronizerId: SynchronizerId,
@@ -1360,22 +1287,6 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     contract(
       MemberTraffic.TEMPLATE_ID_WITH_PACKAGE_ID,
       new MemberTraffic.ContractId(nextCid()),
-      template,
-    )
-  }
-
-  private def electionRequest(requester: PartyId, epoch: Long) = {
-    val template = new ElectionRequest(
-      dsoParty.toProtoPrimitive,
-      requester.toProtoPrimitive,
-      epoch,
-      new ERR_OtherReason("test"),
-      Collections.emptyList(),
-    )
-
-    contract(
-      ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID,
-      new ElectionRequest.ContractId(nextCid()),
       template,
     )
   }
