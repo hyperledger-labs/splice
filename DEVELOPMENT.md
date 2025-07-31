@@ -402,6 +402,27 @@ and click on `Run workflow`. Select the branch of your PR and the
 splice version you want to test compatibility against and input the
 commit sha of your branch.
 
+## Deprecating old Daml code and removing Support Code
+
+To keep our code clean and remove unused logic which makes code harder
+to reason about, increases maintenance effort and makes code audits
+harder, we periodically increase the minimum Daml version that we
+still support.
+
+Our rule for doing so is that we wait for a Daml version to be
+*effective on mainnet for one month* before bumping the minimum
+supported version and cleaning up associated code. Note that this rule
+assumes that the removal is not user facing, e.g., it won't break app
+devs or validator operators. If you are unsure about that, discuss it
+with the other splice maintainers.
+
+To bump the minimum version, go to `DarResources.scala` and edit the
+`minimumInitialization` field in the respective
+`PackageResource`. After doing that you can trigger CI. All the
+version checks from from `PackageVersionSupport` will warn for checks
+that are now redundant because the version they are testing against is
+now redundant so you can delete them and the code relying on them.
+
 # Troubleshooting
 
 ## Nix Issues on MacOS
