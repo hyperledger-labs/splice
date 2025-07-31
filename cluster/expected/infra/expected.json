@@ -543,10 +543,13 @@
     "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
       "compat": "true",
-      "name": "cluster-ingress-cluster-gateway",
-      "namespace": "cluster-ingress"
+      "maxHistory": 10,
+      "name": "cluster-gateway",
+      "namespace": "cluster-ingress",
+      "timeout": 600,
+      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
     },
-    "name": "cluster-ingress-cluster-gateway",
+    "name": "cluster-gateway",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },

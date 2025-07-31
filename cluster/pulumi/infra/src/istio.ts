@@ -474,14 +474,18 @@ function configureGateway(
     version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
   };
   const chart = chartPath('splice-dummy', version);
-  const gatewayChart = new k8s.helm.v3.Release(`cluster-gateway`, {
-    name: `${ingressNs.logicalName}-cluster-gateway`,
-    namespace: ingressNs.ns.metadata.name,
-    chart,
-    version: version.version,
-    timeout: HELM_CHART_TIMEOUT_SEC,
-    maxHistory: HELM_MAX_HISTORY_SIZE,
-  });
+  const gatewayChart = new k8s.helm.v3.Release(
+    `cluster-gateway`,
+    {
+      name: `cluster-gateway`,
+      namespace: ingressNs.ns.metadata.name,
+      chart,
+      version: version.version,
+      timeout: HELM_CHART_TIMEOUT_SEC,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
+    },
+    { deleteBeforeReplace: true }
+  );
 
   const hosts = [
     getDnsNames().cantonDnsName,
