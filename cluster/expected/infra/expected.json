@@ -611,13 +611,8 @@
       },
       "spec": {
         "selector": {
-<<<<<<< HEAD
-          "app": "istio-ingress",
-          "istio": "ingress"
-=======
           "app": "istio-ingress-cometbft",
           "istio": "ingress-cometbft"
->>>>>>> 1549f31f7 ([static] works)
         },
         "servers": [
           {
@@ -646,49 +641,6 @@
               "*"
             ],
             "port": {
-<<<<<<< HEAD
-=======
-              "name": "cometbft-0-1-gw",
-              "number": 26016,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-0-2-gw",
-              "number": 26026,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-0-3-gw",
-              "number": 26036,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-0-4-gw",
-              "number": 26046,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
->>>>>>> 1549f31f7 ([static] works)
               "name": "cometbft-1-0-gw",
               "number": 26106,
               "protocol": "TCP"
@@ -699,49 +651,6 @@
               "*"
             ],
             "port": {
-<<<<<<< HEAD
-=======
-              "name": "cometbft-1-1-gw",
-              "number": 26116,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-1-2-gw",
-              "number": 26126,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-1-3-gw",
-              "number": 26136,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-1-4-gw",
-              "number": 26146,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
->>>>>>> 1549f31f7 ([static] works)
               "name": "cometbft-2-0-gw",
               "number": 26206,
               "protocol": "TCP"
@@ -752,49 +661,6 @@
               "*"
             ],
             "port": {
-<<<<<<< HEAD
-=======
-              "name": "cometbft-2-1-gw",
-              "number": 26216,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-2-2-gw",
-              "number": 26226,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-2-3-gw",
-              "number": 26236,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-2-4-gw",
-              "number": 26246,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
->>>>>>> 1549f31f7 ([static] works)
               "name": "cometbft-3-0-gw",
               "number": 26306,
               "protocol": "TCP"
@@ -805,96 +671,10 @@
               "*"
             ],
             "port": {
-<<<<<<< HEAD
-=======
-              "name": "cometbft-3-1-gw",
-              "number": 26316,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-3-2-gw",
-              "number": 26326,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-3-3-gw",
-              "number": 26336,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-3-4-gw",
-              "number": 26346,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
->>>>>>> 1549f31f7 ([static] works)
               "name": "cometbft-4-0-gw",
               "number": 26406,
               "protocol": "TCP"
             }
-<<<<<<< HEAD
-=======
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-4-1-gw",
-              "number": 26416,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-4-2-gw",
-              "number": 26426,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-4-3-gw",
-              "number": 26436,
-              "protocol": "TCP"
-            }
-          },
-          {
-            "hosts": [
-              "*"
-            ],
-            "port": {
-              "name": "cometbft-4-4-gw",
-              "number": 26446,
-              "protocol": "TCP"
-            }
->>>>>>> 1549f31f7 ([static] works)
           }
         ]
       }
@@ -977,10 +757,6 @@
         "servers": [
           {
             "hosts": [
-<<<<<<< HEAD
-=======
-              "public.mock.network.canton.global",
->>>>>>> 1549f31f7 ([static] works)
               "public.mock.global.canton.network.digitalasset.com"
             ],
             "port": {
@@ -994,10 +770,6 @@
           },
           {
             "hosts": [
-<<<<<<< HEAD
-=======
-              "public.mock.network.canton.global",
->>>>>>> 1549f31f7 ([static] works)
               "public.mock.global.canton.network.digitalasset.com"
             ],
             "port": {
@@ -1006,11 +778,7 @@
               "protocol": "HTTPS"
             },
             "tls": {
-<<<<<<< HEAD
               "credentialName": "cn-test-stacknet-tls",
-=======
-              "credentialName": "cn-test-stacknet-public-tls",
->>>>>>> 1549f31f7 ([static] works)
               "mode": "SIMPLE"
             }
           }
@@ -1461,25 +1229,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "grafana-service-account-token-secret",
-        "namespace": "observability"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
-      }
-    },
-    "name": "grafana-service-account-token-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "VirtualService",
       "metadata": {
@@ -1520,41 +1269,6 @@
     "name": "grafana-virtual-service",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "grafana-sa-token",
-      "serviceAccountId": "undefined_id"
-    },
-    "name": "grafanaSAToken",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:grafana::grafana::undefined_id",
-    "type": "grafana:index/serviceAccountToken:ServiceAccountToken"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "role": "Editor"
-    },
-    "name": "grafanaSA",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:grafana::grafana::undefined_id",
-    "type": "grafana:index/serviceAccount:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "auth": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "cn-admin:grafana-keys-admin-password"
-      },
-      "url": "https://public.mock.global.canton.network.digitalasset.com/grafana"
-    },
-    "name": "grafana",
-    "provider": "",
-    "type": "pulumi:providers:grafana"
   },
   {
     "custom": true,
@@ -1913,124 +1627,34 @@
               "targetPort": 443
             },
             {
+              "name": "cometbft-0-0-gw",
+              "port": 26006,
+              "protocol": "TCP",
+              "targetPort": 26006
+            },
+            {
+              "name": "cometbft-1-0-gw",
+              "port": 26106,
+              "protocol": "TCP",
+              "targetPort": 26106
+            },
+            {
+              "name": "cometbft-2-0-gw",
+              "port": 26206,
+              "protocol": "TCP",
+              "targetPort": 26206
+            },
+            {
               "name": "cometbft-3-0-gw",
               "port": 26306,
               "protocol": "TCP",
               "targetPort": 26306
             },
             {
-              "name": "cometbft-3-1-gw",
-              "port": 26316,
-              "protocol": "TCP",
-              "targetPort": 26316
-            },
-            {
-              "name": "cometbft-3-2-gw",
-              "port": 26326,
-              "protocol": "TCP",
-              "targetPort": 26326
-            },
-            {
-              "name": "cometbft-3-3-gw",
-              "port": 26336,
-              "protocol": "TCP",
-              "targetPort": 26336
-            },
-            {
-              "name": "cometbft-3-4-gw",
-              "port": 26346,
-              "protocol": "TCP",
-              "targetPort": 26346
-            },
-            {
-              "name": "cometbft-3-5-gw",
-              "port": 26356,
-              "protocol": "TCP",
-              "targetPort": 26356
-            },
-            {
-              "name": "cometbft-3-6-gw",
-              "port": 26366,
-              "protocol": "TCP",
-              "targetPort": 26366
-            },
-            {
-              "name": "cometbft-3-7-gw",
-              "port": 26376,
-              "protocol": "TCP",
-              "targetPort": 26376
-            },
-            {
-              "name": "cometbft-3-8-gw",
-              "port": 26386,
-              "protocol": "TCP",
-              "targetPort": 26386
-            },
-            {
-              "name": "cometbft-3-9-gw",
-              "port": 26396,
-              "protocol": "TCP",
-              "targetPort": 26396
-            },
-            {
               "name": "cometbft-4-0-gw",
               "port": 26406,
               "protocol": "TCP",
               "targetPort": 26406
-            },
-            {
-              "name": "cometbft-4-1-gw",
-              "port": 26416,
-              "protocol": "TCP",
-              "targetPort": 26416
-            },
-            {
-              "name": "cometbft-4-2-gw",
-              "port": 26426,
-              "protocol": "TCP",
-              "targetPort": 26426
-            },
-            {
-              "name": "cometbft-4-3-gw",
-              "port": 26436,
-              "protocol": "TCP",
-              "targetPort": 26436
-            },
-            {
-              "name": "cometbft-4-4-gw",
-              "port": 26446,
-              "protocol": "TCP",
-              "targetPort": 26446
-            },
-            {
-              "name": "cometbft-4-5-gw",
-              "port": 26456,
-              "protocol": "TCP",
-              "targetPort": 26456
-            },
-            {
-              "name": "cometbft-4-6-gw",
-              "port": 26466,
-              "protocol": "TCP",
-              "targetPort": 26466
-            },
-            {
-              "name": "cometbft-4-7-gw",
-              "port": 26476,
-              "protocol": "TCP",
-              "targetPort": 26476
-            },
-            {
-              "name": "cometbft-4-8-gw",
-              "port": 26486,
-              "protocol": "TCP",
-              "targetPort": 26486
-            },
-            {
-              "name": "cometbft-4-9-gw",
-              "port": 26496,
-              "protocol": "TCP",
-              "targetPort": 26496
             }
           ]
         },

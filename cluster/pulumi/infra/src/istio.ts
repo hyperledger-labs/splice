@@ -217,14 +217,17 @@ function configureCometBFTGatewayService(
   istiod: k8s.helm.v3.Release
 ) {
   const externalIPRanges = loadIPRanges(true);
-  // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
-    .map(m => m.id)
-    .flatMap((domain: number) => {
-      return Array.from(Array(10).keys()).map(node => {
-        return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
-      });
-    });
+  const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
+  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // and support easily deploying without refreshing the infra stack.
+  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+
+  const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
+    migration =>
+      Array.from({ length: numSVs }, (_, node) => node).map(node =>
+        ingressPort(`cometbft-${migration}-${node}-gw`, cometBFTExternalPort(migration, node))
+      )
+  );
   return configureGatewayService(
     ingressNs,
     ingressIp,
@@ -594,8 +597,8 @@ function configureGateway(
       },
       spec: {
         selector: {
-          app: 'istio-ingress',
-          istio: 'ingress',
+          app: 'istio-ingress-cometbft',
+          istio: 'ingress-cometbft',
         },
         servers: [
           {
@@ -610,7 +613,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [gwSvc, gatewayChart],
+      dependsOn: [cometBftSvc, gatewayChart],
     }
   );
 
