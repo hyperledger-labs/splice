@@ -50,36 +50,9 @@ runs:
       with:
         additional_nix_args: "--keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD ${{ inputs.additional_nix_args }}"
         cmd: |
-            # To understand issues with protoc failure to execute, remove this when https://github.com/DACH-NY/cn-test-failures/issues/5129 is resolved.
-            # Remove this see https://github.com/DACH-NY/canton-network-internal/issues/1109
-            echo -e "#!/usr/bin/env bash\necho TMP EXEC WORKS" > /tmp/test.sh
-            chmod +x /tmp/test.sh
-            echo "Copied test.sh and changed permissions:"
-            ls -l /tmp/test.sh
-            if [ -x /tmp/test.sh ]; then
-              echo "test.sh is executable"
-            else
-              echo "test.sh is NOT executable"
-            fi
-            
-            echo "Attempting to execute /tmp/test.sh..."
-            /tmp/test.sh
-            EXEC_RESULT=$?
-            if [ $EXEC_RESULT -ne 0 ]; then
-              echo "Execution failed with exit code $EXEC_RESULT"
-              if grep ' /tmp ' /proc/mounts | grep noexec; then
-                echo "/tmp is mounted with noexec; cannot execute scripts from /tmp."
-              else
-                echo "/tmp is NOT mounted with noexec, reason for failure may be different."
-              fi
-            else
-              echo "Successfully executed /tmp/test.sh"
-            fi
-            # Cleanup
-            rm -f /tmp/test.sh
-            
+            # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
+            export PROTOCBRIDGE_NO_CLEANUP="1"
             # just set tmpdir to a place where we can write and execute, to fix protoc execution issue: https://github.com/DACH-NY/cn-test-failures/issues/5129
-            # if above debug fails, but protoc succeeds, then we can remove the debugging code above
             mkdir -p "${HOME}/tmp"
             ABS_TMP_DIR="${HOME}/tmp"
             export SBT_OPTS="${SBT_OPTS} -Djava.io.tmpdir=${ABS_TMP_DIR}"
