@@ -227,14 +227,15 @@ class ScanTotalSupplyBigQueryIntegrationTest
     )
     // TODO (#1713) aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
 
+    aliceParty shouldBe aliceParty // TODO (#1713) still needed?
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     actAndCheck(
       "Lock amulet",
       lockAmulets(
         aliceValidatorBackend,
-        aliceParty,
         aliceValidatorParty,
-        aliceWalletClient.list().amulets,
+        aliceValidatorParty,
+        aliceValidatorWalletClient.list().amulets,
         lockedAmount,
         sv1ScanBackend,
         java.time.Duration.ofHours(1),
@@ -246,7 +247,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     )
 
     // burn fees
-    val transferAmount = BigDecimal("100000")
+    val transferAmount = BigDecimal("1000")
     p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, transferAmount)
   }
 
