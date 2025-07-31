@@ -477,7 +477,7 @@ function configureGateway(
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'Gateway',
       metadata: {
-        name: 'cn-http-gateway',
+        name: 'cn-http-gateway-pulumi',
         namespace: ingressNs.ns.metadata.name,
       },
       spec: {
@@ -540,7 +540,7 @@ function configureGateway(
       apiVersion: 'networking.istio.io/v1alpha3',
       kind: 'Gateway',
       metadata: {
-        name: 'cn-apps-gateway',
+        name: 'cn-apps-gateway-pulumi',
         namespace: ingressNs.ns.metadata.name,
       },
       spec: {
@@ -571,7 +571,7 @@ function configureGateway(
       },
       spec: {
         selector: {
-          app: 'istio-ingress-public',
+          app: 'istio-ingress-public-pulumi',
           istio: 'ingress-public',
         },
         servers: [
@@ -609,6 +609,105 @@ function configureGateway(
   return [httpGw, appsGw, publicGw];
 }
 
+function configureDocsAndReleases(enableGcsProxy: boolean, publicDocs: boolean): undefined {
+  const gcsProxyPath: {
+    match: { port: number; uri?: { prefix: string } }[];
+    route: { destination: { port: { number: number }; host: string } }[];
+  }[] = enableGcsProxy
+    ? [
+        {
+          match: [
+            {
+              port: 443,
+              uri: {
+                prefix: '/cn-release-bundles',
+              },
+            },
+          ],
+          route: [
+            {
+              destination: {
+                port: {
+                  number: 8080,
+                },
+                host: 'gcs-proxy.docs.svc.cluster.local',
+              },
+            },
+          ],
+        },
+      ]
+    : [];
+  new k8s.apiextensions.CustomResource('cluster-docs-releases', {
+    apiVersion: 'networking.istio.io/v1alpha3',
+    kind: 'VirtualService',
+    metadata: {
+      name: 'cluster-docs-releases-pulumi',
+      namespace: 'cluster-ingress',
+    },
+    spec: {
+      hosts: [getDnsNames().cantonDnsName].concat(
+        CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [getDnsNames().daDnsName] : []
+      ),
+      gateways: ['cn-http-gateway'],
+      http: gcsProxyPath.concat([
+        {
+          match: [
+            {
+              port: 443,
+            },
+          ],
+          route: [
+            {
+              destination: {
+                port: {
+                  number: 80,
+                },
+                host: 'docs.docs.svc.cluster.local',
+              },
+            },
+          ],
+        },
+      ]),
+    },
+  });
+
+  if (publicDocs) {
+    new k8s.apiextensions.CustomResource('cluster-docs-public', {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'VirtualService',
+      metadata: {
+        name: 'cluster-docs-public-pulumi',
+        namespace: 'cluster-ingress',
+      },
+      spec: {
+        hosts: [`docs.${getDnsNames().cantonDnsName}`].concat(
+          CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [`docs.${getDnsNames().daDnsName}`] : []
+        ),
+        gateways: ['cn-public-http-gateway'],
+        http: [
+          {
+            match: [
+              {
+                port: 443,
+              },
+            ],
+            route: [
+              {
+                destination: {
+                  port: {
+                    number: 80,
+                  },
+                  host: 'docs.docs.svc.cluster.local',
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+  }
+}
+
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
@@ -624,6 +723,7 @@ export function configureIstio(
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
   const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
+  configureDocsAndReleases(true, spliceConfig.pulumiProjectConfig.hasPublicDocs);
   return configureGateway(ingressNs, gwSvc, publicGwSvc);
 }
 
