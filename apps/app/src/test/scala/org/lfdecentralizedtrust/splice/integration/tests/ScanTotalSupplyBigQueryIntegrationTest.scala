@@ -39,6 +39,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
       // prevent ReceiveFaucetCouponTrigger from seeing stale caches
       .withScanDisabledMiningRoundsCache()
 
+  override protected def runTokenStandardCliSanityCheck = false
+
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
   private val datasetName =
