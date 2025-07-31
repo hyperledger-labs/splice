@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.environment.{
   RetryProvider,
   SpliceLedgerClient,
 }
+import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.Bft
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.{
   DomainScans,
@@ -224,7 +225,7 @@ class BftScanConnectionTest
   val notFoundCommandFailure = HttpCommandException(
     HttpRequest(),
     StatusCodes.NotFound,
-    "Whatever thing was not found",
+    HttpCommandException.ErrorResponseBody(ErrorResponse("Whatever thing was not found")),
   )
   val partyIdA = PartyId.tryFromProtoPrimitive("whatever::a")
   val partyIdB = PartyId.tryFromProtoPrimitive("whatever::b")

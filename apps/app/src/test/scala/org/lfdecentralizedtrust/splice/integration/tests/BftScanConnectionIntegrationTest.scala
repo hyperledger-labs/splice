@@ -1,17 +1,29 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.splice.http.v0.wallet as http
+import org.lfdecentralizedtrust.splice.http.v0.wallet.AcceptTokenStandardTransferResponse
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTest
 import org.lfdecentralizedtrust.splice.util.{SvTestUtil, WalletTestUtil}
-import com.digitalasset.canton.logging.SuppressionRule
-import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1.TransferInstruction
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.GetTransferInstructionAcceptContextResponse
+import org.lfdecentralizedtrust.tokenstandard.transferinstruction.v1.definitions.GetChoiceContextRequest
 import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-class BftScanConnectionIntegrationTest extends IntegrationTest with WalletTestUtil with SvTestUtil {
+class BftScanConnectionIntegrationTest
+    extends IntegrationTest
+    with WalletTestUtil
+    with SvTestUtil
+    with HasExecutionContext
+    with HasActorSystem {
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -75,20 +87,72 @@ class BftScanConnectionIntegrationTest extends IntegrationTest with WalletTestUt
 
     aliceValidatorBackend.startSync()
 
-    val fakeCid = "00" + s"01" * 31 + "42"
+    val fakeCid = new TransferInstruction.ContractId("00" + s"01" * 31 + "42")
 
-    loggerFactory.assertThrowsAndLogsSeq[CommandFailure](
-      aliceValidatorWalletClient.acceptTokenStandardTransfer(
-        new TransferInstruction.ContractId(fakeCid)
-      ),
-      entries => {
-        forAll(entries)(_.message should not include "Consensus not reached")
-        forExactly(1, entries)(
-          _.message should include(
-            "HTTP 404 Not Found"
-          ).and(include(s"AmuletTransferInstruction '$fakeCid' not found"))
-        )
-      },
+    val singleScanClient = transferinstruction.v1.Client
+      .httpClient(
+        Http().singleRequest(_),
+        s"http://${sv1ScanBackend.config.adminApi.address}:${sv1ScanBackend.config.adminApi.port.unwrap}",
+      )
+
+    val singleScanResponse =
+      singleScanClient
+        .getTransferInstructionAcceptContext(fakeCid.contractId, GetChoiceContextRequest(None))
+        .value
+        .futureValue
+
+    val bftClient = transferinstruction.v1.Client
+      .httpClient(
+        Http().singleRequest(_),
+        s"http://${aliceValidatorBackend.config.adminApi.address}:${aliceValidatorBackend.config.adminApi.port.unwrap}/api/validator/v0/scan-proxy",
+      )
+    val bftResponse = bftClient
+      .getTransferInstructionAcceptContext(
+        fakeCid.contractId,
+        GetChoiceContextRequest(None),
+        List(
+          Authorization(
+            OAuth2BearerToken(aliceValidatorBackend.token.valueOrFail("No token found"))
+          )
+        ),
+      )
+      .value
+      .futureValue
+
+    inside((bftResponse, singleScanResponse)) {
+      case (
+            Right(err1),
+            Right(err2),
+          ) =>
+        err1 should be(err2)
+    }
+
+    val walletClient = http.WalletClient.httpClient(
+      Http().singleRequest(_),
+      s"http://${aliceValidatorBackend.config.adminApi.address}:${aliceValidatorBackend.config.adminApi.port.unwrap}",
     )
+
+    val endpointThatUsesBftCallResult =
+      walletClient
+        .acceptTokenStandardTransfer(
+          fakeCid.contractId,
+          List(
+            Authorization(
+              OAuth2BearerToken(aliceValidatorBackend.token.valueOrFail("No token found"))
+            )
+          ),
+        )
+        .value
+        .futureValue
+
+    inside((endpointThatUsesBftCallResult, singleScanResponse)) {
+      case (
+            Right(AcceptTokenStandardTransferResponse.NotFound(err1)),
+            Right(GetTransferInstructionAcceptContextResponse.NotFound(err2)),
+          ) =>
+        // still different types...
+        err1.error should be(err2.error)
+    }
   }
+
 }
