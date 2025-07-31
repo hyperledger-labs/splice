@@ -13,11 +13,13 @@ import {
   chartPath,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
+  CnChartVersion,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
   GCP_ZONE,
   getDnsNames,
+  HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   isDevNet,
@@ -467,13 +469,18 @@ function configureGateway(
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
   // TODO: remove this once we migrated to this everywhere
-  const gatewayChart = new k8s.helm.v3.Release(`${ingressNs.logicalName}-cluster-gateway`, {
+  const version: CnChartVersion = {
+    type: 'remote',
+    version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
+  };
+  const chart = chartPath('splice-dummy', version);
+  const gatewayChart = new k8s.helm.v3.Release(`cluster-gateway`, {
     name: `${ingressNs.logicalName}-cluster-gateway`,
     namespace: ingressNs.ns.metadata.name,
-    chart: chartPath('splice-dummy', {
-      type: 'remote',
-      version: '0.4.10-itai-dirty',
-    }),
+    chart,
+    version: version.version,
+    timeout: HELM_CHART_TIMEOUT_SEC,
+    maxHistory: HELM_MAX_HISTORY_SIZE,
   });
 
   const hosts = [
