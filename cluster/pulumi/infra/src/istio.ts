@@ -466,7 +466,7 @@ function configureGateway(
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
-  // TODO: remove this once we migrated to this everywhere
+  // TODO(#1766): remove this once we migrated to this everywhere
   const version: CnChartVersion = {
     type: 'remote',
     version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',

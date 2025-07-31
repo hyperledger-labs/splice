@@ -5,11 +5,35 @@ import * as pulumi from '@pulumi/pulumi';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
 import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 
-import { isDevNet } from '../../common';
+import { chartPath, CnChartVersion, isDevNet } from '../../common';
 import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';
-import { CLUSTER_HOSTNAME, ExactNamespace } from './utils';
+import {
+  CLUSTER_HOSTNAME,
+  ExactNamespace,
+  HELM_CHART_TIMEOUT_SEC,
+  HELM_MAX_HISTORY_SIZE,
+} from './utils';
 
 export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
+  // TODO(#1776): remove this once we migrated to this everywhere
+  const version: CnChartVersion = {
+    type: 'remote',
+    version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
+  };
+  const chart = chartPath('splice-dummy', version);
+  const dummyLoopbackRelease = new k8s.helm.v3.Release(
+    `${namespace.logicalName}-loopback`,
+    {
+      name: `cluster-gateway`,
+      namespace: namespace.ns.metadata.name,
+      chart,
+      version: version.version,
+      timeout: HELM_CHART_TIMEOUT_SEC,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
+    },
+    { deleteBeforeReplace: true }
+  );
+
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
   // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
@@ -56,7 +80,7 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
         resolution: 'DNS',
       },
     },
-    { dependsOn: [namespace.ns] }
+    { dependsOn: [namespace.ns, dummyLoopbackRelease] }
   );
 
   const svHosts = Array.from({ length: numSVs }, (_, i) =>
@@ -140,7 +164,7 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
         ],
       },
     },
-    { dependsOn: [namespace.ns] }
+    { dependsOn: [namespace.ns, dummyLoopbackRelease] }
   );
 
   return [serviceEntry, virtualService];

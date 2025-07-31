@@ -4449,6 +4449,22 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "cluster-gateway",
+      "namespace": "multi-validator",
+      "timeout": 600,
+      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
+    },
+    "name": "multi-validator-loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "length": 16,
       "overrideSpecial": "_%@",
       "special": true
