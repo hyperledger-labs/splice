@@ -315,7 +315,6 @@ class JoiningNodeInitializer(
         decentralizedSynchronizerId,
         dsoAutomation,
         svAutomation,
-        packageVersionSupport,
       )
     } yield {
       (
@@ -334,7 +333,6 @@ class JoiningNodeInitializer(
       decentralizedSynchronizer: SynchronizerId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
-      packageVersionSupport: PackageVersionSupport,
       skipTrafficReconciliationTriggers: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
@@ -346,7 +344,6 @@ class JoiningNodeInitializer(
       clock,
       retryProvider,
       logger,
-      packageVersionSupport,
     )
     for {
       _ <- retryProvider.waitUntil(

@@ -11,7 +11,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SynchronizerNodeConfig,
 }
 import org.lfdecentralizedtrust.splice.environment.{
-  PackageVersionSupport,
   RetryFor,
   RetryProvider,
   SpliceLedgerConnection,
@@ -41,7 +40,6 @@ class SynchronizerNodeReconciler(
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
-    packageVersionSupport: PackageVersionSupport,
 ) {
 
   private val svParty = dsoStore.key.svParty
@@ -85,22 +83,12 @@ class SynchronizerNodeReconciler(
         case SynchronizerNodeState.Onboarding =>
           false
       }
-      legacySequencerConfigFeatureSupport <- packageVersionSupport.supportsLegacySequencerConfig(
-        Seq(
-          dsoParty,
-          svParty,
-        ),
-        clock.now,
-      )
-
       updatedSequencerConfigUpdate =
-        if (legacySequencerConfigFeatureSupport.supported)
           updateLegacySequencerConfig(
             existingLegacySequencerConfig,
             existingSequencerConfig,
-            legacyMigrationId,
+            legacyMigrationId
           )
-        else Left(())
       _ = ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
         existingSequencerConfig,
         localSequencerConfig,
@@ -129,7 +117,6 @@ class SynchronizerNodeReconciler(
             )
             connection
               .submit(Seq(svParty), Seq(dsoParty), cmd)
-              .withPreferredPackage(legacySequencerConfigFeatureSupport.packageIds)
               .noDedup
               .yieldResult()
           }

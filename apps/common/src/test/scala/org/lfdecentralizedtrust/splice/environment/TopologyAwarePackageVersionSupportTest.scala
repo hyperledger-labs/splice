@@ -43,7 +43,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
       featureName: String,
       requiredDar: DarResource,
       featureCheck: (Seq[PartyId], CantonTimestamp) => Future[FeatureSupport],
-      extraPackageNames: Seq[String] = Seq.empty,
+      extraPackageNames: Seq[String],
   ): Unit = {
     val requiredPackageName = requiredDar.metadata.name
     val requiredVersion = requiredDar.metadata.version
@@ -122,12 +122,6 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
   "TopologyAwarePackageVersionSupport" should {
 
     testFeatureSupport(
-      "ValidatorLicenseActivity",
-      DarResources.amulet_0_1_3,
-      packageVersionSupport.supportsValidatorLicenseActivity,
-    )
-
-    testFeatureSupport(
       "MergeDuplicatedValidatorLicense",
       DarResources.dsoGovernance_0_1_8,
       // We use the same parties for amulet and dso governance. The interesting part about using different parties is the response from the
@@ -136,30 +130,6 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
         packageVersionSupport.supportsMergeDuplicatedValidatorLicense(parties, parties, at)
       },
       extraPackageNames = Seq(DarResources.amulet_0_1_8.metadata.name),
-    )
-
-    testFeatureSupport(
-      "LegacySequencerConfig",
-      DarResources.dsoGovernance_0_1_7,
-      packageVersionSupport.supportsLegacySequencerConfig,
-    )
-
-    testFeatureSupport(
-      "ValidatorLivenessActivityRecord",
-      DarResources.amulet_0_1_5,
-      packageVersionSupport.supportsValidatorLivenessActivityRecord,
-    )
-
-    testFeatureSupport(
-      "DsoRulesCreateExternalPartyAmuletRules",
-      DarResources.dsoGovernance_0_1_9,
-      packageVersionSupport.supportsDsoRulesCreateExternalPartyAmuletRules,
-    )
-
-    testFeatureSupport(
-      "NewGovernanceFlow",
-      DarResources.dsoGovernance_0_1_11,
-      packageVersionSupport.supportsNewGovernanceFlow,
     )
   }
 }

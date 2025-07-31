@@ -309,7 +309,6 @@ class SV1Initializer(
       withDsoStore = new WithDsoStore(
         dsoAutomation,
         decentralizedSynchronizer,
-        packageVersionSupport,
       )
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
@@ -563,7 +562,6 @@ class SV1Initializer(
   private class WithDsoStore(
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       synchronizerId: SynchronizerId,
-      packageVersionSupport: PackageVersionSupport,
   ) {
 
     private val dsoStore = dsoStoreWithIngestion.store
@@ -576,7 +574,6 @@ class SV1Initializer(
       clock = clock,
       retryProvider = retryProvider,
       logger = logger,
-      packageVersionSupport,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly

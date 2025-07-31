@@ -4,7 +4,6 @@ import { useScanClient } from '@lfdecentralizedtrust/splice-common-frontend/scan
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 
 export const useFeatureSupport = (): UseQueryResult<{
-  newGovernanceFlow: boolean;
   delegatelessAutomation: boolean;
 }> => {
   const scanClient = useScanClient();
@@ -13,7 +12,6 @@ export const useFeatureSupport = (): UseQueryResult<{
     queryFn: async () => {
       const result = await scanClient.featureSupport();
       return {
-        newGovernanceFlow: result.new_governance_flow,
         delegatelessAutomation: result.delegateless_automation,
       };
     },

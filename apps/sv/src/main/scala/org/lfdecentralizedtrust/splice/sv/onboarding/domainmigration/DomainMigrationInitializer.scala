@@ -234,7 +234,6 @@ class DomainMigrationInitializer(
         dsoAutomationService,
         svAutomation,
         skipTrafficReconciliationTriggers = true,
-        packageVersionSupport = packageVersionSupport,
       )
       _ <- migrationDump.participantUsers match {
         case Some(participantUsersData) => {

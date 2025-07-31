@@ -30,18 +30,6 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
-  def supportsValidatorLicenseActivity(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceAmulet,
-      now,
-      DarResources.amulet,
-      DarResources.amulet_0_1_3,
-    )
-  }
-
   def supportsMergeDuplicatedValidatorLicense(
       dsoGovernanceParties: Seq[PartyId],
       amuletParties: Seq[PartyId],
@@ -57,54 +45,9 @@ trait PackageVersionSupport extends NamedLogging {
       now,
       DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_8,
-    )
-  }
-
-  def supportsLegacySequencerConfig(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_7,
-    )
-  }
-
-  def supportsValidatorLivenessActivityRecord(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceAmulet,
-      now,
-      DarResources.amulet,
-      DarResources.amulet_0_1_5,
-    )
-  }
-
-  def supportsDsoRulesCreateExternalPartyAmuletRules(parties: Seq[PartyId], now: CantonTimestamp)(
-      implicit tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_9,
-    )
-  }
-
-  def supportsNewGovernanceFlow(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_11,
+      ignoreRedundantCheck = true,
+      // ValidatorLicense contracts can stick around for parties that are no longer on the network and don't upgrade beyond the minimum version.
+      // Without the version check our trigger currently gets confused.
     )
   }
 
@@ -152,20 +95,22 @@ trait PackageVersionSupport extends NamedLogging {
       packageId: PackageIdResolver.Package,
       at: CantonTimestamp,
       packageResource: PackageResource,
-      dar: DarResource,
+    dar: DarResource,
+    ignoreRedundantCheck: Boolean = false,
   )(implicit tc: TraceContext): Future[FeatureSupport] =
-    isDarSupported(Seq(packageId -> parties), at, packageResource, dar)
+    isDarSupported(Seq(packageId -> parties), at, packageResource, dar, ignoreRedundantCheck)
 
   private def isDarSupported(
       packageRequirements: Seq[(PackageIdResolver.Package, Seq[PartyId])],
       at: CantonTimestamp,
       packageResource: PackageResource,
-      dar: DarResource,
+    dar: DarResource,
+    ignoreRedundantCheck : Boolean,
   )(implicit tc: TraceContext): Future[FeatureSupport] = {
     require(packageRequirements.exists(_._1.packageName == dar.metadata.name))
     require(packageRequirements.forall(_._2.nonEmpty))
     require(packageResource.minimumInitialization.metadata.name == dar.metadata.name)
-    if (packageResource.minimumInitialization.metadata.version >= dar.metadata.version) {
+    if (!ignoreRedundantCheck && packageResource.minimumInitialization.metadata.version >= dar.metadata.version) {
       logger.warn(
         s"Package version check for ${dar.metadata.name} at version ${dar.metadata.version} is redundant, minimum version: ${packageResource.minimumInitialization.metadata.version}"
       )

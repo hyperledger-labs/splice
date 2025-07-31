@@ -842,7 +842,6 @@ class ValidatorApp(
         config.contactPoint,
         initialSynchronizerTime,
         loggerFactory,
-        packageVersionSupport,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
