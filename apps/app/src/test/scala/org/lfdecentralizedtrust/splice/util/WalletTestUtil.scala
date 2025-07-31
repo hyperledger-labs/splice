@@ -1291,6 +1291,7 @@ trait WalletTestUtil extends TestCommon with AnsTestUtil {
     val packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
       synchronizerId,
       userValidator.validatorAutomation.connection,
+      loggerFactory,
     )
     val partiesOfInterest = Seq(
       userValidator.getValidatorPartyId(),

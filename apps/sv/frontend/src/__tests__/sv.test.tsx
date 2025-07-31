@@ -248,7 +248,6 @@ describe('UI adjusts to delegateless feature', () => {
       rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
         return res(
           ctx.json<FeatureSupportResponse>({
-            new_governance_flow: true,
             delegateless_automation: false,
           })
         );
@@ -263,7 +262,6 @@ describe('UI adjusts to delegateless feature', () => {
       rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
         return res(
           ctx.json<FeatureSupportResponse>({
-            new_governance_flow: true,
             delegateless_automation: true,
           })
         );

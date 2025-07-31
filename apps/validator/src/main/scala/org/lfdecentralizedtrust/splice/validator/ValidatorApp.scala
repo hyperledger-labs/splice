@@ -755,6 +755,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
       walletManagerOpt =
         if (config.enableWallet) {
@@ -841,7 +842,6 @@ class ValidatorApp(
         config.contactPoint,
         initialSynchronizerTime,
         loggerFactory,
-        packageVersionSupport,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
@@ -905,6 +905,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
 
       adminHandler =

@@ -199,6 +199,7 @@ class DomainMigrationInitializer(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
         svAutomation.connection,
+        loggerFactory,
       )
       dsoAutomationService =
         new SvDsoAutomationService(
@@ -233,7 +234,6 @@ class DomainMigrationInitializer(
         dsoAutomationService,
         svAutomation,
         skipTrafficReconciliationTriggers = true,
-        packageVersionSupport = packageVersionSupport,
       )
       _ <- migrationDump.participantUsers match {
         case Some(participantUsersData) => {

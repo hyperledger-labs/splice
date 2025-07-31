@@ -416,6 +416,7 @@ class SvApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection,
+        loggerFactory,
       )
 
       (_, _, isDevNet, _, _, _) <- (

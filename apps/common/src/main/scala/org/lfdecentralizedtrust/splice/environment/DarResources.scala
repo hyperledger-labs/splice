@@ -16,30 +16,37 @@ object DarResources {
   object TokenStandard {
     val tokenMetadata = PackageResource(
       DarResource(s"splice-api-token-metadata-v1-current.dar"),
+      DarResource(s"splice-api-token-metadata-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-metadata-v1-1.0.0.dar")),
     )
     val tokenHolding = PackageResource(
       DarResource(s"splice-api-token-holding-v1-current.dar"),
+      DarResource(s"splice-api-token-holding-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-holding-v1-1.0.0.dar")),
     )
     val tokenTransferInstruction = PackageResource(
       DarResource(s"splice-api-token-transfer-instruction-v1-current.dar"),
+      DarResource(s"splice-api-token-transfer-instruction-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-transfer-instruction-v1-1.0.0.dar")),
     )
     val tokenAllocation = PackageResource(
       DarResource(s"splice-api-token-allocation-v1-current.dar"),
+      DarResource(s"splice-api-token-allocation-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-allocation-v1-1.0.0.dar")),
     )
     val tokenAllocationRequest = PackageResource(
       DarResource(s"splice-api-token-allocation-request-v1-current.dar"),
+      DarResource(s"splice-api-token-allocation-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-allocation-request-v1-1.0.0.dar")),
     )
     val tokenAllocationInstruction = PackageResource(
       DarResource(s"splice-api-token-allocation-instruction-v1-current.dar"),
+      DarResource(s"splice-api-token-allocation-instruction-v1-1.0.0.dar"),
       Seq(DarResource(s"splice-api-token-allocation-instruction-v1-1.0.0.dar")),
     )
     val tokenTestTradingApp = PackageResource(
       DarResource(s"splice-token-test-trading-app-current.dar"),
+      DarResource(s"splice-token-test-trading-app-1.0.0.dar"),
       Seq(DarResource(s"splice-token-test-trading-app-1.0.0.dar")),
     )
     val allProductionPackageResources = Seq(
@@ -69,6 +76,7 @@ object DarResources {
   val amulet_current = DarResource("splice-amulet-current.dar")
   val amulet = PackageResource(
     amulet_current,
+    amulet_0_1_8,
     Seq(
       amulet_0_1_0,
       amulet_0_1_1,
@@ -106,6 +114,7 @@ object DarResources {
   val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_current,
+    dsoGovernance_0_1_11,
     Seq(
       dsoGovernance_0_1_0,
       dsoGovernance_0_1_1,
@@ -143,6 +152,7 @@ object DarResources {
   val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val amuletNameService = PackageResource(
     amuletNameService_current,
+    amuletNameService_0_1_8,
     Seq(
       amuletNameService_0_1_0,
       amuletNameService_0_1_1,
@@ -176,6 +186,7 @@ object DarResources {
   val splitwell_current = DarResource("splitwell-current.dar")
   val splitwell = PackageResource(
     splitwell_current,
+    splitwell_0_1_8,
     Seq(
       splitwell_0_1_0,
       splitwell_0_1_1,
@@ -209,6 +220,7 @@ object DarResources {
   val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_current,
+    wallet_0_1_8,
     Seq(
       wallet_0_1_0,
       wallet_0_1_1,
@@ -242,6 +254,7 @@ object DarResources {
   val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   val walletPayments = PackageResource(
     walletPayments_current,
+    walletPayments_0_1_8,
     Seq(
       walletPayments_0_1_0,
       walletPayments_0_1_1,
@@ -268,6 +281,7 @@ object DarResources {
   val validatorLifecycle_current = DarResource("splice-validator-lifecycle-current.dar")
   val validatorLifecycle = PackageResource(
     validatorLifecycle_current,
+    validatorLifecycle_0_1_2,
     Seq(
       validatorLifecycle_0_1_0,
       validatorLifecycle_0_1_1,
@@ -280,6 +294,7 @@ object DarResources {
 
   val featuredApp = PackageResource(
     DarResource("splice-api-featured-app-v1-current.dar"),
+    DarResource("splice-api-featured-app-v1-1.0.0.dar"),
     Seq(DarResource("splice-api-featured-app-v1-1.0.0.dar")),
   )
 
@@ -322,6 +337,7 @@ object DarResources {
   */
 final case class PackageResource(
     bootstrap: DarResource, // Used during bootstrapping or testing where we can assume a fixed package id.
+    minimumInitialization: DarResource, // The minimum version that can be used for initialization of a fresh network
     others: Seq[DarResource], // Other DARs for the same package
 ) {
   def getPackageIdWithVersion(version: String): Option[String] = {

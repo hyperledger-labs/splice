@@ -244,6 +244,7 @@ class ScanApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         appInitConnection,
+        loggerFactory,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
