@@ -296,6 +296,7 @@ class SV1Initializer(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection,
+        loggerFactory,
       )
       dsoAutomation = newSvDsoAutomationService(
         svStore,

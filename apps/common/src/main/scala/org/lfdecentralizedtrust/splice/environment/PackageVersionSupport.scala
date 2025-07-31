@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
@@ -15,7 +16,7 @@ import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.Feature
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait PackageVersionSupport {
+trait PackageVersionSupport extends NamedLogging {
 
   def supportsDelegatelessAutomation(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
@@ -24,6 +25,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
       now,
+      DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_13,
     )
   }
@@ -31,7 +33,13 @@ trait PackageVersionSupport {
   def supportsValidatorLicenseActivity(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
-    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_3)
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      DarResources.amulet,
+      DarResources.amulet_0_1_3,
+    )
   }
 
   def supportsMergeDuplicatedValidatorLicense(
@@ -47,6 +55,7 @@ trait PackageVersionSupport {
         (PackageIdResolver.Package.SpliceAmulet -> amuletParties),
       ),
       now,
+      DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_8,
     )
   }
@@ -58,6 +67,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
       now,
+      DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_7,
     )
   }
@@ -65,7 +75,13 @@ trait PackageVersionSupport {
   def supportsValidatorLivenessActivityRecord(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
-    isDarSupported(parties, PackageIdResolver.Package.SpliceAmulet, now, DarResources.amulet_0_1_5)
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceAmulet,
+      now,
+      DarResources.amulet,
+      DarResources.amulet_0_1_5,
+    )
   }
 
   def supportsDsoRulesCreateExternalPartyAmuletRules(parties: Seq[PartyId], now: CantonTimestamp)(
@@ -75,6 +91,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
       now,
+      DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_9,
     )
   }
@@ -86,6 +103,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceDsoGovernance,
       now,
+      DarResources.dsoGovernance,
       DarResources.dsoGovernance_0_1_11,
     )
   }
@@ -97,6 +115,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceWallet,
       now,
+      DarResources.wallet,
       // this is the first version implementing the token standard
       DarResources.wallet_0_1_9,
     )
@@ -109,6 +128,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceWallet,
       now,
+      DarResources.wallet,
       // this is when the description field was added to transfer preapprovals
       DarResources.wallet_0_1_9,
     )
@@ -121,6 +141,7 @@ trait PackageVersionSupport {
       parties,
       PackageIdResolver.Package.SpliceAmulet,
       now,
+      DarResources.amulet,
       // this is when the expectedDsoParty was added to all choices granted to users on AmuletRules and ExternalAmuletRules
       DarResources.amulet_0_1_11,
     )
@@ -130,17 +151,25 @@ trait PackageVersionSupport {
       parties: Seq[PartyId],
       packageId: PackageIdResolver.Package,
       at: CantonTimestamp,
+      packageResource: PackageResource,
       dar: DarResource,
   )(implicit tc: TraceContext): Future[FeatureSupport] =
-    isDarSupported(Seq(packageId -> parties), at, dar)
+    isDarSupported(Seq(packageId -> parties), at, packageResource, dar)
 
   private def isDarSupported(
       packageRequirements: Seq[(PackageIdResolver.Package, Seq[PartyId])],
       at: CantonTimestamp,
+      packageResource: PackageResource,
       dar: DarResource,
   )(implicit tc: TraceContext): Future[FeatureSupport] = {
     require(packageRequirements.exists(_._1.packageName == dar.metadata.name))
     require(packageRequirements.forall(_._2.nonEmpty))
+    require(packageResource.minimumInitialization.metadata.name == dar.metadata.name)
+    if (packageResource.minimumInitialization.metadata.version >= dar.metadata.version) {
+      logger.warn(
+        s"Package version check for ${dar.metadata.name} at version ${dar.metadata.version} is redundant, minimum version: ${packageResource.minimumInitialization.metadata.version}"
+      )
+    }
     isPackageSupported(packageRequirements, at, dar.metadata)
   }
 
@@ -157,6 +186,7 @@ trait PackageVersionSupport {
 class TopologyAwarePackageVersionSupport private[environment] (
     synchronizerId: SynchronizerId,
     connection: BaseLedgerConnection,
+    protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends PackageVersionSupport {
 
@@ -203,8 +233,9 @@ object PackageVersionSupport {
   def createPackageVersionSupport(
       synchronizerId: SynchronizerId,
       connection: BaseLedgerConnection,
+      loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext): PackageVersionSupport = {
-    new TopologyAwarePackageVersionSupport(synchronizerId, connection)
+    new TopologyAwarePackageVersionSupport(synchronizerId, connection, loggerFactory)
 
   }
 }

@@ -142,12 +142,18 @@ object SvOnboardingConfig {
         )
       }
 
-      assertPackageVersion(amuletVersion, DarResources.amulet_0_1_8)
-      assertPackageVersion(amuletNameServiceVersion, DarResources.amuletNameService_0_1_8)
-      assertPackageVersion(dsoGovernanceVersion, DarResources.dsoGovernance_0_1_11)
-      assertPackageVersion(validatorLifecycleVersion, DarResources.validatorLifecycle_0_1_2)
-      assertPackageVersion(walletVersion, DarResources.wallet_0_1_8)
-      assertPackageVersion(walletPaymentsVersion, DarResources.walletPayments_0_1_8)
+      assertPackageVersion(amuletVersion, DarResources.amulet.minimumInitialization)
+      assertPackageVersion(
+        amuletNameServiceVersion,
+        DarResources.amuletNameService.minimumInitialization,
+      )
+      assertPackageVersion(dsoGovernanceVersion, DarResources.dsoGovernance.minimumInitialization)
+      assertPackageVersion(
+        validatorLifecycleVersion,
+        DarResources.validatorLifecycle.minimumInitialization,
+      )
+      assertPackageVersion(walletVersion, DarResources.wallet.minimumInitialization)
+      assertPackageVersion(walletPaymentsVersion, DarResources.walletPayments.minimumInitialization)
 
       new InitialPackageConfig(
         amuletVersion,

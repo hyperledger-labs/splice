@@ -199,6 +199,7 @@ class DomainMigrationInitializer(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
         svAutomation.connection,
+        loggerFactory,
       )
       dsoAutomationService =
         new SvDsoAutomationService(

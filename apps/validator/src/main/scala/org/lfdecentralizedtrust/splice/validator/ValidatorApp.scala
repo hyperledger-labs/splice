@@ -755,6 +755,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
       walletManagerOpt =
         if (config.enableWallet) {
@@ -905,6 +906,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
 
       adminHandler =

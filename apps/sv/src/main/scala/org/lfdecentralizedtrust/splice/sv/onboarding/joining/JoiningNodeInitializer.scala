@@ -224,6 +224,7 @@ class JoiningNodeInitializer(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
         svAutomation.connection,
+        loggerFactory,
       )
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {

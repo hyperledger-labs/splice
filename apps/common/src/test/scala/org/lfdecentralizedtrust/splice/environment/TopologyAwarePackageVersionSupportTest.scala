@@ -18,6 +18,7 @@ class TopologyAwarePackageVersionSupportTest extends BaseTest with AnyWordSpecLi
   private val packageVersionSupport = new TopologyAwarePackageVersionSupport(
     synchronizerId,
     connectionMock,
+    loggerFactory,
   )(ExecutionContext.global)
 
   private val party1 = PartyId.tryFromProtoPrimitive("party1::default")
