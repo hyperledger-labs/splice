@@ -541,6 +541,19 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
+      "compat": "true",
+      "name": "cluster-ingress-cluster-gateway",
+      "namespace": "cluster-ingress"
+    },
+    "name": "cluster-ingress-cluster-gateway",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {

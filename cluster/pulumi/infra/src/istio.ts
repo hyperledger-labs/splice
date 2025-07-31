@@ -466,20 +466,15 @@ function configureGateway(
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
-
   // TODO: remove this once we migrated to this everywhere
-  const gatewayChart = new k8s.helm.v3.Release(
-    `${ingressNs.logicalName}-cluster-gateway`,
-    {
-      name: `${ingressNs.logicalName}-cluster-gateway`,
-      namespace: ingressNs.ns.metadata.name,
-      chart: chartPath('splice-dummy', {
-        type: 'remote',
-        version: '0.4.10-itai-dirty'
-      }),
-    }
-  )
-
+  const gatewayChart = new k8s.helm.v3.Release(`${ingressNs.logicalName}-cluster-gateway`, {
+    name: `${ingressNs.logicalName}-cluster-gateway`,
+    namespace: ingressNs.ns.metadata.name,
+    chart: chartPath('splice-dummy', {
+      type: 'remote',
+      version: '0.4.10-itai-dirty',
+    }),
+  });
 
   const hosts = [
     getDnsNames().cantonDnsName,
