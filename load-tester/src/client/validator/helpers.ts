@@ -46,7 +46,7 @@ export function sendAndWaitForTransferOffer(
       );
 
       const syncOfferTime = Date.now();
-      offerSyncLatency.add(syncOfferTime - createdOfferTime)
+      offerSyncLatency.add(syncOfferTime - createdOfferTime);
 
       if (receivingOffer) {
         receiver.v0.wallet.acceptTransferOffer(receivingOffer.contract_id);
