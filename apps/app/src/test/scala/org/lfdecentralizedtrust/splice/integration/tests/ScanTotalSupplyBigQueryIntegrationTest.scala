@@ -57,8 +57,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("1000000")
-  private val lockedAmount = BigDecimal("200000")
+  private val mintedAmount = BigDecimal("26046.0426105176")
+  private val lockedAmount = BigDecimal("5000")
   private val burnedAmount = BigDecimal("304")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
   private val unmintedAmount = BigDecimal("149927.0015223501")
