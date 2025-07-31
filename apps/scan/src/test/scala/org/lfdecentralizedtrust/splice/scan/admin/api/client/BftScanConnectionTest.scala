@@ -13,6 +13,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}
 import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.*
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorWithHttpCode
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules as amuletrulesCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -220,6 +221,11 @@ class BftScanConnectionTest
       entity = HttpEntity(ContentTypes.`application/json`, """{"error":"not_found"}"""),
     )
   )
+  val notFoundCommandFailure = HttpCommandException(
+    HttpRequest(),
+    StatusCodes.NotFound,
+    "Whatever thing was not found",
+  )
   val partyIdA = PartyId.tryFromProtoPrimitive("whatever::a")
   val partyIdB = PartyId.tryFromProtoPrimitive("whatever::b")
 
@@ -251,14 +257,24 @@ class BftScanConnectionTest
 
     "forward the failure if the agreement is a failure" in {
       val connections = getMockedConnections(n = 4)
-      connections.foreach(makeMockReturn(_, partyIdA))
       val bft = getBft(connections)
 
       connections.foreach(makeMockFail(_, notFoundFailure))
 
       for {
         failure <- bft.getDsoPartyId().failed
-      } yield failure should be(failure)
+      } yield failure should be(notFoundFailure)
+    }
+
+    "forward the failure if the agreement is a command failure" in {
+      val connections = getMockedConnections(n = 4)
+      val bft = getBft(connections)
+
+      connections.foreach(makeMockFail(_, notFoundCommandFailure))
+
+      for {
+        failure <- bft.getDsoPartyId().failed
+      } yield failure should be(notFoundCommandFailure)
     }
 
     "fail when consensus cannot be reached" in {
