@@ -753,7 +753,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
 
     def doCall() = {
       sv1ScanBackend.getAcsSnapshot(
-        dsoParty,
+        PartyId.tryCreate("rate-limit-party", dsoParty.namespace),
         None,
       )
     }
@@ -778,13 +778,14 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
           }
         } futureValue
 
-      results.count(identity) should be(
-        // 20 is the limit from where the rate limiter starts to kick in
-        // then 20 every second
-        // first second is 20 (full capacity) + 10 (capacity added after consumption)
-        // then 20 every second
-        110 +- 20
-      )
+      // 20 is the limit from where the rate limiter starts to kick in
+      // then 20 every second
+      // first second is 20 (full capacity) + 20 (capacity added after consumption)
+      // then 20 every second
+      val maxAccepted = 120
+      // account for bursts in the stream used to rate limit the calls in `runRateLimited`
+      val minAccepted = 80
+      results.count(identity) should (be >= minAccepted and be <= maxAccepted)
 
     }
 
