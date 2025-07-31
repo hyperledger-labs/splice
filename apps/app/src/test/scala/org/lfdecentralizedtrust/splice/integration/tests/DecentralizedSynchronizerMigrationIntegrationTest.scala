@@ -1188,7 +1188,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
               withClueAndLog(s"SVs have $initialRound as initial round") {
                 Seq(sv1LocalBackend, sv2LocalBackend).foreach { sv =>
-                  sv.getDsoInfo().initialRound shouldBe initialRound.toString
+                  sv.getDsoInfo().initialRound shouldBe Some(initialRound.toString)
                 }
               }
 

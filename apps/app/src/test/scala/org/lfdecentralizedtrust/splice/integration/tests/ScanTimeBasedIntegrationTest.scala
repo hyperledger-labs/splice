@@ -240,7 +240,7 @@ class ScanTimeBasedIntegrationTest
         val validatorRewardsBobR3 = BigDecimal(1.4000000000)
         val validatorRewardsAliceR3 = BigDecimal(1.2800000000)
 
-        (0 to baseRoundWithLatestData.toInt + 3).map { round =>
+        (baseRoundWithLatestData.toInt to baseRoundWithLatestData.toInt + 3).map { round =>
           sv1ScanBackend.getRewardsCollectedInRound(round.toLong)
         }.sum shouldBe appRewardsAliceR3 + appRewardsBobR3 + validatorRewardsAliceR3 + validatorRewardsBobR3
         val aliceValidatorWalletClientParty =

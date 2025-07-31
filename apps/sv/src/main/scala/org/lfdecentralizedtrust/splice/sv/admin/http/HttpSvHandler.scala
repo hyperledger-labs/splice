@@ -361,7 +361,7 @@ class HttpSvHandler(
         amuletRules = amuletRules.toContractWithState.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
-        initialRound = initialRound,
+        initialRound = Some(initialRound),
       )
     }
   }

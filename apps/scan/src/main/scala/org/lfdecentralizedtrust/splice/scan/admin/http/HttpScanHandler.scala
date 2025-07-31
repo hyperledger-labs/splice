@@ -148,7 +148,7 @@ class HttpScanHandler(
         amuletRules = amuletRules.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
-        initialRound = initialRound,
+        initialRound = Some(initialRound),
       )
     }
   }

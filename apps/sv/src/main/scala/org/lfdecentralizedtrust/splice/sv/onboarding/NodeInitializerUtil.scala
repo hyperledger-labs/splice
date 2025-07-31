@@ -363,7 +363,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
         retryProvider.getValueWithRetries(
           RetryFor.InitializingClientCalls,
           "initial_round_from_sponsor",
-          "Initial Round from sponsoring SV",
+          s"Initial Round from sponsoring SV ${joiningConfig.svClient.adminApi}",
           setInitialRoundFromSponsor(sponsorConfig, upgradesConfig),
           logger,
         )
@@ -387,7 +387,11 @@ trait NodeInitializerUtil extends NamedLogging with Spanning with SynchronizerNo
       retryProvider,
       loggerFactory,
     ).flatMap { svConnection =>
-      svConnection.getDsoInfo().map(_.initialRound).andThen(_ => svConnection.close())
+      svConnection
+        .getDsoInfo()
+        // the sponsor might use the old api, in this case initial round has to be 0
+        .map(_.initialRound.getOrElse("0"))
+        .andThen(_ => svConnection.close())
     }
 
   private def isOnboardedInDecentralizedNamespace(
