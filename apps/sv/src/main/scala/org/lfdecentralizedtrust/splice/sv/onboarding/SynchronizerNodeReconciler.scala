@@ -10,11 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SequencerConfig,
   SynchronizerNodeConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
@@ -84,11 +80,11 @@ class SynchronizerNodeReconciler(
           false
       }
       updatedSequencerConfigUpdate =
-          updateLegacySequencerConfig(
-            existingLegacySequencerConfig,
-            existingSequencerConfig,
-            legacyMigrationId
-          )
+        updateLegacySequencerConfig(
+          existingLegacySequencerConfig,
+          existingSequencerConfig,
+          legacyMigrationId,
+        )
       _ = ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
         existingSequencerConfig,
         localSequencerConfig,

@@ -12,10 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{
-  CommandPriority,
-  SpliceLedgerConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.{CommandPriority, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, ContractWithState}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
@@ -112,11 +109,11 @@ class ReceiveFaucetCouponTrigger(
         .submit(
           actAs = Seq(validatorParty),
           readAs = Seq(validatorParty),
-            license.exercise(
-              _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
-                unclaimedRound.contractId
-              )
-            ),
+          license.exercise(
+            _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
+              unclaimedRound.contractId
+            )
+          ),
           priority = commandPriority,
         )
         .noDedup

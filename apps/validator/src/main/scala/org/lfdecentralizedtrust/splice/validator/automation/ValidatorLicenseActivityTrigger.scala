@@ -36,26 +36,25 @@ class ValidatorLicenseActivityTrigger(
   ): Future[Seq[ValidatorLicenseActivityTrigger.Task]] =
     for {
       tasks <-
-          for {
-            licenseO <- store
-              .lookupValidatorLicenseWithOffset()
-              .map(_.value.flatMap(_.toAssignedContract))
-          } yield {
-            licenseO.toList
-              .filter(license =>
-                license.payload.lastActiveAt.toScala.fold(true)(lastActiveAt =>
-                  (now - CantonTimestamp.tryFromInstant(lastActiveAt))
-                    .compareTo(ValidatorLicenseActivityTrigger.activityReportMinInterval) > 0
-                )
+        for {
+          licenseO <- store
+            .lookupValidatorLicenseWithOffset()
+            .map(_.value.flatMap(_.toAssignedContract))
+        } yield {
+          licenseO.toList
+            .filter(license =>
+              license.payload.lastActiveAt.toScala.fold(true)(lastActiveAt =>
+                (now - CantonTimestamp.tryFromInstant(lastActiveAt))
+                  .compareTo(ValidatorLicenseActivityTrigger.activityReportMinInterval) > 0
               )
-              .map(license =>
-                ValidatorLicenseActivityTrigger.Task(
-                  license,
-                )
+            )
+            .map(license =>
+              ValidatorLicenseActivityTrigger.Task(
+                license
               )
-          }
+            )
         }
-    yield tasks
+    } yield tasks
 
   override def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[ValidatorLicenseActivityTrigger.Task]
@@ -93,11 +92,11 @@ object ValidatorLicenseActivityTrigger {
   private val activityReportMinInterval = java.time.Duration.ofHours(1)
 
   final case class Task(
-      existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
+      existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense]
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
-        param("existingLicense", _.existingLicense),
+        param("existingLicense", _.existingLicense)
       )
     }
   }

@@ -95,8 +95,8 @@ trait PackageVersionSupport extends NamedLogging {
       packageId: PackageIdResolver.Package,
       at: CantonTimestamp,
       packageResource: PackageResource,
-    dar: DarResource,
-    ignoreRedundantCheck: Boolean = false,
+      dar: DarResource,
+      ignoreRedundantCheck: Boolean = false,
   )(implicit tc: TraceContext): Future[FeatureSupport] =
     isDarSupported(Seq(packageId -> parties), at, packageResource, dar, ignoreRedundantCheck)
 
@@ -104,13 +104,15 @@ trait PackageVersionSupport extends NamedLogging {
       packageRequirements: Seq[(PackageIdResolver.Package, Seq[PartyId])],
       at: CantonTimestamp,
       packageResource: PackageResource,
-    dar: DarResource,
-    ignoreRedundantCheck : Boolean,
+      dar: DarResource,
+      ignoreRedundantCheck: Boolean,
   )(implicit tc: TraceContext): Future[FeatureSupport] = {
     require(packageRequirements.exists(_._1.packageName == dar.metadata.name))
     require(packageRequirements.forall(_._2.nonEmpty))
     require(packageResource.minimumInitialization.metadata.name == dar.metadata.name)
-    if (!ignoreRedundantCheck && packageResource.minimumInitialization.metadata.version >= dar.metadata.version) {
+    if (
+      !ignoreRedundantCheck && packageResource.minimumInitialization.metadata.version >= dar.metadata.version
+    ) {
       logger.warn(
         s"Package version check for ${dar.metadata.name} at version ${dar.metadata.version} is redundant, minimum version: ${packageResource.minimumInitialization.metadata.version}"
       )

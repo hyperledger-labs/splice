@@ -37,7 +37,7 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
             CantonTimestamp.now(),
           )
       } yield FeatureSupportResponse(
-        delegatelessAutomation.supported && delegateAutomationEnvironmentFlag,
+        delegatelessAutomation.supported && delegateAutomationEnvironmentFlag
       )
     }
 
