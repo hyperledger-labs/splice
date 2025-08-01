@@ -22,8 +22,18 @@ const MonitoringConfigSchema = z.object({
         thresholdPerNamespace: z.number(),
       }),
       trafficWaste: z.object({
-        kilobytes: z.number(),
-        overMinutes: z.number(),
+        // Traffic wasted in a single time interval
+        burst: z.object({
+          kilobytes: z.number(),
+          timeRange: z.string(),
+        }),
+        // Median traffic wasted over multiple time intervals
+        sustained: z.object({
+          kilobytes: z.number(),
+          sampleTimeRange: z.string(),
+          timeRange: z.string(),
+          quantile: z.number(),
+        }),
       }),
       cloudSql: z.object({
         maintenance: z.boolean(),
