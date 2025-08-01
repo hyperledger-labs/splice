@@ -41,7 +41,7 @@ Super Validators form the backbone of the Global Synchronizer's decentralized in
 Validators
 ###########################
 
-Validators work within the broader Canton Network—a “network of networks” where each node stores only the data it needs and synchronizes with other Validators via synchronizers. Validators typically connect to one or more of these synchronizers (which might be run as centralized or decentralized services) to receive and confirm encrypted messages.
+Validators work within the broader Canton Network—a “network of networks” where each node stores only the data it needs, and interacts with other Validators via synchronizers. Validators typically connect to one or more synchronizers (which might be run as centralized or decentralized services) to receive and confirm encrypted messages.
 
 A Validator in the Global Synchronizer ecosystem primary roles are to:
 
