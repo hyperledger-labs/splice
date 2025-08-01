@@ -15,10 +15,27 @@ import org.lfdecentralizedtrust.splice.http.v0.definitions.ErrorResponse
 import org.lfdecentralizedtrust.splice.util.TemplateJsonDecoder
 import com.digitalasset.canton.tracing.TraceContext
 
-case class HttpCommandException(request: HttpRequest, status: StatusCode, message: String)
-    extends Exception(
-      s"HTTP ${status} ${request.method.name} at '${request.uri.path.toString}' on ${request.uri.authority}. Command failed, message: ${message}"
-    )
+case class HttpCommandException(
+    request: HttpRequest,
+    status: StatusCode,
+    responseBody: HttpCommandException.ResponseBody,
+) extends Exception(
+      s"HTTP ${status} ${request.method.name} at '${request.uri.path.toString}' on ${request.uri.authority}. Command failed, message: ${responseBody.message}"
+    ) {
+  def message: String = responseBody.message
+}
+
+object HttpCommandException {
+  sealed trait ResponseBody {
+    def message: String
+  }
+  case class ErrorResponseBody(errorResponse: ErrorResponse) extends ResponseBody {
+    override def message: String = errorResponse.error
+  }
+  case class RawResponse(body: String) extends ResponseBody {
+    override def message: String = body
+  }
+}
 
 /** Equivalent of Canton’s AdminCommand but for our
   * native HTTP APIs.
@@ -106,10 +123,13 @@ final class HttpClientBuilder()(implicit
         val decoded = for {
           parsed <- parse(body)
           errorResponse <- parsed.as[ErrorResponse]
-        } yield errorResponse.error
+        } yield errorResponse
 
         // Fallback to original response string if deserializing to ErrorResponse fails
-        decoded.getOrElse(body)
+        decoded.fold[HttpCommandException.ResponseBody](
+          _ => HttpCommandException.RawResponse(body),
+          HttpCommandException.ErrorResponseBody(_),
+        )
       }
       .map { errorMessage => HttpCommandException(request, response.status, errorMessage) }
   }

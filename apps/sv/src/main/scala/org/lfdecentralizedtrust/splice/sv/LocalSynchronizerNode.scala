@@ -398,16 +398,16 @@ final class LocalSynchronizerNode(
         "Onbarding sequencer through sponsoring SV",
         svConnection.onboardSvSequencer(sequencerId).recover {
           // TODO(DACH-NY/canton-network-node#13410) - remove once canton returns a retryable error
-          case HttpCommandException(_, StatusCodes.BadRequest, message)
-              if message.contains("SNAPSHOT_NOT_FOUND") =>
+          case HttpCommandException(_, StatusCodes.BadRequest, responseBody)
+              if responseBody.message.contains("SNAPSHOT_NOT_FOUND") =>
             throw Status.NOT_FOUND
-              .withDescription(message)
+              .withDescription(responseBody.message)
               .asRuntimeException()
-          case HttpCommandException(_, StatusCodes.BadRequest, message)
-              if message.contains("BLOCK_NOT_FOUND") =>
+          case HttpCommandException(_, StatusCodes.BadRequest, responseBody)
+              if responseBody.message.contains("BLOCK_NOT_FOUND") =>
             // ensure the request is retried as the sequencer will eventually finish processing the block
             throw Status.NOT_FOUND
-              .withDescription(message)
+              .withDescription(responseBody.message)
               .asRuntimeException()
         },
         logger,

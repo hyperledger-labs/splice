@@ -81,6 +81,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
@@ -730,6 +731,13 @@ object BftScanConnection {
                 Future.successful(BftScanConnection.ExceptionFailureResponse(failure))
             }
           )
+      case Failure(unexpected: HttpCommandException) =>
+        Future.successful(
+          BftScanConnection.HttpFailureResponse(
+            unexpected.status,
+            Json.obj("message" -> Json.fromString(unexpected.message)),
+          )
+        )
       case Failure(error) =>
         Future.successful(BftScanConnection.ExceptionFailureResponse(error))
     }
