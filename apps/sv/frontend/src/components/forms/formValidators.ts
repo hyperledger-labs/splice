@@ -36,17 +36,7 @@ export const svWeightSchema = z
   .min(1, { message: 'Weight is required' })
   .regex(/^\d+$/, { message: 'Weight must be a valid number' });
 
-function syncDelay(ms: number) {
-  console.log('Starting delay...');
-  const start = Date.now();
-  while (Date.now() - start < ms) {
-    console.log('');
-  }
-  console.log('Delay completed!');
-}
-
 export const validateWeight = (value: string): string | undefined => {
-  syncDelay(100);
   const result = svWeightSchema.safeParse(value);
   return result.success ? undefined : result.error.issues[0].message;
 };

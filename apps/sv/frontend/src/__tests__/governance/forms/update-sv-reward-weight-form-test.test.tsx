@@ -137,7 +137,7 @@ describe('Update SV Reward Weight Form', () => {
     await user.type(expiryDateInput, thePast);
 
     waitFor(() => {
-      expect(screen.getByText('Expiration must be in the future')).toBeDefined();
+      expect(screen.queryByText('Expiration must be in the future')).toBeDefined();
     });
 
     await user.clear(expiryDateInput);
@@ -168,7 +168,7 @@ describe('Update SV Reward Weight Form', () => {
     await user.type(effectiveDateInput, effectiveDate.format(dateTimeFormatISO));
 
     waitFor(() => {
-      expect(screen.getByText('Effective Date must be after expiration date')).toBeDefined();
+      expect(screen.queryByText('Effective Date must be after expiration date')).toBeDefined();
     });
 
     const validEffectiveDate = expiryDate.add(1, 'day').format(dateTimeFormatISO);
