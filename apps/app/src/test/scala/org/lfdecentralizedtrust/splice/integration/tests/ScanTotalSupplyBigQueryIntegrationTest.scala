@@ -88,11 +88,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   "test bigquery queries" in { implicit env =>
     withClue("create test data on Splice ledger") {
-      val (aliceParty, bobParty) = onboardAliceAndBob()
+      val (_, bobParty) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWalletClient)
 
       // Create test data with more-or-less known amounts
-      createTestData(aliceParty, bobParty)
+      createTestData(bobParty)
     }
 
     withClue("exporting PostgreSQL tables to BigQuery") {
@@ -211,7 +211,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   /** Creates test data with known amounts for all metrics
     */
-  private def createTestData(aliceParty: PartyId, bobParty: PartyId)(implicit
+  private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
     actAndCheck(
@@ -228,7 +228,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
       },
     )
 
-    aliceParty shouldBe aliceParty // TODO (#1713) still needed?
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
     val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
     actAndCheck(
