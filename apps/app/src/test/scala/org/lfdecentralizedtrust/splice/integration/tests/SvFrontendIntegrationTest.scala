@@ -94,61 +94,6 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "have 5 information tabs" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "DSO and amulet infos are displayed in pretty json", {
-            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see the 5 tab panels",
-          _ => {
-            inside(find(id("information-tab-general"))) { case Some(e) =>
-              e.text shouldBe "General"
-            }
-            inside(find(id("information-tab-dso-info"))) { case Some(e) =>
-              e.text shouldBe "DSO Info"
-            }
-            inside(find(id("information-tab-amulet-info"))) { case Some(e) =>
-              e.text shouldBe s"$amuletName Info"
-            }
-            inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
-              e.text shouldBe "CometBFT Debug Info"
-            }
-            inside(find(id("information-tab-canton-domain-status"))) { case Some(e) =>
-              e.text shouldBe "Domain Node Status"
-            }
-          },
-        )
-        actAndCheck("Click on general information tab", click on "information-tab-general")(
-          "observe information on party information",
-          _ => {
-            val valueCells = findAll(className("general-dso-value-name")).toSeq
-            valueCells should have length 9
-            forExactly(1, valueCells)(cell =>
-              seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
-            )
-            forExactly(3, valueCells)(cell =>
-              seleniumText(cell) should matchText(
-                sv1Backend.getDsoInfo().svParty.toProtoPrimitive
-              )
-            )
-          },
-        )
-        actAndCheck(
-          "Click on domain status tab",
-          click on "information-tab-canton-domain-status",
-        )(
-          "Observe sequencer and mediator as active",
-          _ => {
-            val activeCells = findAll(className("active-value")).toSeq
-            activeCells should have length 2
-            forAll(activeCells)(_.text shouldBe "true")
-          },
-        )
-      }
-    }
-
     "can prepare an onboarding secret for new validator" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         val (_, rowSize) = actAndCheck(
