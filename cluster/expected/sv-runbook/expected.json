@@ -371,6 +371,22 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
+      "compat": "true",
+      "maxHistory": 10,
+      "name": "loopback",
+      "namespace": "sv",
+      "timeout": 600,
+      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
+    },
+    "name": "loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
@@ -800,22 +816,6 @@
     "name": "sv-docker-reg-cred",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "sv",
-      "timeout": 600,
-      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
-    },
-    "name": "sv-loopback",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
