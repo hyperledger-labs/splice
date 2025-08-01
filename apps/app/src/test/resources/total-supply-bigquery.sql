@@ -11,6 +11,8 @@ DECLARE
   current_supply_total,
   allowed_mint,
   burned bignumeric;
+DECLARE
+  dso_party string;
 
 CREATE TEMP FUNCTION
   iso_timestamp(iso8601_string string)
@@ -80,7 +82,9 @@ CREATE TEMP FUNCTION sum_bignumeric_acs(
     module_name string,
     entity_name string,
     as_of_record_time timestamp,
-    migration_id int64
+    migration_id int64,
+    dso_party string,
+    dso_path array<int64>
   ) RETURNS bignumeric AS ((
   SELECT
     COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments,
@@ -103,6 +107,7 @@ CREATE TEMP FUNCTION sum_bignumeric_acs(
       AND e.contract_id = c.contract_id)
     AND c.template_id_module_name = module_name
     AND c.template_id_entity_name = entity_name
+    AND dso_party = JSON_VALUE(c.create_arguments, daml_record_path(dso_path, 'party'))
     AND in_time_window(as_of_record_time, migration_id,
           c.record_time, c.migration_id)));
 
@@ -110,7 +115,8 @@ CREATE TEMP FUNCTION sum_bignumeric_acs(
 -- Total unspent but locked Amulet amount.
 CREATE TEMP FUNCTION locked(
     as_of_record_time timestamp,
-    migration_id int64
+    migration_id int64,
+    dso_party string
   ) RETURNS bignumeric AS (
   sum_bignumeric_acs(
     -- (LockedAmulet) .amulet.amount.initialAmount
@@ -118,13 +124,16 @@ CREATE TEMP FUNCTION locked(
     'Splice.Amulet',
     'LockedAmulet',
     as_of_record_time,
-    migration_id));
+    migration_id,
+    dso_party,
+    [0, 0]));
 
 
 -- Total unlocked, unspent Amulet.
 CREATE TEMP FUNCTION unlocked(
     as_of_record_time timestamp,
-    migration_id int64
+    migration_id int64,
+    dso_party string
   ) RETURNS bignumeric AS (
   sum_bignumeric_acs(
     -- (Amulet) .amount.initialAmount
@@ -132,13 +141,16 @@ CREATE TEMP FUNCTION unlocked(
     'Splice.Amulet',
     'Amulet',
     as_of_record_time,
-    migration_id));
+    migration_id,
+    dso_party,
+    [0]));
 
 
 -- Amulet that was possible to mint, but was not minted.
 CREATE TEMP FUNCTION unminted(
     as_of_record_time timestamp,
-    migration_id int64
+    migration_id int64,
+    dso_party string
   ) RETURNS bignumeric AS (
   sum_bignumeric_acs(
     -- (UnclaimedReward) .amount
@@ -146,7 +158,9 @@ CREATE TEMP FUNCTION unminted(
     'Splice.Amulet',
     'UnclaimedReward',
     as_of_record_time,
-    migration_id));
+    migration_id,
+    dso_party,
+    [0]));
 
 
 CREATE TEMP FUNCTION TransferResult_summary(summary_position int64)
@@ -270,11 +284,12 @@ CREATE TEMP FUNCTION burned(
 
 
 -- using the functions
-SET as_of_record_time = iso_timestamp('2025-07-01T00:00:00Z');
+SET dso_party = 'DSO::1220b1431ef217342db44d516bb9befde802be7d8899637d290895fa58880f19accc';
+SET as_of_record_time = iso_timestamp('2025-07-15T00:00:00Z');
 SET migration_id = 3;
-SET locked = locked(as_of_record_time, migration_id);
-SET unlocked = unlocked(as_of_record_time, migration_id);
-SET unminted = unminted(as_of_record_time, migration_id);
+SET locked = locked(as_of_record_time, migration_id, dso_party);
+SET unlocked = unlocked(as_of_record_time, migration_id, dso_party);
+SET unminted = unminted(as_of_record_time, migration_id, dso_party);
 SET minted = minted(as_of_record_time, migration_id);
 SET burned = burned(as_of_record_time, migration_id);
 SET current_supply_total = locked + unlocked;
