@@ -4,7 +4,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.BaseTest.getResourcePath
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -14,12 +13,14 @@ import bq.{Field, JobInfo, Schema, TableId}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 
+import slick.jdbc.GetResult
+
 import java.nio.file.Paths
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import slick.jdbc.GetResult
+import scala.jdk.DurationConverters.*
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -229,21 +230,22 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
     aliceParty shouldBe aliceParty // TODO (#1713) still needed?
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
     actAndCheck(
       "Lock amulet",
       lockAmulets(
         aliceValidatorBackend,
+        lockingParty,
         aliceValidatorParty,
-        aliceValidatorParty,
-        aliceValidatorWalletClient.list().amulets,
+        lockingClient.list().amulets,
         lockedAmount,
         sv1ScanBackend,
-        java.time.Duration.ofHours(1),
-        CantonTimestamp.now(),
+        10.days.toJava,
+        getLedgerTime,
       ),
     )(
       "Wait for locked amulet to appear",
-      _ => aliceWalletClient.list().lockedAmulets.loneElement,
+      _ => lockingClient.list().lockedAmulets.loneElement,
     )
 
     // burn fees
