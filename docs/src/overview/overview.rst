@@ -43,7 +43,7 @@ Validators
 
 Validators work within the broader Canton Network—a “network of networks” where each node stores only the data it needs, and interacts with other Validators via synchronizers. Validators typically connect to one or more synchronizers (which might be run as centralized or decentralized services) to receive and confirm encrypted messages.
 
-A Validator in the Global Synchronizer ecosystem primary roles are to:
+The primary roles of a Validator in the Global Synchronizer ecosystem are to:
 
 * Validate transactions
 * Record activity
