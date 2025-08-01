@@ -903,7 +903,6 @@
           }
         },
         "nodeName": "Digital-Asset-2",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-3",
         "stateSync": {
           "enable": false,
@@ -1003,7 +1002,6 @@
           }
         },
         "nodeName": "Digital-Asset-2",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
@@ -2724,7 +2722,6 @@
           }
         },
         "nodeName": "DA-Helm-Test-Node",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-3",
         "stateSync": {
           "enable": false,
@@ -2821,7 +2818,6 @@
           }
         },
         "nodeName": "DA-Helm-Test-Node",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
