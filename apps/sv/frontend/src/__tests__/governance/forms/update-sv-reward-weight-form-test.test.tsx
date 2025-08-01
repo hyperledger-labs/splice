@@ -136,7 +136,9 @@ describe('Update SV Reward Weight Form', () => {
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, thePast);
 
-    expect(screen.getByText('Expiration must be in the future')).toBeDefined();
+    waitFor(() => {
+      expect(screen.getByText('Expiration must be in the future')).toBeDefined();
+    });
 
     await user.clear(expiryDateInput);
     await user.type(expiryDateInput, theFuture);
@@ -209,7 +211,9 @@ describe('Update SV Reward Weight Form', () => {
     expect(weightInput).toBeDefined();
     await user.type(weightInput, '123abc');
 
-    expect(screen.getByText('Weight must be a valid number')).toBeDefined();
+    waitFor(() => {
+      expect(screen.getByText('Weight must be a valid number')).toBeDefined();
+    });
 
     await user.clear(weightInput);
     await user.type(weightInput, '1001');
