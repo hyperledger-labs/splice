@@ -2,21 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { Box, Typography } from '@mui/material';
-import { DesktopDateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import dayjs, { Dayjs } from 'dayjs';
+import { DesktopDateTimePicker } from '@mui/x-date-pickers';
+import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useFieldContext } from '../../hooks/formContext';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 export interface DateFieldProps {
   title?: string;
   description?: string;
-  minDate?: Dayjs;
-  id: string;
 }
 
 export const DateField: React.FC<DateFieldProps> = props => {
-  const { title, description, minDate, id } = props;
+  const { title, description } = props;
   const field = useFieldContext<string>();
 
   return (
@@ -26,33 +23,22 @@ export const DateField: React.FC<DateFieldProps> = props => {
           {title}
         </Typography>
       )}
-
       {description && (
         <Typography variant="body2" color="text.secondary" gutterBottom>
           {description}
         </Typography>
       )}
-
-      <LocalizationProvider dateAdapter={AdapterDayjs}>
-        <DesktopDateTimePicker
-          value={dayjs(field.state.value)}
-          format={dateTimeFormatISO}
-          minDateTime={minDate || dayjs()}
-          ampm={false}
-          onChange={newDate => field.handleChange(newDate?.format(dateTimeFormatISO)!)}
-          slotProps={{
-            textField: {
-              fullWidth: true,
-              variant: 'outlined',
-              id: `${id}-field`,
-              helperText: field.state.meta.errors?.[0],
-              inputProps: {
-                'data-testid': `${id}-field`,
-              },
-            },
-          }}
-        />
-      </LocalizationProvider>
+      <DesktopDateTimePicker
+        value={dayjs(field.state.value)}
+        format={dateTimeFormatISO}
+        onChange={newDate => field.handleChange(newDate?.format(dateTimeFormatISO)!)}
+        slotProps={{
+          textField: {
+            fullWidth: true,
+            variant: 'outlined',
+          },
+        }}
+      />
     </Box>
   );
 };

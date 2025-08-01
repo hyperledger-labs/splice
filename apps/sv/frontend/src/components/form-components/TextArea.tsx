@@ -7,11 +7,10 @@ import { useFieldContext } from '../../hooks/formContext';
 export interface TextAreaProps {
   title: string;
   optional?: boolean;
-  id: string;
 }
 
 export const TextArea: React.FC<TextAreaProps> = props => {
-  const { title, optional, id } = props;
+  const { title, optional } = props;
   const field = useFieldContext<string>();
   return (
     <Box>
@@ -32,9 +31,6 @@ export const TextArea: React.FC<TextAreaProps> = props => {
         value={field.state.value}
         onBlur={field.handleBlur}
         onChange={e => field.handleChange(e.target.value)}
-        error={!field.state.meta.isValid}
-        helperText={field.state.meta.errors?.[0]}
-        inputProps={{ 'data-testid': id }}
       />
     </Box>
   );

@@ -8,15 +8,25 @@ import {
 } from '../../components/governance/ProposalDetailsContent';
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
+import { ThemeProvider } from '@mui/material';
 import { ProposalDetails, ProposalVote, ProposalVotingInformation } from '../../utils/types';
 import userEvent from '@testing-library/user-event';
-import { SvConfigProvider } from '../../utils';
+import { SvConfigProvider, useSvConfig } from '../../utils';
+import {
+  AuthProvider,
+  SvClientProvider,
+  theme,
+  UserProvider,
+} from '@lfdecentralizedtrust/splice-common-frontend';
+import { SvAdminClientProvider } from '../../contexts/SvAdminServiceContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { replaceEqualDeep } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { server, svUrl } from '../setup/setup';
 import { rest } from 'msw';
 import { ProposalVoteForm } from '../../components/governance/ProposalVoteForm';
 import App from '../../App';
 import { svPartyId } from '../mocks/constants';
-import { Wrapper } from '../helpers';
 
 const voteRequest = {
   contractId: 'abc123' as ContractId<VoteRequest>,
@@ -99,6 +109,44 @@ const voteResult = {
     },
   ],
 } as ProposalDetailsContentProps;
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchInterval: 500,
+      structuralSharing: replaceEqualDeep,
+    },
+  },
+});
+
+const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  return (
+    <MemoryRouter>
+      <SvConfigProvider>
+        <WrapperProviders children={children} />
+      </SvConfigProvider>
+    </MemoryRouter>
+  );
+};
+
+const WrapperProviders: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const config = useSvConfig();
+  const navigate = useNavigate();
+
+  return (
+    <ThemeProvider theme={theme}>
+      <AuthProvider authConf={config.auth} redirect={(path: string) => navigate(path)}>
+        <QueryClientProvider client={queryClient}>
+          <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
+            <SvClientProvider url={config.services.sv.url}>
+              <SvAdminClientProvider url={config.services.sv.url}>{children}</SvAdminClientProvider>
+            </SvClientProvider>
+          </UserProvider>
+        </QueryClientProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+};
 
 describe('SV user can', () => {
   test('login and see the SV party ID', async () => {
