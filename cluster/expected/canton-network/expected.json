@@ -203,7 +203,9 @@
         "gateways": [
           "mesh"
         ],
-        "hosts": "cometbft.mock.global.canton.network.digitalasset.com",
+        "hosts": [
+          "cometbft.mock.global.canton.network.digitalasset.com"
+        ],
         "tcp": [
           {
             "match": [

@@ -150,27 +150,10 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
             ],
           },
         ],
-        tcp: [
-          {
-            match: [
-              {
-                gateways: ['mesh'],
-              },
-            ],
-            route: [
-              {
-                destination: {
-                  host: 'istio-ingress.cluster-ingress.svc.cluster.local',
-                },
-              },
-            ],
-          },
-        ],
       },
     },
     { dependsOn: [namespace.ns, dummyLoopbackRelease] }
   );
-
 
   const cometBftVirtualService = new k8s.apiextensions.CustomResource(
     `loopback-cometbft-${namespace.logicalName}`,
@@ -182,7 +165,10 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
         namespace: namespace.ns.metadata.name,
       },
       spec: {
-        hosts: `cometbft.${clusterHostname}`,
+        // Even though we only use url `cometbft.clusterHostname`, for some reason setting that in the
+        // hosts field here did not work, so we accept that cometbft is the only tcp traffic right now
+        // anyway, and just use the base cluster hostname and route all tcp traffic through istio-ingress-cometbft.
+        hosts: [clusterHostname],
         exportTo: ['.'],
         gateways: ['mesh'],
         tcp: [
