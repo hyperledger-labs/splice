@@ -4,7 +4,6 @@ import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.BaseTest.getResourcePath
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{HasCloseContext, FlagCloseable}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
@@ -14,14 +13,14 @@ import bq.{Field, JobInfo, Schema, TableId}
 import bq.storage.v1.{JsonStreamWriter, TableSchema}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.*
 
+import slick.jdbc.GetResult
+
 import java.nio.file.Paths
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import slick.jdbc.GetResult
-
-import java.time.Duration
+import scala.jdk.DurationConverters.*
 
 class ScanTotalSupplyBigQueryIntegrationTest
     extends SpliceTests.IntegrationTest
@@ -38,6 +37,13 @@ class ScanTotalSupplyBigQueryIntegrationTest
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
+      // prevent ReceiveFaucetCouponTrigger from seeing stale caches
+      .withScanDisabledMiningRoundsCache()
+      .withAmuletPrice(walletAmuletPrice)
+
+  override def walletAmuletPrice = SpliceUtil.damlDecimal(0.00001)
+
+  override protected def runTokenStandardCliSanityCheck = false
 
   // BigQuery client instance and test dataset
   private lazy val bigquery: bq.BigQuery = bq.BigQueryOptions.getDefaultInstance.getService
@@ -52,11 +58,12 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("1000000")
-  private val lockedAmount = BigDecimal("200000")
-  private val burnedAmount = BigDecimal("304")
+  private val mintedAmount = BigDecimal("2587519.0258740704")
+  private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
+  private val lockedAmount = BigDecimal("5000")
+  private val burnedAmount = BigDecimal("60032.83108")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
-  private val unmintedAmount = BigDecimal("149927.0015223501")
+  private val unmintedAmount = BigDecimal("570776.255709163")
 
   override def beforeAll() = {
     super.beforeAll()
@@ -81,10 +88,11 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   "test bigquery queries" in { implicit env =>
     withClue("create test data on Splice ledger") {
-      val (aliceParty, bobParty) = onboardAliceAndBob()
+      val (_, bobParty) = onboardAliceAndBob()
+      waitForWalletUser(aliceValidatorWalletClient)
 
       // Create test data with more-or-less known amounts
-      createTestData(aliceParty, bobParty)
+      createTestData(bobParty)
     }
 
     withClue("exporting PostgreSQL tables to BigQuery") {
@@ -203,37 +211,45 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   /** Creates test data with known amounts for all metrics
     */
-  private def createTestData(aliceParty: PartyId, bobParty: PartyId)(implicit
+  private def createTestData(bobParty: PartyId)(implicit
       env: FixtureParam
   ): Unit = {
-    // TODO (#1713) use a realistic minting method; best not to support tap in the SQL
-    withClue("step forward to an open round") {
-      advanceTimeAndWaitForRoundAutomation(Duration.ofDays(10))
-      advanceTimeToRoundOpen
-    }
-    aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
+    actAndCheck(
+      "step forward many rounds", {
+        advanceTimeToRoundOpen
+        (1 to 5).foreach { _ =>
+          advanceRoundsByOneTick
+        }
+      },
+    )(
+      "alice validator receives rewards",
+      _ => {
+        aliceValidatorWalletClient.balance().unlockedQty shouldBe aliceValidatorMintedAmount
+      },
+    )
 
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+    val (lockingParty, lockingClient) = (aliceValidatorParty, aliceValidatorWalletClient)
     actAndCheck(
       "Lock amulet",
       lockAmulets(
         aliceValidatorBackend,
-        aliceParty,
+        lockingParty,
         aliceValidatorParty,
-        aliceWalletClient.list().amulets,
+        lockingClient.list().amulets,
         lockedAmount,
         sv1ScanBackend,
-        java.time.Duration.ofHours(1),
-        CantonTimestamp.now(),
+        10.days.toJava,
+        getLedgerTime,
       ),
     )(
       "Wait for locked amulet to appear",
-      _ => aliceWalletClient.list().lockedAmulets.loneElement,
+      _ => lockingClient.list().lockedAmulets.loneElement,
     )
 
     // burn fees
-    val transferAmount = BigDecimal("100000")
-    p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, transferAmount)
+    val transferAmount = BigDecimal("1000")
+    p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobParty, transferAmount)
   }
 
   // copy from PostgreSQL tables to BigQuery
@@ -495,18 +511,25 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // Verify individual metrics
-    val expectedMinted = BigDecimal(0) // TODO (#1713) use mintedAmount
-    results.minted shouldBe expectedMinted withClue "minted"
-    results.locked shouldBe lockedAmount withClue "locked"
-    results.unlocked shouldBe unlockedAmount withClue "unlocked"
-    results.unminted shouldBe unmintedAmount withClue "unminted"
-    results.burned shouldBe burnedAmount withClue "burned"
+    forEvery(
+      Seq(
+        // base metrics
+        ("minted", results.minted, mintedAmount),
+        ("locked", results.locked, lockedAmount),
+        ("unlocked", results.unlocked, unlockedAmount),
+        ("unminted", results.unminted, unmintedAmount),
+        ("burned", results.burned, burnedAmount),
+        // internally-derived metrics
+        ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
+        ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
+      )
+    ) { case (clue, actual, expected) =>
+      actual shouldBe expected withClue clue
+    }
 
-    // Verify derived metrics
+    // other derived metrics
     (mintedAmount - burnedAmount) shouldBe (
       lockedAmount + unlockedAmount
     ) withClue "separate paths to total supply match"
-    results.currentSupplyTotal shouldBe (lockedAmount + unlockedAmount) withClue "current_supply_total"
-    results.allowedMint shouldBe (unmintedAmount + expectedMinted) withClue "allowed_mint"
   }
 }
