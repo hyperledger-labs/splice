@@ -1,15 +1,13 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import dayjs from 'dayjs';
-import { useAppForm } from '../../hooks/form';
-import { CommonFormData } from './CreateProposalform';
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { useDsoInfos } from '../../contexts/SvContext';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { CommonFormData } from './CreateProposalform';
+import { useAppForm } from '../../hooks/form';
+import { useDsoInfos } from '../../contexts/SvContext';
+import dayjs from 'dayjs';
+import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import {
   validateEffectiveDate,
   validateExpiration,
@@ -17,34 +15,28 @@ import {
   validateSummary,
   validateSvSelection,
   validateUrl,
-  validateWeight,
 } from './formValidators';
-import { createProposalActions } from '../../utils/governance';
+import { FormLayout } from './FormLayout';
+import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
+import { useMemo, useState } from 'react';
 
-interface ExtraFormField {
+interface ExtraFormFields {
   sv: string;
-  weight: string;
 }
 
-type UpdateSvRewardWeightFormData = CommonFormData & ExtraFormField;
+type OffboardSvFormData = CommonFormData & ExtraFormFields;
 
-interface UpdateSvRewardWeightFormProps {
-  onSubmit: (
-    data: UpdateSvRewardWeightFormData,
-    action: ActionRequiringConfirmation
-  ) => Promise<void>;
+export interface OffboardSvFormProps {
+  onSubmit: (data: OffboardSvFormData, action: ActionRequiringConfirmation) => Promise<void>;
 }
 
-export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> = props => {
+export const OffboardSvForm: React.FC<OffboardSvFormProps> = props => {
   const { onSubmit } = props;
+
   const [effectivityType, setEffectivityType] = useState('custom');
+
   const dsoInfosQuery = useDsoInfos();
-  const initialExpiration = dayjs().add(
-    Math.floor(
-      parseInt(dsoInfosQuery.data?.dsoRules.payload.config.voteRequestTimeout.microseconds!) / 1000
-    ),
-    'milliseconds'
-  );
+  const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
 
   const svs = useMemo(
@@ -57,18 +49,15 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
     [svs]
   );
 
-  const createProposalAction = createProposalActions.find(
-    a => a.value === 'SRARC_UpdateSvRewardWeight'
-  );
+  const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_OffboardSv');
 
-  const defaultValues: UpdateSvRewardWeightFormData = {
+  const defaultValues: OffboardSvFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
     effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
     url: '',
     summary: '',
     sv: '',
-    weight: '',
   };
 
   const form = useAppForm({
@@ -78,18 +67,16 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
         tag: 'ARC_DsoRules',
         value: {
           dsoAction: {
-            tag: 'SRARC_UpdateSvRewardWeight',
+            tag: 'SRARC_OffboardSv',
             value: {
-              svParty: value.sv,
-              newRewardWeight: value.weight,
+              sv: value.sv,
             },
           },
         },
       };
-      console.log('submit sv reward weight form data: ', value, 'with action:', action);
+      console.log('submit offboard sv form data: ', value, 'with action:', action);
       onSubmit(value, action);
     },
-
     validators: {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
@@ -101,12 +88,12 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
   });
 
   return (
-    <FormLayout form={form} id="update-sv-reward-weight-form">
+    <FormLayout form={form} id="offboard-sv-form">
       <form.AppField name="action">
         {field => (
           <field.TextField
             title="Action"
-            id="update-sv-reward-weight-action"
+            id="offboard-sv-action"
             muiTextFieldProps={{ disabled: true }}
           />
         )}
@@ -123,7 +110,7 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
           <field.DateField
             title="Vote Proposal Expiration"
             description="This is the last day voters can vote on this proposal"
-            id="update-sv-reward-weight-expiry-date"
+            id="offboard-sv-expiry-date"
           />
         )}
       </form.AppField>
@@ -157,7 +144,7 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
                       <field.DateField
                         description="Select the date and time the proposal will take effect"
                         minDate={dayjs(form.getFieldValue('expiryDate'))}
-                        id="update-sv-reward-weight-effective-date"
+                        id="offboard-sv-effective-date"
                       />
                     )}
                   </form.AppField>
@@ -190,7 +177,7 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
           onChange: ({ value }) => validateSummary(value),
         }}
       >
-        {field => <field.TextArea title="Proposal Summary" id="update-sv-reward-weight-summary" />}
+        {field => <field.TextArea title="Proposal Summary" id="offboard-sv-summary" />}
       </form.AppField>
 
       <form.AppField
@@ -200,7 +187,7 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
           onChange: ({ value }) => validateUrl(value),
         }}
       >
-        {field => <field.TextField title="URL" id="update-sv-reward-weight-url" />}
+        {field => <field.TextField title="URL" id="offboard-sv-url" />}
       </form.AppField>
 
       <form.AppField
@@ -210,23 +197,7 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
           onChange: ({ value }) => validateSvSelection(value),
         }}
       >
-        {field => (
-          <field.SelectField
-            title="Member"
-            options={svOptions}
-            id="update-sv-reward-weight-member"
-          />
-        )}
-      </form.AppField>
-
-      <form.AppField
-        name="weight"
-        validators={{
-          onBlur: ({ value }) => validateWeight(value),
-          onChange: ({ value }) => validateWeight(value),
-        }}
-      >
-        {field => <field.TextField title="Weight" id="update-sv-reward-weight-weight" />}
+        {field => <field.SelectField title="Member" options={svOptions} id="offboard-sv-member" />}
       </form.AppField>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

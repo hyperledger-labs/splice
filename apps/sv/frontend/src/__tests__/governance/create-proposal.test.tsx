@@ -19,6 +19,34 @@ const TestWrapper: React.FC<React.PropsWithChildren> = ({ children }) => {
   );
 };
 
+async function checkActionSelection(actionName: string, actionValue: string, testId: string) {
+  const user = userEvent.setup();
+
+  render(
+    <Wrapper>
+      <CreateProposal />
+    </Wrapper>
+  );
+
+  const actionDropdown = screen.getByTestId('select-action');
+
+  const selectInput = actionDropdown.querySelector('[role="combobox"]') as HTMLElement;
+  await user.click(selectInput);
+
+  await waitFor(async () => {
+    const actionToSelect = screen.getByText(actionName);
+    expect(actionToSelect).toBeDefined();
+    await user.click(actionToSelect);
+  });
+
+  const nextButton = screen.getByText('Next');
+  await user.click(nextButton);
+
+  const actionInput = screen.getByTestId(testId);
+  const action = createProposalActions.find(a => a.value === actionValue);
+  expect(actionInput.getAttribute('value')).toBe(action!.name);
+}
+
 describe('Create Proposal', () => {
   test('Display action selection and all actions', async () => {
     const user = userEvent.setup();
@@ -48,31 +76,15 @@ describe('Create Proposal', () => {
   });
 
   test('Update Reward Weight Form is rendered after action selection', async () => {
-    const user = userEvent.setup();
-
-    render(
-      <Wrapper>
-        <CreateProposal />
-      </Wrapper>
+    await checkActionSelection(
+      'Update SV Reward Weight',
+      'SRARC_UpdateSvRewardWeight',
+      'update-sv-reward-weight-action'
     );
+  });
 
-    const actionDropdown = screen.getByTestId('select-action');
-
-    const selectInput = actionDropdown.querySelector('[role="combobox"]') as HTMLElement;
-    await user.click(selectInput);
-
-    await waitFor(async () => {
-      const actionToSelect = screen.getByText('Update SV Reward Weight');
-      expect(actionToSelect).toBeDefined();
-      await user.click(actionToSelect);
-    });
-
-    const nextButton = screen.getByText('Next');
-    await user.click(nextButton);
-
-    const actionInput = screen.getByTestId('update-sv-reward-weight-action');
-    const action = createProposalActions.find(a => a.value === 'SRARC_UpdateSvRewardWeight');
-    expect(actionInput.getAttribute('value')).toBe(action!.value);
+  test('Offboard SV Form is rendered after action selection', async () => {
+    await checkActionSelection('Offboard Member', 'SRARC_OffboardSv', 'offboard-sv-action');
   });
 
   test('Display cancel and next buttons', () => {
