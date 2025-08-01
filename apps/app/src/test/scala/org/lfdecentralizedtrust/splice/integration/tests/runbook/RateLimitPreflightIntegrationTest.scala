@@ -1,6 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests.runbook
 
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.MonadUtil
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -30,7 +31,11 @@ class RateLimitPreflightIntegrationTest extends IntegrationTestWithSharedEnviron
       rateLimitIsEnforced(
         10, {
           scanCli.getAcsSnapshot(
-            dsoParty,
+            // Dummy party that doesn't exist to avoid creating load
+            PartyId.tryCreate(
+              "rate-limit-party",
+              dsoParty.namespace,
+            ),
             None,
           )
         },

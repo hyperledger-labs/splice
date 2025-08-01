@@ -45,7 +45,6 @@ export const useElectionContext = ():
 };
 
 export const useFeatureSupport = (): UseQueryResult<{
-  newGovernanceFlow: boolean;
   delegatelessAutomation: boolean;
 }> => {
   const { featureSupport } = useSvAdminClient();
@@ -54,7 +53,6 @@ export const useFeatureSupport = (): UseQueryResult<{
     queryFn: async () => {
       const resp = await featureSupport();
       return {
-        newGovernanceFlow: resp.new_governance_flow,
         delegatelessAutomation: resp.delegateless_automation,
       };
     },

@@ -408,6 +408,17 @@ function installSvApp(
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
+  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
+    ? [
+        {
+          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
+          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
+        },
+      ]
+    : [];
+  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
+    topologyChangeDelayEnvVars
+  );
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
@@ -421,6 +432,8 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialRound:
+      config.onboarding.type == 'found-dso' ? config.onboarding.initialRound : undefined,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     ...(useCantonBft
@@ -492,14 +505,7 @@ function installSvApp(
     expectedTaskDuration: expectedTaskDuration,
     expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
     logLevel: config.logging?.appsLogLevel,
-    additionalEnvVars: svsConfig?.synchronizer?.topologyChangeDelay
-      ? [
-          {
-            name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-            value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-          },
-        ]
-      : undefined,
+    additionalEnvVars,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

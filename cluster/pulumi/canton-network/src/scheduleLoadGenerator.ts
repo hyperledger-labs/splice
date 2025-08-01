@@ -14,6 +14,7 @@ import {
   numInstances,
   numNodesPerInstance,
   loadTesterConfig,
+  parsedVersion,
 } from 'splice-pulumi-common';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
@@ -96,7 +97,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           },
         }),
       },
-      activeVersion,
+      loadTesterConfig.chartVersion ? parsedVersion(loadTesterConfig.chartVersion) : activeVersion,
       { dependsOn: imagePullDeps.concat(dependencies).concat([loopback]) }
     );
   } else {

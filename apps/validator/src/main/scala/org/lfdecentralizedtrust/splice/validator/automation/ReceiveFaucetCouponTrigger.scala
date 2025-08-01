@@ -12,11 +12,7 @@ import org.lfdecentralizedtrust.splice.automation.{
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{
-  CommandPriority,
-  PackageVersionSupport,
-  SpliceLedgerConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.{CommandPriority, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, ContractWithState}
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
@@ -41,7 +37,6 @@ class ReceiveFaucetCouponTrigger(
     validatorTopupConfig: ValidatorTopupConfig,
     spliceLedgerConnection: SpliceLedgerConnection,
     clock: Clock,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -110,36 +105,19 @@ class ReceiveFaucetCouponTrigger(
           clock,
         )
         .map(if (_) CommandPriority.Low else CommandPriority.High): Future[CommandPriority]
-      validatorLivenessActivityFeatureSupport <-
-        packageVersionSupport
-          .supportsValidatorLivenessActivityRecord(
-            Seq(
-              validatorStore.key.dsoParty,
-              validatorParty,
-            ),
-            clock.now,
-          )
       outcome <- spliceLedgerConnection
         .submit(
           actAs = Seq(validatorParty),
           readAs = Seq(validatorParty),
-          if (validatorLivenessActivityFeatureSupport.supported)
-            license.exercise(
-              _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
-                unclaimedRound.contractId
-              )
+          license.exercise(
+            _.exerciseValidatorLicense_RecordValidatorLivenessActivity(
+              unclaimedRound.contractId
             )
-          else
-            license.exercise(
-              _.exerciseValidatorLicense_ReceiveFaucetCoupon(unclaimedRound.contractId)
-            ),
+          ),
           priority = commandPriority,
         )
         .noDedup
         .withDisclosedContracts(spliceLedgerConnection.disclosedContracts(unclaimedRound))
-        .withPreferredPackage(
-          validatorLivenessActivityFeatureSupport.packageIds
-        )
         .yieldUnit()
         .map(_ =>
           TaskSuccess(s"Received faucet coupon for Round ${unclaimedRound.payload.round.number}")

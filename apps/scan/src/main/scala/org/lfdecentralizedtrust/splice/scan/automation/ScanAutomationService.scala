@@ -43,6 +43,7 @@ class ScanAutomationService(
     svParty: PartyId,
     svName: String,
     upgradesConfig: UpgradesConfig,
+    initialRound: Long,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -66,7 +67,9 @@ class ScanAutomationService(
     ScanAutomationService
 
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
-  registerTrigger(new ScanBackfillAggregatesTrigger(store, triggerContext))
+  registerTrigger(
+    new ScanBackfillAggregatesTrigger(store, triggerContext, initialRound)
+  )
   if (config.updateHistoryBackfillEnabled) {
     registerTrigger(
       new ScanHistoryBackfillingTrigger(

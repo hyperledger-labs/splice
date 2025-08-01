@@ -15,11 +15,12 @@ import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboa
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.lfdecentralizedtrust.splice.sv.util.MemberIdUtil
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{SynchronizerId, MediatorId, SequencerId}
+import com.digitalasset.canton.topology.{MediatorId, SequencerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.RichOptional
@@ -51,7 +52,8 @@ class SvOnboardingMediatorProposalTrigger(
       rulesAndStates <- dsoStore.getDsoRulesWithSvNodeStates()
       synchronizerId = rulesAndStates.dsoRules.domain
       currentMediatorState <- participantAdminConnection.getMediatorSynchronizerState(
-        synchronizerId
+        synchronizerId,
+        AuthorizedState,
       )
     } yield {
       val currentSynchronizerConfigs = rulesAndStates.currentSynchronizerNodeConfigs()
@@ -97,7 +99,7 @@ class SvOnboardingMediatorProposalTrigger(
         "sequencer_added_to_topology_state",
         s"Sequencer is added to the topology state for $task",
         participantAdminConnection
-          .getSequencerSynchronizerState(task.synchronizerId)
+          .getSequencerSynchronizerState(task.synchronizerId, AuthorizedState)
           .map(state =>
             // required so that the mediator doesn't have an assigned counter when the sequencer initializes from the snapshot
             // if the mediator would have a counter, it will not be able to initialize from the sequencer
@@ -121,9 +123,11 @@ class SvOnboardingMediatorProposalTrigger(
   override protected def isStaleTask(task: MediatorToOnboard)(implicit
       tc: TraceContext
   ): Future[Boolean] =
-    participantAdminConnection.getMediatorSynchronizerState(task.synchronizerId).map { state =>
-      state.mapping.active.contains(task.mediatorId)
-    }
+    participantAdminConnection
+      .getMediatorSynchronizerState(task.synchronizerId, AuthorizedState)
+      .map { state =>
+        state.mapping.active.contains(task.mediatorId)
+      }
 }
 
 object SvOnboardingMediatorProposalTrigger {

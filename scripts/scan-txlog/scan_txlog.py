@@ -309,7 +309,7 @@ class ScanClient:
             params=params,
             max_retries=30,
             delay_seconds=0.5,
-            statuses={404},
+            statuses={404, 429},
         )
         return (party, DamlDecimal(json["wallet_balance"]))
 

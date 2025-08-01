@@ -13,10 +13,52 @@ Upcoming
 
 - SV Application
 
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
+
+- Daml
+
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.17
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
+
+0.4.9
+-----
+
+- SV Application
+
   - Status reports are now submitted every 2min rather than every
     1min. This has no impact other than on monitoring infrastructure
     so you may need to adjust some alerts to be slightly less
     aggressive.
+
+- Canton
+
+  - Fix an issue where topology transaction signatures where
+    duplicated based on the actual signature as opposed to the public
+    key of the signature. This caused transactions with thousands of
+    signatures on DevNet due to an SV with KMS enabled using a non-deterministic
+    signature scheme which slowed down onboarding of new nodes to an unusable level.
+
+- Documentation
+
+  - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
+
+- Scan
+
+  - Added basic rate limits to the HTTP APIs. There are configured by default to allow up to 200 req/s per endpoint. The values can be adjusted under the keys `canton.scan-apps.scan-app.parameters.rate-limiting`.
+
 
 0.4.8
 -----
