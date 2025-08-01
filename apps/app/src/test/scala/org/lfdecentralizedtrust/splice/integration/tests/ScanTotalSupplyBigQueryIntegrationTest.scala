@@ -58,7 +58,8 @@ class ScanTotalSupplyBigQueryIntegrationTest
   }
 
   // Test data parameters
-  private val mintedAmount = BigDecimal("26046.0426105176")
+  private val mintedAmount = BigDecimal("2587519.0258740704")
+  private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
   private val lockedAmount = BigDecimal("5000")
   private val burnedAmount = BigDecimal("304")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
@@ -223,7 +224,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
     )(
       "alice validator receives rewards",
       _ => {
-        aliceValidatorWalletClient.balance().unlockedQty shouldBe mintedAmount
+        aliceValidatorWalletClient.balance().unlockedQty shouldBe aliceValidatorMintedAmount
       },
     )
 
