@@ -58,7 +58,7 @@ Tokenomics
 `Canton Coin <https://www.digitalasset.com/hubfs/Canton%20Network%20Files/Documents%20(whitepapers%2c%20etc...)/Canton%20Coin_%20A%20Canton-Network-native%20payment%20application.pdf>`_ incentivizes application builders, users and infrastructure providers to use the Global Synchronizer.
 The Canton Coin application employs a burn-mint equilibrium mechanism, aiming to stabilize the conversion rate of Canton Coin around the intrinsic value it provides to network users:
 
-- Fee Burninng: Users pay fees (denominated in USD but paid by burning Canton Coin) when they initiate Canton Coin transfers or when they create a traffic balance. Instead of paying these fees to a central authority, the coins are burned—i.e., removed from circulation.
+- Fee Burning: Users pay fees (denominated in USD but paid by burning Canton Coin) when they initiate Canton Coin transfers or when they create a traffic balance. Instead of paying these fees to a central authority, the coins are burned—i.e., removed from circulation.
 - Minting Rewards: Validators (as well as Super Validators and application providers) can mint new Canton Coins in return for their “utility” contributions:
 
   - Infrastructure Operation: Super Validators operating synchronizer nodes earn minting rights by contributing to the synchronization service.
