@@ -226,7 +226,6 @@ class ScanTotalSupplyBigQueryIntegrationTest
         aliceValidatorWalletClient.balance().unlockedQty shouldBe mintedAmount
       },
     )
-    // TODO (#1713) aliceWalletClient.tap(walletAmuletToUsd(mintedAmount))
 
     aliceParty shouldBe aliceParty // TODO (#1713) still needed?
     val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
@@ -250,7 +249,7 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
     // burn fees
     val transferAmount = BigDecimal("1000")
-    p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, transferAmount)
+    p2pTransfer(aliceValidatorWalletClient, bobWalletClient, bobParty, transferAmount)
   }
 
   // copy from PostgreSQL tables to BigQuery
