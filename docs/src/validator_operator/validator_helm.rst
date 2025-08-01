@@ -523,17 +523,53 @@ And install it to your cluster:
     helm install istio-ingress istio/gateway -n cluster-ingress -f istio-gateway-values.yaml
 
 
-A reference Helm chart installing a gateway that uses this service is also provided.
-To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
+Create an Istio Gateway resource in the `cluster-ingress` namespace. Save the following to a file named `gateway.yaml`,
+and replace ``YOUR_HOSTNAME`` with the actual hostname you want to use for your validator node
+(and has a DNS record pointing to the cluster IP you configured above):
 
-.. parsed-literal::
+.. code-block:: yaml
 
-    helm install cluster-gateway |helm_repo_prefix|/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
+    apiVersion: networking.istio.io/v1alpha3
+    kind: Gateway
+    metadata:
+      name: cn-http-gateway
+      namespace: cluster-ingress
+    spec:
+      selector:
+        app: istio-ingress
+        istio: ingress
+      servers:
+      - port:
+          number: 443
+          name: https
+          protocol: HTTPS
+        tls:
+          mode: SIMPLE
+          credentialName: cn-net-tls # name of the secret created above
+        hosts:
+        - "*.YOUR_HOSTNAME"
+        - "YOUR_HOSTNAME"
+      - port:
+          number: 80
+          name: http
+          protocol: HTTP
+        tls:
+          httpsRedirect: true
+        hosts:
+        - "*.YOUR_HOSTNAME"
+        - "YOUR_HOSTNAME"
+
+
+And apply it to your cluster:
+
+.. code-block:: bash
+
+    kubectl apply -f gateway.yaml -n cluster-ingress
 
 
 This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
-Another reference Helm chart is provided for that, which can be installed after
+A reference Helm chart is provided for that, which can be installed after
 
 1. replacing ``YOUR_HOSTNAME`` in ``splice-node/examples/sv-helm/validator-cluster-ingress-values.yaml`` and
 2. setting ``nameServiceDomain`` in the same file to ``"cns"``

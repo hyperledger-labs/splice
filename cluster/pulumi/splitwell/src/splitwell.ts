@@ -17,6 +17,7 @@ import {
   failOnAppVersionMismatch,
   imagePullSecret,
   installAuth0Secret,
+  installLoopback,
   installSpliceHelmChart,
   ValidatorTopupConfig,
 } from 'splice-pulumi-common';
@@ -47,18 +48,7 @@ export async function installSplitwell(
         splitPostgresInstances
       );
 
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -73,7 +63,7 @@ export async function installSplitwell(
     decentralizedSynchronizerMigrationConfig.active.version,
     sharedPostgres,
     {
-      dependsOn: imagePullDeps.concat([loopback]),
+      dependsOn: imagePullDeps.concat(loopback),
     }
   );
 

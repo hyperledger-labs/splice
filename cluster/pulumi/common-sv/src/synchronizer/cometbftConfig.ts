@@ -25,3 +25,10 @@ export type StaticCometBftConfig = {
 export interface StaticCometBftConfigWithNodeName extends StaticCometBftConfig {
   nodeName: string;
 }
+
+export function cometBFTExternalPort(migrationId: number, nodeIndex: number): number {
+  // TODO(DACH-NY/canton-network-node#10482) Revisit port scheme
+  return nodeIndex >= 10
+    ? Number(`26${migrationId}${nodeIndex}`)
+    : Number(`26${migrationId}${nodeIndex}6`);
+}

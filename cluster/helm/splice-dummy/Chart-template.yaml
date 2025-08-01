@@ -2,15 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: v2
-name: splice-istio-gateway
+name: splice-dummy
 type: application
-description: Splice Istio Gateway
-deprecated: true
+description: A dummy empty Helm chart
 
 version: VERSION_NUMBER
 appVersion: VERSION_NUMBER
-
-dependencies:
-- name: splice-util-lib
-  version: 0.3.0
-  repository: file://../splice-util-lib
