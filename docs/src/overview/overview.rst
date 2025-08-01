@@ -20,7 +20,7 @@ If you need more details on any particular mechanism (such as fee calculations, 
 Global Synchronizer
 ###########################
 
-The Global Synchronizer is a decentrally operated service, using a 2/3 majority Byzantine Fault Tolerant ("BFT") consensus protocol for message ordering and confirmation, and BFT majority voting on governance changes.
+The Global Synchronizer is a decentrally operated service, using a 2/3 majority Byzantine Fault Tolerant (:term:`BFT`) consensus protocol for message ordering and confirmation, and BFT majority voting on governance changes.
 
 Its infrastructure is operated by independently acting organizations that run components of the decentralized infrastructure called Super Validators, that coordinate activities via an on-chain governance application.
 Its open source code is maintained in `Splice <https://github.com/hyperledger-labs/splice>`__.
