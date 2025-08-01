@@ -7,6 +7,7 @@ import { SelectAction } from '../components/forms/SelectAction';
 import { CreateProposalForm } from '../components/forms/CreateProposalform';
 import { SupportedActionTag } from '../utils/types';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
+import { OffboardSvForm } from '../components/forms/OffboardSvForm';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
@@ -20,6 +21,8 @@ export const CreateProposal: React.FC = () => {
     switch (a) {
       case 'SRARC_UpdateSvRewardWeight':
         return <UpdateSvRewardWeightForm onSubmit={onSubmit} />;
+      case 'SRARC_OffboardSv':
+        return <OffboardSvForm onSubmit={onSubmit} />;
       default:
         return <CreateProposalForm action={selectedAction} />;
     }
