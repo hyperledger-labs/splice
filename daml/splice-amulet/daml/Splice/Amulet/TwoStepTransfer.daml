@@ -13,14 +13,10 @@ module Splice.Amulet.TwoStepTransfer (
 
   -- * Shared support code
   holdingToTransferInputs,
-
-  -- * Test-only
-  holdingFeesForDuration,
 ) where
 
 import DA.Assert
 import DA.Optional (optionalToList)
-import DA.Time
 
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
@@ -29,7 +25,6 @@ import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Expiry
-import Splice.Fees
 import Splice.Round
 import Splice.Types
 import Splice.Util
@@ -83,10 +78,7 @@ prepareTwoStepTransfer TwoStepTransfer{..} requestedAt inputHoldingCids paymentC
         receiverFeeRatio = 0.0  -- all fees are paid by the sender
         lock = None
   [expectedTransferFees] <- exerciseComputeFees dso paymentContext sender [receiverOutputForActualTransfer]
-  openRound <- fetchChecked (ForDso with dso) paymentContext.context.openMiningRound
-  let lockDuration = transferBefore `subTime` requestedAt
-  let approximateHoldingFees = holdingFeesForDuration lockDuration openRound
-  let feesReserveAmount = (expectedTransferFees + approximateHoldingFees) * feeReserveMultiplier
+  let feesReserveAmount = expectedTransferFees * feeReserveMultiplier
 
   -- lock the amulet
   transferInputs <- holdingToTransferInputs (ForOwner with dso; owner = sender) paymentContext inputHoldingCids
@@ -167,10 +159,3 @@ abortTwoStepTransfer TwoStepTransfer{..} lockedAmuletCid extraArgs = do
       assertDeadlineExceeded transferBeforeDeadline transferBefore
       pure []
 
-holdingFeesForDuration : RelTime -> OpenMiningRound -> Decimal
-holdingFeesForDuration duration openRound =
-    holdingFeesUsd / amuletPerUsd
-  where
-    holdingFeesPerDayUsd = ratePerRoundToRatePerDay openRound.transferConfigUsd.holdingFee openRound.tickDuration
-    holdingFeesUsd = chargeRatePerDay holdingFeesPerDayUsd duration
-    amuletPerUsd = openRound.amuletPrice
