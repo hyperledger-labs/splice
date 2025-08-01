@@ -61,9 +61,9 @@ class ScanTotalSupplyBigQueryIntegrationTest
   private val mintedAmount = BigDecimal("2587519.0258740704")
   private val aliceValidatorMintedAmount = BigDecimal("26046.0426105176")
   private val lockedAmount = BigDecimal("5000")
-  private val burnedAmount = BigDecimal("304")
+  private val burnedAmount = BigDecimal("60032.83108")
   private val unlockedAmount = mintedAmount - lockedAmount - burnedAmount
-  private val unmintedAmount = BigDecimal("149927.0015223501")
+  private val unmintedAmount = BigDecimal("570776.255709163")
 
   override def beforeAll() = {
     super.beforeAll()
@@ -512,18 +512,17 @@ class ScanTotalSupplyBigQueryIntegrationTest
 
   private def verifyResults(results: ExpectedMetrics): Unit = {
     // Verify individual metrics
-    val expectedMinted = BigDecimal(0) // TODO (#1713) use mintedAmount
     forEvery(
       Seq(
         // base metrics
-        ("minted", results.minted, expectedMinted),
+        ("minted", results.minted, mintedAmount),
         ("locked", results.locked, lockedAmount),
         ("unlocked", results.unlocked, unlockedAmount),
         ("unminted", results.unminted, unmintedAmount),
         ("burned", results.burned, burnedAmount),
         // internally-derived metrics
         ("current_supply_total", results.currentSupplyTotal, lockedAmount + unlockedAmount),
-        ("allowed_mint", results.allowedMint, unmintedAmount + expectedMinted),
+        ("allowed_mint", results.allowedMint, unmintedAmount + mintedAmount),
       )
     ) { case (clue, actual, expected) =>
       actual shouldBe expected withClue clue
