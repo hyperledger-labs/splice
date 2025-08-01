@@ -309,18 +309,18 @@ function configurePublicGatewayService(
       ).concat(
         spliceConfig.pulumiProjectConfig.hasPublicDocs
           ? [
-            {
-              to: [
-                {
-                  operation: {
-                    hosts: [
-                      ...new Set([getDnsNames().cantonDnsName, getDnsNames().daDnsName]),
-                    ].map(host => `docs.${host}`),
+              {
+                to: [
+                  {
+                    operation: {
+                      hosts: [
+                        ...new Set([getDnsNames().cantonDnsName, getDnsNames().daDnsName]),
+                      ].map(host => `docs.${host}`),
+                    },
                   },
-                },
-              ],
-            },
-          ]
+                ],
+              },
+            ]
           : []
       ),
     },
@@ -456,9 +456,9 @@ function configureGatewayService(
     {
       dependsOn: istioPolicies
         ? istioPolicies.apply(policies => {
-          const base: pulumi.Resource[] = [ingressNs, istiod];
-          return base.concat(policies);
-        })
+            const base: pulumi.Resource[] = [ingressNs, istiod];
+            return base.concat(policies);
+          })
         : [ingressNs, istiod],
     }
   );
@@ -600,16 +600,7 @@ function configureGateway(
           app: 'istio-ingress-cometbft',
           istio: 'ingress-cometbft',
         },
-        servers: [
-          {
-            hosts: [getDnsNames().cantonDnsName, getDnsNames().daDnsName],
-            port: {
-              name: 'grpc-swd-pub',
-              number: 5108,
-              protocol: 'GRPC',
-            },
-          },
-        ].concat(servers),
+        servers,
       },
     },
     {
@@ -679,7 +670,7 @@ function configureDocsAndReleases(
     match: { port: number; uri?: { prefix: string } }[];
     route: { destination: { port: { number: number }; host: string } }[];
   }[] = enableGcsProxy
-      ? [
+    ? [
         {
           match: [
             {
@@ -701,7 +692,7 @@ function configureDocsAndReleases(
           ],
         },
       ]
-      : [];
+    : [];
   const nonPublic = new k8s.apiextensions.CustomResource(
     'cluster-docs-releases',
     {
