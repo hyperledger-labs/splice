@@ -13,7 +13,7 @@ The `Canton Network <https://www.canton.network>`__ is the first privacy-enabled
 Blockchain applications in the Canton Network can use the Global Synchronizer to enable atomic transactions across sovereign blockchains, without sacrificing privacy or control.
 
 - The `Global Synchronizer <https://www.canton.network/global-synchronizer>`__ is a decentralized and transparently governed interoperability service for the Canton Network.
-- Its native token, Canton Coin, is a utility token launched as part of the Global Synchronizer. Designed to overcome enterprise adoption barriers of other networks and be compatible with an ecosystem used by regulated financial enterprises.
+- Canton Network's native token, Canton Coin, is a utility token launched as part of the Global Synchronizer. Designed to overcome enterprise adoption barriers of other networks and be compatible with an ecosystem used by regulated financial enterprises.
 
 If you need more details on any particular mechanism (such as fee calculations, activity record structure, or minting rounds), the following white papers provides further technical specifications: `Canton Network white paper <https://www.digitalasset.com/hubfs/Canton/Canton%20Network%20-%20White%20Paper.pdf>`_, `Canton Coin white paper <https://www.digitalasset.com/hubfs/Canton%20Network%20Files/Documents%20(whitepapers%2c%20etc...)/Canton%20Coin_%20A%20Canton-Network-native%20payment%20application.pdf>`_.
 
