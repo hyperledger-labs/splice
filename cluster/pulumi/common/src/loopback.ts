@@ -24,7 +24,7 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   const dummyLoopbackRelease = new k8s.helm.v3.Release(
     `${namespace.logicalName}-loopback`,
     {
-      name: `cluster-gateway`,
+      name: `loopback`,
       namespace: namespace.ns.metadata.name,
       chart,
       version: version.version,
