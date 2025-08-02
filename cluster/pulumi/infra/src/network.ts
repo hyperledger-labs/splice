@@ -61,17 +61,14 @@ function clusterDnsEntries(
       },
       opts
     ),
-    new gcp.dns.RecordSet(
-      dnsName + '-cometbft',
-      {
-        name: `cometbft.${dnsName}.`,
-        ttl: 60,
-        type: 'A',
-        project: gcpDnsProject,
-        managedZone: managedZone,
-        rrdatas: [cometbftIngressIp.address],
-      },
-    ),
+    new gcp.dns.RecordSet(dnsName + '-cometbft', {
+      name: `cometbft.${dnsName}.`,
+      ttl: 60,
+      type: 'A',
+      project: gcpDnsProject,
+      managedZone: managedZone,
+      rrdatas: [cometbftIngressIp.address],
+    }),
     new gcp.dns.RecordSet(
       dnsName + '-public',
       {
