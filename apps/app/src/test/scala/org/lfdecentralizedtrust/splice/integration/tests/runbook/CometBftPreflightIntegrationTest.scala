@@ -19,7 +19,7 @@ class CometBftPreflightIntegrationTest extends IntegrationTestWithSharedEnvironm
 
   "p2p port for all CometBft nodes is accessible" in { env =>
     env.svs.remote.zipWithIndex.map { case (_, index) =>
-      val cometBftP2pHost = sys.env("NETWORK_APPS_ADDRESS")
+      val cometBftP2pHost = f"cometbft.${sys.env("NETWORK_APPS_ADDRESS")}"
       val port = s"26$migrationId${index + 1}6".toInt
       clue(s"Connection to $cometBftP2pHost with port $port") {
         // All we care about is the p2p port for CometBFT being accessible by other nodes

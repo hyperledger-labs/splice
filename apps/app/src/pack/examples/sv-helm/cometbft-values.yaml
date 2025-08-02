@@ -2,7 +2,7 @@ nodeName: "YOUR_SV_NAME"
 
 sv1:
   # Replace MIGRATION_ID (part of port number!) with the current migration ID of the global synchronizer.
-  externalAddress: TARGET_HOSTNAME:26MIGRATION_ID16
+  externalAddress: cometbft.TARGET_HOSTNAME:26MIGRATION_ID16
 
   ## Uncomment these for DevNet/TestNet:
   # nodeId: "5af57aa83abcec085c949323ed8538108757be9c"

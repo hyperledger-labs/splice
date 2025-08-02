@@ -20,7 +20,7 @@ class RunbookSvCometBftPreflightIntegrationTest extends IntegrationTestWithShare
     )
 
   "p2p port for the CometBft node is accessible" in { _ =>
-    val cometBftP2pHost = sys.env("NETWORK_APPS_ADDRESS")
+    val cometBftP2pHost = f"cometbft.${sys.env("NETWORK_APPS_ADDRESS")}"
     val cometBftPort = 26006 + migrationId.toInt * 100
     // All we care about is the p2p port for CometBFT being accessible by other nodes
     // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
