@@ -181,7 +181,7 @@
           "mesh"
         ],
         "hosts": [
-          "cometbft.mock.global.canton.network.digitalasset.com"
+          "mock.global.canton.network.digitalasset.com"
         ],
         "tcp": [
           {
@@ -304,24 +304,6 @@
           "*.sv-2.mock.global.canton.network.digitalasset.com"
         ],
         "http": [
-          {
-            "match": [
-              {
-                "gateways": [
-                  "mesh"
-                ]
-              }
-            ],
-            "route": [
-              {
-                "destination": {
-                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
-                }
-              }
-            ]
-          }
-        ],
-        "tcp": [
           {
             "match": [
               {

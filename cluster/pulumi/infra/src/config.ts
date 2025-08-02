@@ -79,7 +79,7 @@ type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
   if (svsOnly) {
     if (Array.isArray(x)) {
-      throw new Error("Cannot distinguish SV IP ranges from non-SV IP ranges in an array");
+      throw new Error('Cannot distinguish SV IP ranges from non-SV IP ranges in an array');
     }
     return extractIpRanges(x['svs'], false);
   } else {
@@ -89,9 +89,7 @@ function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
   }
 }
 
-export function loadIPRanges(
-  svsOnly: boolean = false
-): pulumi.Output<string[]> {
+export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> {
   const file = externalIpRangesFile();
   const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file), svsOnly) : [];
 
