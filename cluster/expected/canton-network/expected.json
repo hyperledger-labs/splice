@@ -190,6 +190,175 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "ServiceEntry",
+      "metadata": {
+        "name": "loopback",
+        "namespace": "sv-1"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "ports": [
+          {
+            "name": "http-port",
+            "number": 80,
+            "protocol": "HTTP"
+          },
+          {
+            "name": "tls",
+            "number": 443,
+            "protocol": "TLS"
+          },
+          {
+            "name": "grpc-domain",
+            "number": 5008,
+            "protocol": "GRPC"
+          },
+          {
+            "name": "cometbft-0-0-p2p",
+            "number": 26006,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-0-p2p",
+            "number": 26106,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-0-p2p",
+            "number": 26206,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-0-p2p",
+            "number": 26306,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-0-p2p",
+            "number": 26406,
+            "protocol": "TCP"
+          }
+        ],
+        "resolution": "DNS"
+      }
+    },
+    "name": "loopback-service-entry-sv-1",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:ServiceEntry"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "direct-loopback-through-ingress-gateway",
+        "namespace": "sv-1"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com",
+          "validator.mock.global.canton.network.digitalasset.com",
+          "*.validator.mock.global.canton.network.digitalasset.com",
+          "validator1.mock.global.canton.network.digitalasset.com",
+          "*.validator1.mock.global.canton.network.digitalasset.com",
+          "splitwell.mock.global.canton.network.digitalasset.com",
+          "*.splitwell.mock.global.canton.network.digitalasset.com",
+          "sv-2.mock.global.canton.network.digitalasset.com",
+          "*.sv-2.mock.global.canton.network.digitalasset.com"
+        ],
+        "http": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ],
+        "tcp": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ],
+        "tls": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ],
+                "sniHosts": [
+                  "mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com",
+                  "validator.mock.global.canton.network.digitalasset.com",
+                  "*.validator.mock.global.canton.network.digitalasset.com",
+                  "validator1.mock.global.canton.network.digitalasset.com",
+                  "*.validator1.mock.global.canton.network.digitalasset.com",
+                  "splitwell.mock.global.canton.network.digitalasset.com",
+                  "*.splitwell.mock.global.canton.network.digitalasset.com",
+                  "sv-2.mock.global.canton.network.digitalasset.com",
+                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "name": "loopback-virtual-service-sv-1",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -614,48 +783,13 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
+      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
       "compat": "true",
       "maxHistory": 10,
       "name": "loopback",
       "namespace": "sv-1",
       "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "cometbftPorts": {
-          "domains": 5
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.3.20"
+      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
     },
     "name": "sv-1-loopback",
     "provider": "",

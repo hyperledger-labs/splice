@@ -18,7 +18,7 @@ import {
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
-  DecentralizedSynchronizerUpgradeConfig,
+  installLoopback,
 } from 'splice-pulumi-common';
 import { installParticipant, splitwellDarPaths } from 'splice-pulumi-common-validator';
 import {
@@ -44,22 +44,7 @@ export async function installValidator1(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-      cometbftPorts: {
-        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
-        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
 
   const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
@@ -80,7 +65,7 @@ export async function installValidator1(
     auth0AppName: 'validator1',
   });
 
-  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat([loopback]);
+  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
   const participant = installParticipant(
     validator1Config,
