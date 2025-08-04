@@ -18,6 +18,18 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait PackageVersionSupport extends NamedLogging {
 
+  def supportBootstrapWithNonZeroRound(parties: Seq[PartyId], now: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[FeatureSupport] = {
+    isDarSupported(
+      parties,
+      PackageIdResolver.Package.SpliceDsoGovernance,
+      now,
+      DarResources.dsoGovernance,
+      DarResources.dsoGovernance_0_1_17,
+    )
+  }
+
   def supportsDelegatelessAutomation(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
