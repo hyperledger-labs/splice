@@ -12,6 +12,7 @@ import {
   SvIdKey,
   SvCometBftGovernanceKey,
   ValidatorTopupConfig,
+  RateLimitSchema,
 } from 'splice-pulumi-common';
 import { SweepConfig } from 'splice-pulumi-common-validator';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
@@ -105,6 +106,7 @@ export const SvConfigSchema = z.object({
                 .optional(),
             })
             .optional(),
+          externalRateLimits: RateLimitSchema,
         })
         .optional(),
       synchronizer: z

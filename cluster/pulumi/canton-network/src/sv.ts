@@ -62,6 +62,7 @@ import {
   delegatelessAutomationExpectedTaskDuration,
   delegatelessAutomationExpiredRewardCouponBatchSize,
 } from '../../common/src/automation';
+import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
 import { installInfo } from './info';
@@ -296,9 +297,7 @@ export async function installSvNode(
       },
       rateLimit: {
         scan: {
-          acs: {
-            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
-          },
+          enable: false,
         },
       },
     },
@@ -581,6 +580,10 @@ function installScan(
     logLevel: config.logging?.appsLogLevel,
     ...updateHistoryBackfillingValues,
   };
+
+  if (svsConfig?.scan?.externalRateLimits) {
+    installRateLimits(xns.ns, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+  }
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
     // TODO(#893) if possible, don't require parallel start of sv app and scan when using CantonBft
