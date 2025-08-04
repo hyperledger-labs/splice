@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
@@ -166,6 +167,20 @@ class BootstrapPackageConfigIntegrationTest
     }
 
     val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
+
+    clue("Bob's validator right has the right package id") {
+      // ValidatorRight is special as it does not have the DSO as a signatory but is involved in workflows that include the DSO
+      // so we need to make sure it uses a package id also vetted by the DSO and not the newer one that is pulled in by the splitwell DAR above.
+      val bobValidatorRight =
+        bobValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
+          .active_contracts_of_party(
+            bobUserParty,
+            filterTemplates = Seq(TemplateId("#splice-amulet", "Splice.Amulet", "ValidatorRight")),
+          )
+          .loneElement
+          .getCreatedEvent
+      bobValidatorRight.getTemplateId.packageId shouldBe DarResources.amulet_0_1_8.packageId
+    }
 
     aliceWalletClient.tap(50)
 
