@@ -370,6 +370,6 @@ jobs:
           should_save_gcp: true
           artifactory_user: ""
           artifactory_password: ""
-          cache_version: 4
+          cache_version: 5
           upload_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}
           upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
