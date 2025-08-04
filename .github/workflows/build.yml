@@ -364,10 +364,9 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: test nix upload
-        uses: ./.github/actions/nix/setup_nix
+        uses: ./.github/actions/nix/setup_self_hosted_nix
         with:
           oss_only: true
-          self_hosted: true
           should_save_gcp: true
           artifactory_user: ""
           artifactory_password: ""
