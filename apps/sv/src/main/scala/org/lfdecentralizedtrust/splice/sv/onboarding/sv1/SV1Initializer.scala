@@ -271,9 +271,16 @@ class SV1Initializer(
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        decentralizedSynchronizer,
+        svAutomation.connection,
+        loggerFactory,
+      )
       initialRound <- establishInitialRound(
         svAutomation.connection,
         upgradesConfig,
+        packageVersionSupport,
+        svParty,
       )
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
@@ -297,11 +304,6 @@ class SV1Initializer(
               .asRuntimeException()
         },
         logger,
-      )
-      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        decentralizedSynchronizer,
-        svAutomation.connection,
-        loggerFactory,
       )
       dsoAutomation = newSvDsoAutomationService(
         svStore,

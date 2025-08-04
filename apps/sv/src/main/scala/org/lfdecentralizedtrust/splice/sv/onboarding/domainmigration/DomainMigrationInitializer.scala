@@ -242,6 +242,8 @@ class DomainMigrationInitializer(
       _ <- establishInitialRound(
         readOnlyConnection,
         upgradesConfig,
+        packageVersionSupport,
+        svStore.key.svParty,
       )
     } yield (
       decentralizedSynchronizerId,
