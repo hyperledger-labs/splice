@@ -5,7 +5,7 @@ import * as pulumi from '@pulumi/pulumi';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
 import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 
-import { chartPath, CnChartVersion, isDevNet } from '../../common';
+import { chartPath, CnChartVersion, isDevNet, isMainNet } from '../../common';
 import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';
 import {
   CLUSTER_HOSTNAME,
@@ -45,13 +45,21 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   // and support easily deploying without refreshing the infra stack.
   const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
 
-  const cometBFTPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration =>
-    Array.from({ length: numSVs }, (_, node) => node).map(node => ({
-      number: cometBFTExternalPort(migration, node),
-      name: `cometbft-${migration}-${node}-p2p`,
-      protocol: 'TCP',
-    }))
-  );
+  const port = (migration: number, node: number) => ({
+    number: cometBFTExternalPort(migration, node),
+    name: `cometbft-${migration}-${node}-p2p`,
+    protocol: 'TCP',
+  });
+  const cometBFTPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
+    const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
+      port(migration, node + 1)
+    );
+    if (!isMainNet) {
+      // For non-mainnet clusters, include "node 0" for the sv runbook
+      ret.push(port(migration, 0));
+    }
+    return ret;
+  });
 
   const clusterHostname = CLUSTER_HOSTNAME;
   const serviceEntry = new k8s.apiextensions.CustomResource(

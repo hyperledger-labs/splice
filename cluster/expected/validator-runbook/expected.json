@@ -241,8 +241,18 @@
             "protocol": "GRPC"
           },
           {
+            "name": "cometbft-0-1-p2p",
+            "number": 26016,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-0-0-p2p",
             "number": 26006,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-1-p2p",
+            "number": 26116,
             "protocol": "TCP"
           },
           {
@@ -251,13 +261,28 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-2-1-p2p",
+            "number": 26216,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-2-0-p2p",
             "number": 26206,
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-3-1-p2p",
+            "number": 26316,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-3-0-p2p",
             "number": 26306,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-1-p2p",
+            "number": 26416,
             "protocol": "TCP"
           },
           {
