@@ -200,6 +200,10 @@ runs:
         echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
         mkdir -p /tmp/nix-upload/src
 
+        # FIXME: should not be required, installed already in save_nix above, but for testing we're currently skipping that, so reinstalling here for now
+        sudo -v ; curl https://rclone.org/install.sh | sudo bash
+
+
         CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
         ${CLONE_COMMAND} "$HOME/" "/tmp/nix-upload/src" --include ".nix-*/**" --include ".nix-*"
         ${CLONE_COMMAND} $HOME/.config/nix "/tmp/nix-upload/src"
