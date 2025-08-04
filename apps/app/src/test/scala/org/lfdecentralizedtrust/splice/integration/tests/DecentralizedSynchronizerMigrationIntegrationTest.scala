@@ -431,8 +431,10 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
-  def currentRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
-    sv1ScanBackend.getDsoInfo().initialRound match {
+  def firstRound(
+      backend: SvAppBackendReference
+  ): Long =
+    backend.getDsoInfo().initialRound match {
       case None => 0L
       case Some(round) => round.toLong
     }
@@ -1065,7 +1067,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       "Bob",
                       SvUtil.DefaultSV1Weight,
                       "bob-participant-id",
-                      new Round(currentRound + 42),
+                      new Round(firstRound(sv1LocalBackend) + 42),
                     )
                   )
                 ),
