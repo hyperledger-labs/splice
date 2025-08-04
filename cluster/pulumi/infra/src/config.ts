@@ -72,15 +72,22 @@ export const monitoringConfig = fullConfig.monitoring;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 
-function extractIpRanges(x: IpRangesDict): string[] {
-  return Array.isArray(x)
-    ? x
-    : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
+  if (svsOnly) {
+    if (Array.isArray(x)) {
+      throw new Error('Cannot distinguish SV IP ranges from non-SV IP ranges in an array');
+    }
+    return extractIpRanges(x['svs'], false);
+  } else {
+    return Array.isArray(x)
+      ? x
+      : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+  }
 }
 
-export function loadIPRanges(): pulumi.Output<string[]> {
+export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> {
   const file = externalIpRangesFile();
-  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file)) : [];
+  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file), svsOnly) : [];
 
   const internalWhitelistedIps = getSecretVersionOutput({
     secret: 'pulumi-internal-whitelists',
