@@ -34,6 +34,7 @@ const MonitoringConfigSchema = z.object({
       loadTester: z.object({
         minRate: z.number(),
       }),
+      svParticipantIds: z.array(z.string()).default([]),
     }),
     logAlerts: z.object({}).catchall(z.string()).default({}),
   }),

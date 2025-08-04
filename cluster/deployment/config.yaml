@@ -62,6 +62,9 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+      svParticipantIds:
+        - Dummy-SV-1::122093af924330cad7ae188e8f4907ec683cef01786a49b98b5e2e840309e4f51ecd
+        - Dummy-SV-2::1220d384538d5c8c83d74df89fd57723f40abeff389d7bd6a35293600f29d228ec11
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
