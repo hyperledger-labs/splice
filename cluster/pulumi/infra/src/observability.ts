@@ -752,11 +752,6 @@ function defaultAlertSubstitutions(alert: string): string {
   );
 }
 
-const shortenCantonUid = (s: string): string => {
-  const [a, b] = s.split('::');
-  return `${a}::${b.slice(0, 12)}....`;
-};
-
 function createGrafanaAlerting(namespace: Input<string>) {
   new k8s.core.v1.ConfigMap(
     'grafana-alerting',
@@ -812,8 +807,8 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
-                monitoringConfig.alerting.alerts.svParticipantIds
-                  .map(p => `,member!="${shortenCantonUid(p)}"`)
+                monitoringConfig.alerting.alerts.svNames
+                  .map(p => `,member!~"PAR::${(p)}::.*"`)
                   .join('')
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
