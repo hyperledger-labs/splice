@@ -22,7 +22,9 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   };
   const chart = chartPath('splice-dummy', version);
   const loopbackResourceName =
-    namespace.logicalName == 'sv' || namespace.logicalName == 'validator'
+    namespace.logicalName == 'sv' ||
+    namespace.logicalName == 'validator' ||
+    namespace.logicalName == 'multi-validator'
       ? 'loopback'
       : `${namespace.logicalName}-loopback`;
   const dummyLoopbackRelease = new k8s.helm.v3.Release(
