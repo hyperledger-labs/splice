@@ -30,18 +30,6 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
-  def supportsDelegatelessAutomation(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_13,
-    )
-  }
-
   def supportsMergeDuplicatedValidatorLicense(
       dsoGovernanceParties: Seq[PartyId],
       amuletParties: Seq[PartyId],

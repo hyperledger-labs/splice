@@ -3,15 +3,13 @@
 
 package org.lfdecentralizedtrust.splice.http
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport
 import org.lfdecentralizedtrust.splice.http.v0.definitions.FeatureSupportResponse
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
 
@@ -20,23 +18,15 @@ trait HttpFeatureSupportHandler extends Spanning with NamedLogging {
   protected implicit val tracer: Tracer
 
   def readFeatureSupport(
-      party: PartyId
   )(implicit
       tc: TraceContext,
-      ec: ExecutionContext,
       tracer: Tracer,
   ): Future[FeatureSupportResponse] = {
-    withSpan(s"$workflowId.featureSupport") { implicit tc => _ =>
-      for {
-        delegatelessAutomation <- packageVersionSupport
-          .supportsDelegatelessAutomation(
-            Seq(
-              party
-            ),
-            CantonTimestamp.now(),
-          )
-      } yield FeatureSupportResponse(
-        delegatelessAutomation.supported
+    withSpan(s"$workflowId.featureSupport") { _ => _ =>
+      Future.successful(
+        FeatureSupportResponse(
+          false
+        )
       )
     }
 

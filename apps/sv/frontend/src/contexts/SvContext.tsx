@@ -30,7 +30,7 @@ export const useDsoInfos = (): UseQueryResult<DsoInfo> => {
 };
 
 export const useFeatureSupport = (): UseQueryResult<{
-  delegatelessAutomation: boolean;
+  my_feature: boolean;
 }> => {
   const { featureSupport } = useSvAdminClient();
   return useQuery({
@@ -38,7 +38,7 @@ export const useFeatureSupport = (): UseQueryResult<{
     queryFn: async () => {
       const resp = await featureSupport();
       return {
-        delegatelessAutomation: resp.delegateless_automation,
+        myFeature: resp.my_feature,
       };
     },
   });

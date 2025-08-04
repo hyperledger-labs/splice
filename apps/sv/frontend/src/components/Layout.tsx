@@ -40,19 +40,12 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
     return <Loading />;
   }
 
-  const navLinks = featureSupport.data?.delegatelessAutomation
-    ? [
-        { name: 'Information', path: 'dso' },
-        { name: 'Validator Onboarding', path: 'validator-onboarding' },
-        { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
-        { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
-      ]
-    : [
-        { name: 'Information', path: 'dso' },
-        { name: 'Validator Onboarding', path: 'validator-onboarding' },
-        { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
-        { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
-      ];
+  const navLinks = [
+    { name: 'Information', path: 'dso' },
+    { name: 'Validator Onboarding', path: 'validator-onboarding' },
+    { name: `${config.spliceInstanceNames.amuletName} Price`, path: 'amulet-price' },
+    { name: 'Governance', path: 'votes', badgeCount: actionsPending?.length },
+  ];
 
   return (
     <Box bgcolor="colors.neutral.20" display="flex" flexDirection="column" minHeight="100vh">

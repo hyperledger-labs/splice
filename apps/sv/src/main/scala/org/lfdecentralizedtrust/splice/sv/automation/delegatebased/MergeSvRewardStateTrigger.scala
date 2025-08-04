@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -70,20 +71,15 @@ class MergeSvRewardStateContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       arg = new DsoRules_MergeSvRewardState(
         svName,
         svRewardStates.map(_.contractId).asJava,
-        controllerArgument,
+        Optional.of(controller),
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeSvRewardState(arg))
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(s"Merged ${svRewardStates.length} member traffic contracts for $svName")
   }

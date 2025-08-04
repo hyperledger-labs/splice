@@ -19,6 +19,7 @@ import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -56,10 +57,6 @@ class AdvanceOpenMiningRoundTrigger(
       _ = logger.debug(
         s"Starting work as for ${task.work}"
       )
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        task.work.time,
-      )
       amuletPriceVotes <- store.listSvAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(
@@ -68,7 +65,7 @@ class AdvanceOpenMiningRoundTrigger(
           rounds.middle.contractId,
           rounds.newest.contractId,
           amuletPriceVotes.map(_.contractId).asJava,
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection
@@ -81,7 +78,6 @@ class AdvanceOpenMiningRoundTrigger(
         // as the target domain here.
         .withSynchronizerId(task.work.openRounds.domain)
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"

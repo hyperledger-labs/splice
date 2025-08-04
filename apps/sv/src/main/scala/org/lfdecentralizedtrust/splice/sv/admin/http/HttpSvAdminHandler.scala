@@ -676,9 +676,8 @@ class HttpSvAdminHandler(
   override def featureSupport(respond: SvAdminResource.FeatureSupportResponse.type)()(
       extracted: TracedUser
   ): Future[SvAdminResource.FeatureSupportResponse] = {
-    readFeatureSupport(dsoStore.key.dsoParty)(
+    readFeatureSupport()(
       extracted.traceContext,
-      ec,
       tracer,
     )
       .map(SvAdminResource.FeatureSupportResponseOK(_))

@@ -3,13 +3,11 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.DelayUtil
 import org.lfdecentralizedtrust.splice.automation.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
 import org.lfdecentralizedtrust.splice.environment.{
   PackageVersionSupport,
   RetryFor,
@@ -21,7 +19,6 @@ import org.lfdecentralizedtrust.splice.util.AssignedContract
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.OptionConverters.RichOption
 import scala.util.Random
 
 trait SvTaskBasedTrigger[T <: PrettyPrinting] {
@@ -41,26 +38,6 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] {
   protected def svTaskContext: SvTaskBasedTrigger.Context
 
   private val store = svTaskContext.dsoStore
-  private val packageVersionSupport = svTaskContext.packageVersionSupport
-
-  final protected def supportsDelegateLessAutomation(clock: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] =
-    packageVersionSupport.supportsDelegatelessAutomation(
-      Seq(store.key.svParty, store.key.dsoParty),
-      clock,
-    )
-
-  final protected def getDelegateLessFeatureSupportArguments(
-      controller: String,
-      clock: CantonTimestamp,
-  )(implicit
-      tc: TraceContext
-  ): Future[(java.util.Optional[String], Seq[String])] = {
-    for {
-      featureSupport <- supportsDelegateLessAutomation(clock)
-    } yield (Option.when(featureSupport.supported)(controller).toJava, featureSupport.packageIds)
-  }
 
   final protected override def completeTask(
       task: T
