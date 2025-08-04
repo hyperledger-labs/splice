@@ -4,23 +4,27 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { local } from '@pulumi/command';
+import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
+import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
-  activeVersion,
+  chartPath,
+  CLUSTER_HOSTNAME,
   CLUSTER_NAME,
+  CnChartVersion,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
   GCP_ZONE,
   getDnsNames,
+  HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
-  InstalledHelmChart,
-  installSpliceHelmChart,
   MOCK_SPLICE_ROOT,
   SPLICE_ROOT,
+  isDevNet,
 } from '../../common';
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
@@ -463,38 +467,300 @@ function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
-): InstalledHelmChart {
-  return installSpliceHelmChart(
-    ingressNs,
-    'cluster-gateway',
-    'splice-istio-gateway',
+): k8s.apiextensions.CustomResource[] {
+  // TODO(#1766): remove this once we migrated to this everywhere
+  const version: CnChartVersion = {
+    type: 'remote',
+    version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
+  };
+  const chart = chartPath('splice-dummy', version);
+  const gatewayChart = new k8s.helm.v3.Release(
+    `cluster-gateway`,
     {
-      cluster: {
-        cantonHostname: getDnsNames().cantonDnsName,
-        daHostname: getDnsNames().daDnsName,
-        basename: clusterBasename,
-      },
-      cometbftPorts: {
-        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive
-        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
-      },
-      enableGcsProxy: true,
-      publicDocs: spliceConfig.pulumiProjectConfig.hasPublicDocs,
+      name: `cluster-gateway`,
+      namespace: ingressNs.ns.metadata.name,
+      chart,
+      version: version.version,
+      timeout: HELM_CHART_TIMEOUT_SEC,
+      maxHistory: HELM_MAX_HISTORY_SIZE,
     },
-    activeVersion,
-    {
-      dependsOn: [gwSvc, publicGwSvc],
-    },
-    false,
-    infraAffinityAndTolerations
+    { deleteBeforeReplace: true }
   );
+
+  const hosts = [
+    getDnsNames().cantonDnsName,
+    `*.${getDnsNames().cantonDnsName}`,
+    getDnsNames().daDnsName,
+    `*.${getDnsNames().daDnsName}`,
+  ];
+  const httpGw = new k8s.apiextensions.CustomResource(
+    'cn-http-gateway',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'Gateway',
+      metadata: {
+        name: 'cn-http-gateway',
+        namespace: ingressNs.ns.metadata.name,
+      },
+      spec: {
+        selector: {
+          app: 'istio-ingress',
+          istio: 'ingress',
+        },
+        servers: [
+          {
+            hosts,
+            port: {
+              name: 'http',
+              number: 80,
+              protocol: 'HTTP',
+            },
+            tls: {
+              httpsRedirect: true,
+            },
+          },
+          {
+            hosts,
+            port: {
+              name: 'https',
+              number: 443,
+              protocol: 'HTTPS',
+            },
+            tls: {
+              mode: 'SIMPLE',
+              credentialName: `cn-${clusterBasename}net-tls`,
+            },
+          },
+        ],
+      },
+    },
+    {
+      dependsOn: [gwSvc, gatewayChart],
+    }
+  );
+
+  const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
+  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // and support easily deploying without refreshing the infra stack.
+  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+
+  const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration =>
+    Array.from({ length: numSVs }, (_, node) => node).map(node => ({
+      // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
+      hosts: ['*'],
+      port: {
+        name: `cometbft-${migration}-${node}-gw`,
+        number: cometBFTExternalPort(migration, node),
+        protocol: 'TCP',
+      },
+    }))
+  );
+
+  const appsGw = new k8s.apiextensions.CustomResource(
+    'cn-apps-gateway',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'Gateway',
+      metadata: {
+        name: 'cn-apps-gateway',
+        namespace: ingressNs.ns.metadata.name,
+      },
+      spec: {
+        selector: {
+          app: 'istio-ingress',
+          istio: 'ingress',
+        },
+        servers: [
+          {
+            hosts: [getDnsNames().cantonDnsName, getDnsNames().daDnsName],
+            port: {
+              name: 'grpc-swd-pub',
+              number: 5108,
+              protocol: 'GRPC',
+            },
+          },
+        ].concat(servers),
+      },
+    },
+    {
+      dependsOn: [gwSvc, gatewayChart],
+    }
+  );
+
+  const clusterHostname = CLUSTER_HOSTNAME;
+  const publicHosts = [`public.${clusterHostname}`].concat(
+    spliceConfig.pulumiProjectConfig.hasPublicDocs ? [`docs.${clusterHostname}`] : []
+  );
+  const publicGw = new k8s.apiextensions.CustomResource(
+    'cn-public-http-gateway',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'Gateway',
+      metadata: {
+        name: 'cn-public-http-gateway',
+        namespace: ingressNs.ns.metadata.name,
+      },
+      spec: {
+        selector: {
+          app: 'istio-ingress-public',
+          istio: 'ingress-public',
+        },
+        servers: [
+          {
+            hosts: publicHosts,
+            port: {
+              name: 'http',
+              number: 80,
+              protocol: 'HTTP',
+            },
+            tls: {
+              httpsRedirect: true,
+            },
+          },
+          {
+            hosts: publicHosts,
+            port: {
+              name: 'https',
+              number: 443,
+              protocol: 'HTTPS',
+            },
+            tls: {
+              mode: 'SIMPLE',
+              credentialName: `cn-${clusterBasename}net-tls`,
+            },
+          },
+        ],
+      },
+    },
+    {
+      dependsOn: [publicGwSvc, gatewayChart],
+    }
+  );
+
+  return [httpGw, appsGw, publicGw];
+}
+
+function configureDocsAndReleases(
+  enableGcsProxy: boolean,
+  publicDocs: boolean,
+  dependsOn: pulumi.Resource[]
+): k8s.apiextensions.CustomResource[] {
+  const gcsProxyPath: {
+    match: { port: number; uri?: { prefix: string } }[];
+    route: { destination: { port: { number: number }; host: string } }[];
+  }[] = enableGcsProxy
+    ? [
+        {
+          match: [
+            {
+              port: 443,
+              uri: {
+                prefix: '/cn-release-bundles',
+              },
+            },
+          ],
+          route: [
+            {
+              destination: {
+                port: {
+                  number: 8080,
+                },
+                host: 'gcs-proxy.docs.svc.cluster.local',
+              },
+            },
+          ],
+        },
+      ]
+    : [];
+  const nonPublic = new k8s.apiextensions.CustomResource(
+    'cluster-docs-releases',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'VirtualService',
+      metadata: {
+        name: 'cluster-docs-releases',
+        namespace: 'cluster-ingress',
+      },
+      spec: {
+        hosts: [getDnsNames().cantonDnsName].concat(
+          CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [getDnsNames().daDnsName] : []
+        ),
+        gateways: ['cn-http-gateway'],
+        http: gcsProxyPath.concat([
+          {
+            match: [
+              {
+                port: 443,
+              },
+            ],
+            route: [
+              {
+                destination: {
+                  port: {
+                    number: 80,
+                  },
+                  host: 'docs.docs.svc.cluster.local',
+                },
+              },
+            ],
+          },
+        ]),
+      },
+    },
+    { dependsOn }
+  );
+
+  const ret = [nonPublic];
+
+  if (publicDocs) {
+    const publicVS = new k8s.apiextensions.CustomResource(
+      'cluster-docs-public',
+      {
+        apiVersion: 'networking.istio.io/v1alpha3',
+        kind: 'VirtualService',
+        metadata: {
+          name: 'cluster-docs-public',
+          namespace: 'cluster-ingress',
+        },
+        spec: {
+          hosts: [`docs.${getDnsNames().cantonDnsName}`].concat(
+            CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [`docs.${getDnsNames().daDnsName}`] : []
+          ),
+          gateways: ['cn-public-http-gateway'],
+          http: [
+            {
+              match: [
+                {
+                  port: 443,
+                },
+              ],
+              route: [
+                {
+                  destination: {
+                    port: {
+                      number: 80,
+                    },
+                    host: 'docs.docs.svc.cluster.local',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      },
+      { dependsOn }
+    );
+    ret.push(publicVS);
+  }
+
+  return ret;
 }
 
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
   publicIngressIp: pulumi.Output<string>
-): InstalledHelmChart {
+): pulumi.Resource[] {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
     metadata: {
@@ -505,7 +771,13 @@ export function configureIstio(
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
   const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
-  return configureGateway(ingressNs, gwSvc, publicGwSvc);
+  const gateways = configureGateway(ingressNs, gwSvc, publicGwSvc);
+  const docsAndReleases = configureDocsAndReleases(
+    true,
+    spliceConfig.pulumiProjectConfig.hasPublicDocs,
+    gateways
+  );
+  return gateways.concat(docsAndReleases);
 }
 
 export function istioMonitoring(
