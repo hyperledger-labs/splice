@@ -34,8 +34,14 @@ type PartialWalletTransferOffer = {
   sender: string;
   expiresAt: string;
   isTokenStandard: boolean;
+  receiver: string;
 };
-export const TransferOffers: React.FC = () => {
+
+type TransferOffersListProps = {
+  mode: 'sent' | 'received';
+};
+
+export const TransferOffers: React.FC<TransferOffersListProps> = ({ mode }) => {
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
   const amuletPriceQuery = useAmuletPrice();
   const primaryPartyId = usePrimaryParty();
@@ -46,7 +52,9 @@ export const TransferOffers: React.FC = () => {
       amuletPrice: BigNumber
     ): Promise<WalletTransferOffer[]> => {
       return items
-        .filter(item => item.sender !== primaryPartyId)
+        .filter(item =>
+          mode === 'sent' ? item.sender === primaryPartyId : item.sender !== primaryPartyId
+        )
         .map(item => {
           return {
             contractId: item.contractId,
@@ -59,12 +67,13 @@ export const TransferOffers: React.FC = () => {
               amuletPrice
             ),
             senderId: item.sender,
+            receiverId: item.receiver,
             expiry: item.expiresAt,
             isTokenStandard: item.isTokenStandard,
           };
         });
     },
-    [primaryPartyId]
+    [primaryPartyId, mode]
   );
 
   const transferOfferContractsQuery = useTransferOffers(amuletPriceQuery.data);
@@ -82,6 +91,7 @@ export const TransferOffers: React.FC = () => {
             contractId: offer.contractId,
             amount: offer.payload.amount.amount,
             sender: offer.payload.sender,
+            receiver: offer.payload.receiver,
             expiresAt: offer.payload.expiresAt,
           };
           return item;
@@ -93,6 +103,7 @@ export const TransferOffers: React.FC = () => {
               contractId: transfer.contractId,
               amount: transfer.payload.transfer.amount,
               sender: transfer.payload.transfer.sender,
+              receiver: transfer.payload.transfer.receiver,
               expiresAt: transfer.payload.transfer.executeBefore,
             };
             return item;
@@ -110,11 +121,12 @@ export const TransferOffers: React.FC = () => {
     amuletPriceQuery.isError ||
     transferOfferContractsQuery.isError ||
     tokenStandardTransfersQuery.isError;
+  const heading = mode === 'sent' ? 'Pending Offers ' : 'Action Needed ';
 
   return (
     <Stack spacing={4} direction="column" justifyContent="center" id="transfer-offers">
       <Typography mt={6} variant="h4">
-        Action Needed{' '}
+        {heading}
         <Chip label={offers.length} color="success" className="transfer-offers-count" />
       </Typography>
       {isLoading ? (
@@ -127,7 +139,7 @@ export const TransferOffers: React.FC = () => {
         </Box>
       ) : (
         offers.map((offer, index) => (
-          <TransferOfferDisplay key={'offer-' + index} transferOffer={offer} />
+          <TransferOfferDisplay key={'offer-' + index} transferOffer={offer} mode={mode} />
         ))
       )}
     </Stack>
@@ -136,11 +148,14 @@ export const TransferOffers: React.FC = () => {
 
 interface TransferOfferProps {
   transferOffer: WalletTransferOffer;
+  mode: 'sent' | 'received';
 }
 
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const config = useWalletConfig();
   const offer = props.transferOffer;
+  const mode = props.mode;
+
   const {
     acceptTransferOffer,
     rejectTransferOffer,
@@ -151,7 +166,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const reject = offer.isTokenStandard ? rejectTokenStandardTransfer : rejectTransferOffer;
 
   return (
-    <Card className="transfer-offer" variant="outlined">
+    <Card className={mode === 'sent' ? 'pending-offer' : 'transfer-offer'} variant="outlined">
       <CardContent
         sx={{
           display: 'flex',
@@ -163,11 +178,19 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            <BftAnsEntry
-              partyId={offer.senderId}
-              variant="h5"
-              className={'transfer-offer-sender'}
-            />
+            {mode === 'received' ? (
+              <BftAnsEntry
+                partyId={offer.senderId}
+                variant="h5"
+                className={'transfer-offer-sender'}
+              />
+            ) : (
+              <BftAnsEntry
+                partyId={offer.receiverId}
+                variant="h5"
+                className={'transfer-offer-receiver'}
+              />
+            )}
           </Stack>
         </Stack>
         <Stack direction="column" alignItems="flex-end">
@@ -186,23 +209,27 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
           </Typography>
         </Stack>
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Button
-            variant="pill"
-            size="small"
-            onClick={() => accept(offer.contractId)}
-            className="transfer-offer-accept"
-          >
-            Accept
-          </Button>
-          <Button
-            variant="pill"
-            color="warning"
-            size="small"
-            onClick={() => reject(offer.contractId)}
-            className="transfer-offer-reject"
-          >
-            Reject
-          </Button>
+          {mode !== 'sent' ? (
+            <>
+              <Button
+                variant="pill"
+                size="small"
+                onClick={() => accept(offer.contractId)}
+                className="transfer-offer-accept"
+              >
+                Accept
+              </Button>
+              <Button
+                variant="pill"
+                color="warning"
+                size="small"
+                onClick={() => reject(offer.contractId)}
+                className="transfer-offer-reject"
+              >
+                Reject
+              </Button>
+            </>
+          ) : null}
         </Stack>
         <Typography variant="caption" className="transfer-offer-expiry">
           Expires <DateDisplay datetime={offer.expiry} />
