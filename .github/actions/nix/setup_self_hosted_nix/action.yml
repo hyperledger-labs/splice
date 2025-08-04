@@ -187,7 +187,7 @@ runs:
         workload_identity_provider: '${{ inputs.upload_workload_identity_provider }}'
         service_account: '${{ inputs.upload_service_account }}'
 
-    # FIXME: would be faster if not taken from nfs
+    # FIXME: would be faster if not taken from nfs (done)
     # FIXME: also consider not tarring it at all, the tar/untar takes a couple of minutes each
     # (actually tar much longer, about 8 minutes, but I suspect that ATM it's nfs slowing it down). The
     # upload itself may also be faster if not tarred, as it will parallelize the upload of the files.
@@ -198,8 +198,22 @@ runs:
       run: |
         set -euxo pipefail
         echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
-        mkdir /tmp/nix-upload
-        tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
+        mkdir -p /tmp/nix-upload/src
+
+        CLONE_COMMAND="rclone --no-update-dir-modtime --no-update-modtime --size-only --multi-thread-streams=32 --transfers=32 --ignore-existing --links --create-empty-src-dirs --fast-list --metadata --order-by name,mixed --retries 10 copy"
+        ${CLONE_COMMAND} "$HOME/" "/tmp/nix-upload/src" --include ".nix-*/**" --include ".nix-*"
+        ${CLONE_COMMAND} $HOME/.config/nix "/tmp/nix-upload/src"
+
+        mkdir -p "/tmp/nix-upload/src/nix_store/store"
+        mkdir -p "/tmp/nix-upload/src/nix_store/var"
+
+        #requires to preserve read only during clone
+        sudo ${CLONE_COMMAND} /nix/store/ /tmp/nix-upload/src/nix_store/store
+        sudo ${CLONE_COMMAND} /nix/var/ "/tmp/nix-upload/src/nix_store/var"
+
+
+        tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/tmp/nix-upload/src/" .
+
         echo "Cache compressed to /tmp/nix-upload/${cache_key}.tar.gz"
         ls /tmp/nix-upload
         echo "cache_file=/tmp/nix-upload/${cache_key}.tar.gz" >> $GITHUB_OUTPUT
