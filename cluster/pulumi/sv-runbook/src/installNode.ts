@@ -39,7 +39,6 @@ import {
   spliceInstanceNames,
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
-  InstalledHelmChart,
   ansDomainPrefix,
   svUserIds,
   SvCometBftGovernanceKey,
@@ -100,7 +99,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -167,7 +166,7 @@ type SvConfig = {
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
-  loopback: InstalledHelmChart | null;
+  loopback: pulumi.Resource[];
   backupConfigSecret?: pulumi.Resource;
   svKey: CnInput<SvIdKey>;
   onboardingName: string;
