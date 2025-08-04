@@ -8,6 +8,7 @@ import { GetBalanceResponse } from './models';
 import { ValidatorClient } from './validator';
 
 const createOfferLatency = new Trend('create_offer_latency', true);
+const offerSyncLatency = new Trend('offer_sync_latency', true);
 const acceptOfferLatency = new Trend('accept_offer_latency', true);
 
 const transfersCompleted = new Counter('transfers_completed');
@@ -34,7 +35,6 @@ export function sendAndWaitForTransferOffer(
     const transferOffer = sender.v0.wallet.createTransferOffer(amount, receiverParty);
 
     if (transferOffer) {
-      // Record transferOffer created time
       const createdOfferTime = Date.now();
       createOfferLatency.add(createdOfferTime - startTime);
 
@@ -45,12 +45,14 @@ export function sendAndWaitForTransferOffer(
             ?.transfers.find(o => o.contract_id === transferOffer.output.transfer_instruction_cid),
       );
 
+      const syncOfferTime = Date.now();
+      offerSyncLatency.add(syncOfferTime - createdOfferTime);
+
       if (receivingOffer) {
         receiver.v0.wallet.acceptTransferOffer(receivingOffer.contract_id);
 
-        // Record transferOffer accept time
         const acceptOfferTime = Date.now();
-        acceptOfferLatency.add(acceptOfferTime - createdOfferTime);
+        acceptOfferLatency.add(acceptOfferTime - syncOfferTime);
 
         transfersCompleted.add(1);
       }

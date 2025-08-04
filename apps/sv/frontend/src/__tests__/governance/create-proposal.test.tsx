@@ -8,6 +8,8 @@ import { ThemeProvider } from '@emotion/react';
 import { theme } from '../../../../../common/frontend/lib/theme';
 import { CreateProposal } from '../../routes/createProposal';
 import userEvent from '@testing-library/user-event';
+import { Wrapper } from '../helpers';
+import { createProposalActions } from '../../utils/governance';
 
 const TestWrapper: React.FC<React.PropsWithChildren> = ({ children }) => {
   return (
@@ -16,6 +18,34 @@ const TestWrapper: React.FC<React.PropsWithChildren> = ({ children }) => {
     </MemoryRouter>
   );
 };
+
+async function checkActionSelection(actionName: string, actionValue: string, testId: string) {
+  const user = userEvent.setup();
+
+  render(
+    <Wrapper>
+      <CreateProposal />
+    </Wrapper>
+  );
+
+  const actionDropdown = screen.getByTestId('select-action');
+
+  const selectInput = actionDropdown.querySelector('[role="combobox"]') as HTMLElement;
+  await user.click(selectInput);
+
+  await waitFor(async () => {
+    const actionToSelect = screen.getByText(actionName);
+    expect(actionToSelect).toBeDefined();
+    await user.click(actionToSelect);
+  });
+
+  const nextButton = screen.getByText('Next');
+  await user.click(nextButton);
+
+  const actionInput = screen.getByTestId(testId);
+  const action = createProposalActions.find(a => a.value === actionValue);
+  expect(actionInput.getAttribute('value')).toBe(action!.name);
+}
 
 describe('Create Proposal', () => {
   test('Display action selection and all actions', async () => {
@@ -43,6 +73,18 @@ describe('Create Proposal', () => {
       expect(screen.getByText('Set Amulet Rules Configuration')).toBeTruthy();
       expect(screen.getByText('Update SV Reward Weight')).toBeTruthy();
     });
+  });
+
+  test('Update Reward Weight Form is rendered after action selection', async () => {
+    await checkActionSelection(
+      'Update SV Reward Weight',
+      'SRARC_UpdateSvRewardWeight',
+      'update-sv-reward-weight-action'
+    );
+  });
+
+  test('Offboard SV Form is rendered after action selection', async () => {
+    await checkActionSelection('Offboard Member', 'SRARC_OffboardSv', 'offboard-sv-action');
   });
 
   test('Display cancel and next buttons', () => {

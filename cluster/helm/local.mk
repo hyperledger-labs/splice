@@ -3,7 +3,6 @@
 
 app_charts := \
 	splice-cluster-ingress-runbook \
-	splice-cluster-loopback-gateway \
 	splice-cometbft \
 	cn-docs \
 	splice-domain \
@@ -17,7 +16,8 @@ app_charts := \
 	splice-splitwell-web-ui \
 	splice-sv-node \
 	splice-validator \
-	splice-info
+	splice-info \
+  splice-dummy
 
 HELM_VERSION_TAG := cluster/helm/.version-tag
 IMAGE_DIGESTS := cluster/helm/.image-digests

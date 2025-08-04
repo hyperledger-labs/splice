@@ -1,6 +1,11 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# ******   Deprecated   ******
+# This file is deprecated and will be removed in a future release.
+# Please see instructions for installing gateways manually in the validator & SV docs.
+# ****************************
+
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:

@@ -101,6 +101,7 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
+  chartVersion: 1.2.3
 svs:
   default:
     svApp:

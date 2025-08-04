@@ -247,22 +247,18 @@ class ValidatorApp(
                       migrationDump.acsSnapshot,
                     )
                   }
-                  _ <- migrationDump.participantUsers match {
-                    case Some(participantUsersData) =>
-                      appInitStep("Restoring participant users data") {
-                        val readWriteConnection = ledgerClient.connection(
-                          this.getClass.getSimpleName,
-                          loggerFactory,
-                        )
-                        val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
-                          readWriteConnection,
-                          loggerFactory,
-                        )
-                        participantUsersDataRestorer.restoreParticipantUsersData(
-                          participantUsersData
-                        )
-                      }
-                    case None => Future.unit
+                  _ <- appInitStep("Restoring participant users data") {
+                    val readWriteConnection = ledgerClient.connection(
+                      this.getClass.getSimpleName,
+                      loggerFactory,
+                    )
+                    val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
+                      readWriteConnection,
+                      loggerFactory,
+                    )
+                    participantUsersDataRestorer.restoreParticipantUsersData(
+                      migrationDump.participantUsers
+                    )
                   }
                 } yield ()
               case None =>
@@ -755,6 +751,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
       walletManagerOpt =
         if (config.enableWallet) {
@@ -841,7 +838,6 @@ class ValidatorApp(
         config.contactPoint,
         initialSynchronizerTime,
         loggerFactory,
-        packageVersionSupport,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
@@ -905,6 +901,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
 
       adminHandler =
