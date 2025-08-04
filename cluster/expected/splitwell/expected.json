@@ -586,22 +586,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "splitwell",
-      "timeout": 600,
-      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
-    },
-    "name": "splitwell-loopback",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
