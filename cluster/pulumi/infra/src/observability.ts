@@ -808,7 +808,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
                 monitoringConfig.alerting.alerts.svNames
-                  .map(p => `,member!~"PAR::${(p)}::.*"`)
+                  .map(p => `,member!~"PAR::${p}::.*"`)
                   .join('')
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
