@@ -20,7 +20,7 @@ export const TextField: React.FC<TextFieldProps> = props => {
   const field = useFieldContext<string>();
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>
+      <Typography variant="h6" id={`${id}-title`} data-testid={`${id}-title`} gutterBottom>
         {title}
       </Typography>
 
@@ -31,7 +31,11 @@ export const TextField: React.FC<TextFieldProps> = props => {
         value={field.state.value}
         onBlur={field.handleBlur}
         error={!field.state.meta.isValid}
-        helperText={field.state.meta.errors?.[0]}
+        helperText={
+          <Typography variant="caption" id={`${id}-error`} data-testid={`${id}-error`}>
+            {field.state.meta.errors?.[0]}
+          </Typography>
+        }
         onChange={e => field.handleChange(e.target.value)}
         inputProps={{ 'data-testid': id }}
         {...muiTextFieldProps}

@@ -8,6 +8,7 @@ import { CreateProposalForm } from '../components/forms/CreateProposalform';
 import { SupportedActionTag } from '../utils/types';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
 import { OffboardSvForm } from '../components/forms/OffboardSvForm';
+import { GrantRevokeFeaturedAppForm } from '../components/forms/GrantRevokeFeaturedAppForm';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
@@ -23,6 +24,20 @@ export const CreateProposal: React.FC = () => {
         return <UpdateSvRewardWeightForm onSubmit={onSubmit} />;
       case 'SRARC_OffboardSv':
         return <OffboardSvForm onSubmit={onSubmit} />;
+      case 'SRARC_GrantFeaturedAppRight':
+        return (
+          <GrantRevokeFeaturedAppForm
+            onSubmit={onSubmit}
+            selectedAction={'SRARC_GrantFeaturedAppRight'}
+          />
+        );
+      case 'SRARC_RevokeFeaturedAppRight':
+        return (
+          <GrantRevokeFeaturedAppForm
+            onSubmit={onSubmit}
+            selectedAction={'SRARC_RevokeFeaturedAppRight'}
+          />
+        );
       default:
         return <CreateProposalForm action={selectedAction} />;
     }

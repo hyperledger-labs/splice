@@ -31,6 +31,8 @@ export const expiryEffectiveDateSchema = z
     path: ['effectiveDate'],
   });
 
+export const grantRevokeFeaturedAppRightSchema = z.string().min(1, { message: 'Required' });
+
 export const svWeightSchema = z
   .string()
   .min(1, { message: 'Weight is required' })
@@ -71,5 +73,10 @@ export const validateSummary = (value: string): string | undefined => {
 
 export const validateUrl = (value: string): string | undefined => {
   const result = urlSchema.safeParse(value);
+  return result.success ? undefined : result.error.issues[0].message;
+};
+
+export const validateGrantRevokeFeaturedAppRight = (value: string): string | undefined => {
+  const result = grantRevokeFeaturedAppRightSchema.safeParse(value);
   return result.success ? undefined : result.error.issues[0].message;
 };
