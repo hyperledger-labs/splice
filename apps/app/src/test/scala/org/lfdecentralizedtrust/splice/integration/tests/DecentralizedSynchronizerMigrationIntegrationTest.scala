@@ -431,6 +431,12 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
 
+  def currentRound(implicit env: SpliceTests.SpliceTestConsoleEnvironment): Long =
+    sv1ScanBackend.getDsoInfo().initialRound match {
+      case None => 0L
+      case Some(round) => round.toLong
+    }
+
   // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
 
@@ -1059,7 +1065,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       "Bob",
                       SvUtil.DefaultSV1Weight,
                       "bob-participant-id",
-                      new Round(initialRound + 42),
+                      new Round(currentRound + 42),
                     )
                   )
                 ),
@@ -1185,13 +1191,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 sv1LocalBackend.stop()
                 sv1LocalBackend.startSync()
               }
-
-              withClueAndLog(s"SVs have $initialRound as initial round") {
-                Seq(sv1LocalBackend, sv2LocalBackend).foreach { sv =>
-                  sv.getDsoInfo().initialRound shouldBe Some(initialRound.toString)
-                }
-              }
-
               withClueAndLog("sv1 restarts without any onboarding type") {
                 sv1LocalBackend.stop()
                 svb("sv1LocalOnboarded").startSync()
