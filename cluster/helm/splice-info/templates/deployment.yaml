@@ -19,6 +19,9 @@ spec:
       containers:
       - name: nginx
         image: {{ .Values.nginxImage }}
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         ports:
         - containerPort: 80
         volumeMounts:
@@ -39,6 +42,9 @@ spec:
       {{- if .Values.runtimeDetails }}
       - name: content-runtime-updater
         image: {{ .Values.nginxImage }}
+        {{- with .Values.imagePullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         command: ["/bin/sh", "-c"]
         args:
           - |
