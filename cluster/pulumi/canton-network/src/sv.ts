@@ -341,6 +341,9 @@ async function installValidator(
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
   const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
 
+  const bftSequencerConnection =
+    !svConfig.participant || svConfig.participant.bftSequencerConnection;
+
   const validator = await installValidatorApp({
     xns,
     migration: {
@@ -365,12 +368,21 @@ async function installValidator(
       : [postgres],
     svValidator: true,
     participantAddress: sv.participant.internalClusterAddress,
-    decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
+    decentralizedSynchronizerUrl: bftSequencerConnection ? undefined : decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
+    additionalEnvVars: bftSequencerConnection
+      ? undefined
+      : [
+          {
+            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+            value:
+              'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
+          },
+        ],
   });
 
   return validator;
@@ -400,9 +412,18 @@ function installSvApp(
         },
       ]
     : [];
-  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
-    topologyChangeDelayEnvVars
-  );
+  const disableBftSequencerConnectionEnvVars =
+    !config.participant || config.participant.bftSequencerConnection
+      ? []
+      : [
+          {
+            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+            value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
+          },
+        ];
+  const additionalEnvVars = (config.svApp?.additionalEnvVars || [])
+    .concat(topologyChangeDelayEnvVars)
+    .concat(disableBftSequencerConnectionEnvVars);
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,

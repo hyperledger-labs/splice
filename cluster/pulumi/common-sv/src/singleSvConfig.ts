@@ -11,6 +11,7 @@ const SvCometbftConfigSchema = z.object({
 });
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
+  bftSequencerConnection: z.boolean().default(true),
 });
 const EnvVarConfigSchema = z.object({
   name: z.string(),

@@ -118,6 +118,7 @@ svs:
       cantonLogLevel: INFO
   sv-3:
     participant:
+      bftSequencerConnection: false
       kms:
         keyRingId: sv-3_participant_mock
         locationId: us-central1
