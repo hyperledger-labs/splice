@@ -77,6 +77,9 @@ monitoring:
     alerts:
       cloudSql:
         maintenance: true
+      svNames:
+        - Dummy-SV-1
+        - Dummy-SV-2
     logAlerts:
       forCometBft: |
         -- TODO(DACH-NY/canton-network-internal#475): Failing for all kinds of sequencer and CometBFT-related reasons; let's reevaluate on Canton 3.3
