@@ -26,10 +26,6 @@ inputs:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
     default: "false"
-  self_hosted:
-    description: "Whether this is a self-hosted runner (to use the self-hosted Nix cache)"
-    required: false
-    default: "true"
   upload_workload_identity_provider:
     description: "The workload identity provider to use for uploading the cache"
     required: false
@@ -72,7 +68,6 @@ runs:
         should_save: ${{ inputs.save_nix_cache }}
         should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         oss_only: ${{ inputs.oss_only }}
-        self_hosted: ${{ inputs.self_hosted }}
 
     - name: Set up SBT
       if: inputs.with_sbt == 'true'

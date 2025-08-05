@@ -8,7 +8,7 @@ on:
         default: ''
       self_hosted:
         type: boolean
-        default: true
+        required: true
 
 jobs:
   static_tests:
@@ -30,7 +30,6 @@ jobs:
         with:
           test_name: static_tests
           oss_only: true
-          self_hosted: ${{ inputs.self_hosted }}
 
       - name: Check trailing whitespace
         uses: ./.github/actions/nix/run_bash_command_in_nix

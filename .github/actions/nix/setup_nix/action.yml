@@ -29,10 +29,6 @@ inputs:
     description: "The service account to use for uploading the cache"
     required: false
     default: ""
-  self_hosted:
-    description: "Whether this is a self-hosted runner (to use the self-hosted Nix cache)"
-    default: "true"
-    required: false
 
 runs:
   using: "composite"
@@ -55,7 +51,7 @@ runs:
         echo "cache_key=$cache_key" >> $GITHUB_ENV
 
     - name: Download cache
-      if: ${{ inputs.self_hosted == 'false' }}
+      if: ${{ !startsWith(runner.name, 'self-hosted') }}
       shell: bash
       run: |
         set -euxo pipefail
