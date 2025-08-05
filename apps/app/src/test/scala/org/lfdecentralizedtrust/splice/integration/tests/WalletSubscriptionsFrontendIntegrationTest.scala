@@ -17,6 +17,7 @@ class WalletSubscriptionsFrontendIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
+  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
   override def walletAmuletPrice = SpliceUtil.damlDecimal(2.0)
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

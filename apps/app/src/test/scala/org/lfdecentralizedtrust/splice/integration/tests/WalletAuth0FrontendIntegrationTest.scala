@@ -13,12 +13,15 @@ import org.lfdecentralizedtrust.splice.util.{
 import monocle.macros.syntax.lens.*
 
 import java.net.URI
+import java.time.Duration
 
 class WalletAuth0FrontendIntegrationTest
     extends FrontendIntegrationTest("randomUser")
     with FrontendLoginUtil
     with WalletTestUtil
     with WalletFrontendTestUtil {
+
+  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
 
   override def environmentDefinition
       : org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition = {

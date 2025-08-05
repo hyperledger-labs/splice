@@ -40,6 +40,8 @@ class ScanFrontendTimeBasedIntegrationTest
 
   val amuletPrice = 2
 
+  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
+
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)

@@ -4,16 +4,19 @@ import org.lfdecentralizedtrust.splice.LocalAuth0Test
 import org.lfdecentralizedtrust.splice.auth.AuthConfig.Rs256
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllValidatorConfigs_
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, AnsFrontendTestUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{AnsFrontendTestUtil, FrontendLoginUtil, WalletTestUtil}
 import monocle.macros.syntax.lens.*
 
 import java.net.URI
+import java.time.Duration
 
 class AnsAuth0FrontendIntegrationTest
     extends FrontendIntegrationTest("alice")
     with WalletTestUtil
     with AnsFrontendTestUtil
     with FrontendLoginUtil {
+
+  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
 
   // The change of the authyority appears to break the JSON API and causes "The supplied authentication is invalid"
   override protected def runTokenStandardCliSanityCheck: Boolean = false
