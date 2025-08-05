@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.topology.transaction.VettedPackage
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   DarResources,
   PackageResource,
@@ -31,14 +32,7 @@ class BootstrapPackageConfigDarUploadIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.8",
-    amuletNameServiceVersion = "0.1.8",
-    dsoGovernanceVersion = "0.1.11",
-    validatorLifecycleVersion = "0.1.2",
-    walletVersion = "0.1.8",
-    walletPaymentsVersion = "0.1.8",
-  )
+  private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -128,7 +122,11 @@ class BootstrapPackageConfigDarUploadIntegrationTest
   ): Unit = {
     eventually() {
       val vettedPackages: Seq[VettedPackage] =
-        participantAdminConnection.getVettingState(domainId).futureValue.mapping.packages
+        participantAdminConnection
+          .getVettingState(domainId, AuthorizedState)
+          .futureValue
+          .mapping
+          .packages
       val uploadedPackages =
         participantAdminConnection
           .listDars()

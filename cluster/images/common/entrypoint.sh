@@ -66,7 +66,7 @@ fi
 #
 # Setting SPLICE_MALLOC_ARENA_MAX to 0 or '' will disable the limit and use the
 # default value.
-export MALLOC_ARENA_MAX=${SPLICE_MALLOC_ARENA_MAX:-2}
+export MALLOC_ARENA_MAX=${SPLICE_MALLOC_ARENA_MAX-2}
 
 json_log "Starting '${EXE}' with arguments: ${ARGS[*]}" "entrypoint.sh"
 

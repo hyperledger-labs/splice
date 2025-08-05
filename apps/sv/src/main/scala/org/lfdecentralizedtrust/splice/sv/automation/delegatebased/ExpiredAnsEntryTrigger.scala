@@ -11,6 +11,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 
 class ExpiredAnsEntryTrigger(
@@ -46,21 +47,16 @@ class ExpiredAnsEntryTrigger(
   ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireAnsEntry(
           co.work.contractId,
           new AnsEntry_Expire(store.key.dsoParty.toProtoPrimitive),
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess("archived expired ANS entry")
 }

@@ -87,6 +87,7 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 
 import java.time.Instant
 import java.util.Optional
@@ -416,6 +417,7 @@ class SvApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection,
+        loggerFactory,
       )
 
       (_, _, isDevNet, _, _, _) <- (
@@ -505,6 +507,14 @@ class SvApp(
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
 
+      initialRound <- svAutomation.connection
+        .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
+        .flatMap {
+          case Some(round) => Future.successful(round)
+          case None =>
+            throw new IllegalStateException("No initial round specified in user's metadata")
+        }
+
       handler = new HttpSvHandler(
         config.ledgerApiUser,
         svAutomation,
@@ -526,6 +536,7 @@ class SvApp(
         cometBftClient,
         loggerFactory,
         config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
+        initialRound,
       )
 
       adminHandler = new HttpSvAdminHandler(
@@ -578,17 +589,25 @@ class SvApp(
               concat(
                 SvResource.routes(
                   handler,
-                  _ => provide(traceContext),
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("sv")(operation)
+                      .tflatMap(_ => provide(traceContext)),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
-                  AdminAuthExtractor(
-                    verifier,
-                    svStore.key.svParty,
-                    svAutomation.connection,
-                    loggerFactory,
-                    "splice sv admin realm",
-                  )(traceContext),
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("svAdmin")(operation)
+                      .tflatMap(_ =>
+                        AdminAuthExtractor(
+                          verifier,
+                          svStore.key.svParty,
+                          svAutomation.connection,
+                          loggerFactory,
+                          "splice sv admin realm",
+                        )(traceContext)(operation)
+                      ),
                 ),
               )
             }
@@ -876,76 +895,6 @@ object SvApp {
           )
         )
     }
-  }
-
-  def getElectionRequest(
-      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore]
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = {
-    val store = dsoStoreWithIngestion.store
-    for {
-      dsoRules <- store.getDsoRules()
-    } yield store.listElectionRequests(dsoRules)
-  }.flatten
-
-  def createElectionRequest(
-      requester: String,
-      ranking: Seq[String],
-      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Either[String, Unit]] = {
-    val store = dsoStoreWithIngestion.store
-    for {
-      dsoRules <- store.getDsoRules()
-      queryResult <- store
-        .lookupElectionRequestByRequesterWithOffset(
-          PartyId.tryFromProtoPrimitive(requester),
-          dsoRules.payload.epoch,
-        )
-      result <- queryResult match {
-        case QueryResult(_, Some(_)) =>
-          Future.successful(
-            Left(
-              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive delegate ${dsoRules.payload.dsoDelegate}"
-            )
-          )
-        case QueryResult(offset, None) =>
-          val self = requester
-          val cmd = dsoRules.exercise(
-            _.exerciseDsoRules_RequestElection(
-              self,
-              new splice.dsorules.electionrequestreason.ERR_DsoDelegateUnavailable(
-                com.daml.ledger.javaapi.data.Unit.getInstance()
-              ),
-              ranking.asJava,
-            )
-          )
-          for {
-            _ <- dsoStoreWithIngestion.connection
-              .submit(
-                actAs = Seq(store.key.svParty),
-                readAs = Seq(store.key.dsoParty),
-                cmd,
-              )
-              .withDedup(
-                commandId = SpliceLedgerConnection.CommandId(
-                  "org.lfdecentralizedtrust.splice.sv.requestElection",
-                  Seq(
-                    store.key.svParty,
-                    store.key.dsoParty,
-                  ),
-                  dsoRules.payload.epoch.toString,
-                ),
-                deduplicationOffset = offset,
-              )
-              .yieldUnit()
-          } yield Right(())
-      }
-    } yield result
   }
 
   def createVoteRequest(

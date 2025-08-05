@@ -61,7 +61,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
 }
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
-import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
+import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanAppClientConfig}
 import org.lfdecentralizedtrust.splice.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellDomains,
@@ -112,6 +112,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     with DomainMigrationUtil
     with StandaloneCanton
     with SplitwellTestUtil {
+
+  private val initialRound = 481516L
 
   override def dbsSuffix = "domain_migration"
 
@@ -410,9 +412,32 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
       )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(_.copy(initialRound = initialRound))(config)
+      )
+      .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllScanAppConfigs_(conf =>
+          conf.copy(cache =
+            conf.cache.copy(cachedByParty =
+              CacheConfig(
+                ttl = NonNegativeFiniteDuration.ofMillis(1),
+                maxSize = 2000,
+              )
+            )
+          )
+        )(config)
+      )
       .withManualStart
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
+
+  def firstRound(
+      backend: SvAppBackendReference
+  ): Long =
+    backend.getDsoInfo().initialRound match {
+      case None => 0L
+      case Some(round) => round.toLong
+    }
 
   // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
@@ -1042,7 +1067,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       "Bob",
                       SvUtil.DefaultSV1Weight,
                       "bob-participant-id",
-                      new Round(42),
+                      new Round(firstRound(sv1LocalBackend) + 42),
                     )
                   )
                 ),
@@ -1168,7 +1193,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 sv1LocalBackend.stop()
                 sv1LocalBackend.startSync()
               }
-
               withClueAndLog("sv1 restarts without any onboarding type") {
                 sv1LocalBackend.stop()
                 svb("sv1LocalOnboarded").startSync()

@@ -20,6 +20,8 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import CompletedSvOnboardingTrigger.*
 
+import java.util.Optional
+
 //TODO(DACH-NY/canton-network-node#3756) reconsider this trigger
 class CompletedSvOnboardingTrigger(
     override protected val context: TriggerContext,
@@ -44,15 +46,11 @@ class CompletedSvOnboardingTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svOnboardings <- store.listSvOnboardingRequestsBySvs(dsoRules)
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       cmds = svOnboardings.map(co =>
         dsoRules.exercise(
           _.exerciseDsoRules_ArchiveSvOnboardingRequest(
             co.contractId,
-            controllerArgument,
+            Optional.of(controller),
           )
         )
       )
@@ -65,7 +63,6 @@ class CompletedSvOnboardingTrigger(
               cmd,
             )
             .noDedup
-            .withPreferredPackage(preferredPackageIds)
             .yieldUnit()
         )
       )

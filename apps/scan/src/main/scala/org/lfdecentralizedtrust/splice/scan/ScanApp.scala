@@ -60,6 +60,7 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
 
 /** Class representing a Scan app instance.
   *
@@ -123,6 +124,10 @@ class ScanApp(
       dsoParty <- appInitStep("Get DSO party from user metadata") {
         appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
       }
+      initialRound <- appInitStep("Get initial round from user metadata") {
+        appInitConnection.getInitialRoundFromUserMetadata(config.svUser)
+      }
+      _ = logger.debug(s"Started with initial round $initialRound")
       scanAggregatesReaderContext = new ScanAggregatesReaderContext(
         clock,
         ledgerClient,
@@ -174,6 +179,7 @@ class ScanApp(
         config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        initialRound.toLong,
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
@@ -202,6 +208,7 @@ class ScanApp(
         serviceUserPrimaryParty,
         svName,
         amuletAppParameters.upgradesConfig,
+        initialRound.toLong,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
@@ -243,6 +250,7 @@ class ScanApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         appInitConnection,
+        loggerFactory,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
@@ -259,6 +267,7 @@ class ScanApp(
         loggerFactory,
         packageVersionSupport,
         bftSequencersWithAdminConnections,
+        initialRound,
       )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(
@@ -283,6 +292,10 @@ class ScanApp(
         clock,
         loggerFactory,
       )
+      httpRateLimiter = new HttpRateLimiter(
+        config.parameters.rateLimiting,
+        nodeMetrics.openTelemetryMetricsFactory,
+      )
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
       ) {
@@ -292,8 +305,24 @@ class ScanApp(
               nodeMetrics.httpServerMetrics
                 .withMetrics(httpService)(operation)
                 .tflatMap(_ =>
-                  HttpErrorHandler(loggerFactory)(traceContext).tflatMap { _ =>
-                    provide(traceContext)
+                  // rate limit after the metrics to capture the result in the http metrics
+                  httpRateLimiter.withRateLimit(httpService)(operation).tflatMap { _ =>
+                    val httpErrorHandler = new HttpErrorHandler(loggerFactory)
+                    val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
+                      provide(traceContext)
+                    }
+                    (httpService, config.parameters.customTimeouts.get(operation)) match {
+                      // custom HTTP timeouts
+                      case ("scan", Some(customTimeout)) =>
+                        withRequestTimeout(
+                          customTimeout.duration,
+                          httpErrorHandler.timeoutHandler(customTimeout.duration, _),
+                        ).tflatMap { _ =>
+                          base
+                        }
+                      case _ =>
+                        base
+                    }
                   }
                 )
             }

@@ -10,7 +10,7 @@ import org.lfdecentralizedtrust.splice.automation.{
   TriggerContext,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
-import org.lfdecentralizedtrust.splice.environment.{PackageVersionSupport, SpliceLedgerConnection}
+import org.lfdecentralizedtrust.splice.environment.SpliceLedgerConnection
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 import org.lfdecentralizedtrust.splice.validator.store.ValidatorStore
 import com.digitalasset.canton.data.CantonTimestamp
@@ -18,7 +18,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.environment.PackageVersionSupport.FeatureSupport
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
@@ -27,7 +26,6 @@ class ValidatorLicenseActivityTrigger(
     override protected val context: TriggerContext,
     connection: SpliceLedgerConnection,
     store: ValidatorStore,
-    packageVersionSupport: PackageVersionSupport,
 )(implicit override val ec: ExecutionContext, override val tracer: Tracer, mat: Materializer)
     extends ScheduledTaskTrigger[ValidatorLicenseActivityTrigger.Task] {
 
@@ -37,34 +35,24 @@ class ValidatorLicenseActivityTrigger(
       tc: TraceContext
   ): Future[Seq[ValidatorLicenseActivityTrigger.Task]] =
     for {
-      validatorLicenseActivityFeatureSupport <- packageVersionSupport
-        .supportsValidatorLicenseActivity(
-          Seq(store.key.dsoParty, validator),
-          now,
-        )
       tasks <-
-        if (validatorLicenseActivityFeatureSupport.supported) {
-          for {
-            licenseO <- store
-              .lookupValidatorLicenseWithOffset()
-              .map(_.value.flatMap(_.toAssignedContract))
-          } yield {
-            licenseO.toList
-              .filter(license =>
-                license.payload.lastActiveAt.toScala.fold(true)(lastActiveAt =>
-                  (now - CantonTimestamp.tryFromInstant(lastActiveAt))
-                    .compareTo(ValidatorLicenseActivityTrigger.activityReportMinInterval) > 0
-                )
+        for {
+          licenseO <- store
+            .lookupValidatorLicenseWithOffset()
+            .map(_.value.flatMap(_.toAssignedContract))
+        } yield {
+          licenseO.toList
+            .filter(license =>
+              license.payload.lastActiveAt.toScala.fold(true)(lastActiveAt =>
+                (now - CantonTimestamp.tryFromInstant(lastActiveAt))
+                  .compareTo(ValidatorLicenseActivityTrigger.activityReportMinInterval) > 0
               )
-              .map(license =>
-                ValidatorLicenseActivityTrigger.Task(
-                  license,
-                  validatorLicenseActivityFeatureSupport,
-                )
+            )
+            .map(license =>
+              ValidatorLicenseActivityTrigger.Task(
+                license
               )
-          }
-        } else {
-          Future.successful(Seq.empty)
+            )
         }
     } yield tasks
 
@@ -81,7 +69,6 @@ class ValidatorLicenseActivityTrigger(
         ),
       )
       .noDedup
-      .withPreferredPackage(task.work.featureSupport.packageIds)
       .yieldUnit()
       .map(_ =>
         TaskSuccess(
@@ -105,13 +92,11 @@ object ValidatorLicenseActivityTrigger {
   private val activityReportMinInterval = java.time.Duration.ofHours(1)
 
   final case class Task(
-      existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense],
-      featureSupport: FeatureSupport,
+      existingLicense: AssignedContract[ValidatorLicense.ContractId, ValidatorLicense]
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
-        param("existingLicense", _.existingLicense),
-        param("featureSupport", _.featureSupport),
+        param("existingLicense", _.existingLicense)
       )
     }
   }

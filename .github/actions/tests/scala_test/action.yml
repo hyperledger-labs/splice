@@ -95,11 +95,9 @@ inputs:
     required: false
     default: "true"
 
-
 runs:
   using: "composite"
   steps:
-
     - name: Setup
       uses: ./.github/actions/tests/common_test_setup
       with:
@@ -110,7 +108,7 @@ runs:
         oss_only: ${{ inputs.oss_only }}
         # The docs job saves the oss nix cache, here we save the non-oss one, but only in one runner to reduce contention
         # TODO(#1296): When this runner stops using non-oss, move this to one that does
-        save_nix_cache: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'wall-clock-time' && inputs.oss_only == 'false' }}
+        save_nix_cache: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'canton-enterprise' }}
         self_hosted: ${{ inputs.self_hosted }}
 
     - name: Wait for postgres
@@ -148,7 +146,7 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 4
+        cache_version: 5
 
     - name: Set Daml package versions
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -225,16 +223,16 @@ runs:
     - name: Wait for Canton to be ready
       shell: bash
       run: |
-          if [[ "${{ inputs.with_canton }}" == "false" ]]; then
-            echo "This job does not require Canton"
-            exit 0
-          fi
-          start_canton_options="${{ inputs.start_canton_options }}"
-          if [[ "$start_canton_options" == *"-w"* ]]; then
-            ./wait-for-canton.sh -w
-          elif [[ "$start_canton_options" == *"-s"* ]]; then
-            ./wait-for-canton.sh -s
-          fi
+        if [[ "${{ inputs.with_canton }}" == "false" ]]; then
+          echo "This job does not require Canton"
+          exit 0
+        fi
+        start_canton_options="${{ inputs.start_canton_options }}"
+        if [[ "$start_canton_options" == *"-w"* ]]; then
+          ./wait-for-canton.sh -w
+        elif [[ "$start_canton_options" == *"-s"* ]]; then
+          ./wait-for-canton.sh -s
+        fi
 
     - name: Run tests
       uses: ./.github/actions/sbt/execute_sbt_command
@@ -266,7 +264,6 @@ runs:
             ./stop-frontends.sh
           fi
 
-
     - name: Check logs for errors
       uses: ./.github/actions/sbt/execute_sbt_command
       with:
@@ -278,7 +275,7 @@ runs:
       if: ${{ !cancelled() }}
       uses: ./.github/actions/sbt/post_sbt
       with:
-        cache_version: 4
+        cache_version: 5
         setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
         # Save caches only from one runner, to reduce conflicts on the save
         save_caches: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
@@ -295,7 +292,7 @@ runs:
       if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
       uses: ./.github/actions/tests/failure_notifications
       with:
-        workload_identity_provider: '${{ inputs.google_workload_identity_provider }}'
-        service_account: '${{ inputs.failure_notifications_invoker_sa }}'
-        notifications_url: '${{ inputs.failure_notifications_invoker_url }}'
-        slack_channel: '${{ inputs.failure_notifications_slack_channel }}'
+        workload_identity_provider: "${{ inputs.google_workload_identity_provider }}"
+        service_account: "${{ inputs.failure_notifications_invoker_sa }}"
+        notifications_url: "${{ inputs.failure_notifications_invoker_url }}"
+        slack_channel: "${{ inputs.failure_notifications_slack_channel }}"

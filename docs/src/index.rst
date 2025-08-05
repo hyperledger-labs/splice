@@ -14,19 +14,17 @@ Global Synchronizer for the Canton Network
    * - Helm Chart Version:
      - |chart_version_literal|
 
-.. todo:: Add top-level overview and landing page containing
+.. toctree::
+   :maxdepth: 2
+   :caption: Overview
 
-     - overview of the docs and where to go next
-     - where to get the code for splice
-
-
-.. todo:: Add the usual "Edit on GitHub" link to the top of the page
+   overview/overview.rst
 
 .. toctree::
    :maxdepth: 2
    :caption: Deployment and Operations
 
-   deployment.rst
+   deployment/deployment.rst
    validator_operator/index.rst
    sv_operator/index.rst
    deployment/index.rst
@@ -40,6 +38,7 @@ Global Synchronizer for the Canton Network
    app_dev/overview/version_information
    app_dev/testing/index
    app_dev/ledger_api/index
+   app_dev/scan_api/toc_proxy
    app_dev/overview/splice_app_apis
    app_dev/daml_api/index
    app_dev/daml_models/index

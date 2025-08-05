@@ -1766,6 +1766,8 @@ lazy val `apps-app`: Project =
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += auth0,
       libraryDependencies += kubernetes_client,
+      libraryDependencies +=
+        "com.google.cloud" % "google-cloud-bigquery" % "2.53.0" % "test",
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,
@@ -1844,10 +1846,13 @@ printTests := {
   // These are tests that are particularly resource intensive and need larger runners.
   // Usually that is because they need to spin up an additional Canton instance within the test.
   def isResourceIntensiveTest(name: String): Boolean =
-    name.contains("SvReonboardingIntegration") ||
-      name.contains("DecentralizedSynchronizerMigrationIntegrationTest") ||
-      name.contains("BootstrapPackageConfigIntegrationTest") ||
-      name.contains("SvOffboardingIntegrationTest")
+    Seq(
+      "SvReonboardingIntegration",
+      "DecentralizedSynchronizerMigrationIntegrationTest",
+      "BootstrapPackageConfigIntegrationTest",
+      "SvOffboardingIntegrationTest",
+      "ManualStartIntegrationTest",
+    ).exists(name.contains)
   def isDockerComposeBasedTest(name: String): Boolean =
     name contains "DockerCompose"
   def isLocalNetTest(name: String): Boolean =
@@ -1940,6 +1945,11 @@ printTests := {
       "app upgrade tests",
       "test-full-class-names-app-upgrade.log",
       (t: String) => !isTimeBasedTest(t) && isAppUpgradeTest(t),
+    ),
+    (
+      "BigQuery-accessing tests",
+      "test-full-class-names-bigquery.log",
+      (t: String) => t contains "BigQuery",
     ),
     (
       "resource intensive tests",

@@ -206,13 +206,6 @@ case class EnvironmentDefinition(
       )(config)
     )
 
-  def withoutDsoDelegateReplacement: EnvironmentDefinition =
-    addConfigTransform((_, config) =>
-      ConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.enableDsoDelegateReplacementTrigger).replace(false)
-      )(config)
-    )
-
   def withHttpSettingsForHigherThroughput: EnvironmentDefinition =
     addConfigTransform((_, config) =>
       config.copy(pekkoConfig =
@@ -355,6 +348,14 @@ case class EnvironmentDefinition(
             )
           )
         )(conf),
+    )
+
+  /** e.g. to prevent ReceiveFaucetCouponTrigger from seeing stale caches */
+  def withScanDisabledMiningRoundsCache(): EnvironmentDefinition =
+    addConfigTransforms((_, config) =>
+      ConfigTransforms.updateAllScanAppConfigs_(
+        _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
+      )(config)
     )
 
   def clearConfigTransforms(): EnvironmentDefinition =

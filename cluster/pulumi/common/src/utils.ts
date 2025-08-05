@@ -3,6 +3,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
+import * as nodePath from 'path';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
@@ -14,7 +15,7 @@ import { spliceEnvConfig } from './config/envConfig';
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
 export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY_SIZE')) || 0; // 0 => no limit
 
-export const MOCK_SPLICE_ROOT = config.optionalEnv('MOCK_SPLICE_ROOT');
+const MOCK_SPLICE_ROOT = config.optionalEnv('MOCK_SPLICE_ROOT');
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
 export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
@@ -223,6 +224,12 @@ function getPathToPublicConfigFile(fileName: string): string | undefined {
   }
 
   return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+// only for use with command.local.Command pulumi objects
+export function commandScriptPath(relativeToSplice: string): string {
+  const relativeRoot = nodePath.relative(process.cwd(), MOCK_SPLICE_ROOT || SPLICE_ROOT);
+  return nodePath.join(relativeRoot, relativeToSplice);
 }
 
 export function externalIpRangesFile(): string | undefined {

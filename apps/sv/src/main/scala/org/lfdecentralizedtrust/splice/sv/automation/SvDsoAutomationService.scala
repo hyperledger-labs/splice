@@ -294,10 +294,6 @@ class SvDsoAutomationService(
     if (config.automation.enableClosedRoundArchival)
       registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, dsoStore, connection))
 
-    if (config.automation.enableDsoDelegateReplacementTrigger) {
-      registerTrigger(new ElectionRequestTrigger(triggerContext, dsoStore, connection))
-    }
-
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
     registerTrigger(
@@ -346,15 +342,6 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         connection,
-      )
-    )
-
-    registerTrigger(
-      new ExternalPartyAmuletRulesTrigger(
-        triggerContext,
-        dsoStore,
-        connection,
-        packageVersionSupport,
       )
     )
 
@@ -468,7 +455,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[ReceiveSvRewardCouponTrigger],
       aTrigger[ArchiveClosedMiningRoundsTrigger],
-      aTrigger[ElectionRequestTrigger],
       aTrigger[RestartDsoDelegateBasedAutomationTrigger],
       aTrigger[AnsSubscriptionInitialPaymentTrigger],
       aTrigger[SvPackageVettingTrigger],
@@ -493,7 +479,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReportValidatorLicenseMetricsExportTrigger],
       aTrigger[ReconcileDynamicSynchronizerParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
-      aTrigger[ExternalPartyAmuletRulesTrigger],
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
     )

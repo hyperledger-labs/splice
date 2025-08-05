@@ -18,7 +18,8 @@ export interface UnfeatureAppProposal {
 
 export interface ConfigChange {
   fieldName: string;
-  currentValue: string | number;
+  label: string;
+  currentValue: string;
   newValue: string | number;
   isId?: boolean;
 }

@@ -14,9 +14,10 @@ import scala.concurrent.{ExecutionContext, Future}
 class ScanBackfillAggregatesTrigger(
     store: ScanStore,
     override protected val context: TriggerContext,
+    initialRound: Long,
 )(implicit val ec: ExecutionContext, val tracer: Tracer)
     extends PollingTrigger {
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    store.backFillAggregates().map(_.exists(_ > 0))
+    store.backFillAggregates().map(_.exists(_ > initialRound))
   }
 }

@@ -12,6 +12,10 @@ inputs:
     description: "Whether to save the Nix cache"
     required: false
     default: "false"
+  save_nix_cache_to_gcp:
+    description: "Whether to save the Nix cache to GCP"
+    required: false
+    default: "false"
   artifactory_user:
     description: "The Artifactory user"
     required: false
@@ -26,6 +30,14 @@ inputs:
     description: "Whether this is a self-hosted runner (to use the self-hosted Nix cache)"
     required: false
     default: "true"
+  upload_workload_identity_provider:
+    description: "The workload identity provider to use for uploading the cache"
+    required: false
+    default: ""
+  upload_service_account:
+    description: "The service account to use for uploading the cache"
+    required: false
+    default: ""
 
 outputs:
   sbt_cache_hits:
@@ -35,7 +47,6 @@ outputs:
 runs:
   using: "composite"
   steps:
-
     - name: Validate input
       if: inputs.oss_only != 'true' && (inputs.artifactory_password == '' || inputs.artifactory_user == '')
       shell: bash
@@ -57,8 +68,9 @@ runs:
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
-        cache_version: 4
+        cache_version: 5
         should_save: ${{ inputs.save_nix_cache }}
+        should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         oss_only: ${{ inputs.oss_only }}
         self_hosted: ${{ inputs.self_hosted }}
 
@@ -67,4 +79,4 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 4
+        cache_version: 5

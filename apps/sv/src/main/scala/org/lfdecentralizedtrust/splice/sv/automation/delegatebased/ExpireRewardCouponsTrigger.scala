@@ -49,7 +49,9 @@ class ExpireRewardCouponsTrigger(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
       )
-      .map(seq => Random.shuffle(seq).take(svTaskContext.expiredRewardCouponBatchSize))
+      .map(seq =>
+        Random.shuffle(seq).take(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize)
+      )
   } yield batches
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
@@ -65,16 +67,11 @@ class ExpireRewardCouponsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       numCoupons <- expireRewardCouponsForRound(
         expiredRewardsTask,
         dsoRules,
         amuletRules,
-        controllerArgument,
-        preferredPackageIds,
+        Optional.of(controller),
       )
     } yield TaskSuccess(
       show"Expired ${numCoupons} old reward coupons for closed round ${expiredRewardsTask}"
@@ -86,7 +83,6 @@ class ExpireRewardCouponsTrigger(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       controller: Optional[String],
-      preferredPackageIds: Seq[String],
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
@@ -187,7 +183,6 @@ class ExpireRewardCouponsTrigger(
               cmd,
             )
             .noDedup
-            .withPreferredPackage(preferredPackageIds)
             .yieldResult()
         )
       )

@@ -16,7 +16,6 @@ import {
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
-  DecentralizedSynchronizerUpgradeConfig,
   DEFAULT_AUDIENCE,
   ExactNamespace,
   exactNamespace,
@@ -29,6 +28,7 @@ import {
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
+  installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
@@ -59,9 +59,8 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 
 import {
-  delegatelessAutomation,
-  expectedTaskDuration,
-  expiredRewardCouponBatchSize,
+  delegatelessAutomationExpectedTaskDuration,
+  delegatelessAutomationExpiredRewardCouponBatchSize,
 } from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
@@ -128,22 +127,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-      cometbftPorts: {
-        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
-        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
@@ -210,7 +194,7 @@ export async function installSvNode(
     .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([loopback])
+    .concat(loopback)
     .concat(imagePullDeps)
     .concat(
       config.cometBftGovernanceKey
@@ -408,6 +392,17 @@ function installSvApp(
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
   const useCantonBft = decentralizedSynchronizerMigrationConfig.active.sequencer.enableBftSequencer;
+  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
+    ? [
+        {
+          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
+          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
+        },
+      ]
+    : [];
+  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
+    topologyChangeDelayEnvVars
+  );
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
@@ -421,6 +416,8 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialRound:
+      config.onboarding.type == 'found-dso' ? config.onboarding.initialRound : undefined,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     ...(useCantonBft
@@ -488,18 +485,11 @@ function installSvApp(
     },
     contactPoint: daContactPoint,
     nodeIdentifier: config.onboardingName,
-    delegatelessAutomation: delegatelessAutomation,
-    expectedTaskDuration: expectedTaskDuration,
-    expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    delegatelessAutomationExpectedTaskDuration: delegatelessAutomationExpectedTaskDuration,
+    delegatelessAutomationExpiredRewardCouponBatchSize:
+      delegatelessAutomationExpiredRewardCouponBatchSize,
     logLevel: config.logging?.appsLogLevel,
-    additionalEnvVars: svsConfig?.synchronizer?.topologyChangeDelay
-      ? [
-          {
-            name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-            value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-          },
-        ]
-      : undefined,
+    additionalEnvVars,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

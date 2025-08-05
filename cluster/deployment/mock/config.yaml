@@ -77,6 +77,9 @@ monitoring:
     alerts:
       cloudSql:
         maintenance: true
+      svNames:
+        - Dummy-SV-1
+        - Dummy-SV-2
     logAlerts:
       # These are mock values and in no way recommendations
       forCometBft: |
@@ -101,7 +104,13 @@ loadTester:
   enable: true
   iterationsPerMinute: 30
   minRate: 0.123
+  chartVersion: 1.2.3
 svs:
+  default:
+    svApp:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
   # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
     logging:
@@ -112,3 +121,30 @@ svs:
       kms:
         keyRingId: sv-3_participant_mock
         locationId: us-central1
+infra:
+  extraCustomResources:
+    deny-onboard-prepare-endpoint:
+      apiVersion: security.istio.io/v1
+      kind: AuthorizationPolicy
+      metadata:
+        name: deny-onboard-prepare-endpoint
+        # if we pass a list here, pulumi will multiply the CR for us
+        namespace: [ sv-1, sv-2 ]
+      spec:
+        selector:
+          matchLabels:
+            app: sv-app
+        action: DENY
+        rules:
+          - to:
+              - operation:
+                  paths: ["/api/sv/v0/devnet/onboard/validator/prepare"]
+    mock-cr:
+      apiVersion: mock.example.com/v1
+      kind: MockResource
+      metadata:
+        name: mock-resource
+        namespace: validator1
+      spec:
+        key: value
+        anotherKey: anotherValue

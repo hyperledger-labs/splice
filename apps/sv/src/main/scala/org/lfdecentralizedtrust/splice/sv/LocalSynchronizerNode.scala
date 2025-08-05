@@ -31,6 +31,7 @@ import org.apache.pekko.http.scaladsl.model.StatusCodes
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.environment.*
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpClient
 import org.lfdecentralizedtrust.splice.sv.admin.api.client.SvConnection
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding.SvOnboardingUnlimitedTrafficTrigger.UnlimitedTraffic
@@ -240,7 +241,7 @@ final class LocalSynchronizerNode(
         "local sequencer observes mediator as onboarded",
         // Otherwise we might fail with `PERMISSION_DENIED` during initialization
         sequencerAdminConnection
-          .getMediatorSynchronizerState(synchronizerId)
+          .getMediatorSynchronizerState(synchronizerId, AuthorizedState)
           .map { state =>
             if (!state.mapping.active.contains(mediatorId)) {
               throw Status.FAILED_PRECONDITION
@@ -300,14 +301,15 @@ final class LocalSynchronizerNode(
         RetryFor.WaitingOnInitDependency,
         "mediator_onboarded",
         "mediator observes itself as onboarded",
-        mediatorAdminConnection.getMediatorSynchronizerState(synchronizerId).map { state =>
-          if (!state.mapping.active.contains(mediatorId)) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
-              )
-              .asRuntimeException()
-          }
+        mediatorAdminConnection.getMediatorSynchronizerState(synchronizerId, AuthorizedState).map {
+          state =>
+            if (!state.mapping.active.contains(mediatorId)) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Mediator $mediatorId not in active mediators ${state.mapping.active.forgetNE}"
+                )
+                .asRuntimeException()
+            }
         },
         logger,
       )
@@ -396,16 +398,16 @@ final class LocalSynchronizerNode(
         "Onbarding sequencer through sponsoring SV",
         svConnection.onboardSvSequencer(sequencerId).recover {
           // TODO(DACH-NY/canton-network-node#13410) - remove once canton returns a retryable error
-          case HttpCommandException(_, StatusCodes.BadRequest, message)
-              if message.contains("SNAPSHOT_NOT_FOUND") =>
+          case HttpCommandException(_, StatusCodes.BadRequest, responseBody)
+              if responseBody.message.contains("SNAPSHOT_NOT_FOUND") =>
             throw Status.NOT_FOUND
-              .withDescription(message)
+              .withDescription(responseBody.message)
               .asRuntimeException()
-          case HttpCommandException(_, StatusCodes.BadRequest, message)
-              if message.contains("BLOCK_NOT_FOUND") =>
+          case HttpCommandException(_, StatusCodes.BadRequest, responseBody)
+              if responseBody.message.contains("BLOCK_NOT_FOUND") =>
             // ensure the request is retried as the sequencer will eventually finish processing the block
             throw Status.NOT_FOUND
-              .withDescription(message)
+              .withDescription(responseBody.message)
               .asRuntimeException()
         },
         logger,
@@ -467,7 +469,7 @@ final class LocalSynchronizerNode(
         case _ =>
           throw Status.FAILED_PRECONDITION
             .withDescription(
-              s"Mediator not initialized properly; expected a single sequencer connection got ${connections}"
+              s"Mediator not initialized properly; expected a single sequencer connection got $connections"
             )
             .asRuntimeException
       },
@@ -493,7 +495,10 @@ object LocalSynchronizerNode {
   private def toEndpoints(config: ClientConfig): NonEmpty[Seq[Endpoint]] =
     NonEmpty.mk(Seq, toEndpoint(config))
 
-  def toSequencerConnection(config: ClientConfig, alias: SequencerAlias = SequencerAlias.Default) =
+  private def toSequencerConnection(
+      config: ClientConfig,
+      alias: SequencerAlias = SequencerAlias.Default,
+  ) =
     new GrpcSequencerConnection(
       LocalSynchronizerNode.toEndpoints(config),
       transportSecurity = config.tlsConfig.isDefined,

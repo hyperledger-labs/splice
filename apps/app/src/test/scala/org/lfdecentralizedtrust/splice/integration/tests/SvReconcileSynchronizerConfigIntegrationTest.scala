@@ -19,11 +19,6 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
   "SV automation reconcile amulet config change to domain parameter" in { implicit env =>
     initDso()
 
-    val decentralizedSynchronizerId =
-      inside(sv1Backend.participantClient.synchronizers.list_connected()) { case Seq(domain) =>
-        domain.synchronizerId
-      }
-
     val amuletConfig: AmuletConfig[USD] =
       sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue
 
@@ -80,7 +75,7 @@ class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase
             eventuallySucceeds() {
               sv.castVote(
                 voteRequest.contractId,
-                true,
+                isAccepted = true,
                 "url",
                 "description",
               )
