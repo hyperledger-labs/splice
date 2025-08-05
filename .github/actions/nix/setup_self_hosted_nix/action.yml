@@ -19,11 +19,23 @@ inputs:
     description: 'If the nix cache should be saved'
     # this should be run just from one job to ensure we avoid multi write conflicts, which makes everything worse
     default: 'false'
+  should_save_gcp:
+    description: 'If the nix cache should be saved to the public GCP bucket'
+    default: 'false'
+  upload_workload_identity_provider:
+    description: 'The workload identity provider to use for uploading the cache'
+    required: false
+    default: ''
+  upload_service_account:
+    description: 'The service account to use for uploading the cache'
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
   steps:
-    - name: Restore nix
+    - name: Compute cache Key
+      id: cache_key
       shell: bash
       run: |
         set -euxo pipefail
@@ -35,10 +47,16 @@ runs:
           echo "oss_only: ${{ inputs.oss_only }}" >> /tmp/nix-cache-key
           touch /tmp/oss-only # Create a file to indicate that we are using OSS only dependencies (so we don't need to re-specifify oss_only to run_bash_command_in_nix)
         fi
+        cache_key=($(md5sum "/tmp/nix-cache-key"))
+        echo "cache_key=$cache_key" >> $GITHUB_ENV
+
+    - name: Restore nix
+      shell: bash
+      run: |
+        set -euxo pipefail
         sudo mkdir -p /nix/store
         sudo chown -R $(whoami):$(whoami) /nix
         cat /tmp/nix-cache-key
-        cache_key=($(md5sum "/tmp/nix-cache-key"))
         if [ -f "/cache/nix/$cache_key/cached" ]; then
           echo "Restoring nix cache (key $cache_key)"
           # we use rsync here because it's simply faster to install
@@ -150,3 +168,46 @@ runs:
 
             echo "done" > "/cache/nix/$cache_key/cached"
           fi
+
+    - name: Check if cache already exists in GCP
+      id: already_exists
+      if: ${{ inputs.should_save_gcp == 'true' }}
+      shell: bash
+      run: |
+        if curl -Isf https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz &> /dev/null; then
+          echo "Cache with key ${cache_key} already exists in GCP, not uploading again"
+          echo "already_exists=true" >> $GITHUB_OUTPUT;
+        fi
+    - name: Authenticate to GCP
+      id: auth
+      if: ${{ inputs.should_save_gcp == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
+      uses: 'google-github-actions/auth@ba79af03959ebeac9769e648f473a284504d9193' #v2.1.10
+      with:
+        workload_identity_provider: '${{ inputs.upload_workload_identity_provider }}'
+        service_account: '${{ inputs.upload_service_account }}'
+
+    - name: tar-gz the cache
+      shell: bash
+      if: ${{ inputs.should_save_gcp == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
+      id: prep_cache_upload
+      run: |
+        set -euxo pipefail
+        echo "Compressing nix cache to /cache/nix/${cache_key}.tar.gz"
+        mkdir -p /tmp/nix-upload
+
+        tar -czf "/tmp/nix-upload/${cache_key}.tar.gz" -C "/cache/nix/$cache_key" .
+
+        echo "Cache compressed to /tmp/nix-upload/${cache_key}.tar.gz"
+        ls /tmp/nix-upload
+        echo "cache_file=/tmp/nix-upload/${cache_key}.tar.gz" >> $GITHUB_OUTPUT
+
+        echo "Runner name: ${{ runner.name }}"
+    - name: Upload nix cache
+      if: ${{ inputs.should_save_gcp == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
+      uses: google-github-actions/upload-cloud-storage@v2
+      with:
+        destination: splice-nix-cache-public
+        path: "${{ steps.prep_cache_upload.outputs.cache_file }}"
+        parent: false # upload to root of the bucket
+        process_gcloudignore: false # no gcloud ignore file in this repo, must set this to false
+        gzip: false # it's already gzipped

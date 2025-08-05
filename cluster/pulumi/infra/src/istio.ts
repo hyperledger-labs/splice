@@ -11,19 +11,17 @@ import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 import { commandScriptPath } from 'splice-pulumi-common/src/utils';
 
 import {
-  chartPath,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  CnChartVersion,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
   GCP_ZONE,
   getDnsNames,
-  HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   isDevNet,
+  isMainNet,
 } from '../../common';
 import { clusterBasename, infraConfig, loadIPRanges } from './config';
 
@@ -183,18 +181,11 @@ function configureInternalGatewayService(
     c.nodePools.map(p => p.networkConfigs.map(c => c.podIpv4CidrBlock)).flat()
   );
   const externalIPRanges = loadIPRanges();
-  // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = DecentralizedSynchronizerUpgradeConfig.runningMigrations()
-    .map(m => m.id)
-    .flatMap((domain: number) => {
-      return Array.from(Array(10).keys()).map(node => {
-        return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
-      });
-    });
   return configureGatewayService(
     ingressNs,
     ingressIp,
     pulumi.all([externalIPRanges, internalIPRanges]).apply(([a, b]) => a.concat(b)),
+    pulumi.output(['0.0.0.0/0']),
     [
       ingressPort('grpc-cd-pub-api', 5008),
       ingressPort('grpc-cs-p2p-api', 5010),
@@ -212,9 +203,46 @@ function configureInternalGatewayService(
       ingressPort('grpc-sw-lg', 5201),
       ingressPort('sw-metrics', 10213),
       ingressPort('sw-lg-gw', 6201),
-    ].concat(cometBftIngressPorts),
+    ],
     istiod,
     ''
+  );
+}
+
+function configureCometBFTGatewayService(
+  ingressNs: k8s.core.v1.Namespace,
+  ingressIp: pulumi.Output<string>,
+  istiod: k8s.helm.v3.Release
+) {
+  const externalIPRanges = loadIPRanges(true);
+  const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
+  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // and support easily deploying without refreshing the infra stack.
+  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+
+  const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
+    migration => {
+      const res = Array.from({ length: numSVs }, (_, node) => node).map(node =>
+        ingressPort(
+          `cometbft-${migration}-${node + 1}-gw`,
+          cometBFTExternalPort(migration, node + 1)
+        )
+      );
+      if (!isMainNet) {
+        // For non-mainnet clusters, include "node 0" for the sv runbook
+        res.unshift(ingressPort(`cometbft-${migration}-0-gw`, cometBFTExternalPort(migration, 0)));
+      }
+      return res;
+    }
+  );
+  return configureGatewayService(
+    ingressNs,
+    ingressIp,
+    pulumi.output(['0.0.0.0/0']),
+    externalIPRanges,
+    cometBftIngressPorts,
+    istiod,
+    '-cometbft'
   );
 }
 
@@ -308,6 +336,7 @@ function configurePublicGatewayService(
     ingressNs,
     ingressIp,
     pulumi.output(['0.0.0.0/0']),
+    pulumi.output(['0.0.0.0/0']),
     [],
     istiod,
     '-public'
@@ -371,12 +400,21 @@ function istioAccessPolicies(
 function configureGatewayService(
   ingressNs: k8s.core.v1.Namespace,
   ingressIp: pulumi.Output<string>,
-  externalIPRanges: pulumi.Output<string[]>,
+  externalIPRangesInIstio: pulumi.Output<string[]>,
+  externalIPRangesInLB: pulumi.Output<string[]>,
   ingressPorts: IngressPort[],
   istiod: k8s.helm.v3.Release,
   suffix: string
 ) {
-  const istioPolicies = istioAccessPolicies(ingressNs, externalIPRanges, suffix);
+  // We limit source IPs in two ways:
+  // - For most traffic, we use istio instead of through loadBalancerSourceRanges as the latter has a size limit.
+  //   These IPs should be provided in externalIPRangesInIstio.
+  //   See https://github.com/DACH-NY/canton-network-internal/issues/626
+  // - For cometbft traffic, which is tcp traffic, we failed to use istio policies, so we route it through a dedicated
+  //   LaodBalancer service that uses loadBalancerSourceRanges. The size limit is not an issue as we need only SV IPs.
+  //   These IPs should be provided in externalIPRangesInLB.
+
+  const istioPolicies = istioAccessPolicies(ingressNs, externalIPRangesInIstio, suffix);
   const gateway = new k8s.helm.v3.Release(
     `istio-ingress${suffix}`,
     {
@@ -406,9 +444,7 @@ function configureGatewayService(
         },
         service: {
           loadBalancerIP: ingressIp,
-          // We limit IPs using istio instead of through loadBalancerSourceRanges as the latter has a size limit.
-          // See https://github.com/DACH-NY/canton-network-internal/issues/626
-          loadBalancerSourceRanges: ['0.0.0.0/0'],
+          loadBalancerSourceRanges: externalIPRangesInLB,
           // See https://istio.io/latest/docs/tasks/security/authorization/authz-ingress/#network
           // If you are using a TCP/UDP network load balancer that preserves the client IP address ..
           // then you can use the externalTrafficPolicy: Local setting to also preserve the client IP inside Kubernetes by bypassing kube-proxy
@@ -425,10 +461,12 @@ function configureGatewayService(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: istioPolicies.apply(policies => {
-        const base: pulumi.Resource[] = [ingressNs, istiod];
-        return base.concat(policies);
-      }),
+      dependsOn: istioPolicies
+        ? istioPolicies.apply(policies => {
+            const base: pulumi.Resource[] = [ingressNs, istiod];
+            return base.concat(policies);
+          })
+        : [ingressNs, istiod],
     }
   );
   if (infraConfig.istio.enableIngressAccessLogging) {
@@ -464,27 +502,9 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
+  cometBftSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
-  // TODO(#1766): remove this once we migrated to this everywhere
-  const version: CnChartVersion = {
-    type: 'remote',
-    version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
-  };
-  const chart = chartPath('splice-dummy', version);
-  const gatewayChart = new k8s.helm.v3.Release(
-    `cluster-gateway`,
-    {
-      name: `cluster-gateway`,
-      namespace: ingressNs.ns.metadata.name,
-      chart,
-      version: version.version,
-      timeout: HELM_CHART_TIMEOUT_SEC,
-      maxHistory: HELM_MAX_HISTORY_SIZE,
-    },
-    { deleteBeforeReplace: true }
-  );
-
   const hosts = [
     getDnsNames().cantonDnsName,
     `*.${getDnsNames().cantonDnsName}`,
@@ -533,26 +553,35 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [gwSvc, gatewayChart],
+      dependsOn: [gwSvc],
     }
   );
 
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
 
-  const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration =>
-    Array.from({ length: numSVs }, (_, node) => node).map(node => ({
-      // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
-      hosts: ['*'],
-      port: {
-        name: `cometbft-${migration}-${node}-gw`,
-        number: cometBFTExternalPort(migration, node),
-        protocol: 'TCP',
-      },
-    }))
-  );
+  const server = (migration: number, node: number) => ({
+    // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
+    hosts: ['*'],
+    port: {
+      name: `cometbft-${migration}-${node}-gw`,
+      number: cometBFTExternalPort(migration, node),
+      protocol: 'TCP',
+    },
+  });
+
+  const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
+    const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
+      server(migration, node + 1)
+    );
+    if (!isMainNet) {
+      // For non-mainnet clusters, include "node 0" for the sv runbook
+      ret.unshift(server(migration, 0));
+    }
+    return ret;
+  });
 
   const appsGw = new k8s.apiextensions.CustomResource(
     'cn-apps-gateway',
@@ -565,23 +594,14 @@ function configureGateway(
       },
       spec: {
         selector: {
-          app: 'istio-ingress',
-          istio: 'ingress',
+          app: 'istio-ingress-cometbft',
+          istio: 'ingress-cometbft',
         },
-        servers: [
-          {
-            hosts: [getDnsNames().cantonDnsName, getDnsNames().daDnsName],
-            port: {
-              name: 'grpc-swd-pub',
-              number: 5108,
-              protocol: 'GRPC',
-            },
-          },
-        ].concat(servers),
+        servers,
       },
     },
     {
-      dependsOn: [gwSvc, gatewayChart],
+      dependsOn: [cometBftSvc],
     }
   );
 
@@ -631,7 +651,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [publicGwSvc, gatewayChart],
+      dependsOn: [publicGwSvc],
     }
   );
 
@@ -757,6 +777,7 @@ function configureDocsAndReleases(
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
+  cometBftIngressIp: pulumi.Output<string>,
   publicIngressIp: pulumi.Output<string>
 ): pulumi.Resource[] {
   const nsName = 'istio-system';
@@ -768,8 +789,9 @@ export function configureIstio(
   const base = configureIstioBase(istioSystemNs, ingressNs.ns);
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
+  const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
   const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
-  const gateways = configureGateway(ingressNs, gwSvc, publicGwSvc);
+  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc, publicGwSvc);
   const docsAndReleases = configureDocsAndReleases(
     true,
     spliceConfig.pulumiProjectConfig.hasPublicDocs,

@@ -43,6 +43,10 @@
       "type": "string",
       "description": "The Docker image to use for Nginx. Defaults to 'nginx:latest' if not present."
     },
+    "imagePullPolicy": {
+      "type": "string",
+      "enum": ["Always", "IfNotPresent", "Never"]
+    },
     "contentType": {
       "type": "string",
       "description": "The content type for the Nginx server. Defaults to 'application/json' if not present."

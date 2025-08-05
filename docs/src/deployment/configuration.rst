@@ -11,6 +11,8 @@ Configuring deployed apps
 All the apps have an extended set of configuration options which might need tuning based on different scenarios.
 These configurations are accepted in the `HOCON <https://github.com/lightbend/config/blob/main/HOCON.md>`__ format.
 
+.. _configuration_ad_hoc:
+
 Adding ad-hoc configuration
 +++++++++++++++++++++++++++
 
