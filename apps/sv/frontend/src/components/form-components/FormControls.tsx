@@ -3,6 +3,7 @@
 
 import { Box, Button } from '@mui/material';
 import { useFormContext } from '../../hooks/formContext';
+import { useNavigate } from 'react-router-dom';
 
 export interface FormControlsProps {
   cancelTitle?: string;
@@ -12,6 +13,7 @@ export interface FormControlsProps {
 export const FormControls: React.FC<FormControlsProps> = props => {
   const { cancelTitle, submitTitle } = props;
   const form = useFormContext();
+  const navigate = useNavigate();
 
   return (
     <Box
@@ -24,7 +26,12 @@ export const FormControls: React.FC<FormControlsProps> = props => {
       }}
       data-testid="form-controls"
     >
-      <Button variant="outlined" sx={{ mr: 8 }} data-testid="cancel-button">
+      <Button
+        variant="outlined"
+        sx={{ mr: 8 }}
+        data-testid="cancel-button"
+        onClick={() => navigate('/governance-beta/proposals/create')}
+      >
         {cancelTitle || 'Cancel'}
       </Button>
 
