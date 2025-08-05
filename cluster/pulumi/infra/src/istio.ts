@@ -582,15 +582,15 @@ function configureGateway(
     // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
     hosts: ['*'],
     port: {
-      name: `cometbft-${migration}-${node + 1}-gw`,
-      number: cometBFTExternalPort(migration, node + 1),
+      name: `cometbft-${migration}-${node}-gw`,
+      number: cometBFTExternalPort(migration, node),
       protocol: 'TCP',
     },
   });
 
   const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
     const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
-      server(migration, node)
+      server(migration, node + 1)
     );
     if (!isMainNet) {
       // For non-mainnet clusters, include "node 0" for the sv runbook
