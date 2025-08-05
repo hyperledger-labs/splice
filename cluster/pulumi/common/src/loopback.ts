@@ -5,23 +5,31 @@ import * as pulumi from '@pulumi/pulumi';
 import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
 import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
 
-import { isDevNet } from '../../common';
+import { isDevNet, isMainNet } from '../../common';
 import { DecentralizedSynchronizerUpgradeConfig } from './domainMigration';
 import { CLUSTER_HOSTNAME, ExactNamespace } from './utils';
 
 export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
 
-  const cometBFTPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration =>
-    Array.from({ length: numSVs }, (_, node) => node).map(node => ({
-      number: cometBFTExternalPort(migration, node),
-      name: `cometbft-${migration}-${node}-p2p`,
-      protocol: 'TCP',
-    }))
-  );
+  const port = (migration: number, node: number) => ({
+    number: cometBFTExternalPort(migration, node),
+    name: `cometbft-${migration}-${node}-p2p`,
+    protocol: 'TCP',
+  });
+  const cometBFTPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
+    const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
+      port(migration, node + 1)
+    );
+    if (!isMainNet) {
+      // For non-mainnet clusters, include "node 0" for the sv runbook
+      ret.unshift(port(migration, 0));
+    }
+    return ret;
+  });
 
   const clusterHostname = CLUSTER_HOSTNAME;
   const serviceEntry = new k8s.apiextensions.CustomResource(
