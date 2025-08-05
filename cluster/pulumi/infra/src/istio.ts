@@ -232,6 +232,7 @@ function configureCometBFTGatewayService(
         )
       );
       if (!isMainNet) {
+        // For non-mainnet clusters, include "node 0" for the sv runbook
         res.unshift(ingressPort(`cometbft-${migration}-0-gw`, cometBFTExternalPort(migration, 0)));
       }
       return res;
