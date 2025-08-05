@@ -67,14 +67,7 @@ class BootstrapPackageConfigIntegrationTest
   // Factored out so we can reuse it in the test
   val initialAmulet = DarResources.amulet_0_1_9
 
-  private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.9",
-    amuletNameServiceVersion = "0.1.9",
-    dsoGovernanceVersion = "0.1.13",
-    validatorLifecycleVersion = "0.1.3",
-    walletVersion = "0.1.9",
-    walletPaymentsVersion = "0.1.9",
-  )
+  private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

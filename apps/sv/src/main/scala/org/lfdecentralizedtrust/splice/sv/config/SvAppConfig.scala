@@ -177,6 +177,19 @@ object SvOnboardingConfig {
         walletPaymentsVersion = fromResources.walletPayments,
       )
     }
+
+    val minimumInitialPackageConfig: InitialPackageConfig = InitialPackageConfig(
+      amuletVersion = DarResources.amulet.minimumInitialization.metadata.version.toString,
+      amuletNameServiceVersion =
+        DarResources.amuletNameService.minimumInitialization.metadata.version.toString,
+      dsoGovernanceVersion =
+        DarResources.dsoGovernance.minimumInitialization.metadata.version.toString,
+      validatorLifecycleVersion =
+        DarResources.validatorLifecycle.minimumInitialization.metadata.version.toString,
+      walletVersion = DarResources.wallet.minimumInitialization.metadata.version.toString,
+      walletPaymentsVersion =
+        DarResources.walletPayments.minimumInitialization.metadata.version.toString,
+    )
   }
 
   // TODO(DACH-NY/canton-network-internal#498) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
