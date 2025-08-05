@@ -62,17 +62,18 @@ runs:
         fi
 
         echo "Latest nix cache:"
-        curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name'
 
-        wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" || true
+        # FIXME: uncomment:
+        # wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" -O cache.tar.gz || true
         if [ ! -f "${cache_key}.tar.gz" ]; then
-          echo "Cache not found"
-          # TODO: have a latest.tar.gz to start with, better than nothing (I think)
-          exit 0
+          echo "Cache not found, fetching latest instead"
+          latest=$(curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name')
+          wget -q "https://storage.googleapis.com/splice-nix-cache-public/${latest}" -O cache.tar.gz
+
         fi
 
         sudo mkdir -p /cache/nix/${cache_key}
-        sudo tar -xzf ${cache_key}.tar.gz -C /cache/nix/${cache_key}
+        sudo tar -xzf cache.tar.gz -C /cache/nix/${cache_key}
 
     - name: Restore nix
       id: restore_nix
