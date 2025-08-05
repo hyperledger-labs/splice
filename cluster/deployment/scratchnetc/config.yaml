@@ -17,3 +17,4 @@ sv:
   scan:
     # TODO(#1164): Remove this once the import update backfilling is enabled by default
     enableImportUpdatesBackfill: true
+initialRound: 48151 # approximately 1 year after
