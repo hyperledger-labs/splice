@@ -285,64 +285,6 @@ class SvOnboardingAddlIntegrationTest
       )
   }
 
-  "The election request succeeds if one SV is onboarded in the middle of an election request" in {
-    implicit env =>
-      clue("Initialize DSO with 2 SVs") {
-        startAllSync(
-          (sv1Nodes ++ sv2Nodes)*
-        )
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
-      }
-
-      val currentLeader = sv1Backend.getDsoInfo().svParty.toProtoPrimitive
-      val newLeader = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
-      val newRanking: Vector[String] = Seq(newLeader, currentLeader).toVector
-
-      // note that the new delegate has to vote for himself to prove readiness
-      actAndCheck(
-        "sv2 creates a new election request for epoch 1", {
-          sv2Backend
-            .createElectionRequest(newLeader, newRanking)
-        },
-      )(
-        "the epoch stays the same",
-        _ => {
-          sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate shouldBe currentLeader
-        },
-      )
-
-      clue("SV3 gets onboarded") {
-        startAllSync(
-          sv3Nodes*
-        )
-        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
-        sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 0
-      }
-
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
-        actAndCheck(
-          "sv3 creates a new election request for epoch 1", {
-            val sv3 = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
-            sv3Backend
-              .createElectionRequest(sv3, newRanking.appended(sv3))
-          },
-        )(
-          "the epoch increased and sv2 is the new delegate",
-          _ => {
-            sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 1
-            sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate shouldBe newLeader
-          },
-        ),
-        logEntries => {
-          val noticedLbRestarts = logEntries collect {
-            case logEntry if logEntry.message startsWith "Noticed an DsoRules epoch change" =>
-              raw"\bSV=(.+?)\b".r.findFirstMatchIn(logEntry.loggerName).value.group(1)
-          }
-          noticedLbRestarts should contain theSameElementsAs Seq("sv1", "sv2", "sv3")
-        },
-      )
-  }
-
   "fail to submit command with actAs = dso if there are more than 1 SV onboarded" in {
     implicit env =>
       startAllSync(

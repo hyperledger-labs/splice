@@ -13,6 +13,8 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredSvOnboardingConfirmedTrigger.*
 
+import java.util.Optional
+
 class ExpiredSvOnboardingConfirmedTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -37,20 +39,15 @@ class ExpiredSvOnboardingConfirmedTrigger(
   ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireSvOnboardingConfirmed(
           co.work.contractId,
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess("archived expired SV confirmed contract")
 }

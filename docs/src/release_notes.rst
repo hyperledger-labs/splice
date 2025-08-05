@@ -13,12 +13,13 @@ Upcoming
 
 - SV Application
 
-  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
-    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
+  - Fully removes the automation and logic around DSO delegate elections.
 
 - Daml
 
+  - Deprecates Daml choices related to DSO delegate elections.
   - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
 
      These Daml changes requires an upgrade to the following Daml versions:
 

@@ -30,18 +30,6 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
-  def supportsDelegatelessAutomation(parties: Seq[PartyId], now: CantonTimestamp)(implicit
-      tc: TraceContext
-  ): Future[FeatureSupport] = {
-    isDarSupported(
-      parties,
-      PackageIdResolver.Package.SpliceDsoGovernance,
-      now,
-      DarResources.dsoGovernance,
-      DarResources.dsoGovernance_0_1_13,
-    )
-  }
-
   def supportsMergeDuplicatedValidatorLicense(
       dsoGovernanceParties: Seq[PartyId],
       amuletParties: Seq[PartyId],
@@ -63,6 +51,7 @@ trait PackageVersionSupport extends NamedLogging {
     )
   }
 
+  // TODO(#1825): remove unused flag
   def supportsTokenStandard(parties: Seq[PartyId], now: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[FeatureSupport] = {
@@ -73,9 +62,11 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.wallet,
       // this is the first version implementing the token standard
       DarResources.wallet_0_1_9,
+      ignoreRedundantCheck = true,
     )
   }
 
+  // TODO(#1825): remove unused flag
   def supportsDescriptionInTransferPreapprovals(parties: Seq[PartyId], now: CantonTimestamp)(
       implicit tc: TraceContext
   ): Future[FeatureSupport] = {
@@ -86,6 +77,7 @@ trait PackageVersionSupport extends NamedLogging {
       DarResources.wallet,
       // this is when the description field was added to transfer preapprovals
       DarResources.wallet_0_1_9,
+      ignoreRedundantCheck = true,
     )
   }
 
