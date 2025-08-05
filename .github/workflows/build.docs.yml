@@ -25,7 +25,10 @@ jobs:
         with:
           test_name: static_tests
           save_nix_cache: true
+          save_nix_cache_to_gcp: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
           oss_only: true
+          upload_workload_identity_provider: ${{ secrets.GOOGLE_WORKLOAD_IDENTITY_PROVIDER_SPLICE }}
+          upload_service_account: ${{ secrets.CACHE_UPLOADER_SA }}
 
       - name: Build docs
         uses: ./.github/actions/sbt/execute_sbt_command
