@@ -10,21 +10,19 @@ import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
-  chartPath,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  CnChartVersion,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
   GCP_ZONE,
   getDnsNames,
-  HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   MOCK_SPLICE_ROOT,
   SPLICE_ROOT,
   isDevNet,
+  isMainNet,
 } from '../../common';
 import { clusterBasename, loadIPRanges } from './config';
 
@@ -223,10 +221,19 @@ function configureCometBFTGatewayService(
   const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
 
   const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
-    migration =>
-      Array.from({ length: numSVs }, (_, node) => node).map(node =>
-        ingressPort(`cometbft-${migration}-${node}-gw`, cometBFTExternalPort(migration, node))
-      )
+    migration => {
+      const res = Array.from({ length: numSVs }, (_, node) => node).map(node =>
+        ingressPort(
+          `cometbft-${migration}-${node + 1}-gw`,
+          cometBFTExternalPort(migration, node + 1)
+        )
+      );
+      if (!isMainNet) {
+        // For non-mainnet clusters, include "node 0" for the sv runbook
+        res.unshift(ingressPort(`cometbft-${migration}-0-gw`, cometBFTExternalPort(migration, 0)));
+      }
+      return res;
+    }
   );
   return configureGatewayService(
     ingressNs,
@@ -496,25 +503,6 @@ function configureGateway(
   cometBftSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
-  // TODO(#1766): remove this once we migrated to this everywhere
-  const version: CnChartVersion = {
-    type: 'remote',
-    version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
-  };
-  const chart = chartPath('splice-dummy', version);
-  const gatewayChart = new k8s.helm.v3.Release(
-    `cluster-gateway`,
-    {
-      name: `cluster-gateway`,
-      namespace: ingressNs.ns.metadata.name,
-      chart,
-      version: version.version,
-      timeout: HELM_CHART_TIMEOUT_SEC,
-      maxHistory: HELM_MAX_HISTORY_SIZE,
-    },
-    { deleteBeforeReplace: true }
-  );
-
   const hosts = [
     getDnsNames().cantonDnsName,
     `*.${getDnsNames().cantonDnsName}`,
@@ -563,26 +551,35 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [gwSvc, gatewayChart],
+      dependsOn: [gwSvc],
     }
   );
 
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
 
-  const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration =>
-    Array.from({ length: numSVs }, (_, node) => node).map(node => ({
-      // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
-      hosts: ['*'],
-      port: {
-        name: `cometbft-${migration}-${node}-gw`,
-        number: cometBFTExternalPort(migration, node),
-        protocol: 'TCP',
-      },
-    }))
-  );
+  const server = (migration: number, node: number) => ({
+    // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
+    hosts: ['*'],
+    port: {
+      name: `cometbft-${migration}-${node}-gw`,
+      number: cometBFTExternalPort(migration, node),
+      protocol: 'TCP',
+    },
+  });
+
+  const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
+    const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
+      server(migration, node + 1)
+    );
+    if (!isMainNet) {
+      // For non-mainnet clusters, include "node 0" for the sv runbook
+      ret.unshift(server(migration, 0));
+    }
+    return ret;
+  });
 
   const appsGw = new k8s.apiextensions.CustomResource(
     'cn-apps-gateway',
@@ -602,7 +599,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [cometBftSvc, gatewayChart],
+      dependsOn: [cometBftSvc],
     }
   );
 
@@ -652,7 +649,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [publicGwSvc, gatewayChart],
+      dependsOn: [publicGwSvc],
     }
   );
 

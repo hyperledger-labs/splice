@@ -572,22 +572,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "cluster-gateway",
-      "namespace": "cluster-ingress",
-      "timeout": 600,
-      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
-    },
-    "name": "cluster-gateway",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
@@ -630,8 +614,28 @@
               "*"
             ],
             "port": {
+              "name": "cometbft-0-1-gw",
+              "number": 26016,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
               "name": "cometbft-1-0-gw",
               "number": 26106,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
+              "name": "cometbft-1-1-gw",
+              "number": 26116,
               "protocol": "TCP"
             }
           },
@@ -650,6 +654,16 @@
               "*"
             ],
             "port": {
+              "name": "cometbft-2-1-gw",
+              "number": 26216,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
               "name": "cometbft-3-0-gw",
               "number": 26306,
               "protocol": "TCP"
@@ -660,8 +674,28 @@
               "*"
             ],
             "port": {
+              "name": "cometbft-3-1-gw",
+              "number": 26316,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
               "name": "cometbft-4-0-gw",
               "number": 26406,
+              "protocol": "TCP"
+            }
+          },
+          {
+            "hosts": [
+              "*"
+            ],
+            "port": {
+              "name": "cometbft-4-1-gw",
+              "number": 26416,
               "protocol": "TCP"
             }
           }
@@ -1674,10 +1708,22 @@
               "targetPort": 26006
             },
             {
+              "name": "cometbft-0-1-gw",
+              "port": 26016,
+              "protocol": "TCP",
+              "targetPort": 26016
+            },
+            {
               "name": "cometbft-1-0-gw",
               "port": 26106,
               "protocol": "TCP",
               "targetPort": 26106
+            },
+            {
+              "name": "cometbft-1-1-gw",
+              "port": 26116,
+              "protocol": "TCP",
+              "targetPort": 26116
             },
             {
               "name": "cometbft-2-0-gw",
@@ -1686,16 +1732,34 @@
               "targetPort": 26206
             },
             {
+              "name": "cometbft-2-1-gw",
+              "port": 26216,
+              "protocol": "TCP",
+              "targetPort": 26216
+            },
+            {
               "name": "cometbft-3-0-gw",
               "port": 26306,
               "protocol": "TCP",
               "targetPort": 26306
             },
             {
+              "name": "cometbft-3-1-gw",
+              "port": 26316,
+              "protocol": "TCP",
+              "targetPort": 26316
+            },
+            {
               "name": "cometbft-4-0-gw",
               "port": 26406,
               "protocol": "TCP",
               "targetPort": 26406
+            },
+            {
+              "name": "cometbft-4-1-gw",
+              "port": 26416,
+              "protocol": "TCP",
+              "targetPort": 26416
             }
           ]
         },

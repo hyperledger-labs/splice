@@ -276,8 +276,18 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-0-1-p2p",
+            "number": 26016,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-1-0-p2p",
             "number": 26106,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-1-p2p",
+            "number": 26116,
             "protocol": "TCP"
           },
           {
@@ -286,13 +296,28 @@
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-2-1-p2p",
+            "number": 26216,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-3-0-p2p",
             "number": 26306,
             "protocol": "TCP"
           },
           {
+            "name": "cometbft-3-1-p2p",
+            "number": 26316,
+            "protocol": "TCP"
+          },
+          {
             "name": "cometbft-4-0-p2p",
             "number": 26406,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-1-p2p",
+            "number": 26416,
             "protocol": "TCP"
           }
         ],
@@ -387,22 +412,6 @@
     "name": "loopback-virtual-service-sv",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "sv",
-      "timeout": 600,
-      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
-    },
-    "name": "loopback",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
