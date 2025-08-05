@@ -39,6 +39,9 @@ Upcoming
     It has been replaced with explicit instructions in the :ref:`validator docs <helm-validator-ingress>`
     and :ref:`SV docs <helm-sv-ingress>` on how to set up Istio ingress for the validator and SV nodes.
 
+- Docs
+
+  - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
 
 0.4.9
 -----

@@ -419,6 +419,39 @@ The snapshots are fetched from your onboarding sponsor which exposes its CometBF
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
+.. _helm-sv-bft-sequencer-connections:
+
+Configuring BFT Sequencer Connections
+-------------------------------------
+
+By default, SV participants use BFT sequencer connections to interact with the Global Synchronizer, i.e.,
+they maintain connections to a random subset of all sequencers (most of which typically operated by other SVs)
+and perform reads and writes in the same :term:`BFT` manner used by regular validators.
+In principle, this mode of operation is more robust than using a single connection to the sequencer operated by the SV itself.
+However, bugs in the BFT sequencer connection logic or severe instability of other SVs's sequencers can make it prudent to temporarily switch back to using a single sequencer connection.
+
+To do so, SV operators must:
+
+1. In ``validator-values.yaml``, add ``useSequencerConnectionsFromScan: false`` and set ``decentralizedSynchronizerUrl`` to your ``domain.sequencerPublicUrl`` value from ``sv-values.yaml``.
+
+2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
+
+.. code-block:: yaml
+
+    additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION
+          value: "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+
+3. In ``sv-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
+
+.. code-block:: yaml
+
+    additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION
+          value: "canton.sv-apps.sv.bft-sequencer-connection = false"
+
+The default behavior is restored by undoing above changes.
+
 .. _helm-sv-postgres:
 
 Installing Postgres instances
