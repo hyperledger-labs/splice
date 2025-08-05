@@ -620,8 +620,8 @@
               "*"
             ],
             "port": {
-              "name": "cometbft-0-1-gw",
-              "number": 26016,
+              "name": "cometbft-0-0-gw",
+              "number": 26006,
               "protocol": "TCP"
             }
           },
@@ -640,8 +640,8 @@
               "*"
             ],
             "port": {
-              "name": "cometbft-1-1-gw",
-              "number": 26116,
+              "name": "cometbft-1-0-gw",
+              "number": 26106,
               "protocol": "TCP"
             }
           },
@@ -660,8 +660,8 @@
               "*"
             ],
             "port": {
-              "name": "cometbft-2-1-gw",
-              "number": 26216,
+              "name": "cometbft-2-0-gw",
+              "number": 26206,
               "protocol": "TCP"
             }
           },
@@ -680,8 +680,8 @@
               "*"
             ],
             "port": {
-              "name": "cometbft-3-1-gw",
-              "number": 26316,
+              "name": "cometbft-3-0-gw",
+              "number": 26306,
               "protocol": "TCP"
             }
           },
@@ -700,8 +700,8 @@
               "*"
             ],
             "port": {
-              "name": "cometbft-4-1-gw",
-              "number": 26416,
+              "name": "cometbft-4-0-gw",
+              "number": 26406,
               "protocol": "TCP"
             }
           },
