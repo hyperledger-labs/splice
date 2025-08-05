@@ -24,9 +24,11 @@ import {
 import { FormLayout } from './FormLayout';
 import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
 
+type ProviderId = string;
+type FeaturedAppRightId = string;
+
 interface ExtraFormField {
-  // represents appId for granting and contractId for revoking
-  idValue: string;
+  idValue: ProviderId | FeaturedAppRightId;
 }
 
 type GrantRevokeFeaturedAppFormData = CommonFormData & ExtraFormField;
@@ -51,6 +53,7 @@ export const GrantRevokeFeaturedAppForm: React.FC<GrantRevokeFeaturedAppFormProp
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
 
+  // TODO(#1819): use either search params or props and not both.
   const formAction: GrantRevokeFeaturedAppActions =
     (useSearchParams()[0]?.get('action') as GrantRevokeFeaturedAppActions) || selectedAction;
   const idValueFieldTitle =
