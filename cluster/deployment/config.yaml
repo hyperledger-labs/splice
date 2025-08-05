@@ -60,6 +60,9 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+      svNames:
+        - Dummy-SV-1
+        - Dummy-SV-2
     logAlerts:
       # TODO(hyperledger-labs/splice#1483): stop ignoring sequencer connection warnings once they have better signal
       # TODO(hyperledger-labs/splice#1288): ignore fewer mediator warnings once they have better signal
