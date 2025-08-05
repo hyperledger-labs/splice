@@ -226,13 +226,19 @@ function configureCometBFTGatewayService(
   const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
 
   const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
-    migration =>
-      Array.from({ length: numSVs }, (_, node) => node).map(node =>
+    migration => {
+      const res = Array.from({ length: numSVs }, (_, node) => node).map(node =>
         ingressPort(
           `cometbft-${migration}-${node + 1}-gw`,
           cometBFTExternalPort(migration, node + 1)
         )
-      )
+      );
+      if (!isMainNet) {
+        // For non-mainnet clusters, include "node 0" for the sv runbook
+        res.unshift(ingressPort(`cometbft-${migration}-0-gw`, cometBFTExternalPort(migration, 0)));
+      }
+      return res;
+    }
   );
   return configureGatewayService(
     ingressNs,
