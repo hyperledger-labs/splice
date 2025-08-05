@@ -10,16 +10,13 @@ import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
 
 import {
-  chartPath,
   CLUSTER_HOSTNAME,
   CLUSTER_NAME,
-  CnChartVersion,
   DecentralizedSynchronizerUpgradeConfig,
   ExactNamespace,
   GCP_PROJECT,
   GCP_ZONE,
   getDnsNames,
-  HELM_CHART_TIMEOUT_SEC,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
   MOCK_SPLICE_ROOT,
@@ -510,25 +507,6 @@ function configureGateway(
   cometBftSvc: k8s.helm.v3.Release,
   publicGwSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
-  // TODO(#1766): remove this once we migrated to this everywhere
-  const version: CnChartVersion = {
-    type: 'remote',
-    version: '0.4.10-snapshot.20250731.589.0.v5e776fc4',
-  };
-  const chart = chartPath('splice-dummy', version);
-  const gatewayChart = new k8s.helm.v3.Release(
-    `cluster-gateway`,
-    {
-      name: `cluster-gateway`,
-      namespace: ingressNs.ns.metadata.name,
-      chart,
-      version: version.version,
-      timeout: HELM_CHART_TIMEOUT_SEC,
-      maxHistory: HELM_MAX_HISTORY_SIZE,
-    },
-    { deleteBeforeReplace: true }
-  );
-
   const hosts = [
     getDnsNames().cantonDnsName,
     `*.${getDnsNames().cantonDnsName}`,
@@ -577,7 +555,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [gwSvc, gatewayChart],
+      dependsOn: [gwSvc],
     }
   );
 
@@ -625,7 +603,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [cometBftSvc, gatewayChart],
+      dependsOn: [cometBftSvc],
     }
   );
 
@@ -675,7 +653,7 @@ function configureGateway(
       },
     },
     {
-      dependsOn: [publicGwSvc, gatewayChart],
+      dependsOn: [publicGwSvc],
     }
   );
 
