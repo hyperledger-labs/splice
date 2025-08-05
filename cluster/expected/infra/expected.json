@@ -1720,10 +1720,22 @@
               "targetPort": 443
             },
             {
+              "name": "cometbft-0-0-gw",
+              "port": 26006,
+              "protocol": "TCP",
+              "targetPort": 26006
+            },
+            {
               "name": "cometbft-0-1-gw",
               "port": 26016,
               "protocol": "TCP",
               "targetPort": 26016
+            },
+            {
+              "name": "cometbft-1-0-gw",
+              "port": 26106,
+              "protocol": "TCP",
+              "targetPort": 26106
             },
             {
               "name": "cometbft-1-1-gw",
@@ -1732,16 +1744,34 @@
               "targetPort": 26116
             },
             {
+              "name": "cometbft-2-0-gw",
+              "port": 26206,
+              "protocol": "TCP",
+              "targetPort": 26206
+            },
+            {
               "name": "cometbft-2-1-gw",
               "port": 26216,
               "protocol": "TCP",
               "targetPort": 26216
             },
             {
+              "name": "cometbft-3-0-gw",
+              "port": 26306,
+              "protocol": "TCP",
+              "targetPort": 26306
+            },
+            {
               "name": "cometbft-3-1-gw",
               "port": 26316,
               "protocol": "TCP",
               "targetPort": 26316
+            },
+            {
+              "name": "cometbft-4-0-gw",
+              "port": 26406,
+              "protocol": "TCP",
+              "targetPort": 26406
             },
             {
               "name": "cometbft-4-1-gw",
