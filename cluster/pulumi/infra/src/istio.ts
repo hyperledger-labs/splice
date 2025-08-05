@@ -574,23 +574,23 @@ function configureGateway(
   );
 
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // For DevNet-like clusters, we always assume at least 4 SVs (not including sv-runbook) to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
 
   const server = (migration: number, node: number) => ({
     // We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
     hosts: ['*'],
     port: {
-      name: `cometbft-${migration}-${node + 1}-gw`,
-      number: cometBFTExternalPort(migration, node + 1),
+      name: `cometbft-${migration}-${node}-gw`,
+      number: cometBFTExternalPort(migration, node),
       protocol: 'TCP',
     },
   });
 
   const servers = Array.from({ length: numMigrations }, (_, i) => i).flatMap(migration => {
     const ret = Array.from({ length: numSVs }, (_, node) => node).map(node =>
-      server(migration, node)
+      server(migration, node + 1)
     );
     if (!isMainNet) {
       // For non-mainnet clusters, include "node 0" for the sv runbook
