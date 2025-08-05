@@ -56,7 +56,7 @@ export function installLoopback(namespace: ExactNamespace): pulumi.Resource[] {
     );
     if (!isMainNet) {
       // For non-mainnet clusters, include "node 0" for the sv runbook
-      ret.push(port(migration, 0));
+      ret.unshift(port(migration, 0));
     }
     return ret;
   });

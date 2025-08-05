@@ -594,7 +594,7 @@ function configureGateway(
     );
     if (!isMainNet) {
       // For non-mainnet clusters, include "node 0" for the sv runbook
-      ret.push(server(migration, 0));
+      ret.unshift(server(migration, 0));
     }
     return ret;
   });
