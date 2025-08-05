@@ -354,21 +354,3 @@ jobs:
           jobs: ${{ env.JOBS }}
           # Allow skipping the enterprise-only jobs
           allowed-skips: scala_test_with_cometbft, scala_test_docker_compose, scala_test_local_net, scala_test_canton_enterprise
-
-  test:
-    runs-on: self-hosted-docker-tiny
-    container:
-      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
-    steps:
-      - name: echo runner
-        shell: bash
-        run: |
-          echo "Runner name: ${{ runner.name }}"
-
-  test2:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: echo runner
-        shell: bash
-        run: |
-          echo "Runner name: ${{ runner.name }}"
