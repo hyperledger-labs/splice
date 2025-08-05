@@ -3,6 +3,7 @@ package org.lfdecentralizedtrust.splice.integration.tests
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 
+import java.time.Duration
 import scala.concurrent.duration.*
 import scala.sys.process.*
 
@@ -15,7 +16,7 @@ class LocalNetFrontendIntegrationTest
 
   // This does nothing as the wallet clients will not actually be connected to the compose setup
   override protected def runTokenStandardCliSanityCheck: Boolean = false
-
+  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
   override lazy val resetRequiredTopologyState = false
 
   val partyHint = "localnet-localparty-1"
