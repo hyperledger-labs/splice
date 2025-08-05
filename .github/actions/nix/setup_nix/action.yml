@@ -225,7 +225,6 @@ runs:
         ls /tmp/nix-upload
         echo "cache_file=/tmp/nix-upload/${cache_key}.tar.gz" >> $GITHUB_OUTPUT
 
-        echo "Runner name: ${{ runner.name }}"
     - name: Upload nix cache
       if: ${{ inputs.should_save_gcp == 'true' && steps.already_exists.outputs.already_exists != 'true' }}
       uses: google-github-actions/upload-cloud-storage@v2
