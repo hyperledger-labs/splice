@@ -216,9 +216,9 @@ function configureCometBFTGatewayService(
 ) {
   const externalIPRanges = loadIPRanges(true);
   const numMigrations = DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1;
-  // For DevNet-like clusters, we always assume at least 5 SVs to reduce churn on the gateway definition,
+  // For DevNet-like clusters, we always assume at least 4 SVs to reduce churn on the gateway definition,
   // and support easily deploying without refreshing the infra stack.
-  const numSVs = dsoSize < 5 && isDevNet ? 5 : dsoSize;
+  const numSVs = dsoSize < 4 && isDevNet ? 4 : dsoSize;
 
   const cometBftIngressPorts = Array.from({ length: numMigrations }, (_, i) => i).flatMap(
     migration => {
