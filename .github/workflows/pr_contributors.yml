@@ -28,7 +28,7 @@ jobs:
       - name: echo runner
         shell: bash
         run: |
-          echo "Runner name: ${{ runner.name }}"
+          echo "is self hosted: ${{ startsWith(runner.name, 'self-hosted') }}"
 
   test2:
     runs-on: ubuntu-24.04
@@ -36,4 +36,4 @@ jobs:
       - name: echo runner
         shell: bash
         run: |
-          echo "Runner name: ${{ runner.name }}"
+          echo "is self hosted: ${{ startsWith(runner.name, 'self-hosted') }}"
