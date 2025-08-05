@@ -805,6 +805,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
+                monitoringConfig.alerting.alerts.svNames
+                  .map(p => `,member!~"PAR::${p}::.*"`)
+                  .join('')
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(
