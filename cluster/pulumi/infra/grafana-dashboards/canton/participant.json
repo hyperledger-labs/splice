@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2704,
+  "id": 3569,
   "links": [],
   "panels": [
     {
@@ -660,11 +660,9 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "participant-0"
-          ],
+          "text": "All",
           "value": [
-            "participant-0"
+            "$__all"
           ]
         },
         "datasource": {
@@ -720,8 +718,8 @@
     "to": "now"
   },
   "timepicker": {},
-  "timezone": "browser",
+  "timezone": "",
   "title": "Participant",
   "uid": "edkzo5ukgeqyoc",
-  "version": 2
+  "version": 1
 }
