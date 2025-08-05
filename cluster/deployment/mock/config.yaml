@@ -77,6 +77,9 @@ monitoring:
     alerts:
       cloudSql:
         maintenance: true
+      svNames:
+        - Dummy-SV-1
+        - Dummy-SV-2
     logAlerts:
       # These are mock values and in no way recommendations
       forCometBft: |
