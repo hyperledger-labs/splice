@@ -50,7 +50,7 @@ runs:
         cache_key=($(md5sum "/tmp/nix-cache-key"))
         echo "cache_key=$cache_key" >> $GITHUB_ENV
 
-    - name: Download cache
+    - name: Download cache (for non-self-hosted)
       if: ${{ !startsWith(runner.name, 'self-hosted') }}
       shell: bash
       run: |
@@ -60,6 +60,9 @@ runs:
           echo "Must use OSS only dependencies in GitHub-hosted runners"
           exit 1
         fi
+
+        echo "Latest nix cache:"
+        curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name'
 
         wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" || true
         if [ ! -f "${cache_key}.tar.gz" ]; then
