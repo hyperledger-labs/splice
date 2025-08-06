@@ -244,9 +244,8 @@ CREATE TEMP FUNCTION result_burn(choice string, result json)
     WHEN 'TransferPreapproval_Renew' THEN
       PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([4], 'numeric'))) -- .amuletPaid
       + transferresult_fees(JSON_QUERY(result, daml_record_path([1], 'record'))) -- .transferResult
-    ELSE 0
-  END
-    );
+    ELSE ERROR('Unknown choice for result_burn: ' || choice)
+  END);
 
 -- Amulet burned via fees.
 CREATE TEMP FUNCTION burned(
