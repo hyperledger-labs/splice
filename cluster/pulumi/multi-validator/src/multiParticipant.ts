@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { generatePortSequence, numNodesPerInstance } from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  generatePortSequence,
+  numNodesPerInstance,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';

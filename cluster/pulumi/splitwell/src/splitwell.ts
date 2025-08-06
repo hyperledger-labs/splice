@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as pulumi from '@pulumi/pulumi';
 import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import * as pulumi from '@pulumi/pulumi';
 import {
   activeVersion,
   ansDomainPrefix,
@@ -21,7 +21,10 @@ import {
   installSpliceHelmChart,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
-import { installParticipant, splitwellDarPaths } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import {
+  installParticipant,
+  splitwellDarPaths,
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
 import { installValidatorApp } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
 
 import { splitwellConfig } from '../../common/src/config/splitwellConfig';

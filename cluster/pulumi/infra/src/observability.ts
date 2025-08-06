@@ -5,9 +5,6 @@ import * as pulumi from '@pulumi/pulumi';
 import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
-import { local } from '@pulumi/command';
-import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
-import { Input } from '@pulumi/pulumi';
 import {
   CLUSTER_BASENAME,
   CLUSTER_HOSTNAME,
@@ -26,6 +23,9 @@ import {
   SPLICE_ROOT,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { local } from '@pulumi/command';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
+import { Input } from '@pulumi/pulumi';
 
 import {
   clusterIsResetPeriodically,

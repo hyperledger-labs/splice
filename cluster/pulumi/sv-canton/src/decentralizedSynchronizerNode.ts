@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import { Release } from '@pulumi/kubernetes/helm/v3';
-import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
   CLUSTER_HOSTNAME,
@@ -30,6 +28,8 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { Release } from '@pulumi/kubernetes/helm/v3';
+import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 
 abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource

@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Secret } from '@pulumi/kubernetes/core/v1';
-import { Output } from '@pulumi/pulumi';
 import {
   activeVersion,
   Auth0Client,
@@ -32,6 +30,8 @@ import {
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
+import { Secret } from '@pulumi/kubernetes/core/v1';
+import { Output } from '@pulumi/pulumi';
 
 import { SweepConfig } from './sweep';
 

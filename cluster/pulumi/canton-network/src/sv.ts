@@ -1,9 +1,8 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
-import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   ansDomainPrefix,
@@ -57,6 +56,7 @@ import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/con
 import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
 import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { Resource } from '@pulumi/pulumi';
 
 import {
   delegatelessAutomationExpectedTaskDuration,

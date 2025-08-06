@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as fs from 'fs';
-import { Resource } from '@pulumi/pulumi';
-import { createHash } from 'crypto';
 import {
   approvedSvIdentitiesFile,
   clusterNetwork,
@@ -13,6 +11,8 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { getChainIdSuffix } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
+import { Resource } from '@pulumi/pulumi';
+import { createHash } from 'crypto';
 
 export function installInfo(
   xns: ExactNamespace,

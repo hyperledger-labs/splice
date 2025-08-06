@@ -3,7 +3,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Namespace } from '@pulumi/kubernetes/core/v1';
 import {
   appsAffinityAndTolerations,
   ChartValues,
@@ -11,6 +10,7 @@ import {
   infraAffinityAndTolerations,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
+import { Namespace } from '@pulumi/kubernetes/core/v1';
 
 const circleCiNamespace = new Namespace('circleci-runner', {
   metadata: {

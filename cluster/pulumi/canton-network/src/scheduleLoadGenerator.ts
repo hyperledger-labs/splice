@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   Auth0Client,
@@ -17,6 +16,7 @@ import {
   installLoopback,
   parsedVersion,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { Resource } from '@pulumi/pulumi';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
   if (loadTesterConfig?.enable) {
