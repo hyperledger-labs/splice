@@ -1,5 +1,5 @@
 {
-  "name": "splice-pulumi-gha",
+  "name": "@lfdecentralizedtrust/splice-pulumi-gha",
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {

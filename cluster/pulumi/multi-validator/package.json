@@ -1,5 +1,5 @@
 {
-  "name": "multi-validator",
+  "name": "@lfdecentralizedtrust/splice-pulumi-multi-validator",
   "main": "src/index.ts",
   "devDependencies": {
     "@types/sinon": "^10.0.15",

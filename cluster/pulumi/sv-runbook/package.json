@@ -1,5 +1,5 @@
 {
-  "name": "sv-runbook",
+  "name": "@lfdecentralizedtrust/splice-pulumi-sv-runbook",
   "main": "src/index.ts",
   "devDependencies": {
     "@types/node-fetch": "^2.6.12",
@@ -7,7 +7,7 @@
     "sinon": "^15.0.4"
   },
   "dependencies": {
-    "canton-network-pulumi-deployment": "1.0.0",
+    "@lfdecentralizedtrust/canton-network-pulumi-deployment": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
     "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0"
   },

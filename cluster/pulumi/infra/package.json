@@ -1,5 +1,5 @@
 {
-  "name": "cn-infrastructure",
+  "name": "@lfdecentralizedtrust/splice-pulumi-infra",
   "main": "src/index.ts",
   "dependencies": {
     "@pulumi/auth0": "3.21.0",

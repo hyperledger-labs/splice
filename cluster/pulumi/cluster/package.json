@@ -1,5 +1,5 @@
 {
-  "name": "cn-cluster",
+  "name": "@lfdecentralizedtrust/splice-pulumi-cluster",
   "main": "src/index.ts",
   "dependencies": {
     "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"

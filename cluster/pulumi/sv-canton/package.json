@@ -1,5 +1,5 @@
 {
-  "name": "sv-canton-pulumi-deployment",
+  "name": "@lfdecentralizedtrust/splice-pulumi-sv-canton",
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {

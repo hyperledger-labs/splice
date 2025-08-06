@@ -1,5 +1,5 @@
 {
-  "name": "validator-runbook",
+  "name": "@lfdecentralizedtrust/splice-pulumi-validator-runbook",
   "main": "src/index.ts",
   "devDependencies": {
     "@types/sinon": "^10.0.15",

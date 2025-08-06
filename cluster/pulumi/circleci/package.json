@@ -1,5 +1,5 @@
 {
-  "name": "splice-pulumi-circleci",
+  "name": "@lfdecentralizedtrust/splice-pulumi-circlrci",
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {

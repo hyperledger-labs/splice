@@ -4,7 +4,7 @@ import {
   mustInstallSplitwell,
   mustInstallValidator1,
 } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
-import { startDownOperationsForCantonStacks } from 'sv-canton-pulumi-deployment/pulumiDown';
+import { startDownOperationsForCantonStacks } from '@lfdecentralizedtrust/splice-pulumi-sv-canton/pulumiDown';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';
 import { downOperation } from './pulumiOperations';

@@ -20,7 +20,7 @@ import { installPostgres, Postgres } from '@lfdecentralizedtrust/splice-pulumi-c
 import {
   InStackCantonBftDecentralizedSynchronizerNode,
   InStackCometBftDecentralizedSynchronizerNode,
-} from 'sv-canton-pulumi-deployment/src/decentralizedSynchronizerNode';
+} from '@lfdecentralizedtrust/splice-pulumi-sv-canton/src/decentralizedSynchronizerNode';
 
 export function installCantonComponents(
   xns: ExactNamespace,
