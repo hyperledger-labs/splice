@@ -27,7 +27,6 @@ import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
-    with FrontendLoginUtil
     with AmuletConfigUtil
     with WalletTestUtil
     with WalletFrontendTestUtil
@@ -39,8 +38,6 @@ class ScanFrontendTimeBasedIntegrationTest
     with SvTestUtil {
 
   val amuletPrice = 2
-
-  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
