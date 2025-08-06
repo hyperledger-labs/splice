@@ -21,7 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
-import org.lfdecentralizedtrust.splice.store.{Limit, PageLimit}
+import org.lfdecentralizedtrust.splice.store.PageLimit
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
