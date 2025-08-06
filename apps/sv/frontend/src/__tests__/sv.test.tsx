@@ -4,7 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
-import { ListDsoRulesVoteRequestsResponse } from 'sv-openapi';
+import { ListDsoRulesVoteRequestsResponse } from '@lfdecentralizedtrust/sv-openapi';
 import { test, expect, describe } from 'vitest';
 
 import App from '../App';
