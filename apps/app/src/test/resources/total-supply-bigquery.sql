@@ -2,6 +2,7 @@
 DECLARE
   as_of_record_time timestamp;
 DECLARE
+  migration_id_ok,
   migration_id int64;
 DECLARE
   locked,
@@ -294,13 +295,97 @@ CREATE TEMP FUNCTION burned(
 -- using the functions
 SET as_of_record_time = iso_timestamp('2025-07-01T00:00:00Z');
 SET migration_id = 3;
+SET migration_id_ok = migration_id;
+
+WITH SplitAndBurning_and_Transfer_nodes AS (
+    SELECT e.choice choice, e.result result, e.child_event_ids child_event_ids
+    FROM mainnet_da2_scan.scan_sv_1_update_history_exercises e
+    WHERE ((e.choice = 'SubscriptionInitialPayment_Collect'
+        AND e.template_id_entity_name = 'SubscriptionInitialPayment')
+        OR (e.choice = 'SubscriptionPayment_Collect'
+            AND e.template_id_entity_name = 'SubscriptionPayment'
+            ))
+      AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
+      AND in_time_window(as_of_record_time, migration_id_ok,
+                         e.record_time, e.migration_id))
+SELECT b.choice parent_choice, e2.choice child_choice,
+       timestamp_micros(e2.record_time) record_time
+FROM SplitAndBurning_and_Transfer_nodes b,
+     UNNEST(JSON_VALUE_ARRAY(b.child_event_ids)) AS child_event_id,
+     mainnet_da2_scan.scan_sv_1_update_history_exercises e2
+WHERE e2.event_id = child_event_id
+  AND e2.record_time != -62135596800000000
+--  AND e2.choice = 'AmuletRules_Transfer'
+LIMIT 50;
+
+SELECT
+    e.choice choice,
+    TransferSummary_minted(
+            choice_result_TransferSummary(e.choice, e.result)) minted
+FROM
+    mainnet_da2_scan.scan_sv_1_update_history_exercises e
+WHERE
+    ((e.choice IN ('AmuletRules_BuyMemberTraffic',
+                   'AmuletRules_Transfer',
+                   'AmuletRules_CreateTransferPreapproval',
+                   'AmuletRules_CreateExternalPartySetupProposal')
+        AND e.template_id_entity_name = 'AmuletRules')
+        OR (e.choice = 'TransferPreapproval_Renew'
+            AND e.template_id_entity_name = 'TransferPreapproval'))
+  AND e.template_id_module_name = 'Splice.AmuletRules'
+  AND in_time_window(as_of_record_time, migration_id,
+                     e.record_time, e.migration_id)
+GROUP BY e.choice;
+
 SET locked = locked(as_of_record_time, migration_id);
 SET unlocked = unlocked(as_of_record_time, migration_id);
 SET unminted = unminted(as_of_record_time, migration_id);
 SET minted = minted(as_of_record_time, migration_id);
 SET burned = burned(as_of_record_time, migration_id);
 SET current_supply_total = locked + unlocked;
-SET allowed_mint = unminted + minted;
+--SET allowed_mint = unminted + minted;
+
+
+SELECT choice, fees
+  FROM ((
+            SELECT
+                e.choice choice, SUM(result_burn(e.choice,
+                                e.result)) fees
+            FROM
+                mainnet_da2_scan.scan_sv_1_update_history_exercises e
+            WHERE
+                ((e.choice IN ('AmuletRules_BuyMemberTraffic',
+                               'AmuletRules_Transfer',
+                               'AmuletRules_CreateTransferPreapproval',
+                               'AmuletRules_CreateExternalPartySetupProposal')
+                    AND e.template_id_entity_name = 'AmuletRules')
+                    OR (e.choice = 'TransferPreapproval_Renew'
+                        AND e.template_id_entity_name = 'TransferPreapproval'))
+              AND e.template_id_module_name = 'Splice.AmuletRules'
+              AND in_time_window(as_of_record_time, migration_id_ok,
+                      e.record_time, e.migration_id)
+            GROUP BY e.choice)
+        UNION ALL (-- Purchasing ANS Entries
+            SELECT
+                e.choice choice, SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, daml_record_path([2, 0], 'numeric')))) fees -- .amount.initialAmount
+            FROM
+                mainnet_da2_scan.scan_sv_1_update_history_exercises e,
+                mainnet_da2_scan.scan_sv_1_update_history_creates c
+            WHERE
+                ((e.choice = 'SubscriptionInitialPayment_Collect'
+                    AND e.template_id_entity_name = 'SubscriptionInitialPayment'
+                    AND c.contract_id = JSON_VALUE(e.result, daml_record_path([2], 'contractId'))) -- .amulet
+                    OR (e.choice = 'SubscriptionPayment_Collect'
+                        AND e.template_id_entity_name = 'SubscriptionPayment'
+                        AND c.contract_id = JSON_VALUE(e.result, daml_record_path([1], 'contractId')))) -- .amulet
+              AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
+              AND c.template_id_module_name = 'Splice.Amulet'
+              AND c.template_id_entity_name = 'Amulet'
+              AND in_time_window(as_of_record_time, migration_id_ok,
+                    e.record_time, e.migration_id)
+              AND c.record_time != -62135596800000000
+              GROUP BY e.choice));
+
 SELECT
   locked locked,
   unlocked unlocked,
