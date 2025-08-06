@@ -452,7 +452,7 @@ async function installSvAndValidator(
       ? {}
       : {
           decentralizedSynchronizerUrl: svValues.decentralizedSynchronizerUrl,
-          useSequencerConnectionsFromScan: true,
+          useSequencerConnectionsFromScan: false,
         }),
     additionalEnvVars: [
       ...(validatorValuesWithMaybeTopups.additionalEnvVars || []),

@@ -966,7 +966,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
-        "useSequencerConnectionsFromScan": true,
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64553aa683015a9687d9cc2e"
