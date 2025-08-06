@@ -62,6 +62,14 @@ CREATE TEMP FUNCTION daml_record_path(
          daml_prim_path(prim_selector))
 );
 
+-- the most common JSON selection in this file
+CREATE TEMP FUNCTION daml_record_numeric(
+    daml_record json,
+    path array<int64>
+  ) RETURNS bignumeric AS (
+  PARSE_BIGNUMERIC(JSON_VALUE(daml_record,
+      daml_record_path(path, 'numeric'))));
+
 CREATE TEMP FUNCTION in_time_window(
     as_of_record_time timestamp,
     migration_id_arg int64,
@@ -149,9 +157,12 @@ CREATE TEMP FUNCTION unminted(
     migration_id));
 
 
-CREATE TEMP FUNCTION TransferResult_summary(summary_position int64)
-    RETURNS string AS (
-  daml_record_path([1, summary_position], 'numeric'));
+CREATE TEMP FUNCTION TransferResult_minted(tr_json json)
+    RETURNS bignumeric AS (
+  daml_record_numeric(tr_json, [1, 0]) -- .inputAppRewardAmount
+  + daml_record_numeric(tr_json, [1, 1]) -- .inputValidatorRewardAmount
+  + daml_record_numeric(tr_json, [1, 2]) -- .inputSvRewardAmount
+);
 
 
 -- All Amulet that was ever minted.
@@ -160,26 +171,15 @@ CREATE TEMP FUNCTION minted(
     migration_id int64
   ) RETURNS bignumeric AS ((
   SELECT
-    COALESCE(SUM(
-      PARSE_BIGNUMERIC(JSON_VALUE(e.result,
-                                    -- .inputAppRewardAmount
-                                    TransferResult_summary(0)))
-      + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
-                                    -- .inputValidatorRewardAmount
-                                    TransferResult_summary(1)))
-      + PARSE_BIGNUMERIC(JSON_VALUE(e.result,
-                                    -- .inputSvRewardAmount
-                                    TransferResult_summary(2)))),
-      0)
+    COALESCE(SUM(TransferResult_minted(e.result)), 0)
   FROM
     mainnet_da2_scan.scan_sv_1_update_history_exercises e
   WHERE
     e.choice = 'AmuletRules_Transfer'
     AND e.template_id_module_name = 'Splice.AmuletRules'
     AND e.template_id_entity_name = 'AmuletRules'
-    AND (e.migration_id < migration_id
-      OR (e.migration_id = migration_id
-        AND e.record_time <= UNIX_MICROS(as_of_record_time)))));
+    AND in_time_window(as_of_record_time, migration_id,
+          e.record_time, e.migration_id)));
 
 
 -- fees from a Splice.AmuletRules:TransferResult
@@ -205,13 +205,7 @@ CREATE TEMP FUNCTION result_burn(choice string, result json)
       + PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([1, 7], 'numeric'))) -- .summary.senderChangeFee
     WHEN 'AmuletRules_Transfer' THEN -- Amulet Burnt in Amulet Transfers
       -- TransferResult
-      -- .summary.holdingFees
-      PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([1, 5], 'numeric')))
-      -- .summary.senderChangeFee
-      + PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([1, 7], 'numeric')))
-      + (SELECT COALESCE(SUM(PARSE_BIGNUMERIC(JSON_VALUE(x, '$.numeric'))), 0)
-         -- .summary.outputFees
-         FROM UNNEST(JSON_QUERY_ARRAY(result, daml_record_path([1, 6], 'list'))) AS x)
+      transferresult_fees(result)
     WHEN 'AmuletRules_CreateTransferPreapproval' THEN
       PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([2], 'numeric'))) -- .amuletPaid
       + transferresult_fees(JSON_QUERY(result, daml_record_path([1], 'record'))) -- .transferResult
