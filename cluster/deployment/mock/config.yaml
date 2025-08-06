@@ -110,6 +110,9 @@ loadTester:
   iterationsPerMinute: 30
   minRate: 0.123
 svs:
+  default:
+    participant:
+      bftSequencerConnection: false
   sv-2:
     logging:
       appsLogLevel: INFO
