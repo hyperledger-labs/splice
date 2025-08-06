@@ -186,6 +186,6 @@ class ExpireRewardCouponsTrigger(
             .yieldResult()
         )
       )
-    } yield expiredRewardsTask.validatorCoupons.size + expiredRewardsTask.appCoupons.size + expiredRewardsTask.validatorFaucets.size + expiredRewardsTask.svRewardCoupons.size
+    } yield expiredRewardsTask.validatorCoupons.size + expiredRewardsTask.appCoupons.size + expiredRewardsTask.validatorFaucets.size + expiredRewardsTask.svRewardCoupons.size + expiredRewardsTask.validatorLivenessActivityRecords.size
   }
 }

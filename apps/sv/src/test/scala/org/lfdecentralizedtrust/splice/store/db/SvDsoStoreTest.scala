@@ -2,16 +2,24 @@ package org.lfdecentralizedtrust.splice.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.crypto.Fingerprint
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
+import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules_MiningRound_Archive,
   AppTransferContext,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
-import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
-import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.ans.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.cometbft.CometBftConfigLimits
+import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsynchronizer.{
   DsoDecentralizedSynchronizerConfig,
   SynchronizerNodeConfigLimits,
@@ -22,38 +30,29 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequir
   ARC_AnsEntryContext,
   ARC_DsoRules,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddSv,
   SRARC_OffboardSv,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.round.OpenMiningRound
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
+import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment.{PaymentAmount, Unit}
-import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.{
-  Subscription,
-  SubscriptionData,
-  SubscriptionIdleState,
-  SubscriptionInitialPayment,
-  SubscriptionPayData,
-  SubscriptionRequest,
-}
-import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.subscriptions.*
 import org.lfdecentralizedtrust.splice.environment.{DarResources, RetryProvider}
 import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
-import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
+import org.lfdecentralizedtrust.splice.store.{Limit, MiningRoundsStore, PageLimit, StoreTest}
+import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{IdleAnsSubscription, RoundBatch}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
-import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore.{
-  IdleAnsSubscription,
-  RoundCounterpartyBatch,
-}
 import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil
 import org.lfdecentralizedtrust.splice.util.{
@@ -62,15 +61,6 @@ import org.lfdecentralizedtrust.splice.util.{
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
 }
-import com.digitalasset.canton.{HasActorSystem, HasExecutionContext, SynchronizerAlias}
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -470,9 +460,9 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listAppRewardCouponsGroupedByCounterparty" should {
+    "listAppRewardCouponsGroupedByRound" should {
 
-      "return all app reward coupons in a round grouped by counterparty" in {
+      "return all app reward coupons in a round grouped by round" in {
         val provider1InRound = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(1)))
         val provider2InRound = (1 to 3).map(_ => appRewardCoupon(round = 3, userParty(2)))
         val provider1OutOfRound = (1 to 3).map(_ => appRewardCoupon(round = 2, userParty(1)))
@@ -491,40 +481,32 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listAppRewardCouponsGroupedByCounterparty(
+          result <- store.listAppRewardCouponsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result should have size 4
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          result should have size 2
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 3
-            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet
+            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
+              .map(_.contractId)
+              .toSet
           }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 3
-            cids.toSet shouldBe provider2InRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 2
-            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 2
-            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet
+            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet ++ provider1OutOfRound
+              .map(_.contractId)
+              .toSet
           }
         }
       }
 
     }
 
-    "listValidatorRewardCouponsGroupedByCounterparty" should {
+    "listValidatorRewardCouponsGroupedByRound" should {
 
-      "return all validator reward coupons in a round grouped by counterparty" in {
+      "return all validator reward coupons in a round grouped by round" in {
         val provider1InRound = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(1)))
         val provider2InRound = (1 to 3).map(_ => validatorRewardCoupon(round = 3, userParty(2)))
         val provider1OutOfRound = (1 to 3).map(_ => validatorRewardCoupon(round = 2, userParty(1)))
@@ -543,40 +525,32 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listValidatorRewardCouponsGroupedByCounterparty(
+          result <- store.listValidatorRewardCouponsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result should have size 4
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          result should have size 2
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 3
-            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet
+            cids.toSet shouldBe provider1InRound.map(_.contractId).toSet ++ provider2InRound
+              .map(_.contractId)
+              .toSet
           }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 3
-            cids.toSet shouldBe provider2InRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 2
-            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 2
-            cids.toSet shouldBe provider2OutOfRound.map(_.contractId).toSet
+            cids.toSet shouldBe provider1OutOfRound.map(_.contractId).toSet ++ provider2OutOfRound
+              .map(_.contractId)
+              .toSet
           }
         }
       }
 
     }
 
-    "listValidatorFaucetCouponsGroupedByCounterparty" should {
+    "listValidatorFaucetCouponsGroupedByRound" should {
 
-      "return all validator faucet coupons in a round grouped by counterparty" in {
+      "return all validator faucet coupons in a round grouped by round" in {
         val validator1InRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 3))
         val validator2InRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(2), round = 3))
         val validator1OutOfRound = (1 to 3).map(_ => validatorFaucetCoupon(userParty(1), round = 2))
@@ -597,39 +571,31 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listValidatorFaucetCouponsGroupedByCounterparty(
+          result <- store.listValidatorFaucetCouponsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
           result should have size 4
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 2
-            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet
+            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
+              .map(_.contractId)
+              .toSet
           }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 2
-            cids.toSet shouldBe validator2OutOfRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 3
-            cids.toSet shouldBe validator1InRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 3
-            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet
+            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
+              .map(_.contractId)
+              .toSet
           }
         }
       }
     }
 
-    "listValidatorLivenessActivityRecordsGroupedByCounterparty" should {
+    "listValidatorLivenessActivityRecordsGroupedByRound" should {
 
-      "return all validator liveness activity records in a round grouped by counterparty" in {
+      "return all validator liveness activity records in a round grouped by round" in {
         val validator1InRound =
           (1 to 3).map(_ => validatorLivenessActivityRecord(userParty(1), round = 3))
         val validator2InRound =
@@ -654,31 +620,23 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listValidatorLivenessActivityRecordsGroupedByCounterparty(
+          result <- store.listValidatorLivenessActivityRecordsGroupedByRound(
             domain = dummyDomain,
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result should have size 4
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          result should have size 2
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 2
-            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet
+            cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
+              .map(_.contractId)
+              .toSet
           }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 2
-            cids.toSet shouldBe validator2OutOfRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(1)
+          forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 3
-            cids.toSet shouldBe validator1InRound.map(_.contractId).toSet
-          }
-          forExactly(1, result) { case RoundCounterpartyBatch(user, round, cids) =>
-            user shouldBe userParty(2)
-            round shouldBe 3
-            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet
+            cids.toSet shouldBe validator2InRound.map(_.contractId).toSet ++ validator1InRound
+              .map(_.contractId)
+              .toSet
           }
         }
       }
