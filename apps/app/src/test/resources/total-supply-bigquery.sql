@@ -198,6 +198,7 @@ CREATE TEMP FUNCTION minted(
   FROM
     mainnet_da2_scan.scan_sv_1_update_history_exercises e
   WHERE
+    -- all the choices that can take coupons as input, and thus mint amulets based on them.
     ((e.choice IN ('AmuletRules_BuyMemberTraffic',
                    'AmuletRules_Transfer',
                    'AmuletRules_CreateTransferPreapproval',
