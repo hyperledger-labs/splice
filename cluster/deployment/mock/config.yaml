@@ -111,6 +111,10 @@ svs:
       additionalEnvVars:
         - name: CUSTOM_MOCK_ENV_VAR_NAME
           value: CUSTOM_MOCK_ENV_VAR_VALUE
+    participant:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
   # TODO(tech-debt) Actually use the values below for the mock expected files (we mock deploy only sv-1 atm).
   sv-2:
     logging:
@@ -138,7 +142,7 @@ infra:
         rules:
           - to:
               - operation:
-                  paths: ["/api/sv/v0/devnet/onboard/validator/prepare"]
+                  paths: [ "/api/sv/v0/devnet/onboard/validator/prepare" ]
     mock-cr:
       apiVersion: mock.example.com/v1
       kind: MockResource
