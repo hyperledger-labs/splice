@@ -9,12 +9,13 @@ import { z } from 'zod';
 const SvCometbftConfigSchema = z.object({
   snapshotName: z.string(),
 });
-const SvParticipantConfigSchema = z.object({
-  kms: KmsConfigSchema.optional(),
-});
 const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
+});
+const SvParticipantConfigSchema = z.object({
+  kms: KmsConfigSchema.optional(),
+  bftSequencerConnection: z.boolean().default(true),
 });
 const SvAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
