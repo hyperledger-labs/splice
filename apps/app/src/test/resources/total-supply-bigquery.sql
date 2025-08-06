@@ -291,7 +291,7 @@ CREATE TEMP FUNCTION burned(
 
 
 -- using the functions
-SET as_of_record_time = iso_timestamp('2025-07-01T00:00:00Z');
+SET as_of_record_time = iso_timestamp('2025-08-06T00:00:00Z');
 SET migration_id = 3;
 SET locked = locked(as_of_record_time, migration_id);
 SET unlocked = unlocked(as_of_record_time, migration_id);
