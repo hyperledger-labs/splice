@@ -9,32 +9,36 @@ import { z } from 'zod';
 const SvCometbftConfigSchema = z.object({
   snapshotName: z.string(),
 });
-const SvParticipantConfigSchema = z.object({
-  kms: KmsConfigSchema.optional(),
-  bftSequencerConnection: z.boolean().default(true),
-});
 const EnvVarConfigSchema = z.object({
   name: z.string(),
   value: z.string(),
+});
+
+const SvParticipantConfigSchema = z.object({
+  kms: KmsConfigSchema.optional(),
+  bftSequencerConnection: z.boolean().default(true),
+  additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
 });
 const SvAppConfigSchema = z.object({
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
 });
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
-const SingleSvConfigSchema = z.object({
-  cometbft: SvCometbftConfigSchema.optional(),
-  participant: SvParticipantConfigSchema.optional(),
-  svApp: SvAppConfigSchema.optional(),
-  logging: z
-    .object({
-      appsLogLevel: LogLevelSchema,
-      cantonLogLevel: LogLevelSchema,
-      cometbftLogLevel: CometbftLogLevelSchema.optional(),
-      cometbftExtraLogLevelFlags: z.string().optional(),
-    })
-    .optional(),
-});
+const SingleSvConfigSchema = z
+  .object({
+    cometbft: SvCometbftConfigSchema.optional(),
+    participant: SvParticipantConfigSchema.optional(),
+    svApp: SvAppConfigSchema.optional(),
+    logging: z
+      .object({
+        appsLogLevel: LogLevelSchema,
+        cantonLogLevel: LogLevelSchema,
+        cometbftLogLevel: CometbftLogLevelSchema.optional(),
+        cometbftExtraLogLevelFlags: z.string().optional(),
+      })
+      .optional(),
+  })
+  .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
   z.object({
     default: SingleSvConfigSchema,

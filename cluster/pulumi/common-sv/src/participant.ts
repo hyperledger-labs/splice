@@ -78,6 +78,9 @@ export function installSvParticipant(
     'splice-participant',
     {
       ...participantValuesWithOverwrites,
+      additionalEnvVars: (participantValuesWithOverwrites.additionalEnvVars || []).concat(
+        svConfig.participant?.additionalEnvVars || []
+      ),
       logLevel: svConfig.logging?.cantonLogLevel,
       participantAdminUserNameFrom,
       metrics: {
