@@ -688,12 +688,12 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         _ <- MonadUtil.sequentialTraverse(sv1NotClosed ++ sv2NotClosed ++ sv1Closed ++ sv2Closed)(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
-        result <- store.getExpiredRewards(
+        result <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
           enableExpireValidatorFaucet = true,
           totalCouponsLimit = PageLimit.tryCreate(1000),
         )
-        resultWithoutFaucet <- store.getExpiredRewards(
+        resultWithoutFaucet <- store.getExpiredCouponsInBatchesPerRoundAndCouponType(
           domain = dummyDomain,
           enableExpireValidatorFaucet = false,
           totalCouponsLimit = PageLimit.tryCreate(1000),
