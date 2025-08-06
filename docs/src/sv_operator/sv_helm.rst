@@ -452,6 +452,30 @@ To do so, SV operators must:
 
 The default behavior is restored by undoing above changes.
 
+To confirm the current configuration of your SV participant,
+open a :ref:`Canton console <console_access>` to it and execute ``participant.synchronizers.config("global")``.
+In case BFT sequencer connections are disabled, this should return a single sequencer connection in an output similar to the following:
+
+.. parsed-literal::
+
+    @ participant.synchronizers.config("global")
+    res1: Option[SynchronizerConnectionConfig] = Some(
+      value = SynchronizerConnectionConfig(
+        synchronizer = Synchronizer \'global\',
+        sequencerConnections = SequencerConnections(
+          connections = Sequencer \'DefaultSequencer\' -> GrpcSequencerConnection(sequencerAlias = Sequencer \'DefaultSequencer\', endpoints = http://global-domain-0-sequencer:5008),
+          sequencer trust threshold = 1,
+          submission request amplification = SubmissionRequestAmplification(factor = 1, patience = 10s)
+        ),
+        manualConnect = false,
+        timeTracker = SynchronizerTimeTrackerConfig(minObservationDuration = 30m)
+      )
+    )
+
+Alternatively, you can also search your participant logs for a ``DEBUG``-level entry such as
+``Connecting to synchronizer with config: SynchronizerConnectionConfig(...)``,
+which contains the same information.
+
 .. _helm-sv-postgres:
 
 Installing Postgres instances
