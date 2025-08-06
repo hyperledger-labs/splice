@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as postgres from 'splice-pulumi-common/src/postgres';
+import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
@@ -39,7 +39,7 @@ import {
   SvIdKey,
   svUserIds,
   validatorOnboardingSecretName,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CantonBftSynchronizerNode,
   CometbftSynchronizerNode,
@@ -47,16 +47,16 @@ import {
   InstalledMigrationSpecificSv,
   SvParticipant,
   updateHistoryBackfillingValues,
-} from 'splice-pulumi-common-sv';
-import { svsConfig, SvConfig } from 'splice-pulumi-common-sv/src/config';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { svsConfig, SvConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/config';
 import {
   installValidatorApp,
   installValidatorSecrets,
-} from 'splice-pulumi-common-validator/src/validator';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { initialAmuletPrice } from 'splice-pulumi-common/src/initialAmuletPrice';
-import { jmxOptions } from 'splice-pulumi-common/src/jmx';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validator';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { initialAmuletPrice } from '@lfdecentralizedtrust/splice-pulumi-common/src/initialAmuletPrice';
+import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import {
   delegatelessAutomationExpectedTaskDuration,

@@ -4,7 +4,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Output } from '@pulumi/pulumi';
-import { DockerConfig } from 'splice-pulumi-common/src/dockerConfig';
+import { DockerConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/dockerConfig';
 
 import { installAuth0Secret, installAuth0UiSecretWithClientId } from './auth0';
 import { Auth0Client } from './auth0types';

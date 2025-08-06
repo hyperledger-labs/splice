@@ -19,7 +19,7 @@ import {
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CometbftSynchronizerNode,
@@ -27,9 +27,9 @@ import {
   installCometBftNode,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
-} from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource

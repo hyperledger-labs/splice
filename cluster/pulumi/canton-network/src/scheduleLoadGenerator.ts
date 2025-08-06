@@ -16,7 +16,7 @@ import {
   loadTesterConfig,
   installLoopback,
   parsedVersion,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
   if (loadTesterConfig?.enable) {

@@ -24,8 +24,8 @@ import {
   ObservabilityReleaseName,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
-} from 'splice-pulumi-common';
-import { infraAffinityAndTolerations } from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import {
   clusterIsResetPeriodically,

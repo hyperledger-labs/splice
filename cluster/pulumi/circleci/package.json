@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
-    "splice-pulumi-common": "1.0.0"
+    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

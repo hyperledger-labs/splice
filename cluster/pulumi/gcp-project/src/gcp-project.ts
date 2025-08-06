@@ -3,8 +3,8 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { Secret } from '@pulumi/gcp/secretmanager';
-import { config } from 'splice-pulumi-common';
 
 import { authorizeServiceAccount } from './authorizeServiceAccount';
 import { gcpProjectConfig, configsDir } from './config';

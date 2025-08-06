@@ -39,13 +39,13 @@ import {
   InstalledHelmChart,
   ansDomainPrefix,
   failOnAppVersionMismatch,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   installParticipant,
   ValidatorNodeConfig,
   ValidatorNodeConfigSchema,
-} from 'splice-pulumi-common-validator';
-import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import { clusterSubConfig } from '../../common/src/config/configLoader';
 import {

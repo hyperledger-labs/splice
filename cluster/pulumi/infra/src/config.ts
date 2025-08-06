@@ -1,10 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
+import {
+  config,
+  loadJsonFromFile,
+  externalIpRangesFile,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
-import { config, loadJsonFromFile, externalIpRangesFile } from 'splice-pulumi-common';
-import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 export const clusterBasename = pulumi.getStack().replace(/.*[.]/, '');

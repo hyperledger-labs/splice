@@ -9,8 +9,8 @@ import {
   ChartValues,
   HELM_MAX_HISTORY_SIZE,
   infraAffinityAndTolerations,
-} from 'splice-pulumi-common';
-import { spliceEnvConfig } from 'splice-pulumi-common/src/config/envConfig';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 const circleCiNamespace = new Namespace('circleci-runner', {
   metadata: {

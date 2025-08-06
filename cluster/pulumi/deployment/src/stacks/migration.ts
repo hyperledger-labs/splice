@@ -6,14 +6,17 @@ import {
   config,
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
-} from 'splice-pulumi-common';
-import { allSvsToDeploy, svRunbookConfig } from 'splice-pulumi-common-sv';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { allSvsToDeploy, svRunbookConfig } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
 import {
   GitFluxRef,
   gitRepoForRef,
   StackFromRef,
-} from 'splice-pulumi-common/src/operator/flux-source';
-import { createStackCR, EnvRefs } from 'splice-pulumi-common/src/operator/stack';
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/flux-source';
+import {
+  createStackCR,
+  EnvRefs,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/operator/stack';
 
 export function getMigrationSpecificStacksFromMainReference(): StackFromRef[] {
   const migrations = DecentralizedSynchronizerUpgradeConfig.allMigrations;

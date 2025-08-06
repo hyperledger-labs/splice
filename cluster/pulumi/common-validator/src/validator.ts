@@ -30,8 +30,8 @@ import {
   spliceInstanceNames,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { jmxOptions } from 'splice-pulumi-common/src/jmx';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
 
 import { SweepConfig } from './sweep';
 

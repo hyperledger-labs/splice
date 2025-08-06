@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as postgres from 'splice-pulumi-common/src/postgres';
+import * as postgres from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 import { Output } from '@pulumi/pulumi';
 import {
   activeVersion,
@@ -17,9 +17,9 @@ import {
   sanitizedForPostgres,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-} from 'splice-pulumi-common';
-import { ValidatorNodeConfig } from 'splice-pulumi-common-validator';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { ValidatorNodeConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 
 export function installParticipant(
   validatorConfig: ValidatorNodeConfig,

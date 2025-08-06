@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { CLUSTER_BASENAME, clusterProdLike, config } from 'splice-pulumi-common';
+import { CLUSTER_BASENAME, clusterProdLike, config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { namespace } from '../namespace';
 import { flux } from './flux';

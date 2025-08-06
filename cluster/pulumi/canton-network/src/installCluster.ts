@@ -11,17 +11,17 @@ import {
   sequencerPruningConfig,
   svOnboardingPollingInterval,
   svValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { dsoSize } from 'splice-pulumi-common-sv';
-import { readBackupConfig } from 'splice-pulumi-common-validator/src/backup';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { readBackupConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/backup';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
   splitwellOnboarding,
   standaloneValidatorOnboarding,
   validator1Onboarding,
-} from 'splice-pulumi-common-validator/src/validators';
-import { SplitPostgresInstances } from 'splice-pulumi-common/src/config/configs';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
+import { SplitPostgresInstances } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configs';
 
 import { activeVersion } from '../../common';
 import { installChaosMesh } from './chaosMesh';

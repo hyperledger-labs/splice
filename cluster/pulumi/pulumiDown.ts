@@ -3,7 +3,7 @@
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
-} from 'splice-pulumi-common-validator/src/validators';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
 import { startDownOperationsForCantonStacks } from 'sv-canton-pulumi-deployment/pulumiDown';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController, stack } from './pulumi';

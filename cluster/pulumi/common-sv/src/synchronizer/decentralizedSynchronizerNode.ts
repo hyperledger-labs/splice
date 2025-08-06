@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
 import { Resource } from '@pulumi/pulumi';
-import { CLUSTER_HOSTNAME, DomainMigrationIndex } from 'splice-pulumi-common';
+import { CLUSTER_HOSTNAME, DomainMigrationIndex } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { SvParticipant } from '../participant';
 

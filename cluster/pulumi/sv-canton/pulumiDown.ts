@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { config } from 'splice-pulumi-common/src/config';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 
 import { awaitAllOrThrowAllExceptions, Operation, PulumiAbortController } from '../pulumi';
 import { downStack } from '../pulumiOperations';

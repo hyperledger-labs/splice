@@ -10,9 +10,9 @@ import {
   ExactNamespace,
   externalIpRangesFile,
   installSpliceHelmChart,
-} from 'splice-pulumi-common';
-import { getChainIdSuffix } from 'splice-pulumi-common-sv';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { getChainIdSuffix } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 
 export function installInfo(
   xns: ExactNamespace,

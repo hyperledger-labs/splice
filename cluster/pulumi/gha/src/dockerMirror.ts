@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
-import { infraAffinityAndTolerations } from 'splice-pulumi-common';
+import { infraAffinityAndTolerations } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export function installDockerRegistryMirror(): k8s.helm.v3.Release {
   const namespace = new Namespace('docker-mirror', {

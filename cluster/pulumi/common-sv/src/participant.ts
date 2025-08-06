@@ -15,9 +15,9 @@ import {
   loadYamlFromFile,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-} from 'splice-pulumi-common';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import { SingleSvConfiguration } from './singleSvConfig';
 
