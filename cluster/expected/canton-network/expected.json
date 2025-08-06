@@ -922,6 +922,10 @@
           {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
             "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
           }
         ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
@@ -1101,6 +1105,12 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "additionalUsers": [],
         "affinity": {
@@ -1131,6 +1141,7 @@
           "name": "cn-mocknet"
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "disableAllocateLedgerApiUserParty": true,
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
@@ -1194,7 +1205,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
-        "useSequencerConnectionsFromScan": true,
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64529b128448ded6aa68048f"

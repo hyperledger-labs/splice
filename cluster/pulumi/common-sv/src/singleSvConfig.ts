@@ -11,6 +11,7 @@ const SvCometbftConfigSchema = z.object({
 });
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
+  bftSequencerConnection: z.boolean().default(true),
 });
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);

@@ -46,7 +46,7 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
-import { svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
+import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
@@ -229,6 +229,19 @@ async function installSvAndValidator(
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
+  const svConfig = configForSv('sv');
+  const bftSequencerConnection =
+    !svConfig.participant || svConfig.participant.bftSequencerConnection;
+  const disableBftSequencerConnectionEnvVars = bftSequencerConnection
+    ? []
+    : [
+        {
+          name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+          value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
+        },
+      ];
+  const svAppAdditionalEnvVars = disableBftSequencerConnectionEnvVars;
+
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
@@ -283,6 +296,7 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice,
+    additionalEnvVars: svAppAdditionalEnvVars,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -414,6 +428,28 @@ async function installSvAndValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
+  const validatorValuesWithMaybeNoBftSequencerConnection: ChartValues = {
+    ...validatorValuesWithMaybeTopups,
+    ...(bftSequencerConnection
+      ? {}
+      : {
+          decentralizedSynchronizerUrl: svValues.decentralizedSynchronizerUrl,
+          useSequencerConnectionsFromScan: false,
+        }),
+    additionalEnvVars: [
+      ...(validatorValuesWithMaybeTopups.additionalEnvVars || []),
+      ...(bftSequencerConnection
+        ? []
+        : [
+            {
+              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+              value:
+                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
+            },
+          ]),
+    ],
+  };
+
   const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
   if (!cnsUiClientId) {
     throw new Error('No CNS ui client id in auth0 config');
@@ -423,7 +459,7 @@ async function installSvAndValidator(
     xns,
     'validator',
     'splice-validator',
-    validatorValuesWithMaybeTopups,
+    validatorValuesWithMaybeNoBftSequencerConnection,
     activeVersion,
     {
       dependsOn: imagePullDeps
