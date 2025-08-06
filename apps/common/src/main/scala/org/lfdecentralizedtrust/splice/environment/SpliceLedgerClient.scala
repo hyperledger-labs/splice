@@ -34,8 +34,8 @@ class SpliceLedgerClient(
     // client interceptors below
     val unusedTracerProvider: TracerProvider,
     override protected[this] val retryProvider: RetryProvider,
-  grpcClientMetrics: GrpcClientMetrics,
-  commandCircuitBreakerConfig: CircuitBreakerConfig,
+    grpcClientMetrics: GrpcClientMetrics,
+    commandCircuitBreakerConfig: CircuitBreakerConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     as: ActorSystem,
@@ -52,9 +52,11 @@ class SpliceLedgerClient(
     exponentialBackoffFactor = commandCircuitBreakerConfig.exponentialBackoffFactor,
     randomFactor = commandCircuitBreakerConfig.randomFactor,
   ).onOpen {
-    logger.warn(s"Command circuit breaker tripped after ${commandCircuitBreakerConfig.maxFailures} failures")(TraceContext.empty)
+    logger.warn(
+      s"Command circuit breaker tripped after ${commandCircuitBreakerConfig.maxFailures} failures"
+    )(TraceContext.empty)
   }.onHalfOpen {
-    logger.info(s"Command circuit breaker moving to half-open state") (TraceContext.empty)
+    logger.info(s"Command circuit breaker moving to half-open state")(TraceContext.empty)
   }.onClose {
     logger.info(s"Command circuit breaker moving to closed state")(TraceContext.empty)
   }

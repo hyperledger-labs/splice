@@ -19,7 +19,7 @@ final case class SpliceParametersConfig(
     customTimeouts: Map[String, NonNegativeFiniteDuration] = Map.empty,
     rateLimiting: RateLimitersConfig =
       RateLimitersConfig(SpliceRateLimitConfig(enabled = true, ratePerSecond = 200), Map.empty),
-  // Configuration for the circuit breaker for ledger API command submissions.
+    // Configuration for the circuit breaker for ledger API command submissions.
     commandCircuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
 ) extends LocalNodeParametersConfig {
   override def alphaVersionSupport: Boolean = false

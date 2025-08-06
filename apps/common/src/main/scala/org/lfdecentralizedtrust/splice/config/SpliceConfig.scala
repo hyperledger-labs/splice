@@ -33,12 +33,13 @@ abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
 final case class CircuitBreakerConfig(
-  maxFailures: Int = 20,
-  callTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
-  resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
-  maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-  exponentialBackoffFactor: Double = 2.0,
-  randomFactor: Double = 0.2,
+    maxFailures: Int = 20,
+    callTimeout: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
+    resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
+    exponentialBackoffFactor: Double = 2.0,
+    randomFactor: Double = 0.2,
 )
 
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
