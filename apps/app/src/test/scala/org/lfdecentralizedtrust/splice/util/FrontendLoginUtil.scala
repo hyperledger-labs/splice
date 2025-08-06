@@ -5,6 +5,7 @@ import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebDriver
 
+import java.time.Duration
 import scala.util.Using
 
 trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
@@ -24,6 +25,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
   )(implicit
       webDriver: WebDriver
   ) = {
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
     eventually() {
       val url = if (port == 80) { s"http://$hostname" }
       else { s"http://$hostname:$port" }
@@ -34,6 +36,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
     click on "user-id-field"
     textField("user-id-field").value = ledgerApiUser
     click on "login-button"
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
   }
 
   protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
@@ -88,6 +91,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
+        webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
         clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
           completeAuth0LoginWithAuthorization(
             s"http://localhost:$localHostPort",
@@ -109,7 +113,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
         } else {
           seleniumText(find(id("logged-in-user")))
         }
-
+        webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
         afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)
       }
     }

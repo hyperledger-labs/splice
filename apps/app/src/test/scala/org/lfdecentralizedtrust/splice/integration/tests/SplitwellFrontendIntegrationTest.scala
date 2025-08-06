@@ -9,7 +9,6 @@ import org.lfdecentralizedtrust.splice.util.{
 }
 import com.digitalasset.canton.topology.PartyId
 
-import java.time.Duration
 import scala.concurrent.duration.DurationInt
 
 class SplitwellFrontendIntegrationTest
@@ -22,8 +21,6 @@ class SplitwellFrontendIntegrationTest
     with WalletTestUtil
     with SplitwellFrontendTestUtil
     with FrontendLoginUtil {
-
-  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition

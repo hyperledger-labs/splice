@@ -17,7 +17,6 @@ class WalletSubscriptionsFrontendIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
-  override val seleniumImplicitWaitDuration = Duration.ofSeconds(5)
   override def walletAmuletPrice = SpliceUtil.damlDecimal(2.0)
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -185,7 +184,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         actAndCheck(
           "Alice sees the subscription in the list", {
             go to s"http://localhost:3000" // already logged in
-            click on "navlink-subscriptions"
+            eventuallyClickOn(id("navlink-subscriptions"))
           },
         )(
           "Alice sees the new subscription in the list",
