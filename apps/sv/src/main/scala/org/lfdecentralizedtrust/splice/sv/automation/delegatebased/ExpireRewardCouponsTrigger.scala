@@ -43,7 +43,6 @@ class ExpireRewardCouponsTrigger(
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = for {
     dsoRules <- store.getDsoRules()
-    numSvs = dsoRules.payload.svs.size()
     batches <- store
       .getExpiredRewards(
         dsoRules.domain,
