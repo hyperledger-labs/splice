@@ -1096,7 +1096,7 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
-              "validator/@lfdecentralizedtrust/scan-proxy-openapi-ts-client",
+              "validator/scan-proxy-openapi-ts-client",
               log,
             )
             BuildCommon.TS.runWorkspaceCommand(
