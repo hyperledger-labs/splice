@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.pattern.CircuitBreaker
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import org.lfdecentralizedtrust.splice.admin.api.client.{
   ApiClientRequestLogger,
@@ -11,13 +12,14 @@ import org.lfdecentralizedtrust.splice.admin.api.client.{
   GrpcMetricsClientInterceptor,
 }
 import org.lfdecentralizedtrust.splice.auth.AuthToken
+import org.lfdecentralizedtrust.splice.config.CircuitBreakerConfig
 import org.lfdecentralizedtrust.splice.environment.ledger.api.LedgerClient
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -32,7 +34,8 @@ class SpliceLedgerClient(
     // client interceptors below
     val unusedTracerProvider: TracerProvider,
     override protected[this] val retryProvider: RetryProvider,
-    grpcClientMetrics: GrpcClientMetrics,
+  grpcClientMetrics: GrpcClientMetrics,
+  commandCircuitBreakerConfig: CircuitBreakerConfig,
 )(implicit
     ec: ExecutionContextExecutor,
     as: ActorSystem,
@@ -40,6 +43,22 @@ class SpliceLedgerClient(
 ) extends RetryProvider.Has
     with FlagCloseable
     with NamedLogging {
+  private val commandCircuitBreaker = new CircuitBreaker(
+    as.scheduler,
+    maxFailures = commandCircuitBreakerConfig.maxFailures,
+    callTimeout = commandCircuitBreakerConfig.callTimeout.underlying,
+    resetTimeout = commandCircuitBreakerConfig.resetTimeout.underlying,
+    maxResetTimeout = commandCircuitBreakerConfig.maxResetTimeout.underlying,
+    exponentialBackoffFactor = commandCircuitBreakerConfig.exponentialBackoffFactor,
+    randomFactor = commandCircuitBreakerConfig.randomFactor,
+  ).onOpen {
+    logger.warn(s"Command circuit breaker tripped after ${commandCircuitBreakerConfig.maxFailures} failures")(TraceContext.empty)
+  }.onHalfOpen {
+    logger.info(s"Command circuit breaker moving to half-open state") (TraceContext.empty)
+  }.onClose {
+    logger.info(s"Command circuit breaker moving to closed state")(TraceContext.empty)
+  }
+
   private val client = {
     val clientChannelConfig = LedgerClientChannelConfiguration(
       sslContext = config.tlsConfig.map(x => ClientChannelBuilder.sslContext(x)),
@@ -113,6 +132,7 @@ class SpliceLedgerClient(
       contractDowngradeErrorCallbacks,
       trafficBalanceService,
       completionOffsetCallback,
+      commandCircuitBreaker,
     )
 
   override def onClosed(): Unit = {
