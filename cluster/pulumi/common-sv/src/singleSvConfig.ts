@@ -16,6 +16,7 @@ const EnvVarConfigSchema = z.object({
 
 const SvParticipantConfigSchema = z.object({
   kms: KmsConfigSchema.optional(),
+  bftSequencerConnection: z.boolean().default(true),
   additionalEnvVars: z.array(EnvVarConfigSchema).default([]),
 });
 const SvAppConfigSchema = z.object({

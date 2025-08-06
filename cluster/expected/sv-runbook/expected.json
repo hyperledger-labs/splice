@@ -685,8 +685,16 @@
       "values": {
         "additionalEnvVars": [
           {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          },
+          {
             "name": "ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY",
             "value": "canton.sv-apps.sv.topology-change-delay-duration=250ms"
+          },
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.sv-apps.sv.bft-sequencer-connection = false"
           }
         ],
         "affinity": {
@@ -880,6 +888,12 @@
       "namespace": "sv",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION",
+            "value": "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+          }
+        ],
         "affinity": {
           "nodeAffinity": {
             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -901,6 +915,7 @@
           "jwksUrl": "https://canton-network-sv-test.us.auth0.com/.well-known/jwks.json"
         },
         "contactPoint": "sv-support@digitalasset.com",
+        "decentralizedSynchronizerUrl": "https://sequencer-3.sv-2.mock.global.canton.network.digitalasset.com",
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
@@ -951,6 +966,7 @@
           "minTopupInterval": "1m",
           "targetThroughput": 0
         },
+        "useSequencerConnectionsFromScan": false,
         "validatorWalletUsers": [
           "google-oauth2|1234567890",
           "auth0|64553aa683015a9687d9cc2e"
