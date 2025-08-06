@@ -116,6 +116,9 @@ class DbSvDsoStore(
       Contract.fromCreatedEvent(splice.round.OpenMiningRound.COMPANION)(ev).foreach { round =>
         dsoStoreMetrics.latestOpenMiningRound.updateValue(round.payload.round.number)
       }
+      Contract.fromCreatedEvent(splice.round.IssuingMiningRound.COMPANION)(ev).foreach { round =>
+        dsoStoreMetrics.latestIssuingMiningRound.updateValue(round.payload.round.number)
+      }
     }
   }
 
