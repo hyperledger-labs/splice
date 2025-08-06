@@ -157,13 +157,29 @@ CREATE TEMP FUNCTION unminted(
     migration_id));
 
 
-CREATE TEMP FUNCTION TransferResult_minted(tr_json json)
+CREATE TEMP FUNCTION TransferSummary_minted(tr_json json)
     RETURNS bignumeric AS (
-  daml_record_numeric(tr_json, [1, 0]) -- .inputAppRewardAmount
-  + daml_record_numeric(tr_json, [1, 1]) -- .inputValidatorRewardAmount
-  + daml_record_numeric(tr_json, [1, 2]) -- .inputSvRewardAmount
+  daml_record_numeric(tr_json, [0]) -- .inputAppRewardAmount
+  + daml_record_numeric(tr_json, [1]) -- .inputValidatorRewardAmount
+  + daml_record_numeric(tr_json, [2]) -- .inputSvRewardAmount
 );
 
+-- Path to a choice's TransferSummary, if that choice is filtered by `minted`.
+CREATE TEMP FUNCTION choice_result_TransferSummary_path(choice string)
+    RETURNS ARRAY<INT64> AS (
+  CASE choice
+    WHEN 'AmuletRules_CreateExternalPartySetupProposal'
+      THEN [3, 1] -- .transferResult.summary
+    WHEN 'AmuletRules_CreateTransferPreapproval'
+      THEN [1, 1] -- .transferResult.summary
+    WHEN 'AmuletRules_BuyMemberTraffic'
+      THEN [1] -- .summary
+    WHEN 'AmuletRules_Transfer'
+      THEN [1] -- .summary
+    WHEN 'TransferPreapproval_Renew'
+      THEN [1, 1] -- .transferResult.summary
+    ELSE ERROR('no TransferSummary for this choice: ' || choice)
+  END);
 
 -- All Amulet that was ever minted.
 CREATE TEMP FUNCTION minted(
@@ -171,13 +187,20 @@ CREATE TEMP FUNCTION minted(
     migration_id int64
   ) RETURNS bignumeric AS ((
   SELECT
-    COALESCE(SUM(TransferResult_minted(e.result)), 0)
+    COALESCE(SUM(TransferSummary_minted(
+               JSON_QUERY(e.result, daml_record_path(choice_result_TransferSummary_path(e.choice), 'record')))),
+             0)
   FROM
     mainnet_da2_scan.scan_sv_1_update_history_exercises e
   WHERE
-    e.choice = 'AmuletRules_Transfer'
+    ((e.choice IN ('AmuletRules_BuyMemberTraffic',
+                   'AmuletRules_Transfer',
+                   'AmuletRules_CreateTransferPreapproval',
+                   'AmuletRules_CreateExternalPartySetupProposal')
+        AND e.template_id_entity_name = 'AmuletRules')
+        OR (e.choice = 'TransferPreapproval_Renew'
+            AND e.template_id_entity_name = 'TransferPreapproval'))
     AND e.template_id_module_name = 'Splice.AmuletRules'
-    AND e.template_id_entity_name = 'AmuletRules'
     AND in_time_window(as_of_record_time, migration_id,
           e.record_time, e.migration_id)));
 
