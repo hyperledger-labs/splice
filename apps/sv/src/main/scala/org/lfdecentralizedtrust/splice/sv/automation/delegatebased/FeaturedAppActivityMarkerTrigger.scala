@@ -22,6 +22,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import FeaturedAppActivityMarkerTrigger.Task
 
+import java.util.Optional
+
 class FeaturedAppActivityMarkerTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -60,10 +62,6 @@ class FeaturedAppActivityMarkerTrigger(
       amuletRules <- store.getAmuletRules()
       now = context.clock.now
       openMiningRound <- store.getLatestUsableOpenMiningRound(now)
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        now,
-      )
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
       update = dsoRules.exercise(
@@ -73,7 +71,7 @@ class FeaturedAppActivityMarkerTrigger(
             task.markers.map(_.contractId).asJava,
             openMiningRound.contractId,
           ),
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection
@@ -83,7 +81,6 @@ class FeaturedAppActivityMarkerTrigger(
           update = update,
         )
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess(
       s"Converted featured app activity markers with contract ids: ${task.markers.map(_.contractId)}"

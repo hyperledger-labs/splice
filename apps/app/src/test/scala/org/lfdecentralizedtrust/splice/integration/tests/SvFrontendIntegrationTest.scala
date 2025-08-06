@@ -26,7 +26,6 @@ import org.slf4j.event.Level
 
 import java.util.Optional
 import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters.*
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -124,11 +123,11 @@ class SvFrontendIntegrationTest
           "observe information on party information",
           _ => {
             val valueCells = findAll(className("general-dso-value-name")).toSeq
-            valueCells should have length 9
+            valueCells should have length 8
             forExactly(1, valueCells)(cell =>
               seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
             )
-            forExactly(3, valueCells)(cell =>
+            forExactly(2, valueCells)(cell =>
               seleniumText(cell) should matchText(
                 sv1Backend.getDsoInfo().svParty.toProtoPrimitive
               )
@@ -1074,54 +1073,6 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "can request DSO delegate election" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 operator can login and browse to the delegate election tab", {
-            go to s"http://localhost:$sv1UIPort/delegate"
-            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see a button for requesting a delegate election",
-          _ => {
-            find(id("submit-ranking-delegate-election")) should not be empty
-          },
-        )
-
-        val svs: Vector[String] =
-          sv3Backend.getDsoInfo().dsoRules.payload.svs.keySet().asScala.toVector
-
-        val newLeader = svs.head
-
-        sv2Backend.createElectionRequest(sv2Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
-        sv3Backend.createElectionRequest(sv3Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
-
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          actAndCheck(
-            "sv1 operator makes his own ranking for his delegate preference", {
-              click on "submit-ranking-delegate-election"
-            },
-          )(
-            "The epoch advances by one and the delegate name is changed.",
-            _ => {
-              find(id("delegate-election-epoch")).value.text should include(
-                sv1Backend.getDsoInfo().dsoRules.payload.epoch.toString
-              )
-              find(id("delegate-election-current-delegate")).value.text should include(newLeader)
-            },
-          ),
-          entries => {
-            forExactly(4, entries) { line =>
-              line.message should include(
-                "Noticed an DsoRules epoch change"
-              )
-            }
-          },
-        )
-
-      }
-    }
-
     "can create valid SRARC_CreateUnallocatedUnclaimedActivityRecord vote requests" in {
       implicit env =>
         val requestReasonUrl = "https://vote-request-url.com"
@@ -1226,13 +1177,6 @@ class SvFrontendIntegrationTest
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
     val tbodyRejected = find(id("sv-vote-results-rejected-table-body"))
     tbodyRejected
-      .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
-      .getOrElse(0)
-  }
-
-  def getVoteRequestsActionNeededSize()(implicit webDriver: WebDriverType) = {
-    val tbodyInProgress = find(id("sv-voting-action-needed-table-body"))
-    tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
   }

@@ -839,22 +839,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-dummy",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "sv-1",
-      "timeout": 600,
-      "version": "0.4.10-snapshot.20250731.589.0.v5e776fc4"
-    },
-    "name": "sv-1-loopback",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-scan",
       "compat": "true",
       "maxHistory": 10,
@@ -1008,7 +992,8 @@
           "enabled": true
         },
         "contactPoint": "sv-support@digitalasset.com",
-        "delegatelessAutomation": true,
+        "delegatelessAutomationExpectedTaskDuration": 5000,
+        "delegatelessAutomationExpiredRewardCouponBatchSize": 100,
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-3-mediator",
@@ -1022,7 +1007,6 @@
           "skipInitialization": true
         },
         "enablePostgresMetrics": true,
-        "expectedTaskDuration": 5000,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -1045,7 +1029,6 @@
             }
           }
         ],
-        "expiredRewardCouponBatchSize": 100,
         "failOnAppVersionMismatch": true,
         "identitiesExport": {
           "bucket": {

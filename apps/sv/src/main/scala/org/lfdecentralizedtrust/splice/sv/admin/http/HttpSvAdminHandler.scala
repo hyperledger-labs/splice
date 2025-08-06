@@ -283,39 +283,6 @@ class HttpSvAdminHandler(
     }
   }
 
-  def createElectionRequest(respond: v0.SvAdminResource.CreateElectionRequestResponse.type)(
-      body: definitions.CreateElectionRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateElectionRequestResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.createElectionRequest") { _ => _ =>
-      SvApp
-        .createElectionRequest(
-          body.requester,
-          body.ranking,
-          dsoStoreWithIngestion,
-        )
-        .flatMap {
-          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.CreateElectionRequestResponseOK)
-        }
-    }
-  }
-
-  def getElectionRequest(
-      respond: v0.SvAdminResource.GetElectionRequestResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetElectionRequestResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.getElectionRequest") { _ => _ =>
-      for {
-        electionRequests <- SvApp.getElectionRequest(dsoStoreWithIngestion)
-      } yield {
-        definitions.GetElectionRequestResponse(
-          electionRequests.map(_.toHttp).toVector
-        )
-      }
-    }
-  }
-
   def createVoteRequest(respond: v0.SvAdminResource.CreateVoteRequestResponse.type)(
       body: definitions.CreateVoteRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.CreateVoteRequestResponse] = {
@@ -709,9 +676,8 @@ class HttpSvAdminHandler(
   override def featureSupport(respond: SvAdminResource.FeatureSupportResponse.type)()(
       extracted: TracedUser
   ): Future[SvAdminResource.FeatureSupportResponse] = {
-    readFeatureSupport(dsoStore.key.dsoParty, config.delegatelessAutomation)(
+    readFeatureSupport()(
       extracted.traceContext,
-      ec,
       tracer,
     )
       .map(SvAdminResource.FeatureSupportResponseOK(_))

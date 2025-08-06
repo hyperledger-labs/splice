@@ -376,18 +376,6 @@ class SvAppBackendReference(
     }
   }
 
-  @Help.Summary("Create an election request (via admin API)")
-  def createElectionRequest(
-      requester: String,
-      ranking: Vector[String],
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.CreateElectionRequest(requester, ranking)
-      )
-    }
-  }
-
   @Help.Summary("Get the CometBFT node debug dump")
   def cometBftNodeDump(): definitions.CometBftNodeDumpResponse =
     consoleEnvironment.run {
