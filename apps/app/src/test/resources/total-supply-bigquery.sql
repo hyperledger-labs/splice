@@ -164,20 +164,25 @@ CREATE TEMP FUNCTION TransferSummary_minted(tr_json json)
   + daml_record_numeric(tr_json, [2]) -- .inputSvRewardAmount
 );
 
--- Path to a choice's TransferSummary, if that choice is filtered by `minted`.
-CREATE TEMP FUNCTION choice_result_TransferSummary_path(choice string)
-    RETURNS ARRAY<INT64> AS (
+-- A choice's TransferSummary, if that choice is filtered by `minted`.
+CREATE TEMP FUNCTION choice_result_TransferSummary(choice string, result json)
+    RETURNS json AS (
   CASE choice
     WHEN 'AmuletRules_CreateExternalPartySetupProposal'
-      THEN [3, 1] -- .transferResult.summary
+      -- .transferResult.summary
+      THEN JSON_QUERY(result, daml_record_path([3, 1], 'record'))
     WHEN 'AmuletRules_CreateTransferPreapproval'
-      THEN [1, 1] -- .transferResult.summary
+      -- .transferResult.summary
+      THEN JSON_QUERY(result, daml_record_path([1, 1], 'record'))
     WHEN 'AmuletRules_BuyMemberTraffic'
-      THEN [1] -- .summary
+      -- .summary
+      THEN JSON_QUERY(result, daml_record_path([1], 'record'))
     WHEN 'AmuletRules_Transfer'
-      THEN [1] -- .summary
+      -- .summary
+      THEN JSON_QUERY(result, daml_record_path([1], 'record'))
     WHEN 'TransferPreapproval_Renew'
-      THEN [1, 1] -- .transferResult.summary
+      -- .transferResult.summary
+      THEN JSON_QUERY(result, daml_record_path([1, 1], 'record'))
     ELSE ERROR('no TransferSummary for this choice: ' || choice)
   END);
 
@@ -188,7 +193,7 @@ CREATE TEMP FUNCTION minted(
   ) RETURNS bignumeric AS ((
   SELECT
     COALESCE(SUM(TransferSummary_minted(
-               JSON_QUERY(e.result, daml_record_path(choice_result_TransferSummary_path(e.choice), 'record')))),
+               choice_result_TransferSummary(e.choice, e.result))),
              0)
   FROM
     mainnet_da2_scan.scan_sv_1_update_history_exercises e
