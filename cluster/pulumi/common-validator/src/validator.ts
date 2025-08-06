@@ -213,7 +213,7 @@ export async function installValidatorApp(
           : undefined,
       svValidator: config.svValidator,
       useSequencerConnectionsFromScan:
-        config.svValidator && config.decentralizedSynchronizerUrl === undefined,
+        !config.svValidator || config.decentralizedSynchronizerUrl === undefined,
       metrics: {
         enable: true,
       },

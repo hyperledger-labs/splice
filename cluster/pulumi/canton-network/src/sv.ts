@@ -412,7 +412,7 @@ function installSvApp(
         },
       ]
     : [];
-  const disableBftSequencerConnectionEnvVars =
+  const bftSequencerConnectionEnvVars =
     !config.participant || config.participant.bftSequencerConnection
       ? []
       : [
@@ -423,7 +423,7 @@ function installSvApp(
         ];
   const additionalEnvVars = (config.svApp?.additionalEnvVars || [])
     .concat(topologyChangeDelayEnvVars)
-    .concat(disableBftSequencerConnectionEnvVars);
+    .concat(bftSequencerConnectionEnvVars);
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
