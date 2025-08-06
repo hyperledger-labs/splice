@@ -23,19 +23,21 @@ const SvAppConfigSchema = z.object({
 });
 // https://docs.cometbft.com/main/explanation/core/running-in-production
 const CometbftLogLevelSchema = z.enum(['info', 'error', 'debug', 'none']);
-const SingleSvConfigSchema = z.object({
-  cometbft: SvCometbftConfigSchema.optional(),
-  participant: SvParticipantConfigSchema.optional(),
-  svApp: SvAppConfigSchema.optional(),
-  logging: z
-    .object({
-      appsLogLevel: LogLevelSchema,
-      cantonLogLevel: LogLevelSchema,
-      cometbftLogLevel: CometbftLogLevelSchema.optional(),
-      cometbftExtraLogLevelFlags: z.string().optional(),
-    })
-    .optional(),
-});
+const SingleSvConfigSchema = z
+  .object({
+    cometbft: SvCometbftConfigSchema.optional(),
+    participant: SvParticipantConfigSchema.optional(),
+    svApp: SvAppConfigSchema.optional(),
+    logging: z
+      .object({
+        appsLogLevel: LogLevelSchema,
+        cantonLogLevel: LogLevelSchema,
+        cometbftLogLevel: CometbftLogLevelSchema.optional(),
+        cometbftExtraLogLevelFlags: z.string().optional(),
+      })
+      .optional(),
+  })
+  .strict();
 const AllSvsConfigurationSchema = z.record(z.string(), SingleSvConfigSchema).and(
   z.object({
     default: SingleSvConfigSchema,
