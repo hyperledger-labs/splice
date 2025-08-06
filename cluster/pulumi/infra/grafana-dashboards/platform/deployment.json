@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3391,
+  "id": 3588,
   "links": [],
   "panels": [
     {
@@ -296,7 +296,7 @@
     }
   ],
   "preload": false,
-  "refresh": "",
+  "refresh": "30s",
   "schemaVersion": 41,
   "tags": [],
   "templating": {
