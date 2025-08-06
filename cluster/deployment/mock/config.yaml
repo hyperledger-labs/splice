@@ -116,6 +116,10 @@ svs:
     logging:
       appsLogLevel: INFO
       cantonLogLevel: INFO
+    participant:
+      additionalEnvVars:
+        - name: CUSTOM_MOCK_ENV_VAR_NAME
+          value: CUSTOM_MOCK_ENV_VAR_VALUE
   sv-3:
     participant:
       kms:
@@ -138,7 +142,7 @@ infra:
         rules:
           - to:
               - operation:
-                  paths: ["/api/sv/v0/devnet/onboard/validator/prepare"]
+                  paths: [ "/api/sv/v0/devnet/onboard/validator/prepare" ]
     mock-cr:
       apiVersion: mock.example.com/v1
       kind: MockResource
