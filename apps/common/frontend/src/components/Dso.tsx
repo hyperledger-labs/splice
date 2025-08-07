@@ -272,9 +272,6 @@ const DsoViewPrettyJSON: React.FC<DsoViewPrettyJSONProps> = ({
           id="dso-rules-information"
           style={{ fontSize: '10pt' }}
           data={encodeSvUiState(dsoInfoData)}
-          replacer={(key, value) =>
-            key.includes('dsoDelegate') ? '-- field deprecated --' : value
-          }
         />
       </TabPanel>
       <TabPanel value={value} index={2}>
