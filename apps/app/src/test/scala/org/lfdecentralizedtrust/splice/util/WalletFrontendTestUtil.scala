@@ -93,18 +93,16 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   }
 
   def parseAmountText(str: String, unit: String) = {
-    eventuallySucceeds() {
-      try {
-        BigDecimal(
-          str
-            .replace(unit, "")
-            .trim
-            .replace(",", "")
-        )
-      } catch {
-        case e: Throwable =>
-          throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
-      }
+    try {
+      BigDecimal(
+        str
+          .replace(unit, "")
+          .trim
+          .replace(",", "")
+      )
+    } catch {
+      case e: Throwable =>
+        throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
     }
   }
 

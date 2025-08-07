@@ -24,6 +24,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
   )(implicit
       webDriver: WebDriver
   ) = {
+    // logins need implicit waits to work
     enableSeleniumImplicitWait {
       eventually() {
         val url = if (port == 80) {
@@ -95,6 +96,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
+        // logins need implicit waits to work
         enableSeleniumImplicitWait {
           clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
             completeAuth0LoginWithAuthorization(

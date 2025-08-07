@@ -153,8 +153,6 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
 
   protected lazy val autostartWebDrivers: Boolean = true
 
-  protected val seleniumImplicitWaitDuration: Duration = Duration.ofSeconds(0)
-
   import FrontendIntegrationTest.NavigationInfo
 
   val frontendNames: Seq[String] = Seq()
@@ -252,7 +250,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       )
       (driver, bidi)
     }
-    webDriver.manage().timeouts().implicitlyWait(seleniumImplicitWaitDuration)
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
     registerWebDriver(name, webDriver)
 
     biDi.addListener[LogEntry](
