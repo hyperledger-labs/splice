@@ -49,7 +49,7 @@ Release Notes
 
   - Add circuit breaker functionality for ledger API command submissions in all splice apps;
     causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
-  - Add rate-limiting to scan ``/state/acs/{party}`` endpoint.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
 
 0.4.9
 -----
