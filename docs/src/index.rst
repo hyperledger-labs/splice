@@ -49,6 +49,7 @@ Global Synchronizer for the Canton Network
    :caption: Background
 
    background/architecture
+   background/preapprovals
 
 .. todo:: Add Background sections containing
 
