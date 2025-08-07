@@ -396,6 +396,19 @@ function installK8sRunnerScaleSet(
       data: {
         'pod.yaml': yaml.dump({
           spec: {
+            hostAliases: [
+              {
+                ip: '127.0.0.1',
+                hostnames: [
+                  // Used by the localnet tests
+                  'ans.localhost',
+                  'canton.localhost',
+                  'scan.localhost',
+                  'sv.localhost',
+                  'wallet.localhost',
+                ],
+              },
+            ],
             volumes: [
               {
                 name: 'cache',
