@@ -1157,7 +1157,7 @@ class SvFrontendIntegrationTest
   }
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
-    find(id("display-actions")) should not be empty
+    eventually() { find(id("display-actions")) should not be empty }
     val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
     dropDownAction.selectByValue(actionName)
 

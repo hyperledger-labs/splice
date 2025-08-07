@@ -27,7 +27,6 @@ import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
-    with FrontendLoginUtil
     with AmuletConfigUtil
     with WalletTestUtil
     with WalletFrontendTestUtil
