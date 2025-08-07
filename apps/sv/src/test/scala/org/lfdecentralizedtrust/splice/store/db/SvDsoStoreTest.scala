@@ -576,7 +576,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
             totalCouponsLimit = PageLimit.tryCreate(1000),
           )
         } yield {
-          result should have size 4
+          result should have size 2
           forExactly(1, result) { case RoundBatch(round, cids) =>
             round shouldBe 2
             cids.toSet shouldBe validator1OutOfRound.map(_.contractId).toSet ++ validator2OutOfRound
