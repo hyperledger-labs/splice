@@ -14,6 +14,7 @@ Release Notes
 - SV Application
 
   - Fully remove the automation and logic around DSO delegate elections.
+  - UI enhancements.
 
 - Daml
 
@@ -43,6 +44,12 @@ Release Notes
 - Docs
 
   - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
+
+- Stability improvements
+
+  - Add circuit breaker functionality for ledger API command submissions in all splice apps;
+    causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
 
 0.4.9
 -----
