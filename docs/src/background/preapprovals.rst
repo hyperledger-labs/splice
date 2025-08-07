@@ -65,6 +65,9 @@ the ledger API instead of using the validator APIs.
 
 The validator APIs always create a preapproval with an expiry date of 90 days in the future.
 
+
+.. _preapproval_renewal:
+
 Expiry and Renewal of Preapprovals
 ----------------------------------
 
