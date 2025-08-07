@@ -5,7 +5,7 @@ import {
   installLoopback,
   numInstances,
   imagePullSecret,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';

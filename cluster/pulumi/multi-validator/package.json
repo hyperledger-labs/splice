@@ -1,12 +1,12 @@
 {
-  "name": "multi-validator",
+  "name": "@lfdecentralizedtrust/splice-pulumi-multi-validator",
   "main": "src/index.ts",
   "devDependencies": {
     "@types/sinon": "^10.0.15",
     "sinon": "^15.0.4"
   },
   "dependencies": {
-    "splice-pulumi-common": "1.0.0"
+    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

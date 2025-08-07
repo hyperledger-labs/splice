@@ -13,9 +13,9 @@ import {
   SvCometBftGovernanceKey,
   SvIdKey,
   ValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { SweepConfig } from 'splice-pulumi-common-validator';
-import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 import { SingleSvConfiguration } from './singleSvConfig';
