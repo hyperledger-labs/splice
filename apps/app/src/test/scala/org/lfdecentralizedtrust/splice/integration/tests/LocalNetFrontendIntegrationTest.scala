@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import org.lfdecentralizedtrust.splice.auth.AuthUtil
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, WalletFrontendTestUtil}
 
@@ -11,7 +12,9 @@ class LocalNetFrontendIntegrationTest
     with FrontendLoginUtil
     with WalletFrontendTestUtil {
   override def environmentDefinition: SpliceEnvironmentDefinition =
-    EnvironmentDefinition.empty(this.getClass.getSimpleName)
+    EnvironmentDefinition
+      .fromResources(Seq("localnet-topology.conf"), this.getClass.getSimpleName)
+      .withManualStart
 
   // This does nothing as the wallet clients will not actually be connected to the compose setup
   override protected def runTokenStandardCliSanityCheck: Boolean = false
@@ -25,6 +28,18 @@ class LocalNetFrontendIntegrationTest
       val ret = Seq("build-tools/splice-localnet-compose.sh", "start").!
       if (ret != 0) {
         fail("Failed to start docker-compose SV and validator")
+      }
+
+      clue("Test token standard APIs") {
+        val registryInfo = scancl("scanClient").getRegistryInfo()
+        registryInfo.adminId should startWith("DSO::")
+        val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
+        val userRegistryInfo =
+          vc("userValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
+        val providerRegistryInfo =
+          vc("providerValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
+        registryInfo shouldBe userRegistryInfo
+        registryInfo shouldBe providerRegistryInfo
       }
 
       clue("Test validators") {
