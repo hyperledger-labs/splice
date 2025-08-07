@@ -11,7 +11,7 @@ permissions:
 jobs:
 
   get_head:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get_head.outputs.sha }}
       repo: ${{ steps.get_head.outputs.repo }}
@@ -43,7 +43,7 @@ jobs:
       sha: ${{ needs.get_head.outputs.sha }}
 
   result:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     needs:
       - trigger_cluster_test_basic
       - get_head
@@ -76,7 +76,7 @@ jobs:
       sha: ${{ needs.get_head.outputs.sha }}
 
   result_hdm:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     needs:
       - trigger_cluster_test_hdm
       - get_head
