@@ -41,6 +41,13 @@ Canton Network Token Standard APIs (CIP-0056)
 
 * See the reference docs for the :ref:`OpenAPI specifications of the Canton Network Token Standard <token_standard_openapi>`.
 
+See the following links for more information and code examples on how to use the Canton Network Token Standard:
+
+    .. toctree::
+      :maxdepth: 2
+
+      ./token_standard
+
 Featured App Activity Markers API (CIP-0047)
 --------------------------------------------
 
