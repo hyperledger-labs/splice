@@ -8,16 +8,17 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.10
+------
 
 - SV Application
 
-  - Fully removes the automation and logic around DSO delegate elections.
+  - Fully remove the automation and logic around DSO delegate elections.
+  - UI enhancements.
 
 - Daml
 
-  - Deprecates Daml choices related to DSO delegate elections.
+  - Deprecate Daml choices related to DSO delegate elections.
   - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
     Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
 
@@ -43,6 +44,12 @@ Upcoming
 - Docs
 
   - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
+
+- Stability improvements
+
+  - Add circuit breaker functionality for ledger API command submissions in all splice apps;
+    causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
 
 0.4.9
 -----

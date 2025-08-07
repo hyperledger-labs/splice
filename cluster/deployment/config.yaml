@@ -84,3 +84,10 @@ multiValidator:
         memory: '5Gi'
       limits:
         memory: '12Gi'
+sv:
+  participant:
+    resources:
+      requests:
+        memory: '12Gi'
+      limits:
+        memory: '18Gi'
