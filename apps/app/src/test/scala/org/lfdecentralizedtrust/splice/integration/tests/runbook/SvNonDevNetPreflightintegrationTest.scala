@@ -123,11 +123,12 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
 
   "Check that sv-1 responds with a recent aggregated round" in { implicit env =>
     eventually() {
+      val initialRound = svScanClient.getDsoInfo().initialRound.getOrElse("0").toLong
       val (openRounds, issuingRounds) = svScanClient.getOpenAndIssuingMiningRounds()
-      if (openRounds.exists(_.contract.payload.round.number == 0)) {
-        logger.info("Round 0 is still open, not expecting an aggregate")
-      } else if (issuingRounds.exists(_.contract.payload.round.number == 0)) {
-        logger.info("Round 0 is still issuing, not expecting an aggregate")
+      if (openRounds.exists(_.contract.payload.round.number == initialRound)) {
+        logger.info(s"Initial round $initialRound is still open, not expecting an aggregate")
+      } else if (issuingRounds.exists(_.contract.payload.round.number == initialRound)) {
+        logger.info(s"Initial round $initialRound is still issuing, not expecting an aggregate")
       } else {
         val latestOpenMiningRound =
           Try(

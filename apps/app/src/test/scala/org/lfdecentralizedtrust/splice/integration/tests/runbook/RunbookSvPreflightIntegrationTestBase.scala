@@ -202,11 +202,12 @@ abstract class RunbookSvPreflightIntegrationTestBase
   "The Scan UI shows the same total balance as sv-1" in { implicit env =>
     val svClient = sv_client("sv")
     val sv1ScanClient = scancl("sv1Scan")
+    val initialRound = sv1ScanClient.getDsoInfo().initialRound.getOrElse("0").toLong
 
     val svParty = svClient.getDsoInfo().svParty.toProtoPrimitive
     val svInfo = svClient.getDsoInfo().dsoRules.payload.svs.asScala.get(svParty).value
     val joinedAsOfRound = svInfo.joinedAsOfRound.number
-    val lastAggregatedRoundSv = Try(sv1ScanClient.getRoundOfLatestData()._1).getOrElse(0L)
+    val lastAggregatedRoundSv = Try(sv1ScanClient.getRoundOfLatestData()._1).getOrElse(initialRound)
     logger.debug(
       s"last aggregated round from sv1: $lastAggregatedRoundSv, sv runbook joined as of round: $joinedAsOfRound"
     )
