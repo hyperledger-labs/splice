@@ -30,18 +30,6 @@ class LocalNetFrontendIntegrationTest
         fail("Failed to start docker-compose SV and validator")
       }
 
-      clue("Test token standard APIs") {
-        val registryInfo = scancl("scanClient").getRegistryInfo()
-        registryInfo.adminId should startWith("DSO::")
-        val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
-        val userRegistryInfo =
-          vc("userValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
-        val providerRegistryInfo =
-          vc("providerValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
-        registryInfo shouldBe userRegistryInfo
-        registryInfo shouldBe providerRegistryInfo
-      }
-
       clue("Test validators") {
         List(
           ("app-user", 2000, "app_user"),
@@ -113,6 +101,18 @@ class LocalNetFrontendIntegrationTest
 
           }
         }
+      }
+
+      clue("Test token standard APIs") {
+        val registryInfo = scancl("scanClient").getRegistryInfo()
+        registryInfo.adminId should startWith("DSO::")
+        val token = AuthUtil.testToken(AuthUtil.testAudience, "ledger-api-user", "unsafe")
+        val userRegistryInfo =
+          vc("userValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
+        val providerRegistryInfo =
+          vc("providerValidatorClient").copy(token = Some(token)).scanProxy.getRegistryInfo()
+        registryInfo shouldBe userRegistryInfo
+        registryInfo shouldBe providerRegistryInfo
       }
     } finally {
       Seq("build-tools/splice-localnet-compose.sh", "stop", "-D").!
