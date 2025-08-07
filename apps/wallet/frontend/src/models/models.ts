@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import BigNumber from 'bignumber.js';
-import { AmuletPosition } from 'wallet-openapi';
+import { AmuletPosition } from '@lfdecentralizedtrust/wallet-openapi';
 
 import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';
 import {

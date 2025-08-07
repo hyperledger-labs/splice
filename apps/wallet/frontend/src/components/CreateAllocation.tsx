@@ -7,7 +7,7 @@ import {
   AllocateAmuletRequest,
   AllocateAmuletRequestSettlementSettlementRef,
   AllocateAmuletRequestTransferLeg,
-} from 'wallet-openapi';
+} from '@lfdecentralizedtrust/wallet-openapi';
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';

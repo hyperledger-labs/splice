@@ -13,7 +13,7 @@ import {
   Middleware,
   RequestContext,
   ResponseContext,
-} from 'scan-proxy-openapi';
+} from '@lfdecentralizedtrust/scan-proxy-openapi';
 
 const ValidatorScanProxyContext = React.createContext<ScanProxyApi | undefined>(undefined);
 

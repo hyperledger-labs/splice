@@ -13,7 +13,7 @@ import {
   ResponseContext,
   ServerConfiguration,
   WalletApi,
-} from 'wallet-openapi';
+} from '@lfdecentralizedtrust/wallet-openapi';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 

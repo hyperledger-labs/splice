@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { GetAnsRulesResponse } from 'scan-openapi';
+import { GetAnsRulesResponse } from '@lfdecentralizedtrust/scan-openapi';
 
 import { AnsRules } from '@daml.js/ans/lib/Splice/Ans/';
 

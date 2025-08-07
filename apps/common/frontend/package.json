@@ -30,8 +30,8 @@
     "react-intersection-observer": "^9.15.1",
     "react-oidc-context": "2.2.2",
     "react-router-dom": "6.8.1",
-    "splitwell-openapi": "0.0.1",
-    "sv-openapi": "0.0.1",
+    "@lfdecentralizedtrust/splitwell-openapi": "0.0.1",
+    "@lfdecentralizedtrust/sv-openapi": "0.0.1",
     "web-vitals": "4.2.4",
     "xunit-viewer": "^10.6.1",
     "zod": "3.19.1"

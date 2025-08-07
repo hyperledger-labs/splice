@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useListAnsEntriesFromResponse } from '@lfdecentralizedtrust/splice-common-frontend/scan-api';
 import { UseQueryResult } from '@tanstack/react-query';
-import { AnsEntry } from 'scan-openapi';
+import { AnsEntry } from '@lfdecentralizedtrust/scan-openapi';
 
 import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyContext';
 

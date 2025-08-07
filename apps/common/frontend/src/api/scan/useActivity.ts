@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { PollingStrategy } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { InfiniteData, useInfiniteQuery, UseInfiniteQueryResult } from '@tanstack/react-query';
-import { ListActivityRequest, ListActivityResponseItem } from 'scan-openapi';
+import { ListActivityRequest, ListActivityResponseItem } from '@lfdecentralizedtrust/scan-openapi';
 
 import { useScanClient } from './ScanClientContext';
 

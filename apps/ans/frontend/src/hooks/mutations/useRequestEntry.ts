@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
-import { CreateAnsEntryRequest } from 'ans-external-openapi';
+import { CreateAnsEntryRequest } from '@lfdecentralizedtrust/ans-external-openapi';
 
 import { SubscriptionRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';

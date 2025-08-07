@@ -15,7 +15,12 @@ import { useActivity } from '@lfdecentralizedtrust/splice-common-frontend/scan-a
 import BigNumber from 'bignumber.js';
 import { useEffect } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { ListActivityResponseItem, SenderAmount, Transfer, AmuletAmount } from 'scan-openapi';
+import {
+  ListActivityResponseItem,
+  SenderAmount,
+  Transfer,
+  AmuletAmount,
+} from '@lfdecentralizedtrust/scan-openapi';
 
 import {
   Box,

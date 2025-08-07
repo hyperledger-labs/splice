@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as openapi from 'sv-openapi';
+import * as openapi from '@lfdecentralizedtrust/sv-openapi';
 import { useUserState } from '@lfdecentralizedtrust/splice-common-frontend';
 import {
   BaseApiMiddleware,
@@ -28,7 +28,7 @@ import {
   ResponseContext,
   ServerConfiguration,
   UpdateAmuletPriceVoteRequest,
-} from 'sv-openapi';
+} from '@lfdecentralizedtrust/sv-openapi';
 
 import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types/module';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';

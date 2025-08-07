@@ -7,7 +7,7 @@ import {
   LookupEntryByPartyResponse,
   ListEntriesResponse,
   GetDsoPartyIdResponse,
-} from 'scan-openapi';
+} from '@lfdecentralizedtrust/scan-openapi';
 
 import { alicePartyId, bobPartyId } from '../constants';
 

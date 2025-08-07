@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
-import { LookupTransferPreapprovalByPartyResponse } from 'scan-openapi';
+import { LookupTransferPreapprovalByPartyResponse } from '@lfdecentralizedtrust/scan-openapi';
 import { test, expect, describe } from 'vitest';
 import { vi } from 'vitest';
 
@@ -26,7 +26,7 @@ import {
   ChoiceExecutionMetadata,
   ListAllocationRequestsResponse,
   ListAllocationsResponse,
-} from 'wallet-openapi';
+} from '@lfdecentralizedtrust/wallet-openapi';
 import { AllocationRequest } from '@daml.js/splice-api-token-allocation-request/lib/Splice/Api/Token/AllocationRequestV1/module';
 import { mkContract } from './mocks/contract';
 import { openApiRequestFromTransferLeg } from '../components/ListAllocationRequests';

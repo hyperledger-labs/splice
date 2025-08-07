@@ -16,7 +16,7 @@ import MetaDisplay from './MetaDisplay';
 import TransferLegsDisplay from './TransferLegsDisplay';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useMutation } from '@tanstack/react-query';
-import { AllocateAmuletRequest } from 'wallet-openapi';
+import { AllocateAmuletRequest } from '@lfdecentralizedtrust/wallet-openapi';
 import {
   SettlementInfo,
   TransferLeg,
