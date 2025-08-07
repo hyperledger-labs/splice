@@ -22,8 +22,7 @@ jobs:
       parallelism: 1
       test_name: bigquery
       with_gcp_creds: true
-      commit_sha: ${{ github.sha }}
-      daml_base_version: 'latest'
-      oss_only: true
+      commit_sha: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha }}
+      daml_base_version: ''
+      oss_only: false
     secrets: inherit
-
