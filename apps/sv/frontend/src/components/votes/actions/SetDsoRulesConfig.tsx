@@ -154,7 +154,11 @@ const SetDsoRulesConfig: React.FC<{
     <Stack direction="column" mb={4} spacing={1}>
       <Typography variant="h6">Configuration</Typography>
       <FormControl sx={{ marginRight: '32px', flexGrow: '1' }}>
-        <JsonEditor data={configuration} onChange={setDsoRulesConfigAction} />
+        <JsonEditor
+          data={configuration}
+          onChange={setDsoRulesConfigAction}
+          disabledKeys={['dsoDelegateInactiveTimeout.microseconds']}
+        />
         <FormControlLabel
           control={
             <Checkbox

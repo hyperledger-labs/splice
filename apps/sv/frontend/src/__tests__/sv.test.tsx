@@ -75,6 +75,9 @@ describe('An SetConfig request', () => {
 
     expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
     expect(await screen.findByDisplayValue('10')).toBeDefined();
+    expect(
+      screen.getByTestId('dsoDelegateInactiveTimeout.microseconds-value').hasAttribute('disabled')
+    ).toBe(true);
   });
 
   test(
