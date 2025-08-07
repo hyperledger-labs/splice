@@ -17,6 +17,7 @@ spliceDomainNames:
   nameServiceDomain: "ans"
 rateLimit:
   scan:
+    enable: true
     acs:
       limit: 10
 

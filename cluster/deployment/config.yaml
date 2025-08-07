@@ -1,4 +1,21 @@
 # Reference configuration options
+sv:
+  scan:
+    externalRateLimits:
+      globalLimits:
+        maxTokens: 2147483647
+        tokensPerFill: 2147483647
+        fillInterval: 60s
+      rateLimits:
+        - actions:
+            - name: acs
+              pathPrefix: /api/scan/v0/acs
+            - name: client_ip
+              clientIp: true
+          limits:
+            maxTokens: 10
+            tokensPerFill: 5
+            fillInterval: 60s
 svs:
   default:
     logging:
