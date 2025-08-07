@@ -699,33 +699,33 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           totalCouponsLimit = PageLimit.tryCreate(1000),
         )
       } yield {
-        result should have size 8
+        result should have size 4
         forAll(result)(_.closedRoundNumber shouldBe 2)
-        forExactly(2, result) { batch =>
-          batch.validatorCoupons should have size 3
+        forExactly(1, result) { batch =>
+          batch.validatorCoupons should have size 6
           batch.appCoupons should have size 0
           batch.svRewardCoupons should have size 0
           batch.validatorFaucets should have size 0
         }
-        forExactly(2, result) { batch =>
+        forExactly(1, result) { batch =>
           batch.validatorCoupons should have size 0
-          batch.appCoupons should have size 3
+          batch.appCoupons should have size 6
           batch.svRewardCoupons should have size 0
           batch.validatorFaucets should have size 0
         }
-        forExactly(2, result) { batch =>
+        forExactly(1, result) { batch =>
           batch.validatorCoupons should have size 0
           batch.appCoupons should have size 0
-          batch.svRewardCoupons should have size 3
+          batch.svRewardCoupons should have size 6
           batch.validatorFaucets should have size 0
         }
-        forExactly(2, result) { batch =>
+        forExactly(1, result) { batch =>
           batch.validatorCoupons should have size 0
           batch.appCoupons should have size 0
           batch.svRewardCoupons should have size 0
-          batch.validatorFaucets should have size 3
+          batch.validatorFaucets should have size 6
         }
-        resultWithoutFaucet should have size 6
+        resultWithoutFaucet should have size 3
         forAll(resultWithoutFaucet)(_.validatorFaucets should have size 0)
       }
     }
