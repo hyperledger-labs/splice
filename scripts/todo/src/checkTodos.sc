@@ -92,14 +92,6 @@ def normalizeIssueRef(issueRef: String): String = {
   }
 }
 
-// val fixedIssuesCurrentPR: Set[String] = {
-//   Set(
-//     // "DACH-NY/canton-network-internal#475",
-//     "hyperledger-labs/splice#475"
-//     // "hyperledger-labs/splice#854",
-//   )
-// }
-
 // Determine open issues
 val fixedIssuesCurrentPR: Set[String] = {
   prNumO.fold(Set.empty[String])({ prNum =>
@@ -111,12 +103,10 @@ val fixedIssuesCurrentPR: Set[String] = {
       Seq("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved")
         .map(w => s"($w)")
         .mkString("|")
-    // val fixedIssueRegexStr = "(?i)(" + issueCloseKeywords + ")(\\s+)(#)([0-9]+)"
     val fixedIssueRegexStr = "(?i)(" + issueCloseKeywords + ")(\\s+)(#|([\\w-]+/[\\w-]+#))([0-9]+)"
     val fixedIssueRegex = fixedIssueRegexStr.r
     fixedIssueRegex
       .findAllMatchIn(prInfo + " " + commits)
-      // .map(m => "([0-9]+)".r.findFirstMatchIn(m.matched).get.matched.toInt)
       .map { m =>
         val fullMatch = m.matched
         // issue reference can be either #123 or org/repo#123
@@ -132,12 +122,10 @@ val fixedIssuesCurrentPR: Set[String] = {
 }
 
 val openIssues: Set[String] = {
-  // Seq("hub", "issue", "-f", "%I ").!!.split("\\s+").map(_.toInt).toSet
   Seq("hub", "issue", "-f", "%I ").!!.split("\\s+")
     .map(issueNum => s"$currentRepo#$issueNum")
     .toSet
 }
-println(s"Open issues: ${openIssues.filter(i => i.contains("475"))}")
 
 println(s"Issues fixed by this PR: $fixedIssuesCurrentPR\n")
 
@@ -292,15 +280,12 @@ def numsToIssue(str: String): IssueBucket = {
         if (fixedIssuesCurrentPR.contains(normalizeIssueRef(str))) MarkedAsFixedIssue()
         else if (openIssues.contains(str)) OpenIssue()
         else ClosedIssue()
-      if (str.contains("475"))
-        println(s"status is: $status")
       IssueBucket(i, status)
     }
   }
 }
 
 def parseCrossRefIssue(str: String): CrossRefIssueBucket = {
-  // println(s"Parsing cross ref issue: $str")
   val ori = "\\((\\S+)/(\\S+)#([0-9]+)\\)".r.unanchored
   str match {
     case ori(org, repo, issue) => {
@@ -341,7 +326,6 @@ def addToBucket(
 }
 
 def matchTODOWithBuckets(line: String, bucketsForLine: String): List[(Bucket, String)] = {
-  // println(s"Matching line: $line with bucketsForLine: $bucketsForLine")
   val allAttempts = allRegexps
     .map(rgx =>
       rgx.regex
@@ -441,7 +425,6 @@ val todoStyleIssuesTable: List[(Bucket, String)] =
     }
   })
 val table = pairsToMap(todoStyleIssuesTable)
-// println(s"Table: $table")
 
 // Write all todos to output dir
 new java.io.File("todo-out").mkdirs
