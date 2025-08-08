@@ -121,7 +121,7 @@ Failed to connect to scan of .*SvDevNetReonboardingIntegrationTest
 GENERIC_CONFIG_ERROR.*SpliceConfigTest
 
 # ExecutorServiceMetrics closes the gauges twice through shutdown and shutownNow in cases where shutdown times out
-SdkObservableInstrument.*InstrumentDescriptor.*name=daml.executor.* has called close() multiple times
+.*InstrumentDescriptor.*name=daml.executor.* has called close() multiple times
 
 
 # Make sure to have a trailing newline
