@@ -72,9 +72,29 @@ Console.out.println(
   s"Using Github CLI (`hub`) to fetch open issues assuming that an appropriate access token is provided in GITHUB_TOKEN. Please call `hub` manually to check your setup in case the process is stuck."
 )
 
+val currentRepo: String = {
+  Try {
+    val repoUrl = Seq("hub", "browse", "-u").!!.trim
+    val repoPattern = "github\\.com[/:]([^/]+/[^/\\.]+)".r
+    repoPattern.findFirstMatchIn(repoUrl) match {
+      case Some(m) => m.group(1)
+      case None => "unknown/repo"
+    }
+  }.getOrElse("unknown/repo")
+}
+println(s"Current repo: $currentRepo")
+
+def normalizeIssueRef(issueRef: String): String = {
+  if (issueRef.startsWith("#")) {
+    s"$currentRepo$issueRef"
+  } else {
+    issueRef
+  }
+}
+
 // Determine open issues
-val fixedIssuesCurrentPR: Set[Int] = {
-  prNumO.fold(Set.empty[Int])({ prNum =>
+val fixedIssuesCurrentPR: Set[String] = {
+  prNumO.fold(Set.empty[String])({ prNum =>
     val prInfo = Seq("hub", "pr", "show", "-f", "%b", prNum).!!
     val branch = Seq("hub", "pr", "show", "-f", "%H", prNum).!!.trim
     // When running from forks, we don't currently check the commit messages on the branch
@@ -83,17 +103,29 @@ val fixedIssuesCurrentPR: Set[Int] = {
       Seq("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved")
         .map(w => s"($w)")
         .mkString("|")
-    val fixedIssueRegexStr = "(?i)(" + issueCloseKeywords + ")(\\s+)(#)([0-9]+)"
+    val fixedIssueRegexStr = "(?i)(" + issueCloseKeywords + ")(\\s+)(#|([\\w-]+/[\\w-]+#))([0-9]+)"
     val fixedIssueRegex = fixedIssueRegexStr.r
     fixedIssueRegex
       .findAllMatchIn(prInfo + " " + commits)
-      .map(m => "([0-9]+)".r.findFirstMatchIn(m.matched).get.matched.toInt)
+      .map { m =>
+        val fullMatch = m.matched
+        // issue reference can be either #123 or org/repo#123
+        val issueRefRegex = "(([\\w-]+/[\\w-]+)?#[0-9]+)".r
+        issueRefRegex
+          .findFirstMatchIn(fullMatch)
+          .map(regex => normalizeIssueRef(regex.matched))
+          .getOrElse("")
+      }
+      .filter(_.nonEmpty)
       .toSet
   })
 }
 
-val openIssues: Set[Int] =
-  Seq("hub", "issue", "-f", "%I ").!!.split("\\s+").map(_.toInt).toSet
+val openIssues: Set[String] = {
+  Seq("hub", "issue", "-f", "%I ").!!.split("\\s+")
+    .map(issueNum => s"$currentRepo#$issueNum")
+    .toSet
+}
 
 println(s"Issues fixed by this PR: $fixedIssuesCurrentPR\n")
 
@@ -168,7 +200,7 @@ case class OpenIssue() extends IssueStatus {
 }
 
 case class IssueBucket(number: Int, status: IssueStatus) extends Bucket {
-  override val name = s"Issue #$number (${status.description})"
+  override val name = s"Issue $currentRepo#$number (${status.description})"
   override val classPosition = 3
   override val withinClassPosition = (number * 10 + status.position, "")
   // We do not want to merge a PR or commit that claims to fix an issue, but has left-over todos for it
@@ -239,25 +271,28 @@ object GithubIssueLink extends RegexCategory {
   override def getBucket(str: String): Bucket = numsToIssue(str)
 }
 
-def numsToIssue(str: String): IssueBucket =
+def numsToIssue(str: String): IssueBucket = {
   "[0-9]+".r.findFirstMatchIn(str) match {
     case None => throw new RuntimeException("The given string isn't an issue")
     case Some(m) => {
       val i = m.matched.toInt
       val status =
-        if (fixedIssuesCurrentPR.contains(i)) MarkedAsFixedIssue()
-        else if (openIssues.contains(i)) OpenIssue()
+        if (fixedIssuesCurrentPR.contains(normalizeIssueRef(str))) MarkedAsFixedIssue()
+        else if (openIssues.contains(str)) OpenIssue()
         else ClosedIssue()
       IssueBucket(i, status)
     }
   }
+}
 
 def parseCrossRefIssue(str: String): CrossRefIssueBucket = {
   val ori = "\\((\\S+)/(\\S+)#([0-9]+)\\)".r.unanchored
   str match {
-    case ori(org, repo, issue) =>
+    case ori(org, repo, issue) => {
       CrossRefIssueBucket(issue.toInt, org, repo)
-    case _ => throw new RuntimeException(s"The given string ($str) does not match the expected format")
+    }
+    case _ =>
+      throw new RuntimeException(s"The given string ($str) does not match the expected format")
   }
 }
 
@@ -291,10 +326,11 @@ def addToBucket(
 }
 
 def matchTODOWithBuckets(line: String, bucketsForLine: String): List[(Bucket, String)] = {
-
   val allAttempts = allRegexps
     .map(rgx =>
-      rgx.regex.findFirstMatchIn(bucketsForLine).map(m => rgx.getBucket(m.matched) -> line)
+      rgx.regex
+        .findFirstMatchIn(bucketsForLine)
+        .map(m => rgx.getBucket(m.matched) -> line)
     )
     .collect { case Some(x) => x }
 
@@ -354,6 +390,7 @@ val grepLines = grepCommands.flatMap({ command =>
     case Success(value) => value
   }
 })
+
 object ErrorCollector extends ProcessLogger {
   private val allErrors = ListBuffer[String]()
   def errors() = allErrors.mkString("\n\n")
@@ -370,6 +407,7 @@ if (ErrorCollector.anyError())
   throw new RuntimeException("grep or awk failed with errors:\n\n" + ErrorCollector.errors())
 
 def initialMapping(): Map[Bucket, List[String]] = SortedMap()
+
 def pairsToMap(pairs: List[(Bucket, String)]): Map[Bucket, List[String]] =
   pairs.foldLeft(initialMapping()) { case (acc, (bucket, string)) =>
     addToBucket(acc, bucket, string)
