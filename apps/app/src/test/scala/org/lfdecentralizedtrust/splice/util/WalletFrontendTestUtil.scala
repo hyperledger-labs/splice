@@ -102,7 +102,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       )
     } catch {
       case e: Throwable =>
-        throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
+        fail(s"Could not parse the string '$str' as a amulet amount", e)
     }
   }
 

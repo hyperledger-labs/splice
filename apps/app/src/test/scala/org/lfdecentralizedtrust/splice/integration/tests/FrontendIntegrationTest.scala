@@ -249,7 +249,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       )
       (driver, bidi)
     }
-    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
     registerWebDriver(name, webDriver)
 
     biDi.addListener[LogEntry](
