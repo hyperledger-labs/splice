@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.LocalAuth0Test
 import org.lfdecentralizedtrust.splice.auth.AuthConfig.Rs256
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.updateAllValidatorConfigs_
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.util.{AnsFrontendTestUtil, FrontendLoginUtil, WalletTestUtil}
+import org.lfdecentralizedtrust.splice.util.{FrontendLoginUtil, AnsFrontendTestUtil, WalletTestUtil}
 import monocle.macros.syntax.lens.*
 
 import java.net.URI

@@ -24,24 +24,16 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
   )(implicit
       webDriver: WebDriver
   ) = {
-    // logins need implicit waits to work
-    enableSeleniumImplicitWait {
-      eventually() {
-        val url = if (port == 80) {
-          s"http://$hostname"
-        } else {
-          s"http://$hostname:$port"
-        }
-        currentUrl should startWith(url)
-      }
-      // We reuse frontends across tests so we might need to log out first.
-      eventually() {
-        find(id("logout-button")).foreach(click on _)
-      }
-      click on "user-id-field"
-      textField("user-id-field").value = ledgerApiUser
-      click on "login-button"
+    eventually() {
+      val url = if (port == 80) { s"http://$hostname" }
+      else { s"http://$hostname:$port" }
+      currentUrl should startWith(url)
     }
+    // We reuse frontends across tests so we might need to log out first.
+    eventually() { find(id("logout-button")).foreach(click on _) }
+    click on "user-id-field"
+    textField("user-id-field").value = ledgerApiUser
+    click on "login-button"
   }
 
   protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
@@ -96,31 +88,29 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
-        // logins need implicit waits to work
-        enableSeleniumImplicitWait {
-          clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
-            completeAuth0LoginWithAuthorization(
-              s"http://localhost:$localHostPort",
-              user.email,
-              user.password,
-              () =>
-                if (onboardThroughWalletUI) {
-                  find(id("onboard-button")).value.text should not be empty
-                } else {
-                  seleniumText(find(id("logged-in-user"))) should not be empty
-                },
-            )
-          }
-          val userPartyId = if (onboardThroughWalletUI) {
-            actAndCheck("onboard user", click on "onboard-button")(
-              "user is onboarded",
-              _ => seleniumText(find(id("logged-in-user"))),
-            )._2
-          } else {
-            seleniumText(find(id("logged-in-user")))
-          }
-          afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)
+        clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
+          completeAuth0LoginWithAuthorization(
+            s"http://localhost:$localHostPort",
+            user.email,
+            user.password,
+            () =>
+              if (onboardThroughWalletUI) {
+                find(id("onboard-button")).value.text should not be empty
+              } else {
+                seleniumText(find(id("logged-in-user"))) should not be empty
+              },
+          )
         }
+        val userPartyId = if (onboardThroughWalletUI) {
+          actAndCheck("onboard user", click on "onboard-button")(
+            "user is onboarded",
+            _ => seleniumText(find(id("logged-in-user"))),
+          )._2
+        } else {
+          seleniumText(find(id("logged-in-user")))
+        }
+
+        afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)
       }
     }
   }
