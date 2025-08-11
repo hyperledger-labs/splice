@@ -15,7 +15,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   )(implicit webDriver: WebDriverType, env: SpliceTestConsoleEnvironment): Unit = {
 
     def tap(): Unit = {
-      click on "tap-amount-field"
+      eventuallyClickOn(id("tap-amount-field"))
       numberField("tap-amount-field").underlying.clear()
       numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
       click on "tap-button"
