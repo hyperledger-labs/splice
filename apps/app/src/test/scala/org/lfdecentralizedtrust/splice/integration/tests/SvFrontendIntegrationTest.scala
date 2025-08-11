@@ -25,7 +25,6 @@ import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
 import java.util.Optional
-import scala.concurrent.duration.DurationInt
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -836,7 +835,7 @@ class SvFrontendIntegrationTest
               requestReasonUrl,
               requestReasonBody,
               if (expiresSoon) {
-                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
               } else {
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
               },
@@ -917,7 +916,7 @@ class SvFrontendIntegrationTest
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
-            eventually(120.seconds) {
+            eventually() {
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
@@ -972,7 +971,7 @@ class SvFrontendIntegrationTest
               requestReasonUrl,
               requestReasonBody,
               if (expiresSoon) {
-                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
               } else {
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
               },
@@ -1057,7 +1056,7 @@ class SvFrontendIntegrationTest
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
-            eventually(120.seconds) {
+            eventually() {
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
