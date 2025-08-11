@@ -1,5 +1,6 @@
 package org.lfdecentralizedtrust.splice.store.db
 
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.noop.NoOpMetricsFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -994,34 +995,53 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
       "be consistent with offset changes in lookupAnsEntryByNameWithOffset" in {
         val ansName = ansEntryContext(1, "good")
-        val confirm = confirmation(1, ansEntryContextPaymentAction(ansName.contractId))
+        val confirmations =
+          (1 to 200).map(n => confirmation(n, ansEntryContextPaymentAction(ansName.contractId)))
 
         for {
           store <- mkStore()
           _ <- dummyDomain.create(ansName)(store.multiDomainAcsStore)
-          offsetBefore <- store.lookupAnsEntryByNameWithOffset("good", CantonTimestamp.assertFromInstant(now)).map(
-            result => inside(result) {
-              case QueryResult(offset, None) => offset
-            }
-          )
-          confirmationBefore <- store.listInitialPaymentConfirmationByAnsName(
-            storeSvParty,
-            "good",
-          )
-          _ <- dummyDomain.create(confirm)(store.multiDomainAcsStore)
-          offsetAfter <- store.lookupAnsEntryByNameWithOffset("good", CantonTimestamp.assertFromInstant(now)).map(
-            result => inside(result) {
-              case QueryResult(offset, None) => offset
-            }
-          )
-          confirmationAfter <- store.listInitialPaymentConfirmationByAnsName(
-            storeSvParty,
-            "good",
-          )
+          (_, _) <- (
+            // create lots of confirmations
+            MonadUtil.sequentialTraverse(confirmations)(
+              dummyDomain.create(_)(store.multiDomainAcsStore)
+            ),
+            // in parallel: check that the offset is always consistent
+            MonadUtil.sequentialTraverse(1 to 2000)(_ =>
+              for {
+                offsetBefore <- store
+                  .lookupAnsEntryByNameWithOffset("good", CantonTimestamp.assertFromInstant(now))
+                  .map(result =>
+                    inside(result) { case QueryResult(offset, None) =>
+                      offset
+                    }
+                  )
+                confirmationsBefore <- store.listInitialPaymentConfirmationByAnsName(
+                  storeSvParty,
+                  "good",
+                )
+                offsetAfter <- store
+                  .lookupAnsEntryByNameWithOffset("good", CantonTimestamp.assertFromInstant(now))
+                  .map(result =>
+                    inside(result) { case QueryResult(offset, None) =>
+                      offset
+                    }
+                  )
+                confirmationsAfter <- store.listInitialPaymentConfirmationByAnsName(
+                  storeSvParty,
+                  "good",
+                )
+              } yield {
+                if (offsetAfter > offsetBefore) {
+                  confirmationsAfter.size should be > confirmationsBefore.size
+                } else {
+                  confirmationsAfter.size should be >= confirmationsBefore.size
+                }
+              }
+            ),
+          ).tupled
         } yield {
-          offsetAfter should be > offsetBefore
-          confirmationBefore shouldBe empty
-          confirmationAfter should contain theSameElementsAs Seq(confirm)
+          succeed
         }
       }
     }
