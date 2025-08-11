@@ -4,10 +4,9 @@
 package org.lfdecentralizedtrust.splice.sv
 
 import cats.data.OptionT
-import cats.implicits.catsSyntaxTuple7Semigroupal
+import cats.implicits.catsSyntaxTuple6Semigroupal
 import cats.instances.future.*
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
@@ -52,10 +51,7 @@ import org.lfdecentralizedtrust.splice.sv.config.{
   SvOnboardingConfig,
 }
 import org.lfdecentralizedtrust.splice.sv.metrics.SvAppMetrics
-import org.lfdecentralizedtrust.splice.sv.migration.{
-  DomainDataSnapshotGenerator,
-  SynchronizerNodeIdentities,
-}
+import org.lfdecentralizedtrust.splice.sv.migration.DomainDataSnapshotGenerator
 import org.lfdecentralizedtrust.splice.sv.onboarding.domainmigration.DomainMigrationInitializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.sv1.SV1Initializer
 import org.lfdecentralizedtrust.splice.sv.onboarding.joining.JoiningNodeInitializer
@@ -66,7 +62,7 @@ import org.lfdecentralizedtrust.splice.sv.util.{
   SvUtil,
   ValidatorOnboardingSecret,
 }
-import org.lfdecentralizedtrust.splice.util.{BackupDump, Contract, HasHealth, TemplateJsonDecoder}
+import org.lfdecentralizedtrust.splice.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CryptoConfig,
@@ -82,8 +78,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.util.MonadUtil
 import io.circe.Json
-import io.circe.syntax.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -91,11 +87,11 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.lfdecentralizedtrust.splice.environment.BaseLedgerConnection.INITIAL_ROUND_USER_METADATA_KEY
 
-import java.nio.file.Paths
 import java.time.Instant
 import java.util.Optional
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -421,9 +417,10 @@ class SvApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizer,
         svAutomation.connection,
+        loggerFactory,
       )
 
-      (_, _, isDevNet, _, _, _, _) <- (
+      (_, _, isDevNet, _, _, _) <- (
         // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
         // 1. The ValidatorLicense has both the DSO and the SV as a stakeholder.
         //    That can cause problems during the DSO party migration because the contract is imported there
@@ -469,28 +466,24 @@ class SvApp(
             )
             .getOrElse(Future.unit)
         },
-        appInitStep("Dump identities") {
-          SvApp.backupNodeIdentities(
-            config,
-            localSynchronizerNode,
-            dsoStore,
-            participantAdminConnection,
-            clock,
-            logger,
-            loggerFactory,
-          )
-        },
         appInitStep("Wait until configured onboarding contracts have been created") {
           waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
         },
         localSynchronizerNode match {
           case Some(node) =>
-            appInitStep(
-              "Ensure that the local mediators's sequencer request amplification config is up to date"
-            ) {
-              // Normally we set this up during mediator init
-              // but if the config changed without a mediator reset we need to update it here.
-              node.ensureMediatorSequencerRequestAmplification()
+            if (!config.skipSynchronizerInitialization) {
+              appInitStep(
+                "Ensure that the local mediators's sequencer request amplification config is up to date"
+              ) {
+                // Normally we set this up during mediator init
+                // but if the config changed without a mediator reset we need to update it here.
+                node.ensureMediatorSequencerRequestAmplification()
+              }
+            } else {
+              logger.info(
+                "Skipping mediator sequencer amplification configuration because skipSynchronizerInitialization is enabled"
+              )
+              Future.unit
             }
           case None => Future.unit
         },
@@ -514,6 +507,14 @@ class SvApp(
       // Start the servers for the SvApp's APIs
       // ---------------------------------------
 
+      initialRound <- svAutomation.connection
+        .lookupUserMetadata(config.ledgerApiUser, INITIAL_ROUND_USER_METADATA_KEY)
+        .flatMap {
+          case Some(round) => Future.successful(round)
+          case None =>
+            throw new IllegalStateException("No initial round specified in user's metadata")
+        }
+
       handler = new HttpSvHandler(
         config.ledgerApiUser,
         svAutomation,
@@ -535,6 +536,7 @@ class SvApp(
         cometBftClient,
         loggerFactory,
         config.localSynchronizerNode.exists(_.sequencer.isBftSequencer),
+        initialRound,
       )
 
       adminHandler = new HttpSvAdminHandler(
@@ -587,17 +589,25 @@ class SvApp(
               concat(
                 SvResource.routes(
                   handler,
-                  _ => provide(traceContext),
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("sv")(operation)
+                      .tflatMap(_ => provide(traceContext)),
                 ),
                 SvAdminResource.routes(
                   adminHandler,
-                  AdminAuthExtractor(
-                    verifier,
-                    svStore.key.svParty,
-                    svAutomation.connection,
-                    loggerFactory,
-                    "splice sv admin realm",
-                  )(traceContext),
+                  operation =>
+                    metrics.httpServerMetrics
+                      .withMetrics("svAdmin")(operation)
+                      .tflatMap(_ =>
+                        AdminAuthExtractor(
+                          verifier,
+                          svStore.key.svParty,
+                          svAutomation.connection,
+                          loggerFactory,
+                          "splice sv admin realm",
+                        )(traceContext)(operation)
+                      ),
                 ),
               )
             }
@@ -663,12 +673,13 @@ class SvApp(
       "Onboarding contracts have been created", {
         val expectedValidatorOnboardingSecrets = config.expectedValidatorOnboardings.map(_.secret)
         for {
-          createdValidatorOnboardingSecrets <- expectedValidatorOnboardingSecrets.traverse {
-            secret =>
-              OptionT(store.lookupValidatorOnboardingBySecret(secret))
-                .map(_ => ())
-                .orElse(OptionT(store.lookupUsedSecret(secret)).map(_ => ()))
-                .value
+          createdValidatorOnboardingSecrets <- MonadUtil.sequentialTraverse(
+            expectedValidatorOnboardingSecrets
+          ) { secret =>
+            OptionT(store.lookupValidatorOnboardingBySecret(secret))
+              .map(_ => ())
+              .orElse(OptionT(store.lookupUsedSecret(secret)).map(_ => ()))
+              .value
           }
           missingOnboardingSecrets = createdValidatorOnboardingSecrets.zipWithIndex.filter(
             _._1.isEmpty
@@ -884,76 +895,6 @@ object SvApp {
           )
         )
     }
-  }
-
-  def getElectionRequest(
-      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore]
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = {
-    val store = dsoStoreWithIngestion.store
-    for {
-      dsoRules <- store.getDsoRules()
-    } yield store.listElectionRequests(dsoRules)
-  }.flatten
-
-  def createElectionRequest(
-      requester: String,
-      ranking: Seq[String],
-      dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Either[String, Unit]] = {
-    val store = dsoStoreWithIngestion.store
-    for {
-      dsoRules <- store.getDsoRules()
-      queryResult <- store
-        .lookupElectionRequestByRequesterWithOffset(
-          PartyId.tryFromProtoPrimitive(requester),
-          dsoRules.payload.epoch,
-        )
-      result <- queryResult match {
-        case QueryResult(_, Some(_)) =>
-          Future.successful(
-            Left(
-              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive delegate ${dsoRules.payload.dsoDelegate}"
-            )
-          )
-        case QueryResult(offset, None) =>
-          val self = requester
-          val cmd = dsoRules.exercise(
-            _.exerciseDsoRules_RequestElection(
-              self,
-              new splice.dsorules.electionrequestreason.ERR_DsoDelegateUnavailable(
-                com.daml.ledger.javaapi.data.Unit.getInstance()
-              ),
-              ranking.asJava,
-            )
-          )
-          for {
-            _ <- dsoStoreWithIngestion.connection
-              .submit(
-                actAs = Seq(store.key.svParty),
-                readAs = Seq(store.key.dsoParty),
-                cmd,
-              )
-              .withDedup(
-                commandId = SpliceLedgerConnection.CommandId(
-                  "org.lfdecentralizedtrust.splice.sv.requestElection",
-                  Seq(
-                    store.key.svParty,
-                    store.key.dsoParty,
-                  ),
-                  dsoRules.payload.epoch.toString,
-                ),
-                deduplicationOffset = offset,
-              )
-              .yieldUnit()
-          } yield Right(())
-      }
-    } yield result
   }
 
   def createVoteRequest(
@@ -1260,46 +1201,5 @@ object SvApp {
         Seq(User.Right.ParticipantAdmin.INSTANCE),
       )
     } yield ()
-  }
-
-  private def backupNodeIdentities(
-      config: SvAppBackendConfig,
-      localSynchronizerNode: Option[LocalSynchronizerNode],
-      dsoStore: SvDsoStore,
-      participantAdminConnection: ParticipantAdminConnection,
-      clock: Clock,
-      logger: TracedLogger,
-      loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
-    config.identitiesDump.fold(Future.successful(()))(backupConfig => {
-      val now = clock.now.toInstant
-      val filename = Paths.get(
-        s"sv_identities_${now}.json"
-      )
-      logger.debug(
-        s"Attempting to write node identities to ${backupConfig.locationDescription} at path: $filename"
-      )
-      for {
-        identities <- SynchronizerNodeIdentities.getSynchronizerNodeIdentities(
-          participantAdminConnection,
-          localSynchronizerNode.getOrElse(
-            sys.error("Cannot dump identities with no localSynchronizerNode")
-          ),
-          dsoStore,
-          config.domains.global.alias,
-          loggerFactory,
-        )
-        _ <- Future {
-          blocking {
-            BackupDump.write(
-              backupConfig,
-              filename,
-              identities.toHttp().asJson.noSpaces,
-              loggerFactory,
-            )
-          }
-        }
-      } yield ()
-    })
   }
 }

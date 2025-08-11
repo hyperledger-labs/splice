@@ -62,14 +62,7 @@ object BuildCommon {
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
     libraryDependencies ++= Seq(
       scalatest % Test
-    ),
-    resolvers += "Artifactory Canton Drivers" at "https://digitalasset.jfrog.io/artifactory/canton-drivers/",
-    credentials += Credentials(
-      "Artifactory Realm",
-      "digitalasset.jfrog.io",
-      sys.env("ARTIFACTORY_USER"),
-      sys.env("ARTIFACTORY_PASSWORD"),
-    ),
+    )
   ) ++ sharedProtocSettings ++ Headers.NoHeaderSettings
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
@@ -260,6 +253,7 @@ object BuildCommon {
   lazy val cantonWarts = Seq(
     wartremoverErrors += Wart.custom("com.digitalasset.canton.DiscardedFuture"),
     wartremoverErrors += Wart.custom("com.digitalasset.canton.RequireBlocking"),
+    wartremoverErrors += Wart.custom("com.digitalasset.canton.FutureTraverse"),
     wartremover.WartRemover.dependsOnLocalProjectWarts(
       `canton-wartremover-extension`
     ),
@@ -1064,7 +1058,7 @@ object BuildCommon {
     import CantonDependencies._
     sbt.Project
       .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
-      .dependsOn(`canton-slick-fork`)
+      .dependsOn(`canton-wartremover-annotations`, `canton-slick-fork`)
       .settings(
         disableTests,
         sharedSettings,
@@ -1084,6 +1078,11 @@ object BuildCommon {
         //      coverageEnabled := false,
       )
   }
+
+  lazy val `canton-wartremover-annotations` =
+    sbt.Project
+      .apply("canton-wartremover-annotations", file("canton/community/lib/wartremover-annotations"))
+      .settings(sharedSettings)
 
   // https://github.com/DACH-NY/canton/issues/10617: remove when no longer needed
   lazy val `canton-pekko-fork` = {

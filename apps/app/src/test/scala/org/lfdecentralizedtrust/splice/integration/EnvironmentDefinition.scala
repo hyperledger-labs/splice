@@ -178,6 +178,10 @@ case class EnvironmentDefinition(
             ),
           )
         }
+        participants(env).foreach { p =>
+          logger.info(s"Ensuring vetting topology is effective for ${p.name}")(TraceContext.empty)
+          p.topology.synchronisation.await_idle()
+        }
       }
     )
   }
@@ -199,13 +203,6 @@ case class EnvironmentDefinition(
     addConfigTransform((_, config) =>
       ConfigTransforms.updateAllAutomationConfigs(
         _.focus(_.enableAutomaticRewardsCollectionAndAmuletMerging).replace(false)
-      )(config)
-    )
-
-  def withoutDsoDelegateReplacement: EnvironmentDefinition =
-    addConfigTransform((_, config) =>
-      ConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.enableDsoDelegateReplacementTrigger).replace(false)
       )(config)
     )
 
@@ -353,6 +350,14 @@ case class EnvironmentDefinition(
         )(conf),
     )
 
+  /** e.g. to prevent ReceiveFaucetCouponTrigger from seeing stale caches */
+  def withScanDisabledMiningRoundsCache(): EnvironmentDefinition =
+    addConfigTransforms((_, config) =>
+      ConfigTransforms.updateAllScanAppConfigs_(
+        _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
+      )(config)
+    )
+
   def clearConfigTransforms(): EnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
 
@@ -410,6 +415,14 @@ case class EnvironmentDefinition(
           .updateAllSvAppFoundDsoConfigs_(
             _.focus(_.initialSynchronizerFeesConfig.baseRateBurstAmount)
               .replace(NonNegativeLong.tryCreate(2_000_000L))
+          )(conf)
+      )
+      .addConfigTransform((_, conf) =>
+        ConfigTransforms
+          .updateAllSvAppConfigs_(
+            _.focus(_.topologyChangeDelayDuration)
+              // same as canton for sim time
+              .replace(NonNegativeFiniteDuration.Zero)
           )(conf)
       )
       .withSequencerConnectionsFromScanDisabled(10_000)

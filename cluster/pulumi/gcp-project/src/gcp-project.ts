@@ -4,7 +4,10 @@ import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import { Secret } from '@pulumi/gcp/secretmanager';
-import { config, loadYamlFromFile } from 'splice-pulumi-common';
+import { config } from 'splice-pulumi-common';
+
+import { authorizeServiceAccount } from './authorizeServiceAccount';
+import { gcpProjectConfig, configsDir } from './config';
 
 export class GcpProject extends pulumi.ComponentResource {
   gcpProjectId: string;
@@ -34,16 +37,15 @@ export class GcpProject extends pulumi.ComponentResource {
   }
 
   private internalWhitelists(): Secret {
-    const whitelistsFile = `${config.requireEnv('CONFIGS_DIR')}/ips.yaml`;
-    const ipsFromFile = loadYamlFromFile(whitelistsFile);
-    const ips: string[] = ipsFromFile['All Clusters'].concat(
-      this.isMainNet() ? [] : ipsFromFile['Non-MainNet']
+    const ipsFromConfig = gcpProjectConfig.ips;
+    const ips: string[] = ipsFromConfig['All Clusters'].concat(
+      this.isMainNet() ? [] : ipsFromConfig['Non-MainNet']
     );
     return this.secretAndVersion('internal-whitelists', JSON.stringify(ips));
   }
 
   private userConfigsForTenant(tenant: string): Secret {
-    const userConfigsFile = `${config.requireEnv('CONFIGS_DIR')}/user-configs/${tenant}.us.auth0.com.json`;
+    const userConfigsFile = `${configsDir}/user-configs/${tenant}.us.auth0.com.json`;
     return this.secretAndVersion(
       `user-configs-${tenant}`,
       fs.readFileSync(userConfigsFile, 'utf-8')
@@ -62,10 +64,24 @@ export class GcpProject extends pulumi.ComponentResource {
   }
 
   private letsEncryptEmail(): Secret {
-    const val = fs
-      .readFileSync(`${config.requireEnv('CONFIGS_DIR')}/lets-encrypt-email.txt`, 'utf-8')
-      .trim();
+    const val = gcpProjectConfig.letsEncrypt.email;
     return this.secretAndVersion('lets-encrypt-email', val);
+  }
+
+  private authorizedServiceAccount(): gcp.projects.IAMMember[] {
+    if (!gcpProjectConfig.authorizedServiceAccount) {
+      console.warn(
+        'AUTHORIZED_SERVICE_ACCOUNT is not set; this is only fine for a project never touched by CircleCI flows.'
+      );
+      return [];
+    }
+    const authorizedServiceAccountConfig = {
+      serviceAccountEmail: gcpProjectConfig.authorizedServiceAccount.email,
+      pulumiKeyringProjectId: config.requireEnv('PULUMI_BACKEND_GCPKMS_PROJECT'),
+      pulumiKeyringRegion: config.requireEnv('CLOUDSDK_COMPUTE_REGION'),
+      dnsSaKeySecretName: config.requireEnv('DNS01_SA_KEY_SECRET'),
+    };
+    return authorizeServiceAccount(this.gcpProjectId, authorizedServiceAccountConfig);
   }
 
   constructor(gcpProjectId: string) {
@@ -83,5 +99,6 @@ export class GcpProject extends pulumi.ComponentResource {
     this.internalWhitelists();
     this.userConfigs();
     this.letsEncryptEmail();
+    this.authorizedServiceAccount();
   }
 }

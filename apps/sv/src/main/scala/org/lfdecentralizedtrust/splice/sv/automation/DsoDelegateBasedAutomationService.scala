@@ -50,7 +50,12 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
     registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
     if (config.automation.enableDsoGovernance) {
-      registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
+      registerTrigger(
+        new ExecuteConfirmedActionTrigger(
+          triggerContext,
+          svTaskContext,
+        )
+      )
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
@@ -69,16 +74,12 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
 
-    registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
     registerTrigger(new AnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsEntryTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireTransferPreapprovalsTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredAnsSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new MergeSvRewardStateContractsTrigger(triggerContext, svTaskContext))
-    registerTrigger(
-      new PruneAmuletConfigScheduleTrigger(triggerContext, svTaskContext)
-    )
 
     registerTrigger(
       new MergeValidatorLicenseContractsTrigger(
@@ -89,6 +90,25 @@ class DsoDelegateBasedAutomationService(
 
     registerTrigger(
       new FeaturedAppActivityMarkerTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+
+    registerTrigger(
+      new AllocateUnallocatedUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+    registerTrigger(
+      new ExpiredUnallocatedUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+    registerTrigger(
+      new ExpiredUnclaimedActivityRecordTrigger(
         triggerContext,
         svTaskContext,
       )
@@ -115,15 +135,16 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[GarbageCollectAmuletPriceVotesTrigger],
     aTrigger[MergeUnclaimedRewardsTrigger],
     aTrigger[ExpireRewardCouponsTrigger],
-    aTrigger[ExpireElectionRequestsTrigger],
     aTrigger[AnsSubscriptionRenewalPaymentTrigger],
     aTrigger[ExpiredAnsEntryTrigger],
     aTrigger[ExpireTransferPreapprovalsTrigger],
     aTrigger[ExpiredAnsSubscriptionTrigger],
     aTrigger[TerminatedSubscriptionTrigger],
     aTrigger[MergeSvRewardStateContractsTrigger],
-    aTrigger[PruneAmuletConfigScheduleTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
     aTrigger[FeaturedAppActivityMarkerTrigger],
+    aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],
+    aTrigger[ExpiredUnallocatedUnclaimedActivityRecordTrigger],
+    aTrigger[ExpiredUnclaimedActivityRecordTrigger],
   )
 }

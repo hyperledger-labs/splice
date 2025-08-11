@@ -4,10 +4,9 @@
 package org.lfdecentralizedtrust.splice.scan.admin.http
 
 import cats.data.{NonEmptyVector, OptionT}
-import cats.implicits.toTraverseOps
 import cats.syntax.either.*
-import cats.syntax.traverseFilter.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.admin.http.HttpErrorHandler
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules
@@ -86,6 +85,7 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.util.ErrorUtil
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.scan.config.BftSequencerConfig
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.TxLogBackfillingState
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.BackfillingState
@@ -107,6 +107,7 @@ class HttpScanHandler(
     protected val loggerFactory: NamedLoggerFactory,
     protected val packageVersionSupport: PackageVersionSupport,
     bftSequencers: Seq[(SequencerAdminConnection, BftSequencerConfig)],
+    initialRound: String,
 )(implicit
     ec: ExecutionContextExecutor,
     protected val tracer: Tracer,
@@ -147,6 +148,7 @@ class HttpScanHandler(
         amuletRules = amuletRules.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
+        initialRound = Some(initialRound),
       )
     }
   }
@@ -1112,8 +1114,8 @@ class HttpScanHandler(
           nonce,
           HttpScanHandler.MAX_TRANSFER_COMMAND_CONTRACTS,
         )
-        filteredMap <- txLogEntryMap.view.toList
-          .traverseFilter { case (cid, entry) =>
+        filteredMap <- MonadUtil
+          .sequentialTraverse(txLogEntryMap.view.toList) { case (cid, entry) =>
             // The update history ingests independently so this lookup can return None temporarily.
             // We just filter out those contracts.
             store.updateHistory
@@ -1127,7 +1129,7 @@ class HttpScanHandler(
                 )
               )
           }
-          .map(_.toMap)
+          .map(_.flatten.toMap)
       } yield {
         if (filteredMap.isEmpty) {
           v0.ScanResource.LookupTransferCommandStatusResponseNotFound(
@@ -1958,7 +1960,11 @@ class HttpScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode party ID: $error")
             )
         }
-        response <- sequencerAdminConnection.getPartyToParticipant(domain, party)
+        response <- sequencerAdminConnection.getPartyToParticipant(
+          domain,
+          party,
+          topologyTransactionType = AuthorizedState,
+        )
         participantId <- response.mapping.participantIds match {
           case Seq() =>
             Future.failed(
@@ -2019,8 +2025,7 @@ class HttpScanHandler(
   override def featureSupport(respond: ScanResource.FeatureSupportResponse.type)()(
       extracted: TraceContext
   ): Future[ScanResource.FeatureSupportResponse] = readFeatureSupport(
-    store.key.dsoParty
-  )(extracted, ec, tracer).map(ScanResource.FeatureSupportResponseOK(_))
+  )(extracted, tracer).map(ScanResource.FeatureSupportResponseOK(_))
 
   private def parseTimestamp(str: String): CantonTimestamp = {
     val timestamp = for {
@@ -2038,8 +2043,8 @@ class HttpScanHandler(
   ): Future[ScanResource.ListSvBftSequencersResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listSvBftSequencers") { _ => _ =>
-      bftSequencers
-        .traverse { case (sequencerAdminConnection, bftSequencer) =>
+      MonadUtil
+        .sequentialTraverse(bftSequencers) { case (sequencerAdminConnection, bftSequencer) =>
           for {
             sequencerId <- sequencerAdminConnection.getSequencerId
           } yield {

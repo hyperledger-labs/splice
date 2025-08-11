@@ -5,7 +5,7 @@ module Splice.AmuletRules where
 
 import Prelude hiding (forA)
 
-import DA.Action (when, void, foldlA)
+import DA.Action (when, unless, void, foldlA)
 import DA.Assert
 import DA.Exception
 import DA.Foldable (forA_)
@@ -17,6 +17,7 @@ import DA.Set (Set)
 import qualified DA.Set as Set
 import qualified DA.TextMap as TextMap
 import DA.Traversable (forA)
+import qualified DA.Text as T
 import DA.Time
 
 import Splice.Api.FeaturedAppRightV1 (AppRewardBeneficiary(..))
@@ -55,6 +56,7 @@ data AmuletRules_DevNet_FeatureAppResult = AmuletRules_DevNet_FeatureAppResult w
 
 data AmuletRules_Bootstrap_RoundsResult = AmuletRules_Bootstrap_RoundsResult with
     openMiningRoundCid : ContractId OpenMiningRound
+    initialRound : Optional Round
 
 data AmuletRules_AdvanceOpenMiningRoundsResult = AmuletRules_AdvanceOpenMiningRoundsResult with
     summarizingRoundCid : ContractId SummarizingMiningRound
@@ -107,16 +109,26 @@ template AmuletRules
         context : TransferContext
         sender : Party
         outputs : [TransferOutput]
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
      controller sender
-     do fees <- computeFees dso context sender outputs
+     do checkExpectedDso dso expectedDso
+        fees <- computeFees dso context sender outputs
         return AmuletRules_ComputeFeesResult with fees
 
     nonconsuming choice AmuletRules_Transfer : TransferResult
       with
         transfer : Transfer
         context : TransferContext
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller Set.toList (transferControllers transfer)
       do
+        checkExpectedDso dso expectedDso
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
@@ -132,8 +144,13 @@ template AmuletRules
         user : Party
         validator : Party
         preapprovalExpiresAt : Time
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller validator
       do
+        checkExpectedDso dso expectedDso
         now <- getTime
         require "preapprovalExpiresAt is not in the past" (preapprovalExpiresAt > now)
         let configUsd = getValueAsOf now configSchedule
@@ -155,8 +172,13 @@ template AmuletRules
         receiver : Party
         provider : Party
         expiresAt : Time
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller provider, receiver
       do
+        checkExpectedDso dso expectedDso
         now <- getTime
         require "expiresAt is not in the past" (expiresAt > now)
         let configUsd = getValueAsOf now configSchedule
@@ -184,8 +206,13 @@ template AmuletRules
         synchronizerId : Text
         migrationId : Int
         trafficAmount : Int
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the AmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the AmuletRules contract out for
+        -- one under their control.
       controller provider
       do
+        checkExpectedDso dso expectedDso
         -- validate choice parameters
         configUsd <- getValueAsOfLedgerTime configSchedule
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
@@ -193,7 +220,7 @@ template AmuletRules
           Right _ -> pure ()
         openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
         let transferConfigAmulet = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
-        (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
+        (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees dso provider trafficAmount this context
         -- We want to burn exactly trafficCostAmulet, and createFee is already burnt by the self-transfer itself, so we subtract the createFee from the amount we split off and burn explicitly.
         (transferResult, meta) <- splitAndBurn provider (trafficCostAmulet - transferConfigAmulet.createFee.fee) inputs context dso "traffic purchase"
         -- create a new MemberTraffic contract for the purchased traffic
@@ -309,12 +336,15 @@ template AmuletRules
         amuletPrice : Decimal
         round0Duration : RelTime
         -- Duration of the very first round, typically set to a number large enough for all initial svs to complete joining and grab their SvReward coupon.
+        initialRound : Optional Int
       controller dso
       do
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let nr0 = 0
+        let nr0 = case initialRound of
+                    Some round -> round
+                    None -> 0
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
 
@@ -331,7 +361,7 @@ template AmuletRules
         let opensAt1 = now -- opens at the same time as round0, so there are always two rounds open at the same time
         let opensAt2 = targetClosesAt0 -- by default, at most two rounds are open at the same time, so round 2 opens when round 0 closes
 
-        let issuingFor0 = days 0
+        let issuingFor0 = microseconds (nr0 * convertRelTimeToMicroseconds tickDuration)
         let issuingFor1 = issuingFor0 + tickDuration
         let issuingFor2 = issuingFor1 + tickDuration
 
@@ -349,6 +379,7 @@ template AmuletRules
           dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
         return AmuletRules_Bootstrap_RoundsResult with
           openMiningRoundCid = last
+          initialRound = Some (Round nr0)
 
     nonconsuming choice AmuletRules_AdvanceOpenMiningRounds : AmuletRules_AdvanceOpenMiningRoundsResult
       with
@@ -570,8 +601,6 @@ template AmuletRules
             futureValues = []
         return AmuletRules_SetConfigResult with ..
 
-    -- TODO(#925): make the following three deprecated choices `abort` once all tests that depend on it are migrated.
-
     -- This inserts a new AmuletConfig Schedule into the future Schedules
     -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
@@ -579,10 +608,7 @@ template AmuletRules
         newScheduleItem : (Time, AmuletConfig Unit.USD)
       controller dso
       do
-        now <- getTime
-        require "The insertion is scheduled in the future" (now < newScheduleItem._1)
-        newAmuletRules <- create this with configSchedule = prune now (insert newScheduleItem this.configSchedule)
-        return AmuletRules_AddFutureAmuletConfigScheduleResult with ..
+        deprecatedChoice "splice-amulet" "0.1.12" "AmuletRules_AddFutureAmuletConfigSchedule"
 
     -- This removes a AmuletConfig Schedule defined in the future Schedules
     -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
@@ -591,10 +617,7 @@ template AmuletRules
         scheduleTime: Time
       controller dso
       do
-        now <- getTime
-        require "The removal is scheduled in the future" (now < scheduleTime)
-        newAmuletRules <- create this with configSchedule = prune now (remove scheduleTime this.configSchedule)
-        return AmuletRules_RemoveFutureAmuletConfigScheduleResult with ..
+        deprecatedChoice "splice-amulet" "0.1.12" "AmuletRules_RemoveFutureAmuletConfigSchedule"
 
     -- This updates a AmuletConfig Schedule defined in the future Schedules
     -- __Deprecated__ use `AmuletRules_SetConfig` and governance votes with effective dating instead.
@@ -603,10 +626,7 @@ template AmuletRules
         scheduleItem: (Time, AmuletConfig Unit.USD)
       controller dso
       do
-        now <- getTime
-        require "The update is scheduled in the future" (now < scheduleItem._1)
-        newAmuletRules <- create this with configSchedule = prune now (update scheduleItem this.configSchedule)
-        return AmuletRules_UpdateFutureAmuletConfigScheduleResult with ..
+        deprecatedChoice "splice-amulet" "0.1.12" "AmuletRules_UpdateFutureAmuletConfigSchedule"
 
     nonconsuming choice AmuletRules_ConvertFeaturedAppActivityMarkers : AmuletRules_ConvertFeaturedAppActivityMarkersResult
       with
@@ -1124,14 +1144,14 @@ validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
   | otherwise = Right ()
 
 -- | Computing synchronizer fees
-computeSynchronizerFees : Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
-computeSynchronizerFees validator trafficAmount amuletRules context = do
+computeSynchronizerFees : Party -> Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
+computeSynchronizerFees dso validator trafficAmount amuletRules context = do
   -- compute traffic cost in USD
   configUsd <- getValueAsOfLedgerTime amuletRules.configSchedule
   let extraTrafficPrice = configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
   -- compute traffic cost in Amulet
-  contextMiningRound <- exercise context.openMiningRound (OpenMiningRound_Fetch validator)
+  contextMiningRound <- fetchPublicReferenceData (ForDso dso) context.openMiningRound (OpenMiningRound_Fetch validator)
   let trafficCostAmulet = trafficCostUsd / contextMiningRound.amuletPrice
   pure (trafficCostAmulet, trafficCostUsd)
 
@@ -1142,32 +1162,35 @@ data AppTransferContext = AppTransferContext
     featuredAppRight : Optional (ContractId FeaturedAppRight)
   deriving (Show, Eq)
 
-exerciseAppTransfer : AppTransferContext -> Transfer -> Update TransferResult
-exerciseAppTransfer AppTransferContext{..} transfer =
+checkExpectedDso : Party -> Optional Party -> Update ()
+checkExpectedDso actualDso optExpectedDso =
+  case optExpectedDso of
+    None -> abort "Expected DSO party not set by caller. Please change your code to set it as a prudent security measure."
+    Some expectedDso ->
+      unless (actualDso == expectedDso) $
+         abort $ T.implode ["DSO party expected by caller ", show expectedDso, " does not match actual DSO party ", show actualDso]
+
+exerciseAppTransfer : Party -> AppTransferContext -> Transfer -> Update TransferResult
+exerciseAppTransfer expectedDso AppTransferContext{..} transfer = do
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context = amuletTransferContext openMiningRound featuredAppRight
+    expectedDso = Some expectedDso
 
--- TODO(#14942): replace usages of this function with `exerciseCheckedPaymentTransfer`
-exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
-exercisePaymentTransfer PaymentTransferContext{..} transfer =
+exercisePaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
+exercisePaymentTransfer expectedDso PaymentTransferContext{..} transfer = do
   exercise amuletRules AmuletRules_Transfer with
     transfer
     context
+    expectedDso = Some expectedDso
 
-exerciseCheckedPaymentTransfer : Party -> PaymentTransferContext -> Transfer -> Update TransferResult
-exerciseCheckedPaymentTransfer dso PaymentTransferContext{..} transfer = do
-  _ <- fetchChecked (ForDso with dso) amuletRules
-  exercise amuletRules AmuletRules_Transfer with
-    transfer
-    context
-
-exerciseComputeFees : PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-exerciseComputeFees PaymentTransferContext{..} sender outputs = do
+exerciseComputeFees : Party -> PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
+exerciseComputeFees expectedDso PaymentTransferContext{..} sender outputs = do
   feesResult <- exercise amuletRules AmuletRules_ComputeFees with
         context
         sender
         outputs
+        expectedDso = Some expectedDso
   return feesResult.fees
 
 data PaymentTransferContext = PaymentTransferContext
@@ -1450,8 +1473,7 @@ template TransferPreapproval
       controller sender
       do
          assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
-         _ <- fetchChecked (ForDso dso) context.amuletRules
-         transferResult <- exercisePaymentTransfer context Transfer with
+         transferResult <- exercisePaymentTransfer dso context Transfer with
            sender
            provider
            inputs

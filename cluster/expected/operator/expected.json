@@ -206,6 +206,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "deployment-sa",
         "stack": "organization/deployment/deployment.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -418,7 +423,7 @@
           ]
         }
       },
-      "version": "2.12.4"
+      "version": "2.14.1"
     },
     "name": "flux",
     "provider": "",

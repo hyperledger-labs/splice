@@ -4,28 +4,31 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.implicits.{catsSyntaxParallelTraverse_, toTraverseOps}
+import cats.implicits.catsSyntaxParallelTraverse_
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
   TopologyAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.DarDescription
-import com.digitalasset.canton.admin.api.client.data.topology.ListVettedPackagesResult
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.admin.grpc.{BaseQuery, TopologyStoreId}
-import com.digitalasset.canton.topology.store.TimeQuery
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.{VettedPackage, VettedPackages}
 import com.digitalasset.canton.topology.{ParticipantId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Ref.PackageId
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import monocle.Monocle.toAppliedFocusOps
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.HasParticipantId
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
+  TopologyResult,
+  TopologyTransactionType,
+}
 import org.lfdecentralizedtrust.splice.util.UploadablePackage
 
 import java.nio.file.{Files, Path}
@@ -66,7 +69,7 @@ trait ParticipantAdminDarsConnection {
       )
       domains <- listConnectedDomains().map(_.map(_.synchronizerId))
       darResource = DarResource(path)
-      _ <- domains.traverse { domainId =>
+      _ <- MonadUtil.sequentialTraverse(domains) { domainId =>
         vetDars(domainId, Seq(darResource), None)
       }
     } yield ()
@@ -79,18 +82,20 @@ trait ParticipantAdminDarsConnection {
       // we publish to the authorized store so that it pushed on all the domains and the console commands are still useful when dealing with dars
       AuthorizedStore,
       s"dars ${dars.map(_.packageId)} are vetted in the authorized store with from $fromDate",
-      EitherT(
-        getVettingState(None).map { vettedPackages =>
-          if (
-            dars.forall(dar => vettedPackages.mapping.packages.exists(_.packageId == dar.packageId))
-          ) {
-            // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
-            Right(vettedPackages)
-          } else {
-            Left(vettedPackages)
+      topologyTransactionType =>
+        EitherT(
+          getVettingState(None, topologyTransactionType).map { vettedPackages =>
+            if (
+              dars
+                .forall(dar => vettedPackages.mapping.packages.exists(_.packageId == dar.packageId))
+            ) {
+              // we don't check the validFrom value, we assume that once it's part of the vetting state it can no longer be updated
+              Right(vettedPackages)
+            } else {
+              Left(vettedPackages)
+            }
           }
-        }
-      ),
+        ),
       currentVettingState =>
         Right(
           updateVettingStateForDars(
@@ -103,16 +108,16 @@ trait ParticipantAdminDarsConnection {
     ).flatMap(_ =>
       retryProvider.waitUntil(
         RetryFor.Automation,
-        s"vet_dars_on_domain",
-        s"Dars ${dars.map(_.packageId)} are vetted on domain $domainId",
-        getVettingState(domainId).map { vettingState =>
+        s"vet_dars_on_sync",
+        s"Dars ${dars.map(_.packageId)} are vetted on synchronizer $domainId",
+        getVettingState(domainId, AuthorizedState).map { vettingState =>
           val packagesNotVetted = dars.filterNot(dar =>
             vettingState.mapping.packages.exists(_.packageId == dar.packageId)
           )
           if (packagesNotVetted.nonEmpty) {
             throw Status.NOT_FOUND
               .withDescription(
-                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on domain $domainId"
+                s"Dar ${packagesNotVetted.map(_.packageId)} are not vetted on synchronizer $domainId"
               )
               .asRuntimeException
           }
@@ -181,52 +186,46 @@ trait ParticipantAdminDarsConnection {
   def listVettedPackages(
       participantId: ParticipantId,
       domainId: SynchronizerId,
-  )(implicit tc: TraceContext): Future[Seq[ListVettedPackagesResult]] = {
-    listVettedPackages(participantId, Some(domainId))
+      topologyTransactionType: TopologyTransactionType,
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[VettedPackages]]] = {
+    listVettedPackages(participantId, Some(domainId), topologyTransactionType)
   }
 
   def listVettedPackages(
       participantId: ParticipantId,
       domainId: Option[SynchronizerId],
-  )(implicit tc: TraceContext): Future[Seq[ListVettedPackagesResult]] = {
-    runCmd(
+      topologyTransactionType: TopologyTransactionType,
+  )(implicit tc: TraceContext): Future[Seq[TopologyResult[VettedPackages]]] = {
+    runCommand(
+      domainId
+        .map(TopologyStoreId.SynchronizerStore(_))
+        .getOrElse(TopologyStoreId.AuthorizedStore),
+      topologyTransactionType,
+    )(
       TopologyAdminCommands.Read.ListVettedPackages(
-        BaseQuery(
-          store = domainId
-            .map(TopologyStoreId.Synchronizer(_))
-            .getOrElse(TopologyStoreId.Authorized),
-          proposals = false,
-          timeQuery = TimeQuery.HeadState,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
+        _,
         filterParticipant = participantId.filterString,
       )
     )
   }
 
   def getVettingState(
-      domain: SynchronizerId
+      domain: SynchronizerId,
+      topologyTransactionType: TopologyTransactionType,
   )(implicit tc: TraceContext): Future[TopologyResult[VettedPackages]] = {
-    getVettingState(Some(domain))
+    getVettingState(Some(domain), topologyTransactionType)
   }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   def getVettingState(
-      domain: Option[SynchronizerId]
+      domain: Option[SynchronizerId],
+      topologyTransactionType: TopologyTransactionType,
   )(implicit tc: TraceContext): Future[TopologyResult[VettedPackages]] = {
     for {
       participantId <- getParticipantId()
-      vettedState <- listVettedPackages(participantId, domain)
+      vettedState <- listVettedPackages(participantId, domain, topologyTransactionType)
     } yield {
-      vettedState
-        .map(result =>
-          TopologyResult(
-            result.context,
-            result.item,
-          )
-        ) match {
+      vettedState match {
         case Seq() =>
           throw Status.NOT_FOUND
             .withDescription(s"No package vetting state found for domain $domain")

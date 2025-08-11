@@ -5,10 +5,6 @@ on:
       - 'main'
       - 'release-line-**'
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
 permissions:
   id-token: write # Required for GCP Workload Identity for failure notifications
   contents: read
@@ -24,7 +20,7 @@ jobs:
   publish_docs:
     if: github.ref == 'refs/heads/main'
     needs: ci
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
 
     permissions:
       pages: write      # to deploy to Pages

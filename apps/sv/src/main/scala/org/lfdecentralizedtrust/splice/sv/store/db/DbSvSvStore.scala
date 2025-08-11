@@ -40,6 +40,7 @@ class DbSvSvStore(
 ) extends DbAppStore(
       storage,
       DbSvSvStore.tableName,
+      interfaceViewsTableNameOpt = None,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(

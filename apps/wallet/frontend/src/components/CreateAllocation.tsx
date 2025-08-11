@@ -5,17 +5,19 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useMutation } from '@tanstack/react-query';
 import {
   AllocateAmuletRequest,
-  AllocateAmuletRequestSettlement,
+  AllocateAmuletRequestSettlementSettlementRef,
   AllocateAmuletRequestTransferLeg,
-} from 'wallet-openapi';
+} from '@lfdecentralizedtrust/wallet-openapi';
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from '@mui/material';
 import { DisableConditionally } from '@lfdecentralizedtrust/splice-common-frontend';
 import BftAnsField from './BftAnsField';
 import AmountInput from './AmountInput';
 import { Add, Remove } from '@mui/icons-material';
-import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
-import dayjs from 'dayjs';
-import { getUTCWithOffset } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import {
+  DAML_TIMESTAMP_FORMAT,
+  damlTimestampToOpenApiTimestamp,
+  isValidDamlTimestamp,
+} from '../utils/timestampConversion';
 
 const CreateAllocation: React.FC = () => {
   const { createAllocation } = useWalletClient();
@@ -130,51 +132,49 @@ const CreateAllocation: React.FC = () => {
                 })
               }
             />
-            <Typography variant="h6">Settle before</Typography>
-            <DesktopDateTimePicker
-              label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={dayjs((allocation.settlement.settle_before || 0) / 1000)}
-              format="YYYY-MM-DD HH:mm"
-              minDate={dayjs()}
-              readOnly={false}
-              onChange={newValue => {
-                if (newValue) {
-                  const micros = newValue.second(0).unix() * 1000 * 1000;
-                  setAllocation({
-                    ...allocation,
-                    settlement: { ...allocation.settlement, settle_before: micros },
-                  });
-                }
-              }}
-              slotProps={{
-                textField: {
-                  id: 'create-allocation-settlement-settle-before',
-                },
-              }}
-              closeOnSelect
+            {/*For these timestamp fields: a date picker doesn't work because
+            daml Time has microsecond precision, while javascript only millisecond precision.
+            Furthermore, the timestamps need to match that of an original allocation request,
+            so they will either be copy-pasted or (in the near future) auto-filled.
+            Therefore, a TextField where we validate the timestamp is correctly formatted makes more sense.*/}
+            <Typography variant="h6">Requested at ({DAML_TIMESTAMP_FORMAT})</Typography>
+            <TextField
+              id="create-allocation-settlement-requested-at"
+              placeholder={DAML_TIMESTAMP_FORMAT}
+              value={allocation.settlement.requested_at || ''}
+              error={!isValidDamlTimestamp(allocation.settlement.requested_at)}
+              onChange={event =>
+                setAllocation({
+                  ...allocation,
+                  settlement: { ...allocation.settlement, requested_at: event.target.value },
+                })
+              }
             />
-            <Typography variant="h6">Allocate before</Typography>
-            <DesktopDateTimePicker
-              label={`Enter time in local timezone (${getUTCWithOffset()})`}
-              value={dayjs((allocation.settlement.allocate_before || 0) / 1000)}
-              format="YYYY-MM-DD HH:mm"
-              minDate={dayjs()}
-              readOnly={false}
-              onChange={newValue => {
-                if (newValue) {
-                  const micros = newValue.second(0).unix() * 1000 * 1000;
-                  setAllocation({
-                    ...allocation,
-                    settlement: { ...allocation.settlement, allocate_before: micros },
-                  });
-                }
-              }}
-              slotProps={{
-                textField: {
-                  id: 'create-allocation-settlement-allocate-before',
-                },
-              }}
-              closeOnSelect
+            <Typography variant="h6">Settle before ({DAML_TIMESTAMP_FORMAT})</Typography>
+            <TextField
+              id="create-allocation-settlement-settle-before"
+              placeholder={DAML_TIMESTAMP_FORMAT}
+              value={allocation.settlement.settle_before || ''}
+              error={!isValidDamlTimestamp(allocation.settlement.settle_before)}
+              onChange={event =>
+                setAllocation({
+                  ...allocation,
+                  settlement: { ...allocation.settlement, settle_before: event.target.value },
+                })
+              }
+            />
+            <Typography variant="h6">Allocate before ({DAML_TIMESTAMP_FORMAT})</Typography>
+            <TextField
+              id="create-allocation-settlement-allocate-before"
+              placeholder={DAML_TIMESTAMP_FORMAT}
+              value={allocation.settlement.allocate_before || ''}
+              error={!isValidDamlTimestamp(allocation.settlement.allocate_before)}
+              onChange={event =>
+                setAllocation({
+                  ...allocation,
+                  settlement: { ...allocation.settlement, allocate_before: event.target.value },
+                })
+              }
             />
             <Typography variant="h6">Settlement meta</Typography>
             <MetaEditor
@@ -228,19 +228,28 @@ const CreateAllocation: React.FC = () => {
 };
 
 interface PartialAllocateAmuletRequest {
-  settlement: Partial<AllocateAmuletRequestSettlement>;
+  settlement: {
+    executor: string;
+    settlement_ref: AllocateAmuletRequestSettlementSettlementRef;
+    // dates as strings as opposed to numbers, they're converted once pressing Send.
+    // the user will type (likely copy-paste, or auto-fill) a string with DAML_TIMESTAMP_FORMAT
+    requested_at: string;
+    allocate_before: string;
+    settle_before: string;
+    meta?: { [key: string]: string };
+  };
   transfer_leg_id: string;
   transfer_leg: Partial<AllocateAmuletRequestTransferLeg>;
 }
 
 function emptyForm(): PartialAllocateAmuletRequest {
-  const nowMicros = dayjs().unix() * 1000 * 1000;
   return {
     settlement: {
       executor: '',
       meta: {},
-      allocate_before: nowMicros,
-      settle_before: nowMicros,
+      requested_at: '',
+      allocate_before: '',
+      settle_before: '',
       settlement_ref: {
         id: '',
         cid: undefined,
@@ -259,11 +268,14 @@ function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletReq
   if (
     !partial.settlement.executor ||
     !partial.settlement.settlement_ref?.id ||
-    !partial.settlement.allocate_before ||
-    !partial.settlement.settle_before ||
     !partial.transfer_leg_id ||
     !partial.transfer_leg.amount ||
-    !partial.transfer_leg.receiver
+    !partial.transfer_leg.receiver ||
+    ![
+      partial.settlement.allocate_before,
+      partial.settlement.settle_before,
+      partial.settlement.allocate_before,
+    ].every(isValidDamlTimestamp)
   ) {
     return null;
   }
@@ -271,8 +283,9 @@ function validatedForm(partial: PartialAllocateAmuletRequest): AllocateAmuletReq
     settlement: {
       executor: partial.settlement.executor,
       meta: partial.settlement.meta,
-      allocate_before: partial.settlement.allocate_before,
-      settle_before: partial.settlement.settle_before,
+      requested_at: damlTimestampToOpenApiTimestamp(partial.settlement.requested_at),
+      allocate_before: damlTimestampToOpenApiTimestamp(partial.settlement.allocate_before),
+      settle_before: damlTimestampToOpenApiTimestamp(partial.settlement.settle_before),
       settlement_ref: {
         id: partial.settlement.settlement_ref.id,
         cid: partial.settlement.settlement_ref.cid,

@@ -1,0 +1,51 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Api.Token.Test.DummyTwoInterfaces where
+
+import Splice.Api.Token.MetadataV1 qualified as Api.Token.MetadataV1
+import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
+import Splice.Api.Token.AllocationV1 qualified as Api.Token.AllocationV1
+import Splice.Api.Token.AllocationRequestV1 qualified as Api.Token.AllocationRequestV1
+import DA.TextMap qualified as TextMap
+
+template DummyTwoInterfaces
+  with
+    owner : Party
+    issuer : Party
+    amount : Decimal
+    date : Time
+  where
+    signatory owner, issuer
+
+    interface instance Api.Token.HoldingV1.Holding for DummyTwoInterfaces where
+      view = Api.Token.HoldingV1.HoldingView with
+        owner
+        instrumentId = Api.Token.HoldingV1.InstrumentId with admin = issuer; id = "DTI"
+        amount = amount
+        lock = None
+        meta = Api.Token.MetadataV1.Metadata
+          with
+            values = TextMap.fromList [
+              ("test", "test")
+              ]
+
+    interface instance Api.Token.AllocationRequestV1.AllocationRequest for DummyTwoInterfaces where
+          view = Api.Token.AllocationRequestV1.AllocationRequestView with
+            settlement = Api.Token.AllocationV1.SettlementInfo with
+              executor = issuer
+              requestedAt = date
+              settlementRef = Api.Token.AllocationV1.Reference with
+                id = "DTI"
+                cid = None
+              allocateBefore = date
+              settleBefore = date
+              meta = Api.Token.MetadataV1.emptyMetadata
+            transferLegs = TextMap.empty
+            meta = Api.Token.MetadataV1.emptyMetadata
+
+          allocationRequest_RejectImpl _self _extraArgs =
+            pure Api.Token.MetadataV1.ChoiceExecutionMetadata with meta = Api.Token.MetadataV1.emptyMetadata
+
+          allocationRequest_WithdrawImpl _self _extraArgs =
+            pure Api.Token.MetadataV1.ChoiceExecutionMetadata with meta = Api.Token.MetadataV1.emptyMetadata

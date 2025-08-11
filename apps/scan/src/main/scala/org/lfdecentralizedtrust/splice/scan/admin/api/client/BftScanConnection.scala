@@ -73,6 +73,7 @@ import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.retry.{ErrorKind, ExceptionRetryPolicy}
 import io.circe.Json
 import io.grpc.Status
@@ -80,6 +81,7 @@ import org.apache.pekko.http.scaladsl.model.*
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.util.ByteString
+import org.lfdecentralizedtrust.splice.admin.api.client.commands.HttpCommandException
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.Allocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationinstructionv1
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.transferinstructionv1
@@ -729,6 +731,13 @@ object BftScanConnection {
                 Future.successful(BftScanConnection.ExceptionFailureResponse(failure))
             }
           )
+      case Failure(unexpected: HttpCommandException) =>
+        Future.successful(
+          BftScanConnection.HttpFailureResponse(
+            unexpected.status,
+            Json.obj("message" -> Json.fromString(unexpected.message)),
+          )
+        )
       case Failure(error) =>
         Future.successful(BftScanConnection.ExceptionFailureResponse(error))
     }
@@ -957,8 +966,8 @@ object BftScanConnection {
     )(implicit
         tc: TraceContext
     ): Future[(Seq[(Uri, (Throwable, SvName))], Seq[(Uri, (SingleScanConnection, SvName))])] = {
-      scans
-        .traverse { scan =>
+      MonadUtil
+        .sequentialTraverse(scans) { scan =>
           logger.info(s"Attempting to connect to Scan: $scan.")
           connectionBuilder(scan.publicUrl)
             .transformWith { result =>
@@ -1166,8 +1175,8 @@ object BftScanConnection {
           },
         loggerFactory.getTracedLogger(classOf[BftScanConnection]),
       )
-      bft <- scans
-        .traverse(scan =>
+      bft <- MonadUtil
+        .sequentialTraverse(scans)(scan =>
           builder(scan.publicUrl, amuletRulesCacheTimeToLive).transformWith {
             case Success(conn) => Future.successful(Right(conn))
             case Failure(err) => Future.successful(Left(scan.publicUrl -> err))

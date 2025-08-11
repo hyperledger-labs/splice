@@ -6,6 +6,7 @@ import { config } from 'splice-pulumi-common';
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
 import { clusterBaseDomain, clusterBasename, monitoringConfig } from './config';
+import { installExtraCustomResources } from './extraCustomResources';
 import {
   getNotificationChannel,
   installCloudSQLMaintenanceUpdateAlerts,
@@ -23,10 +24,15 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const istio = configureIstio(network.ingressNs, ingressIp, network.publicIngressIp.address);
+const istio = configureIstio(
+  network.ingressNs,
+  ingressIp,
+  network.cometbftIngressIp.address,
+  network.publicIngressIp.address
+);
 
 // Ensures that images required from Quay for observability can be pulled
-const observabilityDependsOn = [network, istio];
+const observabilityDependsOn = istio.concat([network]);
 configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
@@ -39,6 +45,8 @@ if (enableAlerts && !clusterIsResetPeriodically) {
 istioMonitoring(network.ingressNs, []);
 
 configureStorage();
+
+installExtraCustomResources();
 
 let configuredAuth0;
 if (config.envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {

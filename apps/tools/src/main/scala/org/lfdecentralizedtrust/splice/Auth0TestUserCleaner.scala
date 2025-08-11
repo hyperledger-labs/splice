@@ -101,7 +101,9 @@ object Auth0TestUserCleaner {
       clientSecret,
       loggerFactory,
       new Auth0Util.Auth0Retry {
-        override def retryAuth0CallsForTests[T](f: => T)(implicit tc: TraceContext): T =
+        override def retryAuth0CallsForTests[T](f: => T)(recover: Recover[T])(implicit
+            tc: TraceContext
+        ): T =
           retryAuth0Calls(f)
       },
     )

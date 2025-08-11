@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.scan.store
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.caching.ScaffeineCache
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -31,12 +30,8 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.externalpartyamuletru
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient
-import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStore.{CacheKey, CacheValue}
-import org.lfdecentralizedtrust.splice.scan.store.db.{
-  DbScanStore,
-  DbScanStoreMetrics,
-  ScanAggregator,
-}
+import org.lfdecentralizedtrust.splice.scan.config.{CacheConfig, ScanCacheConfig}
+import org.lfdecentralizedtrust.splice.scan.store.db.{DbScanStoreMetrics, ScanAggregator}
 import org.lfdecentralizedtrust.splice.store.{
   Limit,
   MultiDomainAcsStore,
@@ -49,13 +44,13 @@ import org.lfdecentralizedtrust.splice.store.{
 import org.lfdecentralizedtrust.splice.util.{Contract, ContractWithState}
 
 import java.time.Instant
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class CachingScanStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     store: ScanStore,
-    svNodeStateCacheTtl: NonNegativeFiniteDuration,
+    cacheConfig: ScanCacheConfig,
     storeMetrics: DbScanStoreMetrics,
 )(implicit
     override protected val ec: ExecutionContext
@@ -67,35 +62,29 @@ class CachingScanStore(
 
   override def key: ScanStore.Key = store.key
 
-  private val totalAmuletBalanceCache
-      : ScaffeineCache.TracedAsyncLoadingCache[Future, CacheKey, CacheValue] = {
-    ScaffeineCache.buildTracedAsync[Future, DbScanStore.CacheKey, DbScanStore.CacheValue](
-      Scaffeine()
-        .maximumSize(1000),
-      implicit tc => key => store.getTotalAmuletBalance(key),
-      metrics = Some(storeMetrics.totalAmuletBalanceCache),
-    )(logger, "amuletBalanceCache")
-  }
+  private val cacheOfCaches = scala.collection.concurrent
+    .TrieMap[String, ScaffeineCache.TracedAsyncLoadingCache[Future, ?, ?]]()
 
-  private val svNodeStateCache
-      : ScaffeineCache.TracedAsyncLoadingCache[Future, Unit, Seq[SvNodeState]] = {
-    ScaffeineCache.buildTracedAsync[Future, Unit, Seq[SvNodeState]](
-      Scaffeine()
-        .expireAfterWrite(svNodeStateCacheTtl.asFiniteApproximation),
-      implicit tc => _ => store.listSvNodeStates(),
-      metrics = Some(storeMetrics.svNodeStateCache),
-    )(logger, "svNodeStateCache")
-  }
+  override protected[store] def domainMigrationId: Long = store.domainMigrationId
 
   // TODO(#800) remove when amulet expiry works again
   override def getTotalAmuletBalance(
       asOfEndOfRound: Long
   )(implicit tc: TraceContext): Future[BigDecimal] = {
-    totalAmuletBalanceCache.get(asOfEndOfRound)
+    getCache(
+      "totalAmuletBalance",
+      cacheConfig.totalAmuletBalance,
+      store.getTotalAmuletBalance _,
+    ).get(asOfEndOfRound)
   }
 
-  override def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] =
-    svNodeStateCache.get(())
+  override def listSvNodeStates()(implicit tc: TraceContext): Future[Seq[SvNodeState]] = {
+    getCache(
+      "svNodeStateCache",
+      cacheConfig.svNodeState,
+      (_: Unit) => store.listSvNodeStates(),
+    ).get(())
+  }
 
   override def aggregate()(implicit tc: TraceContext): Future[Option[ScanAggregator.RoundTotals]] =
     store.aggregate()
@@ -103,72 +92,141 @@ class CachingScanStore(
   override def backFillAggregates()(implicit tc: TraceContext): Future[Option[Long]] =
     store.backFillAggregates()
 
-  override protected[store] def domainMigrationId: Long = store.domainMigrationId
-
   override def lookupAmuletRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]] =
-    store.lookupAmuletRules()
+    getCache(
+      "lookupAmuletRules",
+      cacheConfig.amuletRules,
+      (_: Unit) => store.lookupAmuletRules(),
+    ).get(())
 
   override def getExternalPartyAmuletRules()(implicit
       tc: TraceContext
   ): Future[ContractWithState[ExternalPartyAmuletRules.ContractId, ExternalPartyAmuletRules]] =
-    store.getExternalPartyAmuletRules()
+    getCache(
+      "externalPartyAmuletRules",
+      cacheConfig.amuletRules,
+      (_: Unit) => store.getExternalPartyAmuletRules(),
+    ).get(())
 
   override def lookupAnsRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[AnsRules.ContractId, AnsRules]]] = store.lookupAnsRules()
+  ): Future[Option[ContractWithState[AnsRules.ContractId, AnsRules]]] =
+    getCache(
+      "lookupAnsRules",
+      cacheConfig.ansRules,
+      (_: Unit) => store.lookupAnsRules(),
+    ).get(())
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
-    store.getTotalRewardsCollectedEver()
+    getCache(
+      "totalRewardsCollected",
+      cacheConfig.totalRewardsCollected,
+      (_: Unit) => store.getTotalRewardsCollectedEver(),
+    ).get(())
 
   override def getRewardsCollectedInRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[BigDecimal] = store.getRewardsCollectedInRound(round)
+  ): Future[BigDecimal] = {
+    getCache(
+      "rewardsCollectedInRound",
+      cacheConfig.rewardsCollectedInRound,
+      store.getRewardsCollectedInRound,
+    ).get(round)
+  }
 
   override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
       tc: TraceContext
-  ): Future[BigDecimal] = store.getWalletBalance(partyId, asOfEndOfRound)
+  ): Future[BigDecimal] = {
+    getCache(
+      "walletBalance",
+      cacheConfig.walletBalance,
+      (store.getWalletBalance _) tupled,
+    ).get((partyId -> asOfEndOfRound))
+  }
 
   override def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[OpenMiningRoundTxLogEntry] = store.getAmuletConfigForRound(round)
+  ): Future[OpenMiningRoundTxLogEntry] =
+    getCache(
+      "getAmuletConfigForRound",
+      cacheConfig.amuletConfigForRound,
+      store.getAmuletConfigForRound,
+    ).get(round)
 
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
-    store.getRoundOfLatestData()
+  override def lookupRoundOfLatestData()(implicit
+      tc: TraceContext
+  ): Future[Option[(Long, Instant)]] =
+    getCache(
+      "roundOfLatestData",
+      cacheConfig.roundOfLatestData,
+      (_: Unit) => store.lookupRoundOfLatestData(),
+    ).get(())
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = store.getTopProvidersByAppRewards(asOfEndOfRound, limit)
+  ): Future[Seq[(PartyId, BigDecimal)]] = {
+    getCache(
+      "topProvidersByAppRewards",
+      cacheConfig.topProvidersByAppRewards,
+      store.getTopProvidersByAppRewards _ tupled,
+    ).get((asOfEndOfRound, limit))
+  }
 
   override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] =
-    store.getTopValidatorsByValidatorRewards(asOfEndOfRound, limit)
+    getCache(
+      "topValidatorsByValidatorRewards",
+      cacheConfig.topValidators,
+      store.getTopValidatorsByValidatorRewards _ tupled,
+    ).get((asOfEndOfRound, limit))
 
   override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] =
-    store.getTopValidatorsByPurchasedTraffic(asOfEndOfRound, limit)
+    getCache(
+      "topValidatorsByPurchasedTraffic",
+      cacheConfig.topValidators,
+      store.getTopValidatorsByPurchasedTraffic _ tupled,
+    ).get((asOfEndOfRound, limit))
 
   override def getTopValidatorLicenses(limit: Limit)(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
-    store.getTopValidatorLicenses(limit)
+    getCache(
+      "topValidatorLicenses",
+      cacheConfig.topValidators,
+      store.getTopValidatorLicenses,
+    ).get(limit)
 
   override def getValidatorLicenseByValidator(validator: Vector[PartyId])(implicit
       tc: TraceContext
   ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
-    store.getValidatorLicenseByValidator(validator)
+    getCache(
+      "validatorLicenseByValidator",
+      cacheConfig.validatorLicenseByValidator,
+      store.getValidatorLicenseByValidator,
+    ).get(validator)
 
   override def getTotalPurchasedMemberTraffic(memberId: Member, synchronizerId: SynchronizerId)(
       implicit tc: TraceContext
-  ): Future[Long] = store.getTotalPurchasedMemberTraffic(memberId, synchronizerId)
+  ): Future[Long] =
+    getCache(
+      "totalPurchasedMemberTraffic",
+      cacheConfig.totalPurchasedMemberTraffic,
+      store.getTotalPurchasedMemberTraffic _ tupled,
+    ).get((memberId, synchronizerId))
 
   override def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
-    store.lookupFeaturedAppRight(providerPartyId)
+    getCache(
+      "featuredAppRight",
+      cacheConfig.cachedByParty,
+      store.lookupFeaturedAppRight,
+    ).get(providerPartyId)
 
   override def listEntries(namePrefix: String, now: CantonTimestamp, limit: Limit)(implicit
       tc: TraceContext
@@ -188,12 +246,20 @@ class CachingScanStore(
   override def lookupTransferPreapprovalByParty(partyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[TransferPreapproval.ContractId, TransferPreapproval]]] =
-    store.lookupTransferPreapprovalByParty(partyId)
+    getCache(
+      "lookupTransferPreapprovalByParty",
+      cacheConfig.cachedByParty,
+      store.lookupTransferPreapprovalByParty,
+    ).get(partyId)
 
   override def lookupTransferCommandCounterByParty(partyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[TransferCommandCounter.ContractId, TransferCommandCounter]]] =
-    store.lookupTransferCommandCounterByParty(partyId)
+    getCache(
+      "lookupTransferCommandCounterByParty",
+      cacheConfig.cachedByParty,
+      store.lookupTransferCommandCounterByParty,
+    ).get(partyId)
 
   override def listTransactions(
       pageEndEventId: Option[String],
@@ -208,15 +274,30 @@ class CachingScanStore(
 
   override def getAggregatedRounds()(implicit
       tc: TraceContext
-  ): Future[Option[ScanAggregator.RoundRange]] = store.getAggregatedRounds()
+  ): Future[Option[ScanAggregator.RoundRange]] =
+    getCache(
+      "aggregatedRounds",
+      cacheConfig.aggregatedRounds,
+      (_: Unit) => store.getAggregatedRounds(),
+    ).get(())
 
   override def getRoundTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
-  ): Future[Seq[ScanAggregator.RoundTotals]] = store.getRoundTotals(startRound, endRound)
+  ): Future[Seq[ScanAggregator.RoundTotals]] =
+    getCache(
+      "roundTotals",
+      cacheConfig.roundTotals,
+      store.getRoundTotals _ tupled,
+    ).get((startRound, endRound))
 
   override def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
-  ): Future[Seq[ScanAggregator.RoundPartyTotals]] = store.getRoundPartyTotals(startRound, endRound)
+  ): Future[Seq[ScanAggregator.RoundPartyTotals]] =
+    getCache(
+      "roundPartyTotals",
+      cacheConfig.roundTotals,
+      store.getRoundPartyTotals _ tupled,
+    ).get((startRound, endRound))
 
   override def lookupLatestTransferCommandEvents(sender: PartyId, nonce: Long, limit: Int)(implicit
       tc: TraceContext
@@ -242,40 +323,84 @@ class CachingScanStore(
       effectiveTo: Option[String],
       limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[DsoRules_CloseVoteRequestResult]] =
-    store.listVoteRequestResults(
-      actionName,
-      accepted,
-      requester,
-      effectiveFrom,
-      effectiveTo,
-      limit,
+    getCache(
+      "listVoteRequestResults",
+      cacheConfig.voteRequests,
+      store.listVoteRequestResults _ tupled,
+    ).get(
+      (
+        actionName,
+        accepted,
+        requester,
+        effectiveFrom,
+        effectiveTo,
+        limit,
+      )
     )
 
   override def listVoteRequestsByTrackingCid(
       voteRequestCids: Seq[VoteRequest.ContractId],
       limit: Limit,
   )(implicit tc: TraceContext): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] =
-    store.listVoteRequestsByTrackingCid(
-      voteRequestCids,
-      limit,
-    )
+    getCache(
+      "listVoteRequestsByTrackingCid",
+      cacheConfig.voteRequests,
+      store.listVoteRequestsByTrackingCid _ tupled,
+    ).get((voteRequestCids, limit))
 
   override def lookupVoteRequest(contractId: VoteRequest.ContractId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] = store.lookupVoteRequest(
-    contractId
-  )
+  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] =
+    getCache(
+      "lookupVoteRequest",
+      cacheConfig.voteRequests,
+      store.lookupVoteRequest,
+    ).get(contractId)
 
   override def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[SvNodeState.ContractId, SvNodeState]]] =
-    store.lookupSvNodeState(svPartyId)
+    getCache(
+      "lookupSvNodeState",
+      cacheConfig.svNodeState,
+      store.lookupSvNodeState,
+    ).get(svPartyId)
 
   override def domains: SynchronizerStore = store.domains
 
   override def multiDomainAcsStore: MultiDomainAcsStore = store.multiDomainAcsStore
 
   override def updateHistory: UpdateHistory = store.updateHistory
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  private def getCache[Key, Value](
+      cacheName: String,
+      cacheConfig: CacheConfig,
+      loader: Key => Future[Value],
+  )(implicit tc: TraceContext) = {
+    cacheOfCaches
+      .getOrElseUpdate(
+        cacheName,
+        blocking {
+          synchronized {
+            // the function to provide the value if the key is not present can in theory be called multiple times by concurrent threads.
+            // that would cause the same gauges to be created multiple times
+            cacheOfCaches.getOrElseUpdate(
+              cacheName,
+              ScaffeineCache.buildTracedAsync[Future, Key, Value](
+                Scaffeine()
+                  .expireAfterWrite(cacheConfig.ttl.asFiniteApproximation)
+                  .maximumSize(cacheConfig.maxSize),
+                _ => key => loader(key),
+                metrics =
+                  storeMetrics.registerNewCacheMetrics(cacheName).map(Some(_)).onShutdown(None),
+              )(logger, cacheName),
+            )
+          }
+        },
+      )
+      .asInstanceOf[ScaffeineCache.TracedAsyncLoadingCache[Future, Key, Value]]
+  }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     Seq(

@@ -41,8 +41,9 @@ function check_patterns_locally() {
     '^[^:]+package-lock\.json:.*"integrity"' # appears in hashes
     'Preflight.*Test.*\.scala:.*s"https://cns' # hostnames in preflights
     'Test.*\.scala:.*da-cn-splice' # GCP project we use for KMS keys used in integration tests
-    'cluster/images/splice-test-temp-runner-hook/index.js' # gha-runner-hook copied over
-    'apps/app/src/test/resources/dumps/.*-identity-dump.json' # encoded snapshots can randomly contain 'cn'
+    'cluster/images/splice-test-temp-runner-hook/index\.js' # gha-runner-hook copied over
+    'apps/app/src/test/resources/dumps/.*-identity-dump\.json' # encoded snapshots can randomly contain 'cn'
+    'apps/app/src/test/resources/.*\.sql' # sql queries must use the names in the DB
     'token-standard/CHANGELOG.md'
     'Canton Network Token Standard'
     'stop-frontends\.sh'

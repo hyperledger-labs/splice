@@ -172,7 +172,10 @@ class DomainMigrationInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        Some(localSynchronizerNode),
       )
       _ <- SetupUtil
         .grantSvUserRightActAsDso(
@@ -196,6 +199,7 @@ class DomainMigrationInitializer(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         decentralizedSynchronizerId,
         svAutomation.connection,
+        loggerFactory,
       )
       dsoAutomationService =
         new SvDsoAutomationService(
@@ -229,20 +233,18 @@ class DomainMigrationInitializer(
         decentralizedSynchronizerId,
         dsoAutomationService,
         svAutomation,
-        None,
         skipTrafficReconciliationTriggers = true,
-        packageVersionSupport = packageVersionSupport,
       )
-      _ <- migrationDump.participantUsers match {
-        case Some(participantUsersData) => {
-          logger.info("Restoring participant users data")
-          new ParticipantUsersDataRestorer(
-            svAutomation.connection,
-            loggerFactory,
-          ).restoreParticipantUsersData(participantUsersData)
-        }
-        case None => Future.unit
-      }
+      _ <- new ParticipantUsersDataRestorer(
+        svAutomation.connection,
+        loggerFactory,
+      ).restoreParticipantUsersData(migrationDump.participantUsers)
+      _ <- establishInitialRound(
+        readOnlyConnection,
+        upgradesConfig,
+        packageVersionSupport,
+        svStore.key.svParty,
+      )
     } yield (
       decentralizedSynchronizerId,
       dsoPartyHosting,

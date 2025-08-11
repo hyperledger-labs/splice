@@ -23,6 +23,8 @@ jobs:
       - name: Check if static only
         uses: ./.github/actions/tests/skip_on_static
         id: skip
+        with:
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -36,8 +38,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: ui_tests
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          oss_only: true
 
       - name: Run UI tests
         if: steps.skip.outputs.skip != 'true'
@@ -57,7 +58,7 @@ jobs:
         if: steps.skip.outputs.skip != 'true'
         uses: ./.github/actions/sbt/post_sbt
         with:
-          cache_version: 4
+          cache_version: 5
           setup_sbt_cache_hits: ${{ steps.setup.outputs.sbt_cache_hits }}
 
       - name: Upload logs

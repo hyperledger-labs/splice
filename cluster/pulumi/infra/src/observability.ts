@@ -14,13 +14,14 @@ import {
   CLUSTER_NAME,
   clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
+  commandScriptPath,
   ENABLE_COMETBFT_PRUNING,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   isMainNet,
   loadTesterConfig,
-  MOCK_SPLICE_ROOT,
+  ObservabilityReleaseName,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
@@ -135,20 +136,22 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     {
       metadata: {
         name: 'observability',
-        labels: { 'istio-injection': 'enabled' },
+        // istio really doesn't play well with prometheus
+        // it seems to  modify the scraping calls from prometheus and change labels/include extra time series that make no sense
+        labels: { 'istio-injection': 'disabled' },
       },
     },
     { dependsOn }
   );
   const namespaceName = namespace.metadata.name;
   // If the stack version is updated the crd version might need to be upgraded as well, check the release notes https://artifacthub.io/packages/helm/prometheus-community/kube-prometheus-stack
-  const stackVersion = '67.3.1';
-  const prometheusStackCrdVersion = '0.79.0';
+  const stackVersion = '75.9.0';
+  const prometheusStackCrdVersion = '0.83.0';
   const adminPassword = grafanaKeysFromSecret().adminPassword;
   const prometheusStack = new k8s.helm.v3.Release(
     'observability-metrics',
     {
-      name: 'prometheus-grafana-monitoring',
+      name: ObservabilityReleaseName,
       chart: 'kube-prometheus-stack',
       version: stackVersion,
       namespace: namespaceName,
@@ -539,8 +542,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     }
   );
 
-  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/infra/prometheus-crd-update.sh`;
+  const path = commandScriptPath('cluster/pulumi/infra/prometheus-crd-update.sh');
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {
@@ -782,7 +784,10 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
-            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
+            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml').replaceAll(
+              '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
+              monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
+            ),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
             ...(enableMiningRoundAlert
               ? {
@@ -799,6 +804,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
+                monitoringConfig.alerting.alerts.svNames
+                  .map(p => `,member!~"PAR::${p}::.*"`)
+                  .join('')
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

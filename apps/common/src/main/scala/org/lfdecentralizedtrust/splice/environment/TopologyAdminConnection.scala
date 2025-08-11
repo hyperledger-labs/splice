@@ -9,14 +9,17 @@ import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Init.GetIdResult
 import com.digitalasset.canton.admin.api.client.commands.{
+  GrpcAdminCommand,
   SynchronizerTimeCommands,
   TopologyAdminCommands,
   VaultAdminCommands,
 }
+import com.digitalasset.canton.admin.api.client.data.topology
 import com.digitalasset.canton.admin.api.client.data.topology.{
   BaseResult,
   ListNamespaceDelegationResult,
   ListOwnerToKeyMappingResult,
+  ListSynchronizerParametersStateResult,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
@@ -59,19 +62,22 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
-import io.grpc.Status
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 import org.lfdecentralizedtrust.splice.admin.api.client.GrpcClientMetrics
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.RetryProvider.QuietNonRetryableException
-import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.{
+  AuthorizedState,
+  ProposalSignedByOwnKey,
+}
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   AuthorizedStateChanged,
   TopologyTransactionType,
 }
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 
@@ -153,6 +159,25 @@ abstract class TopologyAdminConnection(
       )
     )
 
+  def listPartyToParticipantFromAllStores(
+      filterParty: String
+  )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] = {
+    runCmd(
+      TopologyAdminCommands.Read.ListPartyToParticipant(
+        BaseQuery(
+          store = None,
+          proposals = false,
+          timeQuery = TimeQuery.HeadState,
+          ops = Some(TopologyChangeOp.Replace),
+          filterSigningKey = "",
+          protocolVersion = None,
+        ),
+        filterParty,
+        "",
+      )
+    ).map(_.map(result => TopologyResult(result.context, result.item)))
+  }
+
   def listPartyToParticipant(
       store: Option[TopologyStoreId] = None,
       // list only active (non-removed) mappings by default; this matches the Canton console defaults
@@ -160,22 +185,22 @@ abstract class TopologyAdminConnection(
       filterParty: String = "",
       filterParticipant: String = "",
       timeQuery: TimeQuery = TimeQuery.HeadState,
-      proposals: TopologyTransactionType = AuthorizedState,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipant]]] = {
-    runCmd(
+    runCommand(
+      store.getOrElse(
+        TopologyStoreId.AuthorizedStore
+      ),
+      topologyTransactionType,
+      timeQuery,
+      operation,
+    )(
       TopologyAdminCommands.Read.ListPartyToParticipant(
-        BaseQuery(
-          store.map(internalStoreIdToProto),
-          proposals = proposals.proposals,
-          timeQuery,
-          operation,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
+        _,
         filterParty,
         filterParticipant,
       )
-    ).map(_.map(r => TopologyResult(r.context, r.item)))
+    )
   }
 
   def listPartyToKey(
@@ -183,33 +208,33 @@ abstract class TopologyAdminConnection(
       filterStore: TopologyStoreId,
       filterParty: Option[PartyId] = None,
       timeQuery: TimeQuery = TimeQuery.HeadState,
-      proposals: TopologyTransactionType = AuthorizedState,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToKeyMapping]]] = {
-    runCmd(
+    runCommand(
+      filterStore,
+      topologyTransactionType,
+      timeQuery,
+      operation,
+    ) { baseQuery =>
       TopologyAdminCommands.Read.ListPartyToKeyMapping(
-        BaseQuery(
-          store = filterStore,
-          proposals = proposals.proposals,
-          timeQuery,
-          operation,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
+        baseQuery,
         filterParty.fold("")(_.toProtoPrimitive),
       )
-    ).map(_.map(r => TopologyResult(r.context, r.item)))
+    }
   }
 
   private def findPartyToParticipant(
       synchronizerId: SynchronizerId,
       partyId: PartyId,
       operation: Option[TopologyChangeOp],
+      topologyTransactionType: TopologyTransactionType,
   )(implicit traceContext: TraceContext): OptionT[Future, TopologyResult[PartyToParticipant]] =
     OptionT(
       listPartyToParticipant(
         store = Some(TopologyStoreId.SynchronizerStore(synchronizerId)),
         filterParty = partyId.filterString,
         operation = operation,
+        topologyTransactionType = topologyTransactionType,
       ).map { txs =>
         txs.headOption
       }
@@ -220,8 +245,9 @@ abstract class TopologyAdminConnection(
       partyId: PartyId,
       // get only active (non-removed) mappings by default; this matches the Canton console defaults
       operation: Option[TopologyChangeOp] = Some(TopologyChangeOp.Replace),
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] =
-    findPartyToParticipant(synchronizerId, partyId, operation).getOrElse {
+    findPartyToParticipant(synchronizerId, partyId, operation, topologyTransactionType).getOrElse {
       throw Status.NOT_FOUND
         .withDescription(s"No PartyToParticipant state for $partyId on domain $synchronizerId")
         .asRuntimeException
@@ -230,7 +256,7 @@ abstract class TopologyAdminConnection(
   def listSequencerSynchronizerState(
       synchronizerId: SynchronizerId,
       timeQuery: TimeQuery,
-      proposals: Boolean = false,
+      topologyTransactionType: TopologyTransactionType,
   )(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[SequencerSynchronizerState]]] =
@@ -238,37 +264,35 @@ abstract class TopologyAdminConnection(
       TopologyStoreId.SynchronizerStore(synchronizerId),
       synchronizerId,
       timeQuery,
-      proposals,
+      topologyTransactionType,
     )
 
   def listSequencerSynchronizerState(
       store: TopologyStoreId,
       synchronizerId: SynchronizerId,
       timeQuery: TimeQuery,
-      proposals: Boolean,
+      topologyTransactionType: TopologyTransactionType,
   )(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[SequencerSynchronizerState]]] =
-    runCmd(
+    runCommand(
+      store,
+      topologyTransactionType,
+      timeQuery,
+    )(baseQuery =>
       TopologyAdminCommands.Read.SequencerSynchronizerState(
-        BaseQuery(
-          store = store,
-          proposals = proposals,
-          timeQuery = timeQuery,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
+        baseQuery,
         filterSynchronizerId = synchronizerId.filterString,
       )
-    ).map { txs =>
-      txs.map(res => TopologyResult(res.context, res.item))
-    }
+    )
 
-  def getSequencerSynchronizerState(synchronizerId: SynchronizerId, proposals: Boolean = false)(
-      implicit traceContext: TraceContext
+  def getSequencerSynchronizerState(
+      synchronizerId: SynchronizerId,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
+  )(implicit
+      traceContext: TraceContext
   ): Future[TopologyResult[SequencerSynchronizerState]] =
-    listSequencerSynchronizerState(synchronizerId, HeadState, proposals).map { txs =>
+    listSequencerSynchronizerState(synchronizerId, HeadState, topologyTransactionType).map { txs =>
       txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
@@ -277,54 +301,55 @@ abstract class TopologyAdminConnection(
         )
     }
 
-  def getMediatorSynchronizerState(synchronizerId: SynchronizerId)(implicit
+  def getMediatorSynchronizerState(
+      synchronizerId: SynchronizerId,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
+  )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[MediatorSynchronizerState]] =
     listMediatorSynchronizerState(
       TopologyStoreId.SynchronizerStore(synchronizerId),
       synchronizerId,
-      proposals = false,
-    )
-      .map { txs =>
-        txs.headOption
-          .getOrElse(
-            throw Status.NOT_FOUND
-              .withDescription(s"No mediator state for domain $synchronizerId")
-              .asRuntimeException()
-          )
-      }
+      topologyTransactionType,
+    ).map { txs =>
+      txs.headOption
+        .getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(s"No mediator state for domain $synchronizerId")
+            .asRuntimeException()
+        )
+    }
 
-  def listMediatorSynchronizerState(
+  private def listMediatorSynchronizerState(
       store: TopologyStoreId,
       synchronizerId: SynchronizerId,
-      proposals: Boolean,
+      topologyTransactionType: TopologyTransactionType,
   )(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[MediatorSynchronizerState]]] = {
-    runCmd(
+    runCommand(
+      store,
+      topologyTransactionType,
+    )(baseQuery =>
       TopologyAdminCommands.Read.MediatorSynchronizerState(
-        BaseQuery(
-          store = store,
-          proposals = proposals,
-          timeQuery = TimeQuery.HeadState,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
+        baseQuery,
         filterSynchronizerId = synchronizerId.filterString,
       )
     )
-  }.map { txs =>
-    txs.map { tx => TopologyResult(tx.context, tx.item) }
   }
 
   def getDecentralizedNamespaceDefinition(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit
       traceContext: TraceContext
   ): Future[TopologyResult[DecentralizedNamespaceDefinition]] =
-    listDecentralizedNamespaceDefinition(synchronizerId, decentralizedNamespace).map { txs =>
+    listDecentralizedNamespaceDefinition(
+      synchronizerId,
+      decentralizedNamespace,
+      topologyTransactionType,
+    ).map { txs =>
       txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
@@ -335,27 +360,20 @@ abstract class TopologyAdminConnection(
         )
     }
 
-  def listDecentralizedNamespaceDefinition(
+  private def listDecentralizedNamespaceDefinition(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
-      proposals: TopologyTransactionType = AuthorizedState,
-      timeQuery: TimeQuery = TimeQuery.HeadState,
+      topologyTransactionType: TopologyTransactionType,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[DecentralizedNamespaceDefinition]]] = {
-    runCmd(
+    runCommand(
+      TopologyStoreId.SynchronizerStore(synchronizerId),
+      topologyTransactionType,
+    )(baseQuery =>
       TopologyAdminCommands.Read.ListDecentralizedNamespaceDefinition(
-        BaseQuery(
-          store = TopologyStoreId.SynchronizerStore(synchronizerId),
-          proposals = proposals.proposals,
-          timeQuery = timeQuery,
-          ops = None,
-          filterSigningKey = "",
-          protocolVersion = None,
-        ),
+        baseQuery,
         filterNamespace = decentralizedNamespace.toProtoPrimitive,
       )
-    ).map {
-      _.map(result => TopologyResult(result.context, result.item))
-    }
+    )
   }
 
   def getIdentityTransactions(
@@ -678,13 +696,14 @@ abstract class TopologyAdminConnection(
   def ensureTopologyMapping[M <: TopologyMapping: ClassTag](
       store: TopologyStoreId,
       description: String,
-      check: => EitherT[Future, TopologyResult[M], TopologyResult[M]],
+      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
       update: M => Either[String, M],
       retryFor: RetryFor,
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
         RecreateOnAuthorizedStateChange.Recreate,
       forceChanges: ForceFlags = ForceFlags.none,
+      waitForAuthorization: Boolean = true,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
     withSpan("establish_topology_mapping") { implicit traceContext => _ =>
       logger.info(s"Ensuring that $description")
@@ -693,7 +712,7 @@ abstract class TopologyAdminConnection(
           retryFor,
           "establish_topology_mapping_retry",
           description,
-          check.foldF(
+          check(AuthorizedState).foldF(
             { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
               (recreateOnAuthorizedStateChange match {
                 case RecreateOnAuthorizedStateChange.Abort(expectedSerial)
@@ -702,36 +721,86 @@ abstract class TopologyAdminConnection(
                 case _ => Future.unit
               })
                 .flatMap { _ =>
-                  val updatedMapping = update(mapping)
-                  proposeMapping(
-                    store,
-                    updatedMapping,
-                    serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
-                    isProposal = isProposal,
-                    forceChanges = forceChanges,
-                  )
+                  def proposeNewTopologyTransaction = {
+                    val updatedMapping = update(mapping)
+                    proposeMapping(
+                      store,
+                      updatedMapping,
+                      serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                      isProposal = isProposal,
+                      forceChanges = forceChanges,
+                    ).map { signed =>
+                      logger.info(
+                        s"Submitted proposal ${signed.mapping} for $description, waiting until the proposal gets accepted"
+                      )
+                      signed.mapping
+                    }
+                  }
+
+                  if (isProposal) {
+                    check(ProposalSignedByOwnKey)
+                      .foldF(
+                        _ => {
+                          proposeNewTopologyTransaction
+                        },
+                        existingProposal => {
+                          logger.info(
+                            s"Found existing proposal ${existingProposal.mapping} for $description, waiting until the proposal gets accepted"
+                          )
+                          Future.successful(
+                            existingProposal.mapping
+                          )
+                        },
+                      )
+                      .recoverWith {
+                        case ex: StatusRuntimeException
+                            if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
+                          logger.info(
+                            s"No proposal found for $description, submitting new one."
+                          )
+                          proposeNewTopologyTransaction
+                      }
+                  } else {
+                    proposeNewTopologyTransaction
+                  }
                 }
-                .flatMap { _ =>
-                  logger.debug(
-                    s"Submitted proposal for $description, waiting until the proposal gets accepted"
-                  )
+                .flatMap { proposal =>
                   retryProvider.retry(
                     retryFor,
                     "check_establish_topology_mapping",
                     s"check established $description",
-                    check.leftMap { currentAuthorizedState =>
-                      if (
-                        currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial
-                      ) {
-                        Status.FAILED_PRECONDITION
-                          .withDescription("Condition is not yet observed.")
-                          .asRuntimeException()
-                      } else {
-                        AuthorizedStateChanged(
-                          currentAuthorizedState.base.serial
-                        )
+                    check(TopologyTransactionType.AuthorizedState)
+                      .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
+                        if (
+                          currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial
+                        ) {
+                          if (isProposal && !waitForAuthorization) {
+                            check(TopologyTransactionType.ProposalSignedByOwnKey)
+                              .leftMap { res =>
+                                Status.FAILED_PRECONDITION
+                                  .withDescription(
+                                    s"Condition is not yet observed. Waiting for proposal: $proposal, found: $res."
+                                  )
+                                  .asRuntimeException()
+                              }
+                          } else {
+                            EitherT.leftT(
+                              Status.FAILED_PRECONDITION
+                                .withDescription(
+                                  s"Condition is not yet observed. Proposed: $proposal, found: $currentAuthorizedState."
+                                )
+                                .asRuntimeException()
+                            )
+                          }
+                        } else {
+                          EitherT.leftT[Future, TopologyResult[M]](
+                            AuthorizedStateChanged(
+                              currentAuthorizedState.base.serial
+                            )
+                          )
+                        }
                       }
-                    }.rethrowT,
+                      .rethrowT,
                     logger,
                   )
                 }
@@ -851,19 +920,20 @@ abstract class TopologyAdminConnection(
     ensureTopologyMapping[SequencerSynchronizerState](
       TopologyStoreId.SynchronizerStore(synchronizerId),
       description,
-      EitherT(
-        getSequencerSynchronizerState(synchronizerId).map(result => {
-          val newSequencers = sequencerChange(result.mapping.active)
-          // we need to check the threshold as well because we reset it to 1 in tests (see ResetSequencerSynchronizerStateThreshold)
-          val newThreshold = Thresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
-          Either
-            .cond(
-              result.mapping.active.forgetNE == newSequencers && result.mapping.threshold == newThreshold,
-              result,
-              result,
-            )
-        })
-      ),
+      topologyTransactionType =>
+        EitherT(
+          getSequencerSynchronizerState(synchronizerId, topologyTransactionType).map(result => {
+            val newSequencers = sequencerChange(result.mapping.active)
+            // we need to check the threshold as well because we reset it to 1 in tests (see ResetSequencerSynchronizerStateThreshold)
+            val newThreshold = Thresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
+            Either
+              .cond(
+                result.mapping.active.forgetNE == newSequencers && result.mapping.threshold == newThreshold,
+                result,
+                result,
+              )
+          })
+        ),
       previous => {
         val newSequencers = sequencerChange(previous.active)
         logger.debug(
@@ -949,16 +1019,17 @@ abstract class TopologyAdminConnection(
     ensureTopologyMapping[MediatorSynchronizerState](
       TopologyStoreId.SynchronizerStore(synchronizerId),
       description,
-      EitherT(
-        getMediatorSynchronizerState(synchronizerId).map(result =>
-          Either
-            .cond(
-              result.mapping.active.forgetNE == mediatorChange(result.mapping.active),
-              result,
-              result,
-            )
-        )
-      ),
+      topologyTransactionType =>
+        EitherT(
+          getMediatorSynchronizerState(synchronizerId, topologyTransactionType).map(result =>
+            Either
+              .cond(
+                result.mapping.active.forgetNE == mediatorChange(result.mapping.active),
+                result,
+                result,
+              )
+          )
+        ),
       previous => {
         val newMediators = mediatorChange(previous.active)
         logger.debug(
@@ -1046,11 +1117,14 @@ abstract class TopologyAdminConnection(
     ensureTopologyMapping[DecentralizedNamespaceDefinition](
       TopologyStoreId.SynchronizerStore(synchronizerId),
       description,
-      decentralizedNamespaceDefinitionForNamespace(
-        synchronizerId,
-        decentralizedNamespace,
-        ownerChange,
-      ),
+      topologyTransactionType => {
+        decentralizedNamespaceDefinitionForNamespace(
+          synchronizerId,
+          decentralizedNamespace,
+          ownerChange,
+          topologyTransactionType,
+        )
+      },
       previous => {
         // constructor is not exposed so no copy
         val newOwners = ownerChange(previous.owners)
@@ -1070,10 +1144,14 @@ abstract class TopologyAdminConnection(
       synchronizerId: SynchronizerId,
       decentralizedNamespace: Namespace,
       ownerChange: NonEmpty[Set[Namespace]] => NonEmpty[Set[Namespace]],
-  )(implicit tc: TraceContext) = {
+      topologyType: TopologyTransactionType,
+  )(implicit tc: TraceContext): EitherT[Future, TopologyResult[
+    DecentralizedNamespaceDefinition
+  ], TopologyResult[DecentralizedNamespaceDefinition]] = {
     EitherT(
-      getDecentralizedNamespaceDefinition(synchronizerId, decentralizedNamespace).map(result =>
-        Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
+      getDecentralizedNamespaceDefinition(synchronizerId, decentralizedNamespace, topologyType).map(
+        result =>
+          Either.cond(result.mapping.owners == ownerChange(result.mapping.owners), result, result)
       )
     )
   }
@@ -1101,15 +1179,16 @@ abstract class TopologyAdminConnection(
     ensureTopologyMapping[SynchronizerParametersState](
       TopologyStoreId.SynchronizerStore(synchronizerId),
       "update dynamic domain parameters",
-      EitherT(
-        getSynchronizerParametersState(synchronizerId).map(state =>
-          Either.cond(
-            state.mapping.parameters == parametersBuilder(state.mapping.parameters),
-            state,
-            state,
+      topologyTransactionType =>
+        EitherT(
+          getSynchronizerParametersState(synchronizerId, topologyTransactionType).map(state =>
+            Either.cond(
+              state.mapping.parameters == parametersBuilder(state.mapping.parameters),
+              state,
+              state,
+            )
           )
-        )
-      ),
+        ),
       previous => Right(previous.copy(parameters = parametersBuilder(previous.parameters))),
       retryFor = RetryFor.ClientCalls,
       isProposal = true,
@@ -1118,12 +1197,12 @@ abstract class TopologyAdminConnection(
 
   def getSynchronizerParametersState(
       synchronizerId: SynchronizerId,
-      proposals: TopologyTransactionType = AuthorizedState,
+      topologyTransactionType: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext): Future[TopologyResult[SynchronizerParametersState]] = {
     listSynchronizerParametersState(
       TopologyStoreId.SynchronizerStore(synchronizerId),
       synchronizerId,
-      proposals,
+      topologyTransactionType,
       TimeQuery.HeadState,
     )
       .map(_.headOption.getOrElse {
@@ -1148,28 +1227,26 @@ abstract class TopologyAdminConnection(
   def listSynchronizerParametersState(
       storeId: TopologyStoreId,
       synchronizerId: SynchronizerId,
-      proposals: TopologyTransactionType,
+      topologyTransactionType: TopologyTransactionType,
       timeQuery: TimeQuery,
   )(implicit tc: TraceContext): Future[Seq[TopologyResult[SynchronizerParametersState]]] = {
-    runCmd(
-      TopologyAdminCommands.Read.SynchronizerParametersState(
-        BaseQuery(
-          storeId,
-          proposals = proposals.proposals,
-          timeQuery,
-          None,
-          filterSigningKey = "",
-          protocolVersion = None,
+    runCommandM(
+      storeId,
+      topologyTransactionType,
+      timeQuery,
+    )(
+      baseQuery =>
+        TopologyAdminCommands.Read.SynchronizerParametersState(
+          baseQuery,
+          synchronizerId.filterString,
         ),
-        synchronizerId.filterString,
-      )
-    ).map(
-      _.map(r => TopologyResult(r.context, SynchronizerParametersState(synchronizerId, r.item)))
+      (item: ListSynchronizerParametersStateResult) =>
+        TopologyResult(item.context, SynchronizerParametersState(synchronizerId, item.item)),
     )
   }
 
-  def listNamespaceDelegation(namespace: Namespace, target: Option[SigningPublicKey])(implicit
-      traceContext: TraceContext
+  private def listNamespaceDelegation(namespace: Namespace, target: Option[SigningPublicKey])(
+      implicit traceContext: TraceContext
   ): Future[Seq[TopologyResult[NamespaceDelegation]]] =
     runCmd(
       TopologyAdminCommands.Read.ListNamespaceDelegation(
@@ -1385,7 +1462,6 @@ abstract class TopologyAdminConnection(
       s"Remove party to participant for $partyId on $synchronizerId",
       listPartyToParticipant(
         TopologyStoreId.SynchronizerStore(synchronizerId).some,
-        Some(TopologyChangeOp.Replace),
         filterParty = partyId.filterString,
         filterParticipant = participant.filterString,
       ).map {
@@ -1409,6 +1485,67 @@ abstract class TopologyAdminConnection(
         ).map(_ => ()),
       logger,
     )
+
+  def runCommand[Req, Res, M <: TopologyMapping, Result <: topology.TopologyResult[M]](
+      storeId: TopologyStoreId,
+      topologyTransactionType: TopologyTransactionType,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
+      operation: Option[TopologyChangeOp] = None,
+  )(
+      cmd: BaseQuery => GrpcAdminCommand[Req, Res, Seq[Result]]
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[TopologyResult[M]]] = {
+    val mapping: topology.TopologyResult[M] => TopologyResult[M] = result => {
+      TopologyResult(result.context, result.item)
+    }
+    runCommandM[Req, Res, M, Result](
+      storeId,
+      topologyTransactionType,
+      timeQuery,
+      operation,
+    )(cmd, mapping)
+  }
+
+  private def runCommandM[Req, Res, M <: TopologyMapping, Result](
+      storeId: TopologyStoreId,
+      topologyTransactionType: TopologyTransactionType,
+      timeQuery: TimeQuery,
+      operation: Option[TopologyChangeOp] = None,
+  )(
+      cmd: BaseQuery => GrpcAdminCommand[Req, Res, Seq[Result]],
+      mapping: Result => TopologyResult[M],
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[TopologyResult[M]]] = {
+    val baseQuery = BaseQuery(
+      storeId,
+      topologyTransactionType.proposals,
+      timeQuery = timeQuery,
+      ops = operation,
+      filterSigningKey = "",
+      protocolVersion = None,
+    )
+    runCmd(
+      cmd(baseQuery)
+    ).map(results => results.map(mapping)).flatMap { items =>
+      topologyTransactionType match {
+        // we do the filtering here because canton support filtering by a single key
+        case TopologyTransactionType.ProposalSignedByOwnKey =>
+          for {
+            id <- getId()
+            delegations <- listNamespaceDelegation(id.namespace, None).map(
+              _.map(_.mapping.target.fingerprint)
+            )
+          } yield {
+            val validSigningKeys = delegations :+ id.fingerprint
+            items.filter { proposal =>
+              proposal.base.signedBy
+                .intersect(validSigningKeys)
+                .nonEmpty
+            }
+          }
+        case _ => Future.successful(items)
+      }
+    }
+  }
+
 }
 
 object TopologyAdminConnection {

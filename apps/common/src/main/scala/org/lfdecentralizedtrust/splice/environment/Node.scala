@@ -47,6 +47,10 @@ abstract class Node[State <: AutoCloseable & HasHealth, PreInitializeState](
     */
   protected def requiredPackageIds: Set[String] = Set.empty
 
+  // If true, wait for the ledger API user to have a primary party before calling preInitializeAfterLedgerConnection
+  // This can be useful to control dependency order e.g. make sure the validator app waits for the SV app first.
+  protected def waitForPartyBeforePreinitialize: Boolean = false
+
   // Code that is run after a ledger connection becomes available but before
   // waiting for the primary party. This can be used for things like
   // domain connections and allocation of the primary party.
@@ -61,18 +65,10 @@ abstract class Node[State <: AutoCloseable & HasHealth, PreInitializeState](
       preInitializeState: PreInitializeState,
   )(implicit tc: TraceContext): Future[State]
 
-  override protected def initializeNode(
-      ledgerClient: SpliceLedgerClient
-  )(implicit tc: TraceContext): Future[State] = for {
-    _ <- preInitializeBeforeLedgerConnection()
-    initConnection = appInitStepSync("Acquire ledger connection") {
-      ledgerClient.readOnlyConnection(
-        this.getClass.getSimpleName,
-        loggerFactory,
-      )
-    }
-    preInitializeState <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
-    serviceParty <- appInitStep("Get primary party") {
+  private def waitForParty(
+      initConnection: BaseLedgerConnection
+  )(implicit tc: TraceContext): Future[PartyId] =
+    appInitStep("Get primary party") {
       retryProvider.getValueWithRetries[PartyId](
         RetryFor.WaitingOnInitDependency,
         "primary_party",
@@ -86,6 +82,29 @@ abstract class Node[State <: AutoCloseable & HasHealth, PreInitializeState](
         additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
       )
     }
+
+  override protected def initializeNode(
+      ledgerClient: SpliceLedgerClient
+  )(implicit tc: TraceContext): Future[State] = for {
+    _ <- preInitializeBeforeLedgerConnection()
+    initConnection = appInitStepSync("Acquire ledger connection") {
+      ledgerClient.readOnlyConnection(
+        this.getClass.getSimpleName,
+        loggerFactory,
+      )
+    }
+    (preInitializeState, serviceParty) <-
+      if (waitForPartyBeforePreinitialize) {
+        for {
+          serviceParty <- waitForParty(initConnection)
+          preInitializeState <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
+        } yield (preInitializeState, serviceParty)
+      } else {
+        for {
+          preInitializeState <- preInitializeAfterLedgerConnection(initConnection, ledgerClient)
+          serviceParty <- waitForParty(initConnection)
+        } yield (preInitializeState, serviceParty)
+      }
     _ <- appInitStep("Wait for packages to be uploaded") {
       logger.info(s"Required packages: ${requiredPackageIds}")
       initConnection.waitForPackages(requiredPackageIds)

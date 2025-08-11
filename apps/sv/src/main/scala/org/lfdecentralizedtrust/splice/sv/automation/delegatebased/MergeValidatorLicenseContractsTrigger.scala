@@ -13,10 +13,12 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_Mer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense.ValidatorLicense
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -45,16 +47,19 @@ class MergeValidatorLicenseContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
-      pruneAmuletConfigScheduleFeatureSupport <- svTaskContext.packageVersionSupport
+      supportsMergeDuplicatedValidatorLicense <- svTaskContext.packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
-          Seq(
+          dsoGovernanceParties = Seq(
             store.key.svParty,
             store.key.dsoParty,
+          ),
+          amuletParties = Seq(
+            PartyId.tryFromProtoPrimitive(validator)
           ),
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
       validatorLicenses <-
-        if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        if (supportsMergeDuplicatedValidatorLicense.supported) {
           store.listValidatorLicensePerValidator(
             validator,
             MAX_VALIDATOR_LICENSE_CONTRACTS,
@@ -71,9 +76,8 @@ class MergeValidatorLicenseContractsTrigger(
             validator,
             validatorLicenses,
             controller,
-            pruneAmuletConfigScheduleFeatureSupport.packageIds,
           )
-        } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        } else if (supportsMergeDuplicatedValidatorLicense.supported) {
           Future.successful(
             TaskSuccess(s"Only one Validator License contract for $validator, nothing to merge.")
           )
@@ -91,20 +95,17 @@ class MergeValidatorLicenseContractsTrigger(
       validator: String,
       validatorLicenses: Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]],
       controller: String,
-      preferredPackages: Seq[String],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
       arg = new DsoRules_MergeValidatorLicense(
         validatorLicenses.map(_.contractId).asJava,
-        controllerArgument,
+        Optional.of(controller),
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorLicense(arg))
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackages)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${validatorLicenses.length} ValidatorLicense contracts for $validator"

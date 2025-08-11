@@ -98,6 +98,13 @@ export class CloudPostgres extends pulumi.ComponentResource implements Postgres 
           backupConfiguration: {
             enabled: true,
             pointInTimeRecoveryEnabled: true,
+            ...(spliceConfig.pulumiProjectConfig.cloudSql.backupsToRetain
+              ? {
+                  backupRetentionSettings: {
+                    retainedBackups: spliceConfig.pulumiProjectConfig.cloudSql.backupsToRetain,
+                  },
+                }
+              : {}),
           },
           insightsConfig: {
             queryInsightsEnabled: true,

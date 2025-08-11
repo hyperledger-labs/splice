@@ -3,13 +3,7 @@
 import * as pulumi from '@pulumi/pulumi';
 import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager';
 import util from 'node:util';
-import {
-  config,
-  loadJsonFromFile,
-  PRIVATE_CONFIGS_PATH,
-  clusterDirectory,
-} from 'splice-pulumi-common';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
+import { config, loadJsonFromFile, externalIpRangesFile } from 'splice-pulumi-common';
 import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
@@ -24,6 +18,9 @@ const MonitoringConfigSchema = z.object({
   alerting: z.object({
     enableNoDataAlerts: z.boolean(),
     alerts: z.object({
+      delegatelessContention: z.object({
+        thresholdPerNamespace: z.number(),
+      }),
       trafficWaste: z.object({
         kilobytes: z.number(),
         overMinutes: z.number(),
@@ -37,7 +34,9 @@ const MonitoringConfigSchema = z.object({
       loadTester: z.object({
         minRate: z.number(),
       }),
+      svNames: z.array(z.string()).default([]),
     }),
+    logAlerts: z.object({}).catchall(z.string()).default({}),
   }),
 });
 export const InfraConfigSchema = z.object({
@@ -52,6 +51,10 @@ export const InfraConfigSchema = z.object({
       retentionDuration: z.string(),
       retentionSize: z.string(),
     }),
+    istio: z.object({
+      enableIngressAccessLogging: z.boolean(),
+    }),
+    extraCustomResources: z.object({}).catchall(z.any()).default({}),
   }),
   monitoring: MonitoringConfigSchema,
 });
@@ -74,24 +77,22 @@ export const monitoringConfig = fullConfig.monitoring;
 
 type IpRangesDict = { [key: string]: IpRangesDict } | string[];
 
-function extractIpRanges(x: IpRangesDict): string[] {
-  return Array.isArray(x)
-    ? x
-    : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+function extractIpRanges(x: IpRangesDict, svsOnly: boolean = false): string[] {
+  if (svsOnly) {
+    if (Array.isArray(x)) {
+      throw new Error('Cannot distinguish SV IP ranges from non-SV IP ranges in an array');
+    }
+    return extractIpRanges(x['svs'], false);
+  } else {
+    return Array.isArray(x)
+      ? x
+      : Object.keys(x).reduce((acc: string[], k: string) => acc.concat(extractIpRanges(x[k])), []);
+  }
 }
 
-export function loadIPRanges(): pulumi.Output<string[]> {
-  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !PRIVATE_CONFIGS_PATH) {
-    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
-  }
-
-  const externalIpRanges = spliceConfig.pulumiProjectConfig.isExternalCluster
-    ? extractIpRanges(
-        loadJsonFromFile(
-          `${PRIVATE_CONFIGS_PATH}/configs/${clusterDirectory}/allowed-ip-ranges.json`
-        )
-      )
-    : [];
+export function loadIPRanges(svsOnly: boolean = false): pulumi.Output<string[]> {
+  const file = externalIpRangesFile();
+  const externalIpRanges = file ? extractIpRanges(loadJsonFromFile(file), svsOnly) : [];
 
   const internalWhitelistedIps = getSecretVersionOutput({
     secret: 'pulumi-internal-whitelists',

@@ -24,8 +24,8 @@ import {
 } from 'splice-pulumi-common';
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 
-import { clusterSvsConfiguration } from '../clusterSvConfig';
-import { svConfig } from '../config';
+import { svsConfig } from '../config';
+import { SingleSvConfiguration } from '../singleSvConfig';
 import { CometBftNodeConfigs } from './cometBftNodeConfigs';
 import { disableCometBftStateSync } from './cometbftConfig';
 
@@ -33,6 +33,10 @@ export type Cometbft = {
   rpcServiceName: string;
   release: InstalledHelmChart;
 };
+
+export function getChainIdSuffix(): string {
+  return config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0';
+}
 
 // TODO(#679) -- retrieve exact chain id directly from an env var / external config
 const getChainId = (migrationId: number): string => {
@@ -64,10 +68,10 @@ export function installCometBftNode(
   xns: ExactNamespace,
   onboardingName: string,
   nodeConfigs: CometBftNodeConfigs,
+  svConfiguration: SingleSvConfiguration,
   migrationId: DomainMigrationIndex,
   isActiveDomain: boolean,
   isRunningMigration: boolean,
-  logLevel: string,
   version: CnChartVersion = activeVersion,
   enableStateSync: boolean = !disableCometBftStateSync,
   enableTimeoutCommit: boolean = false,
@@ -111,21 +115,7 @@ export function installCometBftNode(
       keysSecret: keysSecret ? keysSecret.metadata.name : '',
       enableTimeoutCommit,
     },
-    logLevel,
-    peers: nodeConfigs.peers
-      .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
-      .map(peer => {
-        /*
-         * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
-         * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
-         * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
-         * sending the traffic through the loopback to satisfy the firewall rules
-         * */
-        return {
-          nodeId: peer.id,
-          externalAddress: nodeConfigs.p2pServiceAddress(peer.id),
-        };
-      }),
+    logLevel: svConfiguration.logging?.cometbftLogLevel,
     stateSync: {
       ...cometBftValues.stateSync,
       enable: stateSyncEnabled,
@@ -133,7 +123,7 @@ export function installCometBftNode(
     genesis: {
       // for TestNet-like deployments on scratchnet, set the chainId to 'test'
       chainId: getChainId(migrationId),
-      chainIdSuffix: config.optionalEnv('COMETBFT_CHAIN_ID_SUFFIX') || '0',
+      chainIdSuffix: getChainIdSuffix(),
     },
     metrics: {
       enable: true,
@@ -144,14 +134,13 @@ export function installCometBftNode(
       labels: [{ key: 'active_migration', value: isActiveDomain }],
     },
     db: {
-      volumeSize: clusterSmallDisk ? '240Gi' : svConfig?.cometbft?.volumeSize,
+      volumeSize: clusterSmallDisk ? '240Gi' : svsConfig?.cometbft?.volumeSize,
     },
-    extraLogLevelFlags: config.optionalEnv('COMETBFT_EXTRA_LOG_LEVEL_FLAGS'),
+    extraLogLevelFlags: svConfiguration.logging?.cometbftExtraLogLevelFlags,
     serviceAccountName: imagePullServiceAccountName,
   });
   const svIdentifier = nodeConfigs.selfSvNodeName;
   const svIdentifierWithMigration = `${svIdentifier}-m${migrationId}`;
-  const svConfiguration = clusterSvsConfiguration[svIdentifier];
   let volumeDependecies: Resource[] = [];
   if (svConfiguration?.cometbft) {
     const volumeSize = cometbftChartValues.db.volumeSize;

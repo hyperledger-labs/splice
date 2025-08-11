@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 2462,
+  "id": 3266,
   "links": [],
   "panels": [
     {
@@ -52,6 +52,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -82,8 +83,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -113,10 +113,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "repeat": "db_pool",
       "repeatDirection": "h",
       "targets": [
@@ -127,7 +129,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by(namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by(namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\", job=~\"$job\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "includeNullMetadata": false,
           "instant": false,
@@ -143,7 +145,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(namespace, node_name, node_type, component, name, node) (rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\", job=~\"$job\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": false,
@@ -159,7 +161,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by(namespace, node_name, node_type, component, name, node) (histogram_avg(rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\"}[$__rate_interval])))",
+          "expr": "sum by(namespace, node_name, node_type, component, name, node) (histogram_avg(rate(${libs}_db_storage_${db_pool}_executor_waittime_duration_seconds{namespace=~\"$namespace\", job=~\"$job\"}[$__rate_interval])))",
           "hide": false,
           "instant": false,
           "legendFormat": "avg {{namespace}} {{node_name}}{{node}}",
@@ -187,6 +189,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -217,8 +220,114 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "12.0.2",
+      "repeat": "db_pool",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by(namespace, node_name, node_type, component, name, node, query) (rate(${libs}_db_storage_${db_pool}_executor_exectime_duration_seconds{namespace=~\"$namespace\", job=~\"$job\"}[$__rate_interval])))",
+          "fullMetaSearch": false,
+          "includeNullMetadata": false,
+          "instant": false,
+          "legendFormat": "0.95 {{namespace}} {{node_name}} {{node}} {{query}}",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "Exectime ${db_pool}",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
               },
               {
                 "color": "red",
@@ -233,7 +342,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 31
       },
       "id": 2,
       "options": {
@@ -244,10 +353,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "repeat": "db_pool",
       "repeatDirection": "h",
       "targets": [
@@ -257,9 +368,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "${libs}_db_storage_${db_pool}_executor_running{namespace=~\"$namespace\"}",
+          "expr": "${libs}_db_storage_${db_pool}_executor_running{namespace=~\"$namespace\", job=~\"$job\"}",
           "instant": false,
-          "legendFormat": "{{namespace}} {{node_name}}{{node}}",
+          "legendFormat": "{{namespace}} {{node_name}}{{node}} {{query}}",
           "range": true,
           "refId": "A"
         }
@@ -284,6 +395,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -314,8 +426,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -330,7 +441,7 @@
         "h": 10,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 41
       },
       "id": 3,
       "options": {
@@ -341,10 +452,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
+      "pluginVersion": "12.0.2",
       "repeat": "db_pool",
       "repeatDirection": "h",
       "targets": [
@@ -354,9 +467,9 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "${libs}_db_storage_${db_pool}_executor_queued{namespace=~\"$namespace\"}",
+          "expr": "${libs}_db_storage_${db_pool}_executor_queued{namespace=~\"$namespace\", job=~\"$job\"}",
           "instant": false,
-          "legendFormat": "{{namespace}} {{node_name}} {{node}}",
+          "legendFormat": "{{namespace}} {{node_name}} {{node}} {{query}}",
           "range": true,
           "refId": "A"
         }
@@ -367,7 +480,7 @@
   ],
   "preload": false,
   "refresh": "",
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": [
@@ -375,10 +488,10 @@
         "allValue": ".*",
         "current": {
           "text": [
-            "sv-1"
+            "sv-8"
           ],
           "value": [
-            "sv-1"
+            "sv-8"
           ]
         },
         "datasource": {
@@ -400,14 +513,40 @@
         "type": "query"
       },
       {
+        "allValue": ".*",
         "current": {
           "text": [
-            "daml",
-            "splice"
+            "global-domain-6-sequencer"
           ],
           "value": [
-            "daml",
-            "splice"
+            "global-domain-6-sequencer"
+          ]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(db_client_connections_usage{namespace=~\"$namespace\"},job)",
+        "includeAll": true,
+        "multi": true,
+        "name": "job",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(db_client_connections_usage{namespace=~\"$namespace\"},job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "daml"
+          ],
+          "value": [
+            "daml"
           ]
         },
         "includeAll": false,
@@ -415,9 +554,9 @@
         "name": "libs",
         "options": [
           {
-            "selected": true,
-            "text": "splice",
-            "value": "splice"
+            "selected": false,
+            "text": "cn",
+            "value": "cn"
           },
           {
             "selected": true,
@@ -425,20 +564,16 @@
             "value": "daml"
           }
         ],
-        "query": "splice,daml",
+        "query": "cn,daml",
         "type": "custom"
       },
       {
         "current": {
           "text": [
-            "general",
-            "write",
-            "locks"
+            "general"
           ],
           "value": [
-            "general",
-            "write",
-            "locks"
+            "general"
           ]
         },
         "includeAll": false,
@@ -451,12 +586,12 @@
             "value": "general"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "write",
             "value": "write"
           },
           {
-            "selected": true,
+            "selected": false,
             "text": "locks",
             "value": "locks"
           }
@@ -474,6 +609,5 @@
   "timezone": "",
   "title": "Executor",
   "uid": "d7498b3f-c5e4-41ba-9fe2-2874aa683f51",
-  "version": 1,
-  "weekStart": ""
+  "version": 7
 }

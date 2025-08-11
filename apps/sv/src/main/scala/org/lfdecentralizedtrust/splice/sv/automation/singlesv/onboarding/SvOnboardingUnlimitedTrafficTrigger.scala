@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.onboarding
 
 import cats.implicits.catsSyntaxTuple2Semigroupal
-import cats.syntax.traverseFilter.*
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -21,6 +20,7 @@ import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{SynchronizerId, Member}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -62,9 +62,11 @@ class SvOnboardingUnlimitedTrafficTrigger(
       sequencerAdminConnection = SvUtil.getSequencerAdminConnection(
         sequencerAdminConnectionO
       )
-      svMembersWithTrafficState <- dsoRulesAndStates
-        .activeSvParticipantAndMediatorIds(activeSynchronizerId)
-        .traverseFilter { memberId =>
+      svMembersWithTrafficState <- MonadUtil
+        .sequentialTraverse(
+          dsoRulesAndStates
+            .activeSvParticipantAndMediatorIds(activeSynchronizerId)
+        ) { memberId =>
           for {
             stateO <- sequencerAdminConnection.lookupSequencerTrafficControlState(memberId)
           } yield {
@@ -75,6 +77,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
             stateO.map(memberId -> _)
           }
         }
+        .map(_.flatten)
     } yield {
       // Sorting here so we have a better chance of all SVs working on the same set traffic balance request around the same time.
       svMembersWithTrafficState.sortBy(_._1).collect {

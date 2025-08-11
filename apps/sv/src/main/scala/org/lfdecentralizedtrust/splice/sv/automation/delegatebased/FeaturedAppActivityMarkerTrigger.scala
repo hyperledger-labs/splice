@@ -3,7 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
-import cats.syntax.traverse.*
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
@@ -16,11 +15,14 @@ import org.lfdecentralizedtrust.splice.util.Contract
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import FeaturedAppActivityMarkerTrigger.Task
+
+import java.util.Optional
 
 class FeaturedAppActivityMarkerTrigger(
     override protected val context: TriggerContext,
@@ -58,8 +60,8 @@ class FeaturedAppActivityMarkerTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      openMiningRound <- store.getLatestUsableOpenMiningRound(context.clock.now)
-      controllerArgument <- getSvControllerArgument(controller)
+      now = context.clock.now
+      openMiningRound <- store.getLatestUsableOpenMiningRound(now)
       // Note that we don't group by provider or beneficiary. There is no strong need to do so
       // as we want to
       update = dsoRules.exercise(
@@ -69,7 +71,7 @@ class FeaturedAppActivityMarkerTrigger(
             task.markers.map(_.contractId).asJava,
             openMiningRound.contractId,
           ),
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection
@@ -87,7 +89,7 @@ class FeaturedAppActivityMarkerTrigger(
 
   override protected def isStaleTask(task: Task)(implicit tc: TraceContext): Future[Boolean] =
     for {
-      markers <- task.markers.toList.traverse(m =>
+      markers <- MonadUtil.sequentialTraverse(task.markers.toList)(m =>
         store.multiDomainAcsStore.lookupContractById(amulet.FeaturedAppActivityMarker.COMPANION)(
           m.contractId
         )

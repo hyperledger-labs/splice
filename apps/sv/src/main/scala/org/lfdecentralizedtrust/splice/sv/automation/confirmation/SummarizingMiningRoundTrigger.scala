@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.sv.automation.confirmation
 
 import org.apache.pekko.stream.Materializer
-import cats.syntax.traverseFilter.*
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -26,6 +25,7 @@ import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Optional
@@ -64,30 +64,33 @@ class SummarizingMiningRoundTrigger(
 
   override def retrieveTasks()(implicit tc: TraceContext): Future[Seq[Task]] = for {
     summarizingRounds <- store.listOldestSummarizingMiningRounds()
-    tasks <- summarizingRounds.traverseFilter { round =>
-      for {
-        rewards <- queryRewards(round.payload.round.number, round.domain)
-        action = amuletRulesStartIssuingAction(
-          round.contractId,
-          rewards.summary,
-        )
-        queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
-      } yield queryResult.value match {
-        case None =>
-          Some(
-            Task(
-              round,
-              rewards,
-            )
+    tasks <- MonadUtil
+      .sequentialTraverse(summarizingRounds) { round =>
+        for {
+          rewards <- queryRewards(round.payload.round.number, round.domain)
+          action = amuletRulesStartIssuingAction(
+            round.contractId,
+            rewards.summary,
           )
-        case Some(_) => None
+          queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
+        } yield queryResult.value match {
+          case None =>
+            Some(
+              Task(
+                round,
+                rewards,
+              )
+            )
+          case Some(_) => None
+        }
       }
-    }
+      .map(_.flatten)
   } yield tasks
 
   override def completeTask(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val round = task.summarizingRound.contract.payload.round.number
     for {
       dsoRules <- store.getDsoRules()
       action = amuletRulesStartIssuingAction(
@@ -105,7 +108,7 @@ class SummarizingMiningRoundTrigger(
         case QueryResult(_, Some(_)) =>
           Future.successful(
             TaskSuccess(
-              s"skipping as confirmation from ${svParty} is already created for such action"
+              s"skipping as confirmation from ${svParty} is already created for summarizing round ${round}"
             )
           )
         case QueryResult(offset, None) =>
@@ -126,7 +129,7 @@ class SummarizingMiningRoundTrigger(
             .yieldUnit()
             .map { _ =>
               TaskSuccess(
-                s"created confirmation for summarizing mining round"
+                s"created confirmation for summarizing mining round ${round}"
               )
             }
       }

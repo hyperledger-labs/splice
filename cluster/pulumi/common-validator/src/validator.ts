@@ -23,6 +23,7 @@ import {
   installBootstrapDataBucketSecret,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  LogLevel,
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
@@ -67,6 +68,7 @@ type BasicValidatorConfig = {
   extraDomains?: ExtraDomain[];
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
+  additionalEnvVars?: k8s.types.input.core.v1.EnvVar[];
   participantAddress: Output<string> | string;
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
   sweep?: SweepConfig;
@@ -75,6 +77,7 @@ type BasicValidatorConfig = {
   dependencies: CnInput<pulumi.Resource>[];
   participantPruningConfig?: ParticipantPruningConfig;
   deduplicationDuration?: string;
+  logLevel?: LogLevel;
 };
 
 export type ValidatorConfig = BasicValidatorConfig & {
@@ -102,7 +105,7 @@ export function autoAcceptTransfersConfigFromEnv(
 
 type SvValidatorConfig = BasicValidatorConfig & {
   svValidator: true;
-  decentralizedSynchronizerUrl: string;
+  decentralizedSynchronizerUrl?: string;
   migration: {
     id: DomainMigrationIndex;
   };
@@ -179,6 +182,7 @@ export async function installValidatorApp(
     {
       migration: config.migration,
       additionalUsers: config.additionalUsers || [],
+      additionalEnvVars: config.additionalEnvVars || undefined,
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
       decentralizedSynchronizerUrl: config.svValidator
@@ -208,7 +212,8 @@ export async function installValidatorApp(
           ? { secretName: participantBootstrapDumpSecretName }
           : undefined,
       svValidator: config.svValidator,
-      useSequencerConnectionsFromScan: !config.svValidator,
+      useSequencerConnectionsFromScan:
+        !config.svValidator || config.decentralizedSynchronizerUrl === undefined,
       metrics: {
         enable: true,
       },
@@ -227,6 +232,17 @@ export async function installValidatorApp(
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
+      logLevel: config.logLevel,
+      resources: baseConfig.svValidator
+        ? {
+            requests: {
+              memory: '2Gi',
+            },
+            limits: {
+              memory: '4Gi',
+            },
+          }
+        : {},
       ...spliceInstanceNames,
     },
     chartVersion,

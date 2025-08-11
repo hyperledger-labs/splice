@@ -22,6 +22,7 @@ import com.digitalasset.canton.http.json.v2.JsSchema.JsEvent
 import com.digitalasset.canton.http.json.v2.{
   JsContractEntry,
   JsEventServiceCodecs,
+  JsGetActiveContractsResponse,
   JsGetUpdatesResponse,
   JsStateServiceCodecs,
   JsUpdate,
@@ -63,7 +64,9 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
-//TODO(#1304) - re-enable
+// Not checking Daml compatibility as the test data can be specific to the most recent
+// version of the Daml code, and thus the test would falsely fail when running with older
+// Daml code versions.
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class TokenStandardCliTestDataTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment
@@ -111,12 +114,22 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
       holdingv1.Holding.TEMPLATE_ID,
     )
 
-  def replaceOrFail[R](targetPath: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
-    val path = Paths.get(targetPath)
+  val testDataPath = "token-standard/cli/__tests__/mocks/data/"
+  def replaceOrFail[R](targetFile: String, normalizedContent: R, encoder: Encoder[R]): Unit = {
+    val path = Paths.get(testDataPath, targetFile)
     val prettyNormalizedContent = encoder(normalizedContent).spaces2SortKeys
     if (isCI) {
       val actual = Files.readString(path)
 
+      // Writing file for debugging
+      val debugPath = Paths.get("log", s"token-standard-cli-actual-test-data-$targetFile")
+      Files.writeString(debugPath, prettyNormalizedContent)
+      if (actual != prettyNormalizedContent) {
+        fail(
+          "Test data is not up-to-date. Please run the test locally to update it. " +
+            s"You can find the returned test data in $debugPath."
+        )
+      }
       actual should be(prettyNormalizedContent)
     } else {
       Files.writeString(path, prettyNormalizedContent)
@@ -195,392 +208,388 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
           s" validator: ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"
       )
 
-      val (_, (activeContractsResponse, getUpdatesResponse)) = actAndCheck(
-        "Create some holdings", {
-          // Amulet holdings: one transferred via token standard, one tapped (minted)
-          // TransferIn
-          executeTransferViaTokenStandard(
-            aliceValidatorBackend.participantClientWithAdminToken,
-            aliceValidator,
-            alice.partyId,
-            BigDecimal("200.0"),
-            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
-            description = Some("token-standard-transfer-description"),
-          )
-          eventually() {
-            aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
-            val scanTxs = sv1ScanBackend.listActivity(None, 1000)
-            forExactly(1, scanTxs) { tx =>
-              val transfer = tx.transfer.value
-              transfer.transferKind shouldBe Some(
-                definitions.Transfer.TransferKind.members.PreapprovalSend
-              )
-              transfer.description shouldBe Some("token-standard-transfer-description")
-              transfer.sender.party shouldBe aliceValidator.partyId.toProtoPrimitive
-              transfer.receivers.loneElement.party shouldBe alice.partyId.toProtoPrimitive
+      val (_, (activeHoldingsResponse, activeTransferInstructionsResponse, getUpdatesResponse)) =
+        actAndCheck(
+          "Create some holdings", {
+            // Amulet holdings: one transferred via token standard, one tapped (minted)
+            // TransferIn
+            executeTransferViaTokenStandard(
+              aliceValidatorBackend.participantClientWithAdminToken,
+              aliceValidator,
+              alice.partyId,
+              BigDecimal("200.0"),
+              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
+              description = Some("token-standard-transfer-description"),
+            )
+            eventually() {
+              aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("200"))
+              val scanTxs = sv1ScanBackend.listActivity(None, 1000)
+              forExactly(1, scanTxs) { tx =>
+                val transfer = tx.transfer.value
+                transfer.transferKind shouldBe Some(
+                  definitions.Transfer.TransferKind.members.PreapprovalSend
+                )
+                transfer.description shouldBe Some("token-standard-transfer-description")
+                transfer.sender.party shouldBe aliceValidator.partyId.toProtoPrimitive
+                transfer.receivers.loneElement.party shouldBe alice.partyId.toProtoPrimitive
+              }
             }
-          }
-          // send some back so there's a TransferOut
-          executeTransferViaTokenStandard(
-            aliceValidatorBackend.participantClientWithAdminToken,
-            alice,
-            aliceValidator.partyId,
-            BigDecimal("100.0"),
-            transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
-          )
-          eventually() {
-            aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
-          }
-          // Deliberately using a non-token-standard transfer so that this shows up as a Transfer still (tx-kind-based)
-          aliceWalletClient.transferPreapprovalSend(
-            aliceValidator.partyId,
-            BigDecimal("10.0"),
-            UUID.randomUUID().toString,
-          )
-          eventually() {
-            aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
-          }
-          aliceWalletClient.tap(walletAmuletToUsd(6000.0))
-          val (_, bobInstructionCids) = actAndCheck(
-            "Alice creates 5 transfers to Bob who has no pre-approval", {
-              for (_ <- 1 to 4) {
+            // send some back so there's a TransferOut
+            executeTransferViaTokenStandard(
+              aliceValidatorBackend.participantClientWithAdminToken,
+              alice,
+              aliceValidator.partyId,
+              BigDecimal("100.0"),
+              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Direct,
+            )
+            eventually() {
+              aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("87")) // fees!
+            }
+            // Deliberately using a non-token-standard transfer so that this shows up as a Transfer still (tx-kind-based)
+            aliceWalletClient.transferPreapprovalSend(
+              aliceValidator.partyId,
+              BigDecimal("10.0"),
+              UUID.randomUUID().toString,
+            )
+            eventually() {
+              aliceWalletClient.balance().unlockedQty should beAround(BigDecimal("64.9")) // fees!
+            }
+            aliceWalletClient.tap(walletAmuletToUsd(6000.0))
+            val (_, bobInstructionCids) = actAndCheck(
+              "Alice creates 5 transfers to Bob who has no pre-approval", {
+                for (_ <- 1 to 4) {
+                  executeTransferViaTokenStandard(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice,
+                    bob.partyId,
+                    BigDecimal("1000.0"),
+                    transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                    timeToLife = java.time.Duration.ofMinutes(1),
+                  )
+                }
+                // the fifth one uses a longer duration so that it does not expire later when passing time
                 executeTransferViaTokenStandard(
                   aliceValidatorBackend.participantClientWithAdminToken,
                   alice,
                   bob.partyId,
                   BigDecimal("1000.0"),
                   transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
-                  timeToLife = java.time.Duration.ofMinutes(1),
+                  timeToLife = java.time.Duration.ofMinutes(20),
                 )
-              }
-              // the fifth one uses a longer duration so that it does not expire later when passing time
-              executeTransferViaTokenStandard(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                alice,
-                bob.partyId,
-                BigDecimal("1000.0"),
-                transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
-                timeToLife = java.time.Duration.ofMinutes(20),
-              )
-            },
-          )(
-            "Bob can see the transfer instructions",
-            _ => {
-              val instructions = listTransferInstructions(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob.partyId,
-              )
-              instructions should have size 5
-              instructions.map(_._1)
-            },
-          )
-          actAndCheck(
-            "Bob accepts transfer instruction #1", {
-              val now = env.environment.clock.now
-              acceptTransferInstruction(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob,
-                bobInstructionCids(0),
-                // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
-                // so the lower bound is 1min in the past.
-                expectedTimeBounds = Some((now.minusSeconds(60), now.plusSeconds(60).addMicros(-1))),
-              )
-            },
-          )(
-            "Bob sees the funds",
-            _ =>
-              getBobPartyBalance().unlockedQty should beAround(
-                BigDecimal("1000.0")
-              ),
-          )
-          actAndCheck(
-            "Bob rejects transfer instruction #2 and Alice withdraws #3", {
-              rejectTransferInstruction(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob,
-                bobInstructionCids(1),
-                expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
-              )
-              withdrawTransferInstruction(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                alice,
-                bobInstructionCids(2),
-              )
-            },
-          )(
-            "Bob sees only two remaining transfer instructions, and funds are as expected",
-            _ => {
-              val instructions = listTransferInstructions(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob.partyId,
-              )
-              instructions should have size 2
-              getBobPartyBalance().unlockedQty should beAround(BigDecimal("1000.0"))
-              inside(aliceWalletClient.balance()) { aliceBalance =>
-                aliceBalance.unlockedQty should beWithin(BigDecimal("2800.0"), BigDecimal("3000.0"))
-                aliceBalance.lockedQty should beWithin(BigDecimal("2000.0"), BigDecimal("2150.0"))
-              }
-            },
-          )
-          clue("Test receiving two-step transfers") {
-            actAndCheck(
-              "Alice validator cancels TransferPreapproval for alice",
-              aliceValidatorBackend.cancelTransferPreapprovalByParty(alice.partyId),
+              },
             )(
-              "See that TransferPreapproval for alice has been cancelled",
+              "Bob can see the transfer instructions",
               _ => {
-                aliceValidatorBackend.lookupTransferPreapprovalByParty(alice.partyId) shouldBe None
-                sv1ScanBackend.lookupTransferPreapprovalByParty(alice.partyId) shouldBe None
+                val instructions = listTransferInstructions(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob.partyId,
+                )
+                instructions should have size 5
+                instructions.map(_._1)
               },
             )
-            val (_, aliceInstructionCids) = actAndCheck(
-              "Bob creates 4 transfers to Alice who has no longer a pre-approval",
-              for (_ <- 1 to 4) {
+            actAndCheck(
+              "Bob accepts transfer instruction #1", {
+                val now = env.environment.clock.now
+                acceptTransferInstruction(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob,
+                  bobInstructionCids(0),
+                  // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
+                  // so the lower bound is 1min in the past.
+                  expectedTimeBounds =
+                    Some((now.minusSeconds(60), now.plusSeconds(60).addMicros(-1))),
+                )
+              },
+            )(
+              "Bob sees the funds",
+              _ =>
+                getBobPartyBalance().unlockedQty should beAround(
+                  BigDecimal("1000.0")
+                ),
+            )
+            actAndCheck(
+              "Bob rejects transfer instruction #2 and Alice withdraws #3", {
+                rejectTransferInstruction(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob,
+                  bobInstructionCids(1),
+                  expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
+                )
+                withdrawTransferInstruction(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice,
+                  bobInstructionCids(2),
+                )
+              },
+            )(
+              "Bob sees only two remaining transfer instructions, and funds are as expected",
+              _ => {
+                val instructions = listTransferInstructions(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob.partyId,
+                )
+                instructions should have size 2
+                getBobPartyBalance().unlockedQty should beAround(BigDecimal("1000.0"))
+                inside(aliceWalletClient.balance()) { aliceBalance =>
+                  aliceBalance.unlockedQty should beWithin(
+                    BigDecimal("2800.0"),
+                    BigDecimal("3000.0"),
+                  )
+                  aliceBalance.lockedQty should beWithin(BigDecimal("2000.0"), BigDecimal("2150.0"))
+                }
+              },
+            )
+            clue("Test receiving two-step transfers") {
+              actAndCheck(
+                "Alice validator cancels TransferPreapproval for alice",
+                aliceValidatorBackend.cancelTransferPreapprovalByParty(alice.partyId),
+              )(
+                "See that TransferPreapproval for alice has been cancelled",
+                _ => {
+                  aliceValidatorBackend.lookupTransferPreapprovalByParty(
+                    alice.partyId
+                  ) shouldBe None
+                  sv1ScanBackend.lookupTransferPreapprovalByParty(alice.partyId) shouldBe None
+                },
+              )
+              val (_, aliceInstructionCids) = actAndCheck(
+                "Bob creates 4 transfers to Alice who has no longer a pre-approval",
+                for (_ <- 1 to 4) {
+                  val now = env.environment.clock.now
+                  executeTransferViaTokenStandard(
+                    bobValidatorBackend.participantClientWithAdminToken,
+                    bob,
+                    alice.partyId,
+                    BigDecimal("200.0"),
+                    transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                    expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
+                  )
+                },
+              )(
+                "Alice can see the transfer instructions",
+                _ => {
+                  val instructions = listTransferInstructions(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice.partyId,
+                  )
+                  instructions should have size 6 // two outstanding ones from alice to bob, and four new ones from bob to alice
+                  instructions.collect {
+                    case instr if instr._2.transfer.receiver == alice.partyId.toProtoPrimitive =>
+                      instr._1
+                  }
+                },
+              )
+              actAndCheck(
+                "Alice accepts instruction #1 and rejects #2; and bob withdraws #3; while #4 is left as-is", {
+                  clue("Accept instruction #1") {
+                    acceptTransferInstruction(
+                      aliceValidatorBackend.participantClientWithAdminToken,
+                      alice,
+                      aliceInstructionCids(0),
+                    )
+                  }
+                  clue("Reject instruction #2") {
+                    rejectTransferInstruction(
+                      aliceValidatorBackend.participantClientWithAdminToken,
+                      alice,
+                      aliceInstructionCids(1),
+                    )
+                  }
+                  clue("Withdraw instruction #3") {
+                    withdrawTransferInstruction(
+                      bobValidatorBackend.participantClientWithAdminToken,
+                      bob,
+                      aliceInstructionCids(2),
+                      expectedTimeBounds =
+                        Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
+                    )
+                  }
+                },
+              )(
+                "There are three open transfer instructions left and bob observers their updated holdings",
+                _ => {
+                  val instructions = listTransferInstructions(
+                    aliceValidatorBackend.participantClientWithAdminToken,
+                    alice.partyId,
+                  )
+                  instructions should have size 3
+                  val bobHoldings = listHoldings(
+                    bobValidatorBackend.participantClientWithAdminToken,
+                    bob.partyId,
+                  )
+                  val (unlockedHoldings, lockedHoldings) =
+                    bobHoldings.partition(h => h._2.lock.isEmpty)
+                  unlockedHoldings should have size 4
+                  lockedHoldings should have size 1
+                },
+              )
+            }
+
+            // Test self-transfer for party w/o pre-approval
+            actAndCheck(
+              "Bob splits his holdings into two using a self-transfer", {
                 val now = env.environment.clock.now
                 executeTransferViaTokenStandard(
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob,
-                  alice.partyId,
-                  BigDecimal("200.0"),
-                  transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Offer,
+                  bob.partyId,
+                  BigDecimal("250.0"),
+                  transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
                   expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
                 )
               },
             )(
-              "Alice can see the transfer instructions",
+              // 1 locked holding, untouched by the transfer. two unlocked holdings as the output of the self transfer.
+              "Bob's has three holdings and the balance remained the same (modulo fees)",
               _ => {
-                val instructions = listTransferInstructions(
-                  aliceValidatorBackend.participantClientWithAdminToken,
-                  alice.partyId,
-                )
-                instructions should have size 6 // two outstanding ones from alice to bob, and four new ones from bob to alice
-                instructions.collect {
-                  case instr if instr._2.transfer.receiver == alice.partyId.toProtoPrimitive =>
-                    instr._1
-                }
-              },
-            )
-            actAndCheck(
-              "Alice accepts instruction #1 and rejects #2; and bob withdraws #3; while #4 is left as-is", {
-                clue("Accept instruction #1") {
-                  acceptTransferInstruction(
-                    aliceValidatorBackend.participantClientWithAdminToken,
-                    alice,
-                    aliceInstructionCids(0),
-                  )
-                }
-                clue("Reject instruction #2") {
-                  rejectTransferInstruction(
-                    aliceValidatorBackend.participantClientWithAdminToken,
-                    alice,
-                    aliceInstructionCids(1),
-                  )
-                }
-                clue("Withdraw instruction #3") {
-                  withdrawTransferInstruction(
-                    bobValidatorBackend.participantClientWithAdminToken,
-                    bob,
-                    aliceInstructionCids(2),
-                    expectedTimeBounds = Some((CantonTimestamp.MinValue, CantonTimestamp.MaxValue)),
-                  )
-                }
-              },
-            )(
-              "There are three open transfer instructions left and bob observers their updated holdings",
-              _ => {
-                val instructions = listTransferInstructions(
-                  aliceValidatorBackend.participantClientWithAdminToken,
-                  alice.partyId,
-                )
-                instructions should have size 3
-                val bobHoldings = listHoldings(
+                listHoldings(
                   bobValidatorBackend.participantClientWithAdminToken,
                   bob.partyId,
-                )
-                val (unlockedHoldings, lockedHoldings) =
-                  bobHoldings.partition(h => h._2.lock.isEmpty)
-                unlockedHoldings should have size 4
-                lockedHoldings should have size 1
+                ) should have size 3
+                inside(getBobPartyBalance()) { balance =>
+                  balance.unlockedQty should beWithin(
+                    BigDecimal("450.0"),
+                    BigDecimal("600.0"),
+                  ) // received 1_000, transferred back 200, and 200 in-flight
+                  balance.lockedQty should beWithin(
+                    BigDecimal("200.0"),
+                    BigDecimal("270.0"),
+                  ) // locked amount + fee reserve
+                }
               },
             )
-          }
-
-          // Test self-transfer for party w/o pre-approval
-          actAndCheck(
-            "Bob splits his holdings into two using a self-transfer", {
-              val now = env.environment.clock.now
+            // Advance by two minutes so that the short-lived 1 minute transfer instruction from Alice expires
+            val instrAboutToExpire = bobInstructionCids(3)
+            advanceTime(java.time.Duration.ofMinutes(2))
+            clue("Alice as two locked holdings") {
+              inside(
+                listHoldings(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice.partyId,
+                )
+              ) { holdings =>
+                holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 2
+              }
+            }
+            // Test self-transfer for wallet history
+            actAndCheck(
+              "Alice merges her four unlocked holdings, and the expired locked amulet into a two using a self-transfer",
               executeTransferViaTokenStandard(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob,
-                bob.partyId,
-                BigDecimal("250.0"),
-                transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
-                expectedTimeBounds = Some((now, now.plusSeconds(10 * 60).addMicros(-1))),
-              )
-            },
-          )(
-            // 1 locked holding, untouched by the transfer. two unlocked holdings as the output of the self transfer.
-            "Bob's has three holdings and the balance remained the same (modulo fees)",
-            _ => {
-              listHoldings(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob.partyId,
-              ) should have size 3
-              inside(getBobPartyBalance()) { balance =>
-                balance.unlockedQty should beWithin(
-                  BigDecimal("450.0"),
-                  BigDecimal("600.0"),
-                ) // received 1_000, transferred back 200, and 200 in-flight
-                balance.lockedQty should beWithin(
-                  BigDecimal("200.0"),
-                  BigDecimal("270.0"),
-                ) // locked amount + fee reserve
-              }
-            },
-          )
-          // Advance by two minutes so that the short-lived 1 minute transfer instruction from Alice expires
-          val instrAboutToExpire = bobInstructionCids(3)
-          advanceTime(java.time.Duration.ofMinutes(2))
-          clue("Alice as two locked holdings") {
-            inside(
-              listHoldings(
                 aliceValidatorBackend.participantClientWithAdminToken,
-                alice.partyId,
-              )
-            ) { holdings =>
-              holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 2
-            }
-          }
-          // Test self-transfer for wallet history
-          actAndCheck(
-            "Alice merges her four unlocked holdings, and the expired locked amulet into a two using a self-transfer",
-            executeTransferViaTokenStandard(
-              aliceValidatorBackend.participantClientWithAdminToken,
-              alice,
-              alice.partyId,
-              BigDecimal("1.0"),
-              transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
-            ),
-          )(
-            "Alice's has three holdings and the balance remained the same (modulo fees)",
-            _ => {
-              listHoldings(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                alice.partyId,
-              ) should have size 3
-              inside(aliceWalletClient.balance()) { aliceBalance =>
-                aliceBalance.unlockedQty should beWithin(BigDecimal("4100.0"), BigDecimal("4200.0"))
-                aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
-              }
-              // there is one less locke
-            },
-          )
-          clue("Alice as one locked holding left") {
-            inside(
-              listHoldings(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                alice.partyId,
-              )
-            ) { holdings =>
-              holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
-            }
-          }
-          actAndCheck(
-            "Bob rejects instruction #4, whose backing amulet has already been archived", {
-              val now = env.environment.clock.now
-              rejectTransferInstruction(
-                bobValidatorBackend.participantClientWithAdminToken,
-                bob,
-                instrAboutToExpire,
-                // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
-                // so the lower bound is 1min in the past.
-                expectedTimeBounds = Some((now.minusSeconds(60), CantonTimestamp.MaxValue)),
-              )
-            },
-          )(
-            "There are two open transfer instructions left",
-            _ => {
-              val instructions = listTransferInstructions(
-                aliceValidatorBackend.participantClientWithAdminToken,
-                alice.partyId,
-              )
-              instructions should have size 2
-            },
-          )
-
-          // DummyHolding holdings
-          Seq("30.0", "40.0").foreach { amount =>
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
-              .submitJavaExternalOrLocal(
                 alice,
-                commands = new DummyHolding(
-                  alice.partyId.toProtoPrimitive,
-                  alice.partyId.toProtoPrimitive,
-                  BigDecimal(amount).bigDecimal,
-                )
-                  .create()
-                  .commands()
-                  .asScala
-                  .toSeq,
-              )
-          }
-        },
-      )(
-        "holdings and transactions are returned",
-        _ => {
-          val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
-            GetActiveContractsRequest(
-              filter = Some(
-                TransactionFilter(
-                  filtersByParty(
-                    alice.partyId,
-                    Seq(holdingv1.Holding.TEMPLATE_ID),
-                    includeWildcard = false,
-                  )
-                )
+                alice.partyId,
+                BigDecimal("1.0"),
+                transferinstruction.v1.definitions.TransferFactoryWithChoiceContext.TransferKind.Self,
               ),
-              activeAtOffset =
-                aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
+            )(
+              "Alice's has three holdings and the balance remained the same (modulo fees)",
+              _ => {
+                listHoldings(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice.partyId,
+                ) should have size 3
+                inside(aliceWalletClient.balance()) { aliceBalance =>
+                  aliceBalance.unlockedQty should beWithin(
+                    BigDecimal("4100.0"),
+                    BigDecimal("4200.0"),
+                  )
+                  aliceBalance.lockedQty should beWithin(BigDecimal("1000.0"), BigDecimal("1100.0"))
+                }
+                // there is one less locke
+              },
             )
-          )
-
-          val activeContractsResponse =
-            makeJsonApiV2Request(
-              "/v2/state/active-contracts",
-              getActiveContractsPayload,
-              io.circe.Decoder.decodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
+            clue("Alice as one locked holding left") {
+              inside(
+                listHoldings(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice.partyId,
+                )
+              ) { holdings =>
+                holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
+              }
+            }
+            actAndCheck(
+              "Bob rejects instruction #4, whose backing amulet has already been archived", {
+                val now = env.environment.clock.now
+                rejectTransferInstruction(
+                  bobValidatorBackend.participantClientWithAdminToken,
+                  bob,
+                  instrAboutToExpire,
+                  // we advanced time by 2min since the transfer instruction and it had a lifetime of 1min
+                  // so the lower bound is 1min in the past.
+                  expectedTimeBounds = Some((now.minusSeconds(60), CantonTimestamp.MaxValue)),
+                )
+              },
+            )(
+              "There are two open transfer instructions left",
+              _ => {
+                val instructions = listTransferInstructions(
+                  aliceValidatorBackend.participantClientWithAdminToken,
+                  alice.partyId,
+                )
+                instructions should have size 2
+              },
             )
 
-          activeContractsResponse should have size 5 // 2 unlocked amulets, 1 locked amulet, 2 sample holdings
+            // DummyHolding holdings
+            Seq("30.0", "40.0").foreach { amount =>
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.commands
+                .submitJavaExternalOrLocal(
+                  alice,
+                  commands = new DummyHolding(
+                    alice.partyId.toProtoPrimitive,
+                    alice.partyId.toProtoPrimitive,
+                    BigDecimal(amount).bigDecimal,
+                  )
+                    .create()
+                    .commands()
+                    .asScala
+                    .toSeq,
+                )
+            }
+          },
+        )(
+          "holdings and transactions are returned",
+          _ => {
+            val activeHoldingsResponse =
+              listContractsOfInterface(alice, holdingv1.Holding.TEMPLATE_ID)
 
-          val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequest(
-            GetUpdatesRequest(
-              updateFormat = Some(
-                UpdateFormat(includeTransactions =
-                  Some(
-                    TransactionFormat(
-                      transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
-                      eventFormat = Some(
-                        EventFormat(
-                          filtersByParty(alice.partyId, interfaces, includeWildcard = true)
-                        )
-                      ),
+            activeHoldingsResponse should have size 5 // 2 unlocked amulets, 1 locked amulet, 2 sample holdings
+
+            val activeTransferInstructionsResponse =
+              listContractsOfInterface(bob, transferinstructionv1.TransferInstruction.TEMPLATE_ID)
+
+            activeTransferInstructionsResponse should have size 2
+
+            val getUpdatesPayload = JsUpdateServiceCodecs.getUpdatesRequest(
+              GetUpdatesRequest(
+                updateFormat = Some(
+                  UpdateFormat(includeTransactions =
+                    Some(
+                      TransactionFormat(
+                        transactionShape = TRANSACTION_SHAPE_LEDGER_EFFECTS,
+                        eventFormat = Some(
+                          EventFormat(
+                            filtersByParty(alice.partyId, interfaces, includeWildcard = true)
+                          )
+                        ),
+                      )
                     )
                   )
                 )
               )
             )
-          )
 
-          val getUpdatesResponse = makeJsonApiV2Request(
-            "/v2/updates/flats",
-            getUpdatesPayload,
-            io.circe.Decoder.decodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
-          )
+            val getUpdatesResponse = makeJsonApiV2Request(
+              "/v2/updates/flats",
+              getUpdatesPayload,
+              io.circe.Decoder.decodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
+            )
 
-          (activeContractsResponse, getUpdatesResponse)
-        },
-      )
+            (activeHoldingsResponse, activeTransferInstructionsResponse, getUpdatesResponse)
+          },
+        )
 
       def mkTimestamp(major: Long, minor: Int) = {
         // move to a date that's far away from 1970, so we can grep for
@@ -625,6 +634,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         )
       def replaceStringsInJson(viewValue: Json) = {
         val current = viewValue.spaces2SortKeys
+        val amuletRulesId = sv1ScanBackend.getAmuletRules().contractId.contractId
         val allContracts =
           "\"([0-9a-fA-F]{138})\"".r.findAllIn(current).matchData.map(_.group(1)).toSeq
 
@@ -637,9 +647,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
             }
             .replace(aliceWalletClient.config.ledgerApiUser, "the_user")
             .replace(
-              sv1ScanBackend.getAmuletRules().contractId.contractId,
+              amuletRulesId,
               replaceContractIdWithStableString(
-                sv1ScanBackend.getAmuletRules().contractId.contractId
+                amuletRulesId
               ).toString,
             )
 
@@ -694,7 +704,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         )
       }
 
-      val normalizedHoldings = activeContractsResponse.map(entry =>
+      def normalizeActiveContractsResponse(
+          activeContractsResponse: Seq[JsGetActiveContractsResponse]
+      ) = activeContractsResponse.map(entry =>
         entry.copy(contractEntry = entry.contractEntry match {
           case active: JsContractEntry.JsActiveContract =>
             active.copy(
@@ -717,6 +729,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 nodeId = 1,
                 offset = 1,
                 signatories = active.createdEvent.signatories.map(expectedParties),
+                observers = active.createdEvent.observers.map(expectedParties),
                 witnessParties = active.createdEvent.witnessParties.map(expectedParties),
               ),
               synchronizerId = "sync::normalized",
@@ -728,8 +741,9 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         })
       )
 
+      val normalizedHoldings = normalizeActiveContractsResponse(activeHoldingsResponse)
       replaceOrFail(
-        "token-standard/cli/__tests__/mocks/data/holdings.json",
+        "holdings.json",
         normalizedHoldings,
         io.circe.Encoder
           .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
@@ -782,7 +796,7 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         }
 
       replaceOrFail(
-        "token-standard/cli/__tests__/mocks/data/txs.json",
+        "txs.json",
         normalizedUpdates.map(JsGetUpdatesResponse(_)),
         io.circe.Encoder.encodeSeq(JsUpdateServiceCodecs.jsGetUpdatesResponse),
       )
@@ -838,9 +852,18 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         }
       }
       replaceOrFail(
-        s"token-standard/cli/__tests__/mocks/data/eventsByContractIdResponses.json",
+        s"eventsByContractIdResponses.json",
         eventByIdResponses.flatten,
         io.circe.Encoder.encodeSeq(JsEventServiceCodecs.jsGetEventsByContractIdResponseRW),
+      )
+
+      val normalizedTransferInstructions =
+        normalizeActiveContractsResponse(activeTransferInstructionsResponse)
+      replaceOrFail(
+        "transfer-instructions.json",
+        normalizedTransferInstructions,
+        io.circe.Encoder
+          .encodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
       )
     }
   }
@@ -879,6 +902,32 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
         .as[R](decode)
         .fold(fa => Left(s"Failed to decode $rawResponse: $fa"), Right(_))
     }
+  }
+
+  private def listContractsOfInterface(party: RichPartyId, interface: Identifier)(implicit
+      env: SpliceTestConsoleEnvironment
+  ): Seq[JsGetActiveContractsResponse] = {
+    val getActiveContractsPayload = JsStateServiceCodecs.getActiveContractsRequestRW(
+      GetActiveContractsRequest(
+        filter = Some(
+          TransactionFilter(
+            filtersByParty(
+              party.partyId,
+              Seq(interface),
+              includeWildcard = false,
+            )
+          )
+        ),
+        activeAtOffset =
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end(),
+      )
+    )
+
+    makeJsonApiV2Request(
+      "/v2/state/active-contracts",
+      getActiveContractsPayload,
+      io.circe.Decoder.decodeSeq(JsStateServiceCodecs.jsGetActiveContractsResponseRW),
+    )
   }
 
   private def filtersByParty(

@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_act
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_ConfirmSvOnboarding,
+  UnallocatedUnclaimedActivityRecord,
   VoteRequest,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.svonboarding as so
@@ -36,7 +37,7 @@ import org.lfdecentralizedtrust.splice.migration.DomainMigrationInfo
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import org.lfdecentralizedtrust.splice.store.*
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.{QueryResult, TemplateFilter}
-import org.lfdecentralizedtrust.splice.store.db.AcsJdbcTypes
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsJdbcTypes}
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStore
 import org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
@@ -46,8 +47,9 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{SynchronizerId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{Member, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
@@ -69,7 +71,8 @@ trait SvDsoStore
 
   override lazy val acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData
+        org.lfdecentralizedtrust.splice.sv.store.db.DsoTables.DsoAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] =
     SvDsoStore.contractFilter(key.dsoParty, domainMigrationId)
 
@@ -221,12 +224,12 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[AppRewardCouponsSum]
 
-  def listAppRewardCouponsGroupedByCounterparty(
+  def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[splice.amulet.AppRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.AppRewardCoupon.ContractId]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
@@ -243,12 +246,12 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[BigDecimal]
 
-  def listValidatorRewardCouponsGroupedByCounterparty(
+  def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
@@ -282,22 +285,22 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
-  def listValidatorFaucetCouponsGroupedByCounterparty(
+  def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundCounterpartyBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
+    Seq[SvDsoStore.RoundBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
   ]
 
-  def listValidatorLivenessActivityRecordsGroupedByCounterparty(
+  def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundCounterpartyBatch[
+    Seq[SvDsoStore.RoundBatch[
       splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
     ]]
   ]
@@ -329,12 +332,12 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
-  def listSvRewardCouponsGroupedByCounterparty(
+  def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[splice.amulet.SvRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.SvRewardCoupon.ContractId]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
@@ -345,15 +348,19 @@ trait SvDsoStore
     ]]
   ]
 
-  final def getExpiredRewards(
+  /** Returns at most expired coupon batches per round and coupon type.
+    * It will return one entry per closed round that has expired coupon and per type of coupon.
+    * It will return a maximum of `totalCouponsLimit` per coupon type
+    */
+  final def getExpiredCouponsInBatchesPerRoundAndCouponType(
       domain: SynchronizerId,
       enableExpireValidatorFaucet: Boolean,
       totalCouponsLimit: Limit = PageLimit.tryCreate(100),
   )(implicit
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = {
-    def filterRoundCounterpartyBatch[T](
-        batches: Seq[SvDsoStore.RoundCounterpartyBatch[T]],
+    def associateRoundContractWithBatch[T](
+        batches: Seq[SvDsoStore.RoundBatch[T]],
         roundMap: Map[
           java.lang.Long,
           Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound],
@@ -365,27 +372,27 @@ trait SvDsoStore
         roundMap.get(batch.roundNumber).map(closedRound => (closedRound, batch.batch)).toList
       }
     for {
-      appRewardGroups <- listAppRewardCouponsGroupedByCounterparty(
+      appRewardGroups <- listAppRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
-      validatorRewardGroups <- listValidatorRewardCouponsGroupedByCounterparty(
+      validatorRewardGroups <- listValidatorRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
       validatorFaucetGroups <-
         if (enableExpireValidatorFaucet)
-          listValidatorFaucetCouponsGroupedByCounterparty(
+          listValidatorFaucetCouponsGroupedByRound(
             domain,
             totalCouponsLimit = totalCouponsLimit,
           )
         else Future.successful(Seq.empty)
       validatorLivenessActivityRecordGroups <-
-        listValidatorLivenessActivityRecordsGroupedByCounterparty(
+        listValidatorLivenessActivityRecordsGroupedByRound(
           domain,
           totalCouponsLimit = totalCouponsLimit,
         )
-      svRewardCouponGroups <- listSvRewardCouponsGroupedByCounterparty(
+      svRewardCouponGroups <- listSvRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
@@ -395,7 +402,7 @@ trait SvDsoStore
           .toSet
       closedRounds <- listClosedRounds(roundNumbers, domain, totalCouponsLimit)
       closedRoundMap = closedRounds.map(r => r.payload.round.number -> r).toMap
-    } yield filterRoundCounterpartyBatch(appRewardGroups, closedRoundMap).map {
+    } yield associateRoundContractWithBatch(appRewardGroups, closedRoundMap).map {
       case (closedRound, batch) =>
         ExpiredRewardCouponsBatch(
           closedRoundCid = closedRound.contractId,
@@ -407,7 +414,7 @@ trait SvDsoStore
           validatorLivenessActivityRecords = Seq.empty,
         )
     } ++
-      filterRoundCounterpartyBatch(validatorRewardGroups, closedRoundMap).map {
+      associateRoundContractWithBatch(validatorRewardGroups, closedRoundMap).map {
         case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
@@ -418,7 +425,7 @@ trait SvDsoStore
             validatorFaucets = Seq.empty,
             validatorLivenessActivityRecords = Seq.empty,
           )
-      } ++ filterRoundCounterpartyBatch(validatorFaucetGroups, closedRoundMap).map {
+      } ++ associateRoundContractWithBatch(validatorFaucetGroups, closedRoundMap).map {
         case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
@@ -429,8 +436,8 @@ trait SvDsoStore
             validatorFaucets = batch,
             validatorLivenessActivityRecords = Seq.empty,
           )
-      } ++ filterRoundCounterpartyBatch(validatorLivenessActivityRecordGroups, closedRoundMap).map {
-        case (closedRound, batch) =>
+      } ++ associateRoundContractWithBatch(validatorLivenessActivityRecordGroups, closedRoundMap)
+        .map { case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
             closedRoundNumber = closedRound.payload.round.number,
@@ -440,7 +447,7 @@ trait SvDsoStore
             validatorFaucets = Seq.empty,
             validatorLivenessActivityRecords = batch,
           )
-      } ++ filterRoundCounterpartyBatch(svRewardCouponGroups, closedRoundMap).map {
+        } ++ associateRoundContractWithBatch(svRewardCouponGroups, closedRoundMap).map {
         case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
@@ -491,7 +498,7 @@ trait SvDsoStore
         domain,
         limit,
       )
-      archivableClosedRounds <- closedRounds.traverse(round => {
+      archivableClosedRounds <- MonadUtil.sequentialTraverse(closedRounds)(round => {
         for {
           appRewardCoupons <- listAppRewardCouponsOnDomain(
             round.payload.round.number,
@@ -615,6 +622,20 @@ trait SvDsoStore
       now: CantonTimestamp,
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleAnsSubscription]]
+
+  def listExpiredUnallocatedUnclaimedActivityRecord: ListExpiredContracts[
+    UnallocatedUnclaimedActivityRecord.ContractId,
+    UnallocatedUnclaimedActivityRecord,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(UnallocatedUnclaimedActivityRecord.COMPANION)
+
+  def listExpiredUnclaimedActivityRecord: ListExpiredContracts[
+    splice.amulet.UnclaimedActivityRecord.ContractId,
+    splice.amulet.UnclaimedActivityRecord,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(
+      splice.amulet.UnclaimedActivityRecord.COMPANION
+    )
 
   def listSvOnboardingConfirmed(
       limit: Limit = Limit.DefaultLimit
@@ -775,30 +796,6 @@ trait SvDsoStore
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]]
   ]
-
-  def listElectionRequests(
-      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[
-    Seq[Contract[splice.dsorules.ElectionRequest.ContractId, splice.dsorules.ElectionRequest]]
-  ]
-
-  def lookupElectionRequestByRequesterWithOffset(
-      requester: PartyId,
-      epoch: Long,
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[
-      Contract[splice.dsorules.ElectionRequest.ContractId, splice.dsorules.ElectionRequest]
-    ]]
-  ]
-
-  def listExpiredElectionRequests(
-      epoch: Long,
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Contract[
-    splice.dsorules.ElectionRequest.ContractId,
-    splice.dsorules.ElectionRequest,
-  ]]]
 
   def lookupAnsEntryByNameWithOffset(name: String, now: CantonTimestamp)(implicit
       tc: TraceContext
@@ -987,7 +984,10 @@ object SvDsoStore {
   def contractFilter(
       dsoParty: PartyId,
       domainMigrationId: Long,
-  ): MultiDomainAcsStore.ContractFilter[DsoAcsStoreRowData] = {
+  ): MultiDomainAcsStore.ContractFilter[
+    DsoAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
     val dso = dsoParty.toProtoPrimitive
 
@@ -1034,13 +1034,6 @@ object SvDsoStore {
           actionAnsEntryContextCid = actionAnsEntryContextCid,
           actionAnsEntryContextPaymentId = actionAnsEntryContextPaymentId,
           actionAnsEntryContextArcType = actionAnsEntryContextArcType,
-        )
-      },
-      mkFilter(splice.dsorules.ElectionRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
-          electionRequestEpoch = Some(contract.payload.epoch),
         )
       },
       mkFilter(splice.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
@@ -1297,6 +1290,21 @@ object SvDsoStore {
           contract
         )
       },
+      mkFilter(splice.dsorules.UnallocatedUnclaimedActivityRecord.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+        )
+      },
+      mkFilter(splice.amulet.UnclaimedActivityRecord.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
+          )
+      },
     )
 
     MultiDomainAcsStore.SimpleContractFilter(
@@ -1320,8 +1328,7 @@ object SvDsoStore {
       prettyOfClass(param("state", _.state), param("context", _.context))
   }
 
-  case class RoundCounterpartyBatch[+T](
-      counterparty: PartyId,
+  case class RoundBatch[+T](
       roundNumber: Long,
       batch: Seq[T],
   )

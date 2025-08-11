@@ -41,7 +41,6 @@ object DsoTables extends AcsTables with NamedLogging {
       voteRequestTrackingCid: Option[VoteRequest.ContractId] = None,
       requester: Option[PartyId] = None,
       requesterName: Option[String] = None,
-      electionRequestEpoch: Option[Long] = None,
       memberTrafficMember: Option[Member] = None,
       memberTrafficDomain: Option[SynchronizerId] = None,
       ansEntryName: Option[String] = None,
@@ -54,7 +53,7 @@ object DsoTables extends AcsTables with NamedLogging {
       svParty: Option[PartyId] = None,
       svName: Option[String] = None,
       walletParty: Option[PartyId] = None,
-  ) extends AcsRowData {
+  ) extends AcsRowData.AcsRowDataFromContract {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "amulet_round_of_expiry" -> amuletRoundOfExpiry,
       "reward_round" -> rewardRound,
@@ -74,7 +73,6 @@ object DsoTables extends AcsTables with NamedLogging {
       "vote_request_tracking_cid" -> voteRequestTrackingCid,
       "requester" -> requester,
       "requester_name" -> requesterName.map(lengthLimited),
-      "election_request_epoch" -> electionRequestEpoch,
       "member_traffic_member" -> memberTrafficMember,
       "member_traffic_domain" -> memberTrafficDomain,
       "ans_entry_name" -> ansEntryName.map(lengthLimited),

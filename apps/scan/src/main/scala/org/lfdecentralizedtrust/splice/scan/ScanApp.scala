@@ -60,6 +60,7 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.http.HttpRateLimiter
 
 /** Class representing a Scan app instance.
   *
@@ -123,6 +124,10 @@ class ScanApp(
       dsoParty <- appInitStep("Get DSO party from user metadata") {
         appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
       }
+      initialRound <- appInitStep("Get initial round from user metadata") {
+        appInitConnection.getInitialRoundFromUserMetadata(config.svUser)
+      }
+      _ = logger.debug(s"Started with initial round $initialRound")
       scanAggregatesReaderContext = new ScanAggregatesReaderContext(
         clock,
         ledgerClient,
@@ -171,9 +176,10 @@ class ScanApp(
         },
         migrationInfo,
         participantId,
-        config.cache.svNodeStateTtl,
+        config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
+        initialRound.toLong,
       )
       acsSnapshotStore = AcsSnapshotStore(
         storage,
@@ -195,12 +201,14 @@ class ScanApp(
         retryProvider,
         loggerFactory,
         store,
+        storage,
         acsSnapshotStore,
         config.ingestFromParticipantBegin,
         config.ingestUpdateHistoryFromParticipantBegin,
         serviceUserPrimaryParty,
         svName,
         amuletAppParameters.upgradesConfig,
+        initialRound.toLong,
       )
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
@@ -242,6 +250,7 @@ class ScanApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         appInitConnection,
+        loggerFactory,
       )
       scanHandler = new HttpScanHandler(
         serviceUserPrimaryParty,
@@ -258,6 +267,7 @@ class ScanApp(
         loggerFactory,
         packageVersionSupport,
         bftSequencersWithAdminConnections,
+        initialRound,
       )
 
       tokenStandardTransferInstructionHandler = new HttpTokenStandardTransferInstructionHandler(
@@ -275,41 +285,71 @@ class ScanApp(
         store,
         config.spliceInstanceNames,
         loggerFactory,
-      )()
+      )
 
       tokenStandardAllocationInstructionHandler = new HttpTokenStandardAllocationInstructionHandler(
         store,
         clock,
         loggerFactory,
       )
+      httpRateLimiter = new HttpRateLimiter(
+        config.parameters.rateLimiting,
+        nodeMetrics.openTelemetryMetricsFactory,
+      )
       route = cors(
         CorsSettings(ac).withExposedHeaders(Seq("traceparent"))
       ) {
         withTraceContext { traceContext =>
           {
+            def buildRouteForOperation(operation: String, httpService: String) = {
+              nodeMetrics.httpServerMetrics
+                .withMetrics(httpService)(operation)
+                .tflatMap(_ =>
+                  // rate limit after the metrics to capture the result in the http metrics
+                  httpRateLimiter.withRateLimit(httpService)(operation).tflatMap { _ =>
+                    val httpErrorHandler = new HttpErrorHandler(loggerFactory)
+                    val base = httpErrorHandler.directive(traceContext).tflatMap { _ =>
+                      provide(traceContext)
+                    }
+                    (httpService, config.parameters.customTimeouts.get(operation)) match {
+                      // custom HTTP timeouts
+                      case ("scan", Some(customTimeout)) =>
+                        withRequestTimeout(
+                          customTimeout.duration,
+                          httpErrorHandler.timeoutHandler(customTimeout.duration, _),
+                        ).tflatMap { _ =>
+                          base
+                        }
+                      case _ =>
+                        base
+                    }
+                  }
+                )
+            }
 
             requestLogger(traceContext) {
-              HttpErrorHandler(loggerFactory)(traceContext) {
-                concat(
-                  ScanResource.routes(scanHandler, _ => provide(traceContext)),
-                  TokenStandardTransferInstructionResource.routes(
-                    tokenStandardTransferInstructionHandler,
-                    _ => provide(traceContext),
-                  ),
-                  TokenStandardAllocationInstructionResource.routes(
-                    tokenStandardAllocationInstructionHandler,
-                    _ => provide(traceContext),
-                  ),
-                  TokenStandardMetadataResource.routes(
-                    tokenStandardMetadataHandler,
-                    _ => provide(traceContext),
-                  ),
-                  TokenStandardAllocationResource.routes(
-                    tokenStandardAllocationHandler,
-                    _ => provide(traceContext),
-                  ),
-                )
-              }
+              concat(
+                ScanResource.routes(
+                  scanHandler,
+                  buildRouteForOperation(_, "scan"),
+                ),
+                TokenStandardTransferInstructionResource.routes(
+                  tokenStandardTransferInstructionHandler,
+                  buildRouteForOperation(_, "token_standard_transfer_instruction"),
+                ),
+                TokenStandardAllocationInstructionResource.routes(
+                  tokenStandardAllocationInstructionHandler,
+                  buildRouteForOperation(_, "token_standard_allocation_instruction"),
+                ),
+                TokenStandardMetadataResource.routes(
+                  tokenStandardMetadataHandler,
+                  buildRouteForOperation(_, "token_standard_metadata"),
+                ),
+                TokenStandardAllocationResource.routes(
+                  tokenStandardAllocationHandler,
+                  buildRouteForOperation(_, "token_standard_allocation"),
+                ),
+              )
             }
           }
         }

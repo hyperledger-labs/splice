@@ -495,10 +495,10 @@ class ValidatorReonboardingWithPartiesToMigrateIntegrationTest
             aliceValidatorBackend.stop()
           },
         )(
-          s"${aliceValidatorWalletParty} is not hosted anywhere anymore",
+          s"$aliceValidatorWalletParty is not hosted anywhere anymore",
           _ => {
             sv1Backend.appState.participantAdminConnection
-              .listPartyToParticipant(
+              .listPartyToParticipantFromAllStores(
                 filterParty = aliceValidatorWalletParty.filterString
               )
               .futureValue shouldBe empty

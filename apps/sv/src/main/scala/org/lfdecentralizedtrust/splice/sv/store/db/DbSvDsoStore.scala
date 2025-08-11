@@ -49,7 +49,7 @@ import org.lfdecentralizedtrust.splice.store.{
   MultiDomainAcsStore,
 }
 import org.lfdecentralizedtrust.splice.sv.store.{AppRewardCouponsSum, SvDsoStore, SvStore}
-import SvDsoStore.RoundCounterpartyBatch
+import SvDsoStore.RoundBatch
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
@@ -83,6 +83,7 @@ class DbSvDsoStore(
 ) extends DbAppStore(
       storage,
       DsoTables.acsTableName,
+      interfaceViewsTableNameOpt = None,
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
@@ -114,6 +115,9 @@ class DbSvDsoStore(
     summary.ingestedCreatedEvents.foreach { ev =>
       Contract.fromCreatedEvent(splice.round.OpenMiningRound.COMPANION)(ev).foreach { round =>
         dsoStoreMetrics.latestOpenMiningRound.updateValue(round.payload.round.number)
+      }
+      Contract.fromCreatedEvent(splice.round.IssuingMiningRound.COMPANION)(ev).foreach { round =>
+        dsoStoreMetrics.latestIssuingMiningRound.updateValue(round.payload.round.number)
       }
     }
   }
@@ -435,80 +439,80 @@ class DbSvDsoStore(
     }
   }
 
-  override def listAppRewardCouponsGroupedByCounterparty(
+  override def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundCounterpartyBatch[AppRewardCoupon.ContractId]]] =
-    listCouponsGroupedByCounterparty(
+  ): Future[Seq[RoundBatch[AppRewardCoupon.ContractId]]] =
+    listCouponsGroupedByRound(
       AppRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
     )
 
-  override def listValidatorRewardCouponsGroupedByCounterparty(
+  override def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundCounterpartyBatch[ValidatorRewardCoupon.ContractId]]] =
-    listCouponsGroupedByCounterparty(
+  ): Future[Seq[RoundBatch[ValidatorRewardCoupon.ContractId]]] =
+    listCouponsGroupedByRound(
       ValidatorRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
     )
 
-  override def listValidatorFaucetCouponsGroupedByCounterparty(
+  override def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundCounterpartyBatch[ValidatorFaucetCoupon.ContractId]]] =
-    listCouponsGroupedByCounterparty(
+  ): Future[Seq[RoundBatch[ValidatorFaucetCoupon.ContractId]]] =
+    listCouponsGroupedByRound(
       ValidatorFaucetCoupon.COMPANION,
       domain,
       totalCouponsLimit,
     )
 
-  override def listValidatorLivenessActivityRecordsGroupedByCounterparty(
+  override def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[RoundCounterpartyBatch[ValidatorLivenessActivityRecord.ContractId]]] =
-    listCouponsGroupedByCounterparty(
+  ): Future[Seq[RoundBatch[ValidatorLivenessActivityRecord.ContractId]]] =
+    listCouponsGroupedByRound(
       ValidatorLivenessActivityRecord.COMPANION,
       domain,
       totalCouponsLimit,
     )
 
-  override def listSvRewardCouponsGroupedByCounterparty(
+  override def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[RoundCounterpartyBatch[SvRewardCoupon.ContractId]]] =
-    listCouponsGroupedByCounterparty(
+  )(implicit tc: TraceContext): Future[Seq[RoundBatch[SvRewardCoupon.ContractId]]] =
+    listCouponsGroupedByRound(
       SvRewardCoupon.COMPANION,
       domain,
       totalCouponsLimit,
     )
 
-  private def listCouponsGroupedByCounterparty[C, TCId <: ContractId[_]: ClassTag, T](
+  private def listCouponsGroupedByRound[C, TCId <: ContractId[_]: ClassTag, T](
       companion: C,
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       companionClass: ContractCompanion[C, TCId, T],
       tc: TraceContext,
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[TCId]]] = {
+  ): Future[Seq[SvDsoStore.RoundBatch[TCId]]] = {
     val templateId = companionClass.typeId(companion)
-    val opName = s"list${templateId.getEntityName}GroupedByCounterparty"
+    val opName = s"list${templateId.getEntityName}GroupedByRound"
     waitUntilAcsIngested {
       for {
         result <- storage
           .query(
             sql"""
-                select reward_party, reward_round, array_agg(contract_id)
+                select reward_round, array_agg(contract_id)
                 from dso_acs_store
                 where store_id = $acsStoreId
                   and migration_id = $domainMigrationId
@@ -516,15 +520,14 @@ class DbSvDsoStore(
                   and assigned_domain = $domain
                   and reward_party is not null -- otherwise index is not used
                   and reward_round is not null -- otherwise index is not used
-                group by reward_round, reward_party
+                group by reward_round
                 order by reward_round asc
                 limit ${sqlLimit(totalCouponsLimit)}
-               """.as[(PartyId, Long, Array[ContractId[ValidatorRewardCoupon]])],
+               """.as[(Long, Array[ContractId[ValidatorRewardCoupon]])],
             opName,
           )
-      } yield applyLimit(opName, totalCouponsLimit, result).map { case (party, round, batch) =>
-        RoundCounterpartyBatch(
-          party,
+      } yield applyLimit(opName, totalCouponsLimit, result).map { case (round, batch) =>
+        RoundBatch(
           round,
           batch.map(cid => companionClass.toContractId(companion, cid.contractId)).toSeq,
         )
@@ -1187,89 +1190,6 @@ class DbSvDsoStore(
       resultWithOffset.offset,
       resultWithOffset.row.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_)),
     )).getOrRaise(offsetExpectedError())
-  }
-
-  override def listElectionRequests(
-      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = waitUntilAcsIngested {
-    import scala.jdk.CollectionConverters.*
-    val requesters = inClause(dsoRules.payload.svs.keySet().asScala.map(lengthLimited))
-    val electionRequestEpoch = dsoRules.payload.epoch.longValue()
-    for {
-      result <- storage
-        .query(
-          selectFromAcsTable(
-            DsoTables.acsTableName,
-            acsStoreId,
-            domainMigrationId,
-            where = (sql"""template_id_qualified_name = ${QualifiedName(
-                ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                       and requester IN """ ++ requesters ++ sql"""
-                       and election_request_epoch = $electionRequestEpoch""").toActionBuilder,
-            orderLimit = sql"""limit ${sqlLimit(limit)}""",
-          ),
-          "listElectionRequests",
-        )
-      limited = applyLimit("listElectionRequests", limit, result)
-    } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
-  }
-
-  override def lookupElectionRequestByRequesterWithOffset(requester: PartyId, epoch: Long)(implicit
-      tc: TraceContext
-  ): Future[
-    MultiDomainAcsStore.QueryResult[Option[Contract[ElectionRequest.ContractId, ElectionRequest]]]
-  ] = waitUntilAcsIngested {
-    (for {
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithOffset(
-            DsoTables.acsTableName,
-            acsStoreId,
-            domainMigrationId,
-            where = sql"""
-                              template_id_qualified_name = ${QualifiedName(
-                ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )}
-                          and requester = $requester
-                          and election_request_epoch = $epoch
-                            """,
-            orderLimit = sql"limit 1",
-          ).headOption,
-          "lookupElectionRequestByRequesterWithOffset",
-        )
-    } yield MultiDomainAcsStore.QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(ElectionRequest.COMPANION)(_)),
-    )).getOrRaise(offsetExpectedError())
-  }
-
-  override def listExpiredElectionRequests(
-      epoch: Long,
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Contract[
-    ElectionRequest.ContractId,
-    ElectionRequest,
-  ]]] = waitUntilAcsIngested {
-    for {
-      result <- storage
-        .query(
-          selectFromAcsTable(
-            DsoTables.acsTableName,
-            acsStoreId,
-            domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(
-                ElectionRequest.TEMPLATE_ID_WITH_PACKAGE_ID
-              )} and election_request_epoch < $epoch""",
-            orderLimit = sql"""limit ${sqlLimit(limit)}""",
-          ),
-          "listExpiredElectionRequests",
-        )
-      limited = applyLimit("listExpiredElectionRequests", limit, result)
-    } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
   }
 
   override def lookupAnsEntryByNameWithOffset(

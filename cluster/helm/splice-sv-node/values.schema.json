@@ -201,6 +201,9 @@
                   "type": "string"
                 }
               }
+            },
+            "skipInitialization": {
+                "type": "boolean"
             }
           }
         },
@@ -227,7 +230,7 @@
                 "type": "string"
               },
               "weight": {
-                "type": "string"
+                "type": ["integer", "string"]
               }
             }
           }

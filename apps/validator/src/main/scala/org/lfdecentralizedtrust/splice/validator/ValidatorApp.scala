@@ -88,8 +88,9 @@ import com.digitalasset.canton.lifecycle.LifeCycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{SynchronizerId, PartyId}
+import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -98,8 +99,8 @@ import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
-
 import com.google.protobuf.ByteString
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
@@ -134,6 +135,9 @@ class ValidatorApp(
   override def packagesForJsonDecoding =
     super.packagesForJsonDecoding ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
+  // We don't want the validator to mess around with things like sequencer connections until the SV app finishes init
+  override def waitForPartyBeforePreinitialize = false
+
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
   ): Future[Unit] = for {
@@ -152,7 +156,8 @@ class ValidatorApp(
           )
         case None =>
           UpdateHistory.getHighestKnownMigrationId(storage).flatMap {
-            case Some(migrationId) if migrationId < config.domainMigrationId =>
+            case Some(migrationId)
+                if !config.svValidator && migrationId < config.domainMigrationId =>
               throw Status.INVALID_ARGUMENT
                 .withDescription(
                   s"Migration ID was incremented (to ${config.domainMigrationId}) but no migration dump for restoring from was specified."
@@ -242,26 +247,22 @@ class ValidatorApp(
                       migrationDump.acsSnapshot,
                     )
                   }
-                  _ <- migrationDump.participantUsers match {
-                    case Some(participantUsersData) =>
-                      appInitStep("Restoring participant users data") {
-                        val readWriteConnection = ledgerClient.connection(
-                          this.getClass.getSimpleName,
-                          loggerFactory,
-                        )
-                        val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
-                          readWriteConnection,
-                          loggerFactory,
-                        )
-                        participantUsersDataRestorer.restoreParticipantUsersData(
-                          participantUsersData
-                        )
-                      }
-                    case None => Future.unit
+                  _ <- appInitStep("Restoring participant users data") {
+                    val readWriteConnection = ledgerClient.connection(
+                      this.getClass.getSimpleName,
+                      loggerFactory,
+                    )
+                    val participantUsersDataRestorer = new ParticipantUsersDataRestorer(
+                      readWriteConnection,
+                      loggerFactory,
+                    )
+                    participantUsersDataRestorer.restoreParticipantUsersData(
+                      migrationDump.participantUsers
+                    )
                   }
                 } yield ()
               case None =>
-                if (config.svValidator)
+                if (config.svValidator && config.disableSvValidatorBftSequencerConnection)
                   appInitStep("Ensuring decentralized synchronizer already registered") {
                     domainConnector.waitForDecentralizedSynchronizerIsRegisteredAndConnected()
                   }
@@ -393,12 +394,13 @@ class ValidatorApp(
                 }
               }
             }
-            _ <- config.participantPruningSchedule.traverse_ { pruningConfig =>
-              participantAdminConnection.ensurePruningSchedule(
-                pruningConfig.cron,
-                pruningConfig.maxDuration,
-                pruningConfig.retention,
-              )
+            _ <- MonadUtil.sequentialTraverse_(config.participantPruningSchedule.toList) {
+              pruningConfig =>
+                participantAdminConnection.ensurePruningSchedule(
+                  pruningConfig.cron,
+                  pruningConfig.maxDuration,
+                  pruningConfig.retention,
+                )
             }
           } yield initialSynchronizerTime
         }
@@ -460,7 +462,7 @@ class ValidatorApp(
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
-      _ <- instance.dars.traverse_(dar =>
+      _ <- MonadUtil.sequentialTraverse_(instance.dars)(dar =>
         participantAdminConnection.uploadDarFileWithVettingOnAllConnectedSynchronizers(
           dar,
           RetryFor.WaitingOnInitDependency,
@@ -749,6 +751,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
       walletManagerOpt =
         if (config.enableWallet) {
@@ -778,7 +781,7 @@ class ValidatorApp(
             domainTimeAutomationService.domainTimeSync,
             domainParamsAutomationService.domainUnpausedSync,
             config.treasury,
-            storage: Storage,
+            storage,
             retryProvider,
             scanConnection,
             packageVersionSupport,
@@ -812,6 +815,7 @@ class ValidatorApp(
         domainParamsAutomationService.domainUnpausedSync,
         walletManagerOpt,
         store,
+        storage,
         scanConnection,
         ledgerClient,
         participantAdminConnection,
@@ -834,9 +838,8 @@ class ValidatorApp(
         config.contactPoint,
         initialSynchronizerTime,
         loggerFactory,
-        packageVersionSupport,
       )
-      _ <- config.appInstances.toList.traverse({ case (name, instance) =>
+      _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>
         appInitStep(s"Set up app instance $name") {
           setupAppInstance(
             name,
@@ -855,7 +858,7 @@ class ValidatorApp(
         } else {
           config.validatorWalletUsers
         }
-        users.traverse_ { user =>
+        MonadUtil.sequentialTraverse_(users) { user =>
           ValidatorUtil.onboard(
             endUserName = user,
             knownParty = Some(validatorParty),
@@ -898,6 +901,7 @@ class ValidatorApp(
       packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
         synchronizerId,
         readOnlyLedgerConnection,
+        loggerFactory,
       )
 
       adminHandler =
@@ -984,61 +988,138 @@ class ValidatorApp(
                 (Seq(
                   ValidatorResource.routes(
                     handler,
-                    AuthExtractor(verifier, loggerFactory, "splice validator realm"),
+                    operation =>
+                      metrics.httpServerMetrics.withMetrics("validator")(operation).tflatMap { _ =>
+                        AuthExtractor(verifier, loggerFactory, "splice validator realm")(
+                          traceContext
+                        )(
+                          operation
+                        )
+                      },
                   ),
                   ScanproxyResource.routes(
                     scanProxyHandler,
-                    AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                    operation =>
+                      metrics.httpServerMetrics.withMetrics("scanProxy")(operation).tflatMap { _ =>
+                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                          traceContext
+                        )(operation)
+                      },
                   ),
                   pathPrefix("api" / "validator" / "v0" / "scan-proxy") {
                     concat(
                       TokenStandardMetadataResource.routes(
                         tokenStandardScanProxyHandler,
-                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                        operation => {
+                          metrics.httpServerMetrics
+                            .withMetrics("tokenStandardMetadata")(operation)
+                            .tflatMap { _ =>
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                                traceContext
+                              )(
+                                operation
+                              )
+                            }
+                        },
                       ),
                       TokenStandardTransferInstructionResource.routes(
                         tokenStandardScanProxyHandler,
-                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                        operation =>
+                          metrics.httpServerMetrics
+                            .withMetrics("tokenStandardTransfer")(operation)
+                            .tflatMap { _ =>
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                                traceContext
+                              )(
+                                operation
+                              )
+                            },
                       ),
                       TokenStandardAllocationInstructionResource.routes(
                         tokenStandardScanProxyHandler,
-                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                        operation =>
+                          metrics.httpServerMetrics
+                            .withMetrics("tokenStandardAllocationInstruction")(operation)
+                            .tflatMap { _ =>
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                                traceContext
+                              )(
+                                operation
+                              )
+                            },
                       ),
                       TokenStandardAllocationResource.routes(
                         tokenStandardScanProxyHandler,
-                        AuthExtractor(verifier, loggerFactory, "splice scan proxy realm"),
+                        operation =>
+                          metrics.httpServerMetrics
+                            .withMetrics("tokenStandardAllocation")(operation)
+                            .tflatMap { _ =>
+                              AuthExtractor(verifier, loggerFactory, "splice scan proxy realm")(
+                                traceContext
+                              )(
+                                operation
+                              )
+                            },
                       ),
                     )
                   },
                   ValidatorAdminResource.routes(
                     adminHandler,
                     operationId =>
-                      AdminAuthExtractor(
-                        verifier,
-                        validatorParty,
-                        automation.connection,
-                        loggerFactory,
-                        "splice validator operator realm",
-                      )(traceContext)(operationId),
+                      metrics.httpServerMetrics
+                        .withMetrics("admin")(operationId)
+                        .tflatMap { _ =>
+                          AdminAuthExtractor(
+                            verifier,
+                            validatorParty,
+                            automation.connection,
+                            loggerFactory,
+                            "splice validator operator realm",
+                          )(traceContext)(operationId)
+                        },
                   ),
                   ValidatorPublicResource.routes(
                     publicHandler,
-                    _ => provide(()),
+                    operation =>
+                      metrics.httpServerMetrics
+                        .withMetrics("public")(operation)
+                        .tflatMap { _ => provide(()) },
                   ),
                 ) ++ walletInternalHandler.toList.map { walletHandler =>
                   InternalWalletResource.routes(
                     walletHandler,
-                    AuthExtractor(verifier, loggerFactory, "splice wallet realm"),
+                    operation =>
+                      metrics.httpServerMetrics
+                        .withMetrics("walletInternal")(operation)
+                        .tflatMap { _ =>
+                          AuthExtractor(verifier, loggerFactory, "splice wallet realm")(
+                            traceContext
+                          )(operation)
+                        },
                   )
                 } ++ walletExternalHandler.toList.map { walletHandler =>
                   ExternalWalletResource.routes(
                     walletHandler,
-                    AuthExtractor(verifier, loggerFactory, "splice wallet realm"),
+                    operation =>
+                      metrics.httpServerMetrics
+                        .withMetrics("walletExternal")(operation)
+                        .tflatMap { _ =>
+                          AuthExtractor(verifier, loggerFactory, "splice wallet realm")(
+                            traceContext
+                          )(operation)
+                        },
                   )
                 } ++ ansExternalHandler.toList.map { ansHandler =>
                   AnsResource.routes(
                     ansHandler,
-                    AuthExtractor(verifier, loggerFactory, "splice ans realm"),
+                    operation =>
+                      metrics.httpServerMetrics
+                        .withMetrics("ans")(operation)
+                        .tflatMap { _ =>
+                          AuthExtractor(verifier, loggerFactory, "splice ans realm")(traceContext)(
+                            operation
+                          )
+                        },
                   )
                 })*
               )

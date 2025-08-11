@@ -44,10 +44,14 @@ template ExternalPartyAmuletRules
         expiresAt : Time
         nonce : Int
         description : Optional Text
+        expectedDso : Optional Party
+        -- Party that the sender expects to represent the DSO party of the ExternalAmuletRules contract they are calling.
+        -- Must always be set to protect from malicious delegees swapping the ExternalAmuletRules contract out for
+        -- one under their control.
       controller sender
-      do -- TODO(#18633): once the `isLedgerTimeXX` primitives are in, enforce that `expiresAt` is in the future
-         -- We don't do that yet, as otherwise this would be a regression, as it would introduce a time-bound
-         -- on the prepared transaction creating the transfer command.
+      do
+         checkExpectedDso dso expectedDso
+         assertWithinDeadline "ExternalPartyAmuletRules_CreateTransferCommand.expiresAt" expiresAt
          cmd <- create TransferCommand with
            dso
            sender
@@ -142,8 +146,7 @@ template TransferCommand
              -- In the absence of automatic merging of inputs for external parties, it is possible for
              -- a user to accumulate tons of small amulet holdings and be unable to do a transfer.
              -- We do a self-transfer to merge inputs even in case of a failed transfer to guard against this.
-             _ <- fetchChecked (ForDso dso) context.amuletRules
-             _ <- exercisePaymentTransfer context Transfer with
+             _ <- exercisePaymentTransfer dso context Transfer with
                sender
                provider = delegate
                inputs = inputs
@@ -282,7 +285,7 @@ amulet_transferFactory_transferImpl this _self arg = do
           -- execute a self-transfer
           paymentContext <- unfeaturedPaymentContextFromChoiceContext dso extraArgs.context
           inputs <- holdingToTransferInputs (ForOwner with dso; owner = transfer.sender) paymentContext transfer.inputHoldingCids
-          result <- exercisePaymentTransfer paymentContext Transfer with
+          result <- exercisePaymentTransfer dso paymentContext Transfer with
             sender = transfer.sender
             provider = transfer.sender
             inputs

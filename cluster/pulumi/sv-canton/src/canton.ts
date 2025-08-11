@@ -3,7 +3,6 @@
 import {
   Auth0Client,
   auth0UserNameEnvVarSource,
-  config,
   DecentralizedSynchronizerMigrationConfig,
   DomainMigrationIndex,
   ExactNamespace,
@@ -14,6 +13,7 @@ import {
 import {
   InstalledMigrationSpecificSv,
   installSvParticipant,
+  SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
 } from 'splice-pulumi-common-sv';
 import { installPostgres, Postgres } from 'splice-pulumi-common/src/postgres';
@@ -32,7 +32,7 @@ export function installCantonComponents(
     auth0SvAppName: string;
     isFirstSv: boolean;
     isCoreSv: boolean;
-  },
+  } & SingleSvConfiguration,
   migrationConfig: DecentralizedSynchronizerMigrationConfig,
   cometbft: {
     nodeConfigs: {
@@ -52,14 +52,6 @@ export function installCantonComponents(
   disableProtection?: boolean,
   imagePullServiceAccountName?: string
 ): InstalledMigrationSpecificSv | undefined {
-  const logLevel = config.envFlag('SPLICE_DEPLOYMENT_NO_SV_DEBUG')
-    ? 'INFO'
-    : config.envFlag('SPLICE_DEPLOYMENT_SINGLE_SV_DEBUG')
-      ? svConfig.isFirstSv
-        ? 'DEBUG'
-        : 'INFO'
-      : 'DEBUG';
-
   const isActiveMigration = migrationConfig.active.id === migrationId;
 
   const auth0Config = auth0Client.getCfg();
@@ -111,11 +103,11 @@ export function installCantonComponents(
   if (migrationStillRunning) {
     const participant = installSvParticipant(
       xns,
+      svConfig,
       migrationId,
       auth0Config,
       isActiveMigration,
       participantPg,
-      logLevel,
       migrationInfo.version,
       svConfig.onboardingName,
       ledgerApiUserSecretSource,
@@ -133,12 +125,13 @@ export function installCantonComponents(
             setCoreDbNames: svConfig.isCoreSv,
           },
           isActiveMigration,
-          logLevel,
           migrationInfo.version,
+          svConfig.logging?.cantonLogLevel,
           imagePullServiceAccountName,
           opts
         )
       : new InStackCometBftDecentralizedSynchronizerNode(
+          svConfig,
           cometbft,
           migrationId,
           xns,
@@ -150,7 +143,6 @@ export function installCantonComponents(
           isActiveMigration,
           migrationConfig.isRunningMigration(),
           svConfig.onboardingName,
-          logLevel,
           migrationInfo.version,
           imagePullServiceAccountName,
           opts

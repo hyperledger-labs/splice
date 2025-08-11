@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppClientConfig,
   ScanCacheConfig,
   ScanSynchronizerConfig,
+  CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -27,7 +28,7 @@ import org.lfdecentralizedtrust.splice.splitwell.config.{
 import org.lfdecentralizedtrust.splice.sv.config.*
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.sv.config.SvOnboardingConfig.FoundDso
-import org.lfdecentralizedtrust.splice.util.Codec
+import org.lfdecentralizedtrust.splice.util.{Codec, SpliceRateLimitConfig}
 import org.lfdecentralizedtrust.splice.validator.config.*
 import org.lfdecentralizedtrust.splice.wallet.config.{
   AutoAcceptTransfersConfig,
@@ -139,6 +140,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
+        validatorConfig.parameters.commandCircuitBreakerConfig,
         validatorConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -176,6 +178,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
+        svConfig.parameters.commandCircuitBreakerConfig,
         svConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -212,6 +215,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
+        scanConfig.parameters.commandCircuitBreakerConfig,
         scanConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -248,6 +252,7 @@ case class SpliceConfig(
         parameters.timeouts.processing,
         parameters.timeouts.requestTimeout,
         UpgradesConfig(),
+        splitwellConfig.parameters.commandCircuitBreakerConfig,
         splitwellConfig.parameters.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
@@ -395,8 +400,14 @@ object SpliceConfig {
     implicit val networkAppClientConfigReader: ConfigReader[NetworkAppClientConfig] =
       deriveReader[NetworkAppClientConfig]
 
+    implicit val circuitBreakerConfig: ConfigReader[CircuitBreakerConfig] =
+      deriveReader[CircuitBreakerConfig]
     implicit val spliceParametersConfig: ConfigReader[SpliceParametersConfig] =
       deriveReader[SpliceParametersConfig]
+    implicit val rateLimitersConfig: ConfigReader[RateLimitersConfig] =
+      deriveReader[RateLimitersConfig]
+    implicit val spliceRateLimiterConfig: ConfigReader[SpliceRateLimitConfig] =
+      deriveReader[SpliceRateLimitConfig]
 
     implicit val upgradesConfig: ConfigReader[UpgradesConfig] = deriveReader[UpgradesConfig]
 
@@ -430,6 +441,8 @@ object SpliceConfig {
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
+    implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
+      deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -702,6 +715,29 @@ object SpliceConfig {
               s"topup interval ${conf.domains.global.buyExtraTraffic.minTopupInterval} must not be smaller than the polling interval ${conf.automation.pollingInterval}"
             ),
           )
+
+          _ <- Either.cond(
+            !conf.disableSvValidatorBftSequencerConnection || conf.svValidator,
+            (),
+            ConfigValidationFailed(
+              s"disableSvValidatorBftSequencerConnection must not be set for non-sv validators"
+            ),
+          )
+
+          _ <- Either.cond(
+            !(conf.disableSvValidatorBftSequencerConnection && conf.domains.global.url.isEmpty),
+            (),
+            ConfigValidationFailed(
+              s"disableSvValidatorBftSequencerConnection must be set together with domains.global.url"
+            ),
+          )
+          _ <- Either.cond(
+            !(!conf.disableSvValidatorBftSequencerConnection && conf.svValidator && conf.domains.global.url.isDefined),
+            (),
+            ConfigValidationFailed(
+              s"domains.global.url must not be set for an SV unless disableSvValidatorBftSequencerConnection is also set"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
@@ -756,8 +792,15 @@ object SpliceConfig {
     implicit val authConfig: ConfigWriter[AuthConfig] =
       confidentialWriter[AuthConfig](AuthConfig.hideConfidential)
 
+    implicit val circuitBreakerConfig: ConfigWriter[CircuitBreakerConfig] =
+      deriveWriter[CircuitBreakerConfig]
     implicit val spliceParametersConfig: ConfigWriter[SpliceParametersConfig] =
       deriveWriter[SpliceParametersConfig]
+
+    implicit val rateLimitersConfig: ConfigWriter[RateLimitersConfig] =
+      deriveWriter[RateLimitersConfig]
+    implicit val spliceRateLimiterConfig: ConfigWriter[SpliceRateLimitConfig] =
+      deriveWriter[SpliceRateLimitConfig]
 
     implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
       new FieldCoproductHint[AuthTokenSourceConfig]("type")
@@ -809,6 +852,8 @@ object SpliceConfig {
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
       deriveWriter[ScanCacheConfig]
+    implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
+      deriveWriter[SpliceCacheConfig]
 
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]

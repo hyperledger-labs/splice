@@ -195,7 +195,8 @@ template SubscriptionInitialPayment
         transferContext : AppTransferContext
       controller signatory this
       do
-        contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
+        contextRound <- fetchPublicReferenceData (ForDso with dso = subscriptionData.dso)
+          transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
         require ("Round at subscription request " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
 
         now <- getTime
@@ -312,7 +313,8 @@ template SubscriptionPayment
         transferContext : AppTransferContext
       controller signatory this
       do
-        contextRound <- exercise transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
+        contextRound <- fetchPublicReferenceData (ForDso with dso = subscriptionData.dso)
+          transferContext.openMiningRound (OpenMiningRound_Fetch subscriptionData.provider)
         require ("Round at subscription payment " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- TODO(#9465): look into why we even need the separate subscription contract given that we duplicate all its data
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
@@ -362,11 +364,11 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
   let SubscriptionPayData { paymentAmount; .. } = payData
 
 
-  contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
+  contextRound <- fetchPublicReferenceData (ForDso with dso) context.context.openMiningRound (OpenMiningRound_Fetch sender)
 
   targetAmount <- paymentAmountToAmulet dso contextRound paymentAmount
 
-  outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
+  outputFees <- exerciseComputeFees dso context sender [mkTransferOutput receiver targetAmount]
   let lockAmount = targetAmount + sum outputFees
   -- We know that the contextRound (=latest Round) won't be archived before
   -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
@@ -390,7 +392,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
          ]
        beneficiaries = None -- no beneficiaries for locking step
 
-  result <- exercisePaymentTransfer context transfer
+  result <- exercisePaymentTransfer dso context transfer
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
 
   pure(lockedAmulet, result.senderChangeAmulet, targetAmount, result.round)
@@ -408,7 +410,7 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
         inputs = [InputAmulet result.amuletSum.amulet]
         outputs = [mkTransferOutput receiver targetAmount]
         beneficiaries = None -- no beneficiaries, we want do deprecate subscriptions so no plans to extend this
-  result <- exerciseAppTransfer transferContext transfer
+  result <- exerciseAppTransfer subscriptionData.dso transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
   let [TransferResultAmulet amuletCid] = result.createdAmulets
 

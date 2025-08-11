@@ -10,6 +10,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 
 class ExpiredSvOnboardingRequestTrigger(
@@ -45,11 +46,10 @@ class ExpiredSvOnboardingRequestTrigger(
   ): Future[TaskOutcome] =
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireSvOnboardingRequest(
           co.work.contractId,
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection

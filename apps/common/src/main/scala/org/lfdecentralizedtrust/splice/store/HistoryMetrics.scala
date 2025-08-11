@@ -11,7 +11,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 
 class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
     metricsContext: MetricsContext
-) {
+) extends AutoCloseable {
   val prefix: MetricName = SpliceMetrics.MetricsPrefix :+ "history"
 
   object UpdateHistoryBackfilling {
@@ -19,7 +19,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
 
     type CantonTimestampMicros =
       Long // OpenTelemetry Gauges only allow numeric types and there's no way to map it
-    val latestRecordTime: Gauge[CantonTimestampMicros] =
+    lazy val latestRecordTime: Gauge[CantonTimestampMicros] =
       metricsFactory.gauge(
         MetricInfo(
           name = historyBackfillingPrefix :+ "latest-record-time",
@@ -47,7 +47,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         )
       )(metricsContext)
 
-    val completed: Gauge[Int] =
+    lazy val completed: Gauge[Int] =
       metricsFactory.gauge(
         MetricInfo(
           name = historyBackfillingPrefix :+ "completed",
@@ -91,7 +91,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         )
       )(metricsContext)
 
-    val completed: Gauge[Int] =
+    lazy val completed: Gauge[Int] =
       metricsFactory.gauge(
         MetricInfo(
           name = historyBackfillingPrefix :+ "completed",
@@ -105,7 +105,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
   object ImportUpdatesBackfilling {
     private val importUpdatesBackfillingPrefix: MetricName = prefix :+ "import-updates-backfilling"
 
-    val latestMigrationId: Gauge[Long] =
+    lazy val latestMigrationId: Gauge[Long] =
       metricsFactory.gauge(
         MetricInfo(
           name = importUpdatesBackfillingPrefix :+ "latest-migration-id",
@@ -124,7 +124,7 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
         )
       )(metricsContext)
 
-    val completed: Gauge[Int] =
+    lazy val completed: Gauge[Int] =
       metricsFactory.gauge(
         MetricInfo(
           name = importUpdatesBackfillingPrefix :+ "completed",
@@ -163,5 +163,14 @@ class HistoryMetrics(metricsFactory: LabeledMetricsFactory)(implicit
       )
     )(metricsContext)
 
+  }
+
+  override def close(): Unit = {
+    UpdateHistoryBackfilling.completed.close()
+    UpdateHistoryBackfilling.latestRecordTime.close()
+    TxLogBackfilling.completed.close()
+    TxLogBackfilling.latestRecordTime.close()
+    ImportUpdatesBackfilling.latestMigrationId.close()
+    ImportUpdatesBackfilling.completed.close()
   }
 }

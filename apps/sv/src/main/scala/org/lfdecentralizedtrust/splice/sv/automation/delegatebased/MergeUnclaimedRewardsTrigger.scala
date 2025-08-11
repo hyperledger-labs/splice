@@ -19,6 +19,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -64,11 +65,10 @@ class MergeUnclaimedRewardsTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      controllerArgument <- getSvControllerArgument(controller)
       arg = new DsoRules_MergeUnclaimedRewards(
         amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
-        controllerArgument,
+        Optional.of(controller),
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeUnclaimedRewards(arg))
       res <- for {

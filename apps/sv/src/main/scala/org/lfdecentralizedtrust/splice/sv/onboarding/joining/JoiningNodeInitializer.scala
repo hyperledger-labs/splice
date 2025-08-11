@@ -182,7 +182,10 @@ class JoiningNodeInitializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        localSynchronizerNode,
       )
       _ <- DomainMigrationInfo.saveToUserMetadata(
         svAutomation.connection,
@@ -195,6 +198,11 @@ class JoiningNodeInitializer(
           config,
           onboardingConfig.name,
         )
+      )
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        decentralizedSynchronizerId,
+        svAutomation.connection,
+        loggerFactory,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // We need to first wait to ensure the CometBFT node is caught up
@@ -218,10 +226,6 @@ class JoiningNodeInitializer(
         ),
         decentralizedSynchronizerId,
       )
-      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        decentralizedSynchronizerId,
-        svAutomation.connection,
-      )
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {
           logger.info("DSO party is authorized to our participant.")
@@ -241,12 +245,23 @@ class JoiningNodeInitializer(
               )
             _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
-            _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-              dsoAutomation,
-              dsoStore,
-              decentralizedSynchronizerId,
-              Some(withSvStore),
-            )
+            _ <- retryProvider
+              .ensureThatB(
+                RetryFor.WaitingOnInitDependency,
+                "dso_onboard",
+                show"the DsoRules list the SV party ${dsoStore.key.svParty}",
+                isOnboardedInDsoRules(dsoStore), {
+                  for {
+                    (joiningConfig, svConnection) <- svConnection
+                    _ <- withSvStore.startOnboardingWithDsoPartyHosted(
+                      dsoAutomation,
+                      svConnection,
+                      joiningConfig,
+                    )
+                  } yield ()
+                },
+                logger,
+              )
           } yield dsoAutomation
         } else {
           logger.info(
@@ -265,6 +280,15 @@ class JoiningNodeInitializer(
               )
           } yield dsoAutomation
         }
+      // We set the initial round to the one from the sponsor if no initial round is store in the user metadata yet
+      // This is needed so that all scans can aggregate and backfill using the same initial round
+      // Note: we accept the risk that sponsors could maliciously set a wrong initialRound as this is dev/testnet only.
+      _ <- establishInitialRound(
+        svAutomation.connection,
+        upgradesConfig,
+        packageVersionSupport,
+        svParty,
+      )
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
         svParty,
@@ -279,21 +303,27 @@ class JoiningNodeInitializer(
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
       )
-      _ <- localSynchronizerNode.traverse(lsn =>
-        SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
-          cantonIdentifierConfig,
-          lsn,
-          clock,
-          loggerFactory,
-          retryProvider,
-        )
-      )
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          localSynchronizerNode.traverse(lsn =>
+            SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
+              cantonIdentifierConfig,
+              lsn,
+              clock,
+              loggerFactory,
+              retryProvider,
+            )
+          )
+        } else {
+          logger.info(
+            "Skipping synchronizer node initialization because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
       _ <- onboard(
         decentralizedSynchronizerId,
         dsoAutomation,
         svAutomation,
-        Some(withSvStore),
-        packageVersionSupport,
       )
     } yield {
       (
@@ -307,12 +337,11 @@ class JoiningNodeInitializer(
     }
   }
 
+  // Note: This is also used for synchronizer migrations
   def onboard(
       decentralizedSynchronizer: SynchronizerId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
-      withSvStore: Option[WithSvStore],
-      packageVersionSupport: PackageVersionSupport,
       skipTrafficReconciliationTriggers: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
@@ -324,7 +353,6 @@ class JoiningNodeInitializer(
       clock,
       retryProvider,
       logger,
-      packageVersionSupport,
     )
     for {
       _ <- retryProvider.waitUntil(
@@ -349,107 +377,84 @@ class JoiningNodeInitializer(
           dsoPartyId,
         ),
       ).tupled
-      _ <- localSynchronizerNode.traverse_ { localSynchronizerNode =>
-        for {
-          // First, make sure the identity of the new domain nodes is known on the domain
-          _ <-
-            (
-              localSynchronizerNode.addLocalSequencerIdentityIfRequired(
-                config.domains.global.alias,
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          localSynchronizerNode.traverse_ { localSynchronizerNode =>
+            for {
+              // First, make sure the identity of the new domain nodes is known on the domain
+              _ <-
+                (
+                  localSynchronizerNode.addLocalSequencerIdentityIfRequired(
+                    config.domains.global.alias,
+                    decentralizedSynchronizer,
+                  ),
+                  localSynchronizerNode.addLocalMediatorIdentityIfRequired(
+                    decentralizedSynchronizer
+                  ),
+                ).tupled
+              // Then, add the new local domain node to the DSO rules with an "onboarding" status
+              // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
+              _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
+                Some(localSynchronizerNode),
                 decentralizedSynchronizer,
-              ),
-              localSynchronizerNode.addLocalMediatorIdentityIfRequired(decentralizedSynchronizer),
-            ).tupled
-          // Then, add the new local domain node to the DSO rules with an "onboarding" status
-          // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
-          _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
-            Some(localSynchronizerNode),
-            decentralizedSynchronizer,
-            Onboarding,
-            config.domainMigrationId,
-            config.scan,
-          )
-          // Finally, fully onboard the sequencer and mediator
-          _ <-
-            localSynchronizerNode.onboardLocalSequencerIfRequired(
-              svConnection.map(_._2)
-            )
-          // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
-          _ = if (!skipTrafficReconciliationTriggers)
+                Onboarding,
+                config.domainMigrationId,
+                config.scan,
+              )
+              // Finally, fully onboard the sequencer and mediator
+              _ <-
+                localSynchronizerNode.onboardLocalSequencerIfRequired(
+                  svConnection.map(_._2)
+                )
+              // For domain migrations, the traffic triggers have already been registered earlier and so we skip that step here.
+              _ = if (!skipTrafficReconciliationTriggers)
+                dsoAutomationService.registerTrafficReconciliationTriggers()
+              _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
+                decentralizedSynchronizer
+              )
+              _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
+              _ <- waitForSvToObtainUnlimitedTraffic(
+                localSynchronizerNode,
+                decentralizedSynchronizer,
+              )
+            } yield ()
+          }
+        } else {
+          if (!skipTrafficReconciliationTriggers) {
             dsoAutomationService.registerTrafficReconciliationTriggers()
-          _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
-            decentralizedSynchronizer
+          }
+          checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
+          logger.info(
+            "Skipping synchronizer initialization because skipSynchronizerInitialization is enabled"
           )
-          _ = checkTrafficReconciliationTriggersRegistered(dsoAutomationService)
-          _ <- waitForSvToObtainUnlimitedTraffic(localSynchronizerNode, decentralizedSynchronizer)
-          _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
-        } yield ()
-      }
-      _ <- synchronizerNodeReconciler
-        .reconcileSynchronizerNodeConfigIfRequired(
-          localSynchronizerNode,
-          decentralizedSynchronizer,
-          OnboardedAfterDelay,
-          config.domainMigrationId,
-          config.scan,
-        )
-      _ <- checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
+          Future.unit
+        }
+      _ = dsoAutomationService.registerPostUnlimitedTrafficTriggers()
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          synchronizerNodeReconciler
+            .reconcileSynchronizerNodeConfigIfRequired(
+              localSynchronizerNode,
+              decentralizedSynchronizer,
+              OnboardedAfterDelay,
+              config.domainMigrationId,
+              config.scan,
+            )
+        } else {
+          logger.info(
+            "Skipping synchronizer config reconciliation as skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
+      _ <- checkIsInDecentralizedNamespaceAndStartTrigger(
         dsoAutomationService,
         dsoStore,
         decentralizedSynchronizer,
-        withSvStore,
       )
     } yield {
       ()
     }
   }
-
-  private def checkIsOnboardedAndStartSvNamespaceMembershipTrigger(
-      dsoAutomation: SvDsoAutomationService,
-      dsoStore: SvDsoStore,
-      synchronizerId: SynchronizerId,
-      withSvStore: Option[WithSvStore],
-  ) =
-    (withSvStore match {
-      case None =>
-        retryProvider.waitUntil(
-          RetryFor.WaitingOnInitDependency,
-          "dso_onboard",
-          show"the DsoRules list the SV party ${dsoStore.key.svParty}",
-          isOnboardedInDsoRules(dsoStore).map { onboarded =>
-            if (!onboarded)
-              throw Status.FAILED_PRECONDITION
-                .withDescription("SV is not yet onboarded")
-                .asRuntimeException
-          },
-          logger,
-        )
-      case Some(store) =>
-        retryProvider
-          .ensureThatB(
-            RetryFor.WaitingOnInitDependency,
-            "dso_onboard",
-            show"the DsoRules list the SV party ${dsoStore.key.svParty}",
-            isOnboardedInDsoRules(dsoStore), {
-              for {
-                (joiningConfig, svConnection) <- svConnection
-                _ <- store.startOnboardingWithDsoPartyHosted(
-                  dsoAutomation,
-                  svConnection,
-                  joiningConfig,
-                )
-              } yield ()
-            },
-            logger,
-          )
-    })
-      .flatMap { _ =>
-        checkIsInDecentralizedNamespaceAndStartTrigger(
-          dsoAutomation,
-          dsoStore,
-          synchronizerId,
-        )
-      }
 
   private def waitForSvParticipantToHaveSubmissionRights(
       dsoParty: PartyId,
@@ -958,7 +963,7 @@ class JoiningNodeInitializer(
           TopologyStoreId.SynchronizerStore(decentralizedSynchronizerId).some,
           filterParty = dsoPartyId.filterString,
           filterParticipant = participantId.filterString,
-          proposals = TopologyTransactionType.ProposalSignedByOwnKey,
+          topologyTransactionType = TopologyTransactionType.ProposalSignedByOwnKey,
         )
         _ <-
           if (proposals.nonEmpty) {

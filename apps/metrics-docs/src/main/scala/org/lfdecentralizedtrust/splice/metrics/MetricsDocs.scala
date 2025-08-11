@@ -5,13 +5,15 @@ package org.lfdecentralizedtrust.splice.metrics
 
 import better.files.File
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.{MetricDoc, MetricsDocGenerator}
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.admin.api.client.DamlGrpcClientMetrics
 import org.lfdecentralizedtrust.splice.automation.TriggerMetrics
 import org.lfdecentralizedtrust.splice.scan.store.db.DbScanStoreMetrics
-import org.lfdecentralizedtrust.splice.sv.automation.singlesv.{SequencerPruningMetrics}
+import org.lfdecentralizedtrust.splice.sv.automation.singlesv.SequencerPruningMetrics
 import org.lfdecentralizedtrust.splice.sv.automation.ReportSvStatusMetricsExportTrigger
 import org.lfdecentralizedtrust.splice.sv.store.db.DbSvDsoStoreMetrics
 import org.lfdecentralizedtrust.splice.store.{DomainParamsStore, HistoryMetrics, StoreMetrics}
@@ -91,7 +93,11 @@ object MetricsDocs {
     val svMetrics = generator.getAll()
     generator.reset()
     // scan
-    new DbScanStoreMetrics(generator)
+    new DbScanStoreMetrics(
+      generator,
+      NamedLoggerFactory.root,
+      ProcessingTimeout(),
+    )
     val scanMetrics = generator.getAll()
     generator.reset()
     GeneratedMetrics(

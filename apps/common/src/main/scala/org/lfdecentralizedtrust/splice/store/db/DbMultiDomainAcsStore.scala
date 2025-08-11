@@ -8,7 +8,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.lfdecentralizedtrust.splice.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
@@ -62,6 +62,7 @@ import org.lfdecentralizedtrust.splice.store.db.DbMultiDomainAcsStore.StoreDescr
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.metrics.api.MetricHandle.LabeledMetricsFactory
+import com.google.protobuf.ByteString
 import io.circe.Json
 import org.lfdecentralizedtrust.splice.store.HistoryBackfilling.DestinationHistory
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.IngestionSink.IngestionStart
@@ -76,10 +77,14 @@ final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableNameOpt: Option[String],
+    interfaceViewsTableNameOpt: Option[String],
     acsStoreDescriptor: StoreDescriptor,
     txLogStoreDescriptor: Option[StoreDescriptor],
     override protected val loggerFactory: NamedLoggerFactory,
-    contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
+    contractFilter: MultiDomainAcsStore.ContractFilter[
+      _ <: AcsRowData,
+      _ <: AcsInterfaceViewRowData,
+    ],
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
@@ -131,6 +136,10 @@ final class DbMultiDomainAcsStore[TXE](
 
   private[this] def txLogTableName =
     txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
+
+  private[this] def interfaceViewsTableName = interfaceViewsTableNameOpt.getOrElse(
+    throw new RuntimeException("This store does not ingest interfaces")
+  )
 
   // Some callers depend on all queries always returning sensible data, but may perform queries
   // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
@@ -728,6 +737,102 @@ final class DbMultiDomainAcsStore[TXE](
           case _ => false
         }
     }
+  }
+
+  override def listInterfaceViews[C, ICid <: ContractId[?], View <: DamlRecord[View]](
+      companion: C,
+      limit: Limit,
+  )(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Seq[Contract[ICid, View]]] = waitUntilAcsIngested {
+    val interfaceId = companionClass.typeId(companion)
+    val opName = s"listInterfaceViews:${interfaceId.getEntityName}"
+    for {
+      rows <- storage.query(
+        sql"""
+             SELECT contract_id, interface_view, acs.created_at, acs.created_event_blob
+             FROM #$interfaceViewsTableName interface
+               JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
+             WHERE interface_id_package_id = ${interfaceId.getPackageId}
+               AND interface_id_qualified_name = ${QualifiedName(interfaceId)}
+               AND store_id = $acsStoreId
+               AND migration_id = $domainMigrationId
+             ORDER BY interface.acs_event_number
+             LIMIT ${sqlLimit(limit)}
+           """.as[(String, Json, Timestamp, Array[Byte])],
+        opName,
+      )
+    } yield {
+      val limited = applyLimit(opName, limit, rows)
+      limited.map { case (contractId, viewJson, createdAt, createdEventBlob) =>
+        companionClass
+          .fromJson(companion)(
+            interfaceId,
+            contractId,
+            viewJson,
+            ByteString.copyFrom(createdEventBlob),
+            createdAt.toInstant,
+          )
+          .fold(
+            err =>
+              throw new IllegalStateException(
+                s"Contract $contractId cannot be decoded as interface view $interfaceId: $err. Payload: $viewJson"
+              ),
+            identity,
+          )
+      }
+    }
+  }
+
+  override def findInterfaceViewByContractId[C, ICid <: ContractId[_], View <: DamlRecord[View]](
+      companion: C
+  )(contractId: ICid)(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[ICid, View]]] = {
+    val interfaceId = companionClass.typeId(companion)
+    val opName = s"findInterfaceViewByContractId:${interfaceId.getEntityName}"
+    (for {
+      (contractId, viewJson, createdAt, createdEventBlob, state) <- storage.querySingle(
+        sql"""
+             SELECT
+               contract_id,
+               interface_view,
+               acs.created_at,
+               acs.created_event_blob,
+               #${SelectFromAcsTableWithStateResult.stateColumnsCommaSeparated()}
+             FROM #$interfaceViewsTableName interface
+               JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
+             WHERE interface_id_package_id = ${interfaceId.getPackageId}
+               AND interface_id_qualified_name = ${QualifiedName(interfaceId)}
+               AND store_id = $acsStoreId
+               AND migration_id = $domainMigrationId
+               AND contract_id = $contractId
+           """
+          .as[(String, Json, Timestamp, Array[Byte], AcsQueries.SelectFromContractStateResult)]
+          .headOption,
+        opName,
+      )
+    } yield {
+      val contractState = contractStateFromRow(state)
+      val contract = companionClass
+        .fromJson(companion)(
+          interfaceId,
+          contractId,
+          viewJson,
+          ByteString.copyFrom(createdEventBlob),
+          createdAt.toInstant,
+        )
+        .fold(
+          err =>
+            throw new IllegalStateException(
+              s"Contract $contractId cannot be decoded as interface view $interfaceId: $err. Payload: $viewJson"
+            ),
+          identity,
+        )
+      ContractWithState(contract, contractState)
+    }).value
   }
 
   override private[store] def listIncompleteReassignments()(implicit
@@ -1359,7 +1464,7 @@ final class DbMultiDomainAcsStore[TXE](
             }
           },
           onExercise = (st, ev, _) => {
-            if (ev.isConsuming && contractFilter.mightContain(ev.getTemplateId)) {
+            if (ev.isConsuming && contractFilter.shouldArchive(ev)) {
               // optimization: a delete on a contract cancels-out with the corresponding insert
               if (st.contains(ev.getContractId)) {
                 st - ev.getContractId
@@ -1484,48 +1589,83 @@ final class DbMultiDomainAcsStore[TXE](
     )(implicit
         tc: TraceContext
     ) = {
-      contractFilter.matchingContractToRow(createdEvent) match {
-        case None =>
+      (
+        contractFilter.matchingInterfaceRows(createdEvent),
+        contractFilter.matchingContractToRow(createdEvent),
+      ) match {
+        case (Some((fallbackRowData, interfaces)), rowData) =>
+          // For the acs_table row:
+          // If only the interface filter matches, we use the "bare minimum" row data from the interface filter
+          // that does not contain any index columns, as the interface table needs to reference the acs_table.
+          // If both match, we want to use the row data from the template filter,
+          // as that one contains all the information.
+          insertContract(rowData.getOrElse(fallbackRowData), createdEvent, stateData, summary)
+            .flatMap { eventNumber =>
+              DBIO.sequence(interfaces.map { interfaceRow =>
+                val interfaceId = interfaceRow.interfaceId
+                val interfaceIdQualifiedName = QualifiedName(interfaceId)
+                val interfaceIdPackageId = lengthLimited(interfaceId.getPackageId)
+                val viewJson =
+                  AcsJdbcTypes.payloadJsonFromDefinedDataType(interfaceRow.interfaceView)
+                val indexColumnNames = getIndexColumnNames(interfaceRow.indexColumns)
+                val indexColumnNameValues = getIndexColumnValues(interfaceRow.indexColumns)
+                (sql"""
+                insert into #$interfaceViewsTableName(acs_event_number, interface_id_package_id, interface_id_qualified_name, interface_view #$indexColumnNames)
+                values ($eventNumber, $interfaceIdPackageId, $interfaceIdQualifiedName, $viewJson """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
+              })
+            }
+        case (None, Some(rowData)) =>
+          insertContract(rowData, createdEvent, stateData, summary)
+        case _ =>
           val errMsg =
             s"Item at offset $offset with contract id ${createdEvent.getContractId} cannot be ingested."
           logger.error(errMsg)
           throw new IllegalArgumentException(errMsg)
-        case Some(rowData) =>
-          summary.ingestedCreatedEvents.addOne(createdEvent)
+      }
+    }
 
-          val contract = rowData.contract
-          val contractId = contract.contractId.asInstanceOf[ContractId[Any]]
-          val templateId = contract.identifier
-          val templateIdQualifiedName = QualifiedName(templateId)
-          val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-          val createArguments = payloadJsonFromDefinedDataType(contract.payload)
-          val createdAt = Timestamp.assertFromInstant(contract.createdAt)
-          val contractExpiresAt = rowData.contractExpiresAt
-          val ContractStateRowData(
-            assignedDomain,
-            reassignmentCounter,
-            reassignmentTargetDomain,
-            reassignmentSourceDomain,
-            reassignmentSubmitter,
-            reassignmentUnassignId,
-          ) = stateData
+    private def insertContract(
+        rowData: AcsRowData,
+        createdEvent: CreatedEvent,
+        stateData: ContractStateRowData,
+        summary: MutableIngestionSummary,
+    ): DBIOAction[Long, NoStream, Effect.Write & Effect.Read] = {
+      summary.ingestedCreatedEvents.addOne(createdEvent)
 
-          val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
-          val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+      val contractId = rowData.contractId.asInstanceOf[ContractId[Any]]
+      val templateId = rowData.identifier
+      val templateIdQualifiedName = QualifiedName(templateId)
+      val templateIdPackageId = lengthLimited(rowData.identifier.getPackageId)
+      val createArguments = rowData.payload
+      val createdAt = Timestamp.assertFromInstant(rowData.createdAt)
+      val contractExpiresAt = rowData.contractExpiresAt
+      val createdEventBlob = rowData.createdEventBlob
+      val ContractStateRowData(
+        assignedDomain,
+        reassignmentCounter,
+        reassignmentTargetDomain,
+        reassignmentSourceDomain,
+        reassignmentSubmitter,
+        reassignmentUnassignId,
+      ) = stateData
 
-          import storage.DbStorageConverters.setParameterByteArray
-          (sql"""
+      val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
+      val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
+
+      import storage.DbStorageConverters.setParameterByteArray
+      (sql"""
                 insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name,
                                            create_arguments, created_event_blob, created_at, contract_expires_at,
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$indexColumnNames)
                 values ($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
-                        $createArguments, ${contract.createdEventBlob}, $createdAt, $contractExpiresAt,
+                        $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
-              """ ++ indexColumnNameValues ++ sql")").toActionBuilder.asUpdate
-      }
+              """ ++ indexColumnNameValues ++ sql") returning event_number").toActionBuilder
+        .asUpdateReturning[Long]
+        .head
     }
 
     private def doDeleteContract(event: ExercisedEvent, summary: MutableIngestionSummary) = {

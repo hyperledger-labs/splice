@@ -13,15 +13,14 @@ import {
   installAuth0UISecret,
   installSpliceHelmChart,
   spliceInstanceNames,
-  splitwellDarPaths,
   imagePullSecret,
   CnInput,
   DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   ansDomainPrefix,
-  DecentralizedSynchronizerUpgradeConfig,
+  installLoopback,
 } from 'splice-pulumi-common';
-import { installParticipant } from 'splice-pulumi-common-validator';
+import { installParticipant, splitwellDarPaths } from 'splice-pulumi-common-validator';
 import {
   AutoAcceptTransfersConfig,
   installValidatorApp,
@@ -45,24 +44,8 @@ export async function installValidator1(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace(name, true);
 
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-      cometbftPorts: {
-        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
-        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
 
-  const kmsConfig = validator1Config?.kms;
   const participantPruningConfig = validator1Config?.participantPruningSchedule;
 
   const imagePullDeps = imagePullSecret(xns);
@@ -82,17 +65,16 @@ export async function installValidator1(
     auth0AppName: 'validator1',
   });
 
-  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat([loopback]);
+  const participantDependsOn: CnInput<pulumi.Resource>[] = imagePullDeps.concat(loopback);
 
   const participant = installParticipant(
+    validator1Config,
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
     'validator1',
-    kmsConfig,
     decentralizedSynchronizerMigrationConfig.active.version,
     defaultPostgres,
-    undefined,
     {
       dependsOn: participantDependsOn,
     }

@@ -17,7 +17,10 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
 }
 import org.lfdecentralizedtrust.splice.http.v0.definitions as httpApi
 import org.lfdecentralizedtrust.splice.http.v0.definitions.TreeEvent.members.CreatedEvent as HttpCreatedEvent
-import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.members.UpdateHistoryTransaction as HttpUpdateHistoryTx
+import org.lfdecentralizedtrust.splice.http.v0.definitions.UpdateHistoryItem.members.{
+  UpdateHistoryReassignment,
+  UpdateHistoryTransaction as HttpUpdateHistoryTx,
+}
 import org.lfdecentralizedtrust.splice.http.v0.definitions.{DamlValueEncoding, UpdateHistoryItem}
 import org.lfdecentralizedtrust.splice.store.{StoreTest, TreeUpdateWithMigrationId}
 import org.lfdecentralizedtrust.splice.store.UpdateHistory.UpdateHistoryResponse
@@ -28,6 +31,7 @@ import java.time.Instant
 import scala.util.Random
 
 class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers {
+  private val haveMicrosecondPrecision = endWith regex """\.\d{6}Z"""
 
   "LosslessScanHttpEncodings" should {
     "handle transaction updates" in {
@@ -72,6 +76,10 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
           original,
           EventId.prefixedFromUpdateIdAndNodeId,
         )
+      encoded match {
+        case HttpUpdateHistoryTx(tx) => tx.recordTime should haveMicrosecondPrecision
+        case _ => fail("Expected UpdateHistoryTransaction")
+      }
       val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
 
       decoded shouldBe original
@@ -110,6 +118,11 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         original,
         EventId.prefixedFromUpdateIdAndNodeId,
       )
+    encoded match {
+      case UpdateHistoryReassignment(r) => r.recordTime should haveMicrosecondPrecision
+      case _ => fail("Expected UpdateHistoryReassignment")
+    }
+
     val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
 
     decoded shouldBe original
@@ -147,6 +160,11 @@ class ScanHttpEncodingsTest extends StoreTest with TestEssentials with Matchers 
         original,
         EventId.prefixedFromUpdateIdAndNodeId,
       )
+    encoded match {
+      case UpdateHistoryReassignment(r) => r.recordTime should haveMicrosecondPrecision
+      case _ => fail("Expected UpdateHistoryReassignment")
+    }
+
     val decoded = ProtobufJsonScanHttpEncodings.httpToLapiUpdate(encoded)
 
     decoded shouldBe original

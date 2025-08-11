@@ -90,8 +90,6 @@ INVALID_TRAFFIC_CONTROL_PURCHASED_MESSAGE.* signature threshold not reached
 # In ValidatorReonboardingIntegrationTest, importing the ACS on the new participant may lead to temporary ACS_COMMITMENT_MISMATCH errors.
 # The new participant can be both the sender or the counterParticipant in the error message.
 ACS_COMMITMENT_MISMATCH.*aliceValidatorLocalNewForValidatorReonboardingIT
-# TODO(#897): Remove once it's fixed
-Failed to send commitment message batch for period.*RequestInvalid\(Unregistered recipients: HashSet\(PAR::alice-validatorLocalForValidatorReonboardingIT
 
 # TODO(#970): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
@@ -100,9 +98,11 @@ Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:particip
 The operation 'insert block' has failed with an exception
 Now retrying operation 'insert block'
 
-# TODO(#737): investigate why it happens and remove if possible
+# TODO(tech-debt): Remove these once we're on Canton 3.4
+Failed to send commitment message batch for period.*RequestInvalid\(Unregistered recipients:.*Set\(PAR::(?:alice-validatorLocalForValidatorReonboardingIT|da-ComposeValidator-1)
 Failed to send commitment message batch for period CommitmentPeriod.*RequestRefused\(UnknownRecipients
-SEQUENCER_UNKNOWN_RECIPIENTS.*validatorLocalForValidatorReonboardingIT
+Failed to send commitment message batch for period CommitmentPeriod.*RequestInvalid\(Unregistered
+SEQUENCER_UNKNOWN_RECIPIENTS.*(?:alice-validatorLocalForValidatorReonboardingIT|da-ComposeValidator-1)
 
 # TODO(#919) Figure out where this is coming from
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
@@ -114,6 +114,8 @@ Thread starvation or clock leap detected
 
 # Shutdown issues
 Previous channel ManagedChannelImpl.* was garbage collected without being shut down!
+# remove once https://github.com/DACH-NY/canton/issues/27032 is taken care of
+'Party Allocation' was aborted due to shutdown
 
 # TODO(DACH-NY/canton-network-node#2423) Figure out what causes this
 The sequencer clock timestamp .* is already past the max sequencing time
@@ -138,5 +140,9 @@ ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 
 # TODO(#930) - investigate this on the canton side
 Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
+
+# TODO(#1450) - investigate this on the canton side
+FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
+Rejected transaction due to a participant determined timeout
 
 # Make sure to have a trailing newline

@@ -20,6 +20,7 @@ import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 
 class ExpiredAnsSubscriptionTrigger(
@@ -43,13 +44,12 @@ class ExpiredAnsSubscriptionTrigger(
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
-    controllerArgument <- getSvControllerArgument(controller)
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ExpireSubscription(
         task.work.context.contractId,
         task.work.state.contractId,
         new SubscriptionIdleState_ExpireSubscription(store.key.dsoParty.toProtoPrimitive),
-        controllerArgument,
+        Optional.of(controller),
       )
     )
     result <- svTaskContext.connection

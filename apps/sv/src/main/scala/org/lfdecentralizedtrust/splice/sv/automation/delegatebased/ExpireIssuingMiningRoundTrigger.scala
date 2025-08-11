@@ -19,6 +19,8 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 import ExpireIssuingMiningRoundTrigger.*
 
+import java.util.Optional
+
 class ExpireIssuingMiningRoundTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -43,22 +45,22 @@ class ExpireIssuingMiningRoundTrigger(
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
+    val roundNumber = round.payload.round.number
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      controllerArgument <- getSvControllerArgument(controller)
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_MiningRound_Close(
           amuletRules.contractId,
           round.contractId,
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       cid <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
-    } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
+    } yield TaskSuccess(s"successfully created the closed mining round $roundNumber with cid $cid")
   }
 }
 

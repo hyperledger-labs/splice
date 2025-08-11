@@ -6,7 +6,7 @@ on:
 
 jobs:
   trigger_ciupgrade:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     name: Notify on README changes
     steps:
       - name: Checkout code

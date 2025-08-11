@@ -16,6 +16,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 
 class TerminatedSubscriptionTrigger(
@@ -49,8 +50,6 @@ class TerminatedSubscriptionTrigger(
         task.contract.payload.reference
       )
       dsoRules <- svTaskContext.dsoStore.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
-
       _ <- ansEntryContextO match {
         case None =>
           throw Status.NOT_FOUND
@@ -59,18 +58,19 @@ class TerminatedSubscriptionTrigger(
             )
             .asRuntimeException()
         case Some(ansEntryContext) =>
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_TerminateSubscription(
+              ansEntryContext.contractId,
+              task.contractId,
+              Optional.of(controller),
+            )
+          )
           for {
             _ <- svTaskContext.connection
               .submit(
                 Seq(svParty),
                 Seq(dsoParty),
-                dsoRules.exercise(
-                  _.exerciseDsoRules_TerminateSubscription(
-                    ansEntryContext.contractId,
-                    task.contractId,
-                    controllerArgument,
-                  )
-                ),
+                cmd,
               )
               .noDedup
               .yieldUnit()

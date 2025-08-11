@@ -4,14 +4,12 @@
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
 import cats.data.OptionT
-import cats.implicits.toTraverseOps
 import org.lfdecentralizedtrust.splice.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
-import cats.syntax.traverseFilter.*
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.SvRewardState
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2
@@ -29,9 +27,11 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -63,30 +63,36 @@ class ReceiveSvRewardCouponTrigger(
       packages = AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(context.clock.now)
         .packageConfig
-      beneficiariesWithLatestVettedPackages <- extraBeneficiaries.filterA { beneficiary =>
-        val filterParty = beneficiary.beneficiary.filterString
-        participantAdminConnection
-          .listPartyToParticipant(
-            store = Some(TopologyStoreId.SynchronizerStore(dsoRules.domain)),
-            filterParty = filterParty,
-          )
-          .map { txs =>
-            txs.headOption
-          }
-          .flatMap(partyToParticipantO =>
-            partyToParticipantO.fold({
-              logger.warn(
-                s"Party to participant mapping not found for synchronizer = ${dsoRules.domain}, party = $filterParty."
-              )
-              Future.successful(false)
-            }) { partyToParticipant =>
-              isVettingLatestPackages(
-                partyToParticipant.mapping.participantIds,
-                ReceiveSvRewardCouponTrigger.svLatestVettedPackages(packages),
-              )
+      beneficiariesWithLatestVettedPackages <- MonadUtil
+        .sequentialTraverse(extraBeneficiaries) { beneficiary =>
+          val filterParty = beneficiary.beneficiary.filterString
+          participantAdminConnection
+            .listPartyToParticipant(
+              store = Some(TopologyStoreId.SynchronizerStore(dsoRules.domain)),
+              filterParty = filterParty,
+            )
+            .map { txs =>
+              txs.headOption
             }
-          )
-      }
+            .flatMap(partyToParticipantO =>
+              partyToParticipantO.fold({
+                logger.warn(
+                  s"Party to participant mapping not found for synchronizer = ${dsoRules.domain}, party = $filterParty."
+                )
+                Future.successful(false)
+              }) { partyToParticipant =>
+                isVettingLatestPackages(
+                  partyToParticipant.mapping.participantIds,
+                  ReceiveSvRewardCouponTrigger.svLatestVettedPackages(packages),
+                )
+              }
+            )
+            .map {
+              case true => Some(beneficiary)
+              case false => None
+            }
+        }
+        .map(_.flatten)
       result <- retrieveNextRoundToClaim(beneficiariesWithLatestVettedPackages).value.map(_.toList)
     } yield {
       val beneficiariesWithoutLatestPackages =
@@ -110,12 +116,12 @@ class ReceiveSvRewardCouponTrigger(
   ): Future[Boolean] = {
     for {
       dsoRules <- store.getDsoRules()
-      vettedPackages <- participantIds.traverse { pId =>
-        participantAdminConnection.listVettedPackages(pId, dsoRules.domain)
+      vettedPackages <- MonadUtil.sequentialTraverse(participantIds) { pId =>
+        participantAdminConnection.listVettedPackages(pId, dsoRules.domain, AuthorizedState)
       }
     } yield {
       val vettedPackagesPackageIds =
-        vettedPackages.flatMap(_.flatMap(_.item.packages.map(_.packageId)))
+        vettedPackages.flatMap(_.flatMap(_.mapping.packages.map(_.packageId)))
       approvedVettedPackages.diff(vettedPackagesPackageIds).isEmpty
     }
   }
@@ -135,8 +141,9 @@ class ReceiveSvRewardCouponTrigger(
       firstOpenNotClaimed <- OptionT.fromOption[Future](
         openRounds.toSeq
           .filter(round =>
-            round.payload.opensAt <= context.clock.now.toInstant
-              && lastReceivedForOpt.forall(_ < round.payload.round.number)
+            round.payload.opensAt <= context.clock.now.toInstant && lastReceivedForOpt.forall(
+              _ < round.payload.round.number
+            )
           )
           .minByOption(_.payload.opensAt)
       )

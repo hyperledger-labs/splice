@@ -133,6 +133,7 @@ testTransferPreapprovalCancelExpire = script do
 
   pure ()
 
+testTransferCommand : Script ()
 testTransferCommand = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
@@ -158,6 +159,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 12
       nonce = 0
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   transferCounterCid <- submit app.dso $ createCmd TransferCommandCounter with
     dso = app.dso
@@ -218,6 +220,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 12
       nonce = 1
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   allAmulets <- query @Amulet alice.primaryParty
 
@@ -244,6 +247,19 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 1
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
+
+  -- submission fails if expiresAt is not in the future
+  submitMultiMustFail [alice.primaryParty] [app.dso] $ exerciseCmd externalPartyAmuletRulesCid ExternalPartyAmuletRules_CreateTransferCommand
+    with
+      sender = alice.primaryParty
+      receiver = externalParty
+      delegate = aliceValidator.primaryParty
+      amount = 42.0
+      expiresAt = now
+      nonce = 1
+      description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   assert (length allAmulets > 1)
 
@@ -274,6 +290,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 2
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   submit alice.primaryParty $ exerciseCmd transferCmd TransferCommand_Withdraw
 
@@ -289,6 +306,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 2
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   submitMustFail app.dso $ exerciseCmd transferCmd (TransferCommand_Expire app.dso)
 
@@ -309,6 +327,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 1
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   TransferCommand_SendResult (TransferCommandResultFailure reason) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send
     with
@@ -328,6 +347,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 3
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   amulet <- tap app alice 50.0
 
@@ -349,6 +369,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 2
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   amulet <- tap app alice 50.0
 
@@ -384,6 +405,7 @@ testTransferCommand = script do
       expiresAt = now `addRelTime` hours 1
       nonce = 4
       description = Some "test-transfer-command"
+      expectedDso = Some app.dso
 
   -- transferCmdFuture can now be submitted after the counter advanced
   TransferCommand_SendResult (TransferCommandResultFailure msg) _ _ <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd transferCmd TransferCommand_Send

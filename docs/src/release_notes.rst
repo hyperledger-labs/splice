@@ -8,18 +8,294 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.10
+------
+
+- SV Application
+
+  - Fully remove the automation and logic around DSO delegate elections.
+  - UI enhancements.
 
 - Daml
 
-  - Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
-  - Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_
+  - Deprecate Daml choices related to DSO delegate elections.
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
 
-    - Note: the corresponding backend and frontend changes are not yet implemented, so SV operators cannot yet
-      make use of this feature. These changes will be implemented in a future release.
+     These Daml changes requires an upgrade to the following Daml versions:
 
-  - Fix security issues and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_:
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.17
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
+
+- Helm
+
+  - The `splice-istio-gateway` Helm chart has been deprecated, and will be removed in a future release.
+    It has been replaced with explicit instructions in the :ref:`validator docs <helm-validator-ingress>`
+    and :ref:`SV docs <helm-sv-ingress>` on how to set up Istio ingress for the validator and SV nodes.
+
+- Docs
+
+  - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
+
+- Stability improvements
+
+  - Add circuit breaker functionality for ledger API command submissions in all splice apps;
+    causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
+
+0.4.9
+-----
+
+- SV Application
+
+  - Status reports are now submitted every 2min rather than every
+    1min. This has no impact other than on monitoring infrastructure
+    so you may need to adjust some alerts to be slightly less
+    aggressive.
+
+- Canton
+
+  - Fix an issue where topology transaction signatures where
+    duplicated based on the actual signature as opposed to the public
+    key of the signature. This caused transactions with thousands of
+    signatures on DevNet due to an SV with KMS enabled using a non-deterministic
+    signature scheme which slowed down onboarding of new nodes to an unusable level.
+
+- Documentation
+
+  - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
+
+- Scan
+
+  - Added basic rate limits to the HTTP APIs. There are configured by default to allow up to 200 req/s per endpoint. The values can be adjusted under the keys `canton.scan-apps.scan-app.parameters.rate-limiting`.
+
+
+0.4.8
+-----
+
+- Deployment
+
+  - Good-to-know but no changes needed: Added new helm values ``persistence.enablePgInitContainer`` and
+    ``extraInitContainers`` allowing configuration around deployment init containers. So far this is implemented only
+    for the validator and participant helm charts. The default values for these won't change your current deployment,
+    so if uninterested you can safely ignore.
+
+- SV Application
+
+  - Add the ability to configure a different topology change delay for the synchronizer parameters and change the default to ``250ms``.
+    This should have a slight impact on improving the performance of the sequencer.
+    Until a majority of nodes upgrade to ``0.4.8`` the ``ReconcileDynamicSynchronizerParametersTrigger`` might produce warnings.
+
+- Dashboards
+
+  - Moved the acknowledgements section from the catchup dashboard to a dedicated dashboard in the ``canton`` folder.
+
+- Istio Reference Ingress
+
+  - Include in the ``splice-cluster-ingress-runbook`` helm chart an Istio local rate limit filter that adds basic rate limits to a subset of endpoints in Scan.
+    This will be enabled by default if using the helm charts provided for Istio and the Scan ingress is enabled.
+    If not using Istio, the included EnvoyFilter can be used as an inspiration to add rate limits.
+    These rate limits will be expanded in the future to more endpoints.
+
+- Canton
+
+  Reduced the acknowledgement interval for participants, mediators and
+  sequencers to 10 minutes. This has no impact other than on the
+  acknowlegdement metrics exposed by the sequencer.
+
+0.4.7
+-----
+
+Note: 0.4.6 had a bug and should be skipped in favor of 0.4.7 which
+fixed a bug where the ``skipSynchronizerInitialization`` option could
+still result in the SV app crashing if its mediator was unreachable
+which can happen in certain cases when the sequencer is down.
+
+- Info (new)
+
+  - *important* This release contains a new helm chart "splice-info" which is supposed to be installed on all SV nodes and made publicly accessible.
+    The new `info` endpoint provides:
+
+    - Static information about network, sv, synchronizers, config digests of ip ranges and identities under ``https://info.sv.<YOUR_HOSTNAME>``.
+    - Regularly updated (every minute) copy of DSO information under ``https://info.sv.<YOUR_HOSTNAME>/runtime/dso.json``.
+
+    The relevant documentation is updated at :ref:`sv-helm`.
+
+- Scan
+
+  - Fix `bug #1252 <https://github.com/hyperledger-labs/splice/issues/1252>`_:
+    populate the token metadata total supply using the aggregates used for closed rounds.
+    The data used corresponds to the data served by the ``/v0/total-amulet-balance``
+    endpoint in :ref:`app_dev_scan_api` for the latest closed round.
+  - Fix `bug #1280 <https://github.com/hyperledger-labs/splice/pull/1280>`_:
+    ``record_time`` in Scan API ``/updates`` is now right-padded to 6 digits (microseconds).
+
+- Validator
+
+  - Fix a bug where sweeps through transfer preapprovals failed with a
+    ``CONTRACT_NOT_FOUND`` error if the transfer preapproval provider
+    party (usually the validator operator) of the receiver is featured.
+
+- Splice
+
+  - Building the Splice repo, and running the vast majority of integration tests locally, no longer requires
+    JFrog access.
+
+- SV
+
+  - Added a ``domain.skipInitialization`` helm value that can be set for nodes that have already been onboarded and allows the SV app
+    to start without the sequencer being up. This is useful for long-running sequencer database migrations.
+
+  - Retired deprecated code for old Daml choices ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule`` and ``AmuletRules_UpdateFutureAmuletConfigSchedule``
+
+- Sequencer
+
+  - Fix a sequential scan in a pruning query. This requires a
+    long-running sequencer database migration (expected around an hour
+    on mainnet). Make sure to set ``domain.skipInitialization`` on the
+    SV app so the rest of your SV node can continue functioning. The
+    liveness probe of the sequencer will fail during the migration so
+    make sure to temporarily bump ``livenessProbeInitialDelaySeconds``
+    and reduce it back to the default after the migration is
+    complete. Otherwise the liveness probe will kill the sequencer and
+    the migration will never complete.
+
+- Participant
+
+  - Fix an issue in sequencer BFT connections where the node got
+    completely disconnected on certain failures even if only one
+    sequencer reported those failures.
+
+- Daml
+
+  - Deprecated Daml choices ``AmuletRules_AddFutureAmuletConfigSchedule``, ``AmuletRules_RemoveFutureAmuletConfigSchedule`` and ``AmuletRules_UpdateFutureAmuletConfigSchedule``
+
+    * This requires a Daml upgrade to versions
+
+          ================== =======
+          name               version
+          ================== =======
+          amulet             0.1.12
+          amuletNameService  0.1.12
+          dsoGovernance      0.1.16
+          validatorLifecycle 0.1.5
+          wallet             0.1.12
+          walletPayments     0.1.12
+          ================== =======
+
+0.4.5
+-----
+
+- SV
+
+  - *breaking* SV participants now enable sequencer BFT connections
+    for the SV participant by default.  You must remove the
+    ``useSequencerConnectionsFromScan: false`` config and the
+    ``decentralizedSynchronizerUrl`` config from your SV helm values.
+    If needed, the previous behavior can be restored by setting those two variables again
+    as well as the following configs (through ``ADDITIONAL_CONFIG_*`` environment variables for validator app and SV app respectively:
+    ``canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true``
+    ``canton.sv-apps.sv.bft-sequencer-connection = false``
+
+  - The extra beneficiaries weight config has been fixed to accept integer values.
+    The string values for weight have been deprecated and will be removed in future releases.
+    It is recommended to fix the config as per this example, the previous config::
+
+        extraBeneficiaries:
+          - beneficiary: "BENEFICIARY_1_PARTY_ID"
+            weight: "1000"
+
+    changes to::
+
+        extraBeneficiaries:
+          - beneficiary: "BENEFICIARY_1_PARTY_ID"
+            weight: 1000
+
+    Thanks to Divam Narula for contributing this change
+    in https://github.com/hyperledger-labs/splice/pull/1371
+
+- Daml
+
+  - security: change ``AmuletRules_Transfer`` and ``AmuletRules_ComputeFees`` to take an explicit argument
+    ``expectedDso : Optional Party`` and check that against the ``dso`` party value in ``AmuletRules``.
+    This value must be provided, and thus protects people that delegate calls to these choices from
+    unintentionally allowing calls to ``AmuletRules`` contracts with a different ``dso`` party.
+
+    This addresses suggestion S-8 reported by Quantstamp in their security review.
+
+    Application developers that call these choices directly must adjust their call-sites to set the
+    the ``expectedDso`` value. All calls to these choices from within the splice codebase have been
+    adapted.
+
+  - security: apply the spirit of suggestion S-8 to all non-DevNet choices on ``AmuletRules`` and ``ExternalAmuletRules``
+    granted to users. Concretely, we added the ``expectedDso`` party as a required argument to
+    ``AmuletRules_BuyMemberTraffic``,
+    ``AmuletRules_CreateExternalPartySetupProposal``,
+    ``AmuletRules_CreateTransferPreapproval``, and
+    ``ExternalPartyAmuletRules_CreateTransferCommand``.
+
+    Ledger API clients calling these choices should set that value to the ``dso`` party-id of
+    the network they are operating on. They can retrieve that with BFT by calling ``GET /v0/scan-proxy/dso-party-id``
+    on their validator's :ref:`validator-api-scan-proxy`.
+
+    Third-party Daml code calling these choices should set it based on the ``dso`` party that the third-party
+    workflow was started with. All calls to these choices from within the splice codebase have been
+    adapted.
+
+  - security: add a missing check that the actor is a current SV party to ``DsoRules_ExpireSubscription``
+
+  - prudent engineering: enforce on calls to ``ExternalPartyAmuletRules_CreateTransferCommand`` that ``expiresAt``
+    is in the future
+
+  - prudent engineering: change all splice Daml code to fetch all reference data
+    using checked fetches where the caller specifies the expected ``dso`` party
+
+  These Daml changes require an upgrade to the following Daml versions:
+
+   ================== =======
+   name               version
+   ================== =======
+   amulet             0.1.11
+   amuletNameService  0.1.11
+   dsoGovernance      0.1.15
+   wallet             0.1.11
+   walletPayments     0.1.11
+   ================== =======
+
+0.4.4
+-----
+
+- Daml
+
+  This release contains two sets of Daml changes that build upon each other:
+
+  1. Implement `CIP-0064 - Delegateless Automation <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0064/cip-0064.md>`_
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.9
+     amuletNameService  0.1.9
+     dsoGovernance      0.1.13
+     validatorLifecycle 0.1.3
+     wallet             0.1.9
+     walletPayments     0.1.9
+     ================== =======
+
+  2. Implement `CIP-0066 - Mint Canton Coin from Unminted/Unclaimed Pool <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0066/cip-0066.md>`_ and fix security issues
+     and suggestions raised by Quantstamp as part of their `audit of the Splice codebase <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0057/cip-0057.md#abstract>`_.
+     Note that the backend and frontend changes from CIP 66 are not yet implemented so we recommend holding off on upgrading to the new Daml models for now.
+
       - CC-1 (low severity): addressed by rate limiting every SV wrt casting votes on a ``VoteRequest`` and updating their ``AmuletPriceVote``
         to defend against them causing undue contention, which would block other SVs from
         voting, closing the vote, or advancing the mining rounds.
@@ -80,20 +356,20 @@ Upcoming
         - clarifying that the ``amuletRulesCid`` parameter of ``DsoRules_AddConfirmedSv`` is a historical artifact
 
 
-    These Daml changes requires an upgrade to the following Daml versions:
+        These Daml changes requires an upgrade to the following Daml versions:
 
-    ================== =======
-    name               version
-    ================== =======
-    amulet             0.1.9
-    amuletNameService  0.1.9
-    dsoGovernance      0.1.14
-    validatorLifecycle 0.1.4
-    wallet             0.1.9
-    walletPayments     0.1.9
-    ================== =======
+        ================== =======
+        name               version
+        ================== =======
+        amulet             0.1.10
+        amuletNameService  0.1.10
+        dsoGovernance      0.1.14
+        validatorLifecycle 0.1.4
+        wallet             0.1.10
+        walletPayments     0.1.10
+        ================== =======
 
-- Backend
+- SV
 
   - The actual delegate-based triggers inheriting from SvTaskBasedTrigger are modified so that they implement
     the changes described in the delegateless automation CIP once the new dsoGovernance DAR is vetted.

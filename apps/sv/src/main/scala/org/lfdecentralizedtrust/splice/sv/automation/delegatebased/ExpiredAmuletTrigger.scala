@@ -13,6 +13,8 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredAmuletTrigger.*
 
+import java.util.Optional
+
 class ExpiredAmuletTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -37,14 +39,13 @@ class ExpiredAmuletTrigger(
     for {
       latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_Amulet_Expire(
           co.work.contractId,
           new splice.amulet.Amulet_Expire(
             latestOpenMiningRound.contractId
           ),
-          controllerArgument,
+          Optional.of(controller),
         )
       )
       _ <- svTaskContext.connection

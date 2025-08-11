@@ -66,7 +66,7 @@ type VoteResultQueryOptions = {
   requester?: string;
 };
 
-const QUERY_LIMIT = 50;
+const QUERY_LIMIT = 500;
 
 export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   getAction,
@@ -309,7 +309,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
         rows={rows}
         columns={columns}
         initialState={{
-          pagination: { paginationModel: { pageSize: 5 } },
+          pagination: { paginationModel: { pageSize: 25 } },
           columns: {
             columnVisibilityModel: { votedAt: false, accepted: false },
           },

@@ -17,8 +17,10 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.grpc.Status
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.environment.{
   BaseLedgerConnection,
   ParticipantAdminConnection,
@@ -149,7 +151,7 @@ class ParticipantPartyMigrator(
     for {
       mappings <- Future.traverse(parties) { partyId =>
         participantAdminConnection
-          .getPartyToParticipant(synchronizerId, partyId, None)
+          .getPartyToParticipant(synchronizerId, partyId, None, AuthorizedState)
           .map(_.mapping)
       }
     } yield {
@@ -274,31 +276,32 @@ class ParticipantPartyMigrator(
           _ <- participantAdminConnection.ensureTopologyMapping[PartyToParticipant](
             store = TopologyStoreId.SynchronizerStore(synchronizerId),
             s"Party $partyId is hosted on participant $participantId",
-            EitherT {
-              participantAdminConnection
-                .getPartyToParticipant(synchronizerId, partyId, None)
-                .flatMap { result =>
-                  result.mapping.participants match {
-                    case Seq() => Future.successful(Left(result))
-                    case Seq(participant) =>
-                      if (
-                        participant.participantId == participantId && result.base.operation == TopologyChangeOp.Replace
-                      ) {
-                        Future.successful(Right(result))
-                      } else {
-                        Future.successful(Left(result))
-                      }
-                    case participants =>
-                      Future.failed(
-                        Status.INTERNAL
-                          .withDescription(
-                            s"Party $partyId is hosted on multiple participant, giving up: $participants"
-                          )
-                          .asRuntimeException()
-                      )
+            topologyTransactionType =>
+              EitherT {
+                participantAdminConnection
+                  .getPartyToParticipant(synchronizerId, partyId, None, topologyTransactionType)
+                  .flatMap { result =>
+                    result.mapping.participants match {
+                      case Seq() => Future.successful(Left(result))
+                      case Seq(participant) =>
+                        if (
+                          participant.participantId == participantId && result.base.operation == TopologyChangeOp.Replace
+                        ) {
+                          Future.successful(Right(result))
+                        } else {
+                          Future.successful(Left(result))
+                        }
+                      case participants =>
+                        Future.failed(
+                          Status.INTERNAL
+                            .withDescription(
+                              s"Party $partyId is hosted on multiple participant, giving up: $participants"
+                            )
+                            .asRuntimeException()
+                        )
+                    }
                   }
-                }
-            },
+              },
             _ =>
               Right(
                 PartyToParticipant.tryCreate(
@@ -342,7 +345,8 @@ class ParticipantPartyMigrator(
   ): Future[Unit] = {
     for {
       _ <- participantAdminConnection.disconnectFromAllDomains()
-      _ <- Future.traverse(partyIds) { partyId =>
+      // ACS exports are expensive so do not change this to be parallel.
+      _ <- MonadUtil.sequentialTraverse(partyIds) { partyId =>
         for {
           acsSnapshot <- getAcsSnapshot(partyId)
           _ <- participantAdminConnection.uploadAcsSnapshot(acsSnapshot)

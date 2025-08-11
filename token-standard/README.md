@@ -9,11 +9,10 @@ As for documentation, we currently have to refer you to the source code of the
 Daml files defining the relevant Daml interfaces, and the source code of the
 OpenAPI specifications for the off-ledger APIs.
 
-Note that the `splice-api-token-burn-mint` API is not explained in CIP-0056. It was added
-later due to discovering the need for it when considering how to build a bridge
-leveraging an existing token implementation. See the [CHANGELOG](CHANGELOG.md)
-for  a description of that change, and other major and minor changes that were done between
-proposing CIP-0056 and releasing the APIs together with their `Amulet` implementation.
+Note that the fine-tuning of the API definitions happened after proposing
+CIP-0056.  See the [CHANGELOG](CHANGELOG.md) for the changes that were done
+between proposing CIP-0056 and releasing the APIs together with their `Amulet`
+implementation.
 
 
 ## Testing
@@ -89,6 +88,41 @@ You can find an example output in [`token-standard/cli/__tests__/expected/holdin
 The output is a JSON array of holdings, each of which has two relevant fields:
 - `contractId`: The contract id of the holding
 - `payload`: An object containing the same fields as the [`HoldingView` Daml interface](splice-api-token-holding-v1/daml/Splice/Api/Token/HoldingV1.daml#L49).
+
+
+#### List transfer instructions
+
+```
+> npm run cli -- list-transfer-instructions
+
+Usage: main list-transfer-instructions [options] <partyId>
+
+List all transfer instructions where the provided party is a stakeholder of
+
+Arguments:
+  partyId                   The party for which to list the transfer
+                            instructions
+
+Options:
+  -l, --ledger-url <value>  The ledger JSON API base URL, e.g.
+                            http://localhost:6201
+  -a, --auth-token <value>  The ledger JSON API auth token
+  -h, --help                display help for command
+```
+
+Example:
+
+```shell
+npm run cli -- list-transfer-instructions a::partyid -l http://localhost:6201 -a an-auth-token
+```
+
+Output:
+
+You can find an example output in [`token-standard/cli/__tests__/expected/transfer-instructions.json`](cli/__tests__/expected/transfer-instructions.json).
+
+The output is a JSON array of transfer instructions, each of which has two relevant fields:
+- `contractId`: The contract id of the transfer instruction
+- `payload`: An object containing the same fields as the [`TransferInstruction` Daml interface](splice-api-token-transfer-instruction-v1/daml/Splice/Api/Token/TransferInstructionV1.daml#L115).
 
 #### List holding transactions
 
@@ -176,6 +210,7 @@ npm run cli -- transfer \
   -d TheInstrumentId \
   --public-key sender-key.pub \
   --private-key sender-key.priv \
+  -u a-user-id \
   -R http://localhost:5012 \
   -l http://localhost:6201 \
   -a an-auth-token
@@ -183,5 +218,63 @@ npm run cli -- transfer \
 
 Output:
 
-If the output is `{}`, the transfer was successful.
-TODO (#908): record_time and update_id will be added to the output.
+The output will include ` "status": "success" `, when the transfer was successful.
+Additionally, it will also include:
+- `updateId`: the update id identifying the transfer in the ledger.
+- `recordTime`: the time in the ledger at which the transfer happened.
+- `synchronizerId`: the synchronizer id in which the transfer was executed.
+
+Any error will be logged with  "Failed to execute transfer:", followed by error details.
+These can happen due to any intermediate request failing, or timing out.
+
+
+#### Accept transfer instruction
+
+```
+npm run cli -- accept-transfer-instruction --help
+
+Usage: main accept-transfer-instruction [options] <transferInstructionCid>
+
+Execute the choice TransferInstruction_Accept on the provided transfer instruction
+
+Arguments:
+  transferInstructionCid                      The contract ID of the transfer instruction to accept
+
+Options:
+  -p, --party <value>                         The party as which to accept the transfer instruction. Must be usable by the auth token's user.
+  -u, --user-id <value>                       The user id, must match the user in the token
+  --public-key <value>                        Path to the public key file
+  --private-key <value>                       Path to the private key file
+  -R --transfer-factory-registry-url <value>  The URL to a transfer registry.
+  -l, --ledger-url <value>                    The ledger JSON API base URL, e.g. http://localhost:6201
+  -a, --auth-token <value>                    The ledger JSON API auth token
+  -h, --help                                  display help for command
+```
+
+Example:
+
+```shell
+npm run cli -- accept-transfer-instruction \
+  aTransferInstructionCid \
+  -p acting::party \
+  --public-key sender-key.pub \
+  --private-key sender-key.priv \
+  -R http://localhost:5012 \
+  -l http://localhost:6201 \
+  -u a-user-id \
+  -a an-auth-token
+```
+
+You can list all transfer instructions, including their contract id,
+from the output of the `list-transfer-instructions` command.
+
+Output:
+
+The output will include ` "status": "success" `, when the instruction acceptance  was successful.
+Additionally, it will also include:
+- `updateId`: the update id identifying the instruction acceptance in the ledger.
+- `recordTime`: the time in the ledger at which the instruction acceptance happened.
+- `synchronizerId`: the synchronizer id in which the instruction acceptance was executed.
+
+Any error will be logged with  "Failed to accept transfer instruction:", followed by error details.
+These can happen due to any intermediate request failing, or timing out.

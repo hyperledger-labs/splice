@@ -9,7 +9,6 @@ import cats.implicits.{
   catsSyntaxTuple4Semigroupal,
 }
 import cats.syntax.functorFilter.*
-import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
@@ -84,6 +83,7 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
@@ -91,6 +91,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import scala.jdk.OptionConverters.*
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -142,14 +143,29 @@ class SV1Initializer(
       cantonIdentifierConfig = config.cantonIdentifierConfig.getOrElse(
         SvCantonIdentifierConfig.default(config)
       )
-      _ <- SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
-        cantonIdentifierConfig,
-        localSynchronizerNode,
-        clock,
-        loggerFactory,
-        retryProvider,
-      )
-      (namespace, synchronizerId) <- bootstrapDomain(localSynchronizerNode)
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          SynchronizerNodeInitializer.initializeLocalCantonNodesWithNewIdentities(
+            cantonIdentifierConfig,
+            localSynchronizerNode,
+            clock,
+            loggerFactory,
+            retryProvider,
+          )
+        } else {
+          logger.info(
+            "Skipping synchronizer node initialization because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
+      (namespace, synchronizerId) <-
+        if (config.skipSynchronizerInitialization) {
+          participantAdminConnection.getSynchronizerId(config.domains.global.alias).map { s =>
+            (s.namespace, s)
+          }
+        } else {
+          bootstrapDomain(localSynchronizerNode)
+        }
       _ = logger.info("Domain is bootstrapped, connecting sv1 participant to domain")
       internalSequencerApi = localSynchronizerNode.sequencerInternalConfig
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
@@ -173,7 +189,9 @@ class SV1Initializer(
             minObservationDuration = config.timeTrackerMinObservationDuration
           ),
         ),
-        RetryFor.WaitingOnInitDependency,
+        overwriteExistingConnection =
+          false, // The validator will manage sequencer connections after initial setup
+        retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
       (dsoParty, svParty, _) <- (
@@ -233,7 +251,10 @@ class SV1Initializer(
       dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
+        dsoStore,
         ledgerClient,
+        participantAdminConnection,
+        Some(localSynchronizerNode),
       )
       (_, decentralizedSynchronizer) <- (
         SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
@@ -250,6 +271,17 @@ class SV1Initializer(
         migrationInfo,
       )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        decentralizedSynchronizer,
+        svAutomation.connection,
+        loggerFactory,
+      )
+      initialRound <- establishInitialRound(
+        svAutomation.connection,
+        upgradesConfig,
+        packageVersionSupport,
+        svParty,
+      )
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
       // is allocated, as a stand-in for all of these actions.
@@ -273,10 +305,6 @@ class SV1Initializer(
         },
         logger,
       )
-      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        decentralizedSynchronizer,
-        svAutomation.connection,
-      )
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,
@@ -288,14 +316,13 @@ class SV1Initializer(
       withDsoStore = new WithDsoStore(
         dsoAutomation,
         decentralizedSynchronizer,
-        packageVersionSupport,
       )
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "bootstrap_dso_rules",
         show"the DsoRules and AmuletRules are bootstrapped",
         dsoStore.lookupDsoRules().map(_.isDefined), {
-          withDsoStore.foundDso()
+          withDsoStore.foundDso(initialRound, packageVersionSupport)
         },
         logger,
       )
@@ -318,10 +345,18 @@ class SV1Initializer(
       // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
       // for example if sv1 restarted after bootstrapping the DsoRules.
       // We only set the domain sequencer config if the existing one is different here.
-      _ <- withDsoStore.reconcileSequencerConfigIfRequired(
-        Some(localSynchronizerNode),
-        config.domainMigrationId,
-      )
+      _ <-
+        if (!config.skipSynchronizerInitialization) {
+          withDsoStore.reconcileSequencerConfigIfRequired(
+            Some(localSynchronizerNode),
+            config.domainMigrationId,
+          )
+        } else {
+          logger.info(
+            "Skipping reconcile sequencer config step because skipSynchronizerInitialization is enabled"
+          )
+          Future.unit
+        }
     } yield (
       decentralizedSynchronizer,
       dsoPartyHosting,
@@ -408,8 +443,7 @@ class SV1Initializer(
         )
         val initialValues = DynamicSynchronizerParameters.initialValues(clock, ProtocolVersion.v33)
         val values = initialValues.tryUpdate(
-          // TODO(DACH-NY/canton-network-node#6055) Consider increasing topology change delay again
-          topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
+          topologyChangeDelay = config.topologyChangeDelayDuration.toInternal,
           trafficControlParameters = Some(initialTrafficControlParameters),
           reconciliationInterval =
             PositiveSeconds.fromConfig(SvUtil.defaultAcsCommitmentReconciliationInterval),
@@ -440,15 +474,19 @@ class SV1Initializer(
                 sequencerState,
                 mediatorState,
               ) <- (
-                List(
-                  participantAdminConnection,
-                  synchronizerNode.mediatorAdminConnection,
-                  synchronizerNode.sequencerAdminConnection,
-                ).traverse { con =>
-                  con
-                    .getId()
-                    .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
-                }.map(_.flatten),
+                MonadUtil
+                  .sequentialTraverse(
+                    List(
+                      participantAdminConnection,
+                      synchronizerNode.mediatorAdminConnection,
+                      synchronizerNode.sequencerAdminConnection,
+                    )
+                  ) { con =>
+                    con
+                      .getId()
+                      .flatMap(con.getIdentityTransactions(_, TopologyStoreId.AuthorizedStore))
+                  }
+                  .map(_.flatten),
                 participantAdminConnection.proposeInitialDomainParameters(
                   synchronizerId,
                   values,
@@ -531,7 +569,6 @@ class SV1Initializer(
   private class WithDsoStore(
       dsoStoreWithIngestion: AppStoreWithIngestion[SvDsoStore],
       synchronizerId: SynchronizerId,
-      packageVersionSupport: PackageVersionSupport,
   ) {
 
     private val dsoStore = dsoStoreWithIngestion.store
@@ -544,19 +581,18 @@ class SV1Initializer(
       clock = clock,
       retryProvider = retryProvider,
       logger = logger,
-      packageVersionSupport,
     )
 
     /** The one and only entry-point: found a fresh DSO, given a properly
       * allocated DSO party
       */
-    def foundDso()(implicit
+    def foundDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(implicit
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "bootstrap_dso",
       "bootstrapping DSO",
-      bootstrapDso(),
+      bootstrapDso(initialRound, packageVersionSupport),
       logger,
     )
 
@@ -576,8 +612,8 @@ class SV1Initializer(
     }
 
     // Create DsoRules and AmuletRules and open the first mining round
-    private def bootstrapDso()(implicit
-        tc: TraceContext
+    private def bootstrapDso(initialRound: Long, packageVersionSupport: PackageVersionSupport)(
+        implicit tc: TraceContext
     ): Future[Unit] = {
       val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(synchronizerId, sv1Config.voteCooldownTime)
       for {
@@ -622,7 +658,12 @@ class SV1Initializer(
                   )
                   _ = logger
                     .info(
-                      s"Bootstrapping DSO as $dsoParty and BFT nodes $sv1SynchronizerNodes"
+                      s"Bootstrapping DSO as $dsoParty and BFT nodes $sv1SynchronizerNodes at round $initialRound"
+                    )
+                  bootstrapWithNonZeroRound <- packageVersionSupport
+                    .supportBootstrapWithNonZeroRound(
+                      Seq(svParty),
+                      clock.now,
                     )
                   _ <- dsoStoreWithIngestion.connection
                     .submit(
@@ -660,6 +701,9 @@ class SV1Initializer(
                           .toMap
                           .asJava,
                         sv1Config.isDevNet,
+                        Option
+                          .when(bootstrapWithNonZeroRound.supported)(initialRound: java.lang.Long)
+                          .toJava,
                       ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
