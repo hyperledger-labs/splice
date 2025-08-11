@@ -250,7 +250,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       )
       (driver, bidi)
     }
-    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
     registerWebDriver(name, webDriver)
 
     biDi.addListener[LogEntry](
@@ -682,6 +682,17 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       }
     }
     clickOn(query)
+  }
+
+  protected def enableSeleniumImplicitWait[T](codeBlock: => T)(implicit webDriver: WebDriver): T = {
+    try {
+      logger.info("Setting selenium implicit waits to 5 seconds")
+      webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+      codeBlock
+    } finally {
+      logger.info("Setting selenium implicit waits to 0 seconds")
+      webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
+    }
   }
 
   private val DefaultDateTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
