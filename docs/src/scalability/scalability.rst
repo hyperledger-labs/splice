@@ -14,7 +14,9 @@ Number of Parties per Validator
 While the underlying Canton participant supports up to 1 million
 parties per node, limitations in the validator app currently mean that
 only up to 200 parties are supported when the validator app is
-involved.
+involved. The limit of 200 parties is expected to be lifted in the future which
+should make those workarounds no longer required.
+
 
 Concretely, the limit of 200 parties applies to:
 
@@ -57,6 +59,3 @@ party including the fact that ``ValidatorRewardCoupon`` activity
 records generated for that party cannot be minted by the validator
 operator as this relies on the ``ValidatorRight`` contract. If this is
 required, you must build your own minting automation.
-
-The limit of 200 parties is expected to be lifted in the future which
-should make those workarounds no longer required.
