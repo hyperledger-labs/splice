@@ -75,7 +75,8 @@ class WalletSurviveCantonRestartIntegrationTest
       clue("Second run of Canton participant") {
         withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-2") {
           clue("We can tap and list after Canton restart and domain reconnection") {
-            eventuallySucceeds() {
+            // Due to the circuit breaker kicking in, this might take a bit longer to succeed after some failures due to the disconnect
+            eventuallySucceeds(2.minutes) {
               aliceWalletClient.tap(2)
             }
             aliceWalletClient.list()
