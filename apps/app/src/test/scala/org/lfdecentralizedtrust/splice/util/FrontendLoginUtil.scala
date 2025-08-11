@@ -34,7 +34,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
       currentUrl should startWith(url)
     }
-    eventuallySucceeds(timeUntilSuccess = 5.seconds) {
+    eventually(timeUntilSuccess = 5.seconds) {
       if (find(id("logout-button")).isDefined) {
         eventuallyClickOn(id("logout-button"))
       }
