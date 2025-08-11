@@ -210,7 +210,7 @@ runs:
       if: ${{ fromJson(inputs.with_docker_images) }}
       shell: bash
       run: |
-        [[ -d "$HOME/.docker" ]] && sudo chown "$(whoami):$(whoami)" "$HOME/.docker"
+        [[ -d "$HOME/.docker" ]] && sudo chown "$(id -u):$(id -g)" "$HOME/.docker"
 
     # Install QEMU to support building multi-arch images
     - name: Set up QEMU
