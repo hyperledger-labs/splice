@@ -4,6 +4,7 @@ import org.lfdecentralizedtrust.splice.integration.tests.{FrontendTestCommon, Sp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebDriver
+import org.openqa.selenium.support.ui.ExpectedConditions
 
 import scala.util.Using
 
@@ -25,23 +26,31 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       webDriver: WebDriver
   ) = {
     // logins need implicit waits to work
-    enableSeleniumImplicitWait {
-      eventually() {
-        val url = if (port == 80) {
-          s"http://$hostname"
-        } else {
-          s"http://$hostname:$port"
-        }
-        currentUrl should startWith(url)
+    eventually() {
+      val url = if (port == 80) {
+        s"http://$hostname"
+      } else {
+        s"http://$hostname:$port"
       }
-      // We reuse frontends across tests so we might need to log out first.
-      eventually() {
-        find(id("logout-button")).foreach(click on _)
-      }
-      click on "user-id-field"
-      textField("user-id-field").value = ledgerApiUser
-      click on "login-button"
+      currentUrl should startWith(url)
     }
+    // Check if the user is already logged in by looking for the logout button
+    if (find(id("logout-button")).isDefined) {
+      // If so, click it. Use a helper that waits for clickability for extra safety.
+      eventuallyClickOn(id("logout-button"))
+    }
+
+    // NOW, explicitly wait for the login page to be ready by waiting for the user ID field
+    // to be clickable. This is the most important step.
+    clue("Waiting for login page to be ready") {
+      waitForCondition(id("user-id-field")) {
+        ExpectedConditions.elementToBeClickable(_)
+      }
+    }
+
+    // Once the wait is successful, you can safely interact with the login form
+    textField("user-id-field").value = ledgerApiUser
+    eventuallyClickOn(id("login-button"))
   }
 
   protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {

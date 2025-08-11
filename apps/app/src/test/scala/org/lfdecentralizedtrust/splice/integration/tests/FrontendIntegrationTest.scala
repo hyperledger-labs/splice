@@ -675,7 +675,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     }
   }
 
-  protected def eventuallyClickOn(query: Query)(implicit driver: WebDriverType) = {
+  protected def eventuallyClickOn(query: Query)(implicit driver: WebDriver) = {
     clue(s"Waiting for $query to be clickable") {
       waitForCondition(query) {
         ExpectedConditions.elementToBeClickable(_)
