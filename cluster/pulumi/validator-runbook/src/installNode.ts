@@ -39,6 +39,7 @@ import {
   InstalledHelmChart,
   ansDomainPrefix,
   failOnAppVersionMismatch,
+  networkWideConfig,
 } from 'splice-pulumi-common';
 import {
   installParticipant,
@@ -271,6 +272,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

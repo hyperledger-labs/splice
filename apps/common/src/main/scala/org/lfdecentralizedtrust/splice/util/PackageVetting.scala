@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.util
 
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -58,6 +59,7 @@ class PackageVetting(
       domainId,
       packagesToVet,
       None,
+      maxVettingDelay = None,
     )
   }
 
@@ -65,6 +67,7 @@ class PackageVetting(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       futureAmuletConfigFromVoteRequests: Seq[(Option[Instant], AmuletConfig[USD])],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
   )(implicit tc: TraceContext): Future[Unit] = {
     val schedule = AmuletConfigSchedule(amuletRules)
     val vettingSchedule =
@@ -79,7 +82,7 @@ class PackageVetting(
     logger.info(s"Vetting for schedule $vettingTimeSortedDars from amulet rules $schedule")
     MonadUtil
       .sequentialTraverse(vettingTimeSortedDars) { case (validFrom, packages) =>
-        vetPackages(domainId, packages.toSeq, Some(validFrom))
+        vetPackages(domainId, packages.toSeq, Some(validFrom), maxVettingDelay)
       }
       .map(_ => ())
   }
@@ -88,6 +91,7 @@ class PackageVetting(
       domainId: SynchronizerId,
       packages: Seq[(PackageIdResolver.Package, PackageVersion)],
       validFrom: Option[Instant],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
   )(implicit tc: TraceContext): Future[Unit] = {
     logger.debug(s"Vetting packages: ${packages.mkString(", ")} on $domainId valid from $validFrom")
     val resources = packages.flatMap { case (pkg, packageVersion) =>
@@ -113,6 +117,7 @@ class PackageVetting(
       domainId = domainId,
       validFrom = validFrom,
       resources,
+      maxVettingDelay,
     )
   }
 
@@ -120,6 +125,7 @@ class PackageVetting(
       domainId: SynchronizerId,
       validFrom: Option[Instant],
       resources: Seq[DarResource],
+      maxVettingDelay: Option[(Clock, NonNegativeFiniteDuration)],
   )(implicit tc: TraceContext) = {
     for {
       _ <- withSpan("upload_dars") { implicit tc => _ =>
@@ -135,6 +141,7 @@ class PackageVetting(
           domainId,
           resources,
           fromDate = validFrom,
+          maxVettingDelay = maxVettingDelay,
         )
       }
     } yield {}

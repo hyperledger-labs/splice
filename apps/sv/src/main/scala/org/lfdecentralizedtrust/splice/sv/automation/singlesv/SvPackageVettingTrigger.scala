@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import org.lfdecentralizedtrust.splice.automation.{PackageVettingTrigger, TriggerContext}
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
@@ -18,10 +19,11 @@ class SvPackageVettingTrigger(
     override protected val participantAdminConnection: ParticipantAdminConnection,
     store: SvDsoStore,
     override protected val context: TriggerContext,
+    maxVettingDelay: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PackageVettingTrigger(SvPackageVettingTrigger.packages) {
+) extends PackageVettingTrigger(SvPackageVettingTrigger.packages, maxVettingDelay) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
     store.getDsoRules().map(_.domain)

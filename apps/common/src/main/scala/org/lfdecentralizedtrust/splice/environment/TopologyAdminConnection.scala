@@ -41,7 +41,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.time.FetchTimeResponse
+import com.digitalasset.canton.time.{Clock, FetchTimeResponse}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.{
@@ -704,6 +704,7 @@ abstract class TopologyAdminConnection(
         RecreateOnAuthorizedStateChange.Recreate,
       forceChanges: ForceFlags = ForceFlags.none,
       waitForAuthorization: Boolean = true,
+      maxSubmissionDelay: Option[(Clock, NonNegativeFiniteDuration)] = None,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
     withSpan("establish_topology_mapping") { implicit traceContext => _ =>
       logger.info(s"Ensuring that $description")
@@ -723,17 +724,39 @@ abstract class TopologyAdminConnection(
                 .flatMap { _ =>
                   def proposeNewTopologyTransaction = {
                     val updatedMapping = update(mapping)
-                    proposeMapping(
-                      store,
-                      updatedMapping,
-                      serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
-                      isProposal = isProposal,
-                      forceChanges = forceChanges,
-                    ).map { signed =>
-                      logger.info(
-                        s"Submitted proposal ${signed.mapping} for $description, waiting until the proposal gets accepted"
-                      )
-                      signed.mapping
+                    val sleep: Future[Unit] =
+                      maxSubmissionDelay.fold(Future.unit) { case (clock, maxSubmissionDelay) =>
+                        val delay: NonNegativeFiniteDuration =
+                          NonNegativeFiniteDuration.tryFromJavaDuration(
+                            java.time.Duration
+                              .ofNanos((math.random() * maxSubmissionDelay.unwrap.toNanos).toLong)
+                          )
+                        logger.info(
+                          s"Waiting for ${delay.underlying.toUnit(java.util.concurrent.TimeUnit.MINUTES)} minutes before submitting topology transaction"
+                        )
+                        retryProvider
+                          .scheduleAfterUnlessShutdown(
+                            Future.unit,
+                            clock,
+                            delay = delay,
+                            jitter =
+                              0.0, // We don't use jitter here as we already randomize the value itself which allows for better logging.
+                          )
+                          .onShutdown(())
+                      }
+                    sleep.flatMap { _ =>
+                      proposeMapping(
+                        store,
+                        updatedMapping,
+                        serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                        isProposal = isProposal,
+                        forceChanges = forceChanges,
+                      ).map { signed =>
+                        logger.info(
+                          s"Submitted proposal ${signed.mapping} for $description, waiting until the proposal gets accepted"
+                        )
+                        signed.mapping
+                      }
                     }
                   }
 

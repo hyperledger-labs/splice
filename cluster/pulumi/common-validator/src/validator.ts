@@ -24,6 +24,7 @@ import {
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   LogLevel,
+  networkWideConfig,
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
@@ -232,6 +233,7 @@ export async function installValidatorApp(
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
+      maxVettingDelay: networkWideConfig?.maxVettingDelay,
       logLevel: config.logLevel,
       resources: baseConfig.svValidator
         ? {
