@@ -26,7 +26,6 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
   )(implicit
       webDriver: WebDriver
   ) = {
-    // logins need implicit waits to work
     eventually() {
       val url = if (port == 80) {
         s"http://$hostname"
