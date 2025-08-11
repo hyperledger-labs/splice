@@ -177,7 +177,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   val options: FirefoxOptions =
     new FirefoxOptions()
       .setLogLevel(FirefoxDriverLogLevel.DEBUG)
-  // .addArguments("-headless")
+      .addArguments("-headless")
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
@@ -681,17 +681,6 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       }
     }
     clickOn(query)
-  }
-
-  protected def enableSeleniumImplicitWait[T](codeBlock: => T)(implicit webDriver: WebDriver): T = {
-    try {
-      logger.info("Setting selenium implicit waits to 5 seconds")
-      webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
-      codeBlock
-    } finally {
-      logger.info("Setting selenium implicit waits to 0 seconds")
-      webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
-    }
   }
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit

@@ -101,31 +101,33 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
 
       withFrontEnd(frontendDriverName) { implicit webDriver =>
-        // logins need implicit waits to work
-        enableSeleniumImplicitWait {
-          clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
-            completeAuth0LoginWithAuthorization(
-              s"http://localhost:$localHostPort",
-              user.email,
-              user.password,
-              () =>
-                if (onboardThroughWalletUI) {
-                  find(id("onboard-button")).value.text should not be empty
-                } else {
-                  seleniumText(find(id("logged-in-user"))) should not be empty
-                },
-            )
-          }
-          val userPartyId = if (onboardThroughWalletUI) {
-            actAndCheck("onboard user", click on "onboard-button")(
-              "user is onboarded",
-              _ => seleniumText(find(id("logged-in-user"))),
-            )._2
-          } else {
-            seleniumText(find(id("logged-in-user")))
-          }
-          afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)
+        clue("The user logs in with OAauth2 and completes all Auth0 login prompts") {
+          completeAuth0LoginWithAuthorization(
+            s"http://localhost:$localHostPort",
+            user.email,
+            user.password,
+            () =>
+              if (onboardThroughWalletUI) {
+                find(id("onboard-button")).value.text should not be empty
+              } else {
+                seleniumText(find(id("logged-in-user"))) should not be empty
+              },
+          )
         }
+        val userPartyId = if (onboardThroughWalletUI) {
+          actAndCheck("onboard user", click on "onboard-button")(
+            "user is onboarded",
+            _ => {
+              val userId = seleniumText(find(id("logged-in-user")))
+              userId should not be empty
+              userId
+            },
+          )._2
+        } else {
+          seleniumText(find(id("logged-in-user")))
+        }
+
+        afterLoginChecks(user, PartyId.tryFromProtoPrimitive(userPartyId), webDriver)
       }
     }
   }
