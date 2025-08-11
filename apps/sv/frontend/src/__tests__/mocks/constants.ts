@@ -11,7 +11,7 @@ import {
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListVoteRequestByTrackingCidResponse,
-} from 'sv-openapi';
+} from '@lfdecentralizedtrust/sv-openapi';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
 import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';

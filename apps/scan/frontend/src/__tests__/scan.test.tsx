@@ -4,7 +4,10 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rest } from 'msw';
 import { mockAllIsIntersecting } from 'react-intersection-observer/test-utils';
-import { GetBackfillingStatusResponse, GetRoundOfLatestDataResponse } from 'scan-openapi';
+import {
+  GetBackfillingStatusResponse,
+  GetRoundOfLatestDataResponse,
+} from '@lfdecentralizedtrust/scan-openapi';
 import { test, expect } from 'vitest';
 
 import App from '../App';

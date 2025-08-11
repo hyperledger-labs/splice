@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as external from 'wallet-external-openapi';
+import * as external from '@lfdecentralizedtrust/wallet-external-openapi';
 import { useUserState } from '@lfdecentralizedtrust/splice-common-frontend';
 import {
   BaseApiMiddleware,
@@ -20,7 +20,7 @@ import {
   ServerConfiguration,
   WalletApi,
   WalletFeatureSupportResponse,
-} from 'wallet-openapi';
+} from '@lfdecentralizedtrust/wallet-openapi';
 
 import * as payment from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import { AmuletTransferInstruction } from '@daml.js/splice-amulet/lib/Splice/AmuletTransferInstruction';

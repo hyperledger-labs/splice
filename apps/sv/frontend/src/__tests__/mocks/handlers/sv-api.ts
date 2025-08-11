@@ -6,14 +6,14 @@ import {
 } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import dayjs from 'dayjs';
 import { rest, RestHandler } from 'msw';
-import { FeatureSupportResponse } from 'scan-openapi';
+import { FeatureSupportResponse } from '@lfdecentralizedtrust/scan-openapi';
 import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
-} from 'sv-openapi';
+} from '@lfdecentralizedtrust/sv-openapi';
 
 import {
   voteRequest,

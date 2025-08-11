@@ -13,7 +13,7 @@ import {
   Middleware,
   RequestContext,
   ResponseContext,
-} from 'scan-proxy-openapi';
+} from '@lfdecentralizedtrust/scan-proxy-openapi';
 
 //TODO(DACH-NY/canton-network-node#8571) deduplicate this and reuse from specific libraries instead of all on common frontend
 const ValidatorScanProxyContext = React.createContext<ScanProxyApi | undefined>(undefined);

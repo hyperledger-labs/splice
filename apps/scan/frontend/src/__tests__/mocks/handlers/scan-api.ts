@@ -15,7 +15,7 @@ import {
   ListActivityResponse,
   LookupEntryByPartyResponse,
   GetOpenAndIssuingMiningRoundsResponse,
-} from 'scan-openapi';
+} from '@lfdecentralizedtrust/scan-openapi';
 
 import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/module';
 import damlTypes from '@daml/types';

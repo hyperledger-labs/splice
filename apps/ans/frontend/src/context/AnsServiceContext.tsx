@@ -12,7 +12,7 @@ import {
   RequestContext,
   ResponseContext,
   ServerConfiguration,
-} from 'ans-external-openapi';
+} from '@lfdecentralizedtrust/ans-external-openapi';
 import React, { useContext, useMemo } from 'react';
 
 import { useAnsConfig } from '../utils';
