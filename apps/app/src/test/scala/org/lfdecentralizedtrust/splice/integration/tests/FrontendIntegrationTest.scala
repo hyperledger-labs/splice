@@ -177,7 +177,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
   val options: FirefoxOptions =
     new FirefoxOptions()
       .setLogLevel(FirefoxDriverLogLevel.DEBUG)
-      .addArguments("-headless")
+  // .addArguments("-headless")
   options.setCapability("webSocketUrl", true: Any);
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty

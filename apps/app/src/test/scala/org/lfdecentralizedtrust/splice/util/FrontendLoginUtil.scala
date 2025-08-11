@@ -6,6 +6,7 @@ import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.support.ui.ExpectedConditions
 
+import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
@@ -34,21 +35,16 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       }
       currentUrl should startWith(url)
     }
-    // Check if the user is already logged in by looking for the logout button
-    if (find(id("logout-button")).isDefined) {
-      // If so, click it. Use a helper that waits for clickability for extra safety.
-      eventuallyClickOn(id("logout-button"))
-    }
-
-    // NOW, explicitly wait for the login page to be ready by waiting for the user ID field
-    // to be clickable. This is the most important step.
-    clue("Waiting for login page to be ready") {
-      waitForCondition(id("user-id-field")) {
-        ExpectedConditions.elementToBeClickable(_)
+    eventuallySucceeds(timeUntilSuccess = 5.seconds) {
+      if (find(id("logout-button")).isDefined) {
+        eventuallyClickOn(id("logout-button"))
+      }
+      clue("Waiting for login page to be ready") {
+        waitForCondition(id("user-id-field"), timeUntilSuccess = Some(1.seconds)) {
+          ExpectedConditions.elementToBeClickable(_)
+        }
       }
     }
-
-    // Once the wait is successful, you can safely interact with the login form
     textField("user-id-field").value = ledgerApiUser
     eventuallyClickOn(id("login-button"))
   }
