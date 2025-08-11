@@ -38,7 +38,7 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       if (find(id("logout-button")).isDefined) {
         eventuallyClickOn(id("logout-button"))
       }
-      clue("Waiting for login page to be ready") {
+      silentClue("Waiting for login page to be ready") {
         waitForCondition(id("user-id-field"), timeUntilSuccess = Some(1.seconds)) {
           ExpectedConditions.elementToBeClickable(_)
         }
