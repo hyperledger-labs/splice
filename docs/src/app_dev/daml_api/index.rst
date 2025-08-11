@@ -39,7 +39,7 @@ Canton Network Token Standard APIs (CIP-0056)
       ../api/splice-api-token-allocation-instruction-v1/index
       ../api/splice-api-token-allocation-v1/index
 
-.. TODO(#1074): also add links to OpenAPI docs for the REST API parts of these APIs
+* See the reference docs for the :ref:`OpenAPI specifications of the Canton Network Token Standard <token_standard_openapi>`.
 
 Featured App Activity Markers API (CIP-0047)
 --------------------------------------------

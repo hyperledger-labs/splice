@@ -8,7 +8,7 @@ import {
   Vote,
   VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import {
   AmuletRulesConfigProposal,
   DsoRulesConfigProposal,
@@ -23,6 +23,7 @@ import {
 } from '../utils/types';
 import { buildDsoConfigChanges } from './buildDsoConfigChanges';
 import { buildAmuletConfigChanges } from './buildAmuletConfigChanges';
+import { DsoInfo } from '@lfdecentralizedtrust/splice-common-frontend';
 
 export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag, string> => ({
   CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
@@ -34,7 +35,7 @@ export const actionTagToTitle = (amuletName: string): Record<SupportedActionTag,
   SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
 });
 
-export const createProposalActions = [
+export const createProposalActions: { name: string; value: SupportedActionTag }[] = [
   { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
   { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
   { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
@@ -139,4 +140,13 @@ export function getActionValue(
     default:
       return undefined;
   }
+}
+
+export function getInitialExpiration(dsoInfo: DsoInfo | undefined): Dayjs {
+  if (!dsoInfo) return dayjs().add(1, 'day');
+
+  return dayjs().add(
+    Math.floor(parseInt(dsoInfo.dsoRules.payload.config.voteRequestTimeout.microseconds!) / 1000),
+    'milliseconds'
+  );
 }

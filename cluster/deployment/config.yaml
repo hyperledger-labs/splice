@@ -39,6 +39,9 @@ pulumiProjectConfig:
 validator1:
   logging:
     level: DEBUG
+# initial round used only on fresh initialization or resets
+# first SV bootstraps the network with it, other SVs learn it via their sponsors
+initialRound: 0
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:
@@ -81,3 +84,10 @@ multiValidator:
         memory: '5Gi'
       limits:
         memory: '12Gi'
+sv:
+  participant:
+    resources:
+      requests:
+        memory: '12Gi'
+      limits:
+        memory: '18Gi'

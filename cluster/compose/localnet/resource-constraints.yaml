@@ -7,9 +7,9 @@ services:
   postgres:
     mem_limit: 2g
   canton:
-    mem_limit: 6g
+    mem_limit: 7g
     environment:
-      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx3072m"
+      _JAVA_OPTIONS: "-XX:-UseCompressedOops -Xms512m -Xmx4096m"
   splice:
     mem_limit: 3g
     environment:

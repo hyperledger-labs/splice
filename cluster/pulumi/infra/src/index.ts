@@ -24,10 +24,15 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const istio = configureIstio(network.ingressNs, ingressIp, network.publicIngressIp.address);
+const istio = configureIstio(
+  network.ingressNs,
+  ingressIp,
+  network.cometbftIngressIp.address,
+  network.publicIngressIp.address
+);
 
 // Ensures that images required from Quay for observability can be pulled
-const observabilityDependsOn = [network, istio];
+const observabilityDependsOn = istio.concat([network]);
 configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();

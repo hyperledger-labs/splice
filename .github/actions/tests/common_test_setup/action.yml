@@ -12,6 +12,10 @@ inputs:
     description: "Whether to save the Nix cache"
     required: false
     default: "false"
+  save_nix_cache_to_gcp:
+    description: "Whether to save the Nix cache to GCP"
+    required: false
+    default: "false"
   artifactory_user:
     description: "The Artifactory user"
     required: false
@@ -22,6 +26,14 @@ inputs:
     description: "Restrict upstream dependencies (e.g. Canton) to OSS versions (the equivalent of OSS_ONLY=1 in local checkouts)"
     required: false
     default: "false"
+  upload_workload_identity_provider:
+    description: 'The workload identity provider to use for uploading the cache'
+    required: false
+    default: ''
+  upload_service_account:
+    description: 'The service account to use for uploading the cache'
+    required: false
+    default: ''
 
 outputs:
   sbt_cache_hits:
@@ -55,7 +67,10 @@ runs:
         artifactory_password: ${{ inputs.artifactory_password }}
         cache_version: 5
         should_save: ${{ inputs.save_nix_cache }}
+        should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         oss_only: ${{ inputs.oss_only }}
+        upload_workload_identity_provider: ${{ inputs.upload_workload_identity_provider }}
+        upload_service_account: ${{ inputs.upload_service_account }}
 
     - name: Set up SBT
       if: inputs.with_sbt == 'true'

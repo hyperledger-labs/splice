@@ -276,6 +276,7 @@ abstract class NodeBase[State <: AutoCloseable & HasHealth](
       tracerProvider,
       retryProvider,
       nodeMetrics.grpcClientMetrics,
+      parameters.commandCircuitBreakerConfig,
     )
   }
 

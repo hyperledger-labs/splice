@@ -8,8 +8,51 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.10
+------
+
+- SV Application
+
+  - Fully remove the automation and logic around DSO delegate elections.
+  - UI enhancements.
+
+- Daml
+
+  - Deprecate Daml choices related to DSO delegate elections.
+  - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
+    Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.13
+     amuletNameService  0.1.13
+     dsoGovernance      0.1.17
+     validatorLifecycle 0.1.5
+     wallet             0.1.13
+     walletPayments     0.1.13
+     ================== =======
+
+- Helm
+
+  - The `splice-istio-gateway` Helm chart has been deprecated, and will be removed in a future release.
+    It has been replaced with explicit instructions in the :ref:`validator docs <helm-validator-ingress>`
+    and :ref:`SV docs <helm-sv-ingress>` on how to set up Istio ingress for the validator and SV nodes.
+
+- Docs
+
+  - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
+
+- Stability improvements
+
+  - Add circuit breaker functionality for ledger API command submissions in all splice apps;
+    causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
+
+0.4.9
+-----
 
 - SV Application
 
@@ -29,6 +72,11 @@ Upcoming
 - Documentation
 
   - Clarified that the Daml API ``splice-token-burn-mint-v1`` is not part of the token standard, see :ref:`app_dev_daml_api`.
+
+- Scan
+
+  - Added basic rate limits to the HTTP APIs. There are configured by default to allow up to 200 req/s per endpoint. The values can be adjusted under the keys `canton.scan-apps.scan-app.parameters.rate-limiting`.
+
 
 0.4.8
 -----

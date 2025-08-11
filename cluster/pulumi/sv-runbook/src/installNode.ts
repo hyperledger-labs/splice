@@ -39,7 +39,6 @@ import {
   spliceInstanceNames,
   DEFAULT_AUDIENCE,
   DecentralizedSynchronizerUpgradeConfig,
-  InstalledHelmChart,
   ansDomainPrefix,
   svUserIds,
   SvCometBftGovernanceKey,
@@ -100,7 +99,7 @@ export async function installNode(
       bootstrappingConfig,
     });
 
-  const loopback = installLoopback(xns, CLUSTER_HOSTNAME, activeVersion);
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
@@ -174,7 +173,7 @@ type SvConfig = {
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
-  loopback: InstalledHelmChart | null;
+  loopback: pulumi.Resource[];
   backupConfigSecret?: pulumi.Resource;
   svKey: CnInput<SvIdKey>;
   onboardingName: string;
@@ -238,6 +237,28 @@ async function installSvAndValidator(
 
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', 'postgres-values-apps.yaml');
 
+  const bftSequencerConnection =
+    !svConfig.participant || svConfig.participant.bftSequencerConnection;
+  const topologyChangeDelayEnvVars = svsConfig?.synchronizer?.topologyChangeDelay
+    ? [
+        {
+          name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
+          value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
+        },
+      ]
+    : [];
+  const disableBftSequencerConnectionEnvVars = bftSequencerConnection
+    ? []
+    : [
+        {
+          name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+          value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
+        },
+      ];
+  const svAppAdditionalEnvVars = (svConfig.svApp?.additionalEnvVars || [])
+    .concat(topologyChangeDelayEnvVars)
+    .concat(disableBftSequencerConnectionEnvVars);
+
   const valuesFromYamlFile = loadYamlFromFile(
     `${SPLICE_ROOT}/apps/app/src/pack/examples/sv-helm/sv-values.yaml`,
     {
@@ -293,14 +314,7 @@ async function installSvAndValidator(
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice: initialAmuletPrice,
     logLevel: svConfig.logging?.appsLogLevel,
-    additionalEnvVars: svsConfig?.synchronizer?.topologyChangeDelay
-      ? [
-          {
-            name: 'ADDITIONAL_CONFIG_TOPOLOGY_CHANGE_DELAY',
-            value: `canton.sv-apps.sv.topology-change-delay-duration=${svsConfig.synchronizer.topologyChangeDelay}`,
-          },
-        ]
-      : undefined,
+    additionalEnvVars: svAppAdditionalEnvVars,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -432,6 +446,28 @@ async function installSvAndValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
+  const validatorValuesWithMaybeNoBftSequencerConnection: ChartValues = {
+    ...validatorValuesWithMaybeTopups,
+    ...(bftSequencerConnection
+      ? {}
+      : {
+          decentralizedSynchronizerUrl: svValues.decentralizedSynchronizerUrl,
+          useSequencerConnectionsFromScan: false,
+        }),
+    additionalEnvVars: [
+      ...(validatorValuesWithMaybeTopups.additionalEnvVars || []),
+      ...(bftSequencerConnection
+        ? []
+        : [
+            {
+              name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+              value:
+                'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
+            },
+          ]),
+    ],
+  };
+
   const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
   if (!cnsUiClientId) {
     throw new Error('No CNS ui client id in auth0 config');
@@ -441,7 +477,7 @@ async function installSvAndValidator(
     xns,
     'validator',
     'splice-validator',
-    validatorValuesWithMaybeTopups,
+    validatorValuesWithMaybeNoBftSequencerConnection,
     activeVersion,
     {
       dependsOn: imagePullDeps

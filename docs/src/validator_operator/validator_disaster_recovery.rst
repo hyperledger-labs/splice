@@ -270,7 +270,7 @@ We can now check that the topology transaction got correctly applied and get the
 .. code::
 
     // The detailed output will slightly vary. Make sure that you see the new participant id though.
-    sv1Participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
+    participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
       res36: Seq[topology.ListPartyToParticipantResult] = Vector(
         ListPartyToParticipantResult(
           context = BaseResult(

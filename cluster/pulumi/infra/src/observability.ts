@@ -14,13 +14,13 @@ import {
   CLUSTER_NAME,
   clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
+  commandScriptPath,
   ENABLE_COMETBFT_PRUNING,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   isMainNet,
   loadTesterConfig,
-  MOCK_SPLICE_ROOT,
   ObservabilityReleaseName,
   publicPrometheusRemoteWrite,
   SPLICE_ROOT,
@@ -542,8 +542,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     }
   );
 
-  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/infra/prometheus-crd-update.sh`;
+  const path = commandScriptPath('cluster/pulumi/infra/prometheus-crd-update.sh');
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {
@@ -805,6 +804,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
+                monitoringConfig.alerting.alerts.svNames
+                  .map(p => `,member!~"PAR::${p}::.*"`)
+                  .join('')
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

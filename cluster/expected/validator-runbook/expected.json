@@ -167,49 +167,221 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "validator",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "hostname": "mock.global.canton.network.digitalasset.com"
-        },
-        "cometbftPorts": {
-          "domains": 5
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "tolerations": [
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "cometbft-loopback",
+        "namespace": "validator"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "tcp": [
           {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress-cometbft.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
           }
         ]
-      },
-      "version": "0.3.20"
+      }
     },
-    "name": "loopback",
+    "name": "loopback-cometbft-validator",
     "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "ServiceEntry",
+      "metadata": {
+        "name": "loopback",
+        "namespace": "validator"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "ports": [
+          {
+            "name": "http-port",
+            "number": 80,
+            "protocol": "HTTP"
+          },
+          {
+            "name": "tls",
+            "number": 443,
+            "protocol": "TLS"
+          },
+          {
+            "name": "grpc-domain",
+            "number": 5008,
+            "protocol": "GRPC"
+          },
+          {
+            "name": "cometbft-0-0-p2p",
+            "number": 26006,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-0-1-p2p",
+            "number": 26016,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-0-p2p",
+            "number": 26106,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-1-p2p",
+            "number": 26116,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-0-p2p",
+            "number": 26206,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-1-p2p",
+            "number": 26216,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-0-p2p",
+            "number": 26306,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-1-p2p",
+            "number": 26316,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-0-p2p",
+            "number": 26406,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-1-p2p",
+            "number": 26416,
+            "protocol": "TCP"
+          }
+        ],
+        "resolution": "DNS"
+      }
+    },
+    "name": "loopback-service-entry-validator",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:ServiceEntry"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "direct-loopback-through-ingress-gateway",
+        "namespace": "validator"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com",
+          "validator.mock.global.canton.network.digitalasset.com",
+          "*.validator.mock.global.canton.network.digitalasset.com",
+          "validator1.mock.global.canton.network.digitalasset.com",
+          "*.validator1.mock.global.canton.network.digitalasset.com",
+          "splitwell.mock.global.canton.network.digitalasset.com",
+          "*.splitwell.mock.global.canton.network.digitalasset.com",
+          "sv-2.mock.global.canton.network.digitalasset.com",
+          "*.sv-2.mock.global.canton.network.digitalasset.com"
+        ],
+        "http": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ],
+        "tls": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ],
+                "sniHosts": [
+                  "mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com",
+                  "validator.mock.global.canton.network.digitalasset.com",
+                  "*.validator.mock.global.canton.network.digitalasset.com",
+                  "validator1.mock.global.canton.network.digitalasset.com",
+                  "*.validator1.mock.global.canton.network.digitalasset.com",
+                  "splitwell.mock.global.canton.network.digitalasset.com",
+                  "*.splitwell.mock.global.canton.network.digitalasset.com",
+                  "sv-2.mock.global.canton.network.digitalasset.com",
+                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "name": "loopback-virtual-service-validator",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
   },
   {
     "custom": true,

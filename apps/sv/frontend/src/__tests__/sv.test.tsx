@@ -12,7 +12,6 @@ import { SvConfigProvider } from '../utils';
 import { svPartyId, voteRequests } from './mocks/constants';
 import { server, svUrl } from './setup/setup';
 import { changeAction } from './helpers';
-import { FeatureSupportResponse } from 'scan-openapi';
 
 const AppWithConfig = () => {
   return (
@@ -76,6 +75,9 @@ describe('An SetConfig request', () => {
 
     expect(await screen.findByText('numUnclaimedRewardsThreshold')).toBeDefined();
     expect(await screen.findByDisplayValue('10')).toBeDefined();
+    expect(
+      screen.getByTestId('dsoDelegateInactiveTimeout.microseconds-value').hasAttribute('disabled')
+    ).toBe(true);
   });
 
   test(
@@ -239,37 +241,5 @@ describe('An AddFutureAmuletConfigSchedule request', () => {
 
     mockAllIsIntersecting(true);
     expect(await screen.findByDisplayValue('validator::15')).toBeDefined();
-  });
-});
-
-describe('UI adjusts to delegateless feature', () => {
-  test('the delegate election page is present on older version', async () => {
-    server.use(
-      rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-        return res(
-          ctx.json<FeatureSupportResponse>({
-            new_governance_flow: true,
-            delegateless_automation: false,
-          })
-        );
-      })
-    );
-    render(<AppWithConfig />);
-    expect(await screen.findByText('Delegate Election')).toBeDefined();
-  });
-
-  test('the delegate election page is removed on vetted version', async () => {
-    server.use(
-      rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-        return res(
-          ctx.json<FeatureSupportResponse>({
-            new_governance_flow: true,
-            delegateless_automation: true,
-          })
-        );
-      })
-    );
-    render(<AppWithConfig />);
-    expect(screen.queryByText('Delegate Election')).toBeNull();
   });
 });

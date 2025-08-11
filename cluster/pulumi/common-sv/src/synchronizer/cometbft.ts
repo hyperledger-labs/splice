@@ -116,20 +116,6 @@ export function installCometBftNode(
       enableTimeoutCommit,
     },
     logLevel: svConfiguration.logging?.cometbftLogLevel,
-    peers: nodeConfigs.peers
-      .filter(peer => peer.id !== nodeConfigs.self.id && peer.id !== nodeConfigs.sv1.nodeId)
-      .map(peer => {
-        /*
-         * We configure the peers explicitly here so that every cometbft node knows about the other nodes.
-         * This is required to bypass the use of externalAddress when communicating between cometbft nodes for sv1-sv4
-         * We bypass the external address and use the internal kubernetes services address so that there is no requirement for
-         * sending the traffic through the loopback to satisfy the firewall rules
-         * */
-        return {
-          nodeId: peer.id,
-          externalAddress: nodeConfigs.p2pServiceAddress(peer.id),
-        };
-      }),
     stateSync: {
       ...cometBftValues.stateSync,
       enable: stateSyncEnabled,

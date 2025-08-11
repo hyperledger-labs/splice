@@ -1,7 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.plugins
 
 import org.lfdecentralizedtrust.splice.config.SpliceConfig
-import org.lfdecentralizedtrust.splice.console.SvAppBackendReference
+import org.lfdecentralizedtrust.splice.console.{ParticipantClientReference, SvAppBackendReference}
 import org.lfdecentralizedtrust.splice.environment.SpliceEnvironment
 import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests
 import com.digitalasset.canton.BaseTest
@@ -10,6 +10,7 @@ import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.topology.SynchronizerId
 import io.grpc
 import io.grpc.StatusRuntimeException
+
 import scala.util.control.NonFatal
 
 abstract class ResetTopologyStatePlugin
@@ -50,17 +51,40 @@ abstract class ResetTopologyStatePlugin
 
   private def attemptToResetTopologyState(env: SpliceTests.SpliceTestConsoleEnvironment): Unit = {
     val sv1 = env.svs.local.find(_.name == "sv1").value
-    val synchronizerId = eventuallySucceeds() {
-      val connectedDomain = sv1.participantClientWithAdminToken.synchronizers
+    val allSvs = env.svs.local
+      .filterNot(_.name.endsWith("Local"))
+      .filterNot(_.name.endsWith("Onboarded"))
+    val globalDomainAlias = sv1.config.domains.global.alias
+
+    def connectedGlobalSync(client: ParticipantClientReference) = {
+      client.synchronizers
         .list_connected()
-        .find(_.synchronizerAlias == sv1.config.domains.global.alias)
-        .getOrElse(
-          throw new IllegalStateException(
-            "Failed to reset environment as SV1 is not connected to global domain"
-          )
-        )
-      connectedDomain.synchronizerId
+        .find(_.synchronizerAlias == globalDomainAlias)
     }
+
+    def isSynchronizerRegistered(client: ParticipantClientReference) = {
+      client.synchronizers
+        .list_registered()
+        .exists(_._1.synchronizerAlias == globalDomainAlias)
+    }
+
+    allSvs.foreach(backend => {
+      if (isSynchronizerRegistered(backend.participantClientWithAdminToken)) {
+        if (connectedGlobalSync(backend.participantClientWithAdminToken).isEmpty) {
+          // reconnect just in case the participant was left disconnected after the test
+          backend.participantClientWithAdminToken.synchronizers.reconnect(
+            globalDomainAlias
+          )
+        }
+        eventually() {
+          connectedGlobalSync(backend.participantClientWithAdminToken)
+            .getOrElse(
+              fail(s"${backend.name} not connected to the global sync")
+            )
+        }
+      }
+
+    })
 
     def resetTopologyStateRetries(retries: Int): Unit = {
       if (retries > MAX_RETRIES) {
@@ -70,7 +94,11 @@ abstract class ResetTopologyStatePlugin
         sys.exit(1)
       }
       try {
-        resetTopologyState(env, synchronizerId, sv1)
+        resetTopologyState(
+          env,
+          sv1.participantClientWithAdminToken.synchronizers.id_of(globalDomainAlias),
+          sv1,
+        )
       } catch {
         case _: CommandFailure =>
           logger.info(
