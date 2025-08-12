@@ -140,6 +140,12 @@ interface TransferOfferProps {
   transferOffer: WalletTransferOffer;
 }
 
+// An accept or a reject can fail if for example the transfer offer is visible to the validator,
+// but not to f+1 Scans (which are required to get the accept/reject context from).
+// Or overall other transient errors.
+// Ultimately, it should go through so as long as it's visible to the validator.
+const TRANSFER_OFFER_ACTION_RETRIES_COUNT = 5;
+
 export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
   const config = useWalletConfig();
   const offer = props.transferOffer;
@@ -157,8 +163,9 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         : acceptTransferOffer(offer.contractId));
     },
     onError: error => {
-      console.error(`Failed to accept transfer offer ${offer.contractId}:`, error);
+      console.info(`Failed to accept transfer offer ${offer.contractId}:`, error);
     },
+    retry: TRANSFER_OFFER_ACTION_RETRIES_COUNT,
   });
   const rejectMutation = useMutation({
     mutationFn: async () => {
@@ -167,8 +174,9 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         : rejectTransferOffer(offer.contractId));
     },
     onError: error => {
-      console.error(`Failed to reject transfer offer ${offer.contractId}:`, error);
+      console.info(`Failed to reject transfer offer ${offer.contractId}:`, error);
     },
+    retry: TRANSFER_OFFER_ACTION_RETRIES_COUNT,
   });
 
   return (
