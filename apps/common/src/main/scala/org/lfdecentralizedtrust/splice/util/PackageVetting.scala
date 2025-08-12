@@ -40,7 +40,7 @@ class PackageVetting(
     val packagesToVet = currentRequiredPackages.toSeq.flatMap { case (pkg, packageVersion) =>
       DarResources
         .lookupAllPackageVersions(pkg.packageName)
-        .filter(_.metadata.version <= packageVersion)
+        .filter(_.metadata.version == packageVersion)
         .map(versionToVet => pkg -> versionToVet.metadata.version)
     // Stores filter by interfaces contained in this package, including the interface id in the GetUpdates request.
     // Said request will fail if the package is not present. Thus, we upload and vet all token standard packages.
