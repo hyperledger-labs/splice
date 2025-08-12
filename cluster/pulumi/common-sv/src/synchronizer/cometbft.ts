@@ -3,7 +3,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
-import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   CLUSTER_BASENAME,
@@ -21,8 +20,9 @@ import {
   SpliceCustomResourceOptions,
   svCometBftKeysFromSecret,
   withAddedDependencies,
-} from 'splice-pulumi-common';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
+import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 
 import { svsConfig } from '../config';
 import { SingleSvConfiguration } from '../singleSvConfig';

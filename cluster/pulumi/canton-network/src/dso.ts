@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -18,14 +17,19 @@ import {
   ApprovedSvIdentity,
   config,
   approvedSvIdentities,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
   initialRound,
   StaticCometBftConfigWithNodeName,
   svConfigs,
-} from 'splice-pulumi-common-sv';
-import { SequencerPruningConfig, StaticSvConfig, SvOnboarding } from 'splice-pulumi-common-sv';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import {
+  SequencerPruningConfig,
+  StaticSvConfig,
+  SvOnboarding,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import _ from 'lodash';
 
 import { InstalledSv, installSvNode } from './sv';
 

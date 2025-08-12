@@ -2,15 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import _ from 'lodash';
 import {
   appsAffinityAndTolerations,
   DOCKER_REPO,
   imagePullPolicy,
   jmxOptions,
   numNodesPerInstance,
-} from 'splice-pulumi-common';
-import { ServiceMonitor } from 'splice-pulumi-common/src/metrics';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
+import _ from 'lodash';
 
 import { Version } from '../version';
 import { EnvironmentVariable, multiValidatorConfig } from './config';

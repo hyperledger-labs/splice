@@ -7,7 +7,7 @@ import {
   generatePortSequence,
   numNodesPerInstance,
   DecentralizedSynchronizerUpgradeConfig,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { multiValidatorConfig } from './config';
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';

@@ -3,13 +3,13 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
-import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import {
   CLUSTER_BASENAME,
   config,
   infraAffinityAndTolerations,
   isMainNet,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 
 import { spliceEnvConfig } from '../config/envConfig';
 import { PulumiOperatorGracePeriod } from './config';

@@ -1,5 +1,5 @@
 {
-  "name": "canton-network-pulumi-deployment",
+  "name": "@lfdecentralizedtrust/canton-network-pulumi-deployment",
   "version": "1.0.0",
   "main": "src/index.ts",
   "dependencies": {
@@ -7,9 +7,9 @@
     "@types/auth0": "^3.3.2",
     "auth0": "^3.4.0",
     "ip": "^1.1.9",
-    "splice-pulumi-common": "1.0.0",
-    "splice-pulumi-common-sv": "1.0.0",
-    "splice-pulumi-common-validator": "1.0.0",
+    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0",
+    "@lfdecentralizedtrust/splice-pulumi-common-sv": "1.0.0",
+    "@lfdecentralizedtrust/splice-pulumi-common-validator": "1.0.0",
     "@google-cloud/storage": "^6.11.0"
   },
   "scripts": {

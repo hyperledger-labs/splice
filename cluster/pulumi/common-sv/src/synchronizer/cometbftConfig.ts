@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { Output } from '@pulumi/pulumi';
-import { config } from 'splice-pulumi-common/src/config';
 
 const enableCometbftPruning = config.envFlag('ENABLE_COMETBFT_PRUNING', true);
 export const cometbftRetainBlocks = enableCometbftPruning
