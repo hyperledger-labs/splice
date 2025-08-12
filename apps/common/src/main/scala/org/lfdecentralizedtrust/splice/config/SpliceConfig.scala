@@ -32,6 +32,16 @@ abstract class SpliceBackendConfig extends LocalNodeConfig {
 abstract class GrpcClientConfig extends NodeConfig {}
 abstract class HttpClientConfig extends NetworkAppNodeConfig {}
 
+final case class CircuitBreakerConfig(
+    maxFailures: Int = 20,
+    callTimeout: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(0), // disable timeout
+    resetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    maxResetTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
+    exponentialBackoffFactor: Double = 2.0,
+    randomFactor: Double = 0.2,
+)
+
 /** This class aggregates binary-level configuration options that are shared between each Splice app instance.
   * For example, the [[TracingConfig]] is configured once for all Splice apps that are started by a Splice binary as part of the
   * [[com.digitalasset.canton.config.MonitoringConfig]].
@@ -49,6 +59,7 @@ case class SharedSpliceAppParameters(
     override val processingTimeouts: ProcessingTimeout,
     requestTimeout: NonNegativeDuration,
     upgradesConfig: UpgradesConfig = UpgradesConfig(),
+    commandCircuitBreakerConfig: CircuitBreakerConfig = CircuitBreakerConfig(),
     // TODO(DACH-NY/canton-network-node#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,

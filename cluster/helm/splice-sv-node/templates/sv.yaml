@@ -92,6 +92,10 @@ spec:
             - name: SPLICE_APP_SV_ROUND_ZERO_DURATION
               value: {{ .Values.onboardingRoundZeroDuration | quote }}
             {{- end }}
+            {{- if .Values.initialRound }}
+            - name: SPLICE_APP_SV_INITIAL_ROUND
+              value: {{ .Values.initialRound | quote }}
+            {{- end }}
             {{- if .Values.initialTickDuration }}
             - name: SPLICE_APP_SV_INITIAL_TICK_DURATION
               value: {{ .Values.initialTickDuration | quote }}
@@ -334,17 +338,13 @@ spec:
               value: {{ .Values.nodeIdentifier | quote }}
             - name: SPLICE_APP_SV_MEDIATOR_IDENTIFIER
               value: {{ .Values.nodeIdentifier | quote }}
-            {{- if .Values.delegatelessAutomation }}
-            - name: SPLICE_APP_DELEGATELESS_AUTOMATION
-              value: {{ .Values.delegatelessAutomation | quote }}
-            {{- end }}
-            {{- if .Values.expectedTaskDuration }}
+            {{- if .Values.delegatelessAutomationExpectedTaskDuration }}
             - name: SPLICE_APP_EXPECTED_TASK_DURATION
-              value: {{ .Values.expectedTaskDuration | quote }}
+              value: {{ .Values.delegatelessAutomationExpectedTaskDuration | quote }}
             {{- end }}
-            {{- if .Values.expiredRewardCouponBatchSize }}
+            {{- if .Values.delegatelessAutomationExpiredRewardCouponBatchSize }}
             - name: SPLICE_APP_EXPIRED_REWARD_COUPON_BATCH_SIZE
-              value: {{ .Values.expiredRewardCouponBatchSize | quote }}
+              value: {{ .Values.delegatelessAutomationExpiredRewardCouponBatchSize | quote }}
             {{- end }}
             {{- if .Values.domain.skipInitialization }}
             - name: ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION

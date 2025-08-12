@@ -113,6 +113,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
     with StandaloneCanton
     with SplitwellTestUtil {
 
+  private val initialRound = 481516L
+
   override def dbsSuffix = "domain_migration"
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
@@ -411,6 +413,9 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           )(conf),
       )
       .addConfigTransforms((_, config) =>
+        ConfigTransforms.updateAllSvAppFoundDsoConfigs_(_.copy(initialRound = initialRound))(config)
+      )
+      .addConfigTransforms((_, config) =>
         ConfigTransforms.updateAllScanAppConfigs_(conf =>
           conf.copy(cache =
             conf.cache.copy(cachedByParty =
@@ -425,6 +430,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
       .withManualStart
       // TODO (#965) remove and fix test failures
       .withAmuletPrice(walletAmuletPrice)
+
+  def firstRound(
+      backend: SvAppBackendReference
+  ): Long =
+    backend.getDsoInfo().initialRound match {
+      case None => 0L
+      case Some(round) => round.toLong
+    }
 
   // TODO (#965) remove and fix test failures
   override def walletAmuletPrice = SpliceUtil.damlDecimal(1.0)
@@ -1054,7 +1067,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                       "Bob",
                       SvUtil.DefaultSV1Weight,
                       "bob-participant-id",
-                      new Round(42),
+                      new Round(firstRound(sv1LocalBackend) + 42),
                     )
                   )
                 ),
@@ -1180,7 +1193,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 sv1LocalBackend.stop()
                 sv1LocalBackend.startSync()
               }
-
               withClueAndLog("sv1 restarts without any onboarding type") {
                 sv1LocalBackend.stop()
                 svb("sv1LocalOnboarded").startSync()

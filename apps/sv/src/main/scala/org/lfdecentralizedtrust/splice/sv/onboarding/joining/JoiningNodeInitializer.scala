@@ -199,6 +199,11 @@ class JoiningNodeInitializer(
           onboardingConfig.name,
         )
       )
+      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
+        decentralizedSynchronizerId,
+        svAutomation.connection,
+        loggerFactory,
+      )
       dsoPartyHosting = newDsoPartyHosting(storeKey.dsoParty)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
@@ -220,10 +225,6 @@ class JoiningNodeInitializer(
           loggerFactory,
         ),
         decentralizedSynchronizerId,
-      )
-      packageVersionSupport = PackageVersionSupport.createPackageVersionSupport(
-        decentralizedSynchronizerId,
-        svAutomation.connection,
       )
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {
@@ -279,6 +280,15 @@ class JoiningNodeInitializer(
               )
           } yield dsoAutomation
         }
+      // We set the initial round to the one from the sponsor if no initial round is store in the user metadata yet
+      // This is needed so that all scans can aggregate and backfill using the same initial round
+      // Note: we accept the risk that sponsors could maliciously set a wrong initialRound as this is dev/testnet only.
+      _ <- establishInitialRound(
+        svAutomation.connection,
+        upgradesConfig,
+        packageVersionSupport,
+        svParty,
+      )
       _ <- ensureCometBftGovernanceKeysAreSet(
         cometBftNode,
         svParty,
@@ -314,7 +324,6 @@ class JoiningNodeInitializer(
         decentralizedSynchronizerId,
         dsoAutomation,
         svAutomation,
-        packageVersionSupport,
       )
     } yield {
       (
@@ -333,7 +342,6 @@ class JoiningNodeInitializer(
       decentralizedSynchronizer: SynchronizerId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
-      packageVersionSupport: PackageVersionSupport,
       skipTrafficReconciliationTriggers: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
@@ -345,7 +353,6 @@ class JoiningNodeInitializer(
       clock,
       retryProvider,
       logger,
-      packageVersionSupport,
     )
     for {
       _ <- retryProvider.waitUntil(

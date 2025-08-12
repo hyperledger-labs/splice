@@ -6,14 +6,14 @@ import {
 } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import dayjs from 'dayjs';
 import { rest, RestHandler } from 'msw';
-import { FeatureSupportResponse, SuccessStatusResponse } from 'scan-openapi';
+import { FeatureSupportResponse, SuccessStatusResponse } from '@lfdecentralizedtrust/scan-openapi';
 import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
-} from 'sv-openapi';
+} from '@lfdecentralizedtrust/sv-openapi';
 
 import {
   voteRequest,
@@ -160,12 +160,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
     );
   }),
   rest.get(`${svUrl}/v0/admin/feature-support`, (_, res, ctx) => {
-    return res(
-      ctx.json<FeatureSupportResponse>({
-        new_governance_flow: true,
-        delegateless_automation: true,
-      })
-    );
+    return res(ctx.json<FeatureSupportResponse>({ my_feature: false }));
   }),
   validatorLicensesHandler(svUrl),
 ];

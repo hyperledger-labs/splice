@@ -889,7 +889,7 @@
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26316",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26316",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26316,
@@ -903,14 +903,13 @@
           }
         },
         "nodeName": "Digital-Asset-2",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-3",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26316",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -989,7 +988,7 @@
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26416",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26416",
           "id": "5af57aa83abcec085c949323ed8538108757be9c",
           "identifier": "global-domain-4-cometbft",
           "istioPort": 26416,
@@ -1003,14 +1002,13 @@
           }
         },
         "nodeName": "Digital-Asset-2",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26416",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26416",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -1803,6 +1801,12 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -1955,6 +1959,12 @@
       "namespace": "sv-1",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -2713,7 +2723,7 @@
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26306",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26306",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-3-cometbft",
           "istioPort": 26306,
@@ -2724,14 +2734,13 @@
           }
         },
         "nodeName": "DA-Helm-Test-Node",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-3",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26316",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26316",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -2810,7 +2819,7 @@
         },
         "node": {
           "enableTimeoutCommit": false,
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26406",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26406",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "global-domain-4-cometbft",
           "istioPort": 26406,
@@ -2821,14 +2830,13 @@
           }
         },
         "nodeName": "DA-Helm-Test-Node",
-        "peers": [],
         "serviceAccountName": "sv-canton-migration-4",
         "stateSync": {
           "enable": false,
           "rpcServers": "https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-2.mock.global.canton.network.digitalasset.com:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         },
         "sv1": {
-          "externalAddress": "mock.global.canton.network.digitalasset.com:26416",
+          "externalAddress": "cometbft.mock.global.canton.network.digitalasset.com:26416",
           "keyAddress": "8A931AB5F957B8331BDEF3A0A081BD9F017A777F",
           "nodeId": "5af57aa83abcec085c949323ed8538108757be9c",
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
@@ -3621,6 +3629,12 @@
       "namespace": "sv",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {
@@ -3773,6 +3787,12 @@
       "namespace": "sv",
       "timeout": 600,
       "values": {
+        "additionalEnvVars": [
+          {
+            "name": "CUSTOM_MOCK_ENV_VAR_NAME",
+            "value": "CUSTOM_MOCK_ENV_VAR_VALUE"
+          }
+        ],
         "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
         "affinity": {
           "nodeAffinity": {

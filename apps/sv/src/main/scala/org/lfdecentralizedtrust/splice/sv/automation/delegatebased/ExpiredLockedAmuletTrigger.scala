@@ -13,6 +13,8 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, Future}
 import ExpiredLockedAmuletTrigger.*
 
+import java.util.Optional
+
 class ExpiredLockedAmuletTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
@@ -37,17 +39,13 @@ class ExpiredLockedAmuletTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     dsoRules <- store.getDsoRules()
-    (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-      controller,
-      context.clock.now,
-    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
         co.work.contractId,
         new splice.amulet.LockedAmulet_ExpireAmulet(
           latestOpenMiningRound.contractId
         ),
-        controllerArgument,
+        Optional.of(controller),
       )
     )
     _ <- svTaskContext.connection
@@ -57,7 +55,6 @@ class ExpiredLockedAmuletTrigger(
         update = cmd,
       )
       .noDedup
-      .withPreferredPackage(preferredPackageIds)
       .yieldUnit()
   } yield TaskSuccess(s"archived expired locked amulet")
 }

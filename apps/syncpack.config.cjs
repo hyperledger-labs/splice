@@ -20,7 +20,7 @@ module.exports = {
     },
     {
       label: "OpenAPI codegen",
-      packages: ["**-openapi"],
+      packages: ["**/**-openapi"],
       dependencies: ["**"],
       isIgnored: true,
     },

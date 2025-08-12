@@ -106,6 +106,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
             amuletRules,
             dsoRules,
             svNodeStates,
+            _,
           ) =>
         scan.svUser should be(svUser)
         scan.svPartyId should be(svParty.toProtoPrimitive)
@@ -593,7 +594,7 @@ class ScanIntegrationTest extends IntegrationTest with WalletTestUtil with TimeT
     bobValidatorRewardsTrigger.resume()
 
     // The trigger that advances rounds, running in the sv app
-    // Note: using `def`, as the trigger may be destroyed and recreated (when the sv delegate changes)
+    // Note: using `def`, as the trigger may be destroyed and recreated
     def advanceTrigger = sv1Backend.dsoDelegateBasedAutomation
       .trigger[AdvanceOpenMiningRoundTrigger]
 

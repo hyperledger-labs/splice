@@ -239,7 +239,7 @@ it on multiple nodes, you will need to adjust this.
 We'll need the topology transaction and the definitions defined here later again. Either keep your Canton console open or save them.
 
 The topology transaction hash needs to be signed externally following the
-`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding#external-party-onboarding-transactions>`_.
+`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding.html#external-party-onboarding-transactions>`_.
 
 After you signed it externally, you need to construct the signed
 topology transaction, sign it additionally through the participant and
@@ -270,7 +270,7 @@ We can now check that the topology transaction got correctly applied and get the
 .. code::
 
     // The detailed output will slightly vary. Make sure that you see the new participant id though.
-    sv1Participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
+    participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
       res36: Seq[topology.ListPartyToParticipantResult] = Vector(
         ListPartyToParticipantResult(
           context = BaseResult(

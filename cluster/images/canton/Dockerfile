@@ -14,7 +14,7 @@ ARG TARGETPLATFORM
 
 # Install screen for running the console in a headless server
 RUN xx-apt-get update \
-   && DEBIAN_FRONTEND=noninteractive xx-apt-get install -y screen tini libjemalloc2 \
+   && DEBIAN_FRONTEND=noninteractive xx-apt-get install -y screen tini \
    && xx-apt-get clean \
    && rm -rf /var/cache/apt/archives
 
@@ -35,6 +35,12 @@ RUN ln -s bin/canton splice-image-bin
 FROM fullstorydev/grpcurl:v1.9.2@sha256:0c3796edc8b6bb1814da2f11a554996237c0dd98380fce182efb1dc44c556ac1 AS grpcurl
 
 FROM eclipse-temurin:21-jdk-noble@sha256:5a65f334da5a91a66076735d78e3ae30483a2593ac108f830dcd59521f2535cd
+
+# Install platform-dependent dependencies at the last step to ensure correct paths and versions
+RUN apt-get update \
+   && DEBIAN_FRONTEND=noninteractive apt-get install -y libjemalloc2 \
+   && apt-get clean \
+   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/bin/tini /usr/bin/tini
 COPY --from=build /usr/bin/screen /usr/bin/screen

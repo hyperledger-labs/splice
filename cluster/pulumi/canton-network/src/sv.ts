@@ -16,7 +16,6 @@ import {
   CnInput,
   daContactPoint,
   DecentralizedSynchronizerMigrationConfig,
-  DecentralizedSynchronizerUpgradeConfig,
   DEFAULT_AUDIENCE,
   ExactNamespace,
   exactNamespace,
@@ -29,6 +28,7 @@ import {
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   InstalledHelmChart,
+  installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
@@ -59,9 +59,8 @@ import { jmxOptions } from 'splice-pulumi-common/src/jmx';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 
 import {
-  delegatelessAutomation,
-  expectedTaskDuration,
-  expiredRewardCouponBatchSize,
+  delegatelessAutomationExpectedTaskDuration,
+  delegatelessAutomationExpiredRewardCouponBatchSize,
 } from '../../common/src/automation';
 import { configureScanBigQuery } from './bigQuery';
 import { buildCrossStackCantonDependencies } from './canton';
@@ -128,22 +127,7 @@ export async function installSvNode(
   extraDependsOn: CnInput<Resource>[] = []
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-      cometbftPorts: {
-        // This ensures the loopback exposes the right ports. We need a +1 since the helm chart does an exclusive range
-        domains: DecentralizedSynchronizerUpgradeConfig.highestMigrationId + 1,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
   const imagePullDeps = imagePullSecret(xns);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
@@ -210,7 +194,7 @@ export async function installSvNode(
     .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([loopback])
+    .concat(loopback)
     .concat(imagePullDeps)
     .concat(
       config.cometBftGovernanceKey
@@ -357,6 +341,9 @@ async function installValidator(
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
   const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.id}.sv-2.${CLUSTER_HOSTNAME}`;
 
+  const bftSequencerConnection =
+    !svConfig.participant || svConfig.participant.bftSequencerConnection;
+
   const validator = await installValidatorApp({
     xns,
     migration: {
@@ -381,12 +368,21 @@ async function installValidator(
       : [postgres],
     svValidator: true,
     participantAddress: sv.participant.internalClusterAddress,
-    decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
+    decentralizedSynchronizerUrl: bftSequencerConnection ? undefined : decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
     sweep: svConfig.sweep,
     nodeIdentifier: svConfig.onboardingName,
     logLevel: svConfig.logging?.appsLogLevel,
+    additionalEnvVars: bftSequencerConnection
+      ? undefined
+      : [
+          {
+            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+            value:
+              'canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true',
+          },
+        ],
   });
 
   return validator;
@@ -416,9 +412,18 @@ function installSvApp(
         },
       ]
     : [];
-  const additionalEnvVars = (config.svApp?.additionalEnvVars || []).concat(
-    topologyChangeDelayEnvVars
-  );
+  const bftSequencerConnectionEnvVars =
+    !config.participant || config.participant.bftSequencerConnection
+      ? []
+      : [
+          {
+            name: 'ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION',
+            value: 'canton.sv-apps.sv.bft-sequencer-connection = false',
+          },
+        ];
+  const additionalEnvVars = (config.svApp?.additionalEnvVars || [])
+    .concat(topologyChangeDelayEnvVars)
+    .concat(bftSequencerConnectionEnvVars);
   const svValues = {
     ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     ...spliceInstanceNames,
@@ -432,6 +437,8 @@ function installSvApp(
       config.onboarding.type == 'found-dso' ? initialSynchronizerFeesConfig : undefined,
     initialPackageConfigJson:
       config.onboarding.type == 'found-dso' ? initialPackageConfigJson : undefined,
+    initialRound:
+      config.onboarding.type == 'found-dso' ? config.onboarding.initialRound : undefined,
     initialAmuletPrice: initialAmuletPrice,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     ...(useCantonBft
@@ -499,9 +506,9 @@ function installSvApp(
     },
     contactPoint: daContactPoint,
     nodeIdentifier: config.onboardingName,
-    delegatelessAutomation: delegatelessAutomation,
-    expectedTaskDuration: expectedTaskDuration,
-    expiredRewardCouponBatchSize: expiredRewardCouponBatchSize,
+    delegatelessAutomationExpectedTaskDuration: delegatelessAutomationExpectedTaskDuration,
+    delegatelessAutomationExpiredRewardCouponBatchSize:
+      delegatelessAutomationExpiredRewardCouponBatchSize,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars,
   } as ChartValues;

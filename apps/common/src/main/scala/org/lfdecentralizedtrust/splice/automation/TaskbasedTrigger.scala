@@ -8,6 +8,7 @@ import com.daml.metrics.api.MetricsContext
 import com.digitalasset.base.error.utils.ErrorDetails
 import com.digitalasset.canton.ledger.error.groups.ConsistencyErrors.ContractNotFound
 import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.UnknownContractSynchronizer
 import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
   InactiveContracts,
   LockedContracts,
@@ -112,64 +113,63 @@ abstract class TaskbasedTrigger[T: Pretty](
               // if the trigger is disabled in the middle of retrying.
               waitForReadyToWork()
                 .flatMap(_ => processTaskWithStalenessCheck())
-                .transform { result =>
-                  result match {
-                    case Failure(ex) =>
-                      ex match {
-                        case GrpcException(status @ GrpcStatus(statusCode, _), trailers) =>
-                          val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
-                          val errorDetails = ErrorDetails.from(statusProto)
-                          val errorCodeId = errorDetails
-                            .flatMap {
-                              case ed: ErrorDetails.ErrorInfoDetail =>
-                                Some(ed.errorCodeId)
-                              case _ => None
+                .transform {
+                  case Failure(ex) =>
+                    ex match {
+                      case GrpcException(status @ GrpcStatus(statusCode, _), trailers) =>
+                        val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+                        val errorDetails = ErrorDetails.from(statusProto)
+                        val errorCodeId = errorDetails
+                          .flatMap {
+                            case ed: ErrorDetails.ErrorInfoDetail =>
+                              Some(ed.errorCodeId)
+                            case _ => None
+                          }
+                          .headOption
+                          .getOrElse("none")
+                        errorCodeId match {
+                          case ContractNotFound.id | LockedContracts.id |
+                              InactiveContracts.id | UnknownContractSynchronizer.id =>
+                            MetricsContext.withExtraMetricLabels(
+                              ("statusCode", statusCode.toStatus.getCode.toString),
+                              ("errorCodeId", errorCodeId),
+                              ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                              ("contentionFailure", "true"),
+                            ) { m =>
+                              metrics.attempted.mark()(m)
                             }
-                            .headOption
-                            .getOrElse("none")
-                          errorCodeId match {
-                            case ContractNotFound.id | LockedContracts.id | InactiveContracts.id =>
-                              MetricsContext.withExtraMetricLabels(
-                                ("statusCode", statusCode.toStatus.getCode.toString),
-                                ("errorCodeId", errorCodeId),
-                                ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
-                                ("contentionFailure", "true"),
-                              ) { m =>
-                                metrics.attempted.mark()(m)
-                              }
-                            case _ =>
-                              MetricsContext.withExtraMetricLabels(
-                                ("statusCode", statusCode.toStatus.getCode.toString),
-                                ("errorCodeId", errorCodeId),
-                                ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
-                                ("contentionFailure", "false"),
-                              ) { m =>
-                                metrics.attempted.mark()(m)
-                              }
-                          }
-                          Failure(ex)
-                        case _ =>
-                          MetricsContext.withExtraMetricLabels(
-                            ("statusCode", Status.UNKNOWN.getCode.toString),
-                            ("errorCodeId", "none"),
-                            ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
-                            ("contentionFailure", "false"),
-                          ) { m =>
-                            metrics.attempted.mark()(m)
-                          }
-                          Failure(ex)
-                      }
-                    case Success(_) =>
-                      MetricsContext.withExtraMetricLabels(
-                        ("statusCode", Status.OK.getCode.toString),
-                        ("errorCodeId", "none"),
-                        ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
-                        ("contentionFailure", "false"),
-                      ) { m =>
-                        metrics.attempted.mark()(m)
-                      }
-                      result
-                  }
+                          case _ =>
+                            MetricsContext.withExtraMetricLabels(
+                              ("statusCode", statusCode.toStatus.getCode.toString),
+                              ("errorCodeId", errorCodeId),
+                              ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                              ("contentionFailure", "false"),
+                            ) { m =>
+                              metrics.attempted.mark()(m)
+                            }
+                        }
+                        Failure(ex)
+                      case _ =>
+                        MetricsContext.withExtraMetricLabels(
+                          ("statusCode", Status.UNKNOWN.getCode.toString),
+                          ("errorCodeId", "none"),
+                          ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                          ("contentionFailure", "false"),
+                        ) { m =>
+                          metrics.attempted.mark()(m)
+                        }
+                        Failure(ex)
+                    }
+                  case result @ Success(_) =>
+                    MetricsContext.withExtraMetricLabels(
+                      ("statusCode", Status.OK.getCode.toString),
+                      ("errorCodeId", "none"),
+                      ("isDsoDelegateTrigger", isDsoDelegateTrigger.toString),
+                      ("contentionFailure", "false"),
+                    ) { m =>
+                      metrics.attempted.mark()(m)
+                    }
+                    result
                 },
               logger,
               additionalRetryableConditions,
