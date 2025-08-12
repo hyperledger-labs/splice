@@ -112,7 +112,7 @@ jobs:
       runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names-resource-intensive.log'
       start_canton_options: -w
-      parallelism: 2
+      parallelism: 3
       test_name: resource-intensive
       commit_sha: ${{ inputs.commit_sha }}
       daml_base_version: ${{ inputs.daml_base_version }}
