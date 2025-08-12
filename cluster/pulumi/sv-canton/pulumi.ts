@@ -1,8 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as automation from '@pulumi/pulumi/automation';
-import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
-import { DeploySvRunbook, isDevNet } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+
+import { dsoSize } from '../common-sv/src/dsoConfig';
+import { DeploySvRunbook, isDevNet } from '../common/src/config';
 // We have to be explicit with the imports here, if we import a module that creates a pulumi resource running the preview will fail
 // as we have no pulumi runtime
 import {
@@ -10,8 +11,7 @@ import {
   DecentralizedSynchronizerUpgradeConfig,
   DomainMigrationIndex,
   MigrationInfo,
-} from '@lfdecentralizedtrust/splice-pulumi-common/src/domainMigration';
-
+} from '../common/src/domainMigration';
 import { pulumiOptsWithPrefix, stack } from '../pulumi';
 
 export function pulumiOptsForMigration(
