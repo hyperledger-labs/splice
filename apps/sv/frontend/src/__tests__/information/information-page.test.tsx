@@ -41,13 +41,13 @@ describe('The Information page', () => {
     render(<AppWithConfig />);
     expect(await screen.findByText('General')).toBeDefined();
     const valueCells = document.querySelectorAll('.general-dso-value-name');
-    expect(valueCells).toHaveLength(9);
+    expect(valueCells).toHaveLength(8);
     const svUser = screen.getAllByText(dsoInfo.sv_user);
     expect(svUser).toHaveLength(1);
     const svParty = Array.from(valueCells.values()).filter(
       e => e.getAttribute('data-selenium-text') == dsoInfo.sv_party_id
     );
-    expect(svParty).toHaveLength(3);
+    expect(svParty).toHaveLength(2);
   });
 
   test('has a Domain Node Status section', async () => {
