@@ -61,13 +61,23 @@ where the subject claim of the token is the user whose wallet the endpoint opera
 
 .. _validator-api-user-wallet-transfer-offers:
 
-Transfer Offers
-~~~~~~~~~~~~~~~
+Splice Wallet Transfer Offers (deprecated)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Transfer offers are used to in a two-step workflow to transfer Canton Coin between users:
+.. note::
+    **Deprecated** (since ``splice-0.4.11``): Use the :ref:`Canton Network Token Standard APIs <app_dev_token_standard_overview>` instead.
+
+Splice Wallet transfer offers are a legacy two-step workflow to transfer Canton Coin between users.
+They work as follows:
 
   * The sender creates a ``Splice.Wallet.TransferOffer`` daml contract.
   * The receiver accepts the offer, which immediately transfers the agreed coin.
+
+This specific transfer offer workflow is deprecated in favor of the two-step workflow supported by
+Canton Coin implementation of the :ref:`Canton Network Token Standard <app_dev_token_standard_overview>`.
+
+Use the endpoints below to create and manage Splice Wallet transfer offers.
+Use the Ledger API directly to create and manage Canton Network Token Standard transfer offers.
 
 .. list-table::
    :widths: 10 39
@@ -115,10 +125,12 @@ Buying traffic is a multi-step process:
 Internal user wallet API
 ------------------------
 
-These endpoints are used internally to interact with a users wallet,
-for example by the web frontend of the user wallet.
+These endpoints are used internally by the frontend of the Splice Wallet to interact with a user Canton Coin holdings.
 
-.. todo:: Some of these endpoints should be public and documented.
+.. note::
+  These endpoints are not intended to be used by other applications.
+  If you want to build a wallet of your own, we recommend to build on the
+  :ref:`Canton Network Token Standard APIs<app_dev_token_standard_overview>` instead.
 
 **Authorization:** Authentication with a JWT token as described in :ref:`app-auth`,
 where the subject claim of the token is the user whose wallet the endpoint operates on.
