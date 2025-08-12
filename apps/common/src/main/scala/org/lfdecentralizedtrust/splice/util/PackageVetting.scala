@@ -63,6 +63,14 @@ class PackageVetting(
     )
   }
 
+  // Adjust max vetting delay to not be longer than the validFrom date.
+  private def adjustMaxVettingDelay(validFrom: Instant, maxVettingDelay: (Clock, NonNegativeFiniteDuration)): (Clock, NonNegativeFiniteDuration) = {
+    val (clock, maxDelay) = maxVettingDelay
+    val validFromDelayNanos = Math.max(0, java.time.Duration.between(clock.now.toInstant, validFrom).toNanos)
+    (clock, NonNegativeFiniteDuration.tryFromJavaDuration(java.time.Duration.ofNanos(Math.min(validFromDelayNanos, maxDelay.asJava.toNanos))))
+  }
+
+
   def vetPackages(
       domainId: SynchronizerId,
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
@@ -80,9 +88,10 @@ class PackageVetting(
     // also it doesn't really make sense to run multiple vettings in parallel as they will just race to update the topology state
     val vettingTimeSortedDars = vettingSchedule.toSeq.sortBy(_._1)
     logger.info(s"Vetting for schedule $vettingTimeSortedDars from amulet rules $schedule")
+
     MonadUtil
       .sequentialTraverse(vettingTimeSortedDars) { case (validFrom, packages) =>
-        vetPackages(domainId, packages.toSeq, Some(validFrom), maxVettingDelay)
+        vetPackages(domainId, packages.toSeq, Some(validFrom), maxVettingDelay.map(adjustMaxVettingDelay(validFrom, _)))
       }
       .map(_ => ())
   }
