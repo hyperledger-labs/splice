@@ -64,12 +64,20 @@ class PackageVetting(
   }
 
   // Adjust max vetting delay to not be longer than the validFrom date.
-  private def adjustMaxVettingDelay(validFrom: Instant, maxVettingDelay: (Clock, NonNegativeFiniteDuration)): (Clock, NonNegativeFiniteDuration) = {
+  private def adjustMaxVettingDelay(
+      validFrom: Instant,
+      maxVettingDelay: (Clock, NonNegativeFiniteDuration),
+  ): (Clock, NonNegativeFiniteDuration) = {
     val (clock, maxDelay) = maxVettingDelay
-    val validFromDelayNanos = Math.max(0, java.time.Duration.between(clock.now.toInstant, validFrom).toNanos)
-    (clock, NonNegativeFiniteDuration.tryFromJavaDuration(java.time.Duration.ofNanos(Math.min(validFromDelayNanos, maxDelay.asJava.toNanos))))
+    val validFromDelayNanos =
+      Math.max(0, java.time.Duration.between(clock.now.toInstant, validFrom).toNanos)
+    (
+      clock,
+      NonNegativeFiniteDuration.tryFromJavaDuration(
+        java.time.Duration.ofNanos(Math.min(validFromDelayNanos, maxDelay.asJava.toNanos))
+      ),
+    )
   }
-
 
   def vetPackages(
       domainId: SynchronizerId,
@@ -91,7 +99,12 @@ class PackageVetting(
 
     MonadUtil
       .sequentialTraverse(vettingTimeSortedDars) { case (validFrom, packages) =>
-        vetPackages(domainId, packages.toSeq, Some(validFrom), maxVettingDelay.map(adjustMaxVettingDelay(validFrom, _)))
+        vetPackages(
+          domainId,
+          packages.toSeq,
+          Some(validFrom),
+          maxVettingDelay.map(adjustMaxVettingDelay(validFrom, _)),
+        )
       }
       .map(_ => ())
   }

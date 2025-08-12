@@ -706,6 +706,14 @@ abstract class TopologyAdminConnection(
       waitForAuthorization: Boolean = true,
       maxSubmissionDelay: Option[(Clock, NonNegativeFiniteDuration)] = None,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
+    val minSubmissionTimeO = maxSubmissionDelay.map { case (clock, maxSubmissionDelay) =>
+      val delay: NonNegativeFiniteDuration =
+        NonNegativeFiniteDuration.tryFromJavaDuration(
+          java.time.Duration
+            .ofNanos((math.random() * maxSubmissionDelay.unwrap.toNanos).toLong)
+        )
+      (clock, clock.now + delay.toInternal)
+    }
     withSpan("establish_topology_mapping") { implicit traceContext => _ =>
       logger.info(s"Ensuring that $description")
       retryProvider
@@ -725,24 +733,11 @@ abstract class TopologyAdminConnection(
                   def proposeNewTopologyTransaction = {
                     val updatedMapping = update(mapping)
                     val sleep: Future[Unit] =
-                      maxSubmissionDelay.fold(Future.unit) { case (clock, maxSubmissionDelay) =>
-                        val delay: NonNegativeFiniteDuration =
-                          NonNegativeFiniteDuration.tryFromJavaDuration(
-                            java.time.Duration
-                              .ofNanos((math.random() * maxSubmissionDelay.unwrap.toNanos).toLong)
-                          )
+                      minSubmissionTimeO.fold(Future.unit) { case (clock, minSubmissionTime) =>
                         logger.info(
-                          s"Waiting for ${delay.underlying.toUnit(java.util.concurrent.TimeUnit.MINUTES)} minutes before submitting topology transaction"
+                          s"Waiting until $minSubmissionTime before submitting topology transaction"
                         )
-                        retryProvider
-                          .scheduleAfterUnlessShutdown(
-                            Future.unit,
-                            clock,
-                            delay = delay,
-                            jitter =
-                              0.0, // We don't use jitter here as we already randomize the value itself which allows for better logging.
-                          )
-                          .onShutdown(())
+                        clock.scheduleAt(_ => (), minSubmissionTime).onShutdown(())
                       }
                     sleep.flatMap { _ =>
                       proposeMapping(
