@@ -1,8 +1,11 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# deprecated - for up to date examples check the pulumi implementation of rate limiting in istio
 {{- $scanAppLabel := "scan-app" }}
+{{- if .Values.withSvIngress }}
 {{- if .Values.ingress.scan }}
+{{- if .Values.rateLimit.scan.enable }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -95,4 +98,6 @@ spec:
                     max_tokens: {{ .Values.rateLimit.scan.acs.limit }}
                     tokens_per_fill: {{ .Values.rateLimit.scan.acs.limit }}
                     fill_interval: 60s
+{{- end }}
+{{- end }}
 {{- end }}
