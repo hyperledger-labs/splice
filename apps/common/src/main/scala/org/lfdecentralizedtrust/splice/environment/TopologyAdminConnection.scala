@@ -737,6 +737,7 @@ abstract class TopologyAdminConnection(
                         logger.info(
                           s"Waiting until $minSubmissionTime before submitting topology transaction"
                         )
+                        // This is a noop if minSubmissionTime is in the past.
                         clock.scheduleAt(_ => (), minSubmissionTime).onShutdown(())
                       }
                     sleep.flatMap { _ =>
