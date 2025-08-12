@@ -8,6 +8,15 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- SV and Validator apps
+
+  - Add a randomized delay to broadcasting of package vetting changes used on Daml upgrades. This ensures that
+    there is no load spike when all validators try to do so at the same time. This has no impact on behavior as
+    Daml upgrades are announced ahead of time and the broadcasting still happens before the switchover.
+
 0.4.10
 ------
 

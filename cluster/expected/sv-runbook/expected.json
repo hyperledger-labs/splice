@@ -778,6 +778,7 @@
           "sponsorApiUrl": "https://sv.sv-2.mock.global.canton.network.digitalasset.com"
         },
         "logLevel": "DEBUG",
+        "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
         },
@@ -919,6 +920,7 @@
         "enablePostgresMetrics": true,
         "enableWallet": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
         },
