@@ -327,7 +327,7 @@ case class SvAppBackendConfig(
     // 1. try to reset one of your sequencers or mediators
     // 2. change sequencer URLs that need to get published externally.
     skipSynchronizerInitialization: Boolean = false,
-    // The maximum delay before submitting a package vetting change. The actual delay will be chosen randomly to ensure that
+    // The maximum delay before submitting a package vetting change. The actual delay will be chosen randomly (uniformly distributed between 0 and the maximum delay) to ensure that
     // not all validators submit the transaction at the same time overloading the network.
     maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
 ) extends SpliceBackendConfig {
