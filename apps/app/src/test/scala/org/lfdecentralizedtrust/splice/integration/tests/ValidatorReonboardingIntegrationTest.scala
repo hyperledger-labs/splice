@@ -22,11 +22,17 @@ import org.lfdecentralizedtrust.splice.validator.config.{
   MigrateValidatorPartyConfig,
   ValidatorCantonIdentifierConfig,
 }
+import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands.Write.GenerateTransactions
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{DbConfig, FullClientConfig}
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.topology.{ForceFlag, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
@@ -237,9 +243,11 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
   "re-onboard validator" in { implicit env =>
     aliceValidatorBackend.config.ledgerApiUser shouldBe aliceValidatorPartyHint
     initDsoWithSv1Only()
+    // Canton endpoint is kinda slow for this so we only resolve it once.
+    val synchronizerId = decentralizedSynchronizerId
     // We need a standalone instance so we can revoke the domain trust certificate
     // without breaking the long-running nodes.
-    val (dump, aliceValidatorWalletParty, aliceParty, charlieParty, daveExtParty, lockedAmount) =
+    val (dump, aliceValidatorWalletParty, aliceParty, charlieParty, onboardingDave @ OnboardingResult(daveExtParty, _, davePrivateKey), lockedAmount) =
       withCanton(
         Seq(
           testResourcesPath / "standalone-participant-extra.conf",
@@ -266,14 +274,22 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
         val charlieParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         charlieWalletClient.tap(100)
 
-        val daveExtParty = onboardExternalParty(
+        val onboardingDave @ OnboardingResult(daveExtParty, _, _) = onboardExternalParty(
           aliceValidatorBackend,
           Some("daveExternal"),
-        ).party
+        )
         assertMapping(
           daveExtParty,
           aliceValidatorBackend.participantClient.id,
         )
+
+        createAndAcceptExternalPartySetupProposal(
+          aliceValidatorBackend,
+          onboardingDave,
+          verboseHashing = true,
+        )
+
+        aliceValidatorBackend.getExternalPartyBalance(daveExtParty).totalUnlockedCoin shouldBe "0.0000000000"
 
         val lockedAmount = walletUsdToAmulet(BigDecimal(50))
         actAndCheck(
@@ -299,7 +315,7 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
         clue("Stop aliceValidator") {
           aliceValidatorBackend.stop()
         }
-        (dump, aliceValidatorWalletParty, aliceParty, charlieParty, daveExtParty, lockedAmount)
+        (dump, aliceValidatorWalletParty, aliceParty, charlieParty, onboardingDave, lockedAmount)
       }
     better.files
       .File(dumpPath)
@@ -401,7 +417,71 @@ class ValidatorReonboardingIntegrationTest extends ValidatorReonboardingIntegrat
           Seq.empty,
         )
       }
+
+      val signedTx = clue("Sign PartyToParticipant to migrate to alice recovered's validator") {
+
+        val partyToParticipant = PartyToParticipant
+          .create(
+            partyId = aliceParty,
+            threshold = PositiveInt.one,
+            participants = Seq(
+              HostingParticipant(
+                aliceValidatorLocalBackend.participantClient.id,
+                ParticipantPermission.Confirmation,
+              )
+            ),
+          )
+          .value
+
+        val txs = aliceValidatorLocalBackend.participantClient.topology.transactions.generate(
+          Seq(
+            GenerateTransactions.Proposal(
+              partyToParticipant,
+              TopologyStoreId.Synchronizer(synchronizerId),
+            )
+          )
+        )
+
+        val signedTxs = txs.map(sign(_, davePrivateKey))
+
+        // Note: This only signs it does not upload.
+        aliceValidatorLocalBackend.participantClient.topology.transactions.sign(
+          signedTxs,
+          TopologyStoreId.Synchronizer(synchronizerId),
+          signedBy = Seq(aliceValidatorLocalBackend.participantClient.id.fingerprint),
+        )
+      }
+
+      actAndCheck("Upload party to participant",
+      aliceValidatorLocalBackend.participantClient.topology.transactions.load(signedTx, TopologyStoreId.Synchronizer(synchronizerId)))("PartyToParticipant transaction gets sequenced", _ => {
+          val topologyTx = aliceValidatorLocalBackend.participantClient.topology.party_to_participant_mappings
+            .list(synchronizerId, filterParty = aliceParty.filterString)
+            .loneElement
+          topologyTx.item.participants.loneElement.participantId shouldBe aliceValidatorLocalBackend.participantClient.id
+        })
+
+        aliceValidatorLocalBackend.getExternalPartyBalance(daveExtParty).totalUnlockedCoin shouldBe "0.0000000000"
     }
+  }
+
+
+  def sign(
+      tx: TopologyTransaction[TopologyChangeOp, TopologyMapping],
+      privateKey: PrivateKey,
+  ): SignedTopologyTransaction[TopologyChangeOp, TopologyMapping] = {
+    val sig = crypto
+      .sign(
+        hash = tx.hash.hash,
+        signingKey = privateKey.asInstanceOf[SigningPrivateKey],
+        usage = SigningKeyUsage.ProtocolOnly,
+      )
+      .value
+    SignedTopologyTransaction.create(
+      tx,
+      NonEmpty(Set, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
+      isProposal = false,
+      ProtocolVersion.v33,
+    )
   }
 }
 
