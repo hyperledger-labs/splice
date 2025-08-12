@@ -136,6 +136,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
         ): Unit = LoggerUtil.logOnThrow {
 
           def loopWithDelay(newState: PollingTriggerState) = {
+            // Like below,
+            // we use updateAndGet even if it can be reapplied during contention because we know there's no contention
             pollingLoopRef.updateAndGet(_.map(_.flatMap { state =>
               context.retryProvider
                 .scheduleAfterUnlessShutdown(
