@@ -5,9 +5,12 @@
 -- free-of-payment transfers of Amulet tokens; and how to do so.
 module Splice.Tests.TestAmuletTokenTransfer where
 
+import qualified Splice.Amulet
+
 import Splice.Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.TransferInstructionV1 as Api.Token.TransferInstructionV1
+import Splice.Example.TokenStandardProxy
 
 import Daml.Script
 
@@ -121,6 +124,21 @@ setupTwoStepTransfer : Script (TestSetup, ContractId TransferInstruction)
 setupTwoStepTransfer = do
   testSetup@TestSetup {..} <- setupTest
 
+  -- Setup a wallet provider that is featured
+  walletProvider <- allocatePartyExact "walletProvider"
+  featuredAppRightCid <- AmuletRegistry.featureApp registry walletProvider
+  -- Setup the wallet provider's token standard proxy
+  proxyCid <- submit walletProvider $ createCmd TokenStandardProxy with
+    provider = walletProvider
+    providerWeight = 0.9
+    userWeight = 0.1 -- Showcase direct reward sharing with the user using a 90%/10% split
+    extraBeneficiaries = []
+    optAllowList = None
+  -- query the disclosures that the wallet app needs to pass in
+  appRightD <- queryDisclosure' @Splice.Amulet.FeaturedAppRight walletProvider featuredAppRightCid
+  proxyD <- queryDisclosure' @TokenStandardProxy walletProvider proxyCid
+  let extraDisclosuresForProxy = proxyD <> appRightD
+
   -- fund alice
   AmuletRegistry.tapLockedAndUnlockedFunds registry alice 1000.0
   aliceHoldingCids <- WalletClient.listHoldings alice registry.instrumentId
@@ -142,10 +160,34 @@ setupTwoStepTransfer = do
   TextMap.size enrichedChoice.arg.extraArgs.context.values === 2
   Map.size enrichedChoice.disclosures.disclosures === 3
 
-  -- Trigger a two-step transfer
-  -- TODO(tech-debt): test here and for all steps that the expected ledger time bounds are present on the submissions
-  result <- submitWithDisclosures' alice enrichedChoice.disclosures $ exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
+  -- Trigger a two-step transfer via the
+  -- TokenStandardProxy so that the featured app provider gets credit for the activity.
+  result0 <- submitWithDisclosures' alice (extraDisclosuresForProxy <> enrichedChoice.disclosures) $ exerciseCmd
+    proxyCid
+    TokenStandardProxy_TransferFactory_Transfer with
+      proxyArg = ProxyArg with
+        user = alice
+        cid = coerceContractId enrichedChoice.factoryCid
+        choiceArg = enrichedChoice.arg
+        featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+  let result = result0.choiceResult
   TransferInstructionResult_Pending aliceInstrCid <- pure result.output
+
+  -- check that the two markers exist
+  activityMarkers <- sortOn (._2.weight) <$> query @Splice.Amulet.FeaturedAppActivityMarker walletProvider
+  let expectedMarkers =
+        [ Splice.Amulet.FeaturedAppActivityMarker with
+          dso = registry.dso
+          provider = walletProvider
+          beneficiary = alice
+          weight = 0.1
+        , Splice.Amulet.FeaturedAppActivityMarker with
+          dso = registry.dso
+          provider = walletProvider
+          beneficiary = walletProvider
+          weight = 0.9
+        ]
+  expectedMarkers === map (._2) activityMarkers
 
   -- check that the change is returned as expected
   [senderChangeCid] <- pure result.senderChangeCids
