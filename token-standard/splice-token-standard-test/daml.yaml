@@ -32,6 +32,8 @@ data-dependencies:
   - ../examples/splice-token-test-trading-app/.daml/dist/splice-token-test-trading-app-current.dar
   - ../../daml/splice-util/.daml/dist/splice-util-current.dar
   - ../../daml/splice-amulet/.daml/dist/splice-amulet-current.dar
+  # FIXME: remove
+  - ../../daml/splice-api-featured-app-v1/.daml/dist/splice-api-featured-app-v1-current.dar
 build-options:
   - --target=2.1
   - --ghc-option=-Wunused-binds
