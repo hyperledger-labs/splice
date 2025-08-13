@@ -189,6 +189,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     onboardingName: string,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
+    disableProtection?: boolean,
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
@@ -204,6 +205,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       cometbft.enableStateSync,
       cometbft.enableTimeoutCommit,
       imagePullServiceAccountName,
+      disableProtection,
       {
         ...opts,
         parent: this,

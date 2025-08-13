@@ -17,6 +17,9 @@ Upcoming
     there is no load spike when all validators try to do so at the same time. This has no impact on behavior as
     Daml upgrades are announced ahead of time and the broadcasting still happens before the switchover.
 
+  - The CometBFT PVC is now annotated with ``helm.sh/resource-policy: keep``, so that in the event of a (potentially accidental)
+    ``helm uninstall`` the CometBFT data is not deleted and the node can more easily be recovered.
+
 - Docs
 
   - Mark the workflows in the ``splice-wallet-payments`` :ref:`package <reference_docs_splice_wallet_payments>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.

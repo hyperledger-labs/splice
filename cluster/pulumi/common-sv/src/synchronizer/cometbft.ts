@@ -76,6 +76,7 @@ export function installCometBftNode(
   enableStateSync: boolean = !disableCometBftStateSync,
   enableTimeoutCommit: boolean = false,
   imagePullServiceAccountName?: string,
+  disableProtection?: boolean,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
@@ -195,6 +196,7 @@ export function installCometBftNode(
       ),
     ];
   }
+  const protectCometBft = svsConfig?.cometbft?.protected ?? false;
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -206,6 +208,7 @@ export function installCometBftNode(
       ...withAddedDependencies(opts, volumeDependecies.concat(keysSecret ? [keysSecret] : [])),
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
+      protect: disableProtection ? false : protectCometBft,
     }
   );
   return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };
