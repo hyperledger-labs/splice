@@ -22,7 +22,6 @@ import {
   isMainNet,
   loadTesterConfig,
   ObservabilityReleaseName,
-  publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
@@ -82,50 +81,7 @@ function istioVirtualService(
   );
 }
 
-function istioPublicVirtualService(
-  ns: k8s.core.v1.Namespace,
-  name: string,
-  serviceName: string,
-  servicePort: number,
-  urlPrefix: string,
-  rewriteUri?: string
-) {
-  return new k8s.apiextensions.CustomResource(
-    `${name}-virtual-service`,
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'VirtualService',
-      metadata: {
-        name: name,
-        namespace: ns.metadata.name,
-      },
-      spec: {
-        hosts: [`public.${CLUSTER_HOSTNAME}`],
-        gateways: ['cluster-ingress/cn-public-http-gateway'],
-        http: [
-          {
-            match: [{ uri: { prefix: urlPrefix }, port: 443 }],
-            rewrite: rewriteUri ? { uri: rewriteUri } : undefined,
-            route: [
-              {
-                destination: {
-                  host: pulumi.interpolate`${serviceName}.${ns.metadata.name}.svc.cluster.local`,
-                  port: {
-                    number: servicePort,
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      },
-    },
-    { deleteBeforeReplace: true }
-  );
-}
-
 const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
-const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
@@ -552,19 +508,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   );
 
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
-  if (publicPrometheusRemoteWrite) {
-    istioPublicVirtualService(
-      namespace,
-      'prometheus-remote-write',
-      'prometheus-prometheus',
-      9090,
-      '/api/v1/write'
-    );
-  }
-  // TODO(DACH-NY/canton-network-internal#360): Consider removing this also from non-MainNet clusters
-  const grafanaPublicVirtualService = isMainNet
-    ? undefined
-    : istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
@@ -588,12 +531,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
-  if (grafanaPublicVirtualService) {
-    createGrafanaServiceAccount(
-      namespaceName,
-      adminPassword,
-      dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
-    );
+  if (!isMainNet) {
+    createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn.concat([prometheusStack]));
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
@@ -669,7 +608,7 @@ function createGrafanaServiceAccount(
 ) {
   const grafanaProvider = new grafana.Provider('grafana', {
     auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
-    url: grafanaPublicUrl,
+    url: grafanaExternalUrl,
   });
 
   const serviceAccountResource = new grafana.ServiceAccount(
