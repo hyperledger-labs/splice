@@ -22,6 +22,7 @@ IFS=$'\n' read -d '' -ra \
 
 for dockerfile in "${dockerfiles[@]}"; do
   # We exclude "${base_version}", which we use for base images that are built from this repo in the same version
+  # shellcheck disable=SC2016
   if grep -Hn "^\s*FROM\b" "$dockerfile" | grep -v ':\${base_version}' &&
     get_base_image "$dockerfile" | grep -vq '@sha256:'; then
     _error "docker image '$dockerfile' must pin base image to a specific digest"
