@@ -165,9 +165,9 @@ setupTwoStepTransfer = do
   result0 <- submitWithDisclosures' alice (extraDisclosuresForProxy <> enrichedChoice.disclosures) $ exerciseCmd
     proxyCid
     TokenStandardProxy_TransferFactory_Transfer with
+      cid = enrichedChoice.factoryCid
       proxyArg = ProxyArg with
         user = alice
-        cid = coerceContractId enrichedChoice.factoryCid
         choiceArg = enrichedChoice.arg
         featuredAppRightCid = toInterfaceContractId featuredAppRightCid
   let result = result0.choiceResult

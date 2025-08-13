@@ -20,7 +20,6 @@ import Splice.Api.FeaturedAppRightV1
 -- | Generic argument to the proxy choices.
 data ProxyArg arg = ProxyArg with
     user : Party -- ^ The user that is interacting with the token standard workflow.
-    cid : ContractId ()  -- ^ Contract on which the user is exercising the choice.
     choiceArg : arg -- ^ The argument to the choice that the user is exercising.
     featuredAppRightCid : ContractId FeaturedAppRight -- ^ The featured app right contract of the provider.
   deriving (Show, Eq)
@@ -55,58 +54,64 @@ template TokenStandardProxy with
     nonconsuming choice TokenStandardProxy_TransferFactory_Transfer
       : ProxyResult TransferInstructionResult
       with
+        cid : ContractId TransferFactory
         proxyArg : ProxyArg TransferFactory_Transfer
       controller proxyArg.user
       do
-        exerciseProxyChoice @TransferFactory this proxyArg $ \_ -> do
+        exerciseProxyChoice this cid proxyArg $ \_ -> do
           pure proxyArg.choiceArg.transfer.sender
 
     nonconsuming choice TokenStandardProxy_TransferInstruction_Accept
       : ProxyResult TransferInstructionResult
       with
+        cid : ContractId TransferInstruction
         proxyArg : ProxyArg TransferInstruction_Accept
       controller proxyArg.user
       do
-        exerciseProxyChoice @TransferInstruction this proxyArg $ \cid -> do
+        exerciseProxyChoice this cid proxyArg $ \cid -> do
           instr <- fetch cid
           pure (view instr).transfer.receiver
 
     nonconsuming choice TokenStandardProxy_TransferInstruction_Reject
       : ProxyResult TransferInstructionResult
       with
+        cid : ContractId TransferInstruction
         proxyArg : ProxyArg TransferInstruction_Reject
       controller proxyArg.user
       do
-        exerciseProxyChoice @TransferInstruction this proxyArg $ \cid -> do
+        exerciseProxyChoice this cid proxyArg $ \cid -> do
           instr <- fetch cid
           pure (view instr).transfer.receiver
 
     nonconsuming choice TokenStandardProxy_TransferInstruction_Withdraw
       : ProxyResult TransferInstructionResult
       with
+        cid : ContractId TransferInstruction
         proxyArg : ProxyArg TransferInstruction_Withdraw
       controller proxyArg.user
       do
-        exerciseProxyChoice @TransferInstruction this proxyArg $ \cid -> do
+        exerciseProxyChoice this cid proxyArg $ \cid -> do
           instr <- fetch cid
           pure (view instr).transfer.receiver
 
     nonconsuming choice TokenStandardProxy_AllocationFactory_Allocate
       : ProxyResult AllocationInstructionResult
       with
+        cid : ContractId AllocationFactory
         proxyArg : ProxyArg AllocationFactory_Allocate
       controller proxyArg.user
       do
-        exerciseProxyChoice @AllocationFactory this proxyArg $ \_ -> do
+        exerciseProxyChoice this cid proxyArg $ \_ -> do
           pure proxyArg.choiceArg.allocation.transferLeg.sender
 
     nonconsuming choice TokenStandardProxy_Allocation_Withdraw
       : ProxyResult Allocation_WithdrawResult
       with
+        cid : ContractId Allocation
         proxyArg : ProxyArg Allocation_Withdraw
       controller proxyArg.user
       do
-        exerciseProxyChoice @Allocation this proxyArg $ \cid -> do
+        exerciseProxyChoice this cid proxyArg $ \cid -> do
           allocation <- fetch cid
           pure (view allocation).allocation.transferLeg.sender
 
@@ -117,12 +122,11 @@ template TokenStandardProxy with
 -- | Shared code to execute the proxied choice.
 exerciseProxyChoice
   : forall t ch r. HasExercise t ch r =>
-  TokenStandardProxy -> ProxyArg ch -> (ContractId t -> Update Party) -> Update (ProxyResult r)
-exerciseProxyChoice proxy proxyArg getExpectedUser = do
+  TokenStandardProxy -> ContractId t -> ProxyArg ch -> (ContractId t -> Update Party) -> Update (ProxyResult r)
+exerciseProxyChoice proxy cid proxyArg getExpectedUser = do
   let ProxyArg{..} = proxyArg
-  let cid' : ContractId t = coerceContractId cid
   appRight <- fetch featuredAppRightCid
-  expectedUser <- getExpectedUser cid'
+  expectedUser <- getExpectedUser cid
   -- validate the user and provider
   require "User matches expected user" (expectedUser == user)
   forA_ proxy.optAllowList $ \allowList ->
@@ -132,7 +136,7 @@ exerciseProxyChoice proxy proxyArg getExpectedUser = do
   markerResult <- exercise featuredAppRightCid FeaturedAppRight_CreateActivityMarker with
     beneficiaries = proxyBeneficiaries proxy user
   -- exercise proxied choice
-  choiceResult <- exercise cid' choiceArg
+  choiceResult <- exercise cid choiceArg
   pure ProxyResult with markerResult; choiceResult
 
 -- | Get the list of beneficiaries for the featured app marker.
