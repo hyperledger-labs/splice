@@ -68,6 +68,7 @@ in pkgs.mkShell {
                                      }))
     python3Packages.dockerfile-parse
     python3Packages.flask
+    python3Packages.functions-framework
     python3Packages.GitPython
     python3Packages.gql
     python3Packages.humanize

@@ -3,6 +3,8 @@
 python3Packages.buildPythonPackage rec {
   pname = "git-search-replace";
   version = "1.0.3";
+  pyproject = true;
+  build-system = [ python3Packages.setuptools ];
 
   src = python3Packages.fetchPypi {
     inherit pname version;
