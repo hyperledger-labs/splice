@@ -62,6 +62,8 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+      mediators:
+        acknowledgementLagSeconds: 900
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
