@@ -1893,7 +1893,7 @@ printTests := {
     ),
     (
       "SV reonboard preflight",
-      "test-full-class-names-re-onboard-sv-runbook-preflight.log",
+      "test-full-class-names-re-onboSvReonboardingIntegrationard-sv-runbook-preflight.log",
       (t: String) => isSvReOnboardPreflightIntegrationTest(t),
     ),
     (
