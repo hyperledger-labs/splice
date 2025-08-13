@@ -1152,6 +1152,25 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "grafana-service-account-token-secret",
+        "namespace": "observability"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {}
+      }
+    },
+    "name": "grafana-service-account-token-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "VirtualService",
       "metadata": {
@@ -1192,6 +1211,41 @@
     "name": "grafana-virtual-service",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "name": "grafana-sa-token",
+      "serviceAccountId": "undefined_id"
+    },
+    "name": "grafanaSAToken",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:grafana::grafana::undefined_id",
+    "type": "grafana:index/serviceAccountToken:ServiceAccountToken"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "role": "Editor"
+    },
+    "name": "grafanaSA",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:grafana::grafana::undefined_id",
+    "type": "grafana:index/serviceAccount:ServiceAccount"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "auth": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "cn-admin:grafana-keys-admin-password"
+      },
+      "url": "https://grafana.mock.global.canton.network.digitalasset.com"
+    },
+    "name": "grafana",
+    "provider": "",
+    "type": "pulumi:providers:grafana"
   },
   {
     "custom": true,

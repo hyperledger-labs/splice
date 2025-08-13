@@ -1999,7 +1999,7 @@ function _create_grafana_silence() {
     _info "Adding silence with the following: $startsAt, $endsAt, $createdBy, $comment"
 
     curl -sSL --fail-with-body \
-        "https://public.${GCP_CLUSTER_HOSTNAME}/grafana/api/alertmanager/grafana/api/v2/silences" \
+        "https://grafana.${GCP_CLUSTER_HOSTNAME}/api/alertmanager/grafana/api/v2/silences" \
         -H 'content-type: application/json' \
         --request POST \
         -H "x-non-jwt-auth: Bearer ${token}" \
@@ -2011,7 +2011,6 @@ function _create_grafana_silence() {
             \"matchers\":$matchers
             }" || _warning "Failed to silence alerts (see comment in the cncluster code)"
     # If the above fails with a 401 Unauthorized:
-    # - Confirm that the observability namespace has a label: istio-injection=enabled
     # - Restart the grafana pod so that the sidecar is injected (the pod should have 5 containers including the istio-proxy sidecar):
     #   `kubectl delete pod -n observability -l 'app.kubernetes.io/name=grafana'`
     # - Delete the grafana-authorization-header-filter EnvoyFilter if one exists:

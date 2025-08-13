@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import { local } from '@pulumi/command';
@@ -18,6 +19,7 @@ import {
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
+  isMainNet,
   loadTesterConfig,
   ObservabilityReleaseName,
   SPLICE_ROOT,
@@ -529,6 +531,9 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
+  if (!isMainNet) {
+    createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn.concat([prometheusStack]));
+  }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
   return prometheusStack;
@@ -594,6 +599,45 @@ function createGrafanaEnvoyFilter(namespace: Input<string>, dependsOn: pulumi.Re
       dependsOn: dependsOn,
     }
   );
+}
+
+function createGrafanaServiceAccount(
+  namespace: Input<string>,
+  adminPassword: pulumi.Output<string>,
+  dependsOn: pulumi.Resource[]
+) {
+  const grafanaProvider = new grafana.Provider('grafana', {
+    auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
+    url: grafanaExternalUrl,
+  });
+
+  const serviceAccountResource = new grafana.ServiceAccount(
+    'grafanaSA',
+    {
+      role: 'Editor',
+    },
+    {
+      provider: grafanaProvider,
+      dependsOn: [...dependsOn, grafanaProvider],
+    }
+  );
+  const serviceAccountToken = new grafana.ServiceAccountToken(
+    'grafanaSAToken',
+    {
+      serviceAccountId: serviceAccountResource.id,
+      name: 'grafana-sa-token',
+    },
+    {
+      provider: grafanaProvider,
+    }
+  );
+  new k8s.core.v1.Secret('grafana-service-account-token-secret', {
+    metadata: {
+      namespace: namespace,
+      name: 'grafana-service-account-token-secret',
+    },
+    stringData: serviceAccountToken.key.apply(key => ({ token: key })),
+  });
 }
 
 function grafanaContactPoints(
