@@ -550,7 +550,7 @@ class SV1Initializer(
       packageResource.all
         .filter { darResource =>
           val required = PackageVersion.assertFromString(requiredVersion)
-          darResource.metadata.version <= required
+          darResource.metadata.version == required
         }
         .map(UploadablePackage.fromResource)
     }
