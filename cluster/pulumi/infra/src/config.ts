@@ -35,6 +35,9 @@ const MonitoringConfigSchema = z.object({
         minRate: z.number(),
       }),
       svNames: z.array(z.string()).default([]),
+      mediators: z.object({
+        acknowledgementLagSeconds: z.number(),
+      }),
     }),
     logAlerts: z.object({}).catchall(z.string()).default({}),
   }),
