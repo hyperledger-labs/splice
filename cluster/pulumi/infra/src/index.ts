@@ -31,10 +31,12 @@ const observabilityDependsOn = istio.concat([network]);
 configureObservability(observabilityDependsOn);
 if (enableAlerts && !clusterIsResetPeriodically) {
   const notificationChannel = getNotificationChannel();
-  installGcpLoggingAlerts(notificationChannel);
-  installClusterMaintenanceUpdateAlerts(notificationChannel);
-  if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
-    installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+  if (notificationChannel) {
+    installGcpLoggingAlerts(notificationChannel);
+    installClusterMaintenanceUpdateAlerts(notificationChannel);
+    if (monitoringConfig.alerting.alerts.cloudSql.maintenance) {
+      installCloudSQLMaintenanceUpdateAlerts(notificationChannel);
+    }
   }
 }
 istioMonitoring(network.ingressNs, []);
