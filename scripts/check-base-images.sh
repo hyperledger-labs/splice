@@ -7,9 +7,23 @@ set -euo pipefail
 
 source "${TOOLS_LIB}/libcli.source"
 
-# We exclude "base_version", which we use for base images that are built from this repo in the same version
+python_cli=(/usr/bin/env python3)
 
-if find cluster/images/ -name Dockerfile -exec grep -Hn "FROM" {} + | grep -v sha | grep -v base_version; then
-  _error "docker images must pin base images to a specific digest"
-fi
+# This function requires dockerfile-parse for Python to be installed
+get_base_image() {
+  local dockerfile="$1"
+  "${python_cli[@]}" -c 'from sys import argv; from dockerfile_parse import DockerfileParser; print(DockerfileParser(argv[1]).baseimage)' "${dockerfile}"
+}
 
+dockerfiles_find=$(find cluster/images/ -name Dockerfile)
+
+IFS=$'\n' read -d '' -ra \
+  dockerfiles < <(echo "$dockerfiles_find"; echo -e '\0')
+
+for dockerfile in "${dockerfiles[@]}"; do
+  # We exclude "${base_version}", which we use for base images that are built from this repo in the same version
+  if grep -Hn "^\s*FROM\b" "$dockerfile" | grep -v ':\${base_version}' &&
+    get_base_image "$dockerfile" | grep -vq '@sha256:'; then
+    _error "docker image '$dockerfile' must pin base image to a specific digest"
+  fi
+done
