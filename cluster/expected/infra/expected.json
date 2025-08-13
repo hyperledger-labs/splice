@@ -213,37 +213,6 @@
       "apiVersion": "telemetry.istio.io/v1alpha1",
       "kind": "Telemetry",
       "metadata": {
-        "name": "access-logging-public",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "accessLogging": [
-          {
-            "providers": [
-              {
-                "name": "envoy"
-              }
-            ]
-          }
-        ],
-        "selector": {
-          "matchLabels": {
-            "app": "istio-ingress-public"
-          }
-        }
-      }
-    },
-    "name": "access-logging-public",
-    "provider": "",
-    "type": "kubernetes:telemetry.istio.io/v1alpha1:Telemetry"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "telemetry.istio.io/v1alpha1",
-      "kind": "Telemetry",
-      "metadata": {
         "name": "access-logging",
         "namespace": "cluster-ingress"
       },
@@ -312,6 +281,45 @@
     "name": "alertmanager-virtual-service",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "security.istio.io/v1beta1",
+      "kind": "AuthorizationPolicy",
+      "metadata": {
+        "name": "allow-sv-info",
+        "namespace": "cluster-ingress"
+      },
+      "spec": {
+        "action": "ALLOW",
+        "rules": [
+          {
+            "to": [
+              {
+                "operation": {
+                  "hosts": [
+                    "info.sv-1.mock.network.canton.global",
+                    "info.sv-1.mock.global.canton.network.digitalasset.com",
+                    "info.sv.mock.network.canton.global",
+                    "info.sv.mock.global.canton.network.digitalasset.com"
+                  ]
+                }
+              }
+            ]
+          }
+        ],
+        "selector": {
+          "matchLabels": {
+            "istio": "ingress"
+          }
+        }
+      }
+    },
+    "name": "allow-sv-info",
+    "provider": "",
+    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
   },
   {
     "custom": false,
@@ -766,56 +774,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "apiVersion": "networking.istio.io/v1alpha3",
-      "kind": "Gateway",
-      "metadata": {
-        "name": "cn-public-http-gateway",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "selector": {
-          "app": "istio-ingress-public",
-          "istio": "ingress-public"
-        },
-        "servers": [
-          {
-            "hosts": [
-              "public.mock.global.canton.network.digitalasset.com"
-            ],
-            "port": {
-              "name": "http",
-              "number": 80,
-              "protocol": "HTTP"
-            },
-            "tls": {
-              "httpsRedirect": true
-            }
-          },
-          {
-            "hosts": [
-              "public.mock.global.canton.network.digitalasset.com"
-            ],
-            "port": {
-              "name": "https",
-              "number": 443,
-              "protocol": "HTTPS"
-            },
-            "tls": {
-              "credentialName": "cn-test-stacknet-tls",
-              "mode": "SIMPLE"
-            }
-          }
-        ]
-      }
-    },
-    "name": "cn-public-http-gateway",
-    "provider": "",
-    "type": "kubernetes:networking.istio.io/v1alpha3:Gateway"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "name": "cn-test-stack-out",
       "networkTier": "PREMIUM"
     },
@@ -842,17 +800,6 @@
       "networkTier": "PREMIUM"
     },
     "name": "cn-test-stacknet-ip",
-    "provider": "",
-    "type": "gcp:compute/address:Address"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "cn-test-stacknet-pub-ip",
-      "networkTier": "PREMIUM"
-    },
-    "name": "cn-test-stacknet-pub-ip",
     "provider": "",
     "type": "gcp:compute/address:Address"
   },
@@ -1208,73 +1155,6 @@
       "apiVersion": "networking.istio.io/v1alpha3",
       "kind": "VirtualService",
       "metadata": {
-        "name": "grafana-public",
-        "namespace": "observability"
-      },
-      "spec": {
-        "gateways": [
-          "cluster-ingress/cn-public-http-gateway"
-        ],
-        "hosts": [
-          "public.mock.global.canton.network.digitalasset.com"
-        ],
-        "http": [
-          {
-            "match": [
-              {
-                "port": 443,
-                "uri": {
-                  "prefix": "/grafana/"
-                }
-              }
-            ],
-            "rewrite": {
-              "uri": "/"
-            },
-            "route": [
-              {
-                "destination": {
-                  "host": "grafana.observability.svc.cluster.local",
-                  "port": {
-                    "number": 80
-                  }
-                }
-              }
-            ]
-          }
-        ]
-      }
-    },
-    "name": "grafana-public-virtual-service",
-    "provider": "",
-    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "kind": "Secret",
-      "metadata": {
-        "name": "grafana-service-account-token-secret",
-        "namespace": "observability"
-      },
-      "stringData": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {}
-      }
-    },
-    "name": "grafana-service-account-token-secret",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "networking.istio.io/v1alpha3",
-      "kind": "VirtualService",
-      "metadata": {
         "name": "grafana",
         "namespace": "observability"
       },
@@ -1312,41 +1192,6 @@
     "name": "grafana-virtual-service",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "name": "grafana-sa-token",
-      "serviceAccountId": "undefined_id"
-    },
-    "name": "grafanaSAToken",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:grafana::grafana::undefined_id",
-    "type": "grafana:index/serviceAccountToken:ServiceAccountToken"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "role": "Editor"
-    },
-    "name": "grafanaSA",
-    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:grafana::grafana::undefined_id",
-    "type": "grafana:index/serviceAccount:ServiceAccount"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "auth": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": "cn-admin:grafana-keys-admin-password"
-      },
-      "url": "https://public.mock.global.canton.network.digitalasset.com/grafana"
-    },
-    "name": "grafana",
-    "provider": "",
-    "type": "pulumi:providers:grafana"
   },
   {
     "custom": true,
@@ -1475,42 +1320,6 @@
       "apiVersion": "security.istio.io/v1beta1",
       "kind": "AuthorizationPolicy",
       "metadata": {
-        "name": "istio-access-policy-allow-public-0",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "action": "ALLOW",
-        "rules": [
-          {
-            "from": [
-              {
-                "source": {
-                  "remoteIpBlocks": [
-                    "0.0.0.0/0"
-                  ]
-                }
-              }
-            ]
-          }
-        ],
-        "selector": {
-          "matchLabels": {
-            "app": "istio-ingress-public"
-          }
-        }
-      }
-    },
-    "name": "istio-access-policy-allow-public-0",
-    "provider": "",
-    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "security.istio.io/v1beta1",
-      "kind": "AuthorizationPolicy",
-      "metadata": {
         "name": "istio-access-policy-deny-all-cometbft",
         "namespace": "cluster-ingress"
       },
@@ -1523,28 +1332,6 @@
       }
     },
     "name": "istio-access-policy-deny-all-cometbft",
-    "provider": "",
-    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "security.istio.io/v1beta1",
-      "kind": "AuthorizationPolicy",
-      "metadata": {
-        "name": "istio-access-policy-deny-all-public",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "selector": {
-          "matchLabels": {
-            "app": "istio-ingress-public"
-          }
-        }
-      }
-    },
-    "name": "istio-access-policy-deny-all-public",
     "provider": "",
     "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
   },
@@ -1777,91 +1564,6 @@
       "version": "1.26.1"
     },
     "name": "istio-ingress-cometbft",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "gateway",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "istio-ingress-public",
-      "namespace": "cluster-ingress",
-      "repositoryOpts": {
-        "repo": "https://istio-release.storage.googleapis.com/charts"
-      },
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_infra",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "autoscaling": {
-          "maxReplicas": 15
-        },
-        "podDisruptionBudget": {
-          "maxUnavailable": 1
-        },
-        "resources": {
-          "limits": {
-            "cpu": "4",
-            "memory": "2024Mi"
-          },
-          "requests": {
-            "cpu": "500m",
-            "memory": "512Mi"
-          }
-        },
-        "service": {
-          "externalTrafficPolicy": "Local",
-          "loadBalancerSourceRanges": [
-            "0.0.0.0/0"
-          ],
-          "ports": [
-            {
-              "name": "status-port",
-              "port": 15021,
-              "protocol": "TCP",
-              "targetPort": 15021
-            },
-            {
-              "name": "http2",
-              "port": 80,
-              "protocol": "TCP",
-              "targetPort": 80
-            },
-            {
-              "name": "https",
-              "port": 443,
-              "protocol": "TCP",
-              "targetPort": 443
-            }
-          ]
-        },
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_infra",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "1.26.1"
-    },
-    "name": "istio-ingress-public",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2470,23 +2172,6 @@
     "id": "",
     "inputs": {
       "managedZone": "prod-networks",
-      "name": "public.mock.global.canton.network.digitalasset.com.",
-      "project": "da-gcp-canton-domain",
-      "rrdatas": [
-        null
-      ],
-      "ttl": 60,
-      "type": "A"
-    },
-    "name": "mock.global.canton.network.digitalasset.com-public",
-    "provider": "",
-    "type": "gcp:dns/recordSet:RecordSet"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "managedZone": "prod-networks",
       "name": "*.mock.global.canton.network.digitalasset.com.",
       "project": "da-gcp-canton-domain",
       "rrdatas": [
@@ -2530,23 +2215,6 @@
       "type": "A"
     },
     "name": "mock.network.canton.global-cometbft",
-    "provider": "",
-    "type": "gcp:dns/recordSet:RecordSet"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "managedZone": "canton-global",
-      "name": "public.mock.network.canton.global.",
-      "project": "da-gcp-canton-domain",
-      "rrdatas": [
-        null
-      ],
-      "ttl": 60,
-      "type": "A"
-    },
-    "name": "mock.network.canton.global-public",
     "provider": "",
     "type": "gcp:dns/recordSet:RecordSet"
   },
@@ -3235,83 +2903,6 @@
     "name": "prometheus-virtual-service",
     "provider": "",
     "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "security.istio.io/v1",
-      "kind": "RequestAuthentication",
-      "metadata": {
-        "name": "public-request-authentication",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "jwtRules": [
-          {
-            "issuer": "https://canton-network-ci.example.com",
-            "jwks": "{\"keys\": [{\"kty\":\"RSA\",\"n\":\"rX_TFg7BFsaQ4st9NrPiN4gc_sZmhifgEczn6CCedKKOTYouO7ik9KTg0eTfQN2qSU-2L4KYX4KbK2T3e6CYsWDB6UjZYdhEtfj_X_QyIQ8hBVKGoNpL6WJFvzALPR5ILokzp9kDy0oV9-SqC91lS-ai2sHED14uS4NVfw9xk9toZG1stOm4JmfzOyAB3ksBrTfefKaIyKguINOJi2lGCqK9hnWbGJM2OHFmzEle4djrJub9qRCEkHBejPWmHrdN1zB2FZlWVA_Ze8tqBf5K9xx1cIn0cTWETEIWPhLu8pk_hFan1YmMOiBpjsOlg2e6f_m0dvhBSkqqieVFQBka6iocfLGWJFRBHTwgFw9-PIMTtb0l42uIGzKTo1XrvwMSqy4rff028ZLkbxu6OmFHCm4gRR6wlXF4ha6pTkS-vjFVdn2pL09-6jLD7CbNf5Di8RwvdO3puSp_ZExGb8UapgjW3sonlXiMxz1VAYTOYb4YIRSWGKafyBrNB5MGVuqgvK_ZjBzBvax6wSAU6ldcuHiGfS786FH2QwA47Smo2ewPfKpO2ePOmkvNpleT817BStbFtZD8K9y7Pf0QiX1Hk4DA7N_oQp3hrgW7U9Dy0hIh2OflMnFFEdN51fV-89tdIAKTd1rn3NwTqRcTDH1-GvmLfZTWH2-ZOgjizWFPsqE\",\"e\":\"AQAB\",\"ext\":true,\"kid\":\"eb3d58621c3c7fc606386139a\",\"alg\":\"RS256\",\"use\":\"sig\"}]}"
-          }
-        ],
-        "selector": {
-          "matchLabels": {
-            "istio": "ingress-public"
-          }
-        }
-      }
-    },
-    "name": "public-request-authentication",
-    "provider": "",
-    "type": "kubernetes:security.istio.io/v1:RequestAuthentication"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "security.istio.io/v1beta1",
-      "kind": "AuthorizationPolicy",
-      "metadata": {
-        "name": "public-request-authorization",
-        "namespace": "cluster-ingress"
-      },
-      "spec": {
-        "action": "ALLOW",
-        "rules": [
-          {
-            "from": [
-              {
-                "source": {
-                  "requestPrincipals": [
-                    "https://canton-network-ci.example.com/canton-network-ci"
-                  ]
-                }
-              }
-            ]
-          },
-          {
-            "to": [
-              {
-                "operation": {
-                  "paths": [
-                    "/grafana/api/serviceaccounts",
-                    "/grafana/api/serviceaccounts/*",
-                    "/grafana/api/alertmanager/grafana/api/v2/silences"
-                  ]
-                }
-              }
-            ]
-          }
-        ],
-        "selector": {
-          "matchLabels": {
-            "istio": "ingress-public"
-          }
-        }
-      }
-    },
-    "name": "public-request-authorization",
-    "provider": "",
-    "type": "kubernetes:security.istio.io/v1beta1:AuthorizationPolicy"
   },
   {
     "custom": true,

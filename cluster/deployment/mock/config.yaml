@@ -69,6 +69,7 @@ pulumiProjectConfig:
   default:
     interAppsDependencies: false
     isExternalCluster: true
+    hasPublicInfo: true
     cloudSql:
       enabled: true
 monitoring:

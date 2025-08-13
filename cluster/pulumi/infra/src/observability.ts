@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as grafana from '@pulumiverse/grafana';
 import * as fs from 'fs';
 import * as yaml from 'js-yaml';
 import { local } from '@pulumi/command';
@@ -19,10 +18,8 @@ import {
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
-  isMainNet,
   loadTesterConfig,
   ObservabilityReleaseName,
-  publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
@@ -82,50 +79,7 @@ function istioVirtualService(
   );
 }
 
-function istioPublicVirtualService(
-  ns: k8s.core.v1.Namespace,
-  name: string,
-  serviceName: string,
-  servicePort: number,
-  urlPrefix: string,
-  rewriteUri?: string
-) {
-  return new k8s.apiextensions.CustomResource(
-    `${name}-virtual-service`,
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'VirtualService',
-      metadata: {
-        name: name,
-        namespace: ns.metadata.name,
-      },
-      spec: {
-        hosts: [`public.${CLUSTER_HOSTNAME}`],
-        gateways: ['cluster-ingress/cn-public-http-gateway'],
-        http: [
-          {
-            match: [{ uri: { prefix: urlPrefix }, port: 443 }],
-            rewrite: rewriteUri ? { uri: rewriteUri } : undefined,
-            route: [
-              {
-                destination: {
-                  host: pulumi.interpolate`${serviceName}.${ns.metadata.name}.svc.cluster.local`,
-                  port: {
-                    number: servicePort,
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      },
-    },
-    { deleteBeforeReplace: true }
-  );
-}
-
 const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
-const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
@@ -552,19 +506,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   );
 
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
-  if (publicPrometheusRemoteWrite) {
-    istioPublicVirtualService(
-      namespace,
-      'prometheus-remote-write',
-      'prometheus-prometheus',
-      9090,
-      '/api/v1/write'
-    );
-  }
-  // TODO(DACH-NY/canton-network-internal#360): Consider removing this also from non-MainNet clusters
-  const grafanaPublicVirtualService = isMainNet
-    ? undefined
-    : istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
@@ -588,13 +529,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
-  if (grafanaPublicVirtualService) {
-    createGrafanaServiceAccount(
-      namespaceName,
-      adminPassword,
-      dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
-    );
-  }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
   return prometheusStack;
@@ -660,45 +594,6 @@ function createGrafanaEnvoyFilter(namespace: Input<string>, dependsOn: pulumi.Re
       dependsOn: dependsOn,
     }
   );
-}
-
-function createGrafanaServiceAccount(
-  namespace: Input<string>,
-  adminPassword: pulumi.Output<string>,
-  dependsOn: pulumi.Resource[]
-) {
-  const grafanaProvider = new grafana.Provider('grafana', {
-    auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
-    url: grafanaPublicUrl,
-  });
-
-  const serviceAccountResource = new grafana.ServiceAccount(
-    'grafanaSA',
-    {
-      role: 'Editor',
-    },
-    {
-      provider: grafanaProvider,
-      dependsOn: [...dependsOn, grafanaProvider],
-    }
-  );
-  const serviceAccountToken = new grafana.ServiceAccountToken(
-    'grafanaSAToken',
-    {
-      serviceAccountId: serviceAccountResource.id,
-      name: 'grafana-sa-token',
-    },
-    {
-      provider: grafanaProvider,
-    }
-  );
-  new k8s.core.v1.Secret('grafana-service-account-token-secret', {
-    metadata: {
-      namespace: namespace,
-      name: 'grafana-service-account-token-secret',
-    },
-    stringData: serviceAccountToken.key.apply(key => ({ token: key })),
-  });
 }
 
 function grafanaContactPoints(
