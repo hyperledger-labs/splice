@@ -11,7 +11,7 @@ When splitting-off a top-level directory into its own repo, we expect to use
 
 To update the versions used in the project follow the steps:
 - Open a terminal outside a direnv nix environment
-- Run `nix flake update path:<path-to-the-canton-network-repository>/nix`
+- Run `nix flake update --flake path:<path-to-the-canton-network-repository>/nix`
 - Commit the changes to the `flake.lock` file
 
 
