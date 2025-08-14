@@ -8,11 +8,37 @@
 Wallet Integration with Token Standard Assets
 =============================================
 
-See the `ledger's OpenAPI definition <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1>`_.
+This page provides wallet developers with guidance on how to integrate with token standard assets.
+Such an integration works by sending the right read and write requests to the Ledger API of the validator node hosting the wallet user's party.
+There are three kinds of integration patterns:
+
+  * :ref:`token_standard_usage_reading_contracts`
+  * :ref:`token_standard_usage_reading_tx_history`
+  * :ref:`token_standard_usage_executing_factory_choice`
+  * :ref:`token_standard_usage_executing_factory_choice`
+
+All of these integration patterns are demonstrated in the form of executable code as part of the experimental command-line interface for token standard assets.
+The sections below explaining the patterns below thus all start with a link to the code.
+They then provide additional context for an implementor.
+
+You can find the `ledger's OpenAPI definition <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1>`_.
 This is also accessible at ``http(s)://${YOUR_PARTICIPANT}/docs/openapi``.
 We encourage developers to use OpenAPI code generation tools as opposed to manually writing HTTP requests.
 
 Check out the :ref:`Authentication section <app-auth>` for more information on how to authenticate the requests.
+
+.. _token_standard_usage_workflows:
+
+Token Standard Workflows
+------------------------
+
+There are three workflows enabled by the Token Standard.
+Refer to the CIP and source code listed here:
+
+  * `Portfolio View <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#wallet-client--portfolio-view>`_
+  * `Direct Peer-to-Peer / Free of Payment (FOP) Transfers <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#direct-peer-to-peer--free-of-payment-fop-transfer-workflow>`_
+  * `Delivery versus Payment (DVP) Transfer Workflows <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#delivery-versus-payment-dvp-transfer-workflows>`_
+
 
 
 .. _token_standard_usage_reading_contracts:
@@ -248,45 +274,3 @@ The response of these endpoints include two fields:
 
   Note that ``AllocationRequest_Reject`` and ``AllocationRequest_Withdraw`` should be called with an empty choice context.
   This is currently there as a potential future extension.
-
-
-
-.. _token_standard_usage_workflows:
-
-Token Standard Workflows
-------------------------
-
-Transfers
-^^^^^^^^^
-
-The workflow will follow the following steps:
-
-* A party calls ``TransferFactory_Transfer`` to create a transfer.
-* Depending on the implementation of the factory, one of three ``TransferInstructionResult_Output`` is possible:
-
-  * ``Failed``: where the transfer did not succeed and all holdings (minus fees) have been returned to the sender.
-  * ``Completed``: where the transfer succeeded and the receiver has received their holdings. No further action is required.
-  * ``Pending``: where the transfer is pending further steps. This will include a ``transferInstructionCid``.
-* If ``Pending``, The receiver party observes a ``TransferInstruction`` (which has the same contract id as above). Then:
-
-  * The receiver can exercise ``TransferInstruction_Accept``, which again will return a ``TransferInstructionResult`` depending on success and whether further steps are required or not.
-  * The receiver can exercise ``TransferInstruction_Reject``, same as above.
-  * The sender can exercise ``TransferInstruction_Withdraw``, again returning a ``TransferInstructionResult``.
-  * The registry can exercise ``TransferInstruction_Update``, again returning a ``TransferInstructionResult``.
-
-Allocations
-^^^^^^^^^^^
-
-The workflow will follow the following steps:
-
-* A registry creates as many ``AllocationRequests`` as required for a workflow to happen.
-* Parties can:
-
-  * The registry can exercise ``AllocationInstruction_Withdraw`` or ``AllocationInstruction_Update`` on it.
-  * The senders of each transfer leg can exercise ``AllocationFactory_Allocate`` to create an ``Allocation`` satisfying the conditions of the ``AllocationRequest``.
-  * The following choices can be called on the ``Allocation``:
-
-    * Sender, receiver and registry can jointly exercise ``Allocation_ExecuteTransfer``: to execute the allocated transfer.
-    * Sender, receiver and registry can exercise ``Allocation_Cancel``, which consumes it.
-    * The sender can exercise ``Allocation_Withdraw``, which consumes it.
-
