@@ -80,6 +80,11 @@ case class AutomationConfig(
       * Defaults to 2min = participant delay + polling interval + max domain time lag.
       */
     maxAllowedDomainTimeDelay: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(2),
+
+    /** The amount of time that we allow a future to be completed without a new one to be started
+      * before we consider the trigger to be in an unhealthy state.
+      */
+    futureCompletionGracePeriod: PositiveFiniteDuration = PositiveFiniteDuration.ofSeconds(1L),
 ) {
   def withPausedTrigger[T <: Trigger](implicit tag: ClassTag[T]): AutomationConfig = copy(
     pausedTriggers = pausedTriggers + tag.runtimeClass.getCanonicalName

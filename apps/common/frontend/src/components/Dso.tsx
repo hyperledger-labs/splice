@@ -12,7 +12,7 @@ import { UseQueryResult } from '@tanstack/react-query';
 import React from 'react';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';
-import { CometBftNodeDumpOrErrorResponse, NodeStatus } from 'sv-openapi';
+import { CometBftNodeDumpOrErrorResponse, NodeStatus } from '@lfdecentralizedtrust/sv-openapi';
 
 import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';

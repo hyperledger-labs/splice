@@ -6,14 +6,14 @@ import {
 } from '@lfdecentralizedtrust/splice-common-test-handlers';
 import dayjs from 'dayjs';
 import { rest, RestHandler } from 'msw';
-import { FeatureSupportResponse } from 'scan-openapi';
+import { FeatureSupportResponse, SuccessStatusResponse } from '@lfdecentralizedtrust/scan-openapi';
 import {
   ErrorResponse,
   ListDsoRulesVoteRequestsResponse,
   ListDsoRulesVoteResultsResponse,
   ListVoteRequestByTrackingCidResponse,
   LookupDsoRulesVoteRequestResponse,
-} from 'sv-openapi';
+} from '@lfdecentralizedtrust/sv-openapi';
 
 import {
   voteRequest,
@@ -131,17 +131,31 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   }),
   rest.get(`${svUrl}/v0/admin/domain/sequencer/status`, (_, res, ctx) => {
     return res(
-      ctx.status(404),
-      ctx.json<ErrorResponse>({
-        error: `No domain nodes in this test.`,
+      ctx.json<SuccessStatusResponse>({
+        success: {
+          id: 'global-domain::1990be58c99e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb999a',
+          uptime: 'PT26H38.219973S',
+          ports: {
+            public: 5008,
+            admin: 5009,
+          },
+          active: true,
+        },
       })
     );
   }),
   rest.get(`${svUrl}/v0/admin/domain/mediator/status`, (_, res, ctx) => {
     return res(
-      ctx.status(404),
-      ctx.json<ErrorResponse>({
-        error: `No domain nodes in this test.`,
+      ctx.json<SuccessStatusResponse>({
+        success: {
+          id: 'global-domain::1990be58c99e65de40bf273be1dc2b266d43a9a002ea5b18955aeef7aac881bb999a',
+          uptime: 'PT26H38.219973S',
+          ports: {
+            public: 5008,
+            admin: 5009,
+          },
+          active: true,
+        },
       })
     );
   }),

@@ -58,6 +58,11 @@ Global Synchronizer for the Canton Network
           - comparison to other chains
           - tokenomics
 
+.. toctree::
+   :maxdepth: 2
+   :caption: Scalability
+
+   scalability/scalability
 
 .. toctree::
    :maxdepth: 2

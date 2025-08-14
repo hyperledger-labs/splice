@@ -95,6 +95,7 @@ export const SvConfigSchema = z.object({
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
+          protected: z.boolean().optional(),
         })
         .optional(),
       scan: z
