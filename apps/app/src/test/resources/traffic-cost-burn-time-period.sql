@@ -1,6 +1,8 @@
 DECLARE
+  start_record_time,
   as_of_record_time timestamp;
 DECLARE
+  start_migration_id,
   migration_id,
   migration_id_arg int64;
 
@@ -50,6 +52,8 @@ CREATE TEMP FUNCTION daml_record_numeric(
       daml_record_path(path, 'numeric'))));
 
 CREATE TEMP FUNCTION in_time_window(
+    start_record_time timestamp,
+    start_migration_id int64,
     as_of_record_time timestamp,
     migration_id_arg int64,
     record_time int64,
@@ -58,7 +62,9 @@ CREATE TEMP FUNCTION in_time_window(
   (migration_id < migration_id_arg
     OR (migration_id = migration_id_arg
       AND record_time <= UNIX_MICROS(as_of_record_time)))
-  AND record_time != -62135596800000000
+  AND (migration_id > start_migration_id
+       OR (migration_id = start_migration_id
+           AND record_time >= UNIX_MICROS(start_record_time)))
 );
 
 -- fees from a Splice.AmuletRules:TransferResult
@@ -105,7 +111,9 @@ CREATE TEMP FUNCTION result_burn(choice string, result json)
     ELSE ERROR('Unknown choice for result_burn: ' || choice)
   END);
 
-SET as_of_record_time = iso_timestamp('2025-08-06T00:00:00Z');
+SET start_record_time = iso_timestamp('2025-05-14T00:00:00Z');
+SET start_migration_id = 2;
+SET as_of_record_time = iso_timestamp('2025-08-14T00:00:00Z');
 SET migration_id = 3;
 SET migration_id_arg = migration_id;
 
@@ -126,7 +134,8 @@ SELECT SUM(purchase_paid) purchase_burns, SUM(fees) non_purchase_burns
                     OR (e.choice = 'TransferPreapproval_Renew'
                         AND e.template_id_entity_name = 'TransferPreapproval'))
               AND e.template_id_module_name = 'Splice.AmuletRules'
-              AND in_time_window(as_of_record_time, migration_id_arg,
+              AND in_time_window(start_record_time, start_migration_id,
+                      as_of_record_time, migration_id_arg,
                       e.record_time, e.migration_id))
         UNION ALL (-- Purchasing ANS Entries
             SELECT
@@ -145,6 +154,7 @@ SELECT SUM(purchase_paid) purchase_burns, SUM(fees) non_purchase_burns
               AND e.template_id_module_name = 'Splice.Wallet.Subscriptions'
               AND c.template_id_module_name = 'Splice.Amulet'
               AND c.template_id_entity_name = 'Amulet'
-              AND in_time_window(as_of_record_time, migration_id_arg,
+              AND in_time_window(start_record_time, start_migration_id,
+                    as_of_record_time, migration_id_arg,
                     e.record_time, e.migration_id)
               AND c.record_time != -62135596800000000));
