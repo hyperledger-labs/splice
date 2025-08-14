@@ -5,10 +5,10 @@
 
 .. _token_standard_usage:
 
-Token Standard Usage
-====================
+Wallet Integration with Token Standard Assets
+=============================================
 
-See the `ledger's OpenAPI definition <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1>`_.
+See the `ledger's OpenAPI definition <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1>`_.
 This is also accessible at ``http(s)://${YOUR_PARTICIPANT}/docs/openapi``.
 We encourage developers to use OpenAPI code generation tools as opposed to manually writing HTTP requests.
 
@@ -24,10 +24,10 @@ Reading Contracts implementing a Token Standard interface for a party
 
 The Token Standard includes several interfaces that are implemented by Daml templates.
 To list all contracts implementing a particular interface,
-you have to query the participant's `active-contracts endpoint <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L620>`_.
+you have to query the participant's `active-contracts endpoint <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L620>`_.
 
 The ``activeAtOffset`` parameter can be set to the result of
-`the ledger-end endpoint on the participant <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L711>`_
+`the ledger-end endpoint on the participant <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L711>`_
 to get the latest ACS, or an older (non-pruned) one to get the ACS at that point in time.
 
 To filter for a particular party and interface, it should include a ``filtersByParty`` with an ``InterfaceFilter``:
@@ -78,7 +78,7 @@ Reading and parsing transaction history involving Token Standard contracts
 
 `Token Standard CLI's code to list transactions <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listHoldingTransactions.ts>`_
 
-The participant has an `endpoint to list all transactions <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L763>`_ involving the provided parties and interfaces.
+The participant has an `endpoint to list all transactions <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L763>`_ involving the provided parties and interfaces.
 
 To filter for a particular party and interface, it should include a ``filtersByParty`` with an ``InterfaceFilter``:
 
@@ -196,10 +196,10 @@ The response's payload will include three relevant fields:
 * ``disclosedContracts``: must be provided to the exercise of the factory's choice for it to work
 
 With this data, you can execute a choice on the factory. For external parties
-you must call the `prepare <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1553>`_
-and `execute <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1585>`_
+you must call the `prepare <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1553>`_
+and `execute <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1585>`_
 endpoints of the participant.
-For non-external parties, you can just use the `submit-and-wait endpoint <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L6>`_.
+For non-external parties, you can just use the `submit-and-wait endpoint <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L6>`_.
 
 In both cases, you must include an ``ExerciseCommand`` in your payload with the following fields:
 
@@ -218,10 +218,10 @@ Executing a non-factory choice
 `Token Standard CLI's code to accept a transfer instruction <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/acceptTransferInstruction.ts>`_
 
 To execute a choice on a contract implementing a Token Standard interface for external parties,
-you must call the `prepare <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1553>`_
-and `execute <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1585>`_
+you must call the `prepare <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1553>`_
+and `execute <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1585>`_
 endpoints of the participant.
-For non-external parties, you can just use the `submit-and-wait endpoint <https://github.com/hyperledger-labs/splice/blob/902f7069602b7bbce49293cabe7f162cfd8dbffb/canton/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L6>`_.
+For non-external parties, you can just use the `submit-and-wait endpoint <https://github.com/DACH-NY/canton/blob/6a886e75e2c5cf0fd9ba88d5e7fb8d2774542d45/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L6>`_.
 
 In both cases, you must include an ``ExerciseCommand`` in your payload with the following fields:
 
