@@ -146,3 +146,6 @@ FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
 Rejected transaction due to a participant determined timeout
 
 # Make sure to have a trailing newline
+
+# This can be dropped after 3.4
+Flyway upgrade recommended: PostgreSQL 17\.5 is newer than this version of Flyway and support has not been tested
