@@ -11,7 +11,7 @@ export function installFluentBit() {
   const values = {
     tolerations: infraAffinityAndTolerations.tolerations.concat(appsAffinityAndTolerations.tolerations),
     config: {inputs: [
-      // Input config is roughly copied from the default GCP config
+      // Input config is roughly copied from the default GCP config available from `kubectl get configmap -n kube-system fluentbit-gke-config-v1.4.0 -o yaml`
       "[Input]",
       "    Name              tail",
       "    Path              /var/log/containers/*.log",
