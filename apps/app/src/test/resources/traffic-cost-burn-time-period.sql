@@ -74,13 +74,21 @@ CREATE TEMP FUNCTION transferresult_fees(tr_json json)
                 -- .summary.outputFees
                 daml_record_path([1, 6], 'list'))) AS x));
 
-CREATE TEMP FUNCTION result_burn(choice string, result json)
+CREATE TEMP FUNCTION result_traffic_purchase(choice string, result json)
     RETURNS bignumeric AS (
   CASE choice
     WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer
       -- AmuletRules_BuyMemberTrafficResult
       PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([2], 'numeric'))) -- .amuletPaid
-      + PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([1, 5], 'numeric'))) -- .summary.holdingFees
+    ELSE 0
+  END);
+
+CREATE TEMP FUNCTION result_burn(choice string, result json)
+    RETURNS bignumeric AS (
+  CASE choice
+    WHEN 'AmuletRules_BuyMemberTraffic' THEN -- Coin Burnt for Purchasing Traffic on the Synchronizer
+      -- AmuletRules_BuyMemberTrafficResult, less .amuletPaid
+      PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([1, 5], 'numeric'))) -- .summary.holdingFees
       + PARSE_BIGNUMERIC(JSON_VALUE(result, daml_record_path([1, 7], 'numeric'))) -- .summary.senderChangeFee
     WHEN 'AmuletRules_Transfer' THEN -- Amulet Burnt in Amulet Transfers
       -- TransferResult
@@ -97,14 +105,14 @@ CREATE TEMP FUNCTION result_burn(choice string, result json)
     ELSE ERROR('Unknown choice for result_burn: ' || choice)
   END);
 
--- Amulet burned via fees.
-CREATE TEMP FUNCTION burned(
-    as_of_record_time timestamp,
-    migration_id_arg int64
-  ) RETURNS bignumeric AS ((
-  SELECT SUM(fees)
+SET as_of_record_time = iso_timestamp('2025-08-06T00:00:00Z');
+SET migration_id = 3;
+SET migration_id_arg = migration_id;
+
+SELECT SUM(purchase_paid) purchase_burns, SUM(fees) non_purchase_burns
   FROM ((
             SELECT
+                SUM(result_traffic_purchase(e.choice, e.result)) purchase_paid,
                 SUM(result_burn(e.choice,
                                 e.result)) fees
             FROM
@@ -122,6 +130,7 @@ CREATE TEMP FUNCTION burned(
                       e.record_time, e.migration_id))
         UNION ALL (-- Purchasing ANS Entries
             SELECT
+                0 purchase_paid,
                 SUM(PARSE_BIGNUMERIC(JSON_VALUE(c.create_arguments, daml_record_path([2, 0], 'numeric')))) fees -- .amount.initialAmount
             FROM
                 mainnet_da2_scan.scan_sv_1_update_history_exercises e,
@@ -138,10 +147,4 @@ CREATE TEMP FUNCTION burned(
               AND c.template_id_entity_name = 'Amulet'
               AND in_time_window(as_of_record_time, migration_id_arg,
                     e.record_time, e.migration_id)
-              AND c.record_time != -62135596800000000))));
-
-
--- using the functions
-SET as_of_record_time = iso_timestamp('2025-08-06T00:00:00Z');
-SET migration_id = 3;
-SELECT burned(as_of_record_time, migration_id);
+              AND c.record_time != -62135596800000000));
