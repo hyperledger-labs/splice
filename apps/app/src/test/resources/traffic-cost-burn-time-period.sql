@@ -62,6 +62,7 @@ CREATE TEMP FUNCTION in_time_window(
   (migration_id < migration_id_arg
     OR (migration_id = migration_id_arg
       AND record_time <= UNIX_MICROS(as_of_record_time)))
+  AND record_time != -62135596800000000
   AND (migration_id > start_migration_id
        OR (migration_id = start_migration_id
            AND record_time >= UNIX_MICROS(start_record_time)))
