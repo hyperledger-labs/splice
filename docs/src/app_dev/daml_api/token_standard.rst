@@ -17,10 +17,10 @@ Check out the :ref:`Authentication section <app-auth>` for more information on h
 
 .. _token_standard_usage_reading_contracts:
 
-Reading Contracts implementing a Token Standard interface for a party
+Reading contracts implementing a Token Standard interface for a party
 ---------------------------------------------------------------------
 
-`Token Standard CLI's code to list contracts by interface <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listContractsByInterface.ts>`_
+Reference code from the Token Standard CLI  to `list contracts by interface <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listContractsByInterface.ts>`_
 
 The Token Standard includes several interfaces that are implemented by Daml templates.
 To list all contracts implementing a particular interface,
@@ -128,8 +128,8 @@ The ``beginExclusive`` field is the offset from which to start reading transacti
 To paginate, you can start with the ``participantPrunedUpToInclusive`` from ``GET ${PARTICIPANT_URL}/v2/state/latest-pruned-offsets``
 and continue by passing the offset of the last transaction from the previous response.
 
-Parsing
-^^^^^^^
+Parsing the history
+^^^^^^^^^^^^^^^^^^^
 
 You can find an example parser `here <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/txparse/parser.ts>`_.
 This handles transactions involving the ``Holding`` and ``TransferInstruction`` interfaces.
@@ -182,9 +182,10 @@ Executing a factory choice
 
 To execute a choice via a Token Standard factory, first you need need to fetch the factory from the corresponding registry.
 
-.. warning::
+.. note::
 
-    Getting the corresponding registry needs to be maintained currently by apps, until a generic solution is implemented.
+    The mapping from an instrument's `admin` party-id to the corresponding registry URL needs to be maintained currently by wallets themselves,
+    until a generic solution (likely based on CNS) is implemented.
 
 The registry will return the relevant factory in the corresponding endpoint:
 
@@ -278,14 +279,14 @@ Allocations
 
 The workflow will follow the following steps:
 
-* A registry creates as many ``AllocationInstructions`` as required for a workflow to happen.
+* A registry creates as many ``AllocationRequests`` as required for a workflow to happen.
 * Parties can:
 
   * The registry can exercise ``AllocationInstruction_Withdraw`` or ``AllocationInstruction_Update`` on it.
-  * The senders of each transfer leg can exercise ``AllocationFactory_Allocate`` to create an ``Allocation`` satisfying the conditions of the ``AllocationInstruction``.
+  * The senders of each transfer leg can exercise ``AllocationFactory_Allocate`` to create an ``Allocation`` satisfying the conditions of the ``AllocationRequest``.
   * The following choices can be called on the ``Allocation``:
 
-    * Sender, receiver and registry can exercise ``Allocation_ExecuteTransfer``: to accept the allocation.
+    * Sender, receiver and registry can jointly exercise ``Allocation_ExecuteTransfer``: to execute the allocated transfer.
     * Sender, receiver and registry can exercise ``Allocation_Cancel``, which consumes it.
     * The sender can exercise ``Allocation_Withdraw``, which consumes it.
 
