@@ -8,8 +8,8 @@
 Release Notes
 =============
 
-Upcoming
---------
+0.4.11
+------
 
 - SV and Validator apps
 
