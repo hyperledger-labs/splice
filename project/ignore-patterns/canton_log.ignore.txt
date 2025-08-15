@@ -152,3 +152,4 @@ Sequencing result message timed out.*mediator=
 
 # This can be dropped after 3.4
 Flyway upgrade recommended: PostgreSQL 17\.5 is newer than this version of Flyway and support has not been tested
+Expected Postgres version 13, 14, 15, or 16 but got higher version 17\.5
