@@ -438,6 +438,7 @@ abstract class TopologyAdminConnection(
       member: Member,
       keys: NonEmpty[Seq[PublicKey]],
       retryFor: RetryFor,
+      serial: Option[PositiveInt] = None,
   )(implicit traceContext: TraceContext): Future[Unit] =
     // We make two transactions - one to add new keys one to remove old keys - to ensure overlap and a smooth transition.
     // S.a. Canton's `rotate_key`
@@ -465,7 +466,7 @@ abstract class TopologyAdminConnection(
               proposeOwnerToKeyMapping(
                 member,
                 (keys ++ mapping.mapping.keys).distinct,
-                mapping.base.serial + PositiveInt.one,
+                serial.getOrElse(mapping.base.serial + PositiveInt.one),
               )
           }).map(_ => ()),
         logger,
@@ -487,7 +488,11 @@ abstract class TopologyAdminConnection(
             throw new IllegalStateException("Unexpected number of owner to key mappings found")
         },
         (mapping: TopologyResult[OwnerToKeyMapping]) =>
-          proposeOwnerToKeyMapping(member, keys, mapping.base.serial + PositiveInt.one)
+          proposeOwnerToKeyMapping(
+            member,
+            keys,
+            serial.getOrElse(mapping.base.serial + PositiveInt.one),
+          )
             .map(_ => ()),
         logger,
       )
@@ -512,7 +517,7 @@ abstract class TopologyAdminConnection(
       forceChanges = ForceFlags.none,
     )
 
-  def listOwnerToKeyMapping(member: Member)(implicit
+  def listOwnerToKeyMapping(member: Member, timeQuery: TimeQuery = TimeQuery.HeadState)(implicit
       traceContext: TraceContext
   ): Future[Seq[TopologyResult[OwnerToKeyMapping]]] =
     runCmd(
@@ -520,7 +525,7 @@ abstract class TopologyAdminConnection(
         BaseQuery(
           store = AuthorizedStore,
           proposals = false,
-          timeQuery = TimeQuery.HeadState,
+          timeQuery = timeQuery,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,

@@ -3,11 +3,12 @@
 
 package org.lfdecentralizedtrust.splice.setup
 
-import cats.implicits.{showInterpolator}
+import cats.implicits.showInterpolator
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
 import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
@@ -124,8 +125,12 @@ class NodeInitializer(
             logger.info(
               s"Node has identity $id, matching expected identifier $idenfitierName."
             )
-            // fixes previously initialized nodes with messed up keys
-            rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
+            for {
+              // rotate existing keys that are not signed by owner
+              _ <- rotateOwnerToKeyMappingNotSignedByKeys(id, nodeIdentity)
+              // fixes previously initialized nodes with messed up keys
+              _ <- rotateSigningKeyIfSameAsNamespaceKey(id, nodeIdentity)
+            } yield ()
           } else {
             logger.error(
               s"Node has identity $id, but identifier $idenfitierName was expected."
@@ -313,4 +318,68 @@ class NodeInitializer(
       _ <- connection.importTopologySnapshot(authorizedStoreSnapshot, AuthorizedStore)
       _ = logger.info(s"AuthorizedStore snapshot is imported")
     } yield ()
+
+  // ensures that all OTK mappings are signed by the latest keys and all keys they list
+  private def rotateOwnerToKeyMappingNotSignedByKeys(
+      id: UniqueIdentifier,
+      nodeIdentity: UniqueIdentifier => Member & NodeIdentity,
+  )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] =
+    for {
+      ownerToKeyMappingHistory <- connection.listOwnerToKeyMapping(
+        nodeIdentity(id),
+        TimeQuery.Range(None, None),
+      )
+      latestKeys = ownerToKeyMappingHistory
+        .sortBy(_.base.serial)
+        .lastOption
+        .getOrElse(throw new IllegalStateException("ownerToKeyMappingHistory is empty."))
+        .mapping
+        .keys
+        .filter {
+          case _: SigningPublicKey => true
+          case _ => false
+        }
+      _ = ownerToKeyMappingHistory.map { otk =>
+        val toRotate = otk.base.signedBy.diff(latestKeys.map(_.id))
+        val toKeep = otk.base.signedBy.diff(toRotate)
+        // rotate keys that have not signed the OTK transaction
+        val keysToRotate =
+          otk.mapping.keys.filter {
+            case k: SigningPublicKey => toRotate.contains(k.id)
+            case _ => false
+          }
+        // keep keys that have signed the OTK transaction
+        val keysToKeep =
+          otk.mapping.keys.filter {
+            case k: SigningPublicKey => toKeep.contains(k.id)
+            case _ => true
+          }
+        logger.info(s"keysToKeep: ${keysToKeep}")
+        if (keysToRotate.nonEmpty) {
+          logger.info(s"keyToRotate: ${keysToRotate}")
+          val newKeys = keysToRotate.flatMap {
+            case key: SigningPublicKey =>
+              Some(connection.generateKeyPair(key.keySpec.name, key.usage))
+            case _ => None
+          }
+          for {
+            rotatedKeys <- Future.sequence(newKeys)
+            allKeys = (keysToKeep ++ rotatedKeys).distinct
+            _ <- connection.ensureOwnerToKeyMapping(
+              member = nodeIdentity(id),
+              keys = NonEmpty.mk(
+                Seq,
+                allKeys.headOption.getOrElse(throw new IllegalStateException("allKeys are empty.")),
+                allKeys.drop(1)*
+              ),
+              retryFor = RetryFor.Automation,
+              serial = Some(otk.base.serial),
+            )
+          } yield logger.info(
+            s"Rotating OTK mapping keys that did not sign the OTK topology transaction for member=${otk.mapping.member} and serial=${otk.base.serial}."
+          )
+        }
+      }
+    } yield ()
+
 }
