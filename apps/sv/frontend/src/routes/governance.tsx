@@ -13,27 +13,17 @@ import dayjs from 'dayjs';
 import { ContractId } from '@daml/types';
 import {
   ActionRequiringConfirmation,
-  Vote,
   VoteRequest,
-  VoteRequestOutcome,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { useSvConfig } from '../utils';
+import { ProposalListingSection } from '../components/governance/ProposalListingSection';
 import {
-  VoteListingData,
-  VoteListingStatus,
-  VotesListingSection,
-} from '../components/governance/VotesListingSection';
-
-export type YourVoteStatus = 'accepted' | 'rejected' | 'no-vote';
-
-type SupportedActionTag =
-  | 'CRARC_AddFutureAmuletConfigSchedule'
-  | 'CRARC_SetConfig'
-  | 'SRARC_GrantFeaturedAppRight'
-  | 'SRARC_OffboardSv'
-  | 'SRARC_RevokeFeaturedAppRight'
-  | 'SRARC_SetConfig'
-  | 'SRARC_UpdateSvRewardWeight';
+  actionTagToTitle,
+  computeVoteStats,
+  computeYourVote,
+  getVoteResultStatus,
+} from '../utils/governance';
+import { SupportedActionTag, ProposalListingData } from '../utils/types';
 
 function getAction(action: ActionRequiringConfirmation): string {
   switch (action.tag) {
@@ -46,60 +36,11 @@ function getAction(action: ActionRequiringConfirmation): string {
   }
 }
 
-function computeVoteStats(votes: Vote[]): { accepted: number; rejected: number } {
-  return votes.reduce(
-    (acc, vote) => ({
-      accepted: acc.accepted + (vote.accept ? 1 : 0),
-      rejected: acc.rejected + (vote.accept ? 0 : 1),
-    }),
-    { accepted: 0, rejected: 0 }
-  );
-}
-
-function computeYourVote(votes: Vote[], svPartyId: string | undefined): YourVoteStatus {
-  if (svPartyId === undefined) {
-    return 'no-vote';
-  }
-
-  const vote = votes.find(vote => vote.sv === svPartyId);
-  return vote ? (vote.accept ? 'accepted' : 'rejected') : 'no-vote';
-}
-
 const QUERY_LIMIT = 50;
 
 export const Governance: React.FC = () => {
   const svConfig = useSvConfig();
-
   const amuletName = svConfig.spliceInstanceNames.amuletName;
-  const actionTagToTitle = useMemo(
-    (): Record<SupportedActionTag, string> => ({
-      CRARC_AddFutureAmuletConfigSchedule: `Add Future ${amuletName} Configuration Schedule`,
-      CRARC_SetConfig: `Set ${amuletName} Rules Configuration`,
-      SRARC_GrantFeaturedAppRight: 'Feature Application',
-      SRARC_OffboardSv: 'Offboard Member',
-      SRARC_RevokeFeaturedAppRight: 'Unfeature Application',
-      SRARC_SetConfig: 'Set Dso Rules Configuration',
-      SRARC_UpdateSvRewardWeight: 'Update SV Reward Weight',
-    }),
-    [amuletName]
-  );
-
-  const getVoteResultStatus = (outcome: VoteRequestOutcome): VoteListingStatus => {
-    switch (outcome.tag) {
-      case 'VRO_Accepted': {
-        const effectiveAt = dayjs(outcome.value.effectiveAt);
-        const now = dayjs();
-        if (dayjs(effectiveAt).isBefore(now)) return 'Implemented';
-        else return 'Accepted';
-      }
-      case 'VRO_Expired':
-        return 'Expired';
-      case 'VRO_Rejected':
-        return 'Rejected';
-      default:
-        return 'Unknown';
-    }
-  };
 
   const [tabValue, setTabValue] = useState('voting');
 
@@ -157,7 +98,9 @@ export const Governance: React.FC = () => {
     .filter(v => !alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId))
     .map(vr => {
       return {
-        actionName: actionTagToTitle[getAction(vr.payload.action) as SupportedActionTag],
+        contractId: vr.payload.trackingCid || vr.contractId,
+        actionName:
+          actionTagToTitle(amuletName)[getAction(vr.payload.action) as SupportedActionTag],
         votingCloses: dayjs(vr.payload.voteBefore).format(dateTimeFormatISO),
         createdAt: dayjs(vr.createdAt).format(dateTimeFormatISO),
         requester: vr.payload.requester,
@@ -175,14 +118,15 @@ export const Governance: React.FC = () => {
       const votes = v.payload.votes.entriesArray().map(e => e[1]);
 
       return {
-        actionName: actionTagToTitle[getAction(v.payload.action) as SupportedActionTag],
+        contractId: v.payload.trackingCid || v.contractId,
+        actionName: actionTagToTitle(amuletName)[getAction(v.payload.action) as SupportedActionTag],
         votingCloses: dayjs(v.payload.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect: effectiveAt,
         yourVote: computeYourVote(votes, svPartyId),
         status: 'In Progress',
         voteStats: computeVoteStats(votes),
         acceptanceThreshold: votingThreshold,
-      } as VoteListingData;
+      } as ProposalListingData;
     });
 
   const acceptedRequests = acceptedResultsQuery.data.filter(
@@ -200,7 +144,9 @@ export const Governance: React.FC = () => {
       const votes = vr.request.votes.entriesArray().map(e => e[1]);
 
       return {
-        actionName: actionTagToTitle[getAction(vr.request.action) as SupportedActionTag],
+        contractId: vr.request.trackingCid,
+        actionName:
+          actionTagToTitle(amuletName)[getAction(vr.request.action) as SupportedActionTag],
         votingCloses: dayjs(vr.request.voteBefore).format(dateTimeFormatISO),
         voteTakesEffect:
           (vr.outcome.tag === 'VRO_Accepted' &&
@@ -210,7 +156,7 @@ export const Governance: React.FC = () => {
         status: getVoteResultStatus(vr.outcome),
         voteStats: computeVoteStats(votes),
         acceptanceThreshold: votingThreshold,
-      } as VoteListingData;
+      } as ProposalListingData;
     })
     .sort((a, b) => (dayjs(a.voteTakesEffect).isAfter(dayjs(b.voteTakesEffect)) ? -1 : 1));
 
@@ -228,14 +174,14 @@ export const Governance: React.FC = () => {
       </Box>
 
       <ActionRequiredSection actionRequiredRequests={actionRequiredRequests} />
-      <VotesListingSection
+      <ProposalListingSection
         sectionTitle="Inflight Votes"
         data={inflightRequests}
         uniqueId="inflight-vote-requests"
         showVoteStats
         showAcceptanceThreshold
       />
-      <VotesListingSection
+      <ProposalListingSection
         sectionTitle="Vote History"
         data={voteHistory}
         uniqueId="vote-history"

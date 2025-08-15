@@ -9,7 +9,6 @@ import cats.implicits.{
   catsSyntaxTuple4Semigroupal,
 }
 import cats.syntax.functorFilter.*
-import cats.syntax.traverse.*
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
@@ -83,6 +82,7 @@ import com.digitalasset.canton.topology.transaction.{
 }
 import com.digitalasset.canton.topology.transaction.TopologyMapping.Code
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
@@ -175,7 +175,9 @@ class SV1Initializer(
             minObservationDuration = config.timeTrackerMinObservationDuration
           ),
         ),
-        RetryFor.WaitingOnInitDependency,
+        overwriteExistingConnection =
+          false, // The validator will manage sequencer connections after initial setup
+        retryFor = RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
       (dsoParty, svParty, _) <- (
@@ -442,15 +444,19 @@ class SV1Initializer(
                 sequencerState,
                 mediatorState,
               ) <- (
-                List(
-                  participantAdminConnection,
-                  synchronizerNode.mediatorAdminConnection,
-                  synchronizerNode.sequencerAdminConnection,
-                ).traverse { con =>
-                  con
-                    .getId()
-                    .flatMap(con.getIdentityTransactions(_, TopologyStoreId.Authorized))
-                }.map(_.flatten),
+                MonadUtil
+                  .sequentialTraverse(
+                    List(
+                      participantAdminConnection,
+                      synchronizerNode.mediatorAdminConnection,
+                      synchronizerNode.sequencerAdminConnection,
+                    )
+                  ) { con =>
+                    con
+                      .getId()
+                      .flatMap(con.getIdentityTransactions(_, TopologyStoreId.Authorized))
+                  }
+                  .map(_.flatten),
                 participantAdminConnection.proposeInitialDomainParameters(
                   synchronizerId,
                   values,

@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.store
 
-import org.lfdecentralizedtrust.splice.store.db.AcsRowData
+import org.lfdecentralizedtrust.splice.store.db.{AcsInterfaceViewRowData, AcsRowData}
 import com.digitalasset.canton.logging.NamedLogging
 
 import scala.concurrent.ExecutionContext
@@ -15,7 +15,8 @@ trait AppStore extends NamedLogging with AutoCloseable with StoreErrors {
   implicit protected def ec: ExecutionContext
 
   /** Defines which create events are to be ingested into the store. */
-  protected def acsContractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData]
+  protected def acsContractFilter
+      : MultiDomainAcsStore.ContractFilter[_ <: AcsRowData, _ <: AcsInterfaceViewRowData]
 
   def domains: SynchronizerStore
 

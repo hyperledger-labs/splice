@@ -62,7 +62,9 @@ import java.util.UUID
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
 
-//TODO(#1304) - re-enable
+// Not checking Daml compatibility as the test data can be specific to the most recent
+// version of the Daml code, and thus the test would falsely fail when running with older
+// Daml code versions.
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class TokenStandardCliTestDataTimeBasedIntegrationTest
     extends IntegrationTestWithSharedEnvironment

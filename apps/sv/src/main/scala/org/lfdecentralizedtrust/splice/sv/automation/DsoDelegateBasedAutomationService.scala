@@ -50,7 +50,15 @@ class DsoDelegateBasedAutomationService(
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
     registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
     if (config.automation.enableDsoGovernance) {
-      registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
+      registerTrigger(
+        new ExecuteConfirmedActionTrigger(
+          // `ExecuteConfirmedActionTrigger` attempts multiple times the same action when these rely on a threshold of
+          // confirmations. As it does not need a high throughput (mostly runs every 10 minutes), we lower the parallelism
+          // to 1 to avoid such contention.
+          triggerContext.copy(config = triggerContext.config.copy(parallelism = 1)),
+          svTaskContext,
+        )
+      )
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
@@ -93,6 +101,25 @@ class DsoDelegateBasedAutomationService(
         svTaskContext,
       )
     )
+
+    registerTrigger(
+      new AllocateUnallocatedUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+    registerTrigger(
+      new ExpiredUnallocatedUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
+    registerTrigger(
+      new ExpiredUnclaimedActivityRecordTrigger(
+        triggerContext,
+        svTaskContext,
+      )
+    )
   }
 
 }
@@ -125,5 +152,8 @@ object DsoDelegateBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[PruneAmuletConfigScheduleTrigger],
     aTrigger[MergeValidatorLicenseContractsTrigger],
     aTrigger[FeaturedAppActivityMarkerTrigger],
+    aTrigger[AllocateUnallocatedUnclaimedActivityRecordTrigger],
+    aTrigger[ExpiredUnallocatedUnclaimedActivityRecordTrigger],
+    aTrigger[ExpiredUnclaimedActivityRecordTrigger],
   )
 }

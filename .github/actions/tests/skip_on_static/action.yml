@@ -1,7 +1,10 @@
 name: Check for static tests only
 description: |
   This action checks if the current PR is only for static tests (via a commit flag ot a PR label).
-
+inputs:
+  gh_token:
+    type: string
+    required: true
 outputs:
   skip:
     description: "Set to true if the job should be skipped"
@@ -14,11 +17,19 @@ runs:
       id: check
       shell: bash
       run: |
+        set -eou pipefail
         last_commit_msg=$(git log -1 --pretty=%B)
-        pr_labels='${{ toJSON(github.event.pull_request.labels) }}'
-        static_label=$(echo "$pr_labels" | jq -r '.[] | select(.name == "static") | .name' | grep -c 'static' || true)
-        echo "Last commit message: $last_commit_msg"
+          echo "Last commit message: $last_commit_msg"
         if [[ "${{ github.event_name }}" == "pull_request"* ]]; then
+          # We query through the API here instead of relying on github.event.pull_request.labels
+          # as the latter is fixed when the job starts which for `env_hold` jobs
+          # is _before_ the approval already e.g. when an external contributor
+          # created the PR and not when the maintainer approved it after adding the static label.
+          pr_labels=$(curl -sSL --fail-with-body -H "Authorization: Bearer ${{ inputs.gh_token }}" \
+                             -H "Accept: application/vnd.github.v3+json" \
+                             "${{ github.event.pull_request.url }}" | jq '.labels')
+          echo "Pull request labels: $pr_labels"
+          static_label=$(echo "$pr_labels" | jq -r '.[] | select(.name == "static") | .name' | grep -c 'static' || true)
           if [[ "$last_commit_msg" == *"[static]"* ]] || [[ "$static_label" -gt 0 ]]; then
             echo "Only static tests should be running"
             echo "Last commit message is: $last_commit_msg"

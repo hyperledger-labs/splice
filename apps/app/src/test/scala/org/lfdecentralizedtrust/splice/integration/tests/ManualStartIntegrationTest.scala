@@ -1,7 +1,6 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.PruningSchedule
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{FullClientConfig, PositiveDurationSeconds}
@@ -183,28 +182,9 @@ class ManualStartIntegrationTest
                 .value
             sequencerConnections.connections.size shouldBe 1
             sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION
+            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DefaultMediatorSequencerRequestAmplification
             // otherwise we get log warnings
             mediatorConnection.close()
-          }
-        }
-
-        clue("SV1 and SV2 have configured amplification on the participant sequencer connection") {
-          Seq(
-            participantAdminConnection("sv1", sv1Backend.config),
-            participantAdminConnection("sv2", sv2Backend.config),
-          ).map { participantConnection =>
-            val sequencerConnections =
-              participantConnection
-                .lookupSynchronizerConnectionConfig(SynchronizerAlias.tryCreate("global"))
-                .futureValue
-                .value
-                .sequencerConnections
-            sequencerConnections.connections.size shouldBe 1
-            sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(1)
-            sequencerConnections.submissionRequestAmplification shouldBe SvAppBackendConfig.DEFAULT_SEQUENCER_REQUEST_AMPLIFICATION
-            // otherwise we get log warnings
-            participantConnection.close()
           }
         }
 

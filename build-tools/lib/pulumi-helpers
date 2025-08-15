@@ -51,6 +51,14 @@ function _resolve_pulumi_stack() {
 }
 
 function _cluster_reset() {
+    _info "Removing Pulumi finalizers that block reset"
+
+    # See https://github.com/DACH-NY/cn-test-failures/issues/4655 for why this is necessary.
+    # Yhe issue seems to be that the workspace pods get deleted before the stacks are deleted,
+    # and the workspace pods should handle the finalizers. This is controlled by Pulumi,
+    # so until we have an upstream fix we need this workaround.
+    _remove_pulumi_finalizers
+
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
     _pulumi_automation_run_down
@@ -121,6 +129,28 @@ function _pulumi_automation_run_up() {
     else
         _killable_pulumi_automation_run --prefix "${SPLICE_ROOT}/cluster/pulumi" run up
     fi
+}
+
+function _remove_pulumi_finalizers() {
+    for resource in stack update; do
+      if ! kubectl get "$resource" --all-namespaces 2>/dev/null; then
+        _info "Resource type $resource not found or no resources, skipping"
+      else
+        kubectl get "$resource" --all-namespaces -o json | jq -r '.items[] | "\(.metadata.namespace) \(.metadata.name)"' | while read -r namespace name; do
+          finalizers=$(kubectl get "$resource" -n "$namespace" "$name" -o json | jq -r '.metadata.finalizers')
+          if [[ "$finalizers" == "null" ]]; then
+            _info "$resource $name in namespace $namespace has no finalizers, skipping"
+          else
+            _info "$resource $name in namespace $namespace has finalizers $finalizers"
+            new_finalizers=$(jq 'del(.[] | select(. == "finalizer.stack.pulumi.com"))' <<< "$finalizers")
+            patch_payload="{\"metadata\":{\"finalizers\": $new_finalizers}}"
+            _info "Patch payload for $resource $name in namespace $namespace: $patch_payload"
+            kubectl patch -n "$namespace" "$resource" "$name" -p "$patch_payload" --type=merge
+            _info "Patched $resource $name in namespace $namespace to remove finalizers"
+          fi
+        done
+      fi
+    done
 }
 
 function _pulumi_automation_run_down() {

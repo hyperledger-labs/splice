@@ -70,7 +70,10 @@ class MergeSvRewardStateContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       arg = new DsoRules_MergeSvRewardState(
         svName,
         svRewardStates.map(_.contractId).asJava,
@@ -80,6 +83,7 @@ class MergeSvRewardStateContractsTrigger(
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(s"Merged ${svRewardStates.length} member traffic contracts for $svName")
   }

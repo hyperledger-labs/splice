@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
@@ -14,12 +14,10 @@ set -euo pipefail
 
 ignored_files=(
   'daml/splice-util/daml/Splice/Util.daml'
-  'token-standard/splice-token-standard-test/daml/Splice/Testing/Apps/TradingApp.daml'
+  'token-standard/examples/splice-token-test-trading-app/daml/Splice/Testing/Apps/TradingApp.daml'
   'canton/')
 
-# TODO(DACH-NY/canton-network-internal#490): also check for naked `Xyz_Fetch` choices
-
-command=('git' 'grep' '-n' -E '(fetch|archive)\b' '--' '*.daml')
+command=('git' 'grep' '-n' -E '(exercise.*_Fetch|fetch|archive)\b' '--' '*.daml')
 echo "${command[@]}"
 for ignored_file in "${ignored_files[@]}"; do
   command+=(":!$ignored_file")

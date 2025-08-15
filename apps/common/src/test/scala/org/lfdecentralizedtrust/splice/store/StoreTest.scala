@@ -263,6 +263,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       createdAtRound: Long,
       ratePerRound: BigDecimal,
       version: DarResource = DarResources.amulet_current,
+      dso: PartyId = dsoParty,
   ) = {
     val templateId = new Identifier(
       version.packageId,
@@ -270,7 +271,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       amuletCodegen.Amulet.TEMPLATE_ID.getEntityName,
     )
     val template = new amuletCodegen.Amulet(
-      dsoParty.toProtoPrimitive,
+      dso.toProtoPrimitive,
       owner.toProtoPrimitive,
       new feesCodegen.ExpiringAmount(
         numeric(amount),
@@ -600,6 +601,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       signatories: Seq[PartyId] = Seq.empty,
       packageName: String = dummyPackageName,
       observers: Seq[PartyId] = Seq.empty,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+      failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
   ): CreatedEvent = {
     new CreatedEvent(
       Seq.empty[String].asJava,
@@ -610,8 +613,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       contract.contractId.contractId,
       contract.payload.toValue,
       contract.createdEventBlob,
-      new java.util.HashMap(),
-      new java.util.HashMap(),
+      implementedInterfaces.asJava,
+      failedInterfaces.asJava,
       None.toJava,
       signatories.map(_.toProtoPrimitive).asJava,
       observers.map(_.toProtoPrimitive).asJava,
@@ -620,7 +623,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   }
 
   protected def toArchivedEvent[TCid <: ContractId[T], T](
-      contract: Contract[TCid, T]
+      contract: Contract[TCid, T],
+      implementedInterfaces: Seq[Identifier] = Seq.empty,
   ): ExercisedEvent = {
     new ExercisedEvent(
       Seq.empty.asJava,
@@ -636,7 +640,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       true,
       1,
       damlUnit.getInstance(),
-      Seq.empty.asJava,
+      implementedInterfaces.asJava,
     )
   }
 
@@ -714,7 +718,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exercised.isConsuming,
         nodeId,
         exercised.getExerciseResult,
-        Seq.empty.asJava,
+        exercised.getImplementedInterfaces,
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
@@ -758,6 +762,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source: SynchronizerId,
       target: SynchronizerId,
       counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord],
   ): IncompleteReassignmentEvent.Unassign = IncompleteReassignmentEvent.Unassign(
     toUnassignEvent(
       contract.contractId,
@@ -766,7 +771,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       target,
       counter,
     ),
-    toCreatedEvent(contract, Seq(dsoParty)),
+    toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
   )
 
   protected def toIncompleteAssign(
@@ -775,6 +780,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source: SynchronizerId,
       target: SynchronizerId,
       counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord],
   ): IncompleteReassignmentEvent.Assign = IncompleteReassignmentEvent.Assign(
     toAssignEvent(
       contract,
@@ -782,6 +788,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source,
       target,
       counter,
+      implementedInterfaces,
     )
   )
 
@@ -807,12 +814,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       source: SynchronizerId,
       target: SynchronizerId,
       counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord],
   ): ReassignmentEvent.Assign = ReassignmentEvent.Assign(
     unassignId = unassignId,
     submitter = userParty(1),
     source = source,
     target = target,
-    createdEvent = toCreatedEvent(contract, Seq(dsoParty)),
+    createdEvent =
+      toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
     counter = counter,
   )
 
@@ -838,11 +847,44 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       recordTime: Instant = defaultEffectiveAt,
       packageName: String = dummyPackageName,
       createdEventObservers: Seq[PartyId] = Seq.empty,
-  ) = mkTx(
+  ): Transaction = mkCreateTxWithInterfaces(
     offset,
-    createRequests.map[Event](
-      toCreatedEvent(_, createdEventSignatories, packageName, createdEventObservers)
+    createRequests.map(cr =>
+      (cr, Map.empty[Identifier, DamlRecord], Map.empty[Identifier, com.google.rpc.Status])
     ),
+    effectiveAt,
+    createdEventSignatories,
+    synchronizerId,
+    workflowId,
+    recordTime,
+    packageName,
+    createdEventObservers,
+  )
+
+  protected def mkCreateTxWithInterfaces(
+      offset: Long,
+      createRequests: Seq[
+        (Contract[?, ?], Map[Identifier, DamlRecord], Map[Identifier, com.google.rpc.Status])
+      ],
+      effectiveAt: Instant,
+      createdEventSignatories: Seq[PartyId],
+      synchronizerId: SynchronizerId,
+      workflowId: String,
+      recordTime: Instant = defaultEffectiveAt,
+      packageName: String = dummyPackageName,
+      createdEventObservers: Seq[PartyId] = Seq.empty,
+  ): Transaction = mkTx(
+    offset,
+    createRequests.map[Event] { case (contract, implementedInterfaces, failedInterfaces) =>
+      toCreatedEvent(
+        contract,
+        createdEventSignatories,
+        packageName,
+        createdEventObservers,
+        implementedInterfaces,
+        failedInterfaces,
+      )
+    },
     synchronizerId,
     effectiveAt,
     workflowId,
@@ -850,52 +892,71 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   )
 
   protected def acs(
-      acs: Seq[(Contract[?, ?], SynchronizerId, Long)] = Seq.empty,
-      incompleteOut: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] =
-        Seq.empty,
-      incompleteIn: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] = Seq.empty,
+      acs: Seq[StoreTest.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.ingestAcs(
       acsOffset,
-      acs.map { case (contract, domain, counter) =>
+      acs.map { case StoreTest.AcsImportEntry(contract, domain, counter, implementedInterfaces) =>
         ActiveContract(
           domain,
-          toCreatedEvent(contract, Seq(dsoParty)),
+          toCreatedEvent(contract, Seq(dsoParty), implementedInterfaces = implementedInterfaces),
           counter,
         )
       },
-      incompleteOut.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
-        toIncompleteUnassign(
-          c,
-          tfid,
-          sourceDomain,
-          targetDomain,
-          counter,
-        )
+      incompleteOut.map {
+        case StoreTest.AcsImportIncompleteEntry(
+              c,
+              sourceDomain,
+              targetDomain,
+              tfid,
+              counter,
+              implementedInterfaces,
+            ) =>
+          toIncompleteUnassign(
+            c,
+            tfid,
+            sourceDomain,
+            targetDomain,
+            counter,
+            implementedInterfaces,
+          )
       },
-      incompleteIn.map { case (c, sourceDomain, targetDomain, tfid, counter) =>
-        toIncompleteAssign(
-          c,
-          tfid,
-          sourceDomain,
-          targetDomain,
-          counter,
-        )
+      incompleteIn.map {
+        case StoreTest.AcsImportIncompleteEntry(
+              c,
+              sourceDomain,
+              targetDomain,
+              tfid,
+              counter,
+              implementedInterfaces,
+            ) =>
+          toIncompleteAssign(
+            c,
+            tfid,
+            sourceDomain,
+            targetDomain,
+            counter,
+            implementedInterfaces,
+          )
       },
     )
   } yield ()
 
   protected def initWithAcs(
-      activeContracts: Seq[(Contract[?, ?], SynchronizerId, Long)] = Seq.empty,
-      incompleteOut: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] =
-        Seq.empty,
-      incompleteIn: Seq[(Contract[?, ?], SynchronizerId, SynchronizerId, String, Long)] = Seq.empty,
+      activeContracts: Seq[StoreTest.AcsImportEntry] = Seq.empty,
+      incompleteOut: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
+      incompleteIn: Seq[StoreTest.AcsImportIncompleteEntry] = Seq.empty,
       acsOffset: Long = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.testIngestionSink.initialize()
     _ <- acs(activeContracts, incompleteOut, incompleteIn, acsOffset)
   } yield ()
+
+  protected val RepeatedIngestionWarningMessage =
+    "This is expected if the SQL query was automatically retried after a transient database error"
 
   /** Runs the given Future, suppressing warnings generated by repeated database actions.
     *
@@ -911,9 +972,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     */
   def withoutRepeatedIngestionWarning[A](f: => Future[A], maxCount: Int = 1): Future[A] = {
     def isRepeatedIngestionWarning(entry: LogEntry): Boolean =
-      entry.message.contains(
-        "This is expected if the SQL query was automatically retried after a transient database error"
-      )
+      entry.message.contains(RepeatedIngestionWarningMessage)
 
     loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
       f,
@@ -970,10 +1029,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         recordTime: Instant = defaultEffectiveAt,
         packageName: String = dummyPackageName,
         createdEventObservers: Seq[PartyId] = Seq.empty,
+        implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+        failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
     )(implicit store: HasIngestionSink): Future[Transaction] = {
-      val tx = mkCreateTx(
+      val tx = mkCreateTxWithInterfaces(
         offset,
-        Seq(c),
+        Seq((c, implementedInterfaces, failedInterfaces)),
         txEffectiveAt,
         createdEventSignatories,
         domain,
@@ -1023,8 +1084,10 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def archive[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
+        implementedInterfaces: Seq[Identifier] = Seq.empty,
     )(implicit store: HasIngestionSink): Future[Transaction] = {
-      val tx = mkTx(nextOffset(), Seq(toArchivedEvent(c)), domain, txEffectiveAt)
+      val tx =
+        mkTx(nextOffset(), Seq(toArchivedEvent(c, implementedInterfaces)), domain, txEffectiveAt)
       store.testIngestionSink
         .ingestUpdate(
           domain,
@@ -1098,6 +1161,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         counter: Long,
         recordTime: CantonTimestamp = CantonTimestamp.Epoch,
         offset: Long = nextOffset(),
+        implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
     )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
         offset,
@@ -1107,6 +1171,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           contractAndDomain._2,
           domain,
           counter,
+          implementedInterfaces,
         ),
         recordTime,
       )
@@ -1373,4 +1438,20 @@ object StoreTest {
     override def encodeEntry = StoreTest.TxLogEntry.encode
     override def decodeEntry = StoreTest.TxLogEntry.decode
   }
+
+  case class AcsImportEntry(
+      contract: Contract[?, ?],
+      synchronizerId: SynchronizerId,
+      counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+  )
+
+  case class AcsImportIncompleteEntry(
+      contract: Contract[?, ?],
+      sourceDomain: SynchronizerId,
+      targetDomain: SynchronizerId,
+      tfid: String,
+      counter: Long,
+      implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
+  )
 }

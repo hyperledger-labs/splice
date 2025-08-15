@@ -152,7 +152,7 @@ describe('SV can see DsoRules config diffs', () => {
 
     await goToGovernanceTabAndClickOnAction('Executed', action, user, 1);
 
-    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('100', '2200');
+    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('100', '2200', true);
 
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
@@ -168,7 +168,7 @@ describe('SV can see DsoRules config diffs', () => {
 
       await goToGovernanceTabAndClickOnAction('Executed', action, user, 2);
 
-      const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1900', '1800');
+      const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('1900', '1800', true);
 
       await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
 
@@ -183,7 +183,7 @@ describe('SV can see DsoRules config diffs', () => {
 
     await goToGovernanceTabAndClickOnAction('Rejected', action, user, 1);
 
-    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('20', '2000');
+    const mockHtmlContent = getExpectedDsoRulesConfigDiffsHTML('20', '2000', true);
 
     await checkDsoRulesExpectedConfigDiffsHTML(mockHtmlContent, 0);
     checkNumberNumberOfDiffs(1);

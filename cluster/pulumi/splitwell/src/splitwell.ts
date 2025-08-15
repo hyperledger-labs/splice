@@ -23,6 +23,7 @@ import {
 } from 'splice-pulumi-common';
 import { installParticipant } from 'splice-pulumi-common-validator';
 import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
+import { splitwellConfig } from 'splice-pulumi-common/src/config/splitwellConfig';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
@@ -105,6 +106,7 @@ export async function installSplitwell(
         port: pulumi.Output.create(5432),
       },
       failOnAppVersionMismatch: failOnAppVersionMismatch,
+      maxDarVersion: splitwellConfig?.maxDarVersion,
     },
     activeVersion,
     { dependsOn: imagePullDeps }

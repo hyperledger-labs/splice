@@ -10,13 +10,18 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.data.NodeStatus
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port, PositiveInt}
 import com.digitalasset.canton.networking.Endpoint
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.sequencing.{
+  GrpcSequencerConnection,
+  SequencerConnection,
+  SubmissionRequestAmplification,
+}
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.*
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 
 class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil with WalletTestUtil {
@@ -40,64 +45,32 @@ class DistributedDomainIntegrationTest extends IntegrationTest with SvTestUtil w
       sv4Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
-    clue("SV participants are connected to their own sequencers") {
-      eventually() {
-        inside(
-          sv1Backend.participantClient.synchronizers
-            .config(decentralizedSynchronizer)
-            .value
-            .sequencerConnections
-            .connections
-            .forgetNE
-        ) { case Seq(GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _, _)) =>
-          defaultSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5108)))
-            .toVector
-        }
-        inside(
-          sv2Backend.participantClient.synchronizers
-            .config(decentralizedSynchronizer)
-            .value
-            .sequencerConnections
-            .connections
-            .forgetNE
-        ) {
-          case Seq(
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _)
-              ) =>
-            localSequencerEndpoint shouldBe NonEmpty
-              .mk(Seq, Endpoint("localhost", Port.tryCreate(5208)))
-              .toVector
-        }
-        inside(
-          sv3Backend.participantClient.synchronizers
-            .config(decentralizedSynchronizer)
-            .value
-            .sequencerConnections
-            .connections
-            .forgetNE
-        ) {
-          case Seq(
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _)
-              ) =>
-            localSequencerEndpoint shouldBe NonEmpty
-              .mk(Seq, Endpoint("localhost", Port.tryCreate(5308)))
-              .toVector
-        }
-        inside(
-          sv4Backend.participantClient.synchronizers
-            .config(decentralizedSynchronizer)
-            .value
-            .sequencerConnections
-            .connections
-            .forgetNE
-        ) {
-          case Seq(
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _)
-              ) =>
-            localSequencerEndpoint shouldBe NonEmpty
-              .mk(Seq, Endpoint("localhost", Port.tryCreate(5408)))
-              .toVector
+    clue("SV participants are connected to all sequencers") {
+      eventually(60.seconds) {
+        forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
+          clue(s"sv ${sv.name} is connected to all sequencers") {
+            val synchronizerConfig = sv.participantClient.synchronizers
+              .config(decentralizedSynchronizer)
+              .value
+              .sequencerConnections
+            val connections: Seq[SequencerConnection] = synchronizerConfig.connections.forgetNE
+            synchronizerConfig.submissionRequestAmplification shouldBe SubmissionRequestAmplification(
+              PositiveInt.tryCreate(2),
+              NonNegativeFiniteDuration.ofSeconds(10),
+            )
+            val endpoints = connections.map { s =>
+              inside(s) { case GrpcSequencerConnection(endpoint, _, _, _, _) =>
+                endpoint
+              }
+            }
+            endpoints.toSet shouldBe Seq(5108, 5208, 5308, 5408)
+              .map(port =>
+                NonEmpty
+                  .mk(Seq, Endpoint("localhost", Port.tryCreate(port)))
+                  .toVector
+              )
+              .toSet
+          }
         }
       }
     }

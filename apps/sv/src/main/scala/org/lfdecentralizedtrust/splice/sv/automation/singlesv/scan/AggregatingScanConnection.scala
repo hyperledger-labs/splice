@@ -3,10 +3,10 @@
 
 package org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan
 
-import cats.implicits.toTraverseOps
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.RetryProvider
@@ -38,7 +38,7 @@ class AggregatingScanConnection(
   ): Future[Seq[T]] = {
     for {
       scanUrls <- getScanUrls(includeSelf)
-      result <- scanUrls.traverse(url => withScanConnection(url)(f))
+      result <- MonadUtil.sequentialTraverse(scanUrls)(url => withScanConnection(url)(f))
     } yield result
   }
 

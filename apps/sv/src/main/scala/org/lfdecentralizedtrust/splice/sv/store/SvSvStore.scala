@@ -22,6 +22,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.tracing.TraceContext
+import org.lfdecentralizedtrust.splice.store.db.AcsInterfaceViewRowData
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -35,7 +36,8 @@ trait SvSvStore extends AppStore {
 
   override lazy val acsContractFilter
       : org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.ContractFilter[
-        org.lfdecentralizedtrust.splice.sv.store.db.SvTables.SvAcsStoreRowData
+        org.lfdecentralizedtrust.splice.sv.store.db.SvTables.SvAcsStoreRowData,
+        AcsInterfaceViewRowData.NoInterfacesIngested,
       ] = SvSvStore.contractFilter(key)
 
   def lookupValidatorOnboardingBySecretWithOffset(
@@ -108,7 +110,10 @@ object SvSvStore {
     }
 
   /** Contract filter of an sv acs store for a specific acs party. */
-  def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter[SvAcsStoreRowData] = {
+  def contractFilter(key: SvStore.Key): MultiDomainAcsStore.ContractFilter[
+    SvAcsStoreRowData,
+    AcsInterfaceViewRowData.NoInterfacesIngested,
+  ] = {
     import MultiDomainAcsStore.mkFilter
     val sv = key.svParty.toProtoPrimitive
 

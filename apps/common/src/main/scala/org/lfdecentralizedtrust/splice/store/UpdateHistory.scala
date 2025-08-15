@@ -102,6 +102,7 @@ class UpdateHistory(
     new MultiDomainAcsStore.IngestionSink {
       override def ingestionFilter: IngestionFilter = IngestionFilter(
         primaryParty = updateStreamParty,
+        includeInterfaces = Seq.empty,
         includeCreatedEventBlob = false,
       )
 
@@ -1703,8 +1704,9 @@ class UpdateHistory(
   def getLastImportUpdateId(
       migrationId: Long
   )(implicit tc: TraceContext): Future[Option[String]] = {
-    storage.query(
-      sql"""
+    if (enableImportUpdateBackfill) {
+      storage.query(
+        sql"""
         select
           -- Note: to make update ids consistent across SVs, we use the contract id as the update id.
           max(c.contract_id)
@@ -1715,8 +1717,11 @@ class UpdateHistory(
           migration_id = $migrationId and
           record_time = ${CantonTimestamp.MinValue}
       """.as[Option[String]].head,
-      s"getLastImportUpdateId",
-    )
+        s"getLastImportUpdateId",
+      )
+    } else {
+      Future.successful(None)
+    }
   }
 
   def getPreviousMigrationId(migrationId: Long)(implicit
@@ -1954,10 +1959,15 @@ class UpdateHistory(
       override def migrationInfo(
           migrationId: Long
       )(implicit tc: TraceContext): Future[Option[SourceMigrationInfo]] = for {
+        // Note: As the following queries are not wrapped in a REPEATABLE_READ transaction,
+        // the individual results do not form a consistent snapshot of the migration metadata.
+        // This is fine because update history is append-only,
+        // but we have to make sure to query the state first to avoid returning record time ranges
+        // from before the update history was initialized.
+        state <- getBackfillingState()
         previousMigrationId <- getPreviousMigrationId(migrationId)
         recordTimeRange <- getRecordTimeRange(migrationId)
         lastImportUpdateId <- getLastImportUpdateId(migrationId)
-        state <- getBackfillingState()
       } yield {
         state match {
           case BackfillingState.NotInitialized =>

@@ -1,0 +1,74 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestExpectedDsoParty where
+
+import Daml.Script
+
+import Splice.AmuletRules
+import Splice.Scripts.Util
+
+-- | Test that the checks on the expected DSO party work
+testExpectedDsoParty_Transfer : Script ()
+testExpectedDsoParty_Transfer = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+
+  let amulet1Amount = 100.0
+  let outputAmount1 = 20.00
+
+  amulet1 <- tap app alice amulet1Amount
+
+  context <- getPaymentTransferContext app alice
+  let transferChoice = AmuletRules_Transfer with
+        transfer = Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [InputAmulet amulet1]
+          outputs = [ TransferOutput with
+                        receiver = bob.primaryParty
+                        receiverFeeRatio = 0.0
+                        amount = outputAmount1
+                        lock = None
+                    ]
+          beneficiaries = None
+        context = context.context
+        expectedDso = None
+
+  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+    transferChoice
+  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+    transferChoice with expectedDso = Some alice.primaryParty
+  submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+    transferChoice with expectedDso = Some app.dso
+
+  pure ()
+
+-- | Test that the checks on the expected DSO party work for AmuletRules_ComputeFees
+testExpectedDsoParty_ComputeFees : Script ()
+testExpectedDsoParty_ComputeFees = do
+  defaultAppWithUsers <- setupDefaultAppWithUsers
+  let DefaultAppWithUsers{..} = defaultAppWithUsers
+
+  let outputAmount1 = 20.00
+
+  context <- getPaymentTransferContext app alice
+  let computeFeesChoice = AmuletRules_ComputeFees with
+        sender = alice.primaryParty
+        outputs = [ TransferOutput with
+                      receiver = bob.primaryParty
+                      receiverFeeRatio = 0.0
+                      amount = outputAmount1
+                      lock = None
+                  ]
+        context = context.context
+        expectedDso = None
+
+  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+    computeFeesChoice
+  submitMultiMustFail [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+    computeFeesChoice with expectedDso = Some alice.primaryParty
+  submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules
+    computeFeesChoice with expectedDso = Some app.dso
+
+  pure ()

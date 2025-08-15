@@ -200,23 +200,16 @@ class SvOnboardingAddlIntegrationTest
           .connections
           .forgetNE
 
-        val localSequencerUrl = inside(sequencerConnections) {
-          case Seq(
-                GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _, _)
-              ) =>
-            defaultSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
-          case Seq(
-                GrpcSequencerConnection(_, _, _, _, _),
-                GrpcSequencerConnection(localSequencerEndpoint, _, _, _, _),
-              ) =>
-            localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
+        val localSequencerUrls: Seq[String] = sequencerConnections.map {
+          inside(_) { case GrpcSequencerConnection(endpoints, _, _, _, _) =>
+            endpoints.map(_.toURI(false)).forgetNE.loneElement.toString
+          }
         }
-
         val nodeState = sv1NodeStates.get(svParty).value.payload
-        forAll(nodeState.state.synchronizerNodes.values()) { synchronizerNode =>
-          synchronizerNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
-          synchronizerNode.mediator.toScala.value.mediatorId should not be empty
-        }
+        val synchronizerNode = nodeState.state.synchronizerNodes.values.loneElement
+        val localSequencerUrl: String = synchronizerNode.sequencer.toScala.value.url
+        localSequencerUrls should contain(localSequencerUrl)
+        synchronizerNode.mediator.toScala.value.mediatorId should not be empty
 
         clue("published sequencer information can be seen via scan") {
           inside(sv1ScanBackend.listDsoSequencers()) { case Seq(domainSequencers) =>

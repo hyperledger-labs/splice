@@ -130,7 +130,7 @@ setupOtcTrade  = do
     exerciseCmd enrichedChoice.factoryCid enrichedChoice.arg
 
   -- alice accepts allocation request directly via her wallet
-  -- TODO(DACH-NY/canton-network-node#18633): test here and for all steps that the expected ledger time bounds are present on the submissions
+  -- TODO(tech-debt): test here and for all steps that the expected ledger time bounds are present on the submissions
   debug inputHoldingCids
   enrichedChoice <- RegistryApi.getAllocationFactory registry AllocationFactory_Allocate with
     expectedAdmin = registry.dso

@@ -7,6 +7,8 @@ import better.files.*
 import com.digitalasset.daml.lf.archive.{DarDecoder, DarParser}
 import com.digitalasset.daml.lf.data.Ref.{PackageName, PackageVersion}
 
+import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 import scala.sys.process.*
 
@@ -22,7 +24,7 @@ object DarLockChecker {
     args.toSeq match {
       case cmd +: outputFilename +: inputFilenames =>
         // This includes all freshly built DARs but not the checked in DARs.
-        val builtDars: Seq[Dar] = inputFilenames.map(readDar(_))
+        val builtDars: Seq[Dar] = readDars(inputFilenames)
         val nonTestBuiltDars = builtDars.filter(dar => !dar.packageName.endsWith("-test"))
 
         val darMap = toDarMap(builtDars)
@@ -157,14 +159,25 @@ object DarLockChecker {
 
   private def getCheckedInDarMap(): Map[(PackageName, PackageVersion), String] = {
     val checkedInDars = File("daml/dars").list(_.extension == Some(".dar")).toSeq
-    toDarMap(checkedInDars.map(f => readDar(f.toString)))
+    toDarMap(readDars(checkedInDars.map(_.toString())))
   }
 
-  private def readDar(filename: String): Dar = {
-    val hash = DarParser.assertReadArchiveFromFile(File(filename).toJava).main.getHash
-    val metadata =
-      DarDecoder.assertReadArchiveFromFile(File(filename).toJava).main._2.metadata
-    Dar(metadata.name, metadata.version, hash, filename)
+  private def readDars(filenames: Seq[String], timeout: Duration = 1.minutes): Seq[Dar] = {
+    implicit val ec = ExecutionContext.global
+
+    def readDar(filename: String): Dar = {
+      val hash = DarParser.assertReadArchiveFromFile(File(filename).toJava).main.getHash
+      val metadata =
+        DarDecoder.assertReadArchiveFromFile(File(filename).toJava).main._2.metadata
+      Dar(metadata.name, metadata.version, hash, filename)
+    }
+
+    val darFutures: Seq[Future[Dar]] = filenames.map { filename =>
+      Future {
+        readDar(filename)
+      }
+    }
+    Await.result(Future.sequence(darFutures), timeout)
   }
 
   private def updateDars(dars: Seq[Dar]): Unit = {

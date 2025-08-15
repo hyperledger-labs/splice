@@ -17,6 +17,7 @@ import org.lfdecentralizedtrust.splice.scan.config.{
   ScanAppClientConfig,
   ScanCacheConfig,
   ScanSynchronizerConfig,
+  CacheConfig as SpliceCacheConfig,
 }
 import org.lfdecentralizedtrust.splice.splitwell.config.{
   SplitwellAppBackendConfig,
@@ -430,6 +431,8 @@ object SpliceConfig {
       )
     implicit val scanCacheConfigReader: ConfigReader[ScanCacheConfig] =
       deriveReader[ScanCacheConfig]
+    implicit val cacheConfigReader: ConfigReader[SpliceCacheConfig] =
+      deriveReader[SpliceCacheConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -702,6 +705,29 @@ object SpliceConfig {
               s"topup interval ${conf.domains.global.buyExtraTraffic.minTopupInterval} must not be smaller than the polling interval ${conf.automation.pollingInterval}"
             ),
           )
+
+          _ <- Either.cond(
+            !conf.disableSvValidatorBftSequencerConnection || conf.svValidator,
+            (),
+            ConfigValidationFailed(
+              s"disableSvValidatorBftSequencerConnection must not be set for non-sv validators"
+            ),
+          )
+
+          _ <- Either.cond(
+            !(conf.disableSvValidatorBftSequencerConnection && conf.domains.global.url.isEmpty),
+            (),
+            ConfigValidationFailed(
+              s"disableSvValidatorBftSequencerConnection must be set together with domains.global.url"
+            ),
+          )
+          _ <- Either.cond(
+            !(!conf.disableSvValidatorBftSequencerConnection && conf.svValidator && conf.domains.global.url.isDefined),
+            (),
+            ConfigValidationFailed(
+              s"domains.global.url must not be set for an SV unless disableSvValidatorBftSequencerConnection is also set"
+            ),
+          )
         } yield conf
       }
     implicit val validatorClientConfigReader: ConfigReader[ValidatorAppClientConfig] =
@@ -809,6 +835,8 @@ object SpliceConfig {
       deriveWriter[ScanAppBackendConfig]
     implicit val scanCacheConfigWriter: ConfigWriter[ScanCacheConfig] =
       deriveWriter[ScanCacheConfig]
+    implicit val cacheConfigWriter: ConfigWriter[SpliceCacheConfig] =
+      deriveWriter[SpliceCacheConfig]
 
     implicit val svClientConfigWriter: ConfigWriter[SvAppClientConfig] =
       deriveWriter[SvAppClientConfig]

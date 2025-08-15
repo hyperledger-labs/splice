@@ -551,11 +551,31 @@ abstract class WalletAppReference(
 
   @Help.Summary("Creates an AmuletAllocation")
   @Help.Description(
-    "Create an AmuletAllocation, which is an implementation of the Token Standard allocation for Amulet."
+    "Create an AmuletAllocation, which is an implementation of the Allocation Token Standard for Amulet."
   )
   def allocateAmulet(spec: allocationv1.AllocationSpecification): AllocateAmuletResponse = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.TokenStandard.AllocateAmulet(spec))
+    }
+  }
+
+  @Help.Summary("Lists all AmuletAllocations")
+  @Help.Description(
+    "Lists all AmuletAllocation contracts, which are an implementation of the Allocation Token Standard for Amulet."
+  )
+  def listAmuletAllocations() = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.ListAmuletAllocations)
+    }
+  }
+
+  @Help.Summary("List AllocationRequests")
+  @Help.Description(
+    "List all contracts that implement the AllocationRequest interface from the Token Standard."
+  )
+  def listAllocationRequests() = {
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.TokenStandard.ListAllocationRequests)
     }
   }
 }
