@@ -214,7 +214,7 @@ export function createStackCR(
               parallel: parallelism,
             },
           },
-          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
+          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.2.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
             metadata: {
               name: `${name.replaceAll('.', '-')}`,

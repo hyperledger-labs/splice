@@ -45,6 +45,7 @@ import {
   svCometBftGovernanceKeySecret,
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
+  networkWideConfig,
 } from 'splice-pulumi-common';
 import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
@@ -313,6 +314,7 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice: initialAmuletPrice,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
   };
@@ -425,6 +427,7 @@ async function installSvAndValidator(
       ids.concat([validatorWalletUserName])
     ),
     ...spliceInstanceNames,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

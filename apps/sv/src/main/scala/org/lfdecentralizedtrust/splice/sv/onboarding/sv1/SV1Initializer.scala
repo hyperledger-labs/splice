@@ -227,6 +227,7 @@ class SV1Initializer(
                     synchronizerId,
                     packages.map(packageToVet => DarResource(packageToVet.resourcePath)),
                     None,
+                    maxVettingDelay = None,
                   )
                   .flatMap { _ =>
                     initConnection.ensureUserMetadataAnnotation(

@@ -145,6 +145,9 @@ Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardi
 FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
 Rejected transaction due to a participant determined timeout
 
+# Seems like sometimes mediators time out maybe around onboarding, not worth investigating unless it causes issues.
+Sequencing result message timed out.*mediator=
+
 # Make sure to have a trailing newline
 
 # This can be dropped after 3.4

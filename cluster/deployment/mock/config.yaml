@@ -69,6 +69,7 @@ pulumiProjectConfig:
   default:
     interAppsDependencies: false
     isExternalCluster: true
+    hasPublicInfo: true
     cloudSql:
       enabled: true
 monitoring:
@@ -155,3 +156,5 @@ infra:
       spec:
         key: value
         anotherKey: anotherValue
+networkWide:
+  maxVettingDelay: 1m

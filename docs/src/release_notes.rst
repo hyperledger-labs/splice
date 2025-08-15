@@ -8,6 +8,35 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Vagrant (new)
+
+  - Add Vagrantfile as a convenient way to spin up a local development
+    environment for Splice. See `README.vagrant.md
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+    and `Vagrantfile
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+    details.
+
+0.4.11
+------
+
+- SV and Validator apps
+
+  - Add a randomized delay to broadcasting of package vetting changes used on Daml upgrades. This ensures that
+    there is no load spike when all validators try to do so at the same time. This has no impact on behavior as
+    Daml upgrades are announced ahead of time and the broadcasting still happens before the switchover.
+
+  - The CometBFT PVC is now annotated with ``helm.sh/resource-policy: keep``, so that in the event of a (potentially accidental)
+    ``helm uninstall`` the CometBFT data is not deleted and the node can more easily be recovered.
+
+- Docs
+
+  - Mark the workflows in the ``splice-wallet-payments`` :ref:`package <reference_docs_splice_wallet_payments>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.
+  - Mark the :ref:`Splice Wallet transfer offers <validator-api-user-wallet-transfer-offers>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.
+
 0.4.10
 ------
 

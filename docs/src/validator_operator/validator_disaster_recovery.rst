@@ -62,7 +62,6 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 .. _validator_reonboard:
 
-
 Re-onboard a validator and recover balances of all users it hosts
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -189,7 +188,10 @@ hosting it becomes unusable for whatever reason.
              recovery **must** be a **completely new validator**. An existing validator
              may brick completely due to some limitations around party
              migrations and there is no way to recover from that at
-             this point. This limitation is expected to be lifted in
+             this point. Recovering a validator from an identity backup does not classify
+             as a completely new validator here. You must setup it with a completely new identity
+             and a completely clean database.
+             This limitation is expected to be lifted in
              the future.
 
 First, setup a new validator following the standard :ref:`standard validator deployment docs <validator_operator>`.
