@@ -161,6 +161,12 @@ export function buildDsoConfigChanges(
       currentValue: before?.nextScheduledSynchronizerUpgrade?.migrationId || '',
       newValue: after?.nextScheduledSynchronizerUpgrade?.migrationId || '',
     },
+    {
+      fieldName: 'voteCooldownTime',
+      label: 'Vote Cooldown Time',
+      currentValue: before?.voteCooldownTime?.microseconds || '',
+      newValue: after?.voteCooldownTime?.microseconds || '',
+    },
   ] as ConfigChange[];
 
   return showAllFields ? changes : changes.filter(c => c.currentValue !== c.newValue);

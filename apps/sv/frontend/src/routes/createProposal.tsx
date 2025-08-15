@@ -9,6 +9,7 @@ import { SupportedActionTag } from '../utils/types';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
 import { OffboardSvForm } from '../components/forms/OffboardSvForm';
 import { GrantRevokeFeaturedAppForm } from '../components/forms/GrantRevokeFeaturedAppForm';
+import { SetDsoConfigRulesForm } from '../components/forms/SetDsoConfigRulesForm';
 
 export const CreateProposal: React.FC = () => {
   const [searchParams, _] = useSearchParams();
@@ -38,6 +39,8 @@ export const CreateProposal: React.FC = () => {
             selectedAction={'SRARC_RevokeFeaturedAppRight'}
           />
         );
+      case 'SRARC_SetConfig':
+        return <SetDsoConfigRulesForm onSubmit={onSubmit} />;
       default:
         return <CreateProposalForm action={selectedAction} />;
     }
