@@ -16,11 +16,24 @@ export interface UnfeatureAppProposal {
   rightContractId: string;
 }
 
+/**
+ * A config change represents a field that has been changed in a config.
+ * This could be DSO or Amulet Configs.
+ */
 export interface ConfigChange {
+  /**
+   * A unique name based on the json path of the field
+   */
   fieldName: string;
+  /**
+   * A label that can displayed to the user
+   */
   label: string;
   currentValue: string;
   newValue: string | number;
+  /**
+   * If the field is an id, e.g a party id.
+   */
   isId?: boolean;
 }
 

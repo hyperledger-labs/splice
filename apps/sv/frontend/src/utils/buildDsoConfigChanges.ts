@@ -5,7 +5,7 @@ import { DsoDecentralizedSynchronizerConfig } from '@daml.js/splice-dso-governan
 import { Optional } from '@daml/types';
 import { ConfigChange } from './types';
 
-export function buildSynchronizerMap(
+function buildSynchronizerMap(
   baseConfig: DsoDecentralizedSynchronizerConfig | undefined,
   currentConfig: DsoDecentralizedSynchronizerConfig | undefined
 ): ConfigChange[] {
@@ -48,6 +48,13 @@ export function buildSynchronizerMap(
   return res || [];
 }
 
+/**
+ * Given 2 configs, return the changes between them
+ * @param before the base config
+ * @param after the config with changes
+ * @param showAllFields if true, do not filter out fields that have not changed
+ * @returns the changes between the 2 configs
+ */
 export function buildDsoConfigChanges(
   before: Optional<DsoRulesConfig>,
   after: Optional<DsoRulesConfig>,
@@ -160,6 +167,12 @@ export function buildDsoConfigChanges(
       label: 'Next Scheduled Synchronizer Upgrade Migration ID',
       currentValue: before?.nextScheduledSynchronizerUpgrade?.migrationId || '',
       newValue: after?.nextScheduledSynchronizerUpgrade?.migrationId || '',
+    },
+    {
+      fieldName: 'voteCooldownTime',
+      label: 'Vote Cooldown Time',
+      currentValue: before?.voteCooldownTime?.microseconds || '',
+      newValue: after?.voteCooldownTime?.microseconds || '',
     },
   ] as ConfigChange[];
 
