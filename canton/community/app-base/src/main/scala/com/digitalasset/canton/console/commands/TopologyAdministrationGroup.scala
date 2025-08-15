@@ -206,11 +206,11 @@ class TopologyAdministrationGroup(
     (idCache.get() match {
       case Some(v) => Some(v)
       case None =>
-          val r = consoleEnvironment.run {
-            getIdCommand()
-          }
-          r.uniqueIdentifier.foreach(id => idCache.set(Some(id)))
-          r.uniqueIdentifier
+        val r = consoleEnvironment.run {
+          getIdCommand()
+        }
+        r.uniqueIdentifier.foreach(id => idCache.set(Some(id)))
+        r.uniqueIdentifier
     }).map(apply)
 
   @Help.Summary("Topology synchronisation helpers", FeatureFlag.Preview)

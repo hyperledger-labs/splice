@@ -4,7 +4,10 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRewar
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTestWithSharedEnvironment, SpliceTestConsoleEnvironment}
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{
+  IntegrationTestWithSharedEnvironment,
+  SpliceTestConsoleEnvironment,
+}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import com.daml.nonempty.NonEmpty
@@ -248,7 +251,9 @@ class RecoverExternalPartyIntegrationTest
   def sign(
       tx: TopologyTransaction[TopologyChangeOp, TopologyMapping],
       privateKey: PrivateKey,
-  )(implicit env: SpliceTestConsoleEnvironment): SignedTopologyTransaction[TopologyChangeOp, TopologyMapping] = {
+  )(implicit
+      env: SpliceTestConsoleEnvironment
+  ): SignedTopologyTransaction[TopologyChangeOp, TopologyMapping] = {
     val sig = crypto(env.executionContext)
       .sign(
         hash = tx.hash.hash,

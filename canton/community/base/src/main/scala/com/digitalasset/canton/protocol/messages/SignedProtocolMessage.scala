@@ -149,7 +149,8 @@ object SignedProtocolMessage
       traceContext: TraceContext,
       ec: ExecutionContext,
   ): EitherT[FutureUnlessShutdown, SyncCryptoError, SignedProtocolMessage[M]] = {
-    val typedMessage = (TypedSignedProtocolMessageContent(message) : TypedSignedProtocolMessageContent[M])
+    val typedMessage =
+      (TypedSignedProtocolMessageContent(message): TypedSignedProtocolMessageContent[M])
     for {
       signature <- mkSignature(typedMessage, cryptoApi)
     } yield SignedProtocolMessage(typedMessage, NonEmpty(Seq, signature))

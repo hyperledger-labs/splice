@@ -79,7 +79,8 @@ abstract class SequencerBftPeerReconciler(
               config.exists(_.peerId.id == endpointId)
             }
           case (None, None) => true
-        }.collect {
+        }
+        .collect {
           // TODO(#1929) Reconsider whether this works properly.
           case (seqId, Some(endpointId)) => (seqId, endpointId)
         }

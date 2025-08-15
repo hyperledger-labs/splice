@@ -109,7 +109,7 @@ trait BaseIntegrationTest[C <: SharedCantonConfig[C], E <: Environment[C]]
         assertion(entry)
         entry.commandFailureMessage
         succeed
-      } *,
+      }*
     )
 
   def suppressPackageIdWarning[A](within: => A): A =

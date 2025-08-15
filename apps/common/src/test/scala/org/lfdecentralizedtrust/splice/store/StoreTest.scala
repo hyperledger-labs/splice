@@ -746,7 +746,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           lastDescendedNodeId,
           exercised.getExerciseResult,
           Seq.empty.asJava,
-          exercised.isAcsDelta()
+          exercised.isAcsDelta(),
         ).asInstanceOf[E]
       case e => e
     }

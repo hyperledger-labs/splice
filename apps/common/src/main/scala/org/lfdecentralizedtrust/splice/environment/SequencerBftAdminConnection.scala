@@ -5,7 +5,10 @@ package org.lfdecentralizedtrust.splice.environment
 
 import com.digitalasset.canton.admin.api.client.commands.SequencerBftAdminCommands
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.{PeerConnectionStatus, PeerEndpointHealthStatus}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.SequencerBftAdminData.{
+  PeerConnectionStatus,
+  PeerEndpointHealthStatus,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext

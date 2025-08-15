@@ -193,7 +193,9 @@ class UseLedgerApiTestTool(
 
   private def endpointAsString(config: ClientConfig) = s"${config.address}:${config.port.toString}"
 
-  private def testParticipants(implicit env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]): Seq[String] =
+  private def testParticipants(implicit
+      env: TestConsoleEnvironment[CantonConfig, CantonEnvironment]
+  ): Seq[String] =
     env.participants.all
       .map { p =>
         val ledgerApiEndpoint = endpointAsString(p.config.clientLedgerApi)

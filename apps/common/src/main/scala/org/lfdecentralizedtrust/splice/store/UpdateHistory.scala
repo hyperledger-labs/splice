@@ -2302,7 +2302,7 @@ object UpdateHistory {
           /*signatories = */ signatories.getOrElse(missingStringSeq).asJava,
           /*observers = */ observers.getOrElse(missingStringSeq).asJava,
           /*createdAt = */ createdAt.toInstant,
-              /*acsDelta = */ false,
+          /*acsDelta = */ false,
         ),
       )
     }
