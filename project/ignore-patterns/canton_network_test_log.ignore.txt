@@ -123,5 +123,6 @@ GENERIC_CONFIG_ERROR.*SpliceConfigTest
 # ExecutorServiceMetrics closes the gauges twice through shutdown and shutownNow in cases where shutdown times out
 .*InstrumentDescriptor.*name=daml.executor.* has called close() multiple times
 
+Expected Postgres version 13, 14, 15, or 16 but got higher version 17\.5
 
 # Make sure to have a trailing newline
