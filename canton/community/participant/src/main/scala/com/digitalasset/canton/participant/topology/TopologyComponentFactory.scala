@@ -6,13 +6,14 @@ package com.digitalasset.canton.participant.topology
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SynchronizerCrypto
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerPredecessor}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.UnsafeOnlinePartyReplicationConfig
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.ledger.api.LedgerApiStore
 import com.digitalasset.canton.participant.protocol.ParticipantTopologyTerminateProcessing
+import com.digitalasset.canton.participant.sync.LogicalSynchronizerUpgradeCallback
 import com.digitalasset.canton.participant.topology.client.MissingKeysAlerter
 import com.digitalasset.canton.store.SequencedEventStore
 import com.digitalasset.canton.time.Clock
@@ -49,7 +50,9 @@ class TopologyComponentFactory(
       sequencerConnectionSuccessorListener: SequencerConnectionSuccessorListener,
       topologyClient: SynchronizerTopologyClientWithInit,
       recordOrderPublisher: RecordOrderPublisher,
+      lsuCallback: LogicalSynchronizerUpgradeCallback,
       sequencedEventStore: SequencedEventStore,
+      synchronizerPredecessor: Option[SynchronizerPredecessor],
       ledgerApiStore: LedgerApiStore,
   ): TopologyTransactionProcessor.Factory = new TopologyTransactionProcessor.Factory {
     override def create(
@@ -60,12 +63,13 @@ class TopologyComponentFactory(
     ): FutureUnlessShutdown[TopologyTransactionProcessor] = {
 
       val participantTerminateProcessing = new ParticipantTopologyTerminateProcessing(
-        psid,
         recordOrderPublisher,
         topologyStore,
-        recordOrderPublisher.initTimestamp,
+        initialRecordTime = recordOrderPublisher.initTimestamp,
         participantId,
         pauseSynchronizerIndexingDuringPartyReplication = unsafeOnlinePartyReplication.nonEmpty,
+        synchronizerPredecessor = synchronizerPredecessor,
+        lsuCallback,
         loggerFactory,
       )
       val terminateTopologyProcessingFUS =

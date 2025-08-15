@@ -46,7 +46,7 @@ import com.digitalasset.canton.platform.store.utils.{
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.Identifier
+import com.digitalasset.daml.lf.data.Ref.FullIdentifier
 import com.digitalasset.daml.lf.value.Value.ContractId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.NotUsed
@@ -489,12 +489,12 @@ class ACSReader(
     }
 
     val stringWildcardParties = filter.templateWildcardParties.map(_.map(_.toString))
-    val stringTemplateFilters = filter.relation.map { case (key, value) =>
+    val templateFilters = filter.relation.map { case (key, value) =>
       key -> value
     }
-    def eventMeetsConstraints(templateId: Identifier, witnesses: Set[String]): Boolean =
+    def eventMeetsConstraints(templateId: FullIdentifier, witnesses: Set[String]): Boolean =
       stringWildcardParties.fold(true)(_.exists(witnesses)) || (
-        stringTemplateFilters.get(templateId) match {
+        templateFilters.get(templateId.toNameTypeConRef) match {
           case Some(Some(filterParties)) => filterParties.exists(witnesses)
           case Some(None) => true // party wildcard
           case None =>

@@ -121,6 +121,14 @@ sealed trait OnlinePartyReplicationNegotiationTest
             .replace(Some(UnsafeOnlinePartyReplicationConfig()))
         ),
         ConfigTransforms.updateAllSequencerConfigs(selectivelyEnablePartyReplicationOnSequencers),
+        // TODO(#24326): While the SourceParticipant (SP=P1) uses AcsInspection to consume the
+        //  ACS snapshot (rather than the Ledger Api), ensure ACS pruning does not trigger AcsInspection
+        //  TimestampBeforePruning. Allow a generous 5 minutes for the SP to consume all active contracts
+        //  in this test.
+        ConfigTransforms.updateParticipantConfig("participant1")(
+          _.focus(_.parameters.journalGarbageCollectionDelay)
+            .replace(config.NonNegativeFiniteDuration.ofMinutes(5))
+        ),
       )
       .withNetworkBootstrap { implicit env =>
         import env.*
@@ -196,7 +204,7 @@ sealed trait OnlinePartyReplicationNegotiationTest
         )
       }
 
-      val addPartyRequestId = loggerFactory.assertLogs(
+      val addPartyRequestId =
         clue("Initiate add party async")(
           targetParticipant.parties.add_party_async(
             party = alice,
@@ -259,44 +267,10 @@ sealed trait OnlinePartyReplicationNegotiationTest
                 accept.actingParties shouldBe Seq(
                   sourceParticipant.adminParty.toProtoPrimitive
                 )
-
-                // There is an active party replication agreement contract signed by P1 and P2
-                val agreement = participant.ledger_api.javaapi.state.acs
-                  .await(M.partyreplication.PartyReplicationAgreement.COMPANION)(
-                    sourceParticipant.adminParty
-                  )
-                agreement.signatories.asScala.toSet shouldBe Set(
-                  sourceParticipant.adminParty.toProtoPrimitive,
-                  targetParticipant.adminParty.toProtoPrimitive,
-                )
-                agreement.data.partyId shouldBe alice.toProtoPrimitive
-                // Only sequencer2 remains for the party replication as not both participants are
-                // connected to sequencers 1 and 4, and sequencer3 has not enabled sequencer channels.
-                agreement.data.sequencerUid shouldBe sequencer2.id.uid.toProtoPrimitive
               }
             }
           }
-
-          // Archive the party replication agreement, so that subsequent tests have a clean slate.
-          val agreement = targetParticipant.ledger_api.javaapi.state.acs
-            .await(M.partyreplication.PartyReplicationAgreement.COMPANION)(
-              sourceParticipant.adminParty
-            )
-          targetParticipant.ledger_api.commands
-            .submit(
-              actAs = Seq(targetParticipant.adminParty),
-              commands = agreement.id
-                .exerciseDone(targetParticipant.adminParty.toLf)
-                .commands
-                .asScala
-                .toSeq
-                .map(LedgerClientUtils.javaCodegenToScalaProto),
-              synchronizerId = Some(daId),
-            )
-            .discard
-        },
-        _.warningMessage should include regex channelServiceNotImplementedWarning,
-      )
+        }
 
       // Wait until both participants observe that both participants are allowed to host the party.
       eventually()(Seq(sourceParticipant, targetParticipant).foreach { participant =>
@@ -548,8 +522,12 @@ sealed trait OnlinePartyReplicationNegotiationTest
               val proposals = participant.ledger_api.state.acs
                 .of_all(filterTemplates =
                   Seq(
-                    TemplateId.fromIdentifier(PartyReplicationAdminWorkflow.proposalTemplate),
-                    TemplateId.fromIdentifier(PartyReplicationAdminWorkflow.agreementTemplate),
+                    TemplateId.fromIdentifier(
+                      PartyReplicationAdminWorkflow.proposalTemplatePkgName
+                    ),
+                    TemplateId.fromIdentifier(
+                      PartyReplicationAdminWorkflow.agreementTemplatePkgName
+                    ),
                   )
                 )
               proposals shouldBe Seq.empty

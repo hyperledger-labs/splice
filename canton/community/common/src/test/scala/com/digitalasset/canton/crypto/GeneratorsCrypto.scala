@@ -58,9 +58,7 @@ object GeneratorsCrypto {
     key <- Arbitrary.arbitrary[ByteString]
     keySpec <- Arbitrary.arbitrary[SigningKeySpec]
     format = CryptoKeyFormat.Symbolic
-    usage <- Gen
-      .nonEmptyListOf(Gen.oneOf(SigningKeyUsage.All.toList))
-      .map(usages => NonEmptyUtil.fromUnsafe(usages.toSet))
+    usage <- nonEmptySetGen(Arbitrary(Gen.oneOf(SigningKeyUsage.All.toList)))
       .suchThat(usagesNE => SigningKeyUsage.isUsageValid(usagesNE))
   } yield SigningPublicKey.create(format, key, keySpec, usage).value)
 
@@ -175,10 +173,14 @@ object GeneratorsCrypto {
   implicit val symmetricKeyArb: Arbitrary[SymmetricKey] =
     Arbitrary(
       for {
-        format <- Arbitrary.arbitrary[CryptoKeyFormat]
-        key <- Arbitrary.arbitrary[ByteString]
+        key <- Gen
+          .containerOfN[Array, Byte](
+            SymmetricKeyScheme.Aes128Gcm.keySizeInBytes,
+            Arbitrary.arbitrary[Byte],
+          )
+          .map(ByteString.copyFrom)
         scheme <- Arbitrary.arbitrary[SymmetricKeyScheme]
-      } yield new SymmetricKey(format, key, scheme)
+      } yield SymmetricKey.create(CryptoKeyFormat.Raw, key, scheme).value
     )
 
   implicit def asymmetricEncryptedArb[T]: Arbitrary[AsymmetricEncrypted[T]] =

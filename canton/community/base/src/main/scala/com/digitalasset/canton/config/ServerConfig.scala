@@ -9,7 +9,7 @@ import com.daml.nonempty.NonEmpty
 import com.daml.tls.{OcspProperties, ProtocolDisabler, TlsInfo, TlsVersion}
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.SequencerAlias
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.AdminServerConfig.defaultAddress
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
@@ -23,6 +23,7 @@ import com.digitalasset.canton.networking.grpc.{
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TracingConfig
+import io.grpc.ServerInterceptor
 import io.netty.handler.ssl.{ClientAuth, SslContext}
 import org.slf4j.LoggerFactory
 
@@ -69,10 +70,10 @@ trait ServerConfig extends Product with Serializable {
     */
   def jwtTimestampLeeway: Option[JwtTimestampLeeway]
 
-  /** If defined, the admin-token based authoriztion will be supported when accessing this node
-    * through the given `address` and `port`.
+  /** The configuration of the admin-token based authorization that will be supported when accessing
+    * this node through the given `address` and `port`.
     */
-  def adminToken: Option[String]
+  def adminTokenConfig: AdminTokenConfig
 
   /** server cert chain file if TLS is defined
     *
@@ -93,18 +94,22 @@ trait ServerConfig extends Product with Serializable {
       loggerFactory: NamedLoggerFactory,
       grpcMetrics: GrpcServerMetrics,
       authServices: Seq[AuthServiceConfig],
-      adminToken: Option[CantonAdminToken],
+      adminTokenDispenser: Option[CantonAdminTokenDispenser],
       jwtTimestampLeeway: Option[JwtTimestampLeeway],
+      adminTokenConfig: AdminTokenConfig,
       telemetry: Telemetry,
+      additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
   ): CantonServerInterceptors = new CantonCommunityServerInterceptors(
     tracingConfig,
     apiLoggingConfig,
     loggerFactory,
     grpcMetrics,
     authServices,
-    adminToken,
+    adminTokenDispenser,
     jwtTimestampLeeway,
+    adminTokenConfig,
     telemetry,
+    additionalInterceptors,
   )
 
 }
@@ -127,7 +132,7 @@ final case class AdminServerConfig(
     ),
     override val maxInboundMessageSize: NonNegativeInt = ServerConfig.defaultMaxInboundMessageSize,
     override val authServices: Seq[AuthServiceConfig] = Seq.empty,
-    override val adminToken: Option[String] = None,
+    override val adminTokenConfig: AdminTokenConfig = AdminTokenConfig(),
 ) extends ServerConfig
     with UniformCantonConfigValidation {
   def clientConfig: FullClientConfig =
@@ -349,9 +354,7 @@ sealed trait BaseTlsArguments {
   *   supported ciphers. Set to None (or null in config file) to default to JVM settings.
   * @param enableCertRevocationChecking
   *   whether to enable certificate revocation checking per
-  *   https://tersesystems.com/blog/2014/03/22/fixing-certificate-revocation/ TODO(#4881): implement
-  *   cert-revocation at the participant and synchronizer admin endpoints Ledger api server
-  *   reference PR: https://github.com/digital-asset/daml/pull/7965
+  *   https://tersesystems.com/blog/2014/03/22/fixing-certificate-revocation/
   */
 // Information in this ScalaDoc comment has been taken from https://grpc.io/docs/guides/auth/.
 final case class TlsServerConfig(
@@ -598,4 +601,38 @@ object ServerAuthRequirementConfig {
   case object None extends ServerAuthRequirementConfig {
     val clientAuth = ClientAuth.NONE
   }
+}
+
+/** Configuration for admin-token based authorization.
+  *
+  * The given token will be valid forever but it will not be used internally. Other admin-tokens
+  * will be generated and rotated periodically. The fixed token is only used for testing purposes
+  * and should not be used in production.
+  *
+  * The admin-token based authorization will create tokens and rotate them periodically. Each
+  * admin-token is valid for the defined token duration. The half of this value is used as the
+  * rotation interval, after which a new admin-token is generated (if needed).
+  */
+final case class AdminTokenConfig(
+    fixedAdminToken: Option[String] = None,
+    adminTokenDuration: PositiveFiniteDuration = AdminTokenConfig.DefaultAdminTokenDuration,
+    actAsAnyPartyClaim: Boolean = true,
+    adminClaim: Boolean = true,
+) extends UniformCantonConfigValidation {
+
+  def merge(other: AdminTokenConfig): AdminTokenConfig =
+    AdminTokenConfig(
+      fixedAdminToken = fixedAdminToken.orElse(other.fixedAdminToken),
+      adminTokenDuration = adminTokenDuration.min(other.adminTokenDuration),
+      actAsAnyPartyClaim = actAsAnyPartyClaim && other.actAsAnyPartyClaim,
+      adminClaim = adminClaim && other.adminClaim,
+    )
+}
+
+object AdminTokenConfig {
+
+  implicit val adminTokenConfigCantonConfigValidator: CantonConfigValidator[AdminTokenConfig] =
+    CantonConfigValidatorDerivation[AdminTokenConfig]
+
+  val DefaultAdminTokenDuration: PositiveFiniteDuration = PositiveFiniteDuration.ofMinutes(5)
 }

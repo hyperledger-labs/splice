@@ -8,6 +8,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawCreatedEvent,
   UnassignProperties,
 }
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.digitalasset.daml.lf.data.{Ref, Time}
@@ -289,10 +290,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
       .map(original =>
         original.copy(
           event = original.event.copy(
-            rawCreatedEvent = rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+            rawCreatedEvent = rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
               original.event.rawCreatedEvent,
               someSerializedDamlLfValue,
-              someDriverMetadataBytes,
+              someAuthenticationDataBytes,
             )
           ),
           traceContext = hasSameTraceContext(original.traceContext, Some(emptyTraceContext)),
@@ -321,9 +322,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               offset = 1,
               nodeId = 24,
               contractId = hashCid("#1"),
-              templateId = someTemplateId,
-              packageName = somePackageName,
+              templateId = someTemplateIdFull,
               witnessParties = Set("signatory"),
+              flatEventWitnesses = Set("signatory"),
               signatories = Set("signatory"),
               observers = Set("observer"),
               createArgument = someSerializedDamlLfValue,
@@ -333,9 +334,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               createKeyValueCompression = Some(456),
               ledgerEffectiveTime = someTime,
               createKeyHash = None,
-              driverMetadata = someDriverMetadataBytes,
+              authenticationData = someAuthenticationDataBytes,
             ),
           ),
+          externalTransactionHash = None,
         ),
         Entry(
           commandId = Some("command id 2"),
@@ -358,9 +360,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               offset = 2,
               nodeId = 42,
               contractId = hashCid("#2"),
-              templateId = someTemplateId,
-              packageName = somePackageName,
+              templateId = someTemplateIdFull,
               witnessParties = Set("signatory"),
+              flatEventWitnesses = Set("signatory"),
               signatories = Set("signatory"),
               observers = Set("observer"),
               createArgument = someSerializedDamlLfValue,
@@ -370,9 +372,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
               createKeyValueCompression = Some(456),
               ledgerEffectiveTime = someTime,
               createKeyHash = None,
-              driverMetadata = someDriverMetadataBytes,
+              authenticationData = someAuthenticationDataBytes,
             ),
           ),
+          externalTransactionHash = None,
         ),
       )
     )
@@ -428,12 +431,12 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           submitter = Option(someParty),
           reassignmentCounter = 1000L,
           contractId = hashCid("#1"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("signatory"),
           assignmentExclusivity = Some(Time.Timestamp.assertFromLong(11111)),
           nodeId = 24,
         ),
+        externalTransactionHash = None,
       ),
       Entry(
         commandId = Some("command id 2"),
@@ -452,12 +455,12 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           submitter = Option(someParty),
           reassignmentCounter = 1000L,
           contractId = hashCid("#2"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("signatory"),
           assignmentExclusivity = Some(Time.Timestamp.assertFromLong(11111)),
           nodeId = 42,
         ),
+        externalTransactionHash = None,
       ),
     )
   }
@@ -542,7 +545,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#1"),
         commandId = "command id 1",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoCreate(
         offset = offset(2),
@@ -550,7 +553,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#2"),
         commandId = "command id 2",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoExercise(
         offset = offset(3),
@@ -592,10 +595,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
       )
     ).map(activeContract =>
       activeContract.copy(rawCreatedEvent =
-        rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+        rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
           activeContract.rawCreatedEvent,
           someSerializedDamlLfValue,
-          someDriverMetadataBytes,
+          someAuthenticationDataBytes,
         )
       )
     ) shouldBe Vector(
@@ -608,9 +611,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 1,
           nodeId = 0,
           contractId = hashCid("#1"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -620,7 +623,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = None,
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 1L,
       ),
@@ -633,9 +636,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 2,
           nodeId = 0,
           contractId = hashCid("#2"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -645,7 +648,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = None,
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 2L,
       ),
@@ -741,10 +744,10 @@ private[backend] trait StorageBackendTestsReassignmentEvents
       )
     ).map(activeContract =>
       activeContract.copy(rawCreatedEvent =
-        rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+        rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
           activeContract.rawCreatedEvent,
           someSerializedDamlLfValue,
-          someDriverMetadataBytes,
+          someAuthenticationDataBytes,
         )
       )
     ) shouldBe Vector(
@@ -757,9 +760,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 2,
           nodeId = 0,
           contractId = hashCid("#1"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -769,7 +772,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = Some(456),
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 2L,
       ),
@@ -782,9 +785,9 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           offset = 3,
           nodeId = 0,
           contractId = hashCid("#2"),
-          templateId = someTemplateId,
-          packageName = somePackageName,
+          templateId = someTemplateIdFull,
           witnessParties = Set("observer"),
+          flatEventWitnesses = Set("observer"),
           signatories = Set("signatory"),
           observers = Set("observer"),
           createArgument = someSerializedDamlLfValue,
@@ -794,7 +797,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
           createKeyValueCompression = Some(456),
           ledgerEffectiveTime = someTime,
           createKeyHash = None,
-          driverMetadata = someDriverMetadataBytes,
+          authenticationData = someAuthenticationDataBytes,
         ),
         eventSequentialId = 3L,
       ),
@@ -848,7 +851,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#1"),
         commandId = "command id 1",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoCreate(
         offset = offset(2),
@@ -856,7 +859,7 @@ private[backend] trait StorageBackendTestsReassignmentEvents
         contractId = hashCid("#2"),
         commandId = "command id 2",
         synchronizerId = "x::synchronizer1",
-        driverMetadata = someDriverMetadataBytes,
+        authenticationData = someAuthenticationDataBytes,
       ),
       dtoExercise(
         offset = offset(3),
@@ -1006,16 +1009,16 @@ private[backend] trait StorageBackendTestsReassignmentEvents
     ) shouldBe Vector(1L, 2L)
   }
 
-  def rawCreatedEventHasExpectedCreateArgumentAndDriverMetadata(
+  def rawCreatedEventHasExpectedCreateArgumentAndAuthenticationData(
       rawCreatedEvent: RawCreatedEvent,
       createArgument: Array[Byte],
-      driverMetadata: Array[Byte],
+      authenticationData: Array[Byte],
   ): RawCreatedEvent = {
     rawCreatedEvent.createArgument.toList shouldBe createArgument.toList
-    rawCreatedEvent.driverMetadata.toList shouldBe driverMetadata.toList
+    rawCreatedEvent.authenticationData.toList shouldBe authenticationData.toList
     rawCreatedEvent.copy(
       createArgument = createArgument,
-      driverMetadata = driverMetadata,
+      authenticationData = authenticationData,
     )
   }
 

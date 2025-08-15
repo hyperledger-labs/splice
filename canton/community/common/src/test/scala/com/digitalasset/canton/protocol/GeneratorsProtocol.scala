@@ -28,6 +28,8 @@ import com.google.protobuf.ByteString
 import magnolify.scalacheck.auto.*
 import org.scalacheck.{Arbitrary, Gen}
 
+import scala.jdk.CollectionConverters.*
+
 final class GeneratorsProtocol(
     protocolVersion: ProtocolVersion,
     generatorsLf: GeneratorsLf,
@@ -184,6 +186,7 @@ final class GeneratorsProtocol(
     ((_: CantonContractIdVersion) match {
       case AuthenticatedContractIdVersionV10 => ()
       case AuthenticatedContractIdVersionV11 => ()
+      case CantonContractIdV2Version0 => () // TODO(#23971): Add support for V2
     }).discard
   }
   def serializableContractArb(
@@ -211,7 +214,7 @@ final class GeneratorsProtocol(
           createIndex = 0,
           ledgerCreateTime = ledgerCreateTime,
           metadata = metadata,
-          suffixedContractInstance = rawContractInstance,
+          suffixedContractInstance = rawContractInstance.contractInstance.unversioned,
           cantonContractIdVersion = contractIdVersion,
         )
 
@@ -227,10 +230,11 @@ final class GeneratorsProtocol(
         rawContractInstance,
         metadata,
         ledgerCreateTime,
-        contractSalt = computedSalt.unwrap,
+        authenticationData = ContractAuthenticationDataV1(computedSalt.unwrap)(contractIdVersion),
       )
     )
   }
+
   def serializableContractArb(
       canHaveEmptyKey: Boolean
   ): Arbitrary[SerializableContract] = Arbitrary(
@@ -240,10 +244,40 @@ final class GeneratorsProtocol(
     } yield contract
   )
 
+  def contractInstanceArb[Time <: CreationTime](
+      canHaveEmptyKey: Boolean,
+      genTime: Gen[Time],
+      overrideContractId: Option[LfContractId] = None,
+  ): Arbitrary[GenContractInstance { type InstCreatedAtTime <: Time }] = Arbitrary(
+    for {
+      metadata <- contractMetadataArb(canHaveEmptyKey).arbitrary
+      createdAt <- genTime
+    } yield ExampleContractFactory.build[Time](
+      createdAt = createdAt,
+      signatories = metadata.signatories,
+      stakeholders = metadata.stakeholders,
+      keyOpt = metadata.maybeKeyWithMaintainers,
+      overrideContractId = overrideContractId,
+    )
+  )
+
+  def contractInstanceWithMetadataArb(
+      metadata: ContractMetadata
+  ): Arbitrary[ContractInstance] = Arbitrary(
+    for {
+      createdAt <- Arbitrary.arbitrary[CreationTime.CreatedAt]
+    } yield ExampleContractFactory.build(
+      createdAt = createdAt,
+      signatories = metadata.signatories,
+      stakeholders = metadata.stakeholders,
+      keyOpt = metadata.maybeKeyWithMaintainers,
+    )
+  )
+
   implicit val globalKeyWithMaintainersArb: Arbitrary[Versioned[LfGlobalKeyWithMaintainers]] =
     Arbitrary(
       for {
-        maintainers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+        maintainers <- nonEmptySetGen[LfPartyId]
         key <- Arbitrary.arbitrary[LfGlobalKey]
       } yield ExampleTransactionFactory.globalKeyWithMaintainers(
         key,
@@ -258,8 +292,8 @@ final class GeneratorsProtocol(
         else Gen.some(globalKeyWithMaintainersArb.arbitrary)
       maintainers = maybeKeyWithMaintainers.fold(Set.empty[LfPartyId])(_.unversioned.maintainers)
 
-      signatories <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
-      observers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      signatories <- nonEmptySetGen[LfPartyId]
+      observers <- boundedSetGen[LfPartyId]
 
       allSignatories = maintainers ++ signatories
       allStakeholders = allSignatories ++ observers
@@ -274,8 +308,8 @@ final class GeneratorsProtocol(
 
   implicit val stakeholdersArb: Arbitrary[Stakeholders] = Arbitrary(
     for {
-      signatories <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
-      observers <- Gen.containerOf[Set, LfPartyId](Arbitrary.arbitrary[LfPartyId])
+      signatories <- boundedSetGen[LfPartyId]
+      observers <- boundedSetGen[LfPartyId]
     } yield Stakeholders.withSignatoriesAndObservers(
       signatories = signatories,
       observers = observers,
@@ -285,27 +319,24 @@ final class GeneratorsProtocol(
   implicit val requestIdArb: Arbitrary[RequestId] = genArbitrary
 
   implicit val rollbackContextArb: Arbitrary[RollbackContext] =
-    Arbitrary(Gen.listOf(Arbitrary.arbitrary[PositiveInt]).map(RollbackContext.apply))
+    Arbitrary(boundedListGen[PositiveInt].map(RollbackContext.apply))
 
   implicit val createdContractArb: Arbitrary[CreatedContract] = Arbitrary(
     for {
-      contract <- serializableContractArb(canHaveEmptyKey = true).arbitrary
+      contract <- contractInstanceArb(
+        canHaveEmptyKey = true,
+        genTime = Arbitrary.arbitrary[CreationTime.CreatedAt],
+      ).arbitrary
       consumedInCore <- Gen.oneOf(true, false)
       rolledBack <- Gen.oneOf(true, false)
-    } yield CreatedContract
-      .create(
-        contract,
-        consumedInCore,
-        rolledBack,
-      )
-      .value
+    } yield CreatedContract.create(contract, consumedInCore, rolledBack).value
   )
 
   implicit val contractReassignmentBatch: Arbitrary[ContractsReassignmentBatch] = Arbitrary(
     for {
       metadata <- contractMetadataArb(canHaveEmptyKey = true).arbitrary
-      contracts <- Gen.nonEmptyContainerOf[Seq, SerializableContract](
-        serializableContractArb(metadata).arbitrary
+      contracts <- nonEmptyListGen[ContractInstance](
+        Arbitrary(contractInstanceWithMetadataArb(metadata).arbitrary)
       )
       reassignmentCounters <- Gen
         .containerOfN[Seq, ReassignmentCounter](contracts.length, reassignmentCounterGen)
@@ -315,9 +346,16 @@ final class GeneratorsProtocol(
 
   implicit val externalAuthorizationArb: Arbitrary[ExternalAuthorization] = Arbitrary(
     for {
-      signatures <- Arbitrary.arbitrary[Map[PartyId, Seq[Signature]]]
+      parties <- boundedListGen[PartyId]
+      signatures <- Gen.sequence(
+        parties.map(p => boundedListGen[Signature].map(p -> _))
+      )
       hashingSchemeVersion <- Arbitrary.arbitrary[HashingSchemeVersion]
-    } yield ExternalAuthorization.create(signatures, hashingSchemeVersion, protocolVersion)
+    } yield ExternalAuthorization.create(
+      signatures.asScala.toMap,
+      hashingSchemeVersion,
+      protocolVersion,
+    )
   )
 
   implicit val protocolSymmetricKeyArb: Arbitrary[ProtocolSymmetricKey] =
@@ -326,5 +364,4 @@ final class GeneratorsProtocol(
         key <- Arbitrary.arbitrary[SymmetricKey]
       } yield ProtocolSymmetricKey(key, protocolVersion)
     )
-
 }

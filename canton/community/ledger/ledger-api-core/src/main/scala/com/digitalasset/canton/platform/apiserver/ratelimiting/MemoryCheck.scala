@@ -5,16 +5,18 @@ package com.digitalasset.canton.platform.apiserver.ratelimiting
 
 import com.digitalasset.canton.ledger.error.LedgerApiErrors.HeapMemoryOverLimit
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
-import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
-import com.digitalasset.canton.platform.apiserver.ratelimiting.LimitResult.{
+import com.digitalasset.canton.networking.grpc.ratelimiting.LimitResult
+import com.digitalasset.canton.networking.grpc.ratelimiting.LimitResult.{
   LimitResultCheck,
   OverLimit,
   UnderLimit,
 }
+import com.digitalasset.canton.platform.apiserver.configuration.RateLimitingConfig
 
 import java.lang.management.{MemoryMXBean, MemoryPoolMXBean, MemoryType, MemoryUsage}
 import java.util.concurrent.atomic.AtomicLong
 import javax.management.ObjectName
+import scala.annotation.nowarn
 import scala.concurrent.duration.{Duration, DurationInt}
 
 object MemoryCheck {
@@ -102,7 +104,9 @@ object MemoryCheck {
     }
 
     // Delegated methods
+    @nowarn("cat=deprecation") // See https://openjdk.org/jeps/421
     override def getObjectPendingFinalizationCount: Int = delegate.getObjectPendingFinalizationCount
+
     override def getHeapMemoryUsage: MemoryUsage = delegate.getHeapMemoryUsage
     override def getNonHeapMemoryUsage: MemoryUsage = delegate.getNonHeapMemoryUsage
     override def isVerbose: Boolean = delegate.isVerbose

@@ -25,8 +25,8 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.BftOrderingMessageBody.Message
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.{
+  BftOrderingMessage,
   BftOrderingMessageBody,
-  BftOrderingServiceReceiveRequest,
 }
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -44,9 +44,9 @@ class P2PNetworkInModule[E <: Env[E]](
   private type OutcomeType = metrics.p2p.receive.labels.source.values.SourceValue
 
   override def receiveInternal(
-      message: BftOrderingServiceReceiveRequest
+      message: BftOrderingMessage
   )(implicit
-      context: E#ActorContextT[BftOrderingServiceReceiveRequest],
+      context: E#ActorContextT[BftOrderingMessage],
       traceContext: TraceContext,
   ): Unit = {
     val sentBy = BftNodeId(message.sentBy)
@@ -57,7 +57,7 @@ class P2PNetworkInModule[E <: Env[E]](
       sentBy,
       message.body,
       start,
-    )
+    )(TraceContext.fromW3CTraceParent(message.traceContext))
   }
 
   private def parseAndForwardBody(
@@ -98,7 +98,7 @@ class P2PNetworkInModule[E <: Env[E]](
               logger.warn(
                 s"Dropping availability message from $from as it couldn't be parsed: $errorMessage"
               ),
-            msg => availability.asyncSendTraced(msg),
+            msg => availability.asyncSend(msg),
           )
         metrics.p2p.receive.labels.source.values.Availability(from)
       case Message.ConsensusMessage(consensusMessage) =>
@@ -118,26 +118,19 @@ class P2PNetworkInModule[E <: Env[E]](
                   s"Received retransmitted message at epoch $epoch from $from originally created by $originalSender"
                 )
               }
-              consensus.asyncSendTraced(message)
+              consensus.asyncSend(message)
             },
           )
         metrics.p2p.receive.labels.source.values.Consensus(from)
       case Message.RetransmissionMessage(message) =>
-        SignedMessage
-          .fromProto(v30.RetransmissionMessage)(
-            IssConsensusModule.parseRetransmissionMessage(from, _)
-          )(
-            message
-          )
+        IssConsensusModule
+          .parseRetransmissionMessage(from, message)
           .fold(
             errorMessage =>
               logger.warn(
                 s"Dropping retransmission message from $from as it couldn't be parsed: $errorMessage"
               ),
-            signedMessage =>
-              consensus.asyncSendTraced(
-                Consensus.RetransmissionsMessage.UnverifiedNetworkMessage(signedMessage)
-              ),
+            message => consensus.asyncSend(message),
           )
         metrics.p2p.receive.labels.source.values.Retransmissions(from)
 
@@ -153,10 +146,14 @@ class P2PNetworkInModule[E <: Env[E]](
                 s"Dropping state transfer message from $from as it couldn't be parsed: $errorMessage"
               ),
             signedMessage =>
-              consensus.asyncSendTraced(
+              consensus.asyncSend(
                 Consensus.StateTransferMessage.UnverifiedStateTransferMessage(signedMessage)
               ),
           )
         metrics.p2p.receive.labels.source.values.StateTransfer(from)
+
+      case Message.ConnectionOpened(_) =>
+        logger.debug(s"Received connection opener from $from")
+        metrics.p2p.receive.labels.source.values.ConnectionOpener(from)
     }
 }

@@ -32,14 +32,21 @@ import com.digitalasset.canton.synchronizer.sequencer.Sequencer.{
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockOrderer
 import com.digitalasset.canton.synchronizer.sequencer.block.BlockSequencerFactory.OrderingTimeFixMode
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.BftOrderingSequencerAdminService
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.{
+  BftOrderingSequencerAdminService,
+  GrpcBftOrderingSequencerPruningAdminService,
+}
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.canton.topology.SequencerNodeId
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.authentication.ServerAuthenticatingServerFilter
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.PekkoP2PGrpcNetworking.PekkoP2PGrpcNetworkRefFactory
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.authentication.ServerAuthenticatingServerInterceptor
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.{
-  GrpcBftOrderingService,
-  GrpcNetworking,
-  PekkoGrpcP2PNetworking,
+  P2PGrpcBftOrderingService,
+  P2PGrpcConnectionManager,
+  P2PGrpcNetworking,
+  P2PGrpcServerManager,
+  P2PGrpcStreamingServerSideReceiver,
+  PekkoP2PGrpcNetworking,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.pekko.PekkoModuleSystem.{
   PekkoEnv,
@@ -57,15 +64,13 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.mod
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.PekkoBlockSubscription
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.data.OutputMetadataStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.p2p.data.P2PEndpointsStore
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.pruning.BftOrdererPruningScheduler
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.pruning.data.BftOrdererPruningSchedulerStore
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.{
   BftBlockOrdererConfig,
   BftOrderingModuleSystemInitializer,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.{
-  SystemInitializationResult,
-  SystemInitializer,
-}
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleRef
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.SystemInitializer
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.{
   BlockNumber,
   EpochLength,
@@ -77,12 +82,15 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   Output,
   SequencerNode,
 }
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
+  ModuleRef,
+  P2PConnectionEventListener,
+}
 import com.digitalasset.canton.synchronizer.sequencer.errors.SequencerError
 import com.digitalasset.canton.synchronizer.sequencer.{AuthenticationServices, SequencerSnapshot}
 import com.digitalasset.canton.synchronizer.sequencing.sequencer.bftordering.v30.{
+  BftOrderingMessage,
   BftOrderingServiceGrpc,
-  BftOrderingServiceReceiveRequest,
-  BftOrderingServiceReceiveResponse,
 }
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{Member, PhysicalSynchronizerId, SequencerId}
@@ -121,16 +129,20 @@ final class BftBlockOrderer(
 )(implicit executionContext: ExecutionContext, materializer: Materializer)
     extends BlockOrderer
     with NamedLogging
-    with FlagCloseableAsync {
+    with FlagCloseableAsync
+    with HasCloseContext {
 
   import BftBlockOrderer.*
-
-  private implicit val protocolVersion: ProtocolVersion = psid.protocolVersion
 
   require(
     sequencerSubscriptionInitialHeight >= BlockNumber.First,
     s"The sequencer subscription initial height must be non-negative, but was $sequencerSubscriptionInitialHeight",
   )
+
+  private implicit val protocolVersion: ProtocolVersion = psid.protocolVersion
+
+  private val isAuthenticationEnabled =
+    config.initialNetwork.exists(_.endpointAuthentication.enabled)
 
   private val thisNode = SequencerNodeId.toBftNodeId(sequencerId)
 
@@ -179,8 +191,7 @@ final class BftBlockOrderer(
         loggedP2PEndpoint,
       )
 
-  private val closeable = FlagCloseable(loggerFactory.getTracedLogger(getClass), timeouts)
-  implicit private val closeContext: CloseContext = CloseContext(closeable)
+  checkConfigSecurity()
 
   private val p2pServerGrpcExecutor =
     Threading.newExecutionContext(
@@ -202,7 +213,7 @@ final class BftBlockOrderer(
 
   private val maybeServerAuthenticatingFilter =
     maybeAuthenticationServices.map { authenticationServices =>
-      new ServerAuthenticatingServerFilter(
+      new ServerAuthenticatingServerInterceptor(
         psid,
         sequencerId,
         authenticationServices.syncCryptoForAuthentication.crypto,
@@ -213,25 +224,12 @@ final class BftBlockOrderer(
       )
     }
 
-  private val p2pGrpcNetworking = {
-    val maybeGrpcNetworkingAuthenticationInitialState =
-      maybeAuthenticationServices.map { authenticationServices =>
-        GrpcNetworking.AuthenticationInitialState(
-          psid,
-          sequencerId,
-          authenticationServices,
-          authenticationTokenManagerConfig,
-          getServerToClientAuthenticationEndpoint(config),
-          clock,
-        )
-      }
-    new GrpcNetworking(
+  private val p2pGrpcServerManager =
+    new P2PGrpcServerManager(
       config.initialNetwork.map(_.serverEndpoint).map(createServer),
-      maybeGrpcNetworkingAuthenticationInitialState,
       timeouts,
       loggerFactory,
     )
-  }
 
   private val localStorage = {
     implicit val traceContext: TraceContext = TraceContext.empty
@@ -255,6 +253,8 @@ final class BftBlockOrderer(
   private val availabilityStore = AvailabilityStore(localStorage, timeouts, loggerFactory)
   private val epochStore = EpochStore(localStorage, timeouts, loggerFactory)
   private val outputStore = OutputMetadataStore(localStorage, timeouts, loggerFactory)
+  private val pruningSchedulerStore =
+    BftOrdererPruningSchedulerStore(localStorage, timeouts, loggerFactory)
 
   private val sequencerSnapshotAdditionalInfo = sequencerSnapshotInfo.map { snapshot =>
     implicit val traceContext: TraceContext = TraceContext.empty
@@ -275,25 +275,25 @@ final class BftBlockOrderer(
 
   private val PekkoModuleSystem.PekkoModuleSystemInitResult(
     actorSystem,
-    SystemInitializationResult(
-      mempoolRef,
-      p2pNetworkInModuleRef,
-      p2pNetworkOutAdminModuleRef,
-      consensusAdminModuleRef,
-      outputModuleRef,
-    ),
+    initResult,
   ) = createModuleSystem()
 
-  // Start the gRPC server only now because they need the modules to be available before serving requests,
-  //  else `tryCreateServerEndpoint` could end up with a `null` input module. However, we still need
-  //  to create the networking component first because the modules depend on it.
-  p2pGrpcNetworking.serverRole.startServer()
+  private val mempoolRef = initResult.inputModuleRef
+  private val p2pNetworkInModuleRef = initResult.p2pNetworkInModuleRef
+  private val p2pNetworkOutAdminModuleRef = initResult.p2pNetworkOutAdminModuleRef
+  private val consensusAdminModuleRef = initResult.consensusAdminModuleRef
+  private val outputModuleRef = initResult.outputModuleRef
+  private val p2pNetworkRefFactory = initResult.p2pNetworkRefFactory
 
-  private def createModuleSystem() =
+  // Start the gRPC server only now because it needs the modules to be available before serving requests,
+  //  else creating a peer receiver could end up with a `null` input module.
+  p2pGrpcServerManager.startServer()
+
+  private def createModuleSystem(): PekkoModuleSystem.PekkoModuleSystemInitResult[Mempool.Message] =
     PekkoModuleSystem.tryCreate(
       "bftOrderingPekkoModuleSystem",
       createSystemInitializer(),
-      createClientNetworkManager(),
+      createClientNetworkManager,
       metrics,
       loggerFactory,
     )
@@ -341,7 +341,8 @@ final class BftBlockOrderer(
 
   private def createSystemInitializer(): SystemInitializer[
     PekkoEnv,
-    BftOrderingServiceReceiveRequest,
+    PekkoP2PGrpcNetworkRefFactory,
+    BftOrderingMessage,
     Mempool.Message,
   ] = {
     val stores =
@@ -351,6 +352,7 @@ final class BftBlockOrderer(
         epochStore,
         epochStoreReader = epochStore,
         outputStore,
+        pruningSchedulerStore,
       )
     new BftOrderingModuleSystemInitializer(
       thisNode,
@@ -371,42 +373,74 @@ final class BftBlockOrderer(
     )
   }
 
-  private def createClientNetworkManager() =
-    new PekkoGrpcP2PNetworking.PekkoClientP2PNetworkManager(
-      p2pGrpcNetworking.clientRole.getServerHandleOrStartConnection,
-      p2pGrpcNetworking.clientRole.closeConnection,
+  private val pruningScheduler: BftOrdererPruningScheduler = {
+    val scheduler = new BftOrdererPruningScheduler(
+      pruningSchedulerStore,
+      initResult.pruningModuleRef,
+      loggerFactory,
+      timeouts,
+    )
+    implicit val traceContext: TraceContext = TraceContext.empty
+    timeouts.default.await(s"${getClass.getSimpleName} starting pruning scheduler")(
+      scheduler.start()
+    )
+    scheduler
+  }
+
+  private def createClientNetworkManager(P2PConnectionEventListener: P2PConnectionEventListener) =
+    new PekkoP2PGrpcNetworking.PekkoP2PGrpcNetworkRefFactory(
+      createP2PGrpcClientConnectionManager(P2PConnectionEventListener),
       timeouts,
       loggerFactory,
       metrics,
     )
 
-  private def tryCreateServerEndpoint(
-      clientEndpoint: StreamObserver[BftOrderingServiceReceiveResponse]
-  ): StreamObserver[BftOrderingServiceReceiveRequest] = {
-    p2pGrpcNetworking.serverRole.addClientHandle(clientEndpoint)
-    PekkoGrpcP2PNetworking.tryCreateServerHandle(
-      SequencerNodeId.toBftNodeId(sequencerId),
-      p2pNetworkInModuleRef,
-      clientEndpoint,
-      p2pGrpcNetworking.serverRole.cleanupClientHandle,
-      getMessageSendInstant = msg => msg.sentAt.map(_.asJavaInstant),
-      loggerFactory,
+  private def createP2PGrpcClientConnectionManager(
+      p2pConnectionEventListener: P2PConnectionEventListener
+  ) = {
+    val maybeGrpcNetworkingAuthenticationInitialState =
+      maybeAuthenticationServices.map { authenticationServices =>
+        P2PGrpcNetworking.AuthenticationInitialState(
+          psid,
+          sequencerId,
+          authenticationServices,
+          authenticationTokenManagerConfig,
+          getServerToClientAuthenticationEndpoint(config),
+          clock,
+        )
+      }
+    new P2PGrpcConnectionManager(
+      thisNode,
+      maybeGrpcNetworkingAuthenticationInitialState,
+      p2pConnectionEventListener,
       metrics,
+      timeouts,
+      loggerFactory,
     )
   }
+
+  // Called by the Scala gRPC service binding when we receive a request to establish the P2P gRPC streaming channel;
+  //  it either returns a new receiver for the gRPC stream or throws, which fails the stream establishment and
+  //  is propagated to the peer as an error.
+  private def tryCreatePeerReceiverForIncomingConnection(
+      peerSender: StreamObserver[BftOrderingMessage]
+  ): P2PGrpcStreamingServerSideReceiver =
+    p2pNetworkRefFactory.connectionManager.tryCreateServerSidePeerReceiver(
+      p2pNetworkInModuleRef,
+      peerSender,
+    )
 
   private def createServer(
       serverConfig: ServerConfig
   ): UnlessShutdown[LifeCycle.CloseableServer] = {
     implicit val traceContext: TraceContext = TraceContext.empty
     synchronizeWithClosingSync("start-P2P-server") {
-
       import scala.jdk.CollectionConverters.*
       val activeServerBuilder =
         CantonServerBuilder
           .forConfig(
             config = serverConfig,
-            adminToken = None,
+            adminTokenDispenser = None,
             executor = p2pServerGrpcExecutor,
             loggerFactory = loggerFactory,
             apiLoggingConfig = nodeParameters.loggingConfig.api,
@@ -417,17 +451,15 @@ final class BftBlockOrderer(
           .addService(
             ServerInterceptors.intercept(
               BftOrderingServiceGrpc.bindService(
-                new GrpcBftOrderingService(
-                  tryCreateServerEndpoint,
+                new P2PGrpcBftOrderingService(
+                  tryCreatePeerReceiverForIncomingConnection,
                   loggerFactory,
                 ),
                 executionContext,
               ),
               List( // Filters are applied in reverse order
                 maybeServerAuthenticatingFilter,
-                maybeAuthenticationServices.map(
-                  _.authenticationServerInterceptor
-                ),
+                maybeAuthenticationServices.map(_.authenticationServerInterceptor),
               ).flatten.asJava,
             )
           )
@@ -489,26 +521,41 @@ final class BftBlockOrderer(
   )(implicit traceContext: TraceContext): Source[RawLedgerBlock, KillSwitch] =
     blockSubscription.subscription().map(BlockFormat.blockOrdererBlockToRawLedgerBlock(logger))
 
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    maybeServerAuthenticatingFilter.map(_.closeAsync()).getOrElse(Seq.empty) ++
-      Seq[AsyncOrSyncCloseable](
-        SyncCloseable("p2pGrpcNetworking.close()", p2pGrpcNetworking.close()),
-        SyncCloseable("p2pServerGrpcExecutor.shutdown()", p2pServerGrpcExecutor.shutdown()),
-        SyncCloseable("blockSubscription.close()", blockSubscription.close()),
-        SyncCloseable("epochStore.close()", epochStore.close()),
-        SyncCloseable("outputStore.close()", outputStore.close()),
-        SyncCloseable("availabilityStore.close()", availabilityStore.close()),
-        SyncCloseable("p2pEndpointsStore.close()", p2pEndpointsStore.close()),
-        SyncCloseable("shutdownPekkoActorSystem()", shutdownPekkoActorSystem()),
-      ) ++
-      Seq[Option[AsyncOrSyncCloseable]](
-        Option.when(localStorage != sharedLocalStorage)(
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    logger.debug("Beginning async BFT block orderer shutdown")(TraceContext.empty)
+
+    // Shutdown the P2P network client portion and module system
+    Seq[AsyncOrSyncCloseable](
+      SyncCloseable(
+        "p2pNetworkRefFactory.close()",
+        p2pNetworkRefFactory.close(),
+      ),
+      SyncCloseable("blockSubscription.close()", blockSubscription.close()),
+      SyncCloseable("epochStore.close()", epochStore.close()),
+      SyncCloseable("outputStore.close()", outputStore.close()),
+      SyncCloseable("availabilityStore.close()", availabilityStore.close()),
+      SyncCloseable("p2pEndpointsStore.close()", p2pEndpointsStore.close()),
+      SyncCloseable("pruningScheduler.close()", pruningScheduler.close()),
+      SyncCloseable("pruningSchedulerStore.close()", pruningSchedulerStore.close()),
+      SyncCloseable("shutdownPekkoActorSystem()", shutdownPekkoActorSystem()),
+    ) ++
+      // Shutdown the dedicated local storage if present
+      Option
+        .when(localStorage != sharedLocalStorage)(
           SyncCloseable("dedicatedLocalStorage.close()", localStorage.close())
         )
-      ).flatten ++
+        .toList ++
+      // Shutdown the P2P server + connection manager and associated executor
       Seq[AsyncOrSyncCloseable](
-        SyncCloseable("closeable.close()", closeable.close())
-      )
+        SyncCloseable(
+          "p2pGrpcServerConnectionManager.close()",
+          p2pGrpcServerManager.close(),
+        ),
+        SyncCloseable("p2pServerGrpcExecutor.shutdown()", p2pServerGrpcExecutor.shutdown()),
+      ) ++
+      // Shutdown the reused Canton member authentication services, if authentication is enabled
+      maybeServerAuthenticatingFilter.map(_.closeAsync()).getOrElse(Seq.empty)
+  }
 
   override def adminServices: Seq[ServerServiceDefinition] =
     Seq(
@@ -519,7 +566,19 @@ final class BftBlockOrderer(
           loggerFactory,
         ),
         executionContext,
-      )
+      ),
+      v30.SequencerBftPruningAdministrationServiceGrpc.bindService(
+        new GrpcBftOrderingSequencerPruningAdminService(
+          initResult.pruningModuleRef,
+          pruningScheduler,
+          loggerFactory,
+        )(
+          executionContext,
+          metricsContext,
+          TraceContext.empty,
+        ),
+        executionContext,
+      ),
     )
 
   override def sequencerSnapshotAdditionalInfo(
@@ -527,13 +586,13 @@ final class BftBlockOrderer(
   ): EitherT[Future, SequencerError, Option[v30.BftSequencerSnapshotAdditionalInfo]] = {
     val replyPromise = Promise[SequencerNode.SnapshotMessage]()
     val replyRef = new ModuleRef[SequencerNode.SnapshotMessage] {
-      override def asyncSendTraced(msg: SequencerNode.SnapshotMessage)(implicit
+      override def asyncSend(msg: SequencerNode.SnapshotMessage)(implicit
           traceContext: TraceContext,
           metricsContext: MetricsContext,
       ): Unit =
         replyPromise.success(msg)
     }
-    outputModuleRef.asyncSend(
+    outputModuleRef.asyncSendNoTrace(
       Output.SequencerSnapshotMessage.GetAdditionalInfo(timestamp, replyRef)
     )
     EitherT(replyPromise.future.map {
@@ -564,13 +623,13 @@ final class BftBlockOrderer(
   )(implicit traceContext: TraceContext): EitherT[Future, SequencerDeliverError, Unit] = {
     val replyPromise = Promise[SequencerNode.Message]()
     val replyRef = new ModuleRef[SequencerNode.Message] {
-      override def asyncSendTraced(msg: SequencerNode.Message)(implicit
+      override def asyncSend(msg: SequencerNode.Message)(implicit
           traceContext: TraceContext,
           metricsContext: MetricsContext,
       ): Unit =
         replyPromise.success(msg)
     }
-    mempoolRef.asyncSendTraced(
+    mempoolRef.asyncSend(
       Mempool.OrderRequest(
         Traced(
           OrderingRequest(
@@ -589,6 +648,23 @@ final class BftBlockOrderer(
         Left(SequencerErrors.Overloaded(reason)) // Currently the only case
       case _ => Left(SequencerErrors.Internal("wrong response"))
     })
+  }
+
+  private def checkConfigSecurity(): Unit = {
+    if (
+      !(isAuthenticationEnabled || config.initialNetwork
+        .map(_.peerEndpoints)
+        .forall(_.forall(_.tlsConfig.forall(_.enabled))))
+    )
+      logger.warn(
+        "Insecure setup: at least one of P2P endpoint authentication or mTLS must be set up for P2P endpoints to be verifiably associated to sequencer nodes"
+      )(TraceContext.empty)
+
+    if (config.initialNetwork.forall(_.serverEndpoint.tls.isEmpty))
+      logger.info(
+        "TLS is not enabled for the P2P server endpoint; make sure that at least TLS termination is correctly set up " +
+          "to ensure channel confidentiality and integrity"
+      )(TraceContext.empty)
   }
 
   private def awaitFuture[T](f: PekkoFutureUnlessShutdown[T], description: String)(implicit

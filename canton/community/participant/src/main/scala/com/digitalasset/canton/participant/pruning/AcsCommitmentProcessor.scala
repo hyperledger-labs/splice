@@ -40,20 +40,20 @@ import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.AcsCommitmentErrorGroup
 import com.digitalasset.canton.error.{CantonError, ContextualizedCantonError}
 import com.digitalasset.canton.health.{AtomicHealthComponent, ComponentHealthState}
+import com.digitalasset.canton.ledger.participant.state.{
+  AcsChange,
+  AcsChangeFactory,
+  ContractStakeholdersAndReassignmentCounter,
+}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.logging.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.event.{
-  AcsChange,
-  AcsChangeListener,
-  ContractStakeholdersAndReassignmentCounter,
-  RecordTime,
-}
+import com.digitalasset.canton.participant.event.{AcsChangeListener, RecordTime}
 import com.digitalasset.canton.participant.metrics.CommitmentMetrics
-import com.digitalasset.canton.participant.protocol.conflictdetection.CommitSet
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.Errors.DegradationError
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.Errors.MismatchError.AcsCommitmentAlarm
+import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.PublishTickData.PersistRunningCommitmentsAtUpgradeTime
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.RunningCommitments
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.util.TimeOfChange
@@ -69,8 +69,8 @@ import com.digitalasset.canton.protocol.messages.{
 }
 import com.digitalasset.canton.protocol.{
   AcsCommitmentsCatchUpParameters,
+  ContractInstance,
   LfContractId,
-  SerializableContract,
 }
 import com.digitalasset.canton.pruning.{
   ConfigForNoWaitCounterParticipants,
@@ -452,91 +452,93 @@ class AcsCommitmentProcessor private (
       else cur
     }.discard
 
-  override def publish(toc: RecordTime, acsChange: AcsChange)(implicit
+  override def publish(
+      toc: RecordTime,
+      acsChange: AcsChange,
+  )(implicit
       traceContext: TraceContext
   ): Unit =
-    publishInternal(
-      toc,
-      () => FutureUnlessShutdown.pure(acsChange),
-    )
+    publishInternal(PublishTickData.Regular(toc, () => FutureUnlessShutdown.pure(acsChange)))
 
   override def publish(
       toc: RecordTime,
-      commitSetO: Option[CommitSet],
+      acsChangeFactoryO: Option[AcsChangeFactory],
   )(implicit
       traceContext: TraceContext
   ): Unit =
     publishInternal(
-      toc,
-      () => computeAcsChange(toc, commitSetO),
+      PublishTickData.Regular(
+        toc,
+        () => computeAcsChange(toc, acsChangeFactoryO),
+      )
     )
 
-  private def computeAcsChange(toc: RecordTime, commitSetO: Option[CommitSet])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[AcsChange] = {
-    // If the commitSetO is not set, then by default the commit set is empty
-    val commitSet = commitSetO.getOrElse(CommitSet.empty)
-    // Augments the commit set with the updated reassignment counters for archive events,
-    // computes the acs change and publishes it
-    logger.trace(
-      show"The received commit set contains creations ${commitSet.creations} " +
-        show"assignments ${commitSet.assignments} " +
-        show"archivals ${commitSet.archivals} unassignments ${commitSet.unassignments}"
-    )
+  /** Publish to trigger the persisting of the running commitments. Should be called only at logical
+    * synchronizer upgrade time.
+    */
+  def publishForUpgradeTime(
+      upgradeTime: CantonTimestamp
+  )(implicit traceContext: TraceContext): Unit =
+    publishInternal(PublishTickData.PersistRunningCommitmentsAtUpgradeTime(upgradeTime))
 
-    val transientArchivals = reassignmentCountersForArchivedTransient(commitSet)
+  private def computeAcsChange(toc: RecordTime, acsChangeFactoryO: Option[AcsChangeFactory])(
+      implicit traceContext: TraceContext
+  ): FutureUnlessShutdown[AcsChange] = (acsChangeFactoryO match {
+    case None =>
+      FutureUnlessShutdown.pure(AcsChange.empty)
 
-    for {
+    case Some(withoutArchival) if withoutArchival.archivalCids.isEmpty =>
+      FutureUnlessShutdown.pure(withoutArchival.tryAcsChange(Map.empty))
+
+    case Some(acsChangeFactory) =>
       // Retrieves the reassignment counters of the archived contracts from the latest state in the active contract store
-      archivalsWithReassignmentCountersOnly <- activeContractStore
+      activeContractStore
         .contractsReassignmentCounterSnapshotBefore(
-          commitSet.archivals.keySet -- transientArchivals.keySet,
+          acsChangeFactory.archivalCids,
           toc.timestamp,
         )
-
-    } yield {
-      // Computes the ACS change by decorating the archive events in the commit set with their reassignment counters
-      val acsChange = AcsChange.tryFromCommitSet(
-        commitSet,
-        archivalsWithReassignmentCountersOnly,
-        transientArchivals,
-      )
-      // we only log the full list of changes on trace level
-      logger.trace(
-        s"Computed ACS change activations ${acsChange.activations} deactivations ${acsChange.deactivations}"
-      )
-
-      acsChange
-    }
+        .map(acsChangeFactory.tryAcsChange)
+  }).map { acsChange =>
+    // we only log the full list of changes on trace level
+    logger.trace(
+      s"Computed ACS change activations ${acsChange.activations} deactivations ${acsChange.deactivations}"
+    )
+    acsChange
   }
 
-  private def publishInternal(toc: RecordTime, acsChangeF: () => FutureUnlessShutdown[AcsChange])(
-      implicit traceContext: TraceContext
+  private def publishInternal(
+      publishTickData: PublishTickData
+  )(implicit
+      traceContext: TraceContext
   ): Unit = {
     @tailrec
     def go(): Unit =
       timestampsWithPotentialTopologyChanges.get().headOption match {
         // no upcoming topology change queued
-        case None => publishTick(toc, acsChangeF)
+        case None => publishTick(publishTickData)
+
         // pre-insert topology change queued
-        case Some(traced @ Traced(effectiveTime)) if effectiveTime.value <= toc.timestamp =>
+        case Some(traced @ Traced(effectiveTime))
+            if effectiveTime.value <= publishTickData.timestamp =>
           // remove the tick from our update
           timestampsWithPotentialTopologyChanges.updateAndGet(_.drop(1))
           // only update if this is a separate timestamp
           if (
-            effectiveTime.value < toc.timestamp && lastPublished.exists(
+            effectiveTime.value < publishTickData.timestamp && lastPublished.exists(
               _.timestamp < effectiveTime.value
             )
           ) {
             publishTick(
-              RecordTime(timestamp = effectiveTime, tieBreaker = 0),
-              () => FutureUnlessShutdown.pure(AcsChange.empty),
+              PublishTickData.Regular(
+                RecordTime(timestamp = effectiveTime, tieBreaker = 0),
+                () => FutureUnlessShutdown.pure(AcsChange.empty),
+              )
             )(traced.traceContext)
           }
           // now, iterate (there might have been several effective time updates)
           go()
-        case Some(_) =>
-          publishTick(toc, acsChangeF)
+
+        case Some(_) => publishTick(publishTickData)
       }
     go()
   }
@@ -554,7 +556,12 @@ class AcsCommitmentProcessor private (
     *      handle repair requests, as these may cause several changes to have the same timestamp.
     *      Actual ACS changes (e.g., due to transactions) use their request counter as the
     *      tie-breaker, while other updates (e.g., heartbeats) that only update the current time can
-    *      set the tie-breaker to 0
+    *      set the tie-breaker to 0. Note that if
+    *      [[com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.PublishTickData]] is
+    *      a
+    *      [[com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.PublishTickData.PersistRunningCommitmentsAtUpgradeTime]],
+    *      we only require monotonicity (instead of strict monotonicity). See comment in
+    *      `persistRunningCommitments`.
     *   1. after publish is first called within a participant's "crash-epoch" with timestamp `ts`
     *      and tie-breaker `tb`, all subsequent changes to the ACS are also published (no gaps), and
     *      in the record order
@@ -596,8 +603,23 @@ class AcsCommitmentProcessor private (
     *   a. *** default *** whose catch-up interval boundary commitments do not match or who haven't
     *      sent a catch-up interval boundary commitment yet
     */
-  private def publishTick(toc: RecordTime, acsChangeF: () => FutureUnlessShutdown[AcsChange])(
-      implicit traceContext: TraceContext
+  private def publishTick(
+      publishTickData: PublishTickData
+  )(implicit
+      traceContext: TraceContext
+  ): Unit = publishTickData match {
+    case PublishTickData.Regular(toc, acsChangeF) =>
+      publishTickInternal(toc, acsChangeF)
+
+    case upgrade: PublishTickData.PersistRunningCommitmentsAtUpgradeTime =>
+      persistRunningCommitments(upgrade)
+  }
+
+  private def publishTickInternal(
+      toc: RecordTime,
+      acsChangeF: () => FutureUnlessShutdown[AcsChange],
+  )(implicit
+      traceContext: TraceContext
   ): Unit = {
     if (!lastPublished.forall(_ < toc))
       throw new IllegalStateException(
@@ -862,6 +884,7 @@ class AcsCommitmentProcessor private (
                     }
                   } yield res
                 }
+
                 // Add the changes to the running commitments regardless of whether the change leads to a new period
                 _ = updateRunningCommitments(toc, acsChange)
               } yield processPeriodEnd
@@ -880,6 +903,54 @@ class AcsCommitmentProcessor private (
       failureMessage = s"Producing ACS commitments failed.",
       // If the failure is due to the DB instance transitioning to pasive, then failing to produce commitments is
       // expected, and we shouldn't log it as an error.
+      logPassiveInstanceAtInfo = true,
+    )
+  }
+
+  private def persistRunningCommitments(
+      persistenceAtUpdate: PersistRunningCommitmentsAtUpgradeTime
+  )(implicit
+      traceContext: TraceContext
+  ): Unit = {
+    val upgradeTime = persistenceAtUpdate.upgradeTime
+    val rt = RecordTime.fromTimeOfChange(TimeOfChange(upgradeTime, None))
+
+    /* The check is more lenient than the one in publishInternal. The reason we allow for equality
+     * is that we might have several events LogicalSynchronizerUpgradeTimeReached which lead to
+     * several calls to this method. This is safe because:
+     *   - This method is only about persistence.
+     *   - We ensure that the effects of previous messages (with ACS change) have been taken into
+     *     account.
+     *   - The sequencers will not sequencer any message with sequencing time = upgrade time.
+     */
+    if (!lastPublished.forall(_ <= rt))
+      throw new IllegalStateException(
+        s"Publish called with non-increasing record time, $rt (old was $lastPublished)"
+      )
+
+    logger.debug(s"Enqueuing persistence of the running commitments for ts=$upgradeTime")
+
+    val fut = publishQueue
+      .executeUS(
+        for {
+          _ <-
+            if (runningCommitments.watermark >= rt) {
+              logger.debug(s"ACS change at $rt is a replay, treating it as a no-op")
+              // This is a replay of an already processed ACS change, ignore
+              FutureUnlessShutdown.unit
+            } else {
+              updateRunningCommitments(rt, AcsChange.empty)
+              persistRunningCommitments(runningCommitments.snapshot())
+            }
+        } yield (),
+        s"persist running commitments at $rt",
+      )
+
+    FutureUtil.doNotAwait(
+      fut.onShutdown(
+        logger.info(s"Giving up on persisting running commitments at $rt")
+      ),
+      failureMessage = "Persisting running commitments failed.",
       logPassiveInstanceAtInfo = true,
     )
   }
@@ -1510,7 +1581,7 @@ class AcsCommitmentProcessor private (
   /** Checks whether a participant whose processing timestamp is the end of the given period lags
     * too far behind a counter participant. Lagging "too far behind" means that a received
     * counter-commitment has a timestamp ahead of the participant's current timestamp by at least
-    * reconciliation interval len * [[catchIpIntervalSkip]] * [[laggingBehindCatchUpTrigger]]. If
+    * reconciliation interval len * [[catchUpIntervalSkip]] * [[laggingBehindCatchUpTrigger]]. If
     * reconciliation intervals are dynamic, the reconciliation interval len represents the interval
     * len at the time when the catch-up decision is taken.
     * @return
@@ -1632,8 +1703,8 @@ class AcsCommitmentProcessor private (
         ): Either[CommitmentSendState, Unit]
       })
 
-    // returns a left if the commitment send failed and we want to retry
-    // we retry only in the case that the send failed because some of the recipients are no longer known
+    // returns a left if the commitment send failed, and we want to retry
+    // we retry only in the case that the sending failed because some of the recipients are no longer known
     def sendUnlessClosing(msgsFiltered: Seq[(ParticipantId, AcsCommitment)])(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, CommitmentSendState, Unit] = {
@@ -1645,7 +1716,7 @@ class AcsCommitmentProcessor private (
         signedCmtMsgs <- EitherT.right(
           msgsFiltered.parTraverse { case (participant, commitment) =>
             SignedProtocolMessage
-              .trySignAndCreate(commitment, cryptoSnapshot, protocolVersion)
+              .trySignAndCreate(commitment, cryptoSnapshot)
               .map(_ -> Recipients.cc(participant))
           }
         )
@@ -1672,7 +1743,10 @@ class AcsCommitmentProcessor private (
                       .flatMap {
                         case SendResult.Success(deliver) =>
                           val difference = deliver.timestamp.toMicros - period.toInclusive.toMicros
-                          metrics.sequencingTime.updateValue(difference)
+                          // subtract the randomized sending delay to reflect the actual sequencing delay
+                          metrics.sequencingTime.updateValue(
+                            difference - FiniteDuration(delayMillis, MILLISECONDS).toMicros
+                          )
                           FutureUnlessShutdown.pure(Right[CommitmentSendState, Unit](()).either)
                         case notSequenced: SendResult.NotSequenced =>
                           retryLogic(msgsFiltered, Some(notSequenced.toString)).value
@@ -1937,6 +2011,26 @@ object AcsCommitmentProcessor extends HasLoggerName {
   val emptyCommitment: AcsCommitment.CommitmentType = LtHash16().getByteString()
   val hashedEmptyCommitment: AcsCommitment.HashedCommitmentType =
     AcsCommitment.hashCommitment(emptyCommitment)
+
+  sealed trait PublishTickData {
+    def timestamp: CantonTimestamp
+  }
+
+  object PublishTickData {
+    final case class Regular(
+        toc: RecordTime,
+        acsChangeF: () => FutureUnlessShutdown[AcsChange],
+    ) extends PublishTickData {
+      override def timestamp: CantonTimestamp = toc.timestamp
+    }
+
+    // Should be used only for logical synchronizer upgrades
+    final case class PersistRunningCommitmentsAtUpgradeTime(
+        upgradeTime: CantonTimestamp
+    ) extends PublishTickData {
+      override def timestamp: CantonTimestamp = upgradeTime
+    }
+  }
 
   def apply(
       participantId: ParticipantId,
@@ -2277,7 +2371,7 @@ object AcsCommitmentProcessor extends HasLoggerName {
       filterOutParticipantIds: Seq[ParticipantId] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
-      traceContext: TraceContext,
+      loggingContext: ErrorLoggingContext,
   ): FutureUnlessShutdown[Map[ParticipantId, AcsCommitment.CommitmentType]] = {
     val commitmentTimer = pruningMetrics.map(_.compute.startAsync())
 
@@ -2321,10 +2415,11 @@ object AcsCommitmentProcessor extends HasLoggerName {
       parallelism: PositiveNumeric[Int],
   )(implicit
       ec: ExecutionContext,
-      traceContext: TraceContext,
+      loggingContext: ErrorLoggingContext,
   ): FutureUnlessShutdown[
     Map[ParticipantId, Map[SortedSet[LfPartyId], AcsCommitment.CommitmentType]]
-  ] =
+  ] = {
+    implicit val traceContext = loggingContext.traceContext
     for {
       ipsSnapshot <- synchronizerCrypto.awaitIpsSnapshot("acs-stakeholder-commitments")(
         timestamp.forgetRefinement
@@ -2375,6 +2470,7 @@ object AcsCommitmentProcessor extends HasLoggerName {
     } yield {
       byParticipant
     }
+  }
 
   @VisibleForTesting
   private[pruning] def computeCommitmentsPerParticipant(
@@ -2432,12 +2528,9 @@ object AcsCommitmentProcessor extends HasLoggerName {
       namedLoggingContext: NamedLoggingContext,
   ): FutureUnlessShutdown[Unit] = {
 
-    def withMetadataSeq(cids: Seq[LfContractId]): FutureUnlessShutdown[Seq[SerializableContract]] =
+    def withMetadataSeq(cids: Seq[LfContractId]): FutureUnlessShutdown[Seq[ContractInstance]] =
       contractStore
         .lookupManyExistingUncached(cids)(namedLoggingContext.traceContext)
-        .map(
-          _.map(_.serializable)
-        ) // TODO(#26348) - use fat contract downstream
         .valueOr { missingContractId =>
           ErrorUtil.internalError(
             new IllegalStateException(
@@ -2460,7 +2553,7 @@ object AcsCommitmentProcessor extends HasLoggerName {
             .map(c =>
               c.contractId ->
                 ContractStakeholdersAndReassignmentCounter(
-                  c.metadata.stakeholders,
+                  c.stakeholders,
                   activations(c.contractId),
                 )
             )
@@ -2482,11 +2575,9 @@ object AcsCommitmentProcessor extends HasLoggerName {
         }
         change <- lookupChangeMetadata(activations)
       } yield {
-        val emptyRunningCommitments =
-          new RunningCommitments(RecordTime.MinValue, TrieMap.empty[SortedSet[LfPartyId], LtHash16])
         val toc = new RecordTime(toInclusive, 0)
-        emptyRunningCommitments.update(toc, change)
-        val acsCommitments = emptyRunningCommitments.snapshot().active
+        val rc = runningCommitmentFromAcsChange(change, toc)
+        val acsCommitments = rc.snapshot().active
         if (acsCommitments != runningCommitments) {
           Errors.InternalError
             .InconsistentRunningCommitmentAndACS(toc, acsCommitments, runningCommitments)
@@ -2536,14 +2627,16 @@ object AcsCommitmentProcessor extends HasLoggerName {
     }
 
     object MismatchError extends ErrorGroup {
-      @Explanation("""This error indicates that a remote participant has sent a commitment over
-            |an ACS for a period, while this participant does not think that there is a shared contract state.
-            |This error occurs if a remote participant has manually changed contracts using repair,
-            |or due to byzantine behavior, or due to malfunction of the system. The consequence is that
-            |the ledger is forked, and some commands that should pass will not.""")
+      @Explanation(
+        """This error code indicates indicates a special case of a fork, where a counter-participant sent a commitment
+      |for a period, while this participant does not think that there are any shared active contracts at the end of that
+      |period. This case can occur due to malicious behavior of the counter-participant, bugs, or if the administrator
+      |of the counter-participant node manually changed contracts using repair and created an ACS state incompatible
+      |with other participants. The counter-participant will log an ACS_COMMITMENT_MISMATCH."""
+      )
       @Resolution(
         """Please contact the other participant in order to check the cause of the mismatch. Either repair
-            |the store of this participant or of the counterparty."""
+            |the store of this participant or of the counter-participant."""
       )
       object NoSharedContracts extends AlarmErrorCode(id = "ACS_MISMATCH_NO_SHARED_CONTRACTS") {
         final case class Mismatch(synchronizerId: SynchronizerId, remote: AcsCommitmentData)
@@ -2552,14 +2645,21 @@ object AcsCommitmentProcessor extends HasLoggerName {
             )
       }
 
-      @Explanation("""This error indicates that a remote participant has sent a commitment over
-            |an ACS for a period which does not match the local commitment.
-            |This error occurs if a remote participant has manually changed contracts using repair,
-            |or due to byzantine behavior, or due to malfunction of the system. The consequence is that the ledger is forked,
-            |and some commands that should pass will not.""")
+      @Explanation(
+        """This error code indicates a commitment mismatch between the participant and one or more counter-participants.
+           |Between honest participants a fork should never happen, however, misbehavior, bugs or manual changes to
+           |contract stores using the repair service can lead to forks. A fork means that one or more common contracts
+           |are active on the participant, but not on its
+           |counter-participants, or vice versa. Disagreeing participants will have different local verdicts on the
+           |conformance checks of transactions using disputed contracts. As long as these contracts are active, the
+           |fork exists, but if the
+           |contracts get deactivated as part of their lifecycle, then the fork automatically "resolves itself". A
+           |participant node operator can also fix a fork manually via repair commands."""
+      )
       @Resolution(
-        """Please contact the other participant in order to check the cause of the mismatch. Either repair
-            |the store of this participant or of the counterparty."""
+        """Please refer to the runbook on inspecting commitment mismatches in order to determine the cause of the
+            |mismatch together with the counter-participant node. Then repair the store of this participant and/or
+            |the store of the counter-participant."""
       )
       object CommitmentsMismatch extends AlarmErrorCode(id = "ACS_COMMITMENT_MISMATCH") {
         final case class Mismatch(
@@ -2569,7 +2669,16 @@ object AcsCommitmentProcessor extends HasLoggerName {
         ) extends Alarm(cause = "The local commitment does not match the remote commitment")
       }
 
-      @Explanation("The participant has detected that another node is behaving maliciously.")
+      @Explanation(
+        """The participant has detected that another node is behaving maliciously. This warning occurs in several
+           |cases. First, it occurs when the ACS commitment received from a counter-participant has an invalid
+           |signature. It might be that the counter-participant itself is malicious and purposefully added a wrong
+           |signature, or that someone else modified the signed commitment sent correctly by the counter-participant,
+           |or even crafted a message in the name of a counter-participant. Second, this alarm occurs when the
+           |participant receives two correctly signed but different commitments from the same counter-participant
+           |covering the same interval. A correct counter-participant never sends that.
+           |"""
+      )
       @Resolution("Contact support.")
       object AcsCommitmentAlarm extends AlarmErrorCode(id = "ACS_COMMITMENT_ALARM") {
         final case class Warn(override val cause: String) extends Alarm(cause)
@@ -2580,9 +2689,16 @@ object AcsCommitmentProcessor extends HasLoggerName {
     object DegradationError extends ErrorGroup {
 
       @Explanation(
-        "The participant is configured to engage catchup mode, however configuration is invalid to have any effect"
+        """This error code indicates that there is a degradation in commitment computation and the catch-up mode started,
+           |however the catch-up mode configuration is invalid and will not improve performance. This is because the
+           |configuration for the catch-up mode has a skip step of 1, which means that the participant will not skip
+           |any commitment computation. The participant runs the risk of remaining degraded, and its counter-participants
+           |might blacklist it and not actively wait for commitments, weakening the non-repudiation guarantees.
+           |"""
       )
-      @Resolution("Please update catchup mode to have a catchUpIntervalSkip higher than 1")
+      @Resolution(
+        "Please update catch-up mode configuration to have a catchUpIntervalSkip higher than 1"
+      )
       object AcsCommitmentDegradationWithIneffectiveConfig
           extends ErrorCode(
             id = "ACS_COMMITMENT_DEGRADATION_WITH_INEFFECTIVE_CONFIG",
@@ -2598,9 +2714,18 @@ object AcsCommitmentProcessor extends HasLoggerName {
       }
 
       @Explanation(
-        "The participant has detected that ACS computation is taking to long and trying to catch up."
+        """This error code indicates that the participant node is behind some of its counter-participants in commitment
+           |computation, perhaps due to heavy load, and enters catch-up mode. This is referred to as a degradation.
+           |The danger of a degraded participant is that its counter-participants might blacklist it in order to unblock
+           |their pruning, therefore those counter-participants would not wait for the participant's commitments, which
+           |weakens the non-repudiation guarantees.
+           |An operator can configure the threshold of how many reconciliation intervals the participant needs to fall
+           |behind for catch-up mode to trigger, as well as the number of reconciliation intervals that the participant
+           |skips in catch-up mode. However, any counter-participant operator can unilaterally decide to blacklist a
+           |participant based on their own tolerance to slow participants, regardless of each participant's configured
+           |parameters."""
       )
-      @Resolution("Catch up mode is enabled and the participant should recover on its own.")
+      @Resolution("Catch-up mode is enabled and the participant should recover on its own.")
       object AcsCommitmentDegradation
           extends ErrorCode(
             id = "ACS_COMMITMENT_DEGRADATION",
@@ -2622,22 +2747,28 @@ object AcsCommitmentProcessor extends HasLoggerName {
   }
 
   object ReceivedCmtState {
-    object Match extends ReceivedCmtState {
+
+//    case object Match { val toInt = 1 }
+//    case object Mismatch { val toInt = 3 }
+//    case object Buffered extends CommitmentPeriodState { val toInt = 3 }
+//    case object Outstanding extends ValidSentPeriodState { val toInt = 4 }
+
+    case object Match extends ReceivedCmtState {
       override val toProtoV30: ReceivedCommitmentState =
         ReceivedCommitmentState.RECEIVED_COMMITMENT_STATE_MATCH
     }
 
-    object Mismatch extends ReceivedCmtState {
+    case object Mismatch extends ReceivedCmtState {
       override val toProtoV30: ReceivedCommitmentState =
         ReceivedCommitmentState.RECEIVED_COMMITMENT_STATE_MISMATCH
     }
 
-    object Buffered extends ReceivedCmtState {
+    case object Buffered extends ReceivedCmtState {
       override val toProtoV30: ReceivedCommitmentState =
         ReceivedCommitmentState.RECEIVED_COMMITMENT_STATE_BUFFERED
     }
 
-    object Outstanding extends ReceivedCmtState {
+    case object Outstanding extends ReceivedCmtState {
       override val toProtoV30: ReceivedCommitmentState =
         ReceivedCommitmentState.RECEIVED_COMMITMENT_STATE_OUTSTANDING
     }
@@ -2665,17 +2796,17 @@ object AcsCommitmentProcessor extends HasLoggerName {
   }
 
   object SentCmtState {
-    object Match extends SentCmtState {
+    case object Match extends SentCmtState {
       override val toProtoV30: SentCommitmentState =
         SentCommitmentState.SENT_COMMITMENT_STATE_MATCH
     }
 
-    object Mismatch extends SentCmtState {
+    case object Mismatch extends SentCmtState {
       override val toProtoV30: SentCommitmentState =
         SentCommitmentState.SENT_COMMITMENT_STATE_MISMATCH
     }
 
-    object NotCompared extends SentCmtState {
+    case object NotCompared extends SentCmtState {
       override val toProtoV30: SentCommitmentState =
         SentCommitmentState.SENT_COMMITMENT_STATE_NOT_COMPARED
     }
@@ -2697,26 +2828,58 @@ object AcsCommitmentProcessor extends HasLoggerName {
       }
   }
 
-  @VisibleForTesting
-  def reassignmentCountersForArchivedTransient(
-      commitSet: CommitSet
-  ): Map[LfContractId, ReassignmentCounter] = {
+  private def runningCommitmentFromAcsChange(
+      acsChange: AcsChange,
+      rt: RecordTime,
+  )(implicit namedLoggingContext: NamedLoggingContext) = {
+    val runningCommitments = new RunningCommitments(RecordTime.MinValue, TrieMap.empty)
+    runningCommitments.update(rt, acsChange)
+    runningCommitments
+  }
 
-    // We first search in assignments, because they would have the most recent reassignment counter.
-    val transientCidsAssigned = commitSet.assignments.collect {
-      case (contractId, tcAndContractHash) if commitSet.archivals.keySet.contains(contractId) =>
-        (contractId, tcAndContractHash.reassignmentCounter)
-    }
+  /** Checks that the given commitment matches the given contracts and reassignment counters.
+    *
+    * @param commitment
+    *   The commitment to check
+    * @param timestamp
+    *   The timestamp of the commitment
+    * @param contractsAndReassignmentCounter
+    *   The set of contracts and their reassignment counters that should constitute the commitment
+    * @param counterParticipant
+    *   The participant for which the commitment is computed
+    * @return
+    *   true if the commitment matches the contracts and reassignment counters, false otherwise
+    */
+  def checkCommitmentMatchesContracts(
+      commitment: AcsCommitment.HashedCommitmentType,
+      timestamp: CantonTimestamp,
+      contractsAndReassignmentCounter: Set[(ContractInstance, ReassignmentCounter)],
+      counterParticipant: ParticipantId,
+  )(implicit namedLoggingContext: NamedLoggingContext): Boolean = {
 
-    // Then we search in creations
-    val transientCidsCreated = commitSet.creations.collect {
-      case (contractId, tcAndContractHash)
-          if commitSet.archivals.keySet.contains(contractId) && !transientCidsAssigned.keySet
-            .contains(contractId) =>
-        (contractId, tcAndContractHash.reassignmentCounter)
-    }
+    val toc = new RecordTime(timestamp, 0)
+    val acsChangeToCmp =
+      AcsChange(
+        activations = contractsAndReassignmentCounter.map { case (instance, counter) =>
+          instance.contractId ->
+            ContractStakeholdersAndReassignmentCounter(
+              instance.metadata.stakeholders,
+              counter,
+            )
+        }.toMap,
+        deactivations = Map.empty,
+      )
 
-    transientCidsAssigned ++ transientCidsCreated
+    val rc = runningCommitmentFromAcsChange(acsChangeToCmp, toc)
+    val recomputedCommitment = computeCommitmentsPerParticipant(
+      Map {
+        counterParticipant -> rc.snapshot().active
+      },
+      new CachedCommitments(),
+    )
+    commitment == AcsCommitment.hashCommitment(
+      recomputedCommitment.getOrElse(counterParticipant, emptyCommitment)
+    )
   }
 
   private sealed trait CommitmentSendState extends Product with Serializable

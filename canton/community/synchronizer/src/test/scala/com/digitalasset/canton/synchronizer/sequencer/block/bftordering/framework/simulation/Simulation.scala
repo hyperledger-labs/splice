@@ -4,9 +4,10 @@
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
 
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveNumeric}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.endpointToTestBftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.ModuleControl
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.ModuleControl.Send
@@ -18,7 +19,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framewor
   SimulationEnv,
   SimulationInitializer,
   SimulationModuleSystem,
-  SimulationP2PNetworkManager,
+  SimulationP2PNetworkRefFactory,
   TraceContextGenerator,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.RunningFuture
@@ -123,14 +124,14 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
         local.scheduleEvent(node, sendTo, from, msg)
       case NodeCollector.TickEvent(duration, tickId, to, msg) =>
         local.scheduleTick(node, to, tickId, duration, msg)
-      case NodeCollector.SendNetworkEvent(to, msg, traceContext) =>
-        network.scheduleNetworkEvent(from = node, to, msg, traceContext)
+      case NodeCollector.SendNetworkEvent(to, msg) =>
+        network.scheduleNetworkEvent(from = node, to, msg)
       case NodeCollector.AddFuture(to, future, errorMessage, traceContext) =>
         local.scheduleFuture(node, to, clock.now, future, errorMessage, traceContext)
       case NodeCollector.CancelTick(tickCounter) =>
         agenda.removeInternalTick(node, tickCounter)
-      case NodeCollector.OpenConnection(to, endpoint, continuation) =>
-        network.scheduleEstablishConnection(node, to, endpoint, continuation)
+      case NodeCollector.OpenConnection(to, endpoint, p2pConnectionEventListener) =>
+        network.scheduleEstablishConnection(node, to, endpoint, p2pConnectionEventListener)
     }
 
   private def runClientCollector(node: BftNodeId, collector: ClientCollector): Unit =
@@ -339,12 +340,12 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
           logger.trace(s"Future ${toRun.name} for $machine:$to completed")
           executeFuture(machine, to, toRun, fun, traceContext)
           verifier.aFutureHappened(machine)
-        case ReceiveNetworkMessage(machineName, msg, traceContext) =>
+        case ReceiveNetworkMessage(machineName, msg) =>
           local.scheduleEvent(
             machineName,
             tryGetMachine(machineName).networkInReactor,
             EventOriginator.FromNetwork,
-            ModuleControl.Send(msg, traceContext, MetricsContext.Empty),
+            ModuleControl.Send(msg, TraceContext.empty, MetricsContext.Empty),
           )
         case ClientTick(machine, _, msg, traceContext) =>
           logger.trace(s"Client for $machine ticks")
@@ -357,9 +358,10 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
           addCommands(onboardingManager.prepareOnboardingFor(clock.now, node))
         case AddEndpoint(endpoint, to) =>
           addEndpoint(endpoint, to)
-        case EstablishConnection(from, to, endpoint, continuation) =>
+        case EstablishConnection(from, to, endpoint, p2pConnectionEventListener) =>
           logger.debug(s"Establish connection '$from' -> '$to' via $endpoint")
-          continuation(endpoint.id, to)
+          p2pConnectionEventListener.onConnect(endpoint.id)
+          p2pConnectionEventListener.onSequencerId(endpoint.id, to)
           val machine = tryGetMachine(from)
           runNodeCollector(from, EventOriginator.FromNetwork, machine.nodeCollector)
         case CrashNode(node) =>
@@ -418,9 +420,15 @@ class Simulation[OnboardingDataT, SystemNetworkMessageT, SystemInputMessageT, Cl
 }
 
 object Simulation {
-  def fixupDurationPrettyPrinting: PartialFunction[Any, Tree] = {
+  def fixupPrettyPrinting: PartialFunction[Any, Tree] = {
     case duration: java.time.Duration =>
       Tree.Literal(s"Duration.ofNanos(${duration.toNanos}L)")
+    case port: Port =>
+      Tree.Literal(s"Port.tryCreate(${port.unwrap})")
+    case mode: PartitionMode =>
+      Tree.Literal(s"PartitionMode.$mode")
+    case pn: PositiveNumeric[_] =>
+      Tree.Literal(s"PositiveNumeric.tryCreate(${pn.value})")
   }
 }
 
@@ -439,7 +447,7 @@ final case class Machine[OnboardingDataT, SystemNetworkMessageT](
     init: SimulationInitializer[OnboardingDataT, SystemNetworkMessageT, ?, ?],
     onboardingManager: OnboardingManager[OnboardingDataT],
     loggerFactory: NamedLoggerFactory,
-    simulationP2PNetworkManager: SimulationP2PNetworkManager[SystemNetworkMessageT],
+    simulationP2PNetworkRefFactory: SimulationP2PNetworkRefFactory[SystemNetworkMessageT],
 ) {
   private val logger = loggerFactory.getLogger(getClass)
   private var crashed = false
@@ -456,7 +464,7 @@ final case class Machine[OnboardingDataT, SystemNetworkMessageT](
     logger.info("Initializing modules again to simulate restart")
     val _ = init
       .systemInitializerFactory(onboardingManager.provide(ProvideForRestart, node))
-      .initialize(system, simulationP2PNetworkManager)
+      .initialize(system, _ => simulationP2PNetworkRefFactory)
     crashed = false
   }
 

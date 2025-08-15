@@ -64,7 +64,7 @@ import com.digitalasset.canton.protocol.messages.{
   CommitmentPeriodState,
   SignedProtocolMessage,
 }
-import com.digitalasset.canton.protocol.{LfContractId, LfVersionedTransaction, SerializableContract}
+import com.digitalasset.canton.protocol.{ContractInstance, LfContractId, LfVersionedTransaction}
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -73,6 +73,7 @@ import com.digitalasset.canton.topology.{
   ParticipantId,
   PartyId,
   PhysicalSynchronizerId,
+  Synchronizer,
   SynchronizerId,
 }
 import com.digitalasset.canton.tracing.NoTracing
@@ -358,20 +359,20 @@ class ParticipantTestingGroup(
       timeout: NonNegativeDuration,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
-      val id = participantRef.synchronizers.id_of(synchronizerAlias)
+      val id = participantRef.synchronizers.physical_id_of(synchronizerAlias)
       fetch_synchronizer_time(id, timeout)
     }
 
   @Help.Summary("Fetch the current time from the given synchronizer", FeatureFlag.Testing)
   def fetch_synchronizer_time(
-      synchronizerId: PhysicalSynchronizerId,
+      synchronizer: Synchronizer,
       timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
         adminCommand(
           SynchronizerTimeCommands.FetchTime(
-            synchronizerId.some,
+            synchronizer.some,
             NonNegativeFiniteDuration.Zero,
             timeout,
           )
@@ -385,7 +386,7 @@ class ParticipantTestingGroup(
   ): Unit =
     check(FeatureFlag.Testing) {
       participantRef.synchronizers.list_connected().foreach { item =>
-        fetch_synchronizer_time(item.synchronizerId, timeout).discard[CantonTimestamp]
+        fetch_synchronizer_time(item.physicalSynchronizerId, timeout).discard[CantonTimestamp]
       }
     }
 
@@ -399,7 +400,7 @@ class ParticipantTestingGroup(
       timeout: NonNegativeDuration,
   ): Unit =
     check(FeatureFlag.Testing) {
-      val id = participantRef.synchronizers.id_of(synchronizerAlias)
+      val id = participantRef.synchronizers.physical_id_of(synchronizerAlias)
       await_synchronizer_time(id, time, timeout)
     }
 
@@ -408,7 +409,7 @@ class ParticipantTestingGroup(
     FeatureFlag.Testing,
   )
   def await_synchronizer_time(
-      synchronizerId: PhysicalSynchronizerId,
+      synchronizer: Synchronizer,
       time: CantonTimestamp,
       timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
   ): Unit =
@@ -416,7 +417,7 @@ class ParticipantTestingGroup(
       consoleEnvironment.run {
         adminCommand(
           SynchronizerTimeCommands.AwaitTime(
-            synchronizerId.some,
+            synchronizer.some,
             time,
             timeout,
           )
@@ -452,7 +453,7 @@ class LocalParticipantTestingGroup(
       // only include active contracts
       activeSet: Boolean = false,
       limit: PositiveInt = defaultLimit,
-  ): List[(Boolean, SerializableContract)] = {
+  ): List[(Boolean, ContractInstance)] = {
     def toOpt(str: String) = OptionUtil.emptyStringAsNone(str)
 
     val pcs = state_inspection
@@ -475,9 +476,9 @@ class LocalParticipantTestingGroup(
       filterTemplate: String = "",
       filterStakeholder: Option[PartyId] = None,
       limit: PositiveInt = defaultLimit,
-  ): List[SerializableContract] = {
-    val predicate = (c: SerializableContract) =>
-      filterStakeholder.forall(s => c.metadata.stakeholders.contains(s.toLf))
+  ): List[ContractInstance] = {
+    val predicate = (c: ContractInstance) =>
+      filterStakeholder.forall(s => c.stakeholders.contains(s.toLf))
 
     check(FeatureFlag.Testing) {
       pcs_search(
@@ -785,7 +786,7 @@ class LocalCommitmentsAdministrationGroup(
 }
 
 class CommitmentsAdministrationGroup(
-    runner: AdminCommandRunner with BaseInspection[ParticipantNode],
+    runner: AdminCommandRunner,
     val consoleEnvironment: ConsoleEnvironment,
     val loggerFactory: NamedLoggerFactory,
 ) extends FeatureFlagFilter
@@ -964,8 +965,10 @@ class CommitmentsAdministrationGroup(
     )
 
   @Help.Summary(
-    "List the counter-participants of a participant and the ACS commitments that the participant computed and sent to" +
-      "them, together with the commitment state."
+    "List the counter-participants of a participant and the ACS commitments that the participant computed and sent to " +
+      "them. Specifically, the command returns a map from synchronizer IDs to tuples of sent commitment data, " +
+      "specifying the period, target counter-participant, the commitment state, and additional data according to " +
+      "verbose mode."
   )
   @Help.Description(
     """Optional filtering through the arguments:
@@ -979,14 +982,14 @@ class CommitmentsAdministrationGroup(
           |  is not a counter-participant on some synchronizer, no commitments appear in the reply for that counter-participant
           |  on that synchronizer.
           |commitmentState: Lists sent commitments that are in one of the given states. By default considers all states:
-          |   - MATCH: the local commitment matches the remote commitment
-          |   - MISMATCH: the local commitment does not match the remote commitment
-          |   - NOT_COMPARED: the local commitment has been computed and sent but no corresponding remote commitment has
-          |     been received
-          |verboseMode: If false, the reply does not contain the commitment bytes. If true, the reply contains:
+          |   - MATCH: The local commitment matches the remote commitment
+          |   - MISMATCH: The local commitment does not match the remote commitment
+          |   - NOT_COMPARED: The local commitment has been computed and sent but no corresponding remote commitment has
+          |     been received, which essentially indicates that a counter-participant is running behind
+          |verboseMode: If true, the reply contains the commitment bytes, as follows:
           |   - In case of a mismatch, the reply contains both the received and the locally computed commitment that
           |     do not match.
-          |   - In all other cases (match and not compared), the reply contains the sent commitment.
+          |   - In all other cases (MATCH and NOT_COMPARED), the reply contains the sent commitment bytes.
            """
   )
   def lookup_sent_acs_commitments(
@@ -1147,7 +1150,7 @@ class CommitmentsAdministrationGroup(
                     config.distinguishedParticipants ++ participantSeq,
                     config.thresholdDistinguished,
                     config.thresholdDefault,
-                    config.participantsMetrics,
+                    config.individuallyMonitored,
                   )
                 )
             }
@@ -1170,7 +1173,7 @@ class CommitmentsAdministrationGroup(
       | from a synchronizer can be done with Seq.empty for 'counterParticipantsDistinguished' and Seq(SynchronizerId) for synchronizers.
       | Leaving both sequences empty clears all configs on all synchronizers.
       |""")
-  def remove_config_for_slow_counter_participants(
+  def remove_config_distinguished_slow_counter_participants(
       counterParticipantsDistinguished: Seq[ParticipantId],
       synchronizers: Seq[SynchronizerId],
   ): Unit = consoleEnvironment.run {
@@ -1206,7 +1209,7 @@ class CommitmentsAdministrationGroup(
                   config.distinguishedParticipants.diff(participantSeq),
                   config.thresholdDistinguished,
                   config.thresholdDefault,
-                  config.participantsMetrics,
+                  config.individuallyMonitored,
                 )
               )
           }
@@ -1241,7 +1244,7 @@ class CommitmentsAdministrationGroup(
           .zip(individualMetrics)
           .filter { case (synchronizerId, participantId) =>
             configs.exists(slowCp =>
-              slowCp.synchronizerIds.contains(synchronizerId) && !slowCp.participantsMetrics
+              slowCp.synchronizerIds.contains(synchronizerId) && !slowCp.individuallyMonitored
                 .contains(
                   participantId
                 )
@@ -1263,7 +1266,7 @@ class CommitmentsAdministrationGroup(
                   config.distinguishedParticipants,
                   config.thresholdDistinguished,
                   config.thresholdDefault,
-                  config.participantsMetrics ++ participantSeq,
+                  config.individuallyMonitored ++ participantSeq,
                 )
               )
           }
@@ -1299,7 +1302,7 @@ class CommitmentsAdministrationGroup(
           .zip(individualMetrics)
           .filter { case (synchronizerId, participantId) =>
             configs.exists(slowCp =>
-              slowCp.synchronizerIds.contains(synchronizerId) && slowCp.participantsMetrics
+              slowCp.synchronizerIds.contains(synchronizerId) && slowCp.individuallyMonitored
                 .contains(
                   participantId
                 )
@@ -1321,7 +1324,7 @@ class CommitmentsAdministrationGroup(
                   config.distinguishedParticipants,
                   config.thresholdDistinguished,
                   config.thresholdDefault,
-                  config.participantsMetrics.diff(participantSeq),
+                  config.individuallyMonitored.diff(participantSeq),
                 )
               )
           }
@@ -1362,7 +1365,7 @@ class CommitmentsAdministrationGroup(
       counterParticipants: Seq[ParticipantId],
   ): Seq[SlowCounterParticipantSynchronizerConfig] =
     get_config_for_slow_counter_participants(synchronizers).filter(config =>
-      config.participantsMetrics.exists(metricParticipant =>
+      config.individuallyMonitored.exists(metricParticipant =>
         counterParticipants.contains(metricParticipant) ||
           config.distinguishedParticipants.exists(distinguished =>
             counterParticipants.contains(distinguished)
@@ -1723,7 +1726,11 @@ trait ParticipantAdministration extends FeatureFlagFilter {
   object synchronizers extends Helpful {
 
     @Help.Summary("Returns the id of the given synchronizer alias")
-    def id_of(synchronizerAlias: SynchronizerAlias): PhysicalSynchronizerId =
+    def id_of(synchronizerAlias: SynchronizerAlias): SynchronizerId =
+      physical_id_of(synchronizerAlias).logical
+
+    @Help.Summary("Returns the physical id of the given synchronizer alias")
+    def physical_id_of(synchronizerAlias: SynchronizerAlias): PhysicalSynchronizerId =
       consoleEnvironment.run {
         adminCommand(
           ParticipantAdminCommands.SynchronizerConnectivity.GetSynchronizerId(synchronizerAlias)
@@ -1742,20 +1749,20 @@ trait ParticipantAdministration extends FeatureFlagFilter {
       list_connected().exists { r =>
         r.synchronizerAlias == synchronizerAlias &&
         r.healthy &&
-        participantIsActiveOnSynchronizer(r.synchronizerId.logical, id)
+        participantIsActiveOnSynchronizer(r.synchronizerId, id)
       }
 
     @Help.Summary(
       "Test whether a participant is connected to a synchronizer"
     )
     def is_connected(synchronizerId: SynchronizerId): Boolean =
-      list_connected().exists(_.synchronizerId.logical == synchronizerId)
+      list_connected().exists(_.synchronizerId == synchronizerId)
 
     @Help.Summary(
       "Test whether a participant is connected to physical a synchronizer"
     )
     def is_connected(synchronizerId: PhysicalSynchronizerId): Boolean =
-      list_connected().exists(_.synchronizerId == synchronizerId)
+      list_connected().exists(_.physicalSynchronizerId == synchronizerId)
 
     @Help.Summary(
       "Test whether a participant is connected to a synchronizer"

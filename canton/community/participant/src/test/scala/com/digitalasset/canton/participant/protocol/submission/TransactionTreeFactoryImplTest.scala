@@ -31,19 +31,15 @@ final class TransactionTreeFactoryImplTest
 
   val factory: ExampleTransactionFactory = new ExampleTransactionFactory()()
 
-  def successfulLookup(
-      example: ExampleTransaction
-  ): SerializableContractOfId = id => {
+  def successfulLookup(example: ExampleTransaction): ContractInstanceOfId = id =>
     EitherT.fromEither(
       example.inputContracts
         .get(id)
         .toRight(ContractLookupError(id, "Unable to lookup input contract from test data"))
     )
-  }
 
-  def failedLookup(
-      testErrorMessage: String
-  ): SerializableContractOfId = id => EitherT.leftT(ContractLookupError(id, testErrorMessage))
+  def failedLookup(testErrorMessage: String): ContractInstanceOfId =
+    id => EitherT.leftT(ContractLookupError(id, testErrorMessage))
 
   def createTransactionTreeFactory: TransactionTreeFactoryImpl =
     TransactionTreeFactoryImpl(
@@ -56,7 +52,7 @@ final class TransactionTreeFactoryImplTest
   def createTransactionTree(
       treeFactory: TransactionTreeFactoryImpl,
       transaction: WellFormedTransaction[WithoutSuffixes],
-      contractInstanceOfId: SerializableContractOfId,
+      contractInstanceOfId: ContractInstanceOfId,
       keyResolver: LfKeyResolver,
       actAs: List[LfPartyId] = List(ExampleTransactionFactory.submitter),
       snapshot: TopologySnapshot = factory.topologySnapshot,

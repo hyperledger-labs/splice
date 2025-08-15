@@ -38,14 +38,14 @@ import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Status
 import io.opentelemetry.sdk.metrics.data.MetricData
 import org.apache.pekko.NotUsed
-import org.apache.pekko.stream.Materializer
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
+import org.apache.pekko.stream.{Materializer, ThrottleMode}
 
 import java.nio.file.Path
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.DurationConverters.*
 import scala.util.chaining.*
@@ -65,7 +65,15 @@ import scala.util.chaining.*
   */
 trait ReplayingSendsSequencerClientTransport extends SequencerClientTransportCommon {
   import ReplayingSendsSequencerClientTransport.*
-  def replay(sendParallelism: Int): Future[SendReplayReport]
+
+  /** @param sendRatePerSecond
+    *   None means "as fast as possible".
+    */
+  def replay(
+      sendParallelism: Int,
+      sendRatePerSecond: Option[Int] = None,
+      cycles: Int = 1,
+  ): Future[SendReplayReport]
 
   def waitForIdle(
       duration: FiniteDuration,
@@ -231,13 +239,31 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     }
   }
 
-  override def replay(sendParallelism: Int): Future[SendReplayReport] =
+  override def replay(
+      sendParallelism: Int,
+      maybeSendRatePerSecond: Option[Int],
+      cycles: Int,
+  ): Future[SendReplayReport] =
     withNewTraceContext("replay") { implicit traceContext =>
       logger.info(s"Replaying ${submissionRequests.size} sends")
 
-      val submissionReplay = Source(submissionRequests)
-        .mapAsyncUnordered(sendParallelism)(replaySubmit(_).unwrap)
-        .toMat(Sink.fold(SendReplayReport()(sendDuration))(_.update(_)))(Keep.right)
+      val baseSource =
+        Source
+          .cycle(() => submissionRequests.iterator)
+          .take(submissionRequests.size.toLong * cycles)
+
+      val intermediateSource =
+        maybeSendRatePerSecond match {
+          case None =>
+            baseSource
+          case Some(sendRate) =>
+            baseSource.throttle(sendRate, per = 1.second, maximumBurst = 0, ThrottleMode.Shaping)
+        }
+
+      val submissionReplay =
+        intermediateSource
+          .mapAsyncUnordered(sendParallelism)(replaySubmit(_).unwrap)
+          .toMat(Sink.fold(SendReplayReport()(sendDuration))(_.update(_)))(Keep.right)
 
       PekkoUtil.runSupervised(
         submissionReplay,
@@ -271,7 +297,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
   }
 
   protected def subscribe(
-      request: SubscriptionRequestV2,
+      request: SubscriptionRequest,
       handler: SequencedEventHandler[NotUsed],
   ): AutoCloseable
 
@@ -388,7 +414,7 @@ abstract class ReplayingSendsSequencerClientTransportCommon(
     val idleF: Future[EventsReceivedReport] = idleP.future
 
     private val subscription =
-      subscribe(SubscriptionRequestV2(member, readFrom, protocolVersion), handle)
+      subscribe(SubscriptionRequest(member, readFrom, protocolVersion), handle)
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
       Seq(
@@ -456,7 +482,7 @@ class ReplayingSendsSequencerClientTransportImpl(
   ): EitherT[FutureUnlessShutdown, Status, Unit] =
     EitherT.pure(())
 
-  override def subscribe[E](request: SubscriptionRequestV2, handler: SequencedEventHandler[E])(
+  override def subscribe[E](request: SubscriptionRequest, handler: SequencedEventHandler[E])(
       implicit traceContext: TraceContext
   ): SequencerSubscription[E] = new SequencerSubscription[E] {
     override protected def loggerFactory: NamedLoggerFactory =
@@ -474,14 +500,14 @@ class ReplayingSendsSequencerClientTransportImpl(
     SubscriptionErrorRetryPolicy.never
 
   override protected def subscribe(
-      request: SubscriptionRequestV2,
+      request: SubscriptionRequest,
       handler: SequencedEventHandler[NotUsed],
   ): AutoCloseable =
     underlyingTransport.subscribe(request, handler)
 
   override type SubscriptionError = underlyingTransport.SubscriptionError
 
-  override def subscribe(request: SubscriptionRequestV2)(implicit
+  override def subscribe(request: SubscriptionRequest)(implicit
       traceContext: TraceContext
   ): SequencerSubscriptionPekko[SubscriptionError] = underlyingTransport.subscribe(request)
 
@@ -515,7 +541,7 @@ class ReplayingSendsSequencerClientTransportPekko(
     with SequencerClientTransportPekko {
 
   override protected def subscribe(
-      request: SubscriptionRequestV2,
+      request: SubscriptionRequest,
       handler: SequencedEventHandler[NotUsed],
   ): AutoCloseable = {
     val ((killSwitch, _), doneF) = subscribe(request).source

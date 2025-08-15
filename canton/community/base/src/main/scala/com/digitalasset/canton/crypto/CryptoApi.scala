@@ -8,7 +8,13 @@ import cats.syntax.either.*
 import cats.syntax.show.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{CryptoConfig, CryptoProvider, ProcessingTimeout}
+import com.digitalasset.canton.config.{
+  CacheConfig,
+  CryptoConfig,
+  CryptoProvider,
+  ProcessingTimeout,
+  SessionEncryptionKeyCacheConfig,
+}
 import com.digitalasset.canton.crypto.kms.KmsFactory
 import com.digitalasset.canton.crypto.provider.jce.{JceCrypto, JcePureCrypto}
 import com.digitalasset.canton.crypto.provider.kms.KmsPrivateCrypto
@@ -66,7 +72,7 @@ sealed trait BaseCrypto extends NamedLogging {
     * as well.
     */
   def generateSigningKey(
-      keySpec: SigningKeySpec = privateCrypto.defaultSigningKeySpec,
+      keySpec: SigningKeySpec = privateCrypto.signingKeySpecs.default,
       usage: NonEmpty[Set[SigningKeyUsage]],
       name: Option[KeyName] = None,
   )(implicit
@@ -81,7 +87,7 @@ sealed trait BaseCrypto extends NamedLogging {
     * store as well.
     */
   def generateEncryptionKey(
-      keySpec: EncryptionKeySpec = privateCrypto.defaultEncryptionKeySpec,
+      keySpec: EncryptionKeySpec = privateCrypto.encryptionKeySpecs.default,
       name: Option[KeyName] = None,
   )(implicit
       traceContext: TraceContext
@@ -335,11 +341,12 @@ object Crypto {
 
   def create(
       config: CryptoConfig,
+      sessionEncryptionKeyCacheConfig: SessionEncryptionKeyCacheConfig,
+      publicKeyConversionCacheConfig: CacheConfig,
       storage: Storage,
       cryptoPrivateStoreFactory: CryptoPrivateStoreFactory,
       kmsFactory: KmsFactory,
       releaseProtocolVersion: ReleaseProtocolVersion,
-      nonStandardConfig: Boolean,
       futureSupervisor: FutureSupervisor,
       clock: Clock,
       executionContext: ExecutionContext,
@@ -362,6 +369,8 @@ object Crypto {
           JceCrypto
             .create(
               config,
+              sessionEncryptionKeyCacheConfig,
+              publicKeyConversionCacheConfig,
               cryptoPrivateStore,
               cryptoPublicStore,
               timeouts,
@@ -376,7 +385,6 @@ object Crypto {
               kms <- kmsFactory
                 .create(
                   kmsConfig,
-                  nonStandardConfig,
                   timeouts,
                   futureSupervisor,
                   tracerProvider,
@@ -398,6 +406,8 @@ object Crypto {
               )
               pureCrypto <- JcePureCrypto.create(
                 config.copy(provider = CryptoProvider.Jce),
+                sessionEncryptionKeyCacheConfig,
+                publicKeyConversionCacheConfig,
                 loggerFactory,
               )
             } yield new Crypto(

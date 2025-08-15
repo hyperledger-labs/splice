@@ -56,16 +56,17 @@ import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissio
 }
 import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
+  ContractInstanceOfId,
   ContractLookupError,
-  SerializableContractOfId,
   UnknownPackageError,
 }
 import com.digitalasset.canton.participant.protocol.validation.*
+import com.digitalasset.canton.participant.protocol.validation.AuthenticationValidator.AuthenticationValidatorResult
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
 import com.digitalasset.canton.participant.protocol.validation.InternalConsistencyChecker.ErrorWithInternalConsistencyCheck
 import com.digitalasset.canton.participant.protocol.validation.ModelConformanceChecker.{
   ErrorWithSubTransaction,
-  LazyAsyncReInterpretation,
+  LazyAsyncReInterpretationMap,
 }
 import com.digitalasset.canton.participant.protocol.validation.TimeValidator.TimeCheckFailure
 import com.digitalasset.canton.participant.store.*
@@ -100,6 +101,7 @@ import com.digitalasset.canton.{
   WorkflowId,
   checked,
 }
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.google.common.annotations.VisibleForTesting
 import com.google.protobuf.ByteString
 import monocle.PLens
@@ -209,7 +211,7 @@ class TransactionProcessingSteps(
   }
 
   override def embedNoMediatorError(error: NoMediatorError): TransactionSubmissionError =
-    SynchronizerWithoutMediatorError.Error(error.topologySnapshotTimestamp, psid.logical)
+    SynchronizerWithoutMediatorError.Error(error.topologySnapshotTimestamp, psid)
 
   override def getSubmitterInformation(
       views: Seq[DecryptedView]
@@ -223,8 +225,8 @@ class TransactionProcessingSteps(
       wfTransaction: WellFormedTransaction[WithoutSuffixes],
       mediator: MediatorGroupRecipient,
       recentSnapshot: SynchronizerSnapshotSyncCryptoApi,
-      contractLookup: ContractLookup,
-      disclosedContracts: Map[LfContractId, SerializableContract],
+      contractLookup: ContractLookup { type ContractsCreatedAtTime <: CreationTime.CreatedAt },
+      disclosedContracts: Map[LfContractId, ContractInstance],
   )(implicit traceContext: TraceContext)
       extends TrackedSubmission {
 
@@ -330,18 +332,18 @@ class TransactionProcessingSteps(
               )
           )
 
-        lookupContractsWithDisclosed: SerializableContractOfId =
+        lookupContractsWithDisclosed: ContractInstanceOfId =
           (contractId: LfContractId) =>
             disclosedContracts
               .get(contractId)
               .map(contract =>
-                EitherT.rightT[Future, TransactionTreeFactory.ContractLookupError](contract)
+                EitherT.rightT[Future, TransactionTreeFactory.ContractLookupError](
+                  contract: GenContractInstance
+                )
               )
               .getOrElse(
                 TransactionTreeFactory
-                  .contractInstanceLookup(contractLookup)(implicitly, implicitly)(
-                    contractId
-                  )
+                  .contractInstanceLookup(contractLookup)(implicitly, implicitly)(contractId)
               )
 
         confirmationRequestTimer = metrics.protocolMessages.confirmationRequestCreation
@@ -818,7 +820,7 @@ class TransactionProcessingSteps(
       // and save us some work.
       // Note that we keep this asynchronous and lazy on purpose here, such that the authentication checks will only access the result
       // if they need to (for external submissions). For classic submissions the behavior remains the same.
-      val reInterpretedTopLevelViews: LazyAsyncReInterpretation =
+      val reInterpretedTopLevelViews: LazyAsyncReInterpretationMap =
         parsedRequest.rootViewTrees.forgetNE
           .filter(_.isTopLevel)
           .map { viewTree =>
@@ -840,7 +842,6 @@ class TransactionProcessingSteps(
           parsedRequest,
           reInterpretedTopLevelViews,
           psid,
-          protocolVersion,
           transactionEnricher,
           createNodeEnricher,
           logger,
@@ -985,6 +986,8 @@ class TransactionProcessingSteps(
         timeValidationResultE = parallelChecksResult.timeValidationResultE,
         hostedWitnesses = usedAndCreated.hostedWitnesses,
         replayCheckResult = parallelChecksResult.replayCheckResult,
+        validatedExternalTransactionHash =
+          parallelChecksResult.authenticationValidatorResult.externalHash,
       )
     }
 
@@ -1113,7 +1116,7 @@ class TransactionProcessingSteps(
 
   @VisibleForTesting
   private[protocol] def authenticateInputContractsInternal(
-      inputContracts: Map[LfContractId, SerializableContract]
+      inputContracts: Map[LfContractId, GenContractInstance]
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransactionProcessorError, Unit] =
@@ -1121,7 +1124,7 @@ class TransactionProcessingSteps(
       inputContracts.toList
         .traverse_ { case (contractId, contract) =>
           serializableContractAuthenticator
-            .authenticateSerializable(contract)
+            .authenticate(contract.inst)
             .leftMap(message => ContractAuthenticationFailed.Error(contractId, message).reported())
         }
     )
@@ -1153,9 +1156,9 @@ class TransactionProcessingSteps(
   )(implicit
       traceContext: TraceContext
   ): PendingTransaction = {
-    // We consider that we rejected if at least one of the responses is not "approve"
+    // We consider that we rejected if at least one of the responses is a "reject"
     val locallyRejectedF =
-      responsesF.map(_.exists(_.responses.exists(response => !response.localVerdict.isApprove)))
+      responsesF.map(_.exists(_.responses.exists(_.localVerdict.isReject)))
 
     // The request was aborted if the model conformance check ended with an abort error, due to either a timeout
     // or a negative mediator verdict concurrently received in Phase 7
@@ -1200,6 +1203,8 @@ class TransactionProcessingSteps(
       witnessed = txValidationResult.witnessed,
       completionInfoO = completionInfoO,
       lfTx = modelConformanceResult.suffixedTransaction,
+      externalTransactionHash =
+        pendingRequestData.transactionValidationResult.validatedExternalTransactionHash,
     )
   }
 
@@ -1208,10 +1213,11 @@ class TransactionProcessingSteps(
       txId: TransactionId,
       workflowIdO: Option[WorkflowId],
       commitSet: CommitSet,
-      createdContracts: Map[LfContractId, SerializableContract],
-      witnessed: Map[LfContractId, SerializableContract],
+      createdContracts: Map[LfContractId, NewContractInstance],
+      witnessed: Map[LfContractId, GenContractInstance],
       completionInfoO: Option[CompletionInfo],
       lfTx: WellFormedTransaction[WithSuffixesAndMerged],
+      externalTransactionHash: Option[Hash],
   )(implicit
       traceContext: TraceContext
   ): EitherT[
@@ -1220,44 +1226,46 @@ class TransactionProcessingSteps(
     CommitAndStoreContractsAndPublishEvent,
   ] = {
     val commitSetF = FutureUnlessShutdown.pure(commitSet)
-    val contractsToBeStored = createdContracts.values.toSeq
+    val ledgerEffectiveTime = lfTx.metadata.ledgerTime
+    val contractsToBeStored =
+      createdContracts.values.map(ContractInstance.assignCreationTime(_, ledgerEffectiveTime)).toSeq
 
     for {
       lfTxId <- EitherT
         .fromEither[FutureUnlessShutdown](txId.asLedgerTransactionId)
         .leftMap[TransactionProcessorError](FieldConversionError("Transaction Id", _))
 
-      contractMetadata =
-        // We deliberately do not forward the driver metadata
+      contractAuthenticationData =
+        // We deliberately do not forward the authentication data
         // for divulged contracts since they are not visible on the Ledger API
-        (createdContracts ++ witnessed).view.map {
-          case (contractId, SerializableContract(_, _, _, _, salt)) =>
-            contractId -> DriverContractMetadata(salt).toLfBytes(
-              CantonContractIdVersion.tryCantonContractIdVersion(contractId)
-            )
+        (createdContracts ++ witnessed).view.map { case (contractId, contract) =>
+          contractId -> contract.inst.authenticationData
         }.toMap
 
       acceptedEvent =
-        Update.SequencedTransactionAccepted(
-          completionInfoO = completionInfoO,
-          transactionMeta = TransactionMeta(
-            ledgerEffectiveTime = lfTx.metadata.ledgerTime.toLf,
-            workflowId = workflowIdO.map(_.unwrap),
-            preparationTime = lfTx.metadata.preparationTime.toLf,
-            // Set the submission seed to zeros one (None no longer accepted) because it is pointless for projected
-            // transactions and it leaks the structure of the omitted parts of the transaction.
-            submissionSeed = Update.noOpSeed,
-            timeBoundaries = LedgerTimeBoundaries.unconstrained,
-            optUsedPackages = None,
-            optNodeSeeds = None, // optNodeSeeds is unused by the indexer
-            optByKeyNodes = None, // optByKeyNodes is unused by the indexer
-          ),
-          transaction = LfCommittedTransaction(lfTx.unwrap),
-          updateId = lfTxId,
-          contractMetadata = contractMetadata,
-          synchronizerId = psid.logical,
-          recordTime = requestTime,
-        )
+        (acsChangeFactory: AcsChangeFactory) =>
+          Update.SequencedTransactionAccepted(
+            completionInfoO = completionInfoO,
+            transactionMeta = TransactionMeta(
+              ledgerEffectiveTime = ledgerEffectiveTime.toLf,
+              workflowId = workflowIdO.map(_.unwrap),
+              preparationTime = lfTx.metadata.preparationTime.toLf,
+              // Set the submission seed to zeros one (None no longer accepted) because it is pointless for projected
+              // transactions and it leaks the structure of the omitted parts of the transaction.
+              submissionSeed = Update.noOpSeed,
+              timeBoundaries = LedgerTimeBoundaries.unconstrained,
+              optUsedPackages = None,
+              optNodeSeeds = None, // optNodeSeeds is unused by the indexer
+              optByKeyNodes = None, // optByKeyNodes is unused by the indexer
+            ),
+            transaction = LfCommittedTransaction(lfTx.unwrap),
+            updateId = lfTxId,
+            contractAuthenticationData = contractAuthenticationData,
+            synchronizerId = psid.logical,
+            recordTime = requestTime,
+            externalTransactionHash = externalTransactionHash,
+            acsChangeFactory = acsChangeFactory,
+          )
     } yield CommitAndStoreContractsAndPublishEvent(
       Some(commitSetF),
       contractsToBeStored,
@@ -1308,10 +1316,12 @@ class TransactionProcessingSteps(
         witnessed = usedAndCreated.contracts.witnessed,
         completionInfoO = completionInfoO,
         lfTx = validSubTransaction,
+        externalTransactionHash =
+          pendingRequestData.transactionValidationResult.validatedExternalTransactionHash,
       )
     } yield commitAndContractsAndEvent
 
-  override def getCommitSetAndContractsToBeStoredAndEvent(
+  override def getCommitSetAndContractsToBeStoredAndEventFactory(
       event: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]],
       verdict: Verdict,
       pendingRequestData: RequestType#PendingRequestData,
@@ -1424,11 +1434,14 @@ class TransactionProcessingSteps(
       CommitAndStoreContractsAndPublishEvent,
     ] =
       (for {
-        event <- EitherT.fromEither[Future](
+        eventO <- EitherT.fromEither[Future](
           createRejectionEvent(RejectionArgs(pendingRequestData, rejection))
         )
-      } yield CommitAndStoreContractsAndPublishEvent(None, Seq(), event))
-        .mapK(FutureUnlessShutdown.outcomeK)
+      } yield CommitAndStoreContractsAndPublishEvent(
+        None,
+        Seq(),
+        eventO.map(event => _ => event),
+      )).mapK(FutureUnlessShutdown.outcomeK)
 
     for {
       topologySnapshot <- EitherT
@@ -1500,7 +1513,7 @@ object TransactionProcessingSteps {
       transactionMeta: TransactionMeta,
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
-      disclosedContracts: Map[LfContractId, SerializableContract],
+      disclosedContracts: Map[LfContractId, ContractInstance],
   )
 
   final case class ParsedTransactionRequest(
@@ -1540,7 +1553,7 @@ object TransactionProcessingSteps {
   }
 
   private final case class ParallelChecksResult(
-      authenticationResult: Map[ViewPosition, AuthenticationError],
+      authenticationValidatorResult: AuthenticationValidatorResult,
       consistencyResultE: Either[List[ReferenceToFutureContractError], Unit],
       authorizationResult: Map[ViewPosition, String],
       conformanceResultET: EitherT[
@@ -1551,7 +1564,9 @@ object TransactionProcessingSteps {
       internalConsistencyResultE: Either[ErrorWithInternalConsistencyCheck, Unit],
       timeValidationResultE: Either[TimeCheckFailure, Unit],
       replayCheckResult: Option[String],
-  )
+  ) {
+    val authenticationResult = authenticationValidatorResult.viewAuthenticationErrors
+  }
 
   final case class RejectionArgs(
       pendingTransaction: PendingTransaction,
