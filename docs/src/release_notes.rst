@@ -8,6 +8,18 @@
 Release Notes
 =============
 
+Upcoming
+--------
+
+- Vagrant (new)
+
+  - Add Vagrantfile as a convenient way to spin up a local development
+    environment for Splice. See `README.vagrant.md
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+    and `Vagrantfile
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+    details.
+
 0.4.11
 ------
 
