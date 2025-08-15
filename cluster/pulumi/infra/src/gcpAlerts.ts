@@ -15,20 +15,22 @@ function ensureTrailingNewline(s: string): string {
 
 export function getNotificationChannel(
   name: string = `${CLUSTER_BASENAME} Slack Alert Notification Channel`
-): gcp.monitoring.NotificationChannel {
-  const slackAlertNotificationChannel =
-    config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
-    'team-canton-network-internal-alerts';
-  return new gcp.monitoring.NotificationChannel(slackAlertNotificationChannel, {
-    displayName: name,
-    type: 'slack',
-    labels: {
-      channel_name: `#${slackAlertNotificationChannel}`,
-    },
-    sensitiveLabels: {
-      authToken: slackToken(),
-    },
-  });
+): gcp.monitoring.NotificationChannel | undefined {
+  const slackAlertNotificationChannel = config.optionalEnv(
+    'SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME'
+  );
+  return slackAlertNotificationChannel
+    ? new gcp.monitoring.NotificationChannel(slackAlertNotificationChannel, {
+        displayName: name,
+        type: 'slack',
+        labels: {
+          channel_name: `#${slackAlertNotificationChannel}`,
+        },
+        sensitiveLabels: {
+          authToken: slackToken(),
+        },
+      })
+    : undefined;
 }
 
 export function installGcpLoggingAlerts(
