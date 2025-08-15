@@ -19,7 +19,7 @@ import com.digitalasset.canton.sequencing.protocol.{
 import com.digitalasset.canton.sequencing.traffic.TrafficReceipt
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.topology.DefaultTestIdentities
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.{BaseTest, SequencerCounter, config}
 import org.scalatest.FutureOutcome
 import org.scalatest.wordspec.FixtureAsyncWordSpec
@@ -57,7 +57,6 @@ class SynchronizerTimeTrackerTest extends FixtureAsyncWordSpec with BaseTest {
           TimeProof.mkTimeProofRequestMessageId.some,
           Batch.empty(testedProtocolVersion),
           None,
-          testedProtocolVersion,
           Option.empty[TrafficReceipt],
         ),
         SymbolicCrypto.emptySignature,
@@ -78,7 +77,6 @@ class SynchronizerTimeTrackerTest extends FixtureAsyncWordSpec with BaseTest {
           MessageId.tryCreate("not a time proof").some,
           Batch.empty(testedProtocolVersion),
           None,
-          testedProtocolVersion,
           Option.empty[TrafficReceipt],
         ),
         SymbolicCrypto.emptySignature,
@@ -211,7 +209,7 @@ class SynchronizerTimeTrackerTest extends FixtureAsyncWordSpec with BaseTest {
             CantonTimestamp.MaxValue,
             CantonTimestamp.MaxValue.minusSeconds(2),
             CantonTimestamp.MaxValue.minusSeconds(1),
-          )
+          ).map(Traced(_))
         ),
         _.warningMessage should (include(
           s"Ignoring request for 3 ticks from ${CantonTimestamp.MaxValue.minusSeconds(2)} to ${CantonTimestamp.MaxValue} as they are too large"
@@ -238,7 +236,7 @@ class SynchronizerTimeTrackerTest extends FixtureAsyncWordSpec with BaseTest {
             CantonTimestamp.MaxValue
               .minus(synchronizerTimeTrackerConfig.observationLatency.asJava)
               .immediatePredecessor,
-          )
+          ).map(Traced(_))
         ),
         _.warningMessage should (include("Ignoring request for 1 ticks") and include(
           "as they are too large"

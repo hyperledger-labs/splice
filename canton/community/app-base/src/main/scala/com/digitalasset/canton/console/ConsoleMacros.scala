@@ -34,11 +34,8 @@ import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
-import com.digitalasset.canton.console.commands.{
-  PruningSchedulerAdministration,
-  TopologyAdministrationGroup,
-}
-import com.digitalasset.canton.crypto.{CryptoPureApi, Salt}
+import com.digitalasset.canton.console.commands.PruningSchedulerAdministration
+import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.logging.{
@@ -313,7 +310,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             rawContract = contractInstanceWithUpdatedContractIdReferences,
             createdAt = CantonTimestamp(contract.ledgerCreateTime.time),
             discriminator = discriminator,
-            contractSalt = contract.contractSalt,
+            authenticationData = contract.authenticationData,
             metadata = contract.metadata,
           )
 
@@ -344,17 +341,25 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         rawContract: SerializableRawContractInstance,
         createdAt: CantonTimestamp,
         discriminator: LfHash,
-        contractSalt: Salt,
+        authenticationData: ContractAuthenticationData,
         metadata: ContractMetadata,
     ): ContractId.V1 = {
       val unicumGenerator = new UnicumGenerator(cryptoPureApi)
       val cantonContractIdVersion = AuthenticatedContractIdVersionV11
+      val salt = authenticationData match {
+        case ContractAuthenticationDataV1(salt) => salt
+        case ContractAuthenticationDataV2() =>
+          // TODO(#23971) implement this
+          throw new IllegalArgumentException(
+            "Cannot generate a contract ID with authentication data V2"
+          )
+      }
       val unicum = unicumGenerator
         .recomputeUnicum(
-          contractSalt,
+          salt,
           CreationTime.CreatedAt(createdAt.toLf),
           metadata,
-          rawContract,
+          rawContract.contractInstance.unversioned,
           cantonContractIdVersion,
         )
         .valueOr(err => throw new RuntimeException(err))
@@ -667,7 +672,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         proposedOrExisting.reduceLeft[SignedTopologyTransaction[
           TopologyChangeOp,
           DecentralizedNamespaceDefinition,
-        ]]((txA, txB) => txA.addSignaturesFromTransaction(txB))
+        ]]((txA, txB) => txA.addSignatures(txB.signatures))
 
       val ownerNSDs = owners.flatMap(_.topology.transactions.identity_transactions())
       val foundingTransactions = ownerNSDs :+ decentralizedNamespaceDefinition
@@ -767,6 +772,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         sequencers: Seq[SequencerReference],
         mediatorsToSequencers: Map[MediatorReference, (Seq[SequencerReference], PositiveInt)],
         mediatorRequestAmplification: SubmissionRequestAmplification,
+        mediatorThreshold: PositiveInt,
     )(implicit consoleEnvironment: ConsoleEnvironment): PhysicalSynchronizerId = {
       val synchronizerNamespace =
         DecentralizedNamespaceDefinition.computeNamespace(synchronizerOwners.map(_.namespace).toSet)
@@ -816,6 +822,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
           sequencers.map(_.id),
           mediators.map(_.id),
           store = tempStoreForBootstrap,
+          mediatorThreshold,
         )
       )
 
@@ -824,7 +831,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         .distinct
 
       val merged =
-        TopologyAdministrationGroup.merge(initialTopologyState, updateIsProposal = Some(false))
+        SignedTopologyTransactions.compact(initialTopologyState).map(_.updateIsProposal(false))
 
       val storedTopologySnapshot = StoredTopologyTransactions[TopologyChangeOp, TopologyMapping](
         merged.map(stored =>
@@ -848,13 +855,13 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
       mediatorsToSequencers
         .filter(!_._1.health.initialized())
-        .foreach { case (mediator, (mediatorSequencers, threshold)) =>
+        .foreach { case (mediator, (mediatorSequencers, sequencerTrustThreshold)) =>
           mediator.setup.assign(
             synchronizerId,
             SequencerConnections.tryMany(
               mediatorSequencers
                 .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
-              threshold,
+              sequencerTrustThreshold,
               mediatorRequestAmplification,
             ),
             // if we run bootstrap ourselves, we should have been able to reach the nodes
@@ -888,6 +895,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         staticSynchronizerParameters: data.StaticSynchronizerParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification =
           SubmissionRequestAmplification.NoAmplification,
+        mediatorThreshold: PositiveInt = PositiveInt.one,
     )(implicit consoleEnvironment: ConsoleEnvironment): PhysicalSynchronizerId =
       synchronizer(
         synchronizerName,
@@ -897,6 +905,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         synchronizerThreshold,
         staticSynchronizerParameters,
         mediatorRequestAmplification,
+        mediatorThreshold,
       )
 
     @Help.Summary(
@@ -905,6 +914,10 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     @Help.Description(
       """Bootstraps a new synchronizer with the given static synchronizer parameters and members.
         |Any participants as synchronizer owners must still manually connect to the synchronizer afterwards.
+        |
+        |Parameters:
+        |  mediatorsToSequencers: map of mediator reference to a tuple of a sequence of sequencer references and
+        |                         the sequencer trust threshold for the given mediator.
         """
     )
     def synchronizer(
@@ -915,6 +928,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         synchronizerThreshold: PositiveInt,
         staticSynchronizerParameters: data.StaticSynchronizerParameters,
         mediatorRequestAmplification: SubmissionRequestAmplification,
+        mediatorThreshold: PositiveInt,
     )(implicit consoleEnvironment: ConsoleEnvironment): PhysicalSynchronizerId = {
       // skip over HA sequencers
       val uniqueSequencers =
@@ -944,6 +958,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             uniqueSequencers,
             mediatorsToSequencers,
             mediatorRequestAmplification,
+            mediatorThreshold,
           )
         case Left(error) =>
           consoleEnvironment.raiseError(s"The synchronizer cannot be bootstrapped: $error")
@@ -1215,7 +1230,7 @@ object DebuggingHelpers extends LazyLogging {
 
   private def get_active_contracts_helper(
       ref: ParticipantReference,
-      lookup: SynchronizerAlias => Seq[(Boolean, SerializableContract)],
+      lookup: SynchronizerAlias => Seq[(Boolean, ContractInstance)],
   ): (Map[String, String], Map[String, TemplateId]) = {
     val syncAcs = ref.synchronizers
       .list_connected()
@@ -1223,7 +1238,7 @@ object DebuggingHelpers extends LazyLogging {
       .flatMap(lookup)
       .collect {
         case (active, sc) if active =>
-          (sc.contractId.coid, sc.contractInstance.unversioned.template.qualifiedName.toString())
+          (sc.contractId.coid, sc.templateId.qualifiedName.toString())
       }
       .toMap
     val lapiAcs =

@@ -138,4 +138,7 @@ ACS_COMMITMENT_MISMATCH.*(bob|alice)Participant
 # TODO(#930) - investigate this on the canton side
 Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardinality
 
+# TODO(#1932) fix our requests to not trigger that
+Received an identifier with package ID .* but expected a package name
+
 # Make sure to have a trailing newline

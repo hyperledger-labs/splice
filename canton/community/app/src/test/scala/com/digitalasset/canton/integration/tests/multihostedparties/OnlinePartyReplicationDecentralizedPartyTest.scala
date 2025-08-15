@@ -4,37 +4,36 @@
 package com.digitalasset.canton.integration.tests.multihostedparties
 
 import com.digitalasset.canton.BaseTest.CantonLfV21
-import com.digitalasset.canton.BigDecimalImplicits.IntToBigDecimal
 import com.digitalasset.canton.admin.api.client.data.AddPartyStatus
 import com.digitalasset.canton.config.DbConfig
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.console.{LocalInstanceReference, LocalParticipantReference}
+import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.discard.Implicits.DiscardOps
-import com.digitalasset.canton.examples.java.iou.{Amount, Iou}
-import com.digitalasset.canton.integration
+import com.digitalasset.canton.examples.java.iou.Iou
 import com.digitalasset.canton.integration.plugins.{
   UseCommunityReferenceBlockSequencer,
   UsePostgres,
 }
+import com.digitalasset.canton.integration.tests.examples.IouSyntax
 import com.digitalasset.canton.integration.{
   CommunityIntegrationTest,
   ConfigTransforms,
   EnvironmentDefinition,
   SharedEnvironment,
 }
-import com.digitalasset.canton.ledger.client.LedgerClientUtils
 import com.digitalasset.canton.logging.SuppressingLogger.LogEntryOptionality
-import com.digitalasset.canton.participant.admin.workflows.java.canton.internal as M
-import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
+import com.digitalasset.canton.participant.party.PartyReplicationTestInterceptorImpl
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.{config, integration}
+import monocle.macros.syntax.lens.*
 
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-/** Objective: Test party replication of non-local parties such as a decentralized party.
+/** Objective: Test party replication of non-local parties such as a decentralized party with
+  * concurrent archiving of replicated contracts.
   *
   * Setup:
   *   - 3 participants: participant1 hosts a centralized party to replicate to participant2
@@ -44,6 +43,7 @@ import scala.jdk.CollectionConverters.*
   */
 sealed trait OnlinePartyReplicationDecentralizedPartyTest
     extends CommunityIntegrationTest
+    with OnlinePartyReplicationTestHelpers
     with SharedEnvironment {
 
   registerPlugin(new UseCommunityReferenceBlockSequencer[DbConfig.H2](loggerFactory))
@@ -53,9 +53,32 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
 
   lazy val darPaths: Seq[String] = Seq(CantonLfV21, CantonExamplesPath)
 
+  // false means to block OnPR (temporarily) the moment the SP connects to channel
+  private var canSourceProceedWithOnPR: Boolean = false
+
+  // Use the test interceptor to block OnPR until a concurrent exercise is processed by the SP.
+  private def createSourceParticipantTestInterceptor() =
+    PartyReplicationTestInterceptorImpl.sourceParticipantProceedsIf(_ => canSourceProceedWithOnPR)
+
   override lazy val environmentDefinition: EnvironmentDefinition =
     EnvironmentDefinition.P3_S1M1
-      .addConfigTransforms(ConfigTransforms.unsafeEnableOnlinePartyReplication*)
+      .addConfigTransforms(
+        (ConfigTransforms.unsafeEnableOnlinePartyReplication(
+          Map("participant1" -> (() => createSourceParticipantTestInterceptor()))
+        ) :+
+          // TODO(#24326): While the SourceParticipant (SP=P1) uses AcsInspection to consume the
+          //  ACS snapshot (rather than the Ledger Api), ensure ACS pruning does not trigger AcsInspection
+          //  TimestampBeforePruning. Allow a generous 5 minutes for the SP to consume all active contracts
+          //  in this test.
+          ConfigTransforms.updateParticipantConfig("participant1")(
+            _.focus(_.parameters.journalGarbageCollectionDelay)
+              .replace(config.NonNegativeFiniteDuration.ofMinutes(5))
+          ) :+
+          // TODO(#25744): PartyReplicationTargetParticipantProcessor needs to update the in-memory lock state
+          //   along with the ActiveContractStore to prevent racy LockableStates internal consistency check failures
+          //   such as #26384. Until then, disable the "additional consistency checks".
+          ConfigTransforms.disableAdditionalConsistencyChecks)*
+      )
       .withSetup { implicit env =>
         import env.*
 
@@ -76,6 +99,7 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
   private var partyOwners: Seq[LocalInstanceReference] = _
   private var decentralizedParty: PartyId = _
   private var previousSerial: PositiveInt = _
+  private var dpToAlice: Seq[Iou.Contract] = _
   private val numContractsInCreateBatch = 100
 
   "Create decentralized party with contracts" onlyRunWith ProtocolVersion.dev in { implicit env =>
@@ -132,13 +156,13 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
     )
 
     val amounts = (1 to numContractsInCreateBatch)
-    createIous(participant1, alice, decentralizedParty, amounts)
-    createIous(participant1, decentralizedParty, alice, amounts)
+    IouSyntax.createIous(participant1, alice, decentralizedParty, amounts)
+    dpToAlice = IouSyntax.createIous(participant1, decentralizedParty, alice, amounts)
 
     // Create some decentralized party stakeholder contracts shared with a party (Bob) already
     // on the target participant P2.
-    createIous(participant2, bob, decentralizedParty, amounts)
-    createIous(participant1, decentralizedParty, bob, amounts)
+    IouSyntax.createIous(participant2, bob, decentralizedParty, amounts)
+    IouSyntax.createIous(participant1, decentralizedParty, bob, amounts)
   }
 
   "Replicate a decentralized party" onlyRunWith ProtocolVersion.dev in { implicit env =>
@@ -183,28 +207,30 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
     )
 
     // Wait until the party is authorized for onboarding on the TP, before archiving replicated contracts.
-    /* TODO(#25744): Extend LockableStates internal assertVersionedStateIsLatestIfNoPendingWrites to not
-         get upset about the OnPR-TP writing directly to the ActiveContractStore. Also figure out how to
-         block party replication by tunneling through a hook
+    canSourceProceedWithOnPR = false
     eventually() {
       val tpStatus = targetParticipant.parties.get_add_party_status(addPartyRequestId)
-      logger.info(s"Waiting until TP has connected: $tpStatus")
+      logger.info(s"Waiting until party onboarding topology has been authorized: $tpStatus")
       val hasConnected = tpStatus.status match {
-        case AddPartyStatus.ProposalProcessed | AddPartyStatus.AgreementAccepted(_) |
-            AddPartyStatus.Error(_, _) =>
-          false
-        case _ =>
+        case AddPartyStatus.TopologyAuthorized(_, _) | AddPartyStatus.ConnectionEstablished(_, _) |
+            AddPartyStatus.ReplicatingAcs(_, _, _) =>
           true
+        case _ => false
       }
       hasConnected shouldBe true
     }
     val iouToExercise = dpToAlice.last
     clue(s"exercise-iou ${iouToExercise.data.amount.value}") {
       sourceParticipant.ledger_api.javaapi.commands
-        .submit(Seq(alice), iouToExercise.id.exerciseCall().commands.asScala.toSeq)
+        .submit(
+          Seq(alice),
+          iouToExercise.id.exerciseCall().commands.asScala.toSeq,
+          optTimeout = None, // cannot wait for TP because TP indexer paused, so only wait on SP
+        )
         .discard
     }
-     */
+    logger.info("Unblocking progress on SP")
+    canSourceProceedWithOnPR = true
 
     // Expect three batches owned by decentralizedParty:
     // 1. all coins plus the coin factory contract (hence the +1 below)
@@ -214,44 +240,18 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
     val expectedNumContracts = NonNegativeInt.tryCreate(numContractsInCreateBatch * 3 + 1)
 
     // Wait until both SP and TP report that party replication has completed.
-    eventually(retryOnTestFailuresOnly = false, maxPollInterval = 10.millis) {
-      val tpStatus = targetParticipant.parties.get_add_party_status(
-        addPartyRequestId = addPartyRequestId
-      )
-      logger.info(s"TP status: $tpStatus")
-      val spStatus = loggerFactory.assertLogsUnorderedOptional(
-        sourceParticipant.parties.get_add_party_status(
-          addPartyRequestId = addPartyRequestId
-        ),
-        // Ignore UNKNOWN status if SP has not found out about the request yet.
-        // Besides logging the error produces a CommandFailure error message, hence
-        // the retryOnTestFailuresOnly = false above.
-        LogEntryOptionality.Optional -> (_.errorMessage should include(
-          "UNKNOWN/Add party request id"
-        )),
-      )
-      logger.info(s"SP status: $spStatus")
-      (tpStatus.status, spStatus.status) match {
-        case (
-              AddPartyStatus.Completed(_, _, `expectedNumContracts`),
-              AddPartyStatus.Completed(_, _, `expectedNumContracts`),
-            ) =>
-          logger.info(
-            s"TP and SP completed party replication with status $tpStatus and $spStatus"
-          )
-        case (
-              AddPartyStatus.Completed(_, _, numSpContracts),
-              AddPartyStatus.Completed(_, _, numTpContracts),
-            ) =>
-          logger.warn(
-            s"TP and SP completed party replication but had unexpected number of contracts: $numSpContracts and $numTpContracts, expected $expectedNumContracts"
-          )
-        case (targetStatus, sourceStatus) =>
-          fail(
-            s"TP and SP did not complete party replication. TP and SP status: $targetStatus and $sourceStatus"
-          )
-      }
-    }
+    loggerFactory.assertLogsUnorderedOptional(
+      eventuallyOnPRCompletes(
+        sourceParticipant,
+        targetParticipant,
+        addPartyRequestId,
+        expectedNumContracts,
+      ),
+      // Ignore UNKNOWN status if SP has not found out about the request yet.
+      LogEntryOptionality.OptionalMany -> (_.errorMessage should include(
+        "UNKNOWN/Add party request id"
+      )),
+    )
 
     // Expect all the coins to become indexed and visible via the ledger API.
     eventually() {
@@ -261,24 +261,6 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
       )
       coinsAtTargetParticipant.size shouldBe numContractsInCreateBatch
     }
-
-    // Archive the party replication agreement, so that subsequent tests have a clean slate.
-    val agreement = targetParticipant.ledger_api.javaapi.state.acs
-      .await(M.partyreplication.PartyReplicationAgreement.COMPANION)(
-        sourceParticipant.adminParty
-      )
-    targetParticipant.ledger_api.commands
-      .submit(
-        actAs = Seq(targetParticipant.adminParty),
-        commands = agreement.id
-          .exerciseDone(targetParticipant.adminParty.toLf)
-          .commands
-          .asScala
-          .toSeq
-          .map(LedgerClientUtils.javaCodegenToScalaProto),
-        synchronizerId = Some(daId),
-      )
-      .discard
   }
 
   private def createDecentralizedParty(
@@ -313,29 +295,6 @@ sealed trait OnlinePartyReplicationDecentralizedPartyTest
     logger.info(s"Decentralized namespace ${decentralizedNamespace.namespace} authorized")
 
     PartyId.tryCreate(name, decentralizedNamespace.namespace)
-  }
-
-  private def createIous(
-      participant: LocalParticipantReference,
-      payer: PartyId,
-      owner: PartyId,
-      amounts: Seq[Int],
-  ): Seq[Iou.Contract] = {
-    val createIouCmds = amounts.map(amount =>
-      new Iou(
-        payer.toProtoPrimitive,
-        owner.toProtoPrimitive,
-        new Amount(amount.toBigDecimal, "USD"),
-        List.empty.asJava,
-      ).create.commands.loneElement
-    )
-    clue(s"create ${amounts.size} IOUs") {
-      JavaDecodeUtil
-        .decodeAllCreated(Iou.COMPANION)(
-          participant.ledger_api.javaapi.commands
-            .submit(Seq(payer), createIouCmds)
-        )
-    }
   }
 }
 

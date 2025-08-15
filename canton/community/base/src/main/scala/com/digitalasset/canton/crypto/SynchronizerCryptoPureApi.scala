@@ -17,8 +17,6 @@ import com.google.protobuf.ByteString
   * potentially use a downgraded scheme. For other methods, such as key generation, signing, or
   * encryption by this (honest) participant, we rely on the synchronizer handshake to ensure that
   * only supported schemes within the synchronizer are used.
-  *
-  * TODO(#25260): Refactor SynchronizerCryptoPureApi
   */
 final class SynchronizerCryptoPureApi(
     override val staticSynchronizerParameters: StaticSynchronizerParameters,
@@ -61,7 +59,7 @@ final class SynchronizerCryptoPureApi(
       _ <- pureCrypto.verifySignature(bytes, publicKey, signature, usage)
     } yield ()
 
-  override protected[crypto] def decryptWithInternal[M](
+  override private[crypto] def decryptWithInternal[M](
       encrypted: AsymmetricEncrypted[M],
       privateKey: EncryptionPrivateKey,
   )(
@@ -87,11 +85,8 @@ final class SynchronizerCryptoPureApi(
       scheme: SymmetricKeyScheme,
   ): Either[EncryptionKeyCreationError, SymmetricKey] = pureCrypto.createSymmetricKey(bytes, scheme)
 
-  override def defaultEncryptionAlgorithmSpec: EncryptionAlgorithmSpec =
-    pureCrypto.defaultEncryptionAlgorithmSpec
-
-  override def supportedEncryptionAlgorithmSpecs: NonEmpty[Set[EncryptionAlgorithmSpec]] =
-    pureCrypto.supportedEncryptionAlgorithmSpecs
+  override def encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec] =
+    pureCrypto.encryptionAlgorithmSpecs
 
   override def encryptWith[M <: HasToByteString](
       message: M,
@@ -136,17 +131,14 @@ final class SynchronizerCryptoPureApi(
   override protected[crypto] def generateRandomBytes(length: Int): Array[Byte] =
     pureCrypto.generateRandomBytes(length)
 
-  override def defaultSigningAlgorithmSpec: SigningAlgorithmSpec =
-    pureCrypto.defaultSigningAlgorithmSpec
-
-  override def supportedSigningAlgorithmSpecs: NonEmpty[Set[SigningAlgorithmSpec]] =
-    pureCrypto.supportedSigningAlgorithmSpecs
+  override def signingAlgorithmSpecs: CryptoScheme[SigningAlgorithmSpec] =
+    pureCrypto.signingAlgorithmSpecs
 
   override protected[crypto] def signBytes(
       bytes: ByteString,
       signingKey: SigningPrivateKey,
       usage: NonEmpty[Set[SigningKeyUsage]],
-      signingAlgorithmSpec: SigningAlgorithmSpec = defaultSigningAlgorithmSpec,
+      signingAlgorithmSpec: SigningAlgorithmSpec = signingAlgorithmSpecs.default,
   )(implicit traceContext: TraceContext): Either[SigningError, Signature] =
     pureCrypto.signBytes(bytes, signingKey, usage, signingAlgorithmSpec)
 }

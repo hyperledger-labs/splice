@@ -10,14 +10,15 @@ import com.digitalasset.canton.DoNotDiscardLikeFuture
 import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, Outcome}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.modules.{
   Consensus,
   Output,
   P2PNetworkOut,
+  Pruning,
 }
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{HasTraceContext, TraceContext}
 import org.apache.pekko.dispatch.ControlMessage
 
 import java.time.Instant
@@ -166,20 +167,16 @@ trait Module[E <: Env[E], MessageT] extends NamedLogging with FlagCloseable {
   */
 trait ModuleRef[-AcceptedMessageT] {
 
-  // TODO(#23345): review tracing when messaging
-
-  /** The module reference's asynchronous send operation.
+  /** Send operation that is also providing the current TraceContext
     */
   def asyncSend(
       msg: AcceptedMessageT
-  )(implicit metricsContext: MetricsContext): Unit =
-    asyncSendTraced(msg)(TraceContext.empty, metricsContext)
-
-  /** Send operation that is also providing the current TraceContext
-    */
-  def asyncSendTraced(
-      msg: AcceptedMessageT
   )(implicit traceContext: TraceContext, metricsContext: MetricsContext): Unit
+
+  def asyncSendNoTrace(
+      msg: AcceptedMessageT
+  )(implicit metricsContext: MetricsContext): Unit =
+    asyncSend(msg)(traceContext = TraceContext.empty, metricsContext = metricsContext)
 }
 
 /** An abstraction of the network for deterministic simulation testing purposes.
@@ -191,15 +188,27 @@ trait P2PNetworkRef[-P2PMessageT] extends FlagCloseable {
   ): Unit
 }
 
-/** An abstraction of the P2P network manager for deterministic simulation testing purposes.
+trait P2PConnectionEventListener {
+  def onConnect(endpointId: P2PEndpoint.Id): Unit
+  def onDisconnect(endpointId: P2PEndpoint.Id): Unit
+  def onSequencerId(endpointId: P2PEndpoint.Id, nodeId: BftNodeId): Unit
+}
+object P2PConnectionEventListener {
+  val NoOp: P2PConnectionEventListener = new P2PConnectionEventListener {
+    override def onConnect(endpointId: P2PEndpoint.Id): Unit = ()
+    override def onDisconnect(endpointId: P2PEndpoint.Id): Unit = ()
+    override def onSequencerId(endpointId: P2PEndpoint.Id, nodeId: BftNodeId): Unit = ()
+  }
+}
+
+/** An abstraction of the P2P network reference factory for deterministic simulation testing
+  * purposes.
   */
-trait ClientP2PNetworkManager[E <: Env[E], -P2PMessageT] {
+trait P2PNetworkRefFactory[E <: Env[E], -P2PMessageT] extends FlagCloseable {
 
   def createNetworkRef[ActorContextT](
       context: E#ActorContextT[ActorContextT],
       endpoint: P2PEndpoint,
-  )(
-      onSequencerId: (P2PEndpoint.Id, BftNodeId) => Unit
   ): P2PNetworkRef[P2PMessageT]
 }
 
@@ -210,7 +219,7 @@ trait CancellableEvent {
   /** @return
     *   True if the cancellation was successful.
     */
-  def cancel(): Boolean
+  def cancel()(implicit metricsContext: MetricsContext): Boolean
 }
 
 /** FutureContext contains functions for creating and combining E#FutureUnlessShutdown that will be
@@ -287,21 +296,23 @@ trait ModuleContext[E <: Env[E], MessageT] extends NamedLogging with FutureConte
 
   def self: E#ModuleRefT[MessageT]
 
-  // TODO(#23345): review tracing when messaging
-
-  def delayedEvent(delay: FiniteDuration, message: MessageT)(implicit
-      metricsContext: MetricsContext
-  ): CancellableEvent =
-    delayedEventTraced(delay, message)(TraceContext.empty, metricsContext)
-
-  def delayedEventTraced(delay: FiniteDuration, messageT: MessageT)(implicit
+  def delayedEvent(delay: FiniteDuration, messageT: MessageT)(implicit
       traceContext: TraceContext,
       metricsContext: MetricsContext,
   ): CancellableEvent
 
+  def delayedEventNoTrace(delay: FiniteDuration, messageT: MessageT)(implicit
+      metricsContext: MetricsContext
+  ): CancellableEvent = delayedEvent(delay, messageT)(
+    traceContext = TraceContext.empty,
+    metricsContext = metricsContext,
+  )
+
   /** Similar to TraceContext.withNewTraceContext but can be deterministically simulated
     */
   def withNewTraceContext[A](fn: TraceContext => A): A
+
+  def traceContextOfBatch(items: IterableOnce[HasTraceContext]): TraceContext
 
   def futureContext: FutureContext[E]
 
@@ -456,23 +467,36 @@ object Module {
     * of the concrete actors framework, such as Pekko or the simulation testing framework, as to
     * further reduce the gap between what is run and what is deterministically simulation-tested.
     *
-    * Inputs are a module system and a network manager; the latter defines how nodes connect.
+    * Inputs are a module system and a client P2P network manager factory; the latter defines how
+    * nodes connect.
     */
-  trait SystemInitializer[E <: Env[E], P2PMessageT, InputMessageT] {
+  trait SystemInitializer[
+      E <: Env[E],
+      P2PNetworkRefFactoryT <: P2PNetworkRefFactory[E, P2PMessageT],
+      P2PMessageT,
+      InputMessageT,
+  ] {
     def initialize(
         moduleSystem: ModuleSystem[E],
-        networkManager: ClientP2PNetworkManager[E, P2PMessageT],
-    ): SystemInitializationResult[P2PMessageT, InputMessageT]
+        createP2PNetworkRefFactory: P2PConnectionEventListener => P2PNetworkRefFactoryT,
+    ): SystemInitializationResult[E, P2PNetworkRefFactoryT, P2PMessageT, InputMessageT]
   }
 
   /** The result of initializing a module system independent of the actor framework, to be used
     * during the actor framework-specific initialization.
     */
-  final case class SystemInitializationResult[P2PMessageT, InputMessageT](
+  final case class SystemInitializationResult[
+      E <: Env[E],
+      P2PNetworkRefFactoryT <: P2PNetworkRefFactory[E, P2PMessageT],
+      P2PMessageT,
+      InputMessageT,
+  ](
       inputModuleRef: ModuleRef[InputMessageT],
       p2pNetworkInModuleRef: ModuleRef[P2PMessageT],
       p2pNetworkOutAdminModuleRef: ModuleRef[P2PNetworkOut.Admin],
       consensusAdminModuleRef: ModuleRef[Consensus.Admin],
       outputModuleRef: ModuleRef[Output.SequencerSnapshotMessage],
+      pruningModuleRef: ModuleRef[Pruning.Message],
+      p2pNetworkRefFactory: P2PNetworkRefFactoryT,
   )
 }

@@ -19,11 +19,11 @@ class ExtractUsedAndCreatedTest extends BaseTestWordSpec with HasExecutionContex
   val etf: ExampleTransactionFactory = new ExampleTransactionFactory()()
 
   private val emptyUsedAndCreatedContracts = UsedAndCreatedContracts(
-    witnessed = Map.empty[LfContractId, SerializableContract],
+    witnessed = Map.empty[LfContractId, ContractInstance],
     checkActivenessTxInputs = Set.empty[LfContractId],
     consumedInputsOfHostedStakeholders = Map.empty[LfContractId, Set[LfPartyId]],
-    used = Map.empty[LfContractId, SerializableContract],
-    maybeCreated = Map.empty[LfContractId, Option[SerializableContract]],
+    used = Map.empty[LfContractId, ContractInstance],
+    maybeCreated = Map.empty[LfContractId, Option[NewContractInstance]],
     transient = Map.empty[LfContractId, Set[LfPartyId]],
     maybeUnknown = Set.empty[LfContractId],
   )
@@ -56,7 +56,9 @@ class ExtractUsedAndCreatedTest extends BaseTestWordSpec with HasExecutionContex
 
     val expected = UsedAndCreated(
       contracts = emptyUsedAndCreatedContracts.copy(maybeCreated =
-        Map(singleCreate.contractId -> singleCreate.created.headOption)
+        Map(
+          singleCreate.contractId -> singleCreate.created.headOption
+        )
       ),
       hostedWitnesses = informeeParties,
     )
@@ -184,8 +186,9 @@ class ExtractUsedAndCreatedTest extends BaseTestWordSpec with HasExecutionContex
       val actual = underTest.createdContractPrep(Seq(viewData))
 
       val expected = CreatedContractPrep(
-        createdContractsOfHostedInformees =
-          Map(singleCreate.contractId -> singleCreate.created.headOption),
+        createdContractsOfHostedInformees = Map(
+          singleCreate.contractId -> singleCreate.created.headOption
+        ),
         witnessed = Map.empty,
       )
 

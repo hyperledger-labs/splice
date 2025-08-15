@@ -3,7 +3,7 @@ package org.lfdecentralizedtrust.splice.sv.onboarding
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.{SequencerId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.automation.{TaskNoop, TaskOutcome}
@@ -120,8 +120,8 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), sequencer1Host),
-            (Some(sequencer2Id), sequencer2Host),
+            (Some(sequencer1Id), Some(sequencer1Host)),
+            (Some(sequencer2Id), Some(sequencer2Host)),
           )
         )
       )
@@ -156,8 +156,8 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), sequencer1Host),
-            (Some(sequencer2Id), sequencer2Host),
+            (Some(sequencer1Id), Some(sequencer1Host)),
+            (Some(sequencer2Id), Some(sequencer2Host)),
           )
         )
       )
@@ -186,8 +186,8 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), sequencer1Host),
-            (Some(sequencer2Id), sequencer2Host),
+            (Some(sequencer1Id), Some(sequencer1Host)),
+            (Some(sequencer2Id), Some(sequencer2Host)),
           )
         )
       )
@@ -217,7 +217,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), sequencer1Host)
+            (Some(sequencer1Id), Some(sequencer1Host))
           )
         )
       )
@@ -251,7 +251,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), sequencer1Host)
+            (Some(sequencer1Id), Some(sequencer1Host))
           )
         )
       )
@@ -279,7 +279,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (None, sequencer1Host)
+            (None, Some(sequencer1Host))
           )
         )
       )
@@ -300,7 +300,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       .thenReturn(
         Future.successful(
           Seq(
-            (None, sequencer1Host)
+            (None, Some(sequencer1Host))
           )
         )
       )

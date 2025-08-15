@@ -17,18 +17,24 @@ import com.digitalasset.canton.data.{
   ViewPosition,
 }
 import com.digitalasset.canton.error.MediatorError
+import com.digitalasset.canton.error.MediatorError.ParticipantEquivocation
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{RequestId, RootHash}
 import com.digitalasset.canton.synchronizer.mediator.MediatorVerdict.MediatorApprove
-import com.digitalasset.canton.synchronizer.mediator.ResponseAggregation.ViewState
+import com.digitalasset.canton.synchronizer.mediator.ResponseAggregation.ConsortiumVotingState.VoteKind
+import com.digitalasset.canton.synchronizer.mediator.ResponseAggregation.{
+  ConsortiumVotingState,
+  ViewState,
+}
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.immutable.SortedSet
 import scala.concurrent.ExecutionContext
@@ -146,11 +152,9 @@ final case class ResponseAggregation[VKEY](
         )
       ),
     )
-    val ViewState(consortiumVoting, quorumsState, rejections) =
-      stateOfView
+    val ViewState(consortiumVoting, quorumsState, rejections) = stateOfView
     val pendingConfirmingParties = ViewConfirmationParameters.confirmersIdsFromQuorums(quorumsState)
-    val (newlyResponded, _) =
-      pendingConfirmingParties.partition(party => authorizedParties.contains(party))
+    val newlyResponded = pendingConfirmingParties.intersect(authorizedParties)
 
     loggingContext.debug(
       show"$requestId($keyName $viewKey): Received verdict $localVerdict for pending parties $newlyResponded by participant $sender. "
@@ -167,43 +171,52 @@ final case class ResponseAggregation[VKEY](
       )
       Either.right[MediatorVerdict, Map[VKEY, ViewState]](statesOfViews)
     } else {
+
+      // log if a participant has already responded with a different verdict for a party
+      consortiumVoting.foreach { case (party, votingState) =>
+        votingState.responsesOf(sender) match {
+          case Some(voteKind) =>
+            val errorMessage =
+              s"$requestId($keyName $viewKey): Ignoring ${localVerdict.name} verdict for $sender because it has already responded for party $party with $voteKind verdict"
+            if (ConsortiumVotingState.isContradictoryToPreviousVote(voteKind, localVerdict))
+              ParticipantEquivocation.Detected(errorMessage, sender).report()
+            else loggingContext.info(errorMessage)
+          case None => ()
+        }
+      }
+
+      val consortiumVotingUpdated: Map[LfPartyId, ResponseAggregation.ConsortiumVotingState] =
+        newlyResponded.foldLeft(consortiumVoting) { (votes, confirmingParty) =>
+          votes + (confirmingParty -> votes(confirmingParty).update(localVerdict, sender))
+        }
+
       localVerdict match {
-        case LocalApprove() =>
-          val consortiumVotingUpdated =
-            newlyResponded.foldLeft(consortiumVoting) { (votes, confirmingParty) =>
-              votes + (confirmingParty -> votes(confirmingParty).approveBy(sender))
-            }
+        case approve: LocalApprove =>
           val newlyRespondedFullVotes = newlyResponded.filter(consortiumVotingUpdated(_).isApproved)
-          loggingContext.debug(
-            show"$requestId($keyName $viewKey): Received an approval (or reached consortium thresholds) for parties: $newlyRespondedFullVotes"
-          )
+
           val stillPending = pendingConfirmingParties -- newlyRespondedFullVotes
           if (newlyRespondedFullVotes.isEmpty) {
             loggingContext.debug(
-              show"$requestId($keyName $viewKey): Awaiting approvals or additional votes for consortiums for $stillPending"
+              show"$requestId($keyName $viewKey): Received ${approve.name} for $newlyResponded, but awaiting additional votes for consortiums for $stillPending"
             )
+          } else {
+            loggingContext.debug(
+              show"$requestId($keyName $viewKey): Received ${approve.name} and reached consortium thresholds for parties: $newlyRespondedFullVotes"
+            )
+            if (stillPending.nonEmpty)
+              loggingContext.debug(
+                show"$requestId($keyName $viewKey): Awaiting approvals or additional votes for consortiums for $stillPending"
+              )
           }
 
-          def updateQuorumsStateWithThresholdUpdate(): Seq[Quorum] =
-            quorumsState.map { quorum =>
-              val contribution = quorum.confirmers
-                .filter { case (pId, _) => newlyRespondedFullVotes.contains(pId) }
-                .foldLeft(0) { case (acc, (_, weight)) =>
-                  acc + weight.unwrap
-                }
-              // if all thresholds in the list are 0 then all quorums have been met.
-              val updatedThreshold = NonNegativeInt
-                .create(quorum.threshold.unwrap - contribution)
-                .getOrElse(NonNegativeInt.zero)
-              val updatedConfirmers = quorum.confirmers -- newlyRespondedFullVotes
-              Quorum(updatedConfirmers, updatedThreshold)
-            }
+          val quorumUpdated = updateQuorumState(localVerdict, newlyRespondedFullVotes, quorumsState)
 
           val nextViewState = ViewState(
             consortiumVotingUpdated,
-            updateQuorumsStateWithThresholdUpdate(),
+            quorumUpdated,
             rejections,
           )
+
           val nextStatesOfViews = statesOfViews + (viewKey -> nextViewState)
           Either.cond(
             nextStatesOfViews.values.exists(viewState => !quorumsSatisfied(viewState.quorumsState)),
@@ -211,29 +224,26 @@ final case class ResponseAggregation[VKEY](
             MediatorApprove,
           )
 
-        case rejection: LocalReject =>
-          val consortiumVotingUpdated =
-            authorizedParties.foldLeft(consortiumVoting) { (votes, party) =>
-              votes + (party -> votes(party).rejectBy(sender))
-            }
+        case nonPositiveVerdict: NonPositiveLocalVerdict =>
           val newRejectionsFullVotes =
             authorizedParties.filter(party => consortiumVotingUpdated(party).isRejected)
+          val quorumUpdated = updateQuorumState(localVerdict, newRejectionsFullVotes, quorumsState)
+
           if (newRejectionsFullVotes.nonEmpty) {
             loggingContext.debug(
-              show"$requestId($keyName $viewKey): Received a rejection (or reached consortium thresholds) for parties: $newRejectionsFullVotes"
+              show"$requestId($keyName $viewKey): Received a ${nonPositiveVerdict.name} for $newlyResponded and reached consortium thresholds for parties: $newRejectionsFullVotes"
             )
-            val nextRejections =
-              NonEmpty(List, newRejectionsFullVotes -> rejection, rejections*)
 
-            def updateQuorumsStateWithoutThresholdUpdate(): Seq[Quorum] =
-              quorumsState.map { quorum =>
-                val updatedConfirmers = quorum.confirmers -- newRejectionsFullVotes
-                Quorum(updatedConfirmers, quorum.threshold)
-              }
+            // TODO(i26453): Consider whether we want to keep all rejections or only the latest one.
+            // Right now we only keep the last rejection reason that makes the party reject fully.
+            // It can be either a LocalReject or a LocalAbstain.
+
+            val nextRejections =
+              NonEmpty(List, newRejectionsFullVotes -> nonPositiveVerdict, rejections*)
 
             val nextViewState = ViewState(
               consortiumVotingUpdated,
-              updateQuorumsStateWithoutThresholdUpdate(),
+              quorumUpdated,
               nextRejections,
             )
             Either.cond(
@@ -245,7 +255,7 @@ final case class ResponseAggregation[VKEY](
           } else {
             // no full votes, need more confirmations (only in consortium case)
             loggingContext.debug(
-              show"$requestId($keyName $viewKey): Received a rejection, but awaiting more consortium votes for: $pendingConfirmingParties"
+              show"$requestId($keyName $viewKey): Received a ${nonPositiveVerdict.name} for $newlyResponded , but awaiting more consortium votes for: $pendingConfirmingParties"
             )
             val nextViewState = ViewState(
               consortiumVotingUpdated,
@@ -254,8 +264,34 @@ final case class ResponseAggregation[VKEY](
             )
             Right(statesOfViews + (viewKey -> nextViewState))
           }
+
       }
     }
+  }
+
+  private def updateQuorumState(
+      localVerdict: LocalVerdict,
+      newlyRespondedFullVotes: Set[LfPartyId],
+      quorumsState: Seq[Quorum],
+  ): Seq[Quorum] = localVerdict match {
+    case LocalApprove() =>
+      quorumsState.map { quorum =>
+        val contribution = quorum.confirmers.collect {
+          case (pId, weight) if newlyRespondedFullVotes.contains(pId) => weight.unwrap
+        }.sum
+
+        // if all thresholds in the list are 0 then all quorums have been met.
+        val updatedThreshold = NonNegativeInt
+          .create(quorum.threshold.unwrap - contribution)
+          .getOrElse(NonNegativeInt.zero)
+        val updatedConfirmers = quorum.confirmers -- newlyRespondedFullVotes
+        Quorum(updatedConfirmers, updatedThreshold)
+      }
+    case _: NonPositiveLocalVerdict =>
+      quorumsState.map { quorum =>
+        val updatedConfirmers = quorum.confirmers -- newlyRespondedFullVotes
+        Quorum(updatedConfirmers, quorum.threshold)
+      }
   }
 
   def copy(
@@ -314,27 +350,106 @@ final case class ResponseAggregation[VKEY](
 
 object ResponseAggregation {
 
-  final case class ConsortiumVotingState(
-      threshold: PositiveInt = PositiveInt.one,
-      approvals: Set[ParticipantId] = Set.empty,
-      rejections: Set[ParticipantId] = Set.empty,
+  /** Invariant: approvals, rejections, and abstains are pairwise disjoint. */
+  final case class ConsortiumVotingState private (
+      threshold: PositiveInt,
+      hostingParticipantsCount: PositiveInt,
+      approvals: Set[ParticipantId],
+      rejections: Set[ParticipantId],
+      abstains: Set[ParticipantId],
   ) extends PrettyPrinting {
-    def approveBy(participant: ParticipantId): ConsortiumVotingState =
-      this.copy(approvals = this.approvals + participant)
 
-    def rejectBy(participant: ParticipantId): ConsortiumVotingState =
-      this.copy(rejections = this.rejections + participant)
+    def responsesOf(participant: ParticipantId): Option[VoteKind] =
+      if (approvals.contains(participant)) Some(VoteKind.Approve)
+      else if (rejections.contains(participant)) Some(VoteKind.Reject)
+      else if (abstains.contains(participant)) Some(VoteKind.Abstain)
+      else None
+
+    private def hasAlreadyResponded(sender: ParticipantId): Boolean =
+      approvals.contains(sender) || rejections.contains(sender) || abstains.contains(sender)
+
+    // if the sender has already responded, we do not update the state
+    def update(localVerdict: LocalVerdict, sender: ParticipantId): ConsortiumVotingState =
+      if (hasAlreadyResponded(sender)) this
+      else
+        localVerdict match {
+          case _: LocalApprove => this.copy(approvals = this.approvals + sender)
+          case _: LocalReject => this.copy(rejections = this.rejections + sender)
+          case _: LocalAbstain => this.copy(abstains = this.abstains + sender)
+        }
 
     def isApproved: Boolean = approvals.sizeIs >= threshold.value
 
-    def isRejected: Boolean = rejections.sizeIs >= threshold.value
+    def isRejected: Boolean = rejections.sizeIs >= threshold.value || !isThresholdIsReachable
+
+    private def isThresholdIsReachable: Boolean =
+      rejections.size + abstains.size + threshold.value <= hostingParticipantsCount.value
 
     override protected def pretty: Pretty[ConsortiumVotingState] =
       prettyOfClass(
         param("consortium-threshold", _.threshold, _.threshold.value > 1),
+        param(
+          "number-of-hosting-participants",
+          _.hostingParticipantsCount,
+          _.hostingParticipantsCount.value > 1,
+        ),
         paramIfNonEmpty("approved by participants", _.approvals),
         paramIfNonEmpty("rejected by participants", _.rejections),
+        paramIfNonEmpty("abstains by participants", _.abstains),
       )
+  }
+
+  object ConsortiumVotingState {
+    def initialValue(
+        threshold: PositiveInt,
+        numberOfHostingParticipants: PositiveInt,
+    ): ConsortiumVotingState =
+      ConsortiumVotingState(
+        threshold,
+        numberOfHostingParticipants,
+        approvals = Set.empty,
+        rejections = Set.empty,
+        abstains = Set.empty,
+      )
+
+    @VisibleForTesting
+    def withDefaultValues(
+        threshold: PositiveInt = PositiveInt.one,
+        numberOfHostingParticipants: Option[PositiveInt] = None,
+        approvals: Set[ParticipantId] = Set.empty,
+        rejections: Set[ParticipantId] = Set.empty,
+        abstains: Set[ParticipantId] = Set.empty,
+    ): ConsortiumVotingState =
+      ConsortiumVotingState(
+        threshold,
+        numberOfHostingParticipants.getOrElse(threshold),
+        approvals = approvals,
+        rejections = rejections,
+        abstains = abstains,
+      )
+
+    sealed trait VoteKind {
+      override def toString: String = this match {
+        case VoteKind.Approve => "an approval"
+        case VoteKind.Reject => "a rejection"
+        case VoteKind.Abstain => "an abstain"
+      }
+    }
+    object VoteKind {
+      case object Approve extends VoteKind
+      case object Reject extends VoteKind
+      case object Abstain extends VoteKind
+    }
+
+    def isContradictoryToPreviousVote(
+        previousVoteKind: ConsortiumVotingState.VoteKind,
+        localVerdict: LocalVerdict,
+    ): Boolean =
+      previousVoteKind match {
+        case VoteKind.Approve if localVerdict.isReject => true
+        case VoteKind.Reject if localVerdict.isApprove => true
+        case _ => false
+      }
   }
 
   final case class ViewState(
@@ -343,7 +458,7 @@ object ResponseAggregation {
         ConsortiumVotingState,
       ],
       quorumsState: Seq[Quorum],
-      rejections: List[(Set[LfPartyId], LocalReject)],
+      rejections: List[(Set[LfPartyId], NonPositiveLocalVerdict)],
   ) extends PrettyPrinting {
 
     override protected def pretty: Pretty[ViewState] =
@@ -390,12 +505,20 @@ object ResponseAggregation {
       .parTraverse {
         case (viewKey, viewConfirmationParameters @ ViewConfirmationParameters(_, quorumsState)) =>
           for {
-            votingThresholds <- topologySnapshot.consortiumThresholds(
-              viewConfirmationParameters.confirmers
+            confirmersPartyInfo <- topologySnapshot.activeParticipantsOfPartiesWithInfo(
+              viewConfirmationParameters.confirmers.toSeq
             )
           } yield {
-            val consortiumVotingState = votingThresholds.map { case (party, threshold) =>
-              party -> ConsortiumVotingState(threshold)
+            val consortiumVotingState = confirmersPartyInfo.map { case (party, info) =>
+              val hostingParticipantWithConfirmationPermissionCount = info.participants.count {
+                case (_, attributes) => attributes.canConfirm
+              }
+              party -> ConsortiumVotingState.initialValue(
+                info.threshold,
+                PositiveInt
+                  .create(hostingParticipantWithConfirmationPermissionCount)
+                  .getOrElse(PositiveInt.one),
+              )
             }
             viewKey -> ViewState(
               consortiumVotingState,

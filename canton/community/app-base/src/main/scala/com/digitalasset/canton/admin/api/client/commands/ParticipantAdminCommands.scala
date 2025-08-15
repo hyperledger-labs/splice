@@ -23,8 +23,8 @@ import com.digitalasset.canton.admin.api.client.data.{
 }
 import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.admin.participant.v30.EnterpriseParticipantReplicationServiceGrpc.EnterpriseParticipantReplicationServiceStub
-import com.digitalasset.canton.admin.participant.v30.InspectionServiceGrpc.InspectionServiceStub
 import com.digitalasset.canton.admin.participant.v30.PackageServiceGrpc.PackageServiceStub
+import com.digitalasset.canton.admin.participant.v30.ParticipantInspectionServiceGrpc.ParticipantInspectionServiceStub
 import com.digitalasset.canton.admin.participant.v30.ParticipantRepairServiceGrpc.ParticipantRepairServiceStub
 import com.digitalasset.canton.admin.participant.v30.ParticipantStatusServiceGrpc.ParticipantStatusServiceStub
 import com.digitalasset.canton.admin.participant.v30.PartyManagementServiceGrpc.PartyManagementServiceStub
@@ -1186,7 +1186,6 @@ object ParticipantAdminCommands {
 
     }
 
-    // TODO(#25483) Check usage and see whether automatic resolution is fine
     final case class GetSynchronizerId(synchronizerAlias: SynchronizerAlias)
         extends Base[
           v30.GetSynchronizerIdRequest,
@@ -1487,10 +1486,10 @@ object ParticipantAdminCommands {
   object Inspection {
 
     abstract class Base[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Svc = InspectionServiceStub
+      override type Svc = ParticipantInspectionServiceStub
 
-      override def createService(channel: ManagedChannel): InspectionServiceStub =
-        v30.InspectionServiceGrpc.stub(channel)
+      override def createService(channel: ManagedChannel): ParticipantInspectionServiceStub =
+        v30.ParticipantInspectionServiceGrpc.stub(channel)
     }
 
     final case class LookupOffsetByTime(ts: Timestamp)
@@ -1502,7 +1501,7 @@ object ParticipantAdminCommands {
       override protected def createRequest() = Right(v30.LookupOffsetByTimeRequest(Some(ts)))
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.LookupOffsetByTimeRequest,
       ): Future[v30.LookupOffsetByTimeResponse] =
         service.lookupOffsetByTime(request)
@@ -1535,7 +1534,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.OpenCommitmentRequest,
       ): Future[CancellableContext] = {
         val context = Context.current().withCancellation()
@@ -1574,7 +1573,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.InspectCommitmentContractsRequest,
       ): Future[CancellableContext] = {
         val context = Context.current().withCancellation()
@@ -1622,7 +1621,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.LookupReceivedAcsCommitmentsRequest,
       ): Future[v30.LookupReceivedAcsCommitmentsResponse] =
         service.lookupReceivedAcsCommitments(request)
@@ -1746,7 +1745,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.LookupSentAcsCommitmentsRequest,
       ): Future[v30.LookupSentAcsCommitmentsResponse] =
         service.lookupSentAcsCommitments(request)
@@ -1818,7 +1817,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.SetConfigForSlowCounterParticipantsRequest,
       ): Future[v30.SetConfigForSlowCounterParticipantsResponse] =
         service.setConfigForSlowCounterParticipants(request)
@@ -1833,7 +1832,7 @@ object ParticipantAdminCommands {
         distinguishedParticipants: Seq[ParticipantId],
         thresholdDistinguished: NonNegativeInt,
         thresholdDefault: NonNegativeInt,
-        participantsMetrics: Seq[ParticipantId],
+        individuallyMonitored: Seq[ParticipantId],
     ) {
       def toProtoV30: v30.SlowCounterParticipantSynchronizerConfig =
         v30.SlowCounterParticipantSynchronizerConfig(
@@ -1841,7 +1840,7 @@ object ParticipantAdminCommands {
           distinguishedParticipants.map(_.toProtoPrimitive),
           thresholdDistinguished.value.toLong,
           thresholdDefault.value.toLong,
-          participantsMetrics.map(_.toProtoPrimitive),
+          individuallyMonitored.map(_.toProtoPrimitive),
         )
     }
 
@@ -1882,7 +1881,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.GetConfigForSlowCounterParticipantsRequest,
       ): Future[v30.GetConfigForSlowCounterParticipantsResponse] =
         service.getConfigForSlowCounterParticipants(request)
@@ -1919,7 +1918,7 @@ object ParticipantAdminCommands {
       )
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.GetIntervalsBehindForCounterParticipantsRequest,
       ): Future[v30.GetIntervalsBehindForCounterParticipantsResponse] =
         service.getIntervalsBehindForCounterParticipants(request)
@@ -1961,7 +1960,7 @@ object ParticipantAdminCommands {
         Right(v30.CountInFlightRequest(synchronizerId.toProtoPrimitive))
 
       override protected def submitRequest(
-          service: InspectionServiceStub,
+          service: ParticipantInspectionServiceStub,
           request: v30.CountInFlightRequest,
       ): Future[v30.CountInFlightResponse] =
         service.countInFlight(request)

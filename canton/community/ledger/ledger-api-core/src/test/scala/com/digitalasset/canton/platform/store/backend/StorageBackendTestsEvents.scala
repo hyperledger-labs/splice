@@ -9,8 +9,10 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawTreeEvent,
   SynchronizerOffset,
 }
+import com.digitalasset.canton.tracing.SerializableTraceContextConverter.SerializableTraceContextExtension
 import com.digitalasset.canton.tracing.{SerializableTraceContext, TraceContext}
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.NameTypeConRef
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import org.scalatest.Inside
 import org.scalatest.flatspec.AnyFlatSpec
@@ -175,7 +177,7 @@ private[backend] trait StorageBackendTestsEvents
     val partySignatory = Ref.Party.assertFromString("signatory")
     val partyObserver1 = Ref.Party.assertFromString("observer1")
     val partyObserver2 = Ref.Party.assertFromString("observer2")
-    val otherTemplate = Ref.Identifier.assertFromString("pkg:Mod:Template2")
+    val otherTemplate = NameTypeConRef.assertFromString("#pkg-name:Mod:Template2")
 
     val dtos = Vector(
       dtoCreate(
@@ -248,7 +250,7 @@ private[backend] trait StorageBackendTestsEvents
     val partySignatory = Ref.Party.assertFromString("signatory")
     val partyObserver = Ref.Party.assertFromString("observer")
     val partyUnknown = Ref.Party.assertFromString("unknown")
-    val unknownTemplate = Ref.Identifier.assertFromString("unknown:unknown:unknown")
+    val unknownTemplate = NameTypeConRef.assertFromString("#unknown:unknown:unknown")
 
     val dtos = Vector(
       dtoCreate(

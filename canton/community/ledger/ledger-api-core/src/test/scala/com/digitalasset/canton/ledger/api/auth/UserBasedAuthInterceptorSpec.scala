@@ -4,8 +4,8 @@
 package com.digitalasset.canton.ledger.api.auth
 
 import com.daml.tracing.NoOpTelemetry
-import com.digitalasset.canton.auth.{AuthInterceptor, AuthService, ClaimSet}
-import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedAuthInterceptor
+import com.digitalasset.canton.auth.{AuthInterceptor, AuthService, ClaimSet, GrpcAuthInterceptor}
+import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedClaimResolver
 import com.digitalasset.canton.ledger.localstore.api.UserManagementStore
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
@@ -80,24 +80,34 @@ class UserBasedAuthInterceptorSpec
     }
 
     val authInterceptor =
-      new UserBasedAuthInterceptor(
+      new AuthInterceptor(
         List(authService, identityProviderAwareAuthService),
-        Some(userManagementService),
-        NoOpTelemetry,
         loggerFactory,
         executionContext,
+        new UserBasedClaimResolver(
+          Some(userManagementService),
+          executionContext,
+        ),
       )
 
     val statusCaptor = ArgCaptor[Status]
     val metadataCaptor = ArgCaptor[Metadata]
 
     when(
-      identityProviderAwareAuthService.decodeMetadata(any[Metadata], any[String])(any[TraceContext])
+      identityProviderAwareAuthService.decodeToken(any[Option[String]], any[String])(
+        any[TraceContext]
+      )
     )
       .thenReturn(Future.successful(ClaimSet.Unauthenticated))
-    when(authService.decodeMetadata(any[Metadata], any[String])(anyTraceContext))
+    when(authService.decodeToken(any[Option[String]], any[String])(anyTraceContext))
       .thenReturn(failedMetadataDecode)
-    authInterceptor.interceptCall[Nothing, Nothing](serverCall, new Metadata(), null)
+    new GrpcAuthInterceptor(
+      authInterceptor,
+      NoOpTelemetry,
+      loggerFactory,
+      executionContext,
+    )
+      .interceptCall[Nothing, Nothing](serverCall, new Metadata(), null)
 
     promise.future.map { _ =>
       verify(serverCall).close(statusCaptor.capture, metadataCaptor.capture)

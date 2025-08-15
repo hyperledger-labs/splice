@@ -33,7 +33,7 @@ import com.digitalasset.daml.lf.interpretation.Error as LfInterpretationError
 import com.digitalasset.daml.lf.language.Ast.Package
 import com.digitalasset.daml.lf.language.LanguageVersion
 import com.digitalasset.daml.lf.language.LanguageVersion.v2_dev
-import com.digitalasset.daml.lf.transaction.{ContractKeyUniquenessMode, CreationTime, Versioned}
+import com.digitalasset.daml.lf.transaction.{ContractKeyUniquenessMode, Versioned}
 
 import java.nio.file.Path
 import scala.annotation.tailrec
@@ -54,6 +54,7 @@ object DAMLe {
       enableLfBeta: Boolean,
       enableStackTraces: Boolean,
       profileDir: Option[Path] = None,
+      snapshotDir: Option[Path] = None,
       iterationsBetweenInterruptions: Long =
         10000, // 10000 is the default value in the engine configuration,
       paranoidMode: Boolean,
@@ -68,6 +69,7 @@ object DAMLe {
         packageValidation = false,
         stackTraceMode = enableStackTraces,
         profileDir = profileDir,
+        snapshotDir = snapshotDir,
         requireSuffixedGlobalContractId = true,
         contractKeyUniqueness = ContractKeyUniquenessMode.Off,
         iterationsBetweenInterruptions = iterationsBetweenInterruptions,
@@ -277,7 +279,6 @@ class DAMLe(
   def replayCreate(
       submitters: Set[LfPartyId],
       command: LfCreateCommand,
-      ledgerEffectiveTime: CreationTime.CreatedAt,
       getEngineAbortStatus: GetEngineAbortStatus,
   )(implicit
       traceContext: TraceContext
@@ -288,7 +289,8 @@ class DAMLe(
         command = command,
         nodeSeed = Some(DAMLe.zeroSeed),
         preparationTime = Time.Timestamp.Epoch, // Only used to compute contract ids
-        ledgerEffectiveTime = ledgerEffectiveTime.time,
+        // Only used in Updates, but a create command does not go through Updates.
+        ledgerEffectiveTime = Time.Timestamp.Epoch,
         packageResolution = Map.empty,
       )
       for {

@@ -8,6 +8,7 @@ import com.digitalasset.canton.data.{CantonTimestamp, Offset}
 import com.digitalasset.canton.ledger.api.ParticipantId
 import com.digitalasset.canton.ledger.api.health.{HealthStatus, ReportsHealth}
 import com.digitalasset.canton.ledger.participant.state
+import com.digitalasset.canton.ledger.participant.state.TestAcsChangeFactory
 import com.digitalasset.canton.ledger.participant.state.index.IndexerPartyDetails
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
@@ -451,8 +452,7 @@ private class JdbcLedgerDao(
       loggerFactory,
     )
 
-  /** This is a combined store transaction method to support sandbox-classic and tests !!! Usage of
-    * this is discouraged, with the removal of sandbox-classic this will be removed
+  /** This is a combined store transaction method to support tests !!! Usage of this is discouraged
     */
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   override def storeTransaction(
@@ -463,6 +463,7 @@ private class JdbcLedgerDao(
       offset: Offset,
       transaction: CommittedTransaction,
       recordTime: Timestamp,
+      contractActivenessChanged: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[PersistenceResponse] = {
@@ -487,7 +488,7 @@ private class JdbcLedgerDao(
               ),
               transaction = transaction,
               updateId = updateId,
-              contractMetadata = new Map[ContractId, Bytes] {
+              contractAuthenticationData = new Map[ContractId, Bytes] {
                 override def removed(key: ContractId): Map[ContractId, Bytes] = this
 
                 override def updated[V1 >: Bytes](
@@ -501,6 +502,9 @@ private class JdbcLedgerDao(
               }, // only for tests
               synchronizerId = SynchronizerId.tryFromString("invalid::deadbeef"),
               recordTime = CantonTimestamp(recordTime),
+              externalTransactionHash = None,
+              acsChangeFactory =
+                TestAcsChangeFactory(contractActivenessChanged = contractActivenessChanged),
             )
           ),
         )

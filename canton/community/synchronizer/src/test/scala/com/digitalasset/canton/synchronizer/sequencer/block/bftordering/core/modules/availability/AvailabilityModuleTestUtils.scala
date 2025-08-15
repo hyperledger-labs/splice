@@ -68,6 +68,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   protected val metrics =
     SequencerMetrics.noop(getClass.getSimpleName).bftOrdering
 
+  protected val jitterStream = JitterStream.create(BftBlockOrdererConfig(), new Random(0L))
   protected val Node0 = node(0)
   protected val Node1 = node(1)
   protected val Node2 = node(2)
@@ -103,7 +104,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   protected val ANonEmptyBatchId = BatchId.from(ANonEmptyBatch)
   protected val ABatchIdWithInvalidTags = BatchId.from(ABatchWithInvalidTags)
   protected val AnInProgressBatchMetadata =
-    InProgressBatchMetadata(ABatchId, anEpochNumber, ABatch.stats)
+    InProgressBatchMetadata(Traced(ABatchId), anEpochNumber, ABatch.stats)
   protected val WrongBatchId = BatchId.createForTesting("Wrong BatchId")
   protected val ABlockMetadata: BlockMetadata =
     BlockMetadata.mk(
@@ -237,7 +238,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
   )
   protected val BatchReadyForOrderingNode0Vote =
     ABatchId -> InProgressBatchMetadata(
-      ABatchId,
+      Traced(ABatchId),
       anEpochNumber,
       ABatch.stats,
     ).complete(ProofOfAvailabilityNode0AckNode0InTopology.acks)
@@ -271,13 +272,13 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
     anEpochNumber,
   )
   protected val BatchReadyForOrderingNode0And1Votes =
-    ABatchId -> InProgressBatchMetadata(ABatchId, anEpochNumber, ABatch.stats)
+    ABatchId -> InProgressBatchMetadata(Traced(ABatchId), anEpochNumber, ABatch.stats)
       .complete(ProofOfAvailabilityNode0And1VotesNodes0And1InTopology.acks)
   protected val BatchReadyForOrdering4NodesQuorumVotes =
-    ABatchId -> InProgressBatchMetadata(ABatchId, anEpochNumber, ABatch.stats)
+    ABatchId -> InProgressBatchMetadata(Traced(ABatchId), anEpochNumber, ABatch.stats)
       .complete(ProofOfAvailability4NodesQuorumVotesNodes0To3InTopology.acks)
   protected val AnotherBatchReadyForOrdering6NodesQuorumNodes0And4To6Votes =
-    AnotherBatchId -> InProgressBatchMetadata(AnotherBatchId, anEpochNumber, ABatch.stats)
+    AnotherBatchId -> InProgressBatchMetadata(Traced(AnotherBatchId), anEpochNumber, ABatch.stats)
       .complete(ProofOfAvailability6NodesQuorumVotesNodes0And4To6InTopology.acks)
   protected val ABatchProposalNode0And1Votes = Consensus.LocalAvailability.ProposalCreated(
     OrderingBlock(
@@ -297,6 +298,7 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       ProofOfAvailabilityNode1And2AcksNode1And2InTopology,
       remainingNodesToTry = Seq(Node1),
       numberOfAttempts = 1,
+      jitterStream = jitterStream,
       mode = OrderedBlockForOutput.Mode.FromConsensus,
     )
   protected val AMissingBatchStatusNode1And2AcksWithNode2ToTry =
@@ -339,7 +341,8 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       maxRequestPayloadBytes: Int = BftBlockOrdererConfig.DefaultMaxRequestPayloadBytes,
       maxRequestsInBatch: Short = BftBlockOrdererConfig.DefaultMaxRequestsInBatch,
       maxBatchesPerProposal: Short = BftBlockOrdererConfig.DefaultMaxBatchesPerProposal,
-      maxNonOrderedBatchesPerNode: Short = AvailabilityModuleConfig.MaxNonOrderedBatchesPerNode,
+      maxNonOrderedBatchesPerNode: Short =
+        BftBlockOrdererConfig.DefaultAvailabilityMaxNonOrderedBatchesPerNode,
       mempool: ModuleRef[Mempool.Message] = fakeIgnoringModule,
       cryptoProvider: CryptoProvider[E] = failingCryptoProvider[E],
       availabilityStore: data.AvailabilityStore[E] = new FakeAvailabilityStore[E],
@@ -351,16 +354,11 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       outputFetchProtocolState: MainOutputFetchProtocolState = new MainOutputFetchProtocolState(),
       customMembership: Option[Membership] = None,
       customMessageAuthorizer: Option[MessageAuthorizer] = None,
+      jitterConstructor: (BftBlockOrdererConfig, Random) => JitterStream = JitterStream.create,
   )(implicit
       synchronizerProtocolVersion: ProtocolVersion,
       context: E#ActorContextT[Availability.Message[E]],
   ): AvailabilityModule[E] = {
-    val config = AvailabilityModuleConfig(
-      maxRequestsInBatch,
-      maxBatchesPerProposal,
-      BftBlockOrdererConfig.DefaultOutputFetchTimeout,
-      maxNonOrderedBatchesPerNode,
-    )
     val dependencies = AvailabilityModuleDependencies[E](
       mempool,
       p2pNetworkOut,
@@ -383,7 +381,6 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       initialEpochNumber,
       cryptoProvider,
       availabilityStore,
-      config,
       clock,
       new Random(0),
       metrics,
@@ -392,8 +389,14 @@ private[availability] trait AvailabilityModuleTestUtils { self: BftSequencerBase
       timeouts,
       disseminationProtocolState,
       outputFetchProtocolState,
-    )(messageAuthorizer)(
-      new BftBlockOrdererConfig(maxRequestPayloadBytes = maxRequestPayloadBytes),
+    )(messageAuthorizer, jitterConstructor)(
+      new BftBlockOrdererConfig(
+        maxRequestPayloadBytes = maxRequestPayloadBytes,
+        maxRequestsInBatch = maxRequestsInBatch,
+        maxBatchesPerBlockProposal = maxBatchesPerProposal,
+        outputFetchTimeout = BftBlockOrdererConfig.DefaultOutputFetchTimeout,
+        availabilityMaxNonOrderedBatchesPerNode = maxNonOrderedBatchesPerNode,
+      ),
       synchronizerProtocolVersion,
       MetricsContext.Empty,
     )

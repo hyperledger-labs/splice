@@ -17,7 +17,7 @@ import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.nonempty.NonEmpty
 import com.daml.tracing.DefaultOpenTelemetry
 import com.digitalasset.canton.admin.health.v30.StatusServiceGrpc
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -25,6 +25,7 @@ import com.digitalasset.canton.concurrent.{
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.InitConfigBase.NodeIdentifierConfig
 import com.digitalasset.canton.config.{
+  AdminTokenConfig,
   CryptoConfig,
   IdentityConfig,
   LocalNodeConfig,
@@ -157,7 +158,7 @@ trait CantonNodeBootstrap[+T <: CantonNode]
   def getNode: Option[T]
 
   /** Access to the private and public store to support local key inspection commands */
-  def crypto: Option[Crypto]
+  protected[canton] def crypto: Option[Crypto]
   def isActive: Boolean
 
   def metrics: BaseMetrics
@@ -271,7 +272,7 @@ abstract class CantonNodeBootstrapImpl[
   protected val ips = new IdentityProvidingServiceClient(loggerFactory)
 
   private val adminApiConfig = config.adminApi
-  protected def adminTokenConfig: Option[String]
+  protected def adminTokenConfig: AdminTokenConfig
 
   def getAdminToken: Option[String] = startupStage.getAdminToken
 
@@ -351,7 +352,7 @@ abstract class CantonNodeBootstrapImpl[
       storage: Storage,
       crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
+      adminTokenDispenser: CantonAdminTokenDispenser,
       nodeId: UniqueIdentifier,
       manager: AuthorizedTopologyManager,
       healthReporter: GrpcHealthReporter,
@@ -368,7 +369,8 @@ abstract class CantonNodeBootstrapImpl[
     startupStage.start().onShutdown(Left("Aborted due to shutdown"))
 
   override def getNode: Option[T] = startupStage.getNode
-  override def crypto: Option[Crypto] = startupStage.next.flatMap(_.next).map(_.crypto)
+  override protected[canton] def crypto: Option[Crypto] =
+    startupStage.next.flatMap(_.next).map(_.crypto)
 
   /** callback for topology read service
     *
@@ -466,11 +468,12 @@ abstract class CantonNodeBootstrapImpl[
         Crypto
           .create(
             cryptoConfig,
+            arguments.parameterConfig.cachingConfigs.sessionEncryptionKeyCache,
+            arguments.parameterConfig.cachingConfigs.publicKeyConversionCache,
             storage,
             arguments.cryptoPrivateStoreFactory,
             arguments.kmsFactory,
             ReleaseProtocolVersion.latest,
-            arguments.parameterConfig.nonStandardConfig,
             arguments.futureSupervisor,
             arguments.clock,
             executionContext,
@@ -505,7 +508,7 @@ abstract class CantonNodeBootstrapImpl[
       with HasCloseContext {
 
     private def createAdminServerRegistry(
-        adminToken: CantonAdminToken
+        adminTokenDispenser: CantonAdminTokenDispenser
     ): Either[String, CantonMutableHandlerRegistry] = {
       // The admin-API services
       logger.info(s"Starting admin-api services on $adminApiConfig")
@@ -513,7 +516,7 @@ abstract class CantonNodeBootstrapImpl[
       val builder = CantonServerBuilder
         .forConfig(
           adminApiConfig,
-          Some(adminToken),
+          Some(adminTokenDispenser),
           executionContext,
           bootstrapStageCallback.loggerFactory,
           arguments.parameterConfig.loggingConfig.api,
@@ -540,10 +543,13 @@ abstract class CantonNodeBootstrapImpl[
     override protected def attempt()(implicit
         traceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, String, Option[SetupNodeId]] = {
-      // admin token is taken from the config or created per session
-      val adminToken: CantonAdminToken = adminTokenConfig
-        .fold(CantonAdminToken.create(crypto.pureCrypto))(token => CantonAdminToken(secret = token))
-      createAdminServerRegistry(adminToken).map { adminServerRegistry =>
+      val adminTokenDispenser: CantonAdminTokenDispenser =
+        new CantonAdminTokenDispenser(
+          tokenDuration = adminTokenConfig.adminTokenDuration.asJava,
+          randomOps = crypto.pureCrypto,
+          fixedToken = adminTokenConfig.fixedAdminToken,
+        )
+      createAdminServerRegistry(adminTokenDispenser).map { adminServerRegistry =>
         val (healthReporter, grpcHealthServer, httpHealthServer) =
           mkHealthComponents(healthService, livenessService)
         grpcHealthServer.foreach(addCloseable)
@@ -586,7 +592,7 @@ abstract class CantonNodeBootstrapImpl[
             storage,
             crypto,
             adminServerRegistry,
-            adminToken,
+            adminTokenDispenser,
             healthReporter,
             healthService,
           )
@@ -601,7 +607,7 @@ abstract class CantonNodeBootstrapImpl[
       storage: Storage,
       val crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
+      adminTokenDispenser: CantonAdminTokenDispenser,
       healthReporter: GrpcHealthReporter,
       healthService: DependenciesHealthService,
   ) extends BootstrapStageWithStorage[
@@ -616,7 +622,7 @@ abstract class CantonNodeBootstrapImpl[
       )
       with HasCloseContext
       with GrpcIdentityInitializationService.Callback {
-    override def getAdminToken: Option[String] = Some(adminToken.secret)
+    override def getAdminToken: Option[String] = Some(adminTokenDispenser.getCurrentToken.secret)
 
     private val initializationStore = InitializationStore(
       storage,
@@ -671,7 +677,7 @@ abstract class CantonNodeBootstrapImpl[
           storage,
           crypto,
           adminServerRegistry,
-          adminToken,
+          adminTokenDispenser,
           healthReporter,
           healthService,
         )
@@ -899,7 +905,7 @@ abstract class CantonNodeBootstrapImpl[
       storage: Storage,
       crypto: Crypto,
       adminServerRegistry: CantonMutableHandlerRegistry,
-      adminToken: CantonAdminToken,
+      adminTokenDispenser: CantonAdminTokenDispenser,
       healthReporter: GrpcHealthReporter,
       healthService: DependenciesHealthService,
   ) extends BootstrapStageWithStorage[T, BootstrapStageOrLeaf[T], Unit](
@@ -909,7 +915,7 @@ abstract class CantonNodeBootstrapImpl[
         autoInit = config.init.generateTopologyTransactionsAndKeys,
       ) {
 
-    override def getAdminToken: Option[String] = Some(adminToken.secret)
+    override def getAdminToken: Option[String] = Some(adminTokenDispenser.getCurrentToken.secret)
 
     private val temporaryStoreRegistry =
       new TemporaryStoreRegistry(
@@ -1047,7 +1053,7 @@ abstract class CantonNodeBootstrapImpl[
           storage,
           crypto,
           adminServerRegistry,
-          adminToken,
+          adminTokenDispenser,
           nodeId,
           topologyManager,
           healthReporter,

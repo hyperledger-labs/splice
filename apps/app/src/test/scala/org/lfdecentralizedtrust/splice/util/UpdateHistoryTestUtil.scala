@@ -355,6 +355,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     e.getSignatories,
     e.getObservers,
     e.createdAt,
+    e.isAcsDelta,
   )
   def dropTrailingNones(e: ExercisedEvent): ExercisedEvent = new ExercisedEvent(
     e.getWitnessParties,
@@ -371,6 +372,7 @@ trait UpdateHistoryTestUtil extends TestCommon {
     e.getLastDescendantNodeId,
     dropTrailingNones(e.getExerciseResult),
     e.getImplementedInterfaces,
+    e.isAcsDelta,
   )
 
   def dropTrailingNones(v: Value): Value = v match {

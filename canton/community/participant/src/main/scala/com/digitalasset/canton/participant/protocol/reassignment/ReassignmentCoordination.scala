@@ -15,6 +15,7 @@ import com.digitalasset.canton.data.{
   CantonTimestamp,
   ContractsReassignmentBatch,
   ReassignmentSubmitterMetadata,
+  UnassignmentData,
 }
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -81,21 +82,20 @@ class ReassignmentCoordination(
         .getOrElse(Future.successful(()))
     )
 
-  // TODO(#25483) This should be physical
   private[reassignment] def awaitSynchronizerTime(
-      synchronizerId: ReassignmentTag[PhysicalSynchronizerId],
+      psid: ReassignmentTag[PhysicalSynchronizerId],
       timestamp: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, UnknownPhysicalSynchronizer, Unit] =
-    reassignmentSubmissionFor(synchronizerId.unwrap) match {
+    reassignmentSubmissionFor(psid.unwrap) match {
       case Some(handle) =>
         handle.timeTracker.requestTick(timestamp, immediately = true)
         EitherT.right(handle.timeTracker.awaitTick(timestamp).map(_.void).getOrElse(Future.unit))
       case None =>
         EitherT.leftT(
           UnknownPhysicalSynchronizer(
-            synchronizerId.unwrap,
+            psid.unwrap,
             s"Unable to find synchronizer when awaiting synchronizer time $timestamp.",
           )
         )

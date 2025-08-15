@@ -330,6 +330,7 @@ sealed trait ScanHttpEncodings {
       http.signatories.asJava,
       http.observers.asJava,
       http.createdAt.toInstant,
+      /* acsDelta = */ false,
     )
   }
 
@@ -358,6 +359,7 @@ sealed trait ScanHttpEncodings {
       ),
       decodeExerciseResult(templateId, interfaceId, http.choice, http.exerciseResult),
       /*implementedInterfaces = */ java.util.Collections.emptyList(),
+      /*acsDelta = */ false,
     )
   }
 
@@ -516,6 +518,7 @@ object ScanHttpEncodings {
                     assign.createdEvent.getSignatories,
                     assign.createdEvent.getObservers,
                     assign.createdEvent.createdAt,
+                    assign.createdEvent.isAcsDelta,
                   )
                 ),
               )
@@ -565,6 +568,7 @@ object ScanHttpEncodings {
           created.getSignatories,
           created.getObservers,
           created.createdAt,
+          created.isAcsDelta,
         )
       case (nodeId, exercised: javaApi.ExercisedEvent) =>
         val newNodeId = mapping(exercised.getNodeId)
@@ -586,6 +590,7 @@ object ScanHttpEncodings {
           ),
           exercised.getExerciseResult,
           exercised.getImplementedInterfaces,
+          exercised.isAcsDelta,
         )
       case (_, event) => sys.error(s"Unexpected event type: $event")
     }

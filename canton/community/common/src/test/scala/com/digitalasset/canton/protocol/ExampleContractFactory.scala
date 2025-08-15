@@ -39,25 +39,28 @@ object ExampleContractFactory extends EitherValues {
   val templateId: LfTemplateId = LfTransactionBuilder.defaultTemplateId
   val packageName: PackageName = LfTransactionBuilder.defaultPackageName
 
-  def build(
+  def build[Time <: CreationTime](
       templateId: Ref.Identifier = templateId,
       packageName: Ref.PackageName = packageName,
       argument: Value = ValueInt64(random.nextLong()),
-      createdAt: Time.Timestamp = Time.Timestamp.now(),
+      createdAt: Time = CreationTime.CreatedAt(Time.Timestamp.now()),
       salt: Salt = TestSalt.generateSalt(random.nextInt()),
       signatories: Set[Ref.Party] = Set(signatory),
       stakeholders: Set[Ref.Party] = Set(signatory, observer, extra),
       keyOpt: Option[GlobalKeyWithMaintainers] = None,
       version: LanguageVersion = LanguageVersion.default,
-      cantonContractIdVersion: CantonContractIdVersion = AuthenticatedContractIdVersionV11,
+      cantonContractIdVersion: CantonContractIdV1Version = AuthenticatedContractIdVersionV11,
       overrideContractId: Option[ContractId] = None,
-  ): ContractInstance = {
+  ): GenContractInstance { type InstCreatedAtTime <: Time } = {
 
     val discriminator = lfHash()
 
+    // Template ID must be common across contract and key
+    val contractTemplateId = keyOpt.map(_.globalKey.templateId).getOrElse(templateId)
+
     val create = Node.Create(
       coid = LfContractId.V1(discriminator),
-      templateId = templateId,
+      templateId = contractTemplateId,
       packageName = packageName,
       arg = argument,
       signatories = signatories,
@@ -67,8 +70,8 @@ object ExampleContractFactory extends EitherValues {
     )
     val unsuffixed = FatContractInstance.fromCreateNode(
       create,
-      CreationTime.CreatedAt(createdAt),
-      DriverContractMetadata(salt).toLfBytes(cantonContractIdVersion),
+      createdAt,
+      ContractAuthenticationDataV1(salt)(cantonContractIdVersion).toLfBytes,
     )
 
     val unicum = unicumGenerator.recomputeUnicum(unsuffixed, cantonContractIdVersion).value
@@ -78,18 +81,44 @@ object ExampleContractFactory extends EitherValues {
 
     val inst = FatContractInstance.fromCreateNode(
       create.copy(coid = contractId),
-      CreationTime.CreatedAt(createdAt),
-      DriverContractMetadata(salt).toLfBytes(cantonContractIdVersion),
+      createdAt,
+      ContractAuthenticationDataV1(salt)(cantonContractIdVersion).toLfBytes,
     )
 
-    ContractInstance(inst).value
-
+    ContractInstance.create(inst).value
   }
 
   def buildContractId(
       index: Int = random.nextInt(),
-      cantonContractIdVersion: CantonContractIdVersion = AuthenticatedContractIdVersionV11,
+      cantonContractIdVersion: CantonContractIdV1Version = AuthenticatedContractIdVersionV11,
   ): ContractId =
     cantonContractIdVersion.fromDiscriminator(lfHash(index), Unicum(TestHash.digest(index)))
+
+  def modify[Time <: CreationTime](
+      base: GenContractInstance { type InstCreatedAtTime <: Time },
+      contractId: Option[ContractId] = None,
+      metadata: Option[ContractMetadata] = None,
+      arg: Option[Value] = None,
+      templateId: Option[LfTemplateId] = None,
+      packageName: Option[PackageName] = None,
+  ): GenContractInstance { type InstCreatedAtTime <: Time } = {
+
+    val create = base.toLf
+    val inst = FatContractInstance.fromCreateNode(
+      base.toLf.copy(
+        coid = contractId.getOrElse(create.coid),
+        templateId = templateId.getOrElse(create.templateId),
+        arg = arg.getOrElse(create.arg),
+        signatories = metadata.map(_.signatories).getOrElse(create.signatories),
+        stakeholders = metadata.map(_.stakeholders).getOrElse(create.stakeholders),
+        keyOpt = metadata.map(_.maybeKeyWithMaintainers).getOrElse(create.keyOpt),
+        packageName = packageName.getOrElse(create.packageName),
+      ),
+      base.inst.createdAt,
+      base.inst.authenticationData,
+    )
+
+    ContractInstance.create(inst).value
+  }
 
 }

@@ -61,7 +61,7 @@ import org.lfdecentralizedtrust.splice.util.{
   TemplateJsonDecoder,
 }
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.P2PEndpointConfig
 import com.digitalasset.canton.topology.{
   Member,

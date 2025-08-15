@@ -502,6 +502,7 @@ object BuildCommon {
         sharedSettings ++ cantonWarts,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
         libraryDependencies ++= Seq(
+          better_files,
           daml_lf_data,
           daml_nonempty_cats,
           daml_metrics,
@@ -1185,6 +1186,7 @@ object BuildCommon {
         `canton-daml-errors` % "compile->compile;test->test",
         `canton-bindings-java` % "compile->compile;test->test",
         `canton-daml-grpc-utils`,
+        `canton-daml-jwt`,
         `canton-util-observability`,
         `canton-ledger-api`,
       )

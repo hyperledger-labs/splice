@@ -150,6 +150,7 @@ private[platform] object InMemoryStateUpdaterFlow {
                     Some((tt.synchronizerId, tt.recordTime))
                   case sim: Update.SequencerIndexMoved => Some((sim.synchronizerId, sim.recordTime))
                   case _: Update.EmptyAcsPublicationRequired => None
+                  case _: Update.LogicalSynchronizerUpgradeTimeReached => None
                   case _: Update.CommitRepair => None
                 }
 
@@ -367,7 +368,10 @@ private[platform] object InMemoryStateUpdater {
 
   private[index] def convertLogToStateEvent
       : PartialFunction[TransactionLogUpdate.Event, ContractStateEvent] = {
-    case createdEvent: TransactionLogUpdate.CreatedEvent =>
+    case createdEvent: TransactionLogUpdate.CreatedEvent
+        // no state updates for participant divulged events and transient events as these events
+        // cannot lead to successful contract lookup and usage in interpretation anyway
+        if createdEvent.flatEventWitnesses.nonEmpty =>
       ContractStateEvent.Created(
         contract = FatContract.fromCreateNode(
           Create(
@@ -389,11 +393,14 @@ private[platform] object InMemoryStateUpdater {
             version = createdEvent.createArgument.version,
           ),
           createTime = CreationTime.CreatedAt(createdEvent.ledgerEffectiveTime),
-          cantonData = createdEvent.driverMetadata,
+          authenticationData = createdEvent.authenticationData,
         ),
         eventOffset = createdEvent.eventOffset,
       )
-    case exercisedEvent: TransactionLogUpdate.ExercisedEvent if exercisedEvent.consuming =>
+    case exercisedEvent: TransactionLogUpdate.ExercisedEvent
+        // no state updates for participant divulged events and transient events as these events
+        // cannot lead to successful contract lookup and usage in interpretation anyway
+        if exercisedEvent.consuming && exercisedEvent.flatEventWitnesses.nonEmpty =>
       ContractStateEvent.Archived(
         contractId = exercisedEvent.contractId,
         globalKey = exercisedEvent.contractKey.map(k =>
@@ -448,7 +455,8 @@ private[platform] object InMemoryStateUpdater {
             com.digitalasset.daml.lf.transaction.Versioned(create.version, k.value)
           ),
           treeEventWitnesses = blinding.disclosure.getOrElse(nodeId, Set.empty),
-          flatEventWitnesses = create.stakeholders,
+          flatEventWitnesses =
+            if (txAccepted.isAcsDelta(create.coid)) create.stakeholders else Set.empty,
           submitters = txAccepted.completionInfoO
             .map(_.actAs.toSet)
             .getOrElse(Set.empty),
@@ -459,9 +467,11 @@ private[platform] object InMemoryStateUpdater {
           createKeyHash = create.keyOpt.map(_.globalKey.hash),
           createKey = create.keyOpt.map(_.globalKey),
           createKeyMaintainers = create.keyOpt.map(_.maintainers),
-          driverMetadata = txAccepted.contractMetadata.getOrElse(
+          authenticationData = txAccepted.contractAuthenticationData.getOrElse(
             create.coid,
-            throw new IllegalStateException(s"missing driver metadata for contract ${create.coid}"),
+            throw new IllegalStateException(
+              s"missing authentication data for contract ${create.coid}"
+            ),
           ),
         )
       case NodeInfo(nodeId, exercise: Exercise, lastDescendantNodeId) =>
@@ -480,7 +490,10 @@ private[platform] object InMemoryStateUpdater {
             com.digitalasset.daml.lf.transaction.Versioned(exercise.version, k.value)
           ),
           treeEventWitnesses = blinding.disclosure.getOrElse(nodeId, Set.empty),
-          flatEventWitnesses = if (exercise.consuming) exercise.stakeholders else Set.empty,
+          flatEventWitnesses =
+            if (exercise.consuming && txAccepted.isAcsDelta(exercise.targetCoid))
+              exercise.stakeholders
+            else Set.empty,
           submitters = txAccepted.completionInfoO
             .map(_.actAs.toSet)
             .getOrElse(Set.empty),
@@ -525,6 +538,7 @@ private[platform] object InMemoryStateUpdater {
       completionStreamResponse = completionStreamResponse,
       synchronizerId = txAccepted.synchronizerId.toProtoPrimitive,
       recordTime = txAccepted.recordTime.toLf,
+      externalTransactionHash = txAccepted.externalTransactionHash,
     )(txAccepted.traceContext)
   }
 

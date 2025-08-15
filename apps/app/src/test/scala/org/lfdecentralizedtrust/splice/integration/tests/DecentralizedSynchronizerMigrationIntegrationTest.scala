@@ -1395,7 +1395,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               yield participant.ledger_api.parties
                 .allocate(
                   s"fake-party-${i}-${suffix}",
-                  synchronizerId = decentralizedSynchronizerId.toProtoPrimitive,
+                  synchronizerId = Some(decentralizedSynchronizerId),
                 )
                 .party
           }

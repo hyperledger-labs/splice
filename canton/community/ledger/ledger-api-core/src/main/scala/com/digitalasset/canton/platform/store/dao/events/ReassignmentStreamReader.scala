@@ -34,7 +34,7 @@ import com.digitalasset.canton.platform.store.utils.{
 }
 import com.digitalasset.canton.util.PekkoUtil.syntax.*
 import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.Party
+import com.digitalasset.daml.lf.data.Ref.{NameTypeConRef, Party}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.Attributes
 import org.apache.pekko.stream.scaladsl.Source
@@ -234,7 +234,7 @@ object ReassignmentStreamReader {
   trait IdDbQuery {
     def fetchIds(
         stakeholder: Option[Party],
-        templateIdO: Option[Ref.Identifier],
+        templateIdO: Option[NameTypeConRef],
         startExclusive: Long,
         endInclusive: Long,
         limit: Int,

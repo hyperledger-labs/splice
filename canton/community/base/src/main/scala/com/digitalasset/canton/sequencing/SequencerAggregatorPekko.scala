@@ -44,6 +44,7 @@ import com.digitalasset.canton.version.RepresentativeProtocolVersion
 import org.apache.pekko.Done
 import org.apache.pekko.stream.scaladsl.{Flow, Source}
 import org.apache.pekko.stream.{KillSwitch, OverflowStrategy}
+import org.slf4j.event.Level
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, Future}
@@ -156,8 +157,13 @@ class SequencerAggregatorPekko(
       case DeadlockDetected(elem, trigger) =>
         trigger match {
           case DeadlockTrigger.ActiveSourceTermination =>
-            logger.error(
-              s"Sequencer subscription for synchronizer $synchronizerId is now stuck. Needs operator intervention to reconfigure the sequencer connections."
+            // TODO(#26535): Log this unsettling event as info rather than as error as this condition can
+            //  be flakily triggered upon shutdown by an unpredictable ordering of onUpstreamFinish()
+            //  notifications at different levels of the pekko graph (details in #26543). We get away with
+            //  not investing further into hardening this because the SequencerAggregatorPekko and
+            //  OrderedBucketMergeHub are being removed as part of sequencer connection pooling aggregation.
+            logger.info(
+              s"Sequencer subscription for synchronizer $synchronizerId may now be stuck if this has happened outside the context of shutdown and may need operator intervention to reconfigure the sequencer connections."
             )
           case DeadlockTrigger.Reconfiguration =>
             logger.error(
@@ -323,12 +329,14 @@ object SequencerAggregatorPekko {
       val state = additionalState.get()
       if (state.deadlocked) {
         ComponentHealthState.failed(
-          s"Sequencer subscriptions have diverged and cannot reach the threshold ${state.currentThreshold} for synchronizer $synchronizerId any more."
+          s"Sequencer subscriptions have diverged and cannot reach the threshold ${state.currentThreshold} for synchronizer $synchronizerId any more.",
+          logLevel = Level.WARN,
         )
       } else {
         SequencerAggregator.aggregateHealthResult(
           getDependencies.fmap(_.getState),
           state.currentThreshold,
+          associatedHasRunOnClosing,
         )
       }
     }

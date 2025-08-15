@@ -7,6 +7,7 @@ import com.daml.jwt.JwtTimestampLeeway
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.config.manual.CantonConfigValidatorDerivation
 import com.digitalasset.canton.config.{
+  AdminTokenConfig,
   AuthServiceConfig,
   BasicKeepAliveServerConfig,
   CantonConfigValidator,
@@ -23,15 +24,13 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig.{
-  BlacklistLeaderSelectionPolicyConfig,
+  DefaultAvailabilityMaxNonOrderedBatchesPerNode,
   DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning,
   DefaultConsensusQueueMaxSize,
   DefaultConsensusQueuePerNodeQuota,
   DefaultDelayedInitQueueMaxSize,
   DefaultEpochLength,
   DefaultEpochStateTransferTimeout,
-  DefaultHowLongToBlackList,
-  DefaultHowManyCanWeBlacklist,
   DefaultLeaderSelectionPolicy,
   DefaultMaxBatchCreationInterval,
   DefaultMaxBatchesPerProposal,
@@ -40,10 +39,9 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.Bft
   DefaultMaxRequestsInBatch,
   DefaultMinRequestsInBatch,
   DefaultOutputFetchTimeout,
-  DefaultPruningConfig,
+  DefaultOutputFetchTimeoutCap,
   LeaderSelectionPolicyConfig,
   P2PNetworkConfig,
-  PruningConfig,
 }
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.leaders.BlacklistStatus
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.modules.output.time.BftTime
@@ -81,6 +79,7 @@ final case class BftBlockOrdererConfig(
     maxBatchCreationInterval: FiniteDuration = DefaultMaxBatchCreationInterval,
     availabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int =
       DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning,
+    availabilityMaxNonOrderedBatchesPerNode: Short = DefaultAvailabilityMaxNonOrderedBatchesPerNode,
     // TODO(#24184) make a dynamic sequencing parameter
     maxBatchesPerBlockProposal: Short = DefaultMaxBatchesPerProposal,
     consensusQueueMaxSize: Int = DefaultConsensusQueueMaxSize,
@@ -88,11 +87,8 @@ final case class BftBlockOrdererConfig(
     delayedInitQueueMaxSize: Int = DefaultDelayedInitQueueMaxSize,
     epochStateTransferRetryTimeout: FiniteDuration = DefaultEpochStateTransferTimeout,
     outputFetchTimeout: FiniteDuration = DefaultOutputFetchTimeout,
-    pruningConfig: PruningConfig = DefaultPruningConfig,
+    outputFetchTimeoutCap: FiniteDuration = DefaultOutputFetchTimeoutCap,
     initialNetwork: Option[P2PNetworkConfig] = None,
-    howLongToBlacklist: LeaderSelectionPolicyConfig.HowLongToBlacklist = DefaultHowLongToBlackList,
-    howManyCanWeBlacklist: LeaderSelectionPolicyConfig.HowManyCanWeBlacklist =
-      DefaultHowManyCanWeBlacklist,
     leaderSelectionPolicy: LeaderSelectionPolicyConfig = DefaultLeaderSelectionPolicy,
     storage: Option[StorageConfig] = None,
     // We may want to flip the default once we're satisfied with initial performance
@@ -106,9 +102,6 @@ final case class BftBlockOrdererConfig(
       s"$maxRequestsPerBlock maximum requests per block, " +
       s"but the maximum number allowed of requests per block is ${BftTime.MaxRequestsPerBlock}",
   )
-
-  def blacklistLeaderSelectionPolicyConfig: BlacklistLeaderSelectionPolicyConfig =
-    BlacklistLeaderSelectionPolicyConfig(howLongToBlacklist, howManyCanWeBlacklist)
 }
 
 object BftBlockOrdererConfig {
@@ -123,27 +116,25 @@ object BftBlockOrdererConfig {
   val DefaultMaxBatchCreationInterval: FiniteDuration = 100.milliseconds
   val DefaultMaxBatchesPerProposal: Short = 16
   val DefaultAvailabilityNumberOfAttemptsOfDownloadingOutputFetchBeforeWarning: Int = 5
+  val DefaultAvailabilityMaxNonOrderedBatchesPerNode: Short = 1000
   val DefaultConsensusQueueMaxSize: Int = 10 * 1024
   val DefaultConsensusQueuePerNodeQuota: Int = 1024
   val DefaultDelayedInitQueueMaxSize: Int = 1024
   val DefaultEpochStateTransferTimeout: FiniteDuration = 10.seconds
   val DefaultOutputFetchTimeout: FiniteDuration = 2.second
-  val DefaultPruningConfig: PruningConfig = PruningConfig(
-    enabled = true,
-    retentionPeriod = 30.days,
-    minNumberOfBlocksToKeep = 100,
-    pruningFrequency = 1.hour,
-  )
-  val DefaultLeaderSelectionPolicy: LeaderSelectionPolicyConfig = LeaderSelectionPolicyConfig.Simple
+  val DefaultOutputFetchTimeoutCap: FiniteDuration = 20.second
+
   val DefaultHowLongToBlackList: LeaderSelectionPolicyConfig.HowLongToBlacklist =
     LeaderSelectionPolicyConfig.HowLongToBlacklist.Linear
   val DefaultHowManyCanWeBlacklist: LeaderSelectionPolicyConfig.HowManyCanWeBlacklist =
     LeaderSelectionPolicyConfig.HowManyCanWeBlacklist.NumFaultsTolerated
+  val DefaultLeaderSelectionPolicy: LeaderSelectionPolicyConfig =
+    LeaderSelectionPolicyConfig.Blacklisting()
 
-  final case class BlacklistLeaderSelectionPolicyConfig(
-      howLongToBlackList: LeaderSelectionPolicyConfig.HowLongToBlacklist,
-      howManyCanWeBlacklist: LeaderSelectionPolicyConfig.HowManyCanWeBlacklist,
-  )
+  trait BlacklistLeaderSelectionPolicyConfig {
+    def howLongToBlackList: LeaderSelectionPolicyConfig.HowLongToBlacklist
+    def howManyCanWeBlacklist: LeaderSelectionPolicyConfig.HowManyCanWeBlacklist
+  }
 
   implicit val configCantonConfigValidator: CantonConfigValidator[BftBlockOrdererConfig] =
     CantonConfigValidatorDerivation[BftBlockOrdererConfig]
@@ -192,7 +183,7 @@ object BftBlockOrdererConfig {
     override val jwtTimestampLeeway: Option[JwtTimestampLeeway] = None
     override val keepAliveServer: Option[BasicKeepAliveServerConfig] = None
     override val authServices: Seq[AuthServiceConfig] = Seq.empty
-    override val adminToken: Option[String] = None
+    override val adminTokenConfig: AdminTokenConfig = AdminTokenConfig()
 
     override def sslContext: Option[SslContext] = tls.map(CantonServerBuilder.sslContext(_))
 
@@ -232,17 +223,6 @@ object BftBlockOrdererConfig {
       tls: Boolean,
   )
 
-  final case class PruningConfig(
-      enabled: Boolean = DefaultPruningConfig.enabled,
-      retentionPeriod: FiniteDuration = DefaultPruningConfig.retentionPeriod,
-      minNumberOfBlocksToKeep: Int = DefaultPruningConfig.minNumberOfBlocksToKeep,
-      pruningFrequency: FiniteDuration = DefaultPruningConfig.pruningFrequency,
-  ) extends UniformCantonConfigValidation
-  object PruningConfig {
-    implicit val pruningConfigCantonConfigValidator: CantonConfigValidator[PruningConfig] =
-      CantonConfigValidatorDerivation[PruningConfig]
-  }
-
   sealed trait LeaderSelectionPolicyConfig extends UniformCantonConfigValidation
 
   object LeaderSelectionPolicyConfig {
@@ -250,9 +230,23 @@ object BftBlockOrdererConfig {
         : CantonConfigValidator[LeaderSelectionPolicyConfig] =
       CantonConfigValidatorDerivation[LeaderSelectionPolicyConfig]
 
-    final case object Simple extends LeaderSelectionPolicyConfig
+    final case object Simple extends LeaderSelectionPolicyConfig {
+      implicit val simpleValidator: CantonConfigValidator[Simple.type] =
+        CantonConfigValidatorDerivation[Simple.type]
+    }
 
-    final case object Blacklisting extends LeaderSelectionPolicyConfig
+    final case class Blacklisting(
+        override val howLongToBlackList: LeaderSelectionPolicyConfig.HowLongToBlacklist =
+          DefaultHowLongToBlackList,
+        override val howManyCanWeBlacklist: LeaderSelectionPolicyConfig.HowManyCanWeBlacklist =
+          DefaultHowManyCanWeBlacklist,
+    ) extends LeaderSelectionPolicyConfig
+        with BlacklistLeaderSelectionPolicyConfig
+
+    object Blacklisting {
+      implicit val blacklistingValidator: CantonConfigValidator[Blacklisting] =
+        CantonConfigValidatorDerivation[Blacklisting]
+    }
 
     sealed trait HowLongToBlacklist extends UniformCantonConfigValidation {
       def compute(failedEpochSoFar: Long): BlacklistStatus

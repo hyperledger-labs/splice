@@ -10,7 +10,7 @@ import cats.syntax.parallel.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v2.update_service.GetUpdatesResponse
 import com.digitalasset.base.error.{ErrorCategory, ErrorCode, Explanation, Resolution, RpcError}
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -22,10 +22,7 @@ import com.digitalasset.canton.ledger.client.{LedgerClient, ResilientLedgerSubsc
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
-import com.digitalasset.canton.participant.admin.party.{
-  PartyReplicationAdminWorkflow,
-  PartyReplicator,
-}
+import com.digitalasset.canton.participant.admin.party.PartyReplicationAdminWorkflow
 import com.digitalasset.canton.participant.config.ParticipantNodeConfig
 import com.digitalasset.canton.participant.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.participant.sync.CantonSyncService
@@ -49,7 +46,6 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Flow
 
 import java.io.InputStream
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Manages our admin workflow applications (ping, party management). Currently, each is an
@@ -61,7 +57,7 @@ class AdminWorkflowServices(
     packageService: PackageService,
     syncService: CantonSyncService,
     participantId: ParticipantId,
-    adminToken: CantonAdminToken,
+    adminTokenDispenser: CantonAdminTokenDispenser,
     futureSupervisor: FutureSupervisor,
     protected val loggerFactory: NamedLoggerFactory,
     protected val clock: Clock,
@@ -114,7 +110,7 @@ class AdminWorkflowServices(
 
   val partyManagementO
       : Option[(Future[ResilientLedgerSubscription[?, ?]], PartyReplicationAdminWorkflow)] =
-    parameters.unsafeOnlinePartyReplication.map(_ =>
+    parameters.unsafeOnlinePartyReplication.map(config =>
       createService(
         "party-management",
         // TODO(#20637): Don't resubscribe if the ledger api has been pruned as that would mean missing updates that
@@ -124,19 +120,11 @@ class AdminWorkflowServices(
         new PartyReplicationAdminWorkflow(
           connection,
           participantId,
-          // See the note in the PartyReplicator pertaining to lifetime.
-          new PartyReplicator(
-            participantId,
-            syncService,
-            clock,
-            futureSupervisor,
-            parameters.exitOnFatalFailures,
-            parameters.processingTimeouts,
-            loggerFactory,
-          ),
           syncService,
           clock,
+          config,
           futureSupervisor,
+          parameters.exitOnFatalFailures,
           timeouts,
           loggerFactory,
         )
@@ -275,12 +263,10 @@ class AdminWorkflowServices(
       CommandClientConfiguration.default, // not used by admin workflows
       tracerProvider,
       loggerFactory,
-      Some(adminToken.secret),
+      Some(adminTokenDispenser),
     )
   }
 
-  // TODO(#26455) remove suppression of deprecation warnings
-  @nowarn("cat=deprecation")
   private def createService[S <: AdminWorkflowService](
       userId: String,
       resubscribeIfPruned: Boolean,
@@ -293,7 +279,11 @@ class AdminWorkflowServices(
     val startupF =
       client.stateService.getLedgerEndOffset().flatMap { offset =>
         client.stateService
-          .getActiveContracts(filter = service.filters, validAtOffset = offset)
+          .getActiveContracts(
+            eventFormat = service.eventFormat,
+            validAtOffset = offset,
+            token = None,
+          )
           .map { acs =>
             logger.debug(s"Loading $acs $service")
             service.processAcs(acs)
@@ -301,7 +291,7 @@ class AdminWorkflowServices(
               makeSource = subscribeOffset =>
                 client.updateService.getUpdatesSource(
                   begin = subscribeOffset,
-                  filter = service.filters,
+                  eventFormat = service.eventFormat,
                 ),
               consumingFlow = Flow[GetUpdatesResponse]
                 .map(_.update)

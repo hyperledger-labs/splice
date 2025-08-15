@@ -619,6 +619,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       signatories.map(_.toProtoPrimitive).asJava,
       observers.map(_.toProtoPrimitive).asJava,
       contract.createdAt,
+      false,
     )
   }
 
@@ -641,6 +642,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       1,
       damlUnit.getInstance(),
       implementedInterfaces.asJava,
+      false,
     )
   }
 
@@ -679,6 +681,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       1,
       result,
       Seq.empty.asJava,
+      false,
     )
   }
 
@@ -702,6 +705,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         created.getSignatories,
         created.getObservers,
         created.createdAt,
+        created.isAcsDelta(),
       )
     case exercised: ExercisedEvent =>
       new ExercisedEvent(
@@ -719,6 +723,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         nodeId,
         exercised.getExerciseResult,
         exercised.getImplementedInterfaces,
+        exercised.isAcsDelta(),
       )
     case _ => sys.error("Catch-all required because of no exhaustiveness checks with Java")
   }
@@ -741,6 +746,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
           lastDescendedNodeId,
           exercised.getExerciseResult,
           Seq.empty.asJava,
+          exercised.isAcsDelta(),
         ).asInstanceOf[E]
       case e => e
     }
@@ -1306,6 +1312,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       1,
       exerciseResult,
       Seq.empty.asJava,
+      false,
     )
 
   /** Convenience wrapper that autoinfers the payloadValue assuming

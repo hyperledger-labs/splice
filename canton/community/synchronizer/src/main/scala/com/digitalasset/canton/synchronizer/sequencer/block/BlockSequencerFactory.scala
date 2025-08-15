@@ -86,6 +86,7 @@ abstract class BlockSequencerFactory(
     storage,
     nodeParameters.processingTimeouts,
     loggerFactory,
+    nodeParameters.batchingConfig,
   )
 
   protected val name: String
@@ -105,7 +106,7 @@ abstract class BlockSequencerFactory(
       driverClock: Clock,
       rateLimitManager: SequencerRateLimitManager,
       orderingTimeFixMode: OrderingTimeFixMode,
-      minimumSequencingTime: CantonTimestamp,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       initialBlockHeight: Option[Long],
       sequencerSnapshot: Option[SequencerSnapshot],
       authenticationServices: Option[AuthenticationServices],
@@ -177,7 +178,7 @@ abstract class BlockSequencerFactory(
       synchronizerSyncCryptoApi: SynchronizerCryptoClient,
       futureSupervisor: FutureSupervisor,
       trafficConfig: SequencerTrafficConfig,
-      minimumSequencingTime: CantonTimestamp,
+      sequencingTimeLowerBoundExclusive: Option[CantonTimestamp],
       runtimeReady: FutureUnlessShutdown[Unit],
       sequencerSnapshot: Option[SequencerSnapshot] = None,
       authenticationServices: Option[AuthenticationServices] = None,
@@ -233,7 +234,6 @@ abstract class BlockSequencerFactory(
           synchronizerSyncCryptoApi.psid,
           store,
           trafficConsumedStore,
-          minimumSequencingTime,
           nodeParameters.enableAdditionalConsistencyChecks,
           nodeParameters.processingTimeouts,
           synchronizerLoggerFactory,
@@ -253,7 +253,7 @@ abstract class BlockSequencerFactory(
         driverClock,
         rateLimitManager,
         orderingTimeFixMode,
-        minimumSequencingTime,
+        sequencingTimeLowerBoundExclusive,
         initialBlockHeight,
         sequencerSnapshot,
         authenticationServices,

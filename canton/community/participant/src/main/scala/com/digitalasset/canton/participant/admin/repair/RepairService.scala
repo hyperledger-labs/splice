@@ -28,17 +28,17 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageDependencyResolver
 import com.digitalasset.canton.participant.admin.data.RepairContract
-import com.digitalasset.canton.participant.admin.repair.RepairService.{
-  ContractToAdd,
-  SynchronizerLookup,
-}
+import com.digitalasset.canton.participant.admin.repair.RepairService.ContractToAdd
 import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.ledger.api.LedgerApiIndexer
 import com.digitalasset.canton.participant.protocol.ContractAuthenticator
 import com.digitalasset.canton.participant.store.*
-import com.digitalasset.canton.participant.sync.SyncEphemeralStateFactory
+import com.digitalasset.canton.participant.sync.{
+  ConnectedSynchronizersLookup,
+  SyncEphemeralStateFactory,
+  SyncPersistentStateLookup,
+}
 import com.digitalasset.canton.participant.synchronizer.SynchronizerAliasManager
-import com.digitalasset.canton.participant.topology.TopologyComponentFactory
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.{LfChoiceName, *}
 import com.digitalasset.canton.store.SequencedEventStore
@@ -88,7 +88,8 @@ final class RepairService(
     ledgerApiIndexer: Eval[LedgerApiIndexer],
     aliasManager: SynchronizerAliasManager,
     parameters: ParticipantNodeParameters,
-    val synchronizerLookup: SynchronizerLookup,
+    syncPersistentStateLookup: SyncPersistentStateLookup,
+    connectedSynchronizersLookup: ConnectedSynchronizersLookup,
     @VisibleForTesting
     private[canton] val executionQueue: SimpleExecutionQueue,
     protected val loggerFactory: NamedLoggerFactory,
@@ -106,19 +107,19 @@ final class RepairService(
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
   private def synchronizerNotConnected(
-      synchronizerId: PhysicalSynchronizerId
+      psid: PhysicalSynchronizerId
   ): EitherT[FutureUnlessShutdown, String, Unit] =
     EitherT.cond(
-      !synchronizerLookup.isConnected(synchronizerId),
+      !connectedSynchronizersLookup.isConnected(psid),
       (),
-      s"Participant is still connected to synchronizer $synchronizerId",
+      s"Participant is still connected to synchronizer $psid",
     )
 
   private def contractToAdd(
       repairContract: RepairContract,
       ignoreAlreadyAdded: Boolean,
       acsState: Option[ActiveContractStore.Status],
-      storedContract: Option[SerializableContract],
+      storedContract: Option[ContractInstance],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Option[ContractToAdd]] = {
@@ -126,11 +127,14 @@ final class RepairService(
 
     def addContract(
         reassigningFrom: Option[Source[SynchronizerId]]
-    ): EitherT[FutureUnlessShutdown, String, Option[ContractToAdd]] = Right(
-      Option(
-        ContractToAdd(repairContract.contract, repairContract.reassignmentCounter, reassigningFrom)
+    ): EitherT[FutureUnlessShutdown, String, Option[ContractToAdd]] =
+      for {
+        contractInstance <- EitherT.fromEither[FutureUnlessShutdown](
+          ContractInstance.create(repairContract.contract)
+        )
+      } yield Option(
+        ContractToAdd(contractInstance, repairContract.reassignmentCounter, reassigningFrom)
       )
-    ).toEitherT[FutureUnlessShutdown]
 
     acsState match {
       case None => addContract(reassigningFrom = None)
@@ -145,7 +149,7 @@ final class RepairService(
               }
             )
             _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
-              contractAlreadyThere == repairContract.contract,
+              contractAlreadyThere.inst == repairContract.contract,
               log(
                 s"Contract $contractId exists in synchronizer, but does not match with contract being added. "
                   + s"Existing contract is $contractAlreadyThere while contract supposed to be added ${repairContract.contract}"
@@ -201,7 +205,7 @@ final class RepairService(
   private def readRepairContractCurrentState(
       repairContract: RepairContract,
       acsState: Option[ActiveContractStore.Status],
-      storedContract: Option[SerializableContract],
+      storedContract: Option[ContractInstance],
       ignoreAlreadyAdded: Boolean,
   )(implicit
       traceContext: TraceContext
@@ -209,7 +213,7 @@ final class RepairService(
     for {
       _ <- EitherT
         .fromEither[FutureUnlessShutdown](
-          contractAuthenticator.authenticateSerializable(repairContract.contract)
+          contractAuthenticator.authenticate(repairContract.contract)
         )
         .leftMap(e =>
           log(s"Failed to authenticate contract with id: ${repairContract.contract.contractId}: $e")
@@ -236,7 +240,7 @@ final class RepairService(
   ): EitherT[FutureUnlessShutdown, String, RepairRequest.SynchronizerData] =
     for {
       psid <- EitherT.fromEither[FutureUnlessShutdown](
-        synchronizerLookup
+        syncPersistentStateLookup
           .latestKnownPSId(synchronizerId)
           .toRight(s"Unable to resolve $synchronizerId to a physical synchronizer id")
       )
@@ -250,7 +254,7 @@ final class RepairService(
         .right(
           ledgerApiIndexer.value.ledgerApiStore.value.cleanSynchronizerIndex(synchronizerId)
         )
-      topologyFactory <- synchronizerLookup
+      topologyFactory <- syncPersistentStateLookup
         .topologyFactoryFor(psid)
         .toRight(s"No topology factory for synchronizer $synchronizerAlias")
         .toEitherT[FutureUnlessShutdown]
@@ -326,18 +330,13 @@ final class RepairService(
               )
             )
 
-            storedContracts <- logOnFailureWithInfoLevel(
-              contractStore.value.lookupManyUncached(
-                contracts.map(_.contract.contractId)
-              ),
-              "Unable to lookup contracts in contract store",
-            )
-              .map { contracts =>
-                contracts.view
-                  .flatMap(_.map(c => c.contractId -> c.serializable))
-                  .toMap // TODO(#26348) - use fat contract downstream
-              }
+            contractInstances <-
+              logOnFailureWithInfoLevel(
+                contractStore.value.lookupManyUncached(contracts.map(_.contract.contractId)),
+                "Unable to lookup contracts in contract store",
+              ).map(_.flatten)
 
+            storedContracts = contractInstances.map(c => c.contractId -> c).toMap
             filteredContracts <- contracts.zip(contractStates).parTraverseFilter {
               case (contract, acsState) =>
                 readRepairContractCurrentState(
@@ -349,7 +348,7 @@ final class RepairService(
             }
 
             contractsByCreation = filteredContracts
-              .groupBy(_.contract.ledgerCreateTime)
+              .groupBy(_.contract.inst.createdAt)
               .toList
               .sortBy { case (ledgerCreateTime, _) => ledgerCreateTime.time }
 
@@ -369,7 +368,7 @@ final class RepairService(
                     )
 
                     allStakeholders = filteredContracts
-                      .flatMap(_.contract.metadata.stakeholders)
+                      .flatMap(_.contract.stakeholders)
                       .toSet
 
                     allHostedStakeholders <- EitherT.right(
@@ -456,6 +455,7 @@ final class RepairService(
               .synchronizerIdForAlias(synchronizerAlias)
               .toRight(s"Could not find $synchronizerAlias")
           )
+
           repair <- initRepairRequestAndVerifyPreconditions(synchronizerId)
 
           contractStates <- EitherT.right[String](
@@ -465,16 +465,21 @@ final class RepairService(
             )
           )
 
-          storedContracts <-
+          contractInstances <-
             logOnFailureWithInfoLevel(
               contractStore.value.lookupManyUncached(contractIds),
               "Unable to lookup contracts in contract store",
-            )
-              .map { contracts =>
-                contracts.view
-                  .flatMap(_.map(c => c.contractId -> c.serializable))
-                  .toMap // TODO(#26348) - use fat contract downstream
+            ).map(_.flatten)
+
+          storedContracts <- EitherT.fromEither[FutureUnlessShutdown](
+            contractInstances
+              .traverse { contract =>
+                SerializableContract
+                  .fromLfFatContractInst(contract.inst)
+                  .map(c => c.contractId -> c)
               }
+              .map(_.toMap)
+          )
 
           toc = repair.tryExactlyOneTimeOfRepair.toToc
 
@@ -647,7 +652,7 @@ final class RepairService(
         contractIdsData <- EitherT.fromEither[FutureUnlessShutdown](
           ChangeAssignation.Data
             .from[Seq[(LfContractId, Option[ReassignmentCounter])]](
-              reassignmentData.contracts.contractIds.map(_ -> None).toSeq,
+              reassignmentData.contractsBatch.contractIds.map(_ -> None).toSeq,
               changeAssignationBack,
             )
             .incrementRepairCounter
@@ -680,7 +685,7 @@ final class RepairService(
 
       synchronizerPredecessor <- EitherT
         .fromEither[FutureUnlessShutdown](
-          synchronizerLookup
+          syncPersistentStateLookup
             .connectionConfig(psid)
             .toRight(s"Cannot find connection config for $psid")
         )
@@ -737,9 +742,7 @@ final class RepairService(
     for {
       // All referenced templates known and vetted
       _packagesVetted <- contracts
-        .map(
-          _.contract.rawContractInstance.contractInstance.unversioned.template.packageId
-        )
+        .map(_.contract.templateId.packageId)
         .distinct
         .parTraverse_(packageKnown)
 
@@ -770,7 +773,7 @@ final class RepairService(
     val contractId = contractToAdd.cid
     for {
       _warnOnEmptyMaintainers <- EitherT.cond[FutureUnlessShutdown](
-        !contract.metadata.maybeKeyWithMaintainers.exists(_.maintainers.isEmpty),
+        !contract.contractKeyWithMaintainers.exists(_.maintainers.isEmpty),
         (),
         log(s"Contract $contractId has key without maintainers."),
       )
@@ -779,18 +782,18 @@ final class RepairService(
         if (ignoreStakeholderCheck) EitherT.rightT[FutureUnlessShutdown, String](())
         else {
           val localStakeholders =
-            allHostedStakeholders.intersect(contractToAdd.contract.metadata.stakeholders)
+            allHostedStakeholders.intersect(contractToAdd.contract.stakeholders)
 
           for {
             // At least one stakeholder is hosted locally
             _ <- EitherTUtil.condUnitET[FutureUnlessShutdown](
               localStakeholders.nonEmpty,
-              s"Contract ${contract.contractId} has stakeholders ${contract.metadata.stakeholders} but none of them are hosted locally",
+              s"Contract ${contract.contractId} has stakeholders ${contract.stakeholders} but none of them are hosted locally",
             )
 
             // All stakeholders exist on the synchronizer
             _ <- topologySnapshot
-              .allHaveActiveParticipants(contract.metadata.stakeholders)
+              .allHaveActiveParticipants(contract.stakeholders)
               .leftMap { missingStakeholders =>
                 log(
                   s"Synchronizer ${repair.synchronizer.alias} missing stakeholders $missingStakeholders of contract ${contract.contractId}"
@@ -819,7 +822,7 @@ final class RepairService(
   private def persistAddContracts(
       repair: RepairRequest,
       contractsToAdd: Seq[(ContractToAdd, TimeOfChange)],
-      storedContracts: Map[LfContractId, SerializableContract],
+      storedContracts: Map[LfContractId, ContractInstance],
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] =
@@ -830,16 +833,13 @@ final class RepairService(
           case (contractToAdd, _) =>
             storedContracts.get(contractToAdd.cid) match {
               case None =>
-                EitherT.fromEither[FutureUnlessShutdown](
-                  ContractInstance(contractToAdd.contract).map(c => Some(c))
-                )
+                EitherT.rightT[FutureUnlessShutdown, String](Some(contractToAdd.contract))
               case Some(storedContract) =>
-                EitherTUtil
-                  .condUnitET[FutureUnlessShutdown](
-                    storedContract == contractToAdd.contract,
-                    s"Contract ${contractToAdd.cid} already exists in the contract store, but differs from contract to be created. Contract to be created $contractToAdd versus existing contract $storedContract.",
-                  )
-                  .map(_ => Option.empty[MissingContract])
+                EitherT.cond[FutureUnlessShutdown](
+                  storedContract == contractToAdd.contract,
+                  Option.empty[MissingContract],
+                  s"Contract ${contractToAdd.cid} already exists in the contract store, but differs from contract to be created. Contract to be created $contractToAdd versus existing contract $storedContract.",
+                )
             }
         }
 
@@ -988,7 +988,7 @@ final class RepairService(
         )
       ),
       updateId = repair.transactionId.tryAsLedgerTransactionId,
-      contractMetadata = Map.empty,
+      contractAuthenticationData = Map.empty,
       synchronizerId = repair.synchronizer.psid.logical,
       repairCounter = repair.tryExactlyOneRepairCounter,
       recordTime = repair.timestamp,
@@ -1004,9 +1004,8 @@ final class RepairService(
       contractsAdded: Seq[ContractToAdd],
       workflowIdProvider: () => Option[LfWorkflowId],
   )(implicit traceContext: TraceContext): RepairUpdate = {
-    val contractMetadata = contractsAdded.view.map { c =>
-      val cId = c.contract.contractId
-      cId -> c.driverMetadata(CantonContractIdVersion.tryCantonContractIdVersion(cId))
+    val contractAuthenticationData = contractsAdded.view.map { c =>
+      c.contract.contractId -> c.authenticationData
     }.toMap
     val nodeIds = LazyList.from(0).map(LfNodeId)
     val txNodes = nodeIds.zip(contractsAdded.map(_.contract.toLf)).toMap
@@ -1028,7 +1027,7 @@ final class RepairService(
         )
       ),
       updateId = randomTransactionId(syncCrypto).tryAsLedgerTransactionId,
-      contractMetadata = contractMetadata,
+      contractAuthenticationData = contractAuthenticationData,
       synchronizerId = repair.synchronizer.psid.logical,
       repairCounter = repairCounter,
       recordTime = repair.timestamp,
@@ -1202,19 +1201,19 @@ final class RepairService(
 
   // Looks up synchronizer persistence erroring if synchronizer is based on in-memory persistence for which repair is not supported.
   private def lookUpSynchronizerPersistence(
-      synchronizerId: PhysicalSynchronizerId
+      psid: PhysicalSynchronizerId
   )(implicit
       traceContext: TraceContext
   ): Either[String, SyncPersistentState] =
     for {
-      dp <- synchronizerLookup
-        .persistentStateFor(synchronizerId)
-        .toRight(log(s"Could not find persistent state for $synchronizerId"))
+      dp <- syncPersistentStateLookup
+        .get(psid)
+        .toRight(log(s"Could not find persistent state for $psid"))
       _ <- Either.cond(
         !dp.isMemory,
         (),
         log(
-          s"$synchronizerId is in memory which is not supported by repair. Use db persistence."
+          s"$psid is in memory which is not supported by repair. Use db persistence."
         ),
       )
     } yield dp
@@ -1241,11 +1240,7 @@ final class RepairService(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, B] = {
     logger.info(s"Queuing $description")
-    EitherT(
-      executionQueue
-        .executeEUS(code, description)
-        .value
-    )
+    executionQueue.executeEUS(code, description)
   }
 
   private def log(message: String)(implicit traceContext: TraceContext): String = {
@@ -1259,7 +1254,7 @@ final class RepairService(
   private def withRepairIndexer(code: FutureQueue[RepairUpdate] => EitherT[Future, String, Unit])(
       implicit traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, String, Unit] =
-    if (synchronizerLookup.isConnectedToAnySynchronizer) {
+    if (connectedSynchronizersLookup.isConnectedToAny) {
       EitherT.leftT[FutureUnlessShutdown, Unit](
         "There are still synchronizers connected. Please disconnect all synchronizers."
       )
@@ -1271,43 +1266,14 @@ final class RepairService(
 object RepairService {
 
   private final case class ContractToAdd(
-      contract: SerializableContract,
+      contract: ContractInstance,
       reassignmentCounter: ReassignmentCounter,
       reassigningFrom: Option[Source[SynchronizerId]],
   ) {
     def cid: LfContractId = contract.contractId
 
-    def driverMetadata(contractIdVersion: CantonContractIdVersion): Bytes =
-      DriverContractMetadata(contract.contractSalt).toLfBytes(contractIdVersion)
+    def authenticationData: Bytes =
+      contract.inst.authenticationData
 
-  }
-
-  trait SynchronizerLookup {
-
-    /** Check whether the participant is currently connected to the given physical synchronizer.
-      */
-    def isConnected(synchronizerId: PhysicalSynchronizerId): Boolean
-
-    def isConnectedToAnySynchronizer: Boolean
-
-    /** Return the persistent state of the give physical synchronizer.
-      */
-    def persistentStateFor(synchronizerId: PhysicalSynchronizerId): Option[SyncPersistentState]
-
-    def connectionConfig(psid: PhysicalSynchronizerId): Option[StoredSynchronizerConnectionConfig]
-
-    /** Return the latest [[com.digitalasset.canton.topology.PhysicalSynchronizerId]] known for the
-      * given [[com.digitalasset.canton.topology.SynchronizerId]].
-      *
-      * Use cases are:
-      *   - submission of a transaction (phase 1)
-      *   - repair service
-      *   - inspection services
-      */
-    def latestKnownPSId(synchronizerId: SynchronizerId): Option[PhysicalSynchronizerId]
-
-    def topologyFactoryFor(synchronizerId: PhysicalSynchronizerId)(implicit
-        traceContext: TraceContext
-    ): Option[TopologyComponentFactory]
   }
 }

@@ -16,7 +16,12 @@ import com.digitalasset.canton.concurrent.{
   HasFutureSupervision,
 }
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
-import com.digitalasset.canton.config.{BatchingConfig, CryptoConfig, DefaultProcessingTimeouts}
+import com.digitalasset.canton.config.{
+  BatchingConfig,
+  CachingConfigs,
+  CryptoConfig,
+  DefaultProcessingTimeouts,
+}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
@@ -353,6 +358,7 @@ class TestingIdentityFactory(
       crypto,
       cryptoConfig,
       BatchingConfig().parallelism,
+      CachingConfigs.defaultPublicKeyConversionCache,
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
       loggerFactory,
@@ -596,7 +602,7 @@ class TestingIdentityFactory(
       serial: PositiveInt = PositiveInt.one,
       isProposal: Boolean = false,
   ): SignedTopologyTransaction[TopologyChangeOp.Replace, TopologyMapping] =
-    SignedTopologyTransaction.create(
+    SignedTopologyTransaction.tryCreate(
       TopologyTransaction(
         TopologyChangeOp.Replace,
         serial,

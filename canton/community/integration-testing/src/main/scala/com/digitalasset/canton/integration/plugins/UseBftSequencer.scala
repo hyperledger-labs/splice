@@ -5,6 +5,7 @@ package com.digitalasset.canton.integration.plugins
 
 import com.digitalasset.canton.UniquePortGenerator
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.StorageConfig.Memory
 import com.digitalasset.canton.config.{CantonConfig, TlsClientConfig}
 import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
@@ -31,12 +32,19 @@ import scala.collection.mutable
   * @param shouldGenerateEndpointsOnly
   *   If true, replaces addresses and ports only (instead of building a full config) to avoid their
   *   clashes. Useful for config file integration tests.
+  * @param shouldOverwriteStoredEndpoints
+  *   Set to true to overwrite peer endpoints in the database with config, e.g., when using a
+  *   database dump.
+  * @param shouldUseMemoryStorageForBftOrderer
+  *   Overwrites the dedicated BFT Orderer's storage to in-memory.
   */
 final class UseBftSequencer(
     override protected val loggerFactory: NamedLoggerFactory,
     val sequencerGroups: SequencerSynchronizerGroups = SingleSynchronizer,
     dynamicallyOnboardedSequencerNames: Seq[InstanceName] = Seq.empty,
     shouldGenerateEndpointsOnly: Boolean = false,
+    shouldOverwriteStoredEndpoints: Boolean = false,
+    shouldUseMemoryStorageForBftOrderer: Boolean = false,
 ) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
 
   val sequencerEndpoints
@@ -139,9 +147,13 @@ final class UseBftSequencer(
               ),
             ),
             peerEndpoints = otherInitialEndpoints,
+            overwriteStoredEndpoints = shouldOverwriteStoredEndpoints,
           )
           selfInstanceName -> SequencerConfig.BftSequencer(
-            config = BftBlockOrdererConfig(initialNetwork = Some(network))
+            config = BftBlockOrdererConfig(
+              initialNetwork = Some(network),
+              storage = Option.when(shouldUseMemoryStorageForBftOrderer)(Memory()),
+            )
           )
         }
       }.toMap

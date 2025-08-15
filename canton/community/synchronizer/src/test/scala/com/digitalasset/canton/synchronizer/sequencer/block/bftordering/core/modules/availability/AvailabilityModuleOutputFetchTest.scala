@@ -36,6 +36,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   BftSequencerBaseTest,
   fakeCellModule,
 }
+import com.digitalasset.canton.tracing.Traced
 import org.scalatest.wordspec.AnyWordSpec
 import org.slf4j.event.Level
 
@@ -90,6 +91,7 @@ class AvailabilityModuleOutputFetchTest
               outputFetchProtocolState = outputFetchProtocolState,
               cryptoProvider = ProgrammableUnitTestEnv.noSignatureCryptoProvider,
               p2pNetworkOut = fakeCellModule(p2pNetworkOutCell),
+              jitterConstructor = (_, _) => jitterStream,
             )
             availability.receive(
               LocalOutputFetch.FetchBatchDataFromNodes(
@@ -98,8 +100,7 @@ class AvailabilityModuleOutputFetchTest
               )
             )
 
-            outputFetchProtocolState.localOutputMissingBatches should
-              contain only ABatchId -> AMissingBatchStatusNode1And2AcksWithNode2ToTry
+            outputFetchProtocolState.localOutputMissingBatches should contain only ABatchId -> AMissingBatchStatusNode1And2AcksWithNode2ToTry
             outputFetchProtocolState.incomingBatchRequests should be(empty)
             context.delayedMessages should contain(
               LocalOutputFetch.FetchRemoteBatchDataTimeout(ABatchId)
@@ -574,7 +575,7 @@ class AvailabilityModuleOutputFetchTest
               ("message", "reply"),
               (
                 Availability.LocalDissemination.LocalBatchCreated(Seq(anOrderingRequest)),
-                Availability.LocalDissemination.LocalBatchesStored(Seq(ABatchId -> ABatch)),
+                Availability.LocalDissemination.LocalBatchesStored(Seq(Traced(ABatchId) -> ABatch)),
               ),
               (
                 Availability.RemoteDissemination.RemoteBatch.create(
@@ -602,6 +603,7 @@ class AvailabilityModuleOutputFetchTest
                 ProofOfAvailabilityNode1And2AcksNode1And2InTopology,
                 Seq(Node1),
                 numberOfAttempts = 1,
+                jitterStream = jitterStream,
                 mode = OrderedBlockForOutput.Mode.FromConsensus,
               )
             )
@@ -627,10 +629,12 @@ class AvailabilityModuleOutputFetchTest
             Table[Msg, Msg, String](
               ("message", "reply", "crypto operation ID"),
               (
-                Availability.LocalDissemination.LocalBatchesStored(Seq(ABatchId -> ABatch)),
+                Availability.LocalDissemination.LocalBatchesStored(Seq(Traced(ABatchId) -> ABatch)),
                 Availability.LocalDissemination
                   .LocalBatchesStoredSigned(
-                    Seq(LocalBatchStoredSigned(ABatchId, ABatch, Some(Signature.noSignature)))
+                    Seq(
+                      LocalBatchStoredSigned(Traced(ABatchId), ABatch, Some(Signature.noSignature))
+                    )
                   ),
                 "availability-sign-local-batchId",
               ),
@@ -685,6 +689,7 @@ class AvailabilityModuleOutputFetchTest
                   ProofOfAvailabilityNode1And2AcksNode1And2InTopology,
                   Seq(Node1),
                   numberOfAttempts = 1,
+                  jitterStream = jitterStream,
                   mode = OrderedBlockForOutput.Mode.FromConsensus,
                 )
               )
@@ -735,6 +740,7 @@ class AvailabilityModuleOutputFetchTest
                   ProofOfAvailabilityNode1And2AcksNode1And2InTopology,
                   Seq(Node1),
                   numberOfAttempts = 1,
+                  jitterStream = jitterStream,
                   mode = OrderedBlockForOutput.Mode.FromConsensus,
                 )
               )

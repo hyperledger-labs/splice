@@ -22,12 +22,12 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.networking.grpc.CantonGrpcUtil.GrpcErrors.AbortedDueToShutdown
-import com.digitalasset.canton.participant.sync.CantonSyncService.ConnectSynchronizer
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceInternalError.{
   PhysicalSynchronizerIdNotConfigured,
   SynchronizerIsMissingInternally,
 }
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceUnknownSynchronizer
+import com.digitalasset.canton.participant.sync.SynchronizerConnectionsManager.ConnectSynchronizer
 import com.digitalasset.canton.participant.sync.{CantonSyncService, SyncServiceError}
 import com.digitalasset.canton.participant.synchronizer.{
   SynchronizerAliasManager,
@@ -357,7 +357,8 @@ class GrpcSynchronizerConnectivityService(
     _mapErrNewEUS(ret)
   }
 
-  /** Get the synchronizer id of the given synchronizer alias
+  /** Get the physical synchronizer id of the given synchronizer alias (corresponding to the active
+    * connection)
     */
   override def getSynchronizerId(
       request: v30.GetSynchronizerIdRequest

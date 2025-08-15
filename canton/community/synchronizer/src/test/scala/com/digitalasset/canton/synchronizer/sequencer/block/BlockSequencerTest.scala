@@ -8,6 +8,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   ApiLoggingConfig,
   BatchingConfig,
+  CachingConfigs,
   DefaultProcessingTimeouts,
   ProcessingTimeout,
 }
@@ -137,6 +138,7 @@ class BlockSequencerTest
       defaultStaticSynchronizerParameters,
       topologyTransactionFactory.syncCryptoClient.crypto,
       BatchingConfig().parallelism,
+      CachingConfigs.defaultPublicKeyConversionCache,
       DefaultProcessingTimeouts.testing,
       FutureSupervisor.Noop,
       loggerFactory,
@@ -180,7 +182,8 @@ class BlockSequencerTest
         clock = new SimClock(loggerFactory = loggerFactory),
         blockRateLimitManager = defaultRateLimiter,
         orderingTimeFixMode = OrderingTimeFixMode.MakeStrictlyIncreasing,
-        minimumSequencingTime = SequencerNodeParameterConfig.DefaultMinimumSequencingTime,
+        sequencingTimeLowerBoundExclusive =
+          SequencerNodeParameterConfig.DefaultSequencingTimeLowerBoundExclusive,
         processingTimeouts = BlockSequencerTest.this.timeouts,
         logEventDetails = true,
         prettyPrinter = new CantonPrettyPrinter(
@@ -258,8 +261,8 @@ class BlockSequencerTest
 
     override def getHeadState: BlockSequencerStateManager.HeadState =
       BlockSequencerStateManager.HeadState(
-        BlockInfo.initial(CantonTimestamp.Epoch),
-        ChunkState.initial(BlockEphemeralState.empty(CantonTimestamp.Epoch)),
+        BlockInfo.initial,
+        ChunkState.initial(BlockEphemeralState.empty),
       )
 
     override protected def timeouts: ProcessingTimeout = BlockSequencerTest.this.timeouts

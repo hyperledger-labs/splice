@@ -9,7 +9,8 @@ import com.digitalasset.canton.data.ViewPosition
 import com.digitalasset.canton.sequencing.protocol.MediatorGroupRecipient
 import com.digitalasset.canton.serialization.DeterministicEncoding
 import com.digitalasset.canton.topology.PhysicalSynchronizerId
-import com.digitalasset.daml.lf.transaction.{CreationTime, Versioned}
+import com.digitalasset.daml.lf.transaction.{CreationTime, FatContractInstance, Versioned}
+import com.digitalasset.daml.lf.value.Value.ThinContractInstance
 
 import java.util.UUID
 import scala.util.Try
@@ -127,8 +128,7 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
     * @param metadata
     *   contract metadata
     * @param suffixedContractInstance
-    *   the serializable raw contract instance of the contract where contract IDs have already been
-    *   suffixed.
+    *   the thin instance of the contract where contract IDs have already been suffixed.
     * @param cantonContractIdVersion
     *   the contract id versioning
     *
@@ -144,8 +144,8 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
       createIndex: Int,
       ledgerCreateTime: CreationTime.CreatedAt,
       metadata: ContractMetadata,
-      suffixedContractInstance: SerializableRawContractInstance,
-      cantonContractIdVersion: CantonContractIdVersion,
+      suffixedContractInstance: ThinContractInstance,
+      cantonContractIdVersion: CantonContractIdV1Version,
   ): (ContractSalt, Unicum) = {
     val contractSalt =
       ContractSalt.create(cryptoOps)(
@@ -160,12 +160,23 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
       ledgerCreateTime = ledgerCreateTime,
       metadata = metadata,
       contractHash =
-        suffixedContractInstance.contractHash(cantonContractIdVersion.useUpgradeFriendlyHashing),
+        contractHash(suffixedContractInstance, cantonContractIdVersion.useUpgradeFriendlyHashing),
       contractSalt = contractSalt.unwrap,
     )
 
     contractSalt -> Unicum(unicumHash)
   }
+
+  private def contractHash(
+      contractInstance: ThinContractInstance,
+      upgradeFriendly: Boolean,
+  ): LfHash =
+    LfHash.assertHashContractInstance(
+      contractInstance.template,
+      contractInstance.arg,
+      contractInstance.packageName,
+      upgradeFriendly = upgradeFriendly,
+    )
 
   /** Re-computes a contract's [[Unicum]] based on the provided salt. Used for authenticating
     * contracts.
@@ -177,8 +188,7 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
     * @param metadata
     *   contract metadata
     * @param suffixedContractInstance
-    *   the serializable raw contract instance of the contract where contract IDs have already been
-    *   suffixed.
+    *   the thin instance of the contract where contract IDs have already been suffixed.
     * @param cantonContractIdVersion
     *   the contract id versioning
     * @return
@@ -189,15 +199,15 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
       contractSalt: Salt,
       ledgerCreateTime: CreationTime.CreatedAt,
       metadata: ContractMetadata,
-      suffixedContractInstance: SerializableRawContractInstance,
-      cantonContractIdVersion: CantonContractIdVersion,
+      suffixedContractInstance: ThinContractInstance,
+      cantonContractIdVersion: CantonContractIdV1Version,
   ): Either[String, Unicum] =
     recomputeUnicum(
       contractSalt = contractSalt,
       ledgerCreateTime = ledgerCreateTime,
       metadata = metadata,
       contractHash =
-        suffixedContractInstance.contractHash(cantonContractIdVersion.useUpgradeFriendlyHashing),
+        contractHash(suffixedContractInstance, cantonContractIdVersion.useUpgradeFriendlyHashing),
     )
 
   /** Re-computes a contract's [[Unicum]] based on the provided salt. Used for authenticating
@@ -213,8 +223,8 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
     *   predefined size.
     */
   def recomputeUnicum(
-      contractInstance: LfFatContractInst,
-      cantonContractIdVersion: CantonContractIdVersion,
+      contractInstance: FatContractInstance,
+      cantonContractIdVersion: CantonContractIdV1Version,
   ): Either[String, Unicum] =
     for {
       contractHash <- Try(
@@ -231,12 +241,18 @@ class UnicumGenerator(cryptoOps: HashOps & HmacOps) {
         maybeKeyWithMaintainersVersioned =
           contractInstance.contractKeyWithMaintainers.map(Versioned(contractInstance.version, _)),
       )
-      driverMetadata <- DriverContractMetadata
-        .fromLfBytes(contractInstance.cantonData.toByteArray)
+      authenticationData <- ContractAuthenticationData
+        .fromLfBytes(cantonContractIdVersion, contractInstance.authenticationData)
         .leftMap(err => s"Failed to decode canton metadata: $err")
+      createdAt <- contractInstance.createdAt match {
+        case createdAt: CreationTime.CreatedAt =>
+          Right(createdAt)
+        case _ =>
+          Left("Cannot recompute unicum for a contract without a creation time")
+      }
       unicum <- recomputeUnicum(
-        driverMetadata.salt,
-        contractInstance.createdAt,
+        authenticationData.salt,
+        createdAt,
         metadata,
         contractHash,
       )

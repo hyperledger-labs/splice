@@ -67,6 +67,7 @@ object JsSchema {
       synchronizerId: String,
       traceContext: Option[TraceContext],
       recordTime: com.google.protobuf.timestamp.Timestamp,
+      externalTransactionHash: Option[String],
   )
 
   final case class JsTransactionTree(
@@ -236,6 +237,7 @@ object JsSchema {
         observers: Seq[String],
         createdAt: protobuf.timestamp.Timestamp,
         packageName: String,
+        acsDelta: Boolean,
     ) extends Event
 
     final case class ArchivedEvent(
@@ -263,6 +265,7 @@ object JsSchema {
         exerciseResult: Json,
         packageName: String,
         implementedInterfaces: Seq[Identifier],
+        acsDelta: Boolean,
     ) extends Event
   }
 
@@ -290,6 +293,8 @@ object JsSchema {
   object JsCantonError {
     import DirectScalaPbRwImplicits.*
     implicit val rw: Codec[JsCantonError] = deriveCodec
+    val ledgerApiErrorContext: String = "ledger_api_error"
+    val tokenProblemError: (String, String) = (ledgerApiErrorContext -> "invalid token")
 
     def fromErrorCode(damlError: RpcError): JsCantonError = JsCantonError(
       code = damlError.code.id,

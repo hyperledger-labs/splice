@@ -23,7 +23,7 @@ import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.{Bytes, ImmArray, Ref, Time}
 import com.digitalasset.daml.lf.language.LanguageMajorVersion
 import com.digitalasset.daml.lf.transaction.{CreationTime, Node, Versioned}
-import com.digitalasset.daml.lf.value.Value.{ValueRecord, ValueText}
+import com.digitalasset.daml.lf.value.Value.{ValueInt64, ValueRecord, ValueText}
 import org.mockito.MockitoSugar
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
@@ -222,7 +222,7 @@ class MutableCacheBackedContractStoreSpec
       stakeholders = exStakeholders,
       signatories = exSignatories,
       key = Some(KeyWithMaintainers(someKey, exMaintainers)),
-      driverMetadata = exDriverMetadata,
+      authenticationData = exAuthenticationData,
     )
 
     val stateValueActive = ContractStateValue.Active(contract)
@@ -275,22 +275,19 @@ object MutableCacheBackedContractStoreSpec {
   private val Seq(alice, bob, charlie) = Seq("alice", "bob", "charlie").map(party)
   private val (
     Seq(cId_1, cId_2, cId_3, cId_4, cId_5, cId_6, cId_7),
-    contracts @ Seq(contract1, contract2, contract3, contract4, _, contract6, _),
+    Seq(contract1, contract2, contract3, contract4, _, contract6, _),
     Seq(t1, t2, t3, t4, _, t6, _),
   ) =
     (1 to 7).map { id =>
-      (contractId(id), thinContract(s"id$id"), Time.Timestamp.assertFromLong(id.toLong * 1000L))
+      (contractId(id), thinContract(id), Time.Timestamp.assertFromLong(id.toLong * 1000L))
     }.unzip3
-
-  // We double check all the contracts have different templateId
-  assert(contracts.distinctBy(_.unversioned.template).sizeIs.==(7))
 
   private val someKey = globalKey("key1")
 
   private val exStakeholders = Set(bob, alice)
   private val exSignatories = Set(alice)
   private val exMaintainers = Set(alice)
-  private val exDriverMetadata = Bytes.fromByteArray("meta".getBytes)
+  private val exAuthenticationData = Bytes.fromByteArray("meta".getBytes)
   private val someKeyWithMaintainers = KeyWithMaintainers(someKey, exMaintainers)
 
   private def contractStore(
@@ -354,7 +351,7 @@ object MutableCacheBackedContractStoreSpec {
       ledgerEffectiveTime: Time.Timestamp,
       signatories: Set[Party] = exSignatories,
       key: Option[KeyWithMaintainers] = Some(someKeyWithMaintainers),
-      driverMetadata: Bytes = exDriverMetadata,
+      authenticationData: Bytes = exAuthenticationData,
   ): Future[Option[LedgerDaoContractsReader.ActiveContract]] =
     Future.successful(
       Some(
@@ -366,7 +363,7 @@ object MutableCacheBackedContractStoreSpec {
             stakeholders = stakeholders,
             signatories = signatories,
             key = key,
-            driverMetadata = driverMetadata,
+            authenticationData = authenticationData,
           )
         )
       )
@@ -379,13 +376,13 @@ object MutableCacheBackedContractStoreSpec {
 
   private def party(name: String): Party = Party.assertFromString(name)
 
-  private def thinContract(templateName: String): ThinContract = {
-    val templateId = Identifier.assertFromString(s"some:template:$templateName")
+  private def thinContract(idx: Int): ThinContract = {
+    val templateId = Identifier.assertFromString("some:template:name")
     val packageName = Ref.PackageName.assertFromString("pkg-name")
 
     val contractArgument = ValueRecord(
       Some(templateId),
-      ImmArray.Empty,
+      ImmArray(None -> ValueInt64(idx.toLong)),
     )
     ThinContract(
       packageName = packageName,
@@ -401,7 +398,7 @@ object MutableCacheBackedContractStoreSpec {
       stakeholders: Set[Party],
       signatories: Set[Party],
       key: Option[KeyWithMaintainers],
-      driverMetadata: Bytes,
+      authenticationData: Bytes,
   ) =
     FatContract.fromCreateNode(
       Node.Create(
@@ -415,7 +412,7 @@ object MutableCacheBackedContractStoreSpec {
         version = thinContract.version,
       ),
       createTime = CreationTime.CreatedAt(createLedgerEffectiveTime),
-      cantonData = driverMetadata,
+      authenticationData = authenticationData,
     )
 
   private def contractId(id: Int): ContractId =
@@ -423,7 +420,7 @@ object MutableCacheBackedContractStoreSpec {
 
   private def globalKey(desc: String): Key =
     Key.assertBuild(
-      Identifier.assertFromString(s"some:template:$desc"),
+      Identifier.assertFromString("some:template:name"),
       ValueText(desc),
       Ref.PackageName.assertFromString("pkg-name"),
     )

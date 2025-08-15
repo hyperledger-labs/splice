@@ -5,7 +5,7 @@ package com.digitalasset.canton.networking.grpc
 
 import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.CantonAdminToken
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.TlsServerConfig.logTlsProtocolsAndCipherSuites
@@ -142,13 +142,14 @@ object CantonServerBuilder {
     */
   def forConfig(
       config: ServerConfig,
-      adminToken: Option[CantonAdminToken],
+      adminTokenDispenser: Option[CantonAdminTokenDispenser],
       executor: Executor,
       loggerFactory: NamedLoggerFactory,
       apiLoggingConfig: ApiLoggingConfig,
       tracing: TracingConfig,
       grpcMetrics: GrpcServerMetrics,
       telemetry: Telemetry,
+      additionalInterceptors: Seq[ServerInterceptor] = Seq.empty,
   ): CantonServerBuilder = {
     val builder =
       NettyServerBuilder
@@ -171,9 +172,11 @@ object CantonServerBuilder {
         loggerFactory,
         grpcMetrics,
         config.authServices,
-        adminToken,
+        adminTokenDispenser,
         config.jwtTimestampLeeway,
+        config.adminTokenConfig,
         telemetry,
+        additionalInterceptors,
       ),
     )
   }

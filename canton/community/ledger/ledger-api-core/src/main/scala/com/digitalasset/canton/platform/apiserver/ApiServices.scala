@@ -26,10 +26,7 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
 import com.digitalasset.canton.platform.apiserver.execution.*
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.{
-  AuthenticateFatContractInstance,
-  AuthenticateSerializableContract,
-}
+import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.AuthenticateFatContractInstance
 import com.digitalasset.canton.platform.apiserver.services.*
 import com.digitalasset.canton.platform.apiserver.services.admin.*
 import com.digitalasset.canton.platform.apiserver.services.command.interactive.InteractiveSubmissionServiceImpl
@@ -117,7 +114,6 @@ object ApiServices {
       userManagementServiceConfig: UserManagementServiceConfig,
       partyManagementServiceConfig: PartyManagementServiceConfig,
       engineLoggingConfig: EngineLoggingConfig,
-      authenticateSerializableContract: AuthenticateSerializableContract,
       authenticateFatContractInstance: AuthenticateFatContractInstance,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
@@ -132,7 +128,6 @@ object ApiServices {
       tracer: Tracer,
   ): ApiServices = {
     implicit val traceContext: TraceContext = TraceContext.empty
-
     val activeContractsService: IndexActiveContractsService = indexService
     val updateService: IndexUpdateService = indexService
     val eventQueryService: IndexEventQueryService = indexService
@@ -264,7 +259,7 @@ object ApiServices {
           participant = participantId,
           packageSyncService = syncService,
           contractStore = contractStore,
-          authenticateSerializableContract = authenticateSerializableContract,
+          authenticateFatContractInstance = authenticateFatContractInstance,
           metrics = metrics,
           config = engineLoggingConfig,
           prefetchingRecursionLevel = commandConfig.contractPrefetchingDepth,
@@ -385,6 +380,8 @@ object ApiServices {
             interactiveSubmissionServiceConfig,
             contractStore,
             packagePreferenceBackend,
+            transactionSubmissionTracker,
+            commandConfig.defaultTrackingTimeout,
             loggerFactory,
           )
 

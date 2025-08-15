@@ -7,8 +7,11 @@ import com.digitalasset.canton.admin.participant.v30
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.participant.protocol.party.PartyReplicationProcessor
+import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId, SynchronizerId}
+import io.scalaland.chimney.dsl.*
 
 import scala.reflect.ClassTag
 
@@ -25,6 +28,7 @@ object PartyReplicationStatus {
     case object ReplicatingAcs extends PartyReplicationStatusCode
     case object Completed extends PartyReplicationStatusCode
     case object Error extends PartyReplicationStatusCode
+    case object Disconnected extends PartyReplicationStatusCode
   }
 
   /** Indicates whether party replication is active and expected to be progressing, i.e. whether
@@ -80,10 +84,15 @@ object PartyReplicationStatus {
         )
       )
   }
+  sealed trait AgreedReplicationStatus extends PartyReplicationStatus {
+    def sequencerId: SequencerId
+    def damlAgreementCid: LfContractId
+  }
   final case class AgreementAccepted(
       params: ReplicationParams,
       sequencerId: SequencerId,
-  ) extends PartyReplicationStatus
+      damlAgreementCid: LfContractId,
+  ) extends AgreedReplicationStatus
       with ProgressIsExpected {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.AgreementAccepted
 
@@ -94,7 +103,10 @@ object PartyReplicationStatus {
       )
   }
   object AgreementAccepted {
-    def apply(agreement: PartyReplicationAgreementParams): AgreementAccepted =
+    def apply(
+        agreement: PartyReplicationAgreementParams,
+        damlAgreementCid: LfContractId,
+    ): AgreementAccepted =
       AgreementAccepted(
         ReplicationParams(
           agreement.requestId,
@@ -106,15 +118,20 @@ object PartyReplicationStatus {
           agreement.participantPermission,
         ),
         agreement.sequencerId,
+        damlAgreementCid,
       )
   }
-  sealed trait AuthorizedPartyReplicationStatus extends PartyReplicationStatus {
-    def authorizedParams: AuthorizedReplicationParams
-    def params: ReplicationParams = authorizedParams.toBasic
+  sealed trait AuthorizedPartyReplicationStatus extends AgreedReplicationStatus {
+    def sequencerId: SequencerId
+    def effectiveAt: CantonTimestamp
   }
 
-  final case class TopologyAuthorized(authorizedParams: AuthorizedReplicationParams)
-      extends AuthorizedPartyReplicationStatus
+  final case class TopologyAuthorized(
+      params: ReplicationParams,
+      sequencerId: SequencerId,
+      damlAgreementCid: LfContractId,
+      effectiveAt: CantonTimestamp,
+  ) extends AuthorizedPartyReplicationStatus
       with ProgressIsExpected {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.TopologyAuthorized
 
@@ -122,35 +139,25 @@ object PartyReplicationStatus {
       v30.GetAddPartyStatusResponse.Status.Status.TopologyAuthorized(
         v30.GetAddPartyStatusResponse.Status
           .TopologyAuthorized(
-            authorizedParams.sequencerId.uid.toProtoPrimitive,
-            Some(authorizedParams.effectiveAt.toProtoTimestamp),
+            sequencerId.uid.toProtoPrimitive,
+            Some(effectiveAt.toProtoTimestamp),
           )
       )
   }
 
-  object TopologyAuthorized {
-    def apply(
-        agreement: ReplicationParams,
-        sequencerId: SequencerId,
-        effectiveAt: CantonTimestamp,
-    ): TopologyAuthorized =
-      TopologyAuthorized(
-        AuthorizedReplicationParams(
-          agreement.requestId,
-          agreement.partyId,
-          agreement.synchronizerId,
-          agreement.sourceParticipantId,
-          agreement.targetParticipantId,
-          agreement.serial,
-          agreement.participantPermission,
-          sequencerId,
-          effectiveAt,
-        )
-      )
+  sealed trait ConnectedPartyReplicationStatus extends AuthorizedPartyReplicationStatus {
+    def partyReplicationProcessor: PartyReplicationProcessor
+    final def replicatedContractsCount: NonNegativeInt =
+      partyReplicationProcessor.replicatedContractsCount
   }
 
-  final case class ConnectionEstablished(authorizedParams: AuthorizedReplicationParams)
-      extends AuthorizedPartyReplicationStatus
+  final case class ConnectionEstablished(
+      params: ReplicationParams,
+      sequencerId: SequencerId,
+      damlAgreementCid: LfContractId,
+      effectiveAt: CantonTimestamp,
+      partyReplicationProcessor: PartyReplicationProcessor,
+  ) extends ConnectedPartyReplicationStatus
       with ProgressIsExpected {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.ConnectionEstablished
 
@@ -158,16 +165,19 @@ object PartyReplicationStatus {
       v30.GetAddPartyStatusResponse.Status.Status.ConnectionEstablished(
         v30.GetAddPartyStatusResponse.Status
           .ConnectionEstablished(
-            authorizedParams.sequencerId.uid.toProtoPrimitive,
-            Some(authorizedParams.effectiveAt.toProtoTimestamp),
+            sequencerId.uid.toProtoPrimitive,
+            Some(effectiveAt.toProtoTimestamp),
           )
       )
   }
 
   final case class ReplicatingAcs(
-      authorizedParams: AuthorizedReplicationParams,
-      numberOfContractsReplicated: NonNegativeInt,
-  ) extends AuthorizedPartyReplicationStatus
+      params: ReplicationParams,
+      sequencerId: SequencerId,
+      damlAgreementCid: LfContractId,
+      effectiveAt: CantonTimestamp,
+      partyReplicationProcessor: PartyReplicationProcessor,
+  ) extends ConnectedPartyReplicationStatus
       with ProgressIsExpected {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.ReplicatingAcs
 
@@ -175,28 +185,66 @@ object PartyReplicationStatus {
       v30.GetAddPartyStatusResponse.Status.Status.ReplicatingAcs(
         v30.GetAddPartyStatusResponse.Status
           .ReplicatingAcs(
-            authorizedParams.sequencerId.uid.toProtoPrimitive,
-            Some(authorizedParams.effectiveAt.toProtoTimestamp),
-            numberOfContractsReplicated.unwrap,
+            sequencerId.uid.toProtoPrimitive,
+            Some(effectiveAt.toProtoTimestamp),
+            replicatedContractsCount.unwrap,
           )
       )
   }
+  object ReplicatingAcs {
+    def apply(connectionEstablished: ConnectionEstablished): ReplicatingAcs =
+      connectionEstablished.transformInto[ReplicatingAcs]
+  }
+
+  final case class FullyReplicatedAcs(
+      params: ReplicationParams,
+      sequencerId: SequencerId,
+      damlAgreementCid: LfContractId,
+      effectiveAt: CantonTimestamp,
+      partyReplicationProcessor: PartyReplicationProcessor,
+  ) extends ConnectedPartyReplicationStatus
+      with ProgressIsExpected {
+    override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.ReplicatingAcs
+
+    override def toProto: v30.GetAddPartyStatusResponse.Status.Status =
+      v30.GetAddPartyStatusResponse.Status.Status.FullyReplicatedAcs(
+        v30.GetAddPartyStatusResponse.Status
+          .FullyReplicatedAcs(
+            sequencerId.uid.toProtoPrimitive,
+            Some(effectiveAt.toProtoTimestamp),
+            replicatedContractsCount.unwrap,
+          )
+      )
+  }
+  object FullyReplicatedAcs {
+    def apply(replicatingAcs: ReplicatingAcs): FullyReplicatedAcs =
+      replicatingAcs.transformInto[FullyReplicatedAcs]
+    def apply(connectionEstablished: ConnectionEstablished): FullyReplicatedAcs =
+      connectionEstablished.transformInto[FullyReplicatedAcs]
+  }
 
   final case class Completed(
-      authorizedParams: AuthorizedReplicationParams,
-      numberOfContractsReplicated: NonNegativeInt,
-  ) extends AuthorizedPartyReplicationStatus {
+      params: ReplicationParams,
+      sequencerId: SequencerId,
+      damlAgreementCid: LfContractId,
+      effectiveAt: CantonTimestamp,
+      partyReplicationProcessor: PartyReplicationProcessor,
+  ) extends ConnectedPartyReplicationStatus {
     override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.Completed
 
     override def toProto: v30.GetAddPartyStatusResponse.Status.Status =
       v30.GetAddPartyStatusResponse.Status.Status.Completed(
         v30.GetAddPartyStatusResponse.Status
           .Completed(
-            authorizedParams.sequencerId.uid.toProtoPrimitive,
-            Some(authorizedParams.effectiveAt.toProtoTimestamp),
-            numberOfContractsReplicated.unwrap,
+            sequencerId.uid.toProtoPrimitive,
+            Some(effectiveAt.toProtoTimestamp),
+            replicatedContractsCount.unwrap,
           )
       )
+  }
+  object Completed {
+    def apply(fullyReplicatedAcs: FullyReplicatedAcs): Completed =
+      fullyReplicatedAcs.transformInto[Completed]
   }
 
   final case class Error(
@@ -216,6 +264,24 @@ object PartyReplicationStatus {
       )
   }
 
+  final case class Disconnected(
+      message: String,
+      previousConnectedStatus: ConnectedPartyReplicationStatus,
+  ) extends PartyReplicationStatus
+      with ProgressIsExpected {
+    override def code: PartyReplicationStatusCode = PartyReplicationStatusCode.Disconnected
+    override def params: ReplicationParams = previousConnectedStatus.params
+
+    override def toProto: v30.GetAddPartyStatusResponse.Status.Status =
+      v30.GetAddPartyStatusResponse.Status.Status.Disconnected(
+        v30.GetAddPartyStatusResponse.Status
+          .Disconnected(
+            message,
+            Some(v30.GetAddPartyStatusResponse.Status(previousConnectedStatus.toProto)),
+          )
+      )
+  }
+
   final case class ReplicationParams(
       requestId: Hash,
       partyId: PartyId,
@@ -224,44 +290,5 @@ object PartyReplicationStatus {
       targetParticipantId: ParticipantId,
       serial: PositiveInt,
       participantPermission: ParticipantPermission,
-  ) {
-    implicit def toAuthorized(
-        sequencerId: SequencerId,
-        effectiveAt: CantonTimestamp,
-    ): AuthorizedReplicationParams =
-      AuthorizedReplicationParams(
-        requestId,
-        partyId,
-        synchronizerId,
-        sourceParticipantId,
-        targetParticipantId,
-        serial,
-        participantPermission,
-        sequencerId,
-        effectiveAt,
-      )
-  }
-
-  final case class AuthorizedReplicationParams(
-      requestId: Hash,
-      partyId: PartyId,
-      synchronizerId: SynchronizerId,
-      sourceParticipantId: ParticipantId,
-      targetParticipantId: ParticipantId,
-      serial: PositiveInt,
-      participantPermission: ParticipantPermission,
-      sequencerId: SequencerId,
-      effectiveAt: CantonTimestamp,
-  ) {
-    implicit def toBasic: ReplicationParams =
-      ReplicationParams(
-        requestId,
-        partyId,
-        synchronizerId,
-        sourceParticipantId,
-        targetParticipantId,
-        serial,
-        participantPermission,
-      )
-  }
+  )
 }

@@ -36,9 +36,10 @@ class KmsPrivateCrypto(
     kms: Kms,
     private[kms] val privateStore: KmsCryptoPrivateStore,
     private[kms] val publicStore: CryptoPublicStore,
-    override val defaultSigningAlgorithmSpec: SigningAlgorithmSpec,
-    override val defaultSigningKeySpec: SigningKeySpec,
-    override val defaultEncryptionKeySpec: EncryptionKeySpec,
+    override val signingAlgorithmSpecs: CryptoScheme[SigningAlgorithmSpec],
+    override val signingKeySpecs: CryptoScheme[SigningKeySpec],
+    override val encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec],
+    override val encryptionKeySpecs: CryptoScheme[EncryptionKeySpec],
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -89,6 +90,13 @@ class KmsPrivateCrypto(
           SigningKeyGenerationError.GeneralKmsError(err.show)
         )
         .toEitherT[FutureUnlessShutdown]
+      _ <- CryptoKeyValidation
+        .ensureCryptoKeySpec(
+          publicKey.keySpec,
+          signingKeySpecs.allowed,
+          SigningKeyGenerationError.UnsupportedKeySpec.apply,
+        )
+        .toEitherT[FutureUnlessShutdown]
       _ <- EitherT.right(publicStore.storeSigningKey(publicKey, keyName))
       _ = privateStore.storeKeyMetadata(
         KmsMetadata(publicKey.id, keyId, KeyPurpose.Signing, Some(publicKey.usage))
@@ -103,6 +111,13 @@ class KmsPrivateCrypto(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SigningKeyGenerationError, SigningPublicKey] =
     for {
+      _ <- CryptoKeyValidation
+        .ensureCryptoKeySpec(
+          keySpec,
+          signingKeySpecs.allowed,
+          SigningKeyGenerationError.UnsupportedKeySpec.apply,
+        )
+        .toEitherT[FutureUnlessShutdown]
       keyId <- kms
         .generateSigningKeyPair(keySpec, name)
         .leftMap[SigningKeyGenerationError](err =>
@@ -136,7 +151,6 @@ class KmsPrivateCrypto(
         privateStore
           .getKeyMetadata(signingKeyId)
       )
-      signatureFormat = SignatureFormat.fromSigningAlgoSpec(signingAlgorithmSpec)
       signature <- metadata match {
         case Some(KmsMetadata(_, kmsKeyId, _, _)) =>
           ByteString4096.create(bytes) match {
@@ -160,14 +174,25 @@ class KmsPrivateCrypto(
                     SigningError.InvalidKeyUsage.apply,
                   )
                   .toEitherT[FutureUnlessShutdown]
+                validAlgorithmSpec <- CryptoKeyValidation
+                  .selectSigningAlgorithmSpec(
+                    pubKey.keySpec,
+                    signingAlgorithmSpec,
+                    signingAlgorithmSpecs.allowed,
+                    () =>
+                      SigningError.NoMatchingAlgorithmSpec(
+                        "No matching algorithm spec for key spec " + pubKey.keySpec
+                      ),
+                  )
+                  .toEitherT[FutureUnlessShutdown]
                 signatureRaw <- kms
-                  .sign(kmsKeyId, bytes, signingAlgorithmSpec, pubKey.keySpec)
+                  .sign(kmsKeyId, bytes, validAlgorithmSpec, pubKey.keySpec)
                   .leftMap[SigningError](err => SigningError.FailedToSign(err.show))
               } yield Signature.create(
-                signatureFormat,
+                SignatureFormat.fromSigningAlgoSpec(validAlgorithmSpec),
                 signatureRaw,
                 signingKeyId,
-                Some(signingAlgorithmSpec),
+                Some(validAlgorithmSpec),
               )
 
           }
@@ -202,6 +227,13 @@ class KmsPrivateCrypto(
           EncryptionKeyGenerationError.GeneralKmsError(err.show)
         )
         .toEitherT[FutureUnlessShutdown]
+      _ <- CryptoKeyValidation
+        .ensureCryptoKeySpec(
+          publicKey.keySpec,
+          encryptionKeySpecs.allowed,
+          EncryptionKeyGenerationError.UnsupportedKeySpec.apply,
+        )
+        .toEitherT[FutureUnlessShutdown]
       _ <- EitherT.right(publicStore.storeEncryptionKey(publicKey, keyName))
       _ = privateStore.storeKeyMetadata(KmsMetadata(publicKey.id, keyId, KeyPurpose.Encryption))
     } yield publicKey
@@ -213,6 +245,13 @@ class KmsPrivateCrypto(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, EncryptionKeyGenerationError, EncryptionPublicKey] =
     for {
+      _ <- CryptoKeyValidation
+        .ensureCryptoKeySpec(
+          keySpec,
+          encryptionKeySpecs.allowed,
+          EncryptionKeyGenerationError.UnsupportedKeySpec.apply,
+        )
+        .toEitherT[FutureUnlessShutdown]
       keyId <- kms
         .generateAsymmetricEncryptionKeyPair(keySpec, name)
         .leftMap[EncryptionKeyGenerationError](err =>
@@ -236,6 +275,13 @@ class KmsPrivateCrypto(
       deserialize: ByteString => Either[DeserializationError, M]
   )(implicit tc: TraceContext): EitherT[FutureUnlessShutdown, DecryptionError, M] =
     for {
+      _ <- CryptoKeyValidation
+        .ensureCryptoAlgorithmSpec(
+          encrypted.encryptionAlgorithmSpec,
+          encryptionAlgorithmSpecs.allowed,
+          DecryptionError.UnsupportedAlgorithmSpec.apply,
+        )
+        .toEitherT[FutureUnlessShutdown]
       metadata <- EitherT.right(
         privateStore
           .getKeyMetadata(encrypted.encryptedFor)
@@ -325,6 +371,7 @@ object KmsPrivateCrypto {
           driverKms.supportedEncryptionKeySpecs,
           "encryption key specs",
         )
+
         _ <- ensureSupportedSchemes(
           cryptoSchemes.encryptionAlgoSpecs.allowed,
           CryptoProvider.Kms.pureEncryptionAlgorithms,
@@ -335,9 +382,10 @@ object KmsPrivateCrypto {
         kms,
         kmsCryptoPrivateStore,
         cryptoPublicStore,
-        cryptoSchemes.signingAlgoSpecs.default,
-        cryptoSchemes.signingKeySpecs.default,
-        cryptoSchemes.encryptionKeySpecs.default,
+        cryptoSchemes.signingAlgoSpecs,
+        cryptoSchemes.signingKeySpecs,
+        cryptoSchemes.encryptionAlgoSpecs,
+        cryptoSchemes.encryptionKeySpecs,
         timeouts,
         loggerFactory,
       )
@@ -349,9 +397,10 @@ object KmsPrivateCrypto {
           kms,
           kmsCryptoPrivateStore,
           cryptoPublicStore,
-          cryptoSchemes.signingAlgoSpecs.default,
-          cryptoSchemes.signingKeySpecs.default,
-          cryptoSchemes.encryptionKeySpecs.default,
+          cryptoSchemes.signingAlgoSpecs,
+          cryptoSchemes.signingKeySpecs,
+          cryptoSchemes.encryptionAlgoSpecs,
+          cryptoSchemes.encryptionKeySpecs,
           timeouts,
           loggerFactory,
         )

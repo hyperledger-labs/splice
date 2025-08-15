@@ -6,7 +6,13 @@ package com.digitalasset.canton.platform.apiserver
 import com.daml.jwt.JwtTimestampLeeway
 import com.daml.ledger.resources.ResourceOwner
 import com.daml.tracing.Telemetry
-import com.digitalasset.canton.auth.{AuthService, Authorizer}
+import com.digitalasset.canton.auth.{
+  AuthInterceptor,
+  AuthService,
+  Authorizer,
+  GrpcAuthInterceptor,
+  JwtVerifierLoader,
+}
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.config.{
   KeepAliveServerConfig,
@@ -18,7 +24,7 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
 import com.digitalasset.canton.ledger.api.IdentityProviderConfig
 import com.digitalasset.canton.ledger.api.auth.*
-import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedAuthInterceptor
+import com.digitalasset.canton.ledger.api.auth.interceptor.UserBasedClaimResolver
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.localstore.api.{
@@ -33,10 +39,7 @@ import com.digitalasset.canton.metrics.LedgerApiServerMetrics
 import com.digitalasset.canton.platform.PackagePreferenceBackend
 import com.digitalasset.canton.platform.apiserver.SeedService.Seeding
 import com.digitalasset.canton.platform.apiserver.configuration.EngineLoggingConfig
-import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.{
-  AuthenticateFatContractInstance,
-  AuthenticateSerializableContract,
-}
+import com.digitalasset.canton.platform.apiserver.execution.ContractAuthenticators.AuthenticateFatContractInstance
 import com.digitalasset.canton.platform.apiserver.execution.{
   CommandProgressTracker,
   DynamicSynchronizerParameterGetter,
@@ -110,7 +113,6 @@ object ApiServiceOwner {
       engineLoggingConfig: EngineLoggingConfig,
       telemetry: Telemetry,
       loggerFactory: NamedLoggerFactory,
-      authenticateSerializableContract: AuthenticateSerializableContract,
       authenticateFatContractInstance: AuthenticateFatContractInstance,
       dynParamGetter: DynamicSynchronizerParameterGetter,
       interactiveSubmissionServiceConfig: InteractiveSubmissionServiceConfig,
@@ -122,7 +124,7 @@ object ApiServiceOwner {
       materializer: Materializer,
       traceContext: TraceContext,
       tracer: Tracer,
-  ): ResourceOwner[ApiService] = {
+  ): ResourceOwner[(ApiService, AuthInterceptor)] = {
     import com.digitalasset.canton.platform.ResourceOwnerOps
     val logger = loggerFactory.getTracedLogger(getClass)
 
@@ -154,7 +156,19 @@ object ApiServiceOwner {
           commandExecutionContext,
         )
     }
-
+    val userAuthInterceptor = new AuthInterceptor(
+      authServices = authServices :+ new IdentityProviderAwareAuthService(
+        identityProviderConfigLoader = identityProviderConfigLoader,
+        jwtVerifierLoader = jwtVerifierLoader,
+        loggerFactory = loggerFactory,
+      )(commandExecutionContext),
+      loggerFactory = loggerFactory,
+      ec = commandExecutionContext,
+      claimResolver = new UserBasedClaimResolver(
+        userManagementStoreO = Option.when(userManagement.enabled)(userManagementStore),
+        ec = commandExecutionContext,
+      ),
+    )
     for {
       executionSequencerFactory <- new ExecutionSequencerFactoryOwner()
         .afterReleased(logger.info(s"ExecutionSequencerFactory is released for LedgerApiService"))
@@ -192,7 +206,6 @@ object ApiServiceOwner {
         engineLoggingConfig = engineLoggingConfig,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
-        authenticateSerializableContract = authenticateSerializableContract,
         authenticateFatContractInstance = authenticateFatContractInstance,
         dynParamGetter = dynParamGetter,
         interactiveSubmissionServiceConfig = interactiveSubmissionServiceConfig,
@@ -208,17 +221,13 @@ object ApiServiceOwner {
         maxInboundMetadataSize,
         address,
         tls,
-        new UserBasedAuthInterceptor(
-          authServices = authServices :+ new IdentityProviderAwareAuthService(
-            identityProviderConfigLoader = identityProviderConfigLoader,
-            jwtVerifierLoader = jwtVerifierLoader,
-            loggerFactory = loggerFactory,
-          )(commandExecutionContext),
-          Option.when(userManagement.enabled)(userManagementStore),
+        new GrpcAuthInterceptor(
+          userAuthInterceptor,
           telemetry,
           loggerFactory,
           commandExecutionContext,
-        ) :: otherInterceptors,
+        )
+          :: otherInterceptors,
         commandExecutionContext,
         metrics,
         keepAlive,
@@ -229,7 +238,7 @@ object ApiServiceOwner {
         s"Initialized API server listening to port = ${apiService.port} ${if (tls.isDefined) "using tls"
           else "without tls"}."
       )
-      apiService
+      (apiService, userAuthInterceptor)
     }
   }
 

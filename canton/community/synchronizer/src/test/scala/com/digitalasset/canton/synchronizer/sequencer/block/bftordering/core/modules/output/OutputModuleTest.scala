@@ -96,6 +96,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.{
   BftSequencerBaseTest,
   failingCryptoProvider,
   fakeCellModule,
+  fakeIgnoringModule,
   fakeModuleExpectingSilence,
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
@@ -139,7 +140,7 @@ class OutputModuleTest
         output.receive(Output.Start)
         output.receive(Output.BlockOrdered(initialBlock))
 
-        verify(availabilityRef, times(1)).asyncSendTraced(
+        verify(availabilityRef, times(1)).asyncSend(
           eqTo(Availability.LocalOutputFetch.FetchBlockData(initialBlock))
         )(any[TraceContext], any[MetricsContext])
         succeed
@@ -162,7 +163,7 @@ class OutputModuleTest
         output.receive(Output.Start)
         output.receive(Output.BlockOrdered(initialBlock))
 
-        verify(availabilityRef, times(1)).asyncSendTraced(
+        verify(availabilityRef, times(1)).asyncSend(
           eqTo(Availability.LocalOutputFetch.FetchBlockData(initialBlock))
         )(any[TraceContext], any[MetricsContext])
 
@@ -171,7 +172,7 @@ class OutputModuleTest
 
         verify(availabilityRef, never).asyncSend(
           eqTo(Availability.LocalOutputFetch.FetchBlockData(initialBlock))
-        )(any[MetricsContext])
+        )(any[TraceContext], any[MetricsContext])
         succeed
       }
 
@@ -196,7 +197,7 @@ class OutputModuleTest
 
         verify(availabilityRef, never).asyncSend(
           eqTo(Availability.LocalOutputFetch.FetchBlockData(initialBlock))
-        )(any[MetricsContext])
+        )(any[TraceContext], any[MetricsContext])
         succeed
       }
     }
@@ -759,7 +760,7 @@ class OutputModuleTest
                 Membership(BftNodeId("node1"), newOrderingTopology, Seq.empty),
                 any[CryptoProvider[ProgrammableUnitTestEnv]],
               )
-            )(any[MetricsContext])
+            )(any[TraceContext], any[MetricsContext])
 
             succeed
           }
@@ -806,7 +807,7 @@ class OutputModuleTest
               aCryptoProvider,
             )
           )
-        )(any[MetricsContext])
+        )(any[TraceContext], any[MetricsContext])
 
         output.receive(
           TopologyFetched(
@@ -827,7 +828,7 @@ class OutputModuleTest
                 aCryptoProvider,
               )
             )
-          )(any[MetricsContext])
+          )(any[TraceContext], any[MetricsContext])
         order
           .verify(consensusRef, times(1))
           .asyncSend(
@@ -838,14 +839,14 @@ class OutputModuleTest
                 aCryptoProvider,
               )
             )
-          )(any[MetricsContext])
+          )(any[TraceContext], any[MetricsContext])
 
         succeed
       }
     }
 
     "not process a block from a future epoch" when {
-      "when receiving multiple state-transferred blocks" in {
+      "receiving multiple state-transferred blocks" in {
         val subscriptionBlocks = mutable.Queue.empty[BlockFormat.Block]
         val output =
           createOutputModule[ProgrammableUnitTestEnv](requestInspector = new RequestInspector {
@@ -906,6 +907,155 @@ class OutputModuleTest
       }
     }
 
+    "not insert epoch metadata again" when {
+      "the cache about epoch metadata says it's been inserted already" in {
+        val store = spy(createOutputMetadataStore[ProgrammableUnitTestEnv])
+        val output = createOutputModule[ProgrammableUnitTestEnv](
+          store = store,
+          requestInspector = new RequestInspector {
+            override def isRequestToAllMembersOfSynchronizer(
+                request: OrderingRequest,
+                maxRequestSizeToDeserialize: MaxRequestSizeToDeserialize,
+                logger: TracedLogger,
+                traceContext: TraceContext,
+            )(implicit synchronizerProtocolVersion: ProtocolVersion): Boolean =
+              true // All requests are topology transactions
+          },
+        )()
+        implicit val context: ProgrammableUnitTestContext[Output.Message[ProgrammableUnitTestEnv]] =
+          new ProgrammableUnitTestContext(resolveAwaits = true)
+
+        val blockData1 =
+          completeBlockData(
+            BlockNumber.First,
+            aTimestamp,
+            lastInEpoch = false,
+            EpochNumber.First,
+          )
+        val blockNumber2 = BlockNumber(BlockNumber.First + 1L)
+        val blockData2 =
+          completeBlockData(
+            blockNumber2,
+            anotherTimestamp,
+            epochNumber = EpochNumber.First,
+          )
+
+        output.receive(Output.Start)
+
+        output.receive(Output.BlockDataFetched(blockData1))
+        // Store the epoch and block metadata
+        context.runPipedMessagesUntilNoMorePiped(output)
+
+        // The cache should say that the epoch metadata has been stored
+        output.epochsWithMetadataStoredCache should contain only EpochNumber.First
+
+        output.receive(Output.BlockDataFetched(blockData2))
+        // Store the block metadata only
+        context.runPipedMessagesUntilNoMorePiped(output)
+
+        // Epoch metadata should have been inserted only once
+        verify(store, times(1)).insertEpochIfMissing(
+          OutputEpochMetadata(EpochNumber.First, couldAlterOrderingTopology = true)
+        )
+        // The cache should still say that the epoch metadata has been stored
+        output.epochsWithMetadataStoredCache should contain only EpochNumber.First
+      }
+    }
+
+    "cache correctly that epoch metadata has been stored, but only for the last 2 epochs" when {
+      "processing block insertions out of order across > 2 epochs" in {
+        val output =
+          createOutputModule[ProgrammableUnitTestEnv](consensusRef = fakeIgnoringModule)()
+        implicit val context: ProgrammableUnitTestContext[Output.Message[ProgrammableUnitTestEnv]] =
+          new ProgrammableUnitTestContext(resolveAwaits = true)
+
+        output.receive(Output.Start)
+
+        output.maybeNewEpochTopologyMessagePeanoQueue.putIfAbsent(
+          new PeanoQueue(EpochNumber.First)(fail(_))
+        )
+
+        val blockData1 =
+          completeBlockData(
+            BlockNumber.First,
+            aTimestamp,
+            epochNumber = EpochNumber.First,
+          )
+        val blockDataStored1 =
+          Output.BlockDataStored(
+            blockData1,
+            BlockNumber.First,
+            aTimestamp,
+            epochCouldAlterOrderingTopology = true,
+          )
+        val blockNumber2 = BlockNumber(BlockNumber.First + 1L)
+        val epochNumber2 = EpochNumber(EpochNumber.First + 1L)
+        val blockData2 =
+          completeBlockData(
+            blockNumber2,
+            anotherTimestamp,
+            epochNumber = epochNumber2,
+          )
+        val blockDataStored2 =
+          Output.BlockDataStored(
+            blockData2,
+            blockNumber2,
+            anotherTimestamp,
+            epochCouldAlterOrderingTopology = true,
+          )
+        val blockNumber3 = BlockNumber(BlockNumber.First + 2L)
+        val epochNumber3 = EpochNumber(EpochNumber.First + 2L)
+        val blockData3 =
+          completeBlockData(
+            blockNumber3,
+            yetAnotherTimestamp,
+            epochNumber = epochNumber3,
+          )
+        val blockDataStored3 =
+          Output.BlockDataStored(
+            blockData3,
+            blockNumber3,
+            yetAnotherTimestamp,
+            epochCouldAlterOrderingTopology = true,
+          )
+
+        val anOrderingTopology =
+          OrderingTopology.forTesting(Set(BftNodeId("node1"))) // Irrelevant for this test
+        val aCryptoProvider = failingCryptoProvider[ProgrammableUnitTestEnv]
+
+        output.epochsWithMetadataStoredCache shouldBe empty
+
+        // Receive-blocks in different epochs out of order
+        output.receive(blockDataStored3)
+        output.receive(blockDataStored2)
+
+        output.epochsWithMetadataStoredCache should contain theSameElementsAs Seq(
+          epochNumber2,
+          epochNumber3,
+        )
+
+        output.receive(blockDataStored1)
+
+        output.epochsWithMetadataStoredCache should contain theSameElementsAs Seq(
+          EpochNumber.First,
+          epochNumber2,
+          epochNumber3,
+        )
+
+        // Switch to the third epoch and reduce the cache
+        output.receive(TopologyFetched(EpochNumber.First, anOrderingTopology, aCryptoProvider))
+        output.receive(TopologyFetched(epochNumber2, anOrderingTopology, aCryptoProvider))
+        output.receive(TopologyFetched(epochNumber3, anOrderingTopology, aCryptoProvider))
+        context.runPipedMessagesUntilNoMorePiped(output)
+
+        output.epochsWithMetadataStoredCache should contain theSameElementsAs Seq(
+          epochNumber2,
+          epochNumber3,
+        )
+
+      }
+    }
+
     "not try to issue a new topology but still send a topology to consensus" when {
       "no block in the epoch has requests to all members of synchronizer" in {
         implicit val context: ProgrammableUnitTestContext[Output.Message[ProgrammableUnitTestEnv]] =
@@ -955,7 +1105,7 @@ class OutputModuleTest
             Membership.forTesting(BftNodeId("node1")),
             any[CryptoProvider[ProgrammableUnitTestEnv]],
           )
-        )(any[MetricsContext])
+        )(any[TraceContext], any[MetricsContext])
         succeed
       }
     }
@@ -1122,7 +1272,7 @@ class OutputModuleTest
             )
           )
         )
-      )(any[MetricsContext])
+      )(any[TraceContext], any[MetricsContext])
       succeed
     }
   }
@@ -1155,7 +1305,7 @@ class OutputModuleTest
     output.receive(Output.Start)
     output.receive(Output.BlockOrdered(block))
 
-    verify(availabilityRef, times(1)).asyncSendTraced(
+    verify(availabilityRef, times(1)).asyncSend(
       eqTo(Availability.LocalOutputFetch.FetchBlockData(block))
     )(any[TraceContext], any[MetricsContext])
     val completeBlockData = CompleteBlockData(block, batches = Seq.empty)
@@ -1326,6 +1476,8 @@ object OutputModuleTest {
     CantonTimestamp.assertFromInstant(Instant.parse("2024-03-08T12:00:00.000Z"))
   private val anotherTimestamp =
     CantonTimestamp.assertFromInstant(Instant.parse("2024-03-08T12:01:00.000Z"))
+  private val yetAnotherTimestamp =
+    CantonTimestamp.assertFromInstant(Instant.parse("2024-03-08T12:02:00.000Z"))
 
   private val secondEpochNumber = EpochNumber(1L)
   private val secondBlockNumber = BlockNumber(1L)

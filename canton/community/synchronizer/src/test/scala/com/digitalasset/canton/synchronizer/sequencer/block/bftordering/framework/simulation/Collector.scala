@@ -3,15 +3,15 @@
 
 package com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation
 
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.{
-  P2PEndpoint,
-  PlainTextP2PEndpoint,
-}
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.PlainTextP2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.Module.ModuleControl
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.ModuleName
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.data.BftOrderingIdentifiers.BftNodeId
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.SimulationModuleSystem.SimulationEnv
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.simulation.future.SimulationFuture
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.framework.{
+  ModuleName,
+  P2PConnectionEventListener,
+}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.blocking
@@ -62,8 +62,8 @@ class NodeCollector extends Collector[NodeCollector.Event] {
     newTickId
   }
 
-  def addNetworkEvent(node: BftNodeId, msg: Any)(implicit traceContext: TraceContext): Unit =
-    add(NodeCollector.SendNetworkEvent(node, msg, traceContext))
+  def addNetworkEvent(node: BftNodeId, msg: Any): Unit =
+    add(NodeCollector.SendNetworkEvent(node, msg))
 
   def addFuture[X, T](
       to: ModuleName,
@@ -75,9 +75,9 @@ class NodeCollector extends Collector[NodeCollector.Event] {
   def addOpenConnection(
       to: BftNodeId,
       endpoint: PlainTextP2PEndpoint,
-      continuation: (P2PEndpoint.Id, BftNodeId) => Unit,
+      p2pConnectionEventListener: P2PConnectionEventListener,
   ): Unit =
-    add(NodeCollector.OpenConnection(to, endpoint, continuation))
+    add(NodeCollector.OpenConnection(to, endpoint, p2pConnectionEventListener))
 
   override def addCancelTick(tickId: Int): Unit =
     add(NodeCollector.CancelTick(tickId))
@@ -92,8 +92,7 @@ object NodeCollector {
       to: ModuleName,
       msg: ModuleControl[SimulationEnv, ?],
   ) extends Event
-  final case class SendNetworkEvent(to: BftNodeId, msg: Any, traceContext: TraceContext)
-      extends Event
+  final case class SendNetworkEvent(to: BftNodeId, msg: Any) extends Event
   final case class AddFuture[X, T](
       to: ModuleName,
       future: SimulationFuture[X],
@@ -103,7 +102,7 @@ object NodeCollector {
   final case class OpenConnection(
       to: BftNodeId,
       endpoint: PlainTextP2PEndpoint,
-      continuation: (P2PEndpoint.Id, BftNodeId) => Unit,
+      p2pConnectionEventListener: P2PConnectionEventListener,
   ) extends Event
   final case class CancelTick(tickId: Int) extends Event
 }

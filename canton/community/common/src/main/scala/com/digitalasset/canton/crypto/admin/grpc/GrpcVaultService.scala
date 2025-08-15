@@ -204,7 +204,7 @@ class GrpcVaultService(
     for {
       scheme <-
         if (request.keySpec.isSigningKeySpecUnspecified)
-          Future.successful(crypto.privateCrypto.defaultSigningKeySpec)
+          Future.successful(crypto.privateCrypto.signingKeySpecs.default)
         else
           Future(
             SigningKeySpec
@@ -237,7 +237,7 @@ class GrpcVaultService(
     for {
       scheme <-
         if (request.keySpec.isEncryptionKeySpecUnspecified)
-          Future.successful(crypto.privateCrypto.defaultEncryptionKeySpec)
+          Future.successful(crypto.privateCrypto.encryptionKeySpecs.default)
         else
           Future(
             EncryptionKeySpec
@@ -577,7 +577,7 @@ class GrpcVaultService(
       )
 
       // Decrypt the keypair if a password is provided
-      keyPair <-
+      parsedKeyPair <-
         OptionUtil.emptyStringAsNone(request.password) match {
           case Some(password) =>
             val resultE = for {
@@ -602,7 +602,21 @@ class GrpcVaultService(
             }
         }
 
-      _ <- loadKeyPair(validatedName, keyPair)
+      derivedKeyPair <- (parsedKeyPair.privateKey: @unchecked) match {
+        case encryptionPrivateKey: EncryptionPrivateKey =>
+          EncryptionKeyPair
+            .create(encryptionPrivateKey)
+            .toFutureUS { errMsg =>
+              throw EncryptionKeyCreationError.ErrorCode.Wrap(errMsg).asGrpcError
+            }
+        case signingPrivateKey: SigningPrivateKey =>
+          SigningKeyPair
+            .create(signingPrivateKey)
+            .toFutureUS { errMsg =>
+              throw SigningKeyCreationError.ErrorCode.Wrap(errMsg).asGrpcError
+            }
+      }
+      _ <- loadKeyPair(validatedName, derivedKeyPair)
     } yield v30.ImportKeyPairResponse()
   }.failOnShutdownTo(AbortedDueToShutdown.Error().asGrpcError)
 

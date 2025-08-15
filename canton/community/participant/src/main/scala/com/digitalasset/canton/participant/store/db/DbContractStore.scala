@@ -10,10 +10,14 @@ import com.daml.nameof.NameOf.functionFullName
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.caching.ScaffeineCache
 import com.digitalasset.canton.config.CantonRequireTypes.String2066
-import com.digitalasset.canton.config.{BatchAggregatorConfig, CacheConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{
+  BatchAggregatorConfig,
+  BatchingConfig,
+  CacheConfig,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.logging.pretty.Pretty.{param, prettyOfClass}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.protocol.*
@@ -55,20 +59,13 @@ class DbContractStore(
   implicit def contractGetResult(implicit
       getResultByteArray: GetResult[Array[Byte]]
   ): GetResult[ContractInstance] = GetResult { r =>
-    ContractInstance.decode(ByteString.copyFrom(r.<<[Array[Byte]])) match {
+    ContractInstance.decodeWithCreatedAt(ByteString.copyFrom(r.<<[Array[Byte]])) match {
       case Right(contract) => contract
       case Left(e) => throw new DbDeserializationException(s"Invalid contract instance: $e")
     }
   }
 
-  implicit def contractSetParameter: SetParameter[ContractInstance] = (c, pp) =>
-    pp >> {
-      c.encode() match {
-        case Right(bytes) => bytes
-        case Left(error) =>
-          throw new DbDeserializationException(s"Failed to encode contract: $error")
-      }
-    }
+  implicit def contractSetParameter: SetParameter[ContractInstance] = (c, pp) => pp >> c.encoded
 
   private val cache: ScaffeineCache.TunnelledAsyncCache[LfContractId, Option[ContractInstance]] =
     ScaffeineCache.buildMappedAsync[LfContractId, Option[ContractInstance]](
@@ -154,8 +151,15 @@ class DbContractStore(
 
   private def lookupManyUncachedInternal(
       ids: NonEmpty[Seq[LfContractId]]
-  )(implicit traceContext: TraceContext) =
-    storage.query(lookupQuery(ids), functionFullName)
+  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Seq[Option[ContractInstance]]] =
+    MonadUtil
+      .batchedSequentialTraverseNE(
+        parallelism = BatchingConfig().parallelism,
+        // chunk the ids to query to avoid hitting prepared statement limits
+        chunkSize = DbStorage.maxSqlParameters,
+      )(
+        ids
+      )(chunk => storage.query(lookupQuery(chunk), functionFullName))
 
   override def find(
       exactId: Option[String],
@@ -326,11 +330,8 @@ class DbContractStore(
             }
         }
 
-      override def prettyItem: Pretty[ContractInstance] = prettyOfClass(
-        param("contract Id", _.contractId),
-        param("signatories", _.signatories),
-        param("create time", _.inst.createdAt),
-      )
+      override def prettyItem: Pretty[ContractInstance] =
+        ContractInstance.prettyGenContractInstance
     }
 
     BatchAggregator(processor, insertBatchAggregatorConfig)
@@ -384,7 +385,7 @@ class DbContractStore(
           MonadUtil
             .parTraverseWithLimit(BatchAggregatorConfig.defaultMaximumInFlight)(
               idsNel.forgetNE.toSeq
-            )(id => lookupContract(id).toRight(id).value)
+            )(id => lookup(id).toRight(id).value)
             .map(_.collectRight)
             .map { contracts =>
               Either.cond(

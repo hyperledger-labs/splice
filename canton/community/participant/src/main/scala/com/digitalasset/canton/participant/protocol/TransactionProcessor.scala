@@ -91,7 +91,6 @@ class TransactionProcessor(
         new TransactionConfirmationResponsesFactory(
           participantId,
           synchronizerId,
-          staticSynchronizerParameters.protocolVersion,
           loggerFactory,
         ),
         ModelConformanceChecker(
@@ -138,7 +137,7 @@ class TransactionProcessor(
       transactionMeta: TransactionMeta,
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
-      disclosedContracts: Map[LfContractId, SerializableContract],
+      disclosedContracts: Map[LfContractId, ContractInstance],
       topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext
@@ -279,7 +278,7 @@ object TransactionProcessor {
     final case class SubmissionAlreadyInFlight(
         changeId: ChangeId,
         existingSubmissionId: Option[LedgerSubmissionId],
-        existingSubmissionSynchronizerId: PhysicalSynchronizerId,
+        existingSubmissionSynchronizerId: SynchronizerId,
     ) extends TransactionErrorImpl(cause = "The submission is already in-flight")(
           ConsistencyErrors.SubmissionAlreadyInFlight.code
         )
@@ -389,7 +388,7 @@ object TransactionProcessor {
         ) {
       final case class Error(
           topologySnapshotTimestamp: CantonTimestamp,
-          chosenSynchronizerId: SynchronizerId,
+          chosenSynchronizerId: PhysicalSynchronizerId,
       ) extends TransactionErrorImpl(
             cause = "There are no active mediators on the synchronizer"
           )

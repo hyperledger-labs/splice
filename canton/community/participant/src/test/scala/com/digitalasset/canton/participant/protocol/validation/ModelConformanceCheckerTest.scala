@@ -5,7 +5,6 @@ package com.digitalasset.canton.participant.protocol.validation
 
 import cats.Eval
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.syntax.parallel.*
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.daml.scalautil.Statement.discard
@@ -20,7 +19,7 @@ import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFa
 import com.digitalasset.canton.participant.protocol.validation.ModelConformanceChecker.*
 import com.digitalasset.canton.participant.protocol.validation.ModelConformanceCheckerTest.HashReInterpretationCounter
 import com.digitalasset.canton.participant.protocol.{
-  ContractAuthenticator,
+  DummyContractAuthenticator,
   TransactionProcessingSteps,
 }
 import com.digitalasset.canton.participant.store.ContractLookupAndVerification
@@ -69,7 +68,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
   val ledgerTimeRecordTimeTolerance: Duration = Duration.ofSeconds(10)
 
   def validateContractOk(
-      @unused _contract: SerializableContract,
+      @unused _contract: GenContractInstance,
       @unused _getEngineAbortStatus: GetEngineAbortStatus,
       @unused _context: TraceContext,
   ): EitherT[FutureUnlessShutdown, ContractValidationFailure, Unit] = EitherT.pure(())
@@ -160,16 +159,6 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       loggerFactory,
     )
 
-  object dummyAuthenticator extends ContractAuthenticator {
-    override def authenticateSerializable(contract: SerializableContract): Either[String, Unit] =
-      Either.unit
-    override def authenticateFat(contract: LfFatContractInst): Either[String, Unit] = Either.unit
-    override def verifyMetadata(
-        contract: SerializableContract,
-        metadata: ContractMetadata,
-    ): Either[String, Unit] = Either.unit
-  }
-
   def reInterpret(
       mcc: ModelConformanceChecker,
       view: TransactionView,
@@ -190,7 +179,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       mcc: ModelConformanceChecker,
       views: NonEmpty[Seq[(FullTransactionViewTree, Seq[(TransactionView, LfKeyResolver)])]],
       ips: TopologySnapshot = factory.topologySnapshot,
-      reInterpretedTopLevelViews: ModelConformanceChecker.LazyAsyncReInterpretation = Map.empty,
+      reInterpretedTopLevelViews: ModelConformanceChecker.LazyAsyncReInterpretationMap = Map.empty,
   ): EitherT[Future, ErrorWithSubTransaction, Result] = {
     val rootViewTrees = views.map(_._1)
     val commonData = TransactionProcessingSteps.tryCommonData(rootViewTrees)
@@ -226,7 +215,7 @@ class ModelConformanceCheckerTest extends AsyncWordSpec with BaseTest {
       validateContractOk,
       transactionTreeFactory,
       submittingParticipant,
-      dummyAuthenticator,
+      DummyContractAuthenticator,
       packageResolver,
       loggerFactory,
     )
