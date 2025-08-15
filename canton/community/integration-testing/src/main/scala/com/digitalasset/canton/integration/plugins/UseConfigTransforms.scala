@@ -4,7 +4,6 @@
 package com.digitalasset.canton.integration.plugins
 
 import com.digitalasset.canton.config.CantonConfig
-import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.{ConfigTransform, EnvironmentSetupPlugin}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 
@@ -14,7 +13,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 class UseConfigTransforms(
     configTransforms: Seq[ConfigTransform],
     override protected val loggerFactory: NamedLoggerFactory,
-) extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment] {
+) extends EnvironmentSetupPlugin {
 
   override def beforeEnvironmentCreated(config: CantonConfig): CantonConfig =
     configTransforms.foldLeft(config)((cfg, transform) => transform(cfg))
