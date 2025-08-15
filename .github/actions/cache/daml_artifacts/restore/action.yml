@@ -23,6 +23,7 @@ runs:
         restore-keys: |
           daml-artifacts-${{ inputs.cache_version }} branch:${{ github.head_ref || github.ref_name }} dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }}
           daml-artifacts-${{ inputs.cache_version }} branch:main dependencies:${{ hashFiles('project/build.properties', 'project/BuildCommon.scala', 'project/DamlPlugin.scala', 'build.sbt', 'daml/dars.lock', 'nix/canton-sources.json') }}
+        enableCrossOsArchive: true
     - name: Extract Daml artifacts
       shell: bash
       run: |

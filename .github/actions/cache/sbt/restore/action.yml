@@ -22,3 +22,4 @@ runs:
         key: sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}-${{ hashFiles('project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
         restore-keys: |
           sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}
+        enableCrossOsArchive: true
