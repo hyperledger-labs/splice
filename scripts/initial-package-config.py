@@ -17,7 +17,7 @@ def parse_dar_lock(content):
             [
                 line.split(" ")[:2]
                 for line in content.splitlines()
-                if "-test" not in line
+                if "-test " not in line
             ],
             key=lambda x: x[0],
         )

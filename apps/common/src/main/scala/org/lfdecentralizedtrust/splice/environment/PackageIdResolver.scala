@@ -42,8 +42,8 @@ object PackageIdResolver {
         DarResources.TokenStandard.tokenAllocationRequest.bootstrap.metadata.version.toString()
       case TokenStandard.SpliceApiTokenAllocationInstructionV1 =>
         DarResources.TokenStandard.tokenAllocationInstruction.bootstrap.metadata.version.toString()
-      case TokenStandard.SpliceTokenStandardTest =>
-        DarResources.TokenStandard.tokenStandardTest.bootstrap.metadata.version.toString()
+      case TokenStandard.SpliceTokenTestTradingApp =>
+        DarResources.TokenStandard.tokenTestTradingApp.bootstrap.metadata.version.toString()
       case FeaturedApp =>
         DarResources.featuredApp.bootstrap.metadata.version.toString()
     }
@@ -70,7 +70,7 @@ object PackageIdResolver {
       final case object SpliceApiTokenAllocationV1 extends Package
       final case object SpliceApiTokenAllocationRequestV1 extends Package
       final case object SpliceApiTokenAllocationInstructionV1 extends Package
-      final case object SpliceTokenStandardTest extends Package
+      final case object SpliceTokenTestTradingApp extends Package
     }
     final case object SpliceAmulet extends Package
     final case object SpliceAmuletNameService extends Package

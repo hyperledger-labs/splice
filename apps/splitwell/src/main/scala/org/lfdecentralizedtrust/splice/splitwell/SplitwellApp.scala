@@ -3,8 +3,6 @@
 
 package org.lfdecentralizedtrust.splice.splitwell
 
-import cats.syntax.foldable.*
-import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -15,6 +13,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -142,10 +141,11 @@ class SplitwellApp(
       store.domains.waitForDomainConnection(config.domains.splitwell.preferred.alias)
     }
     others <- appInitStep(s"Wait for other domain connections") {
-      config.domains.splitwell.others
-        .map(_.alias)
-        .toList
-        .traverse(store.domains.waitForDomainConnection(_))
+      MonadUtil.sequentialTraverse(
+        config.domains.splitwell.others
+          .map(_.alias)
+          .toList
+      )(store.domains.waitForDomainConnection(_))
     }
     splitwellDomains = SplitwellDomains(preferred, others)
 
@@ -190,7 +190,9 @@ class SplitwellApp(
       domains: SplitwellDomains,
       automation: SplitwellAutomationService,
   )(implicit traceContext: TraceContext): Future[Unit] =
-    (domains.preferred +: domains.others).toList.traverse_(createSplitwellRules(_, automation))
+    MonadUtil.sequentialTraverse_((domains.preferred +: domains.others).toList)(
+      createSplitwellRules(_, automation)
+    )
 
   private def createSplitwellRules(
       domain: SynchronizerId,

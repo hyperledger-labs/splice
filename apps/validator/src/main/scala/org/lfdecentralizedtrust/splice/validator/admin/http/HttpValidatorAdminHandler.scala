@@ -769,6 +769,12 @@ class HttpValidatorAdminHandler(
             clock.now,
           )
           .map(_.supported)
+        supportsExpectedDsoParty <- packageVersionSupport
+          .supportsExpectedDsoParty(
+            Seq(receiverParty, senderParty, store.key.dsoParty),
+            clock.now,
+          )
+          .map(_.supported)
         commands = externalPartyAmuletRules.toAssignedContract
           .getOrElse(
             throw Status.Code.FAILED_PRECONDITION.toStatus
@@ -786,6 +792,7 @@ class HttpValidatorAdminHandler(
               body.expiresAt.toInstant,
               body.nonce,
               Option.when(supportsDescription)(body.description).flatten.toJava,
+              Option.when(supportsExpectedDsoParty)(store.key.dsoParty.toProtoPrimitive).toJava,
             )
           )
           .update

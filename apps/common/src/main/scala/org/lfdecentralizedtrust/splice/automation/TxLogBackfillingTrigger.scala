@@ -4,6 +4,7 @@
 package org.lfdecentralizedtrust.splice.automation
 
 import com.daml.metrics.api.MetricsContext
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, LifeCycle}
 import org.lfdecentralizedtrust.splice.store.{
   HistoryBackfilling,
   HistoryMetrics,
@@ -135,6 +136,10 @@ class TxLogBackfillingTrigger[TXE](
     }
   } yield outcome
 
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    LifeCycle.close(historyMetrics)(logger)
+    super.closeAsync()
+  }
 }
 
 object TxLogBackfillingTrigger {

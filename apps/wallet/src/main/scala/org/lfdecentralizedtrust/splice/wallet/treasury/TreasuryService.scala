@@ -12,6 +12,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.transferi
   InputAmulet,
   InputAppRewardCoupon,
   InputSvRewardCoupon,
+  InputUnclaimedActivityRecord,
   InputValidatorLivenessActivityRecord,
   InputValidatorRewardCoupon,
 }
@@ -746,12 +747,17 @@ class TreasuryService(
         maxNumInputs,
         issuingRoundsMap,
       )
+      (unclaimedActivityRecordsQuantity, unclaimedActivityRecordInputs) <-
+        getUnclaimedActivityRecordsAndQuantity(
+          maxNumInputs
+        )
     } yield {
       val createFeeCc = SpliceUtil.dollarsToCC(configUsd.createFee.fee, amuletPrice)
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
           appRewardsTotalAmuletQuantity + validatorRewardsAmuletQuantity + validatorFaucetsAmuletQuantity +
-            validatorLivenessActivityRecordsAmuletQuantity + svRewardsTotalAmuletQuantity,
+            validatorLivenessActivityRecordsAmuletQuantity + svRewardsTotalAmuletQuantity +
+            unclaimedActivityRecordsQuantity,
           amuletInputsAndQuantity,
           createFeeCc,
         )
@@ -766,6 +772,7 @@ class TreasuryService(
           validatorFaucetInputs,
           validatorActivityRecordsInputs,
           svRewardInputs,
+          unclaimedActivityRecordInputs,
           numTapOperations,
         )
         val rewardInputRounds =
@@ -829,6 +836,7 @@ class TreasuryService(
         (Round, BigDecimal, InputValidatorLivenessActivityRecord)
       ],
       svRewardCouponInputs: Seq[(Round, BigDecimal, InputSvRewardCoupon)],
+      unclaimedActivityRecordInputs: Seq[(BigDecimal, InputUnclaimedActivityRecord)],
       numTapOperations: Int,
   ): Seq[TransferInput] = {
     val sortedRewardInputs =
@@ -855,7 +863,7 @@ class TreasuryService(
     val inputs =
       (amuletInputs.take(numAmuletsToPrioritize) ++ sortedRewardInputs ++ amuletInputs.drop(
         numAmuletsToPrioritize
-      ))
+      ) ++ unclaimedActivityRecordInputs.map(_._2))
         .take(maxNumInputs - numTapOperations)
     inputs
   }
@@ -994,6 +1002,29 @@ class TreasuryService(
         )
       )
     } yield (appRewardsAmuletQuantity, appRewardInputs)
+
+  private def getUnclaimedActivityRecordsAndQuantity(
+      maxNumInputs: Int
+  )(implicit
+      tc: TraceContext
+  ): Future[(BigDecimal, Seq[(BigDecimal, InputUnclaimedActivityRecord)])] =
+    for {
+      unclaimedActivityRecordsInputs <- userStore.listUnclaimedActivityRecords(
+        PageLimit.tryCreate(maxNumInputs)
+      )
+      unclaimedActivityRecordsQuantity = unclaimedActivityRecordsInputs
+        .map(uar => scala.math.BigDecimal(uar.payload.amount))
+        .sum
+      unclaimedActivityRecordInputs = unclaimedActivityRecordsInputs.map(uar =>
+        (
+          new scala.math.BigDecimal(uar.payload.amount),
+          new splice.amuletrules.transferinput.InputUnclaimedActivityRecord(
+            uar.contractId
+          ),
+        )
+      )
+    } yield (unclaimedActivityRecordsQuantity, unclaimedActivityRecordInputs)
+
 }
 
 object TreasuryService {

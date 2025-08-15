@@ -171,7 +171,7 @@ class ScanApp(
         },
         migrationInfo,
         participantId,
-        config.cache.svNodeStateTtl,
+        config.cache,
         config.updateHistoryBackfillImportUpdatesEnabled,
         nodeMetrics.dbScanStore,
       )
@@ -287,29 +287,39 @@ class ScanApp(
       ) {
         withTraceContext { traceContext =>
           {
+            def buildRouteForOperation(operation: String, httpService: String) = {
+              nodeMetrics.httpServerMetrics
+                .withMetrics(httpService)(operation)
+                .tflatMap(_ =>
+                  HttpErrorHandler(loggerFactory)(traceContext).tflatMap { _ =>
+                    provide(traceContext)
+                  }
+                )
+            }
 
             requestLogger(traceContext) {
-              HttpErrorHandler(loggerFactory)(traceContext) {
-                concat(
-                  ScanResource.routes(scanHandler, _ => provide(traceContext)),
-                  TokenStandardTransferInstructionResource.routes(
-                    tokenStandardTransferInstructionHandler,
-                    _ => provide(traceContext),
-                  ),
-                  TokenStandardAllocationInstructionResource.routes(
-                    tokenStandardAllocationInstructionHandler,
-                    _ => provide(traceContext),
-                  ),
-                  TokenStandardMetadataResource.routes(
-                    tokenStandardMetadataHandler,
-                    _ => provide(traceContext),
-                  ),
-                  TokenStandardAllocationResource.routes(
-                    tokenStandardAllocationHandler,
-                    _ => provide(traceContext),
-                  ),
-                )
-              }
+              concat(
+                ScanResource.routes(
+                  scanHandler,
+                  buildRouteForOperation(_, "scan"),
+                ),
+                TokenStandardTransferInstructionResource.routes(
+                  tokenStandardTransferInstructionHandler,
+                  buildRouteForOperation(_, "token_standard_transfer_instruction"),
+                ),
+                TokenStandardAllocationInstructionResource.routes(
+                  tokenStandardAllocationInstructionHandler,
+                  buildRouteForOperation(_, "token_standard_allocation_instruction"),
+                ),
+                TokenStandardMetadataResource.routes(
+                  tokenStandardMetadataHandler,
+                  buildRouteForOperation(_, "token_standard_metadata"),
+                ),
+                TokenStandardAllocationResource.routes(
+                  tokenStandardAllocationHandler,
+                  buildRouteForOperation(_, "token_standard_allocation"),
+                ),
+              )
             }
           }
         }

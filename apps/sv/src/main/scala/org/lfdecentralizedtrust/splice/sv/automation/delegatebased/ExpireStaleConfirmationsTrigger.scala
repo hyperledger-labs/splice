@@ -44,7 +44,10 @@ class ExpireStaleConfirmationsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        context.clock.now,
+      )
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_ExpireStaleConfirmation(
           task.work.contractId,
@@ -54,6 +57,7 @@ class ExpireStaleConfirmationsTrigger(
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(
       s"successfully expired the confirmation with cid ${task.work.contractId}"

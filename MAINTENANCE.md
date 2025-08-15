@@ -2,7 +2,14 @@
 
 ## Bumping CometBFT
 
-Update the version in the `nix/cometbft-driver-sources.json` file
+1. Update the version in the `nix/cometbft-driver-sources.json` file
+2. Download the corresponding `canton-drivers-proto-<version>.jar` file from
+   JFrog, at `https://digitalasset.jfrog.io/ui/native/canton-drivers/com/digitalasset/canton/drivers/canton-drivers-proto/<version>/canton-drivers-proto-<version>.jar`,
+   and save it under `nix/vendored`.
+3. Update the symlink from `nix/vendored/canton-drivers-proto.jar` to point to the newly downloaded jar.
+4. Delete the older `canton-drivers-proto-<old-version>.jar` file from `nix/vendored`.
+
+// TODO(#1296): once we pull the file from s3 in nix instead of vendoring it in this repo, update the section above (should be just step 1).
 
 ## Bumping Canton
 
@@ -47,14 +54,14 @@ Current Canton commit: `54792e6f5e1808db54b800fcfd17f5df3e64ea6f`
    2. Create a Canton patch file capturing all our changes relative to that `./scripts/diff-canton.sh $PATH_TO_CANTON_OSS/ > canton.patch`
    3. Undo our changes: `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton -R canton.patch`
       The exclusion is because those files are under a symlink and we don’t want to change them twice.
-   4. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes" --no-verify`
+   4. Create a commit to ease review, `git add canton/ && git commit -s -m"Undo our changes" --no-verify`
 3. Checkout the commit of the Canton OSS repo to which you have decided to upgrade in Step 1.1
    1. Learn the Daml SDK version used by Canton from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`.
 5. Execute the following steps in your Splice repo:
    1. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
-   2. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit" --no-verify`
+   2. Create a commit to ease review, `git add canton/ && git commit -s -m"Bump Canton commit" --no-verify`
    3. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`.
-   4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -m"Reapply our changes" --no-verify`
+   4. Create a commit to ease review `git add canton/ && git reset '*.rej' && git commit -s -m"Reapply our changes" --no-verify`
    5. Bump the SDK/Canton versions in the following places:
       1. The current Canton commit in this `README.md`
       2. If we're also updating the sdk version (this can lead to dar changes so we might skip it)
@@ -64,7 +71,7 @@ Current Canton commit: `54792e6f5e1808db54b800fcfd17f5df3e64ea6f`
         4. Change the hashes for both the linux and macos releases in `daml2js.nix`. To do so change a character of the `sha256` digest (e.g. "ef..." -> "0f...") in `daml2js.nix`,
            and then call `direnv reload` to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
            Note that nix may print the hash in base64, when you specified it in base16, or vice versa. Just copying the 'got' hash should work in either case.
-   6. Create another commit, `git add -A && git reset '*.rej' && git commit -m"Bump Canton commit and Canton/SDK versions" --no-verify`
+   6. Create another commit, `git add -A && git reset '*.rej' && git commit -s -m"Bump Canton commit and Canton/SDK versions" --no-verify`
 6. Check if the `protocolVersions` in our `BuildInfoKeys` in `BuildCommon.scala` needs to be bumped.
    - One way to do this is to run `start-canton.sh -w` with an updated Canton binary, and check `ProtocolVersion.latest` in the console.
 7. Test whether things compile using `sbt Test/compile`.

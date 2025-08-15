@@ -114,6 +114,7 @@ testRewardComputation = do
       outputs = [ ]
       beneficiaries = None -- test code, don't set beneficiaries
     context = context.context
+    expectedDso = Some app.dso
 
 
   -- But bob can redeem the coupon himself
@@ -127,6 +128,7 @@ testRewardComputation = do
         outputs = [ ]
         beneficiaries = None -- test code, don't set beneficiaries
       context = context.context
+      expectedDso = Some app.dso
   transferResult.summary.senderChangeAmount ===
     ( intToDecimal bob2Weight * issuingMiningRound0.issuancePerSvRewardCoupon - createFee)
 
@@ -153,6 +155,7 @@ testRewardComputation = do
                   ]
         beneficiaries = None -- test code, don't set beneficiaries
       context = context.context
+      expectedDso = Some app.dso
 
   let expectedValidatorFaucetAmount = getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound0
   let aliceSvWeight = intToDecimal $ alice1Weight + alice2Weight
@@ -198,6 +201,7 @@ testRewardComputation = do
         outputs = []
         beneficiaries = None -- test code, don't set beneficiaries
       context = context.context
+      expectedDso = Some app.dso
 
   -- collected both featured and unfeatured
   transferResult.summary.inputAppRewardAmount ===

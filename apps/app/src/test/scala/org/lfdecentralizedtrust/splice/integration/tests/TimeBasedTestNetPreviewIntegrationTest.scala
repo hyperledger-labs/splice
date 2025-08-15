@@ -36,9 +36,12 @@ class TimeBasedTestNetPreviewIntegrationTest
         }
       },
     )(
-      "Wait for SV rewards to be collected",
+      "Wait for SV rewards for rounds 0&1 to be collected",
       _ => {
         sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
+        forAll(Seq(0, 1)) { round =>
+          ensureNoSvRewardCouponExistsForRound(round.toLong, sv1WalletClient)
+        }
       },
     )
 

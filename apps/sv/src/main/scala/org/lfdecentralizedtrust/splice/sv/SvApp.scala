@@ -7,7 +7,6 @@ import cats.data.OptionT
 import cats.implicits.catsSyntaxTuple7Semigroupal
 import cats.instances.future.*
 import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import org.lfdecentralizedtrust.splice.admin.api.TraceContextDirectives.withTraceContext
@@ -83,6 +82,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.util.MonadUtil
 import io.circe.Json
 import io.circe.syntax.*
 import io.grpc.Status
@@ -666,12 +666,13 @@ class SvApp(
       "Onboarding contracts have been created", {
         val expectedValidatorOnboardingSecrets = config.expectedValidatorOnboardings.map(_.secret)
         for {
-          createdValidatorOnboardingSecrets <- expectedValidatorOnboardingSecrets.traverse {
-            secret =>
-              OptionT(store.lookupValidatorOnboardingBySecret(secret))
-                .map(_ => ())
-                .orElse(OptionT(store.lookupUsedSecret(secret)).map(_ => ()))
-                .value
+          createdValidatorOnboardingSecrets <- MonadUtil.sequentialTraverse(
+            expectedValidatorOnboardingSecrets
+          ) { secret =>
+            OptionT(store.lookupValidatorOnboardingBySecret(secret))
+              .map(_ => ())
+              .orElse(OptionT(store.lookupUsedSecret(secret)).map(_ => ()))
+              .value
           }
           missingOnboardingSecrets = createdValidatorOnboardingSecrets.zipWithIndex.filter(
             _._1.isEmpty

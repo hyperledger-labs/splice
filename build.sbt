@@ -115,6 +115,7 @@ lazy val root: Project = (project in file("."))
     `splice-api-token-allocation-instruction-v1-daml`,
     `splice-api-token-burn-mint-v1-daml`,
     `splice-token-standard-test-daml`,
+    `splice-token-test-trading-app-daml`,
     `splice-token-test-dummy-holding-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
@@ -221,6 +222,7 @@ lazy val docs = project
           (`splice-validator-lifecycle-daml` / Compile / damlBuild).value ++
           (`splice-wallet-daml` / Compile / damlBuild).value ++
           (`splice-token-standard-test-daml` / Compile / damlBuild).value ++
+          (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
           (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
@@ -388,13 +390,27 @@ lazy val `splice-api-token-allocation-instruction-v1-daml` =
 
 lazy val `splice-api-token-burn-mint-v1-daml` =
   project
-    .in(file("token-standard/splice-api-token-burn-mint-v1"))
+    .in(file("daml/splice-api-token-burn-mint-v1"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-token-test-trading-app-daml` =
+  project
+    .in(file("token-standard/examples/splice-token-test-trading-app"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -411,6 +427,7 @@ lazy val `splice-token-standard-test-daml` =
           (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value ++
           (`splice-api-token-allocation-instruction-v1-daml` / Compile / damlBuild).value ++
+          (`splice-token-test-trading-app-daml` / Compile / damlBuild).value ++
           (`splice-util-daml` / Compile / damlBuild).value ++
           (`splice-amulet-daml` / Compile / damlBuild).value,
     )
@@ -424,7 +441,9 @@ lazy val `splice-token-test-dummy-holding-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-api-token-metadata-v1-daml` / Compile / damlBuild).value ++
-          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value,
+          (`splice-api-token-holding-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-v1-daml` / Compile / damlBuild).value ++
+          (`splice-api-token-allocation-request-v1-daml` / Compile / damlBuild).value,
       Compile / damlEnableJavaCodegen := true,
     )
     .dependsOn(`canton-bindings-java`)
@@ -740,7 +759,7 @@ lazy val `apps-common` =
       `splice-api-token-allocation-request-v1-daml`,
       `splice-api-token-allocation-instruction-v1-daml`,
       `splice-token-test-dummy-holding-daml`,
-      `splice-token-standard-test-daml`,
+      `splice-token-test-trading-app-daml`,
       `splice-featured-app-api-v1-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
@@ -874,8 +893,9 @@ lazy val `apps-sv` =
       libraryDependencies ++= Seq(
         pekko_http_cors,
         scalapb_runtime,
-        comet_bft_proto,
       ),
+      Compile / unmanagedJars := Attributed
+        .blankSeq(Seq(file(s"${sys.env("COMETBFT_PROTO")}/canton-drivers-proto.jar"))),
       BuildCommon.sharedAppSettings,
       templateDirectory := (`openapi-typescript-template` / patchTemplate).value,
       BuildCommon.TS.openApiSettings(
@@ -1912,11 +1932,6 @@ printTests := {
       "disaster recovery tests",
       "test-full-class-names-disaster-recovery.log",
       (t: String) => !isTimeBasedTest(t) && isDisasterRecoveryTest(t),
-    ),
-    (
-      "canton bft tests",
-      "test-full-class-names-canton-bft.log",
-      (t: String) => t.contains("BftManualStartIntegrationTest"),
     ),
     (
       "app upgrade tests",

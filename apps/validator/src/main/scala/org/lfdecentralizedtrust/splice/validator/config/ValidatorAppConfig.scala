@@ -195,6 +195,7 @@ case class ValidatorAppBackendConfig(
     deduplicationDuration: PositiveDurationSeconds = PositiveDurationSeconds.ofHours(24),
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
+    disableSvValidatorBftSequencerConnection: Boolean = false,
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

@@ -23,8 +23,14 @@ object JavaDecodeUtil {
   def decodeCreated[Id, View](
       companion: InterfaceCompanion[?, Id, View]
   )(event: JavaCreatedEvent): Option[Contract[Id, View]] =
-    if (event.getInterfaceViews.containsKey(companion.getTemplateIdWithPackageId)) {
-      Some(companion.fromCreatedEvent(event))
+    if (
+      event.getInterfaceViews
+        .keySet()
+        .asScala
+        .contains(companion.getTemplateIdWithPackageId)
+    ) {
+      val result = Some(companion.fromCreatedEvent(event))
+      result
     } else None
 
   def decodeAllCreated[TC](

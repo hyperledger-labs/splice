@@ -58,7 +58,79 @@ case class ScanAppBackendConfig(
 }
 
 final case class ScanCacheConfig(
-    svNodeStateTtl: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30)
+    svNodeState: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 100,
+    ),
+    totalAmuletBalance: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(2),
+      maxSize = 1000,
+    ),
+    amuletRules: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 1,
+    ),
+    ansRules: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 1,
+    ),
+    totalRewardsCollected: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(2),
+      maxSize = 1,
+    ),
+    rewardsCollectedInRound: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 1000,
+    ),
+    walletBalance: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 2000,
+    ),
+    amuletConfigForRound: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 1000,
+    ),
+    roundOfLatestData: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 1,
+    ),
+    topProvidersByAppRewards: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(2),
+      maxSize = 2000,
+    ),
+    topValidators: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(2),
+      maxSize = 2000,
+    ),
+    validatorLicenseByValidator: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 1000,
+    ),
+    totalPurchasedMemberTraffic: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 2000,
+    ),
+    cachedByParty: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 2000,
+    ),
+    aggregatedRounds: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofSeconds(30),
+      maxSize = 1,
+    ),
+    roundTotals: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 1000,
+    ),
+    voteRequests: CacheConfig = CacheConfig(
+      ttl = NonNegativeFiniteDuration.ofMinutes(1),
+      maxSize = 1000,
+    ),
+)
+
+final case class CacheConfig(
+    ttl: NonNegativeFiniteDuration,
+    maxSize: Long,
 )
 
 case class ScanAppClientConfig(

@@ -43,6 +43,7 @@ jobs:
         with:
           parallelism: ${{ inputs.parallelism }}
           test_names_file: ${{ inputs.test_names_file }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
 
 
   scala_test:

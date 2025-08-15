@@ -59,7 +59,10 @@ class ExpireElectionRequestsTrigger(
       controller: String,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- store.getDsoRules()
-    controllerArgument <- getSvControllerArgument(controller)
+    (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+      controller,
+      context.clock.now,
+    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_ArchiveOutdatedElectionRequest(
         task.contractId,
@@ -73,6 +76,7 @@ class ExpireElectionRequestsTrigger(
         cmd,
       )
       .noDedup
+      .withPreferredPackage(preferredPackageIds)
       .yieldResult()
   } yield TaskSuccess(
     s"successfully expired the election request with cid ${task.contractId}"

@@ -24,6 +24,7 @@ const PartyId: React.FC<PartyIdProps> = ({ className, id, partyId, noCopy }) => 
       disabled
       readOnly
       value={partyId}
+      inputProps={{ 'data-testid': `${id}-input` }}
       endAdornment={
         !noCopy && (
           <IconButton onClick={() => navigator.clipboard.writeText(partyId)}>

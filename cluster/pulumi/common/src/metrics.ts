@@ -4,12 +4,22 @@ import * as pulumi from '@pulumi/pulumi';
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import { Input, Inputs } from '@pulumi/pulumi';
 
+import { ObservabilityReleaseName } from './utils';
+
 export class PodMonitor extends CustomResource {
   constructor(
     name: string,
-    matchLabels: Inputs,
-    podMetricsEndpoints: Array<{ port: string; path: string }>,
     namespace: Input<string>,
+    spec: {
+      matchLabels: Inputs;
+      podMetricsEndpoints: Array<{
+        port: string;
+        path: string;
+        relabelings?: Array<unknown>;
+        metricRelabelings?: Array<unknown>;
+      }>;
+      namespaces?: Array<Input<string>>;
+    },
     opts?: pulumi.CustomResourceOptions
   ) {
     super(
@@ -20,15 +30,29 @@ export class PodMonitor extends CustomResource {
         metadata: {
           name: name,
           namespace: namespace,
+          labels: {
+            monitoring: 'istio-proxies',
+            release: ObservabilityReleaseName,
+          },
         },
         spec: {
+          jobLabel: 'app',
           selector: {
-            matchLabels: matchLabels,
+            matchLabels: spec.matchLabels,
           },
-          namespaceSelector: {
-            any: true,
-          },
-          podMetricsEndpoints: podMetricsEndpoints,
+          namespaceSelector: spec.namespaces
+            ? {
+                matchNames: spec.namespaces,
+              }
+            : {
+                any: true,
+              },
+          podMetricsEndpoints: spec.podMetricsEndpoints.map(endpoint => {
+            return {
+              honorLabels: true,
+              ...endpoint,
+            };
+          }),
         },
       },
       opts
@@ -52,6 +76,9 @@ export class ServiceMonitor extends CustomResource {
         metadata: {
           name: name,
           namespace: namespace,
+          labels: {
+            release: ObservabilityReleaseName,
+          },
         },
         spec: {
           selector: {
@@ -63,6 +90,7 @@ export class ServiceMonitor extends CustomResource {
           endpoints: [
             {
               port: port,
+              honorLabels: true,
             },
           ],
         },

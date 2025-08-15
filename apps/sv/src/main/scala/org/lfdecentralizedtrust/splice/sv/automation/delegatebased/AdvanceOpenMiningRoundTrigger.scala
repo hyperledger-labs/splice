@@ -15,6 +15,7 @@ import org.lfdecentralizedtrust.splice.store.MiningRoundsStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -42,7 +43,7 @@ class AdvanceOpenMiningRoundTrigger(
       if (rounds.readyToAdvanceAt.isBefore(now.toInstant))
       // NOTE: we store the amulet-rules reference in the task, as otherwise its tickDuration and the one that is
       // actually used in the choice might go out of sync
-    } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)
+    } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds, now)).value.map(_.toList)
 
   /** How to process a task. */
   override protected def completeTaskAsDsoDelegate(
@@ -55,7 +56,10 @@ class AdvanceOpenMiningRoundTrigger(
       _ = logger.debug(
         s"Starting work as delegate ${dsoRules.payload.dsoDelegate} for ${task.work}"
       )
-      controllerArgument <- getSvControllerArgument(controller)
+      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+        controller,
+        task.work.time,
+      )
       amuletPriceVotes <- store.listSvAmuletPriceVotes()
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_AdvanceOpenMiningRounds(
@@ -77,6 +81,7 @@ class AdvanceOpenMiningRoundTrigger(
         // as the target domain here.
         .withSynchronizerId(task.work.openRounds.domain)
         .noDedup
+        .withPreferredPackage(preferredPackageIds)
         .yieldUnit()
     } yield TaskSuccess(
       s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
@@ -87,7 +92,6 @@ class AdvanceOpenMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
   )(implicit tc: TraceContext): Future[Boolean] = {
     import cats.instances.future.*
-    import cats.syntax.traverse.*
 
     val synchronizerId = task.work.openRounds.domain
     (for {
@@ -101,7 +105,7 @@ class AdvanceOpenMiningRoundTrigger(
             task.work.amuletRulesId,
           )
       )
-      _ <- task.work.openRounds.toSeq.traverse(co =>
+      _ <- MonadUtil.sequentialTraverse(task.work.openRounds.toSeq)(co =>
         OptionT(
           store.multiDomainAcsStore
             .lookupContractByIdOnDomain(splice.round.OpenMiningRound.COMPANION)(
@@ -118,6 +122,7 @@ object AdvanceOpenMiningRoundTrigger {
   case class Task(
       amuletRulesId: splice.amuletrules.AmuletRules.ContractId,
       openRounds: MiningRoundsStore.OpenMiningRoundTriple,
+      time: CantonTimestamp,
   ) extends PrettyPrinting {
 
     import org.lfdecentralizedtrust.splice.util.PrettyInstances.*

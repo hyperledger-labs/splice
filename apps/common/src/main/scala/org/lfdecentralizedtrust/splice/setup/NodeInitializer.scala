@@ -3,7 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.setup
 
-import cats.implicits.{showInterpolator, toFoldableOps}
+import cats.implicits.{showInterpolator}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForId}
 import com.digitalasset.canton.crypto.{SigningKeyUsage, SigningPublicKey}
@@ -12,6 +12,7 @@ import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId.Authorized
 import com.digitalasset.canton.topology.transaction.OwnerToKeyMapping
 import com.digitalasset.canton.topology.{Member, Namespace, NodeIdentity, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import org.lfdecentralizedtrust.splice.environment.{
@@ -281,7 +282,7 @@ class NodeInitializer(
       s"Uploading node keys ${dump.keys.map(_.name)} from dump for id ${dump.id}, new node id: $expectedId"
     )
     // this is idempotent
-    dump.keys.traverse_ {
+    MonadUtil.sequentialTraverse_(dump.keys) {
       case NodeIdentitiesDump.NodeKey.KeyPair(keyPair, name) =>
         connection.importKeyPair(keyPair.toArray, name)
       case NodeIdentitiesDump.NodeKey.KmsKeyId(keyType, keyId, Some(name)) =>

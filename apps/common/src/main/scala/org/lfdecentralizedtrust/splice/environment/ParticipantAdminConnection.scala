@@ -239,6 +239,7 @@ class ParticipantAdminConnection(
 
   def ensureDomainRegisteredAndConnected(
       config: SynchronizerConnectionConfig,
+      overwriteExistingConnection: Boolean,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
     _ <- retryProvider
@@ -247,6 +248,7 @@ class ParticipantAdminConnection(
         "domain_registered",
         s"participant registered ${config.synchronizerAlias} with config $config",
         lookupSynchronizerConnectionConfig(config.synchronizerAlias).map {
+          case Some(_) if !overwriteExistingConnection => Right(())
           // We don't set the sequencer id when connecting but Canton returns it so we ignore it in the comparison here.
           case Some(existingConfig)
               if ParticipantAdminConnection.dropSequencerId(
@@ -419,7 +421,8 @@ class ParticipantAdminConnection(
           logger.info(s"Domain ${config.synchronizerAlias} is new, registering")
           ensureDomainRegisteredAndConnected(
             config,
-            retryFor,
+            overwriteExistingConnection = true,
+            retryFor = retryFor,
           ).map(_ => false)
       }
     } yield needsReconnect

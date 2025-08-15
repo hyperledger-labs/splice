@@ -37,7 +37,10 @@ class ExpiredLockedAmuletTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
     dsoRules <- store.getDsoRules()
-    controllerArgument <- getSvControllerArgument(controller)
+    (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
+      controller,
+      context.clock.now,
+    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
         co.work.contractId,
@@ -54,6 +57,7 @@ class ExpiredLockedAmuletTrigger(
         update = cmd,
       )
       .noDedup
+      .withPreferredPackage(preferredPackageIds)
       .yieldUnit()
   } yield TaskSuccess(s"archived expired locked amulet")
 }

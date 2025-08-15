@@ -5,6 +5,7 @@ package org.lfdecentralizedtrust.splice.wallet.admin.http
 
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet as amuletCodegen
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation as amuletAllocationCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
@@ -64,6 +65,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.metadatav1.
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   allocationinstructionv1,
   allocationv1,
+  allocationrequestv1,
   holdingv1,
   metadatav1,
   transferinstructionv1,
@@ -764,28 +766,37 @@ class HttpWalletHandler(
       dedupOffset: Long,
   )(implicit tc: TraceContext) = {
     val store = wallet.store
-    wallet.connection
-      .submit(
-        Seq(store.key.validatorParty, store.key.endUserParty),
-        Seq.empty,
-        new TransferPreapprovalProposal(
-          store.key.endUserParty.toProtoPrimitive,
-          store.key.validatorParty.toProtoPrimitive,
-        ).create,
-      )
-      .withDedup(
-        SpliceLedgerConnection.CommandId(
-          "org.lfdecentralizedtrust.splice.wallet.createTransferPreapprovalProposal",
-          Seq(
-            store.key.endUserParty,
-            store.key.validatorParty,
+    for {
+      supportsExpectedDsoParty <- packageVersionSupport
+        .supportsExpectedDsoParty(
+          Seq(store.key.validatorParty, store.key.endUserParty, store.key.dsoParty),
+          walletManager.clock.now,
+        )
+        .map(_.supported)
+      _ <- wallet.connection
+        .submit(
+          Seq(store.key.validatorParty, store.key.endUserParty),
+          Seq.empty,
+          new TransferPreapprovalProposal(
+            store.key.endUserParty.toProtoPrimitive,
+            store.key.validatorParty.toProtoPrimitive,
+            Option.when(supportsExpectedDsoParty)(store.key.dsoParty.toProtoPrimitive).toJava,
+          ).create,
+        )
+        .withDedup(
+          SpliceLedgerConnection.CommandId(
+            "org.lfdecentralizedtrust.splice.wallet.createTransferPreapprovalProposal",
+            Seq(
+              store.key.endUserParty,
+              store.key.validatorParty,
+            ),
           ),
-        ),
-        deduplicationOffset = dedupOffset,
-      )
-      .withSynchronizerId(domain)
-      .yieldResult()
-      .map(_.contractId)
+          deduplicationOffset = dedupOffset,
+        )
+        .withSynchronizerId(domain)
+        .yieldResult()
+        .map(_.contractId)
+    } yield ()
   }
 
   def transferPreapprovalSend(respond: r0.TransferPreapprovalSendResponse.type)(
@@ -1035,7 +1046,7 @@ class HttpWalletHandler(
               body.settlement.settlementRef.id,
               body.settlement.settlementRef.cid.map(cid => new AnyContract.ContractId(cid)).toJava,
             ),
-            now,
+            Codec.tryDecode(Codec.Timestamp)(body.settlement.requestedAt).toInstant,
             Codec.tryDecode(Codec.Timestamp)(body.settlement.allocateBefore).toInstant,
             Codec.tryDecode(Codec.Timestamp)(body.settlement.settleBefore).toInstant,
             new metadatav1.Metadata(body.settlement.meta.getOrElse(Map.empty).asJava),
@@ -1082,6 +1093,17 @@ class HttpWalletHandler(
       },
       result.senderChangeCids.asScala.map(_.contractId).toVector,
       result.meta.values.asScala.toMap,
+    )
+  }
+
+  override def listAmuletAllocations(
+      respond: WalletResource.ListAmuletAllocationsResponse.type
+  )()(tUser: TracedUser): Future[WalletResource.ListAmuletAllocationsResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    listContracts(
+      amuletAllocationCodegen.AmuletAllocation.COMPANION,
+      user,
+      contracts => d0.ListAllocationsResponse(contracts.map(d0.Allocation(_))),
     )
   }
 
@@ -1193,6 +1215,25 @@ class HttpWalletHandler(
           tokenStandard = tokenStandard.supported,
           transferPreapprovalDescription = preapprovalDescription.supported,
         )
+      )
+    }
+  }
+
+  override def listAllocationRequests(
+      respond: WalletResource.ListAllocationRequestsResponse.type
+  )()(tuser: TracedUser): Future[WalletResource.ListAllocationRequestsResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    withSpan(s"$workflowId.listInterfaces") { _ => _ =>
+      for {
+        userStore <- getUserStore(user)
+        contracts <- userStore.multiDomainAcsStore.listInterfaceViews(
+          allocationrequestv1.AllocationRequest.INTERFACE
+        )
+      } yield d0.ListAllocationRequestsResponse(
+        contracts
+          .map(_.toHttp)
+          .toVector
+          .map(d0.AllocationRequest(_))
       )
     }
   }
