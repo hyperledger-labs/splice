@@ -22,7 +22,7 @@ import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/
 
 type ConfigFormData = Record<string, ConfigFieldState>;
 
-export interface CommonFormData {
+interface CommonFormData {
   action: string;
   expiryDate: string;
   effectiveDate: string;
@@ -30,7 +30,7 @@ export interface CommonFormData {
   summary: string;
 }
 
-export type CompleteFormData = {
+type SetDsoConfigCompleteFormData = {
   common: CommonFormData;
   config: ConfigFormData;
 };
@@ -53,7 +53,10 @@ export function configFormDataToConfigChanges(
 const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_SetConfig');
 
 export interface SetDsoConfigRulesFormProps {
-  onSubmit: (data: CompleteFormData, action: ActionRequiringConfirmation) => Promise<void>;
+  onSubmit: (
+    data: SetDsoConfigCompleteFormData,
+    action: ActionRequiringConfirmation
+  ) => Promise<void>;
 }
 
 export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => {
@@ -62,7 +65,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
 
-  const defaultValues = useMemo((): CompleteFormData => {
+  const defaultValues = useMemo((): SetDsoConfigCompleteFormData => {
     if (!dsoInfoQuery.data) {
       return {
         common: {
