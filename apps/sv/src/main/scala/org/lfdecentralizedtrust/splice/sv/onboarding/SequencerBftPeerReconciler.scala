@@ -4,10 +4,11 @@
 package org.lfdecentralizedtrust.splice.sv.onboarding
 
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.SequencerAdminConnection
+import org.lfdecentralizedtrust.splice.scan.admin.api.client.commands.HttpScanAppClient.BftSequencer
 import org.lfdecentralizedtrust.splice.store.DsoRulesStore
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.DsoRulesTopologyStateReconciler
 import org.lfdecentralizedtrust.splice.sv.automation.singlesv.scan.AggregatingScanConnection
@@ -56,25 +57,31 @@ abstract class SequencerBftPeerReconciler(
       }
       currentPeers <- sequencerAdminConnection.listCurrentPeerEndpoints()
 
-      peersToAdd = dsoSequencersWithScanInfo
+      peersToAdd: Seq[(SequencerId, BftSequencer)] = dsoSequencersWithScanInfo
         .collect { case (id, Some(config)) =>
           id -> config
         }
         .filterNot { case (dsoSequencerId, peer) =>
           currentPeers.exists { case (peerSequencerId, endpointId) =>
-            peerSequencerId.forall(_ == dsoSequencerId) && peer.peerId.id == endpointId
+            // TODO(#1929) Reconsider whether this works properly.
+            peerSequencerId.forall(_ == dsoSequencerId)
           }
         }
       peersToRemove = currentPeers
         .filterNot {
           case (Some(peerSequencerId), endpointId) =>
             dsoSequencersWithScanInfo.exists { case (sequencerId, config) =>
-              sequencerId == peerSequencerId && config.forall(_.peerId.id == endpointId)
+              // TODO(#1929) Reconsider whether this works properly.
+              sequencerId == peerSequencerId
             }
-          case (None, endpointId) =>
+          case (None, Some(endpointId)) =>
             dsoSequencersWithScanInfo.exists { case (_, config) =>
               config.exists(_.peerId.id == endpointId)
             }
+          case (None, None) => true
+        }.collect {
+          // TODO(#1929) Reconsider whether this works properly.
+          case (seqId, Some(endpointId)) => (seqId, endpointId)
         }
     } yield {
       if (peersToAdd.nonEmpty || peersToRemove.nonEmpty)
@@ -101,6 +108,6 @@ object SequencerBftPeerReconciler {
   case class BftPeerDifference(
       toAdd: Seq[P2PEndpoint],
       toRemove: Seq[P2PEndpoint.Id],
-      currentPeers: Seq[(Option[SequencerId], P2PEndpoint.Id)],
+      currentPeers: Seq[(Option[SequencerId], Option[P2PEndpoint.Id])],
   )
 }

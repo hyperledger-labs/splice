@@ -413,6 +413,7 @@ object UpdateHistoryTestBase {
       /*signatories = */ created.getSignatories,
       /*observers = */ created.getObservers,
       /*createdAt = */ created.getCreatedAt,
+      /*acsDelta = */ created.isAcsDelta,
     )
   }
 
@@ -442,6 +443,7 @@ object UpdateHistoryTestBase {
       ),
       /*exerciseResult = */ exercised.getExerciseResult,
       /*implementedInterfaces = */ exercised.getImplementedInterfaces,
+      /*acsDelta = */ exercised.isAcsDelta,
     )
   }
 

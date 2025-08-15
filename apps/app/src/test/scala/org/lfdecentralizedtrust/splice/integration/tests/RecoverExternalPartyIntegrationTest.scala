@@ -4,7 +4,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.ValidatorRewar
 import org.lfdecentralizedtrust.splice.codegen.java.splice.types.Round
 import org.lfdecentralizedtrust.splice.console.LedgerApiExtensions.RichPartyId
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
-import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.IntegrationTestWithSharedEnvironment
+import org.lfdecentralizedtrust.splice.integration.tests.SpliceTests.{IntegrationTestWithSharedEnvironment, SpliceTestConsoleEnvironment}
 import org.lfdecentralizedtrust.tokenstandard.transferinstruction
 
 import com.daml.nonempty.NonEmpty
@@ -219,7 +219,7 @@ class RecoverExternalPartyIntegrationTest
         aliceParty,
         prepareSend.transaction,
         HexString.toHexString(
-          crypto
+          crypto(env.executionContext)
             .signBytes(
               HexString.parseToByteString(prepareSend.txHash).value,
               alicePrivateKey.asInstanceOf[SigningPrivateKey],
@@ -248,15 +248,15 @@ class RecoverExternalPartyIntegrationTest
   def sign(
       tx: TopologyTransaction[TopologyChangeOp, TopologyMapping],
       privateKey: PrivateKey,
-  ): SignedTopologyTransaction[TopologyChangeOp, TopologyMapping] = {
-    val sig = crypto
+  )(implicit env: SpliceTestConsoleEnvironment): SignedTopologyTransaction[TopologyChangeOp, TopologyMapping] = {
+    val sig = crypto(env.executionContext)
       .sign(
         hash = tx.hash.hash,
         signingKey = privateKey.asInstanceOf[SigningPrivateKey],
         usage = SigningKeyUsage.ProtocolOnly,
       )
       .value
-    SignedTopologyTransaction.create(
+    SignedTopologyTransaction.tryCreate(
       tx,
       NonEmpty(Set, SingleTransactionSignature(tx.hash, sig): TopologyTransactionSignature),
       isProposal = false,

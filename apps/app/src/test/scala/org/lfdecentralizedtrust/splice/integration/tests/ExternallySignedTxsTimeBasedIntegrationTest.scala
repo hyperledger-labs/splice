@@ -105,7 +105,7 @@ class ExternallySignedTxsTimeBasedIntegrationTest
           onboarding1.party,
           prepareSend.transaction,
           HexString.toHexString(
-            crypto
+            crypto(env.executionContext)
               .signBytes(
                 HexString.parseToByteString(prepareSend.txHash).value,
                 onboarding1.privateKey.asInstanceOf[SigningPrivateKey],

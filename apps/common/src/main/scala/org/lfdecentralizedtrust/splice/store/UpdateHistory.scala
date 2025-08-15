@@ -8,6 +8,7 @@ import cats.syntax.semigroup.*
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Event, ExercisedEvent, Identifier, Transaction}
+import com.google.protobuf.ByteString
 import org.lfdecentralizedtrust.splice.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ActiveContract,
@@ -41,7 +42,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{Storage, DbStorage}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.ByteString
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
 import slick.jdbc.{GetResult, JdbcProfile}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -1382,6 +1382,7 @@ class UpdateHistory(
       /*signatories = */ updateRow.signatories.getOrElse(missingStringSeq).asJava,
       /*observers = */ updateRow.observers.getOrElse(missingStringSeq).asJava,
       /*createdAt = */ updateRow.createdAt.toInstant,
+      /*acsDelta = */ false,
     )
 
     UpdateHistoryResponse(
@@ -1443,6 +1444,7 @@ class UpdateHistory(
         ),
         /*exerciseResult = */ ProtobufCodec.deserializeValue(row.result),
         /*implementedInterfaces = */ java.util.Collections.emptyList(),
+        /*acsDelta = */ false,
       )
     }
     val events: Seq[Event] = (createEvents ++ exerciseEvents).sortBy(_.getNodeId)
@@ -1498,6 +1500,7 @@ class UpdateHistory(
               /*signatories = */ row.signatories.getOrElse(missingStringSeq).asJava,
               /*observers = */ row.observers.getOrElse(missingStringSeq).asJava,
               /*createdAt = */ row.createdAt.toInstant,
+              /*acsDelta = */ false,
             ),
             counter = row.reassignmentCounter,
           ),
@@ -2299,6 +2302,7 @@ object UpdateHistory {
           /*signatories = */ signatories.getOrElse(missingStringSeq).asJava,
           /*observers = */ observers.getOrElse(missingStringSeq).asJava,
           /*createdAt = */ createdAt.toInstant,
+              /*acsDelta = */ false,
         ),
       )
     }

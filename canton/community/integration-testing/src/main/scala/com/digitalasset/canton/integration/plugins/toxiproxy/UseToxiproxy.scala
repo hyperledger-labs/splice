@@ -4,6 +4,7 @@
 package com.digitalasset.canton.integration.plugins.toxiproxy
 
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.environment.CantonEnvironment
 import com.digitalasset.canton.integration.ConfigTransforms.*
 import com.digitalasset.canton.integration.plugins.toxiproxy.ProxyConfig.postgresConfig
 import com.digitalasset.canton.integration.plugins.toxiproxy.UseToxiproxy.*
@@ -31,7 +32,7 @@ import scala.concurrent.duration.*
   */
 @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.Null"))
 final case class UseToxiproxy(toxiproxyConfig: ToxiproxyConfig)
-    extends EnvironmentSetupPlugin
+    extends EnvironmentSetupPlugin[CantonConfig, CantonEnvironment]
     with BaseTest {
   private val TOXIPROXY_CONTROL_PORT: Int = 8474
   var runningToxiproxy: RunningToxiproxy = _
