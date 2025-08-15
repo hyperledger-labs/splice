@@ -966,11 +966,6 @@ final class DbMultiDomainAcsStore[TXE](
           case _ => Future.unit
         }
 
-        version <- storage
-          .querySingle(sql"select version()".as[String].headOption, "initialize.version")
-          .value
-        _ = logger.error(s"Postgres version is $version")
-
         acsSizeInDb <- acsInitResult match {
           case StoreHasData(acsStoreId, _) =>
             storage
