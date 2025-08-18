@@ -4,7 +4,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { createProposalActions } from '../utils/governance';
 import { SelectAction } from '../components/forms/SelectAction';
-import { CreateProposalForm } from '../components/forms/CreateProposalform';
 import { SupportedActionTag } from '../utils/types';
 import { UpdateSvRewardWeightForm } from '../components/forms/UpdateSvRewardWeightForm';
 import { OffboardSvForm } from '../components/forms/OffboardSvForm';
@@ -40,9 +39,8 @@ export const CreateProposal: React.FC = () => {
           />
         );
       case 'SRARC_SetConfig':
+      case 'CRARC_SetConfig':
         return <SetDsoConfigRulesForm onSubmit={onSubmit} />;
-      default:
-        return <CreateProposalForm action={selectedAction} />;
     }
   } else {
     return <SelectAction />;
