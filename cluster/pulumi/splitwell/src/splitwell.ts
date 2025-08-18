@@ -3,27 +3,28 @@
 import * as pulumi from '@pulumi/pulumi';
 import * as postgres from 'splice-pulumi-common/src/postgres';
 import {
+  activeVersion,
+  ansDomainPrefix,
   Auth0Client,
   auth0UserNameEnvVar,
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_HOSTNAME,
+  CnInput,
+  DecentralizedSynchronizerMigrationConfig,
   exactNamespace,
   ExactNamespace,
-  DecentralizedSynchronizerMigrationConfig,
+  failOnAppVersionMismatch,
+  imagePullSecret,
   installAuth0Secret,
+  installLoopback,
   installSpliceHelmChart,
   ValidatorTopupConfig,
-  splitwellDarPaths,
-  imagePullSecret,
-  CnInput,
-  activeVersion,
-  ansDomainPrefix,
-  failOnAppVersionMismatch,
 } from 'splice-pulumi-common';
-import { installParticipant } from 'splice-pulumi-common-validator';
+import { installParticipant, splitwellDarPaths } from 'splice-pulumi-common-validator';
 import { installValidatorApp } from 'splice-pulumi-common-validator/src/validator';
-import { splitwellConfig } from 'splice-pulumi-common/src/config/splitwellConfig';
+
+import { splitwellConfig } from '../../common/src/config/splitwellConfig';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
@@ -47,34 +48,22 @@ export async function installSplitwell(
         splitPostgresInstances
       );
 
-  const loopback = installSpliceHelmChart(
-    xns,
-    'loopback',
-    'splice-cluster-loopback-gateway',
-    {
-      cluster: {
-        hostname: CLUSTER_HOSTNAME,
-      },
-    },
-    activeVersion,
-    { dependsOn: [xns.ns] }
-  );
+  const loopback = installLoopback(xns);
 
   const imagePullDeps = imagePullSecret(xns);
 
   installIngress(xns, imagePullDeps);
 
   const participant = installParticipant(
+    splitwellConfig,
     decentralizedSynchronizerMigrationConfig.active.id,
     xns,
     auth0Client.getCfg(),
     'splitwell',
-    undefined,
     decentralizedSynchronizerMigrationConfig.active.version,
     sharedPostgres,
-    undefined,
     {
-      dependsOn: imagePullDeps.concat([loopback]),
+      dependsOn: imagePullDeps.concat(loopback),
     }
   );
 
@@ -107,6 +96,7 @@ export async function installSplitwell(
       },
       failOnAppVersionMismatch: failOnAppVersionMismatch,
       maxDarVersion: splitwellConfig?.maxDarVersion,
+      logLevel: splitwellConfig.logging?.level,
     },
     activeVersion,
     { dependsOn: imagePullDeps }
@@ -121,7 +111,7 @@ export async function installSplitwell(
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell')
   );
 
-  const validator = await installValidatorApp({
+  return await installValidatorApp({
     xns,
     extraDependsOn,
     dependencies: [],
@@ -163,9 +153,8 @@ export async function installSplitwell(
     validatorWalletUsers: pulumi.output([validatorWalletUser]),
     validatorPartyHint: 'digitalasset-splitwell-1',
     nodeIdentifier: 'splitwell',
+    logLevel: splitwellConfig.logging?.level,
   });
-
-  return validator;
 }
 
 function installIngress(xns: ExactNamespace, dependsOn: CnInput<pulumi.Resource>[]) {

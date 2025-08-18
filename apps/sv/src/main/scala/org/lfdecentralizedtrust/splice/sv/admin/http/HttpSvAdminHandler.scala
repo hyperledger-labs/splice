@@ -37,6 +37,7 @@ import org.lfdecentralizedtrust.splice.sv.store.{SvDsoStore, SvSvStore}
 import org.lfdecentralizedtrust.splice.sv.util.SvUtil.generateRandomOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.util.ValidatorOnboardingSecret
 import org.lfdecentralizedtrust.splice.sv.{LocalSynchronizerNode, SvApp}
+
 import java.util.Optional
 import org.lfdecentralizedtrust.splice.util.{BackupDump, Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.{
@@ -58,6 +59,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.config.{NetworkAppClientConfig, UpgradesConfig}
+import org.lfdecentralizedtrust.splice.migration.ParticipantUsersDataExporter
 import org.lfdecentralizedtrust.splice.scan.admin.api.client.ScanConnection
 import org.lfdecentralizedtrust.splice.scan.config.ScanAppClientConfig
 
@@ -249,18 +251,25 @@ class HttpSvAdminHandler(
       body: definitions.UpdateAmuletPriceVoteRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.UpdateAmuletPriceVoteResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.updateAmuletPriceVote") { _ => _ =>
-      val amuletPrice = Codec.tryDecode(Codec.BigDecimal)(body.amuletPrice)
-      SvApp
-        .updateAmuletPriceVote(
-          amuletPrice,
-          dsoStoreWithIngestion,
-          logger,
-        )
-        .flatMap {
-          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.UpdateAmuletPriceVoteResponseOK)
-        }
+    withSpan(s"$workflowId.updateAmuletPriceVote") { implicit traceContext => _ =>
+      retryProvider.retryForClientCalls(
+        "updateAmuletPriceVote",
+        "Update Amulet Price Vote", {
+          val amuletPrice = Codec.tryDecode(Codec.BigDecimal)(body.amuletPrice)
+          SvApp
+            .updateAmuletPriceVote(
+              amuletPrice,
+              dsoStoreWithIngestion,
+              logger,
+            )
+            .flatMap {
+              case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+              case Right(()) =>
+                Future.successful(v0.SvAdminResource.UpdateAmuletPriceVoteResponseOK)
+            }
+        },
+        logger,
+      )
     }
   }
 
@@ -271,39 +280,6 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.isAuthorized") { _ => _ =>
       Future.successful(v0.SvAdminResource.IsAuthorizedResponseOK)
-    }
-  }
-
-  def createElectionRequest(respond: v0.SvAdminResource.CreateElectionRequestResponse.type)(
-      body: definitions.CreateElectionRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateElectionRequestResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.createElectionRequest") { _ => _ =>
-      SvApp
-        .createElectionRequest(
-          body.requester,
-          body.ranking,
-          dsoStoreWithIngestion,
-        )
-        .flatMap {
-          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.CreateElectionRequestResponseOK)
-        }
-    }
-  }
-
-  def getElectionRequest(
-      respond: v0.SvAdminResource.GetElectionRequestResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetElectionRequestResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.getElectionRequest") { _ => _ =>
-      for {
-        electionRequests <- SvApp.getElectionRequest(dsoStoreWithIngestion)
-      } yield {
-        definitions.GetElectionRequestResponse(
-          electionRequests.map(_.toHttp).toVector
-        )
-      }
     }
   }
 
@@ -556,7 +532,10 @@ class HttpSvAdminHandler(
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
     val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
-      domainDataSnapshotGenerator
+      for {
+        participantUsersData <- new ParticipantUsersDataExporter(svStoreWithIngestion.connection)
+          .exportParticipantUsersData()
+      } yield domainDataSnapshotGenerator
         .getDomainDataSnapshot(
           Instant.parse(timestamp),
           partyId.map(Codec.tryDecode(Codec.Party)(_)),
@@ -570,11 +549,12 @@ class HttpSvAdminHandler(
                 responseHttp.acsTimestamp,
                 migrationId getOrElse (config.domainMigrationId + 1),
                 responseHttp,
+                participantUsersData.toHttp,
               )
           )
         }
     }(traceContext, tracer)
-  }
+  }.flatten
 
   override def getSynchronizerNodeIdentitiesDump(
       respond: v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse.type
@@ -696,9 +676,8 @@ class HttpSvAdminHandler(
   override def featureSupport(respond: SvAdminResource.FeatureSupportResponse.type)()(
       extracted: TracedUser
   ): Future[SvAdminResource.FeatureSupportResponse] = {
-    readFeatureSupport(dsoStore.key.dsoParty, config.delegatelessAutomation)(
+    readFeatureSupport()(
       extracted.traceContext,
-      ec,
       tracer,
     )
       .map(SvAdminResource.FeatureSupportResponseOK(_))

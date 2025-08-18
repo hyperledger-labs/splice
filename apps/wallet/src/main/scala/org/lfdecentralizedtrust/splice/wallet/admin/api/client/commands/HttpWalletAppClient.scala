@@ -43,9 +43,10 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulettransferinstruction.AmuletTransferInstruction
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationrequestv1.AllocationRequest
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
-  allocationv1,
   allocationrequestv1,
+  allocationv1,
   transferinstructionv1,
 }
 
@@ -1236,6 +1237,31 @@ object HttpWalletAppClient {
       }
     }
 
+    final case class WithdrawAmuletAllocation(
+        contractId: amuletAllocationCodegen.AmuletAllocation.ContractId
+    ) extends InternalBaseCommand[
+          http.WithdrawAmuletAllocationResponse,
+          definitions.AmuletAllocationWithdrawResult,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[
+        Throwable,
+        HttpResponse,
+      ], http.WithdrawAmuletAllocationResponse] =
+        client.withdrawAmuletAllocation(contractId.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.WithdrawAmuletAllocationResponse, Either[
+        String,
+        definitions.AmuletAllocationWithdrawResult,
+      ]] = { case http.WithdrawAmuletAllocationResponse.OK(value) =>
+        Right(value)
+      }
+    }
+
     final case object ListAmuletAllocations
         extends InternalBaseCommand[
           http.ListAmuletAllocationsResponse,
@@ -1312,6 +1338,26 @@ object HttpWalletAppClient {
       }
     }
 
+    case class RejectAllocationRequest(id: AllocationRequest.ContractId)
+        extends InternalBaseCommand[
+          http.RejectAllocationRequestResponse,
+          Unit,
+        ] {
+      override def submitRequest(
+          client: WalletClient,
+          headers: List[HttpHeader],
+      ): EitherT[Future, Either[Throwable, HttpResponse], http.RejectAllocationRequestResponse] =
+        client.rejectAllocationRequest(id.contractId, headers)
+
+      override protected def handleOk()(implicit
+          decoder: TemplateJsonDecoder
+      ): PartialFunction[http.RejectAllocationRequestResponse, Either[
+        String,
+        Unit,
+      ]] = { case http.RejectAllocationRequestResponse.OK(_) =>
+        Right(())
+      }
+    }
   }
 
 }

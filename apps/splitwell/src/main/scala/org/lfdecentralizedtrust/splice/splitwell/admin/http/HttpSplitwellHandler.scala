@@ -241,7 +241,7 @@ class HttpSplitwellHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getConnectedDomains") { _ => _ =>
       for {
-        mappings <- participantAdminConnection.listPartyToParticipant(
+        mappings <- participantAdminConnection.listPartyToParticipantFromAllStores(
           filterParty = party
         )
       } yield definitions.GetConnectedDomainsResponse(

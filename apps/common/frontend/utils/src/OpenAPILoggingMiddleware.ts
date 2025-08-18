@@ -55,35 +55,44 @@ export class OpenAPILoggingMiddleware<
     const traceparent = context.headers['traceparent'];
 
     // Unfortunately we don't have the URL
-    return context.getBodyAsAny().then(body => {
-      console.debug(
-        `${this.name} got response with status code`,
-        context.httpStatusCode,
-        'and body:',
-        body && JSON.stringify(body).substring(0, MAX_BODY_LENGTH_TO_LOG),
-        `[${traceparent}]`
-      );
-      // Work-around for `TypeError: Response.text: Body has already been consumed.`
-      return {
-        ...context,
-        getBodyAsAny: () => Promise.resolve(body),
-        body: {
-          text: () => {
-            if (typeof body === 'string') {
-              return Promise.resolve(body);
-            } else {
-              return Promise.reject('Body is not a string.');
-            }
+    return context.getBodyAsAny().then(
+      body => {
+        console.debug(
+          `${this.name} got response with status code`,
+          context.httpStatusCode,
+          'and body:',
+          body && JSON.stringify(body).substring(0, MAX_BODY_LENGTH_TO_LOG),
+          `[${traceparent}]`
+        );
+        // Work-around for `TypeError: Response.text: Body has already been consumed.`
+        return {
+          ...context,
+          getBodyAsAny: () => Promise.resolve(body),
+          body: {
+            text: () => {
+              if (typeof body === 'string') {
+                return Promise.resolve(body);
+              } else {
+                return Promise.reject('Body is not a string.');
+              }
+            },
+            binary: () => {
+              if (typeof body === 'string') {
+                return Promise.resolve(new Blob([body]));
+              } else {
+                return Promise.resolve(body);
+              }
+            },
           },
-          binary: () => {
-            if (typeof body === 'string') {
-              return Promise.resolve(new Blob([body]));
-            } else {
-              return Promise.resolve(body);
-            }
-          },
-        },
-      };
-    });
+        };
+      },
+      err => {
+        console.error(
+          `Got an error when getting response body (traceparent: [${traceparent}]:`,
+          err
+        );
+        throw err;
+      }
+    );
   }
 }

@@ -99,9 +99,10 @@ The operation 'insert block' has failed with an exception
 Now retrying operation 'insert block'
 
 # TODO(tech-debt): Remove these once we're on Canton 3.4
-Failed to send commitment message batch for period.*RequestInvalid\(Unregistered recipients:.*Set\(PAR::(?:validatorLocalForValidatorReonboardingIT|da-ComposeValidator-1)
+Failed to send commitment message batch for period.*RequestInvalid\(Unregistered recipients:.*Set\(PAR::(?:alice-validatorLocalForValidatorReonboardingIT|da-ComposeValidator-1)
 Failed to send commitment message batch for period CommitmentPeriod.*RequestRefused\(UnknownRecipients
-SEQUENCER_UNKNOWN_RECIPIENTS.*(?:validatorLocalForValidatorReonboardingIT|da-ComposeValidator-1)
+Failed to send commitment message batch for period CommitmentPeriod.*RequestInvalid\(Unregistered
+SEQUENCER_UNKNOWN_RECIPIENTS.*(?:alice-validatorLocalForValidatorReonboardingIT|da-ComposeValidator-1)
 
 # TODO(#919) Figure out where this is coming from
 Instrument rpc\.server\.duration has exceeded the maximum allowed cardinality
@@ -113,6 +114,8 @@ Thread starvation or clock leap detected
 
 # Shutdown issues
 Previous channel ManagedChannelImpl.* was garbage collected without being shut down!
+# remove once https://github.com/DACH-NY/canton/issues/27032 is taken care of
+'Party Allocation' was aborted due to shutdown
 
 # TODO(DACH-NY/canton-network-node#2423) Figure out what causes this
 The sequencer clock timestamp .* is already past the max sequencing time
@@ -140,5 +143,12 @@ Instrument daml\.sequencer\.bftordering.* has exceeded the maximum allowed cardi
 
 # TODO(#1932) fix our requests to not trigger that
 Received an identifier with package ID .* but expected a package name
+
+# TODO(#1450) - investigate this on the canton side
+FAILED_PRECONDITION/SEQUENCER_SENDER_UNKNOWN.*Senders are unknown: MED::sv
+Rejected transaction due to a participant determined timeout
+
+# Seems like sometimes mediators time out maybe around onboarding, not worth investigating unless it causes issues.
+Sequencing result message timed out.*mediator=
 
 # Make sure to have a trailing newline

@@ -785,6 +785,56 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
+  override def findInterfaceViewByContractId[C, ICid <: ContractId[_], View <: DamlRecord[View]](
+      companion: C
+  )(contractId: ICid)(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[ICid, View]]] = {
+    val interfaceId = companionClass.typeId(companion)
+    val opName = s"findInterfaceViewByContractId:${interfaceId.getEntityName}"
+    (for {
+      (contractId, viewJson, createdAt, createdEventBlob, state) <- storage.querySingle(
+        sql"""
+             SELECT
+               contract_id,
+               interface_view,
+               acs.created_at,
+               acs.created_event_blob,
+               #${SelectFromAcsTableWithStateResult.stateColumnsCommaSeparated()}
+             FROM #$interfaceViewsTableName interface
+               JOIN #$acsTableName acs ON acs.event_number = interface.acs_event_number
+             WHERE interface_id_package_id = ${interfaceId.getPackageId}
+               AND interface_id_qualified_name = ${QualifiedName(interfaceId)}
+               AND store_id = $acsStoreId
+               AND migration_id = $domainMigrationId
+               AND contract_id = $contractId
+           """
+          .as[(String, Json, Timestamp, Array[Byte], AcsQueries.SelectFromContractStateResult)]
+          .headOption,
+        opName,
+      )
+    } yield {
+      val contractState = contractStateFromRow(state)
+      val contract = companionClass
+        .fromJson(companion)(
+          interfaceId,
+          contractId,
+          viewJson,
+          ByteString.copyFrom(createdEventBlob),
+          createdAt.toInstant,
+        )
+        .fold(
+          err =>
+            throw new IllegalStateException(
+              s"Contract $contractId cannot be decoded as interface view $interfaceId: $err. Payload: $viewJson"
+            ),
+          identity,
+        )
+      ContractWithState(contract, contractState)
+    }).value
+  }
+
   override private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
   ): Future[Map[ContractId[_], NonEmpty[Set[ReassignmentId]]]] = {

@@ -33,12 +33,11 @@ import org.scalatestplus.selenium.WebBrowser
 import java.io.{File, StringReader}
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
-import java.time.{Duration, Instant, ZoneOffset}
+import java.time.Duration
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicLong
 import org.openqa.selenium.firefox.GeckoDriverService
 
-import java.time.format.DateTimeFormatter
 import scala.collection.mutable
 import scala.concurrent.blocking
 import scala.concurrent.duration.*
@@ -250,7 +249,7 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
       )
       (driver, bidi)
     }
-    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(0))
     registerWebDriver(name, webDriver)
 
     biDi.addListener[LogEntry](
@@ -675,23 +674,13 @@ trait FrontendTestCommon extends TestCommon with WebBrowser with CustomMatchers 
     }
   }
 
-  protected def eventuallyClickOn(query: Query)(implicit driver: WebDriverType) = {
+  protected def eventuallyClickOn(query: Query)(implicit driver: WebDriver) = {
     clue(s"Waiting for $query to be clickable") {
       waitForCondition(query) {
         ExpectedConditions.elementToBeClickable(_)
       }
     }
     clickOn(query)
-  }
-
-  private val DefaultDateTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-  def setDateTime(
-      party: String,
-      pickerId: String,
-      instant: Instant,
-      dateTimeFormat: DateTimeFormatter = DefaultDateTimeFormat,
-  )(implicit webDriver: WebDriverType): Assertion = {
-    setDateTime(party, pickerId, dateTimeFormat.format(instant.atOffset(ZoneOffset.UTC)))
   }
 
   def setDateTime(party: String, pickerId: String, dateTime: String)(implicit

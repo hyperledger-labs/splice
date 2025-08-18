@@ -25,8 +25,6 @@ import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
 import java.util.Optional
-import scala.concurrent.duration.DurationInt
-import scala.jdk.CollectionConverters.*
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -89,61 +87,6 @@ class SvFrontendIntegrationTest
                 "Trying to re-register"
               )
             }
-          },
-        )
-      }
-    }
-
-    "have 5 information tabs" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "DSO and amulet infos are displayed in pretty json", {
-            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see the 5 tab panels",
-          _ => {
-            inside(find(id("information-tab-general"))) { case Some(e) =>
-              e.text shouldBe "General"
-            }
-            inside(find(id("information-tab-dso-info"))) { case Some(e) =>
-              e.text shouldBe "DSO Info"
-            }
-            inside(find(id("information-tab-amulet-info"))) { case Some(e) =>
-              e.text shouldBe s"$amuletName Info"
-            }
-            inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
-              e.text shouldBe "CometBFT Debug Info"
-            }
-            inside(find(id("information-tab-canton-domain-status"))) { case Some(e) =>
-              e.text shouldBe "Domain Node Status"
-            }
-          },
-        )
-        actAndCheck("Click on general information tab", click on "information-tab-general")(
-          "observe information on party information",
-          _ => {
-            val valueCells = findAll(className("general-dso-value-name")).toSeq
-            valueCells should have length 9
-            forExactly(1, valueCells)(cell =>
-              seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
-            )
-            forExactly(3, valueCells)(cell =>
-              seleniumText(cell) should matchText(
-                sv1Backend.getDsoInfo().svParty.toProtoPrimitive
-              )
-            )
-          },
-        )
-        actAndCheck(
-          "Click on domain status tab",
-          click on "information-tab-canton-domain-status",
-        )(
-          "Observe sequencer and mediator as active",
-          _ => {
-            val activeCells = findAll(className("active-value")).toSeq
-            activeCells should have length 2
-            forAll(activeCells)(_.text shouldBe "true")
           },
         )
       }
@@ -837,7 +780,7 @@ class SvFrontendIntegrationTest
               requestReasonUrl,
               requestReasonBody,
               if (expiresSoon) {
-                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
               } else {
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
               },
@@ -918,7 +861,7 @@ class SvFrontendIntegrationTest
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
-            eventually(120.seconds) {
+            eventually() {
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
@@ -973,7 +916,7 @@ class SvFrontendIntegrationTest
               requestReasonUrl,
               requestReasonBody,
               if (expiresSoon) {
-                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
               } else {
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
               },
@@ -1058,7 +1001,7 @@ class SvFrontendIntegrationTest
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
-            eventually(120.seconds) {
+            eventually() {
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
@@ -1074,57 +1017,91 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "can request DSO delegate election" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "sv1 operator can login and browse to the delegate election tab", {
-            go to s"http://localhost:$sv1UIPort/delegate"
-            loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see a button for requesting a delegate election",
-          _ => {
-            find(id("submit-ranking-delegate-election")) should not be empty
-          },
-        )
+    "can create valid SRARC_CreateUnallocatedUnclaimedActivityRecord vote requests" in {
+      implicit env =>
+        val requestReasonUrl = "https://vote-request-url.com"
+        val requestReasonBody = "This is a request reason."
 
-        val svs: Vector[String] =
-          sv3Backend.getDsoInfo().dsoRules.payload.svs.keySet().asScala.toVector
+        val beneficiary = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
+        val amount = "1000"
 
-        val newLeader = svs.head
-
-        sv2Backend.createElectionRequest(sv2Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
-        sv3Backend.createElectionRequest(sv3Backend.getDsoInfo().svParty.toProtoPrimitive, svs)
-
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+        withFrontEnd("sv1") { implicit webDriver =>
           actAndCheck(
-            "sv1 operator makes his own ranking for his delegate preference", {
-              click on "submit-ranking-delegate-election"
+            "sv1 operator can login and browse to the governance tab", {
+              go to s"http://localhost:$sv1UIPort/votes"
+              loginOnCurrentPage(sv1UIPort, sv1Backend.config.ledgerApiUser)
             },
           )(
-            "The epoch advances by one and the delegate name is changed.",
+            "sv1 can see the create vote request button",
             _ => {
-              find(id("delegate-election-epoch")).value.text should include(
-                sv1Backend.getDsoInfo().dsoRules.payload.epoch.toString
-              )
-              find(id("delegate-election-current-delegate")).value.text should include(newLeader)
+              find(id("create-voterequest-submit-button")) should not be empty
+              find(id("display-actions")) should not be empty
             },
-          ),
-          entries => {
-            forExactly(4, entries) { line =>
-              line.message should include(
-                "Noticed an DsoRules epoch change"
-              )
-            }
-          },
-        )
+          )
 
-      }
+          click on "tab-panel-in-progress"
+          val previousVoteRequestsInProgress = getVoteRequestsInProgressSize()
+
+          actAndCheck(
+            "sv1 operator can create a new vote request", {
+              changeAction("SRARC_CreateUnallocatedUnclaimedActivityRecord")
+
+              inside(find(id("create-beneficiary"))) { case Some(element) =>
+                element.underlying.sendKeys(beneficiary)
+              }
+              inside(find(id("create-amount"))) { case Some(element) =>
+                element.underlying.sendKeys(amount)
+              }
+
+              inside(find(id("create-reason-url"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonUrl)
+              }
+              clue("sv1 operator can't click submit before adding a summary") {
+                find(id("create-voterequest-submit-button")).value.isEnabled shouldBe false
+              }
+              inside(find(id("create-reason-summary"))) { case Some(element) =>
+                element.underlying.sendKeys(requestReasonBody)
+              }
+
+              clickVoteRequestSubmitButtonOnceEnabled()
+            },
+          )(
+            "sv1 can see the new vote request",
+            _ => {
+              click on "tab-panel-in-progress"
+
+              val tbody = find(id("sv-voting-in-progress-table-body"))
+              inside(tbody) { case Some(tb) =>
+                val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+                rows.size shouldBe previousVoteRequestsInProgress + 1
+                (
+                  rows.head.text,
+                  tb.findAllChildElements(className("vote-row-requester")).toSeq.head.text,
+                )
+              }
+            },
+          )
+
+          actAndCheck(
+            "sv1 operator can see the vote request detail by clicking review button", {
+              val rows = getAllVoteRows("sv-voting-in-progress-table-body")
+              val reviewButton = rows.head
+              reviewButton.underlying.click()
+            },
+          )(
+            "sv1 can see the new vote request detail",
+            _ => {
+              inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
+                tb.text
+              }
+            },
+          )
+        }
     }
   }
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
-    find(id("display-actions")) should not be empty
+    eventually() { find(id("display-actions")) should not be empty }
     val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
     dropDownAction.selectByValue(actionName)
 
@@ -1144,13 +1121,6 @@ class SvFrontendIntegrationTest
   def getVoteRequestsRejectedSize()(implicit webDriver: WebDriverType) = {
     val tbodyRejected = find(id("sv-vote-results-rejected-table-body"))
     tbodyRejected
-      .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
-      .getOrElse(0)
-  }
-
-  def getVoteRequestsActionNeededSize()(implicit webDriver: WebDriverType) = {
-    val tbodyInProgress = find(id("sv-voting-action-needed-table-body"))
-    tbodyInProgress
       .map(_.findAllChildElements(className("vote-row-action")).toSeq.size)
       .getOrElse(0)
   }

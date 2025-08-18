@@ -5,6 +5,11 @@ import org.lfdecentralizedtrust.splice.integration.tests.FrontendIntegrationTest
 
 import scala.concurrent.duration.DurationInt
 
+import java.net.URI
+import java.net.http.{HttpClient, HttpRequest, HttpResponse}
+
+import io.circe.parser.parse
+
 /** Preflight test that makes sure that *our* SVs (1-4) have initialized fine.
   */
 class DsoPreflightIntegrationTest
@@ -28,6 +33,37 @@ class DsoPreflightIntegrationTest
         }
       }
     )
+  }
+
+  "INFO endpoints of SVs 1-4 are reachable and return JSON Object" in { _ =>
+    for (i <- (1 to 4)) {
+      val ingressName = if (i == 1) "sv-2" else s"sv-$i-eng"
+      val infoUrl = s"https://info.${ingressName}.${sys.env("NETWORK_APPS_ADDRESS")}"
+
+      val urls = Array(
+        s"${infoUrl}",
+        s"${infoUrl}/runtime/dso.json",
+      )
+
+      urls.foreach { url =>
+        val client = HttpClient.newHttpClient()
+        val uri = URI.create(url)
+        val request = HttpRequest.newBuilder().uri(uri).build()
+
+        clue(s"Checking INFO at ${url}") {
+          eventuallySucceeds(timeUntilSuccess = 5.minutes) {
+            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            assert(
+              response.statusCode() == 200,
+              s"Unexpected HTTP status code: ${response.statusCode()}",
+            )
+            val body = response.body()
+            val json = parse(body).getOrElse(fail("Invalid JSON"))
+            assert(json.isObject, s"Response body must be a JSON object, but got: $body")
+          }
+        }
+      }
+    }
   }
 
   "The Web UIs of SVs 1-4 are reachable and working as expected" in { env =>

@@ -45,6 +45,10 @@ enableWallet: true
 #    receiver: "<receiverPartyId>"
 #    useTransferPreapproval: false # sweep by transferring directly through the transfer preapproval of the receiver,
 #                                    if set to false sweeping creates transfer offers that need to be accepted on the receiver side.
+#                                    Note that this refers to the preapprovals described in https://docs.dev.sync.global/background/preapprovals.html
+#                                    and not to auto accepting transfers. Auto accept transfers does not setup preapproval contracts that allow
+#                                    for a direct transfer but just automates the acceptance of the transfer offer so in that case
+#                                    useTransferPreapproval should be set to false.
 # SWEEP_END
 
 # AUTO_ACCEPT_START

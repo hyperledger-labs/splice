@@ -107,14 +107,234 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "cometbft-loopback",
+        "namespace": "validator1"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "tcp": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress-cometbft.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "name": "loopback-cometbft-validator1",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "ServiceEntry",
+      "metadata": {
+        "name": "loopback",
+        "namespace": "validator1"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com"
+        ],
+        "ports": [
+          {
+            "name": "http-port",
+            "number": 80,
+            "protocol": "HTTP"
+          },
+          {
+            "name": "tls",
+            "number": 443,
+            "protocol": "TLS"
+          },
+          {
+            "name": "grpc-domain",
+            "number": 5008,
+            "protocol": "GRPC"
+          },
+          {
+            "name": "cometbft-0-0-p2p",
+            "number": 26006,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-0-1-p2p",
+            "number": 26016,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-0-p2p",
+            "number": 26106,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-1-1-p2p",
+            "number": 26116,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-0-p2p",
+            "number": 26206,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-2-1-p2p",
+            "number": 26216,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-0-p2p",
+            "number": 26306,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-3-1-p2p",
+            "number": 26316,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-0-p2p",
+            "number": 26406,
+            "protocol": "TCP"
+          },
+          {
+            "name": "cometbft-4-1-p2p",
+            "number": 26416,
+            "protocol": "TCP"
+          }
+        ],
+        "resolution": "DNS"
+      }
+    },
+    "name": "loopback-service-entry-validator1",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:ServiceEntry"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "networking.istio.io/v1alpha3",
+      "kind": "VirtualService",
+      "metadata": {
+        "name": "direct-loopback-through-ingress-gateway",
+        "namespace": "validator1"
+      },
+      "spec": {
+        "exportTo": [
+          "."
+        ],
+        "gateways": [
+          "mesh"
+        ],
+        "hosts": [
+          "mock.global.canton.network.digitalasset.com",
+          "sv.mock.global.canton.network.digitalasset.com",
+          "*.sv.mock.global.canton.network.digitalasset.com",
+          "validator.mock.global.canton.network.digitalasset.com",
+          "*.validator.mock.global.canton.network.digitalasset.com",
+          "validator1.mock.global.canton.network.digitalasset.com",
+          "*.validator1.mock.global.canton.network.digitalasset.com",
+          "splitwell.mock.global.canton.network.digitalasset.com",
+          "*.splitwell.mock.global.canton.network.digitalasset.com",
+          "sv-2.mock.global.canton.network.digitalasset.com",
+          "*.sv-2.mock.global.canton.network.digitalasset.com"
+        ],
+        "http": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ],
+        "tls": [
+          {
+            "match": [
+              {
+                "gateways": [
+                  "mesh"
+                ],
+                "sniHosts": [
+                  "mock.global.canton.network.digitalasset.com",
+                  "sv.mock.global.canton.network.digitalasset.com",
+                  "*.sv.mock.global.canton.network.digitalasset.com",
+                  "validator.mock.global.canton.network.digitalasset.com",
+                  "*.validator.mock.global.canton.network.digitalasset.com",
+                  "validator1.mock.global.canton.network.digitalasset.com",
+                  "*.validator1.mock.global.canton.network.digitalasset.com",
+                  "splitwell.mock.global.canton.network.digitalasset.com",
+                  "*.splitwell.mock.global.canton.network.digitalasset.com",
+                  "sv-2.mock.global.canton.network.digitalasset.com",
+                  "*.sv-2.mock.global.canton.network.digitalasset.com"
+                ]
+              }
+            ],
+            "route": [
+              {
+                "destination": {
+                  "host": "istio-ingress.cluster-ingress.svc.cluster.local"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "name": "loopback-virtual-service-validator1",
+    "provider": "",
+    "type": "kubernetes:networking.istio.io/v1alpha3:VirtualService"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
-        "title": "\"validator1_test\" keyring"
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock\")",
+        "title": "\"validator1_mock\" keyring"
       },
       "role": "roles/cloudkms.admin"
     },
-    "name": "mock-validator1-kms-roles/cloudkms.admin-\"validator1_test\"-keyring-iam",
+    "name": "mock-validator1-kms-roles/cloudkms.admin-\"validator1_mock\"-keyring-iam",
     "provider": "",
     "type": "gcp:projects/iAMMember:IAMMember"
   },
@@ -124,12 +344,12 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test\")",
-        "title": "\"validator1_test\" keyring"
+        "expression": "resource.name.startsWith(\"projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock\")",
+        "title": "\"validator1_mock\" keyring"
       },
       "role": "roles/cloudkms.cryptoOperator"
     },
-    "name": "mock-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_test\"-keyring-iam",
+    "name": "mock-validator1-kms-roles/cloudkms.cryptoOperator-\"validator1_mock\"-keyring-iam",
     "provider": "",
     "type": "gcp:projects/iAMMember:IAMMember"
   },
@@ -427,57 +647,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-cluster-loopback-gateway",
-      "compat": "true",
-      "maxHistory": 10,
-      "name": "loopback",
-      "namespace": "validator1",
-      "timeout": 600,
-      "values": {
-        "affinity": {
-          "nodeAffinity": {
-            "requiredDuringSchedulingIgnoredDuringExecution": {
-              "nodeSelectorTerms": [
-                {
-                  "matchExpressions": [
-                    {
-                      "key": "cn_apps",
-                      "operator": "Exists"
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        "cluster": {
-          "dnsName": "mock.global.canton.network.digitalasset.com",
-          "fixedTokens": false,
-          "hostname": "mock.global.canton.network.digitalasset.com",
-          "name": "cn-mocknet"
-        },
-        "cometbftPorts": {
-          "domains": 5
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
-        "tolerations": [
-          {
-            "effect": "NoSchedule",
-            "key": "cn_apps",
-            "operator": "Exists"
-          }
-        ]
-      },
-      "version": "0.3.20"
-    },
-    "name": "validator1-loopback",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "oci://ghcr.io/digital-asset/decentralized-canton-sync-dev/helm/splice-participant",
       "compat": "true",
       "maxHistory": 10,
@@ -537,11 +706,12 @@
         ],
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
         "kms": {
-          "keyRingId": "validator1_test",
+          "keyRingId": "validator1_mock",
           "locationId": "us-central1",
           "projectId": "da-cn-devnet",
           "type": "gcp"
         },
+        "logLevel": "DEBUG",
         "metrics": {
           "enable": true,
           "migration": {
@@ -561,6 +731,14 @@
           "postgresName": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secrets"
+        },
+        "resources": {
+          "limits": {
+            "memory": "8Gi"
+          },
+          "requests": {
+            "memory": "4Gi"
+          }
         },
         "tolerations": [
           {
@@ -822,6 +1000,7 @@
         "enablePostgresMetrics": true,
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker",
+        "maxVettingDelay": "1m",
         "metrics": {
           "enable": true
         },
@@ -858,6 +1037,7 @@
           "secretName": "validator-pg-secrets",
           "user": "cnadmin"
         },
+        "resources": {},
         "scanAddress": "http://scan-app.sv-1:5012",
         "spliceInstanceNames": {
           "amuletName": "Amulet",
@@ -895,13 +1075,13 @@
   },
   {
     "custom": true,
-    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_test",
+    "id": "projects/da-cn-devnet/locations/us-central1/keyRings/validator1_mock",
     "inputs": {
       "location": "us-central1",
-      "name": "validator1_test",
+      "name": "validator1_mock",
       "project": "da-cn-devnet"
     },
-    "name": "validator1_test_keyring",
+    "name": "validator1_mock_keyring",
     "provider": "",
     "type": "gcp:kms/keyRing:KeyRing"
   },

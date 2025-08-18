@@ -221,6 +221,13 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       tc: TraceContext
   ): Future[Boolean]
 
+  def findInterfaceViewByContractId[C, ICid <: ContractId[?], View <: DamlRecord[View]](
+      companion: C
+  )(id: ICid)(implicit
+      companionClass: ContractCompanion[C, ICid, View],
+      tc: TraceContext,
+  ): Future[Option[ContractWithState[ICid, View]]]
+
   def listInterfaceViews[C, ICid <: ContractId[?], View <: DamlRecord[View]](
       companion: C,
       limit: Limit = Limit.DefaultLimit,

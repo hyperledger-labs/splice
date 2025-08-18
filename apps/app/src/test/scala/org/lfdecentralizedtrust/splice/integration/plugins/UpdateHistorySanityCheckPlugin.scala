@@ -182,11 +182,13 @@ class UpdateHistorySanityCheckPlugin(
         throw new RuntimeException("scan_txlog.py failed.", ex)
     }
 
-    readLines.filter { log =>
-      log.contains("ERROR:") || log.contains("WARNING:")
-    } should be(empty)
-    forExactly(1, readLines) { line =>
-      line should include("Reached end of stream")
+    withClue(readLines) {
+      readLines.filter { log =>
+        log.contains("ERROR:") || log.contains("WARNING:")
+      } should be(empty)
+      forExactly(1, readLines) { line =>
+        line should include("Reached end of stream")
+      }
     }
   }
 

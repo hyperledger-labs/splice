@@ -26,8 +26,7 @@ jobs:
         uses: ./.github/actions/tests/common_test_setup
         with:
           test_name: static_tests
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+          oss_only: true
 
       - name: Check trailing whitespace
         uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -79,11 +78,14 @@ jobs:
         with:
           cmd: ./scripts/check-repo-names.sh
 
+      - name: Check that docker base images are pinned by digest
+        uses: ./.github/actions/nix/run_bash_command_in_nix
+        with:
+          cmd: ./scripts/check-base-images.sh
+
       - name: SBT-based static checks
         uses: ./.github/actions/sbt/execute_sbt_command
         with:
-          artifactory_user: ${{ vars.ARTIFACTORY_USER }}
-          artifactory_password: ${{ secrets.ARTIFACTORY_PASSWORD }}
           cmd: "Test/compile lint printTests"
 
       - name: Verify no changes in SBT test files

@@ -67,7 +67,6 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
 import scala.util.chaining.scalaUtilChainingOps
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 /** Analogue to Canton's CommunityTests */
@@ -503,23 +502,6 @@ object SpliceTests extends LazyLogging {
             val y = checkFun(x)
             (x, y)
           }
-        }
-      }
-    }
-
-    /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
-      */
-    def eventuallySucceeds[T](
-        timeUntilSuccess: FiniteDuration = 20.seconds,
-        maxPollInterval: FiniteDuration = 5.seconds,
-        suppressErrors: Boolean = true,
-    )(testCode: => T): T = {
-      eventually(timeUntilSuccess, maxPollInterval) {
-        try {
-          if (suppressErrors) loggerFactory.suppressErrors(testCode) else testCode
-        } catch {
-          case e: TestFailedException => throw e
-          case NonFatal(e) => fail(e)
         }
       }
     }

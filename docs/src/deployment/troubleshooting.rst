@@ -14,6 +14,8 @@ This section provides an overview of which information can be collected to debug
 
     console_access.rst
 
+.. _where-to-find-logs:
+
 Where to find logs
 ------------------
 
@@ -25,7 +27,7 @@ Canton logs into ``canton.log``.
 
 **When the node is launched in a kubernetes cluster**, we recommend to setup a log collector so that you can capture logs of at least the last day. For now, the default log level is set to Debug.
 
-We recommend to use ``lnav`` to read the logs. A guideline is provided in `this documentation <https://docs.daml.com/canton/usermanual/troubleshooting_guide.html#using-lnav-to-view-log-files>`_.
+We recommend to use ``lnav`` to read the logs. A guideline is provided in `this documentation <https://github.com/hyperledger-labs/splice/blob/main/TESTING.md#setting-up-lnav-to-inspect-canton-and-cometbft-logs>`_.
 
 .. note::
     Logging in kubernetes (note that this only provides logs for a limited timeframe):

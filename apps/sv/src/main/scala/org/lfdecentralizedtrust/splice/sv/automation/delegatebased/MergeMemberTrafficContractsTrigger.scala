@@ -14,10 +14,11 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.decentralizedsynchron
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.DsoRules_MergeMemberTrafficContracts
 import org.lfdecentralizedtrust.splice.store.PageLimit
 import org.lfdecentralizedtrust.splice.util.{AssignedContract, Contract}
-import com.digitalasset.canton.topology.{SynchronizerId, Member}
+import com.digitalasset.canton.topology.{Member, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -79,21 +80,16 @@ class MergeMemberTrafficContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       amuletRules <- store.getAmuletRules()
       arg = new DsoRules_MergeMemberTrafficContracts(
         amuletRules.contractId,
         memberTraffics.map(_.contractId).asJava,
-        controllerArgument,
+        Optional.of(controller),
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeMemberTrafficContracts(arg))
       outcome <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain ${dsoRules.domain} " +

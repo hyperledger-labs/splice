@@ -278,6 +278,10 @@ spec:
               tx-log-backfill-batch-size = "{{ .batchSize }}"
             }
         {{- end }}
+        {{- with .Values.maxVettingDelay }}
+        - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
+          value: canton.validator-apps.validator_backend.max-vetting-delay = "{{ . }}"
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http
@@ -313,7 +317,9 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
+      {{- if or (.Values.persistence.enablePgInitContainer) (.Values.extraInitContainers) }}
       initContainers:
+        {{- if .Values.persistence.enablePgInitContainer }}
         - name: {{ .Release.Name }}-init
           image: postgres:14
           env:
@@ -335,6 +341,11 @@ spec:
                 echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
+        {{- end }}
+        {{- if .Values.extraInitContainers }}
+        {{ .Values.extraInitContainers | toYaml | nindent 8 }}
+        {{- end }}
+      {{- end }}
       {{- if or .Values.participantIdentitiesDumpImport $requiresMigrationPvc }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}

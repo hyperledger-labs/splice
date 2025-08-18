@@ -29,6 +29,19 @@ In order to setup your development environment, please see the [Development READ
 
 TBD: futher contribution guidelines, s.a. [Canton's Contributing Guide](https://github.com/DACH-NY/canton/blob/main/contributing/README.md)
 
+## Picking up issues
+
+Splice maintainers may use the following GitHub issue labels to highlight issues suitable for newer contributors:
+
+- [`help wanted`](https://github.com/hyperledger-labs/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22help%20wanted%22):
+  tasks of various sizes and difficulty levels suitable for contributors outside of the maintainers team
+- [`good first issue`](https://github.com/hyperledger-labs/splice/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22):
+  easier tasks that are well-suited for onboarding to the code base
+
+Note that not all `good first issue`s are also `help wanted`; some may require access to infrastructure (CI, test deployments) that is not openly available.
+
+If you are planning to work on an issue please assign yourself to it (if you are able to) or leave a comment, to avoid duplicate work across contributors.
+
 ## Testing
 
 Every contribution must be tested in an automated test! For further details see the [Testing README](TESTING.md).

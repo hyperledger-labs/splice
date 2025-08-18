@@ -167,7 +167,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[OpenMiningRoundTxLogEntry]
 
-  def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)]
+  final def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
+    lookupRoundOfLatestData().map(_.getOrElse(throw roundNotAggregated()))
+
+  def lookupRoundOfLatestData()(implicit tc: TraceContext): Future[Option[(Long, Instant)]]
 
   def ensureAggregated[T](asOfEndOfRound: Long)(f: => Future[T])(implicit
       tc: TraceContext
@@ -307,6 +310,7 @@ object ScanStore {
       cacheConfigs: ScanCacheConfig,
       enableImportUpdateBackfill: Boolean,
       metrics: DbScanStoreMetrics,
+      initialRound: Long,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -328,6 +332,7 @@ object ScanStore {
             participantId,
             enableImportUpdateBackfill,
             metrics,
+            initialRound,
           ),
           cacheConfigs,
           metrics,

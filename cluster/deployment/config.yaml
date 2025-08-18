@@ -1,13 +1,17 @@
 # Reference configuration options
-#svs:
-#  sv-1:
-#    cometbft:
-#      snapshotName: "nicu-test-cometbft-cloning"
+svs:
+  default:
+    logging:
+      appsLogLevel: DEBUG
+      cantonLogLevel: DEBUG
+      cometbftLogLevel: debug
 infra:
   prometheus:
     retentionDuration: "1y"
     retentionSize: "1500GB"
     storageSize: "2Ti"
+  istio:
+    enableIngressAccessLogging: true
 # configs specific for the pulumi project
 # will be applied to all the stacks in the project
 pulumiProjectConfig:
@@ -16,7 +20,7 @@ pulumiProjectConfig:
     # this for example lets you create the cloud sql instances without having deployments using them, and restoring them from other sources
     installDataOnly: false
     isExternalCluster: false
-    hasPublicDocs: false
+    hasPublicInfo: false
     # For long running production clusters this flag can be set to false to remove pulumi dependencies between our apps.
     # This allows for much faster updates going all at once
     # We don't want this enabled for the initial deployments in ciclusters as the logs would become a lot noisier
@@ -28,9 +32,16 @@ pulumiProjectConfig:
       tier: 'db-custom-2-7680'
       # enable enterprise plus for better performance and faster maintenance
       enterprisePlus: false
+    skipSynchronizerInitialization: true
   sv-runbook:
     cloudSql:
       enabled: false
+validator1:
+  logging:
+    level: DEBUG
+# initial round used only on fresh initialization or resets
+# first SV bootstraps the network with it, other SVs learn it via their sponsors
+initialRound: 0
 ## in the form <pulumi-project>:
 ##                <settings>
 ## ex:
@@ -40,6 +51,8 @@ monitoring:
   alerting:
     enableNoDataAlerts: false
     alerts:
+      delegatelessContention:
+        thresholdPerNamespace: 0.05
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
@@ -49,3 +62,34 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+      mediators:
+        acknowledgementLagSeconds: 900
+multiValidator:
+  postgresPvcSize: '100Gi'
+  resources:
+    participant:
+      requests:
+        cpu: '1'
+        memory: '8Gi'
+      limits:
+        cpu: '6'
+        memory: '16Gi'
+    validator:
+      requests:
+        cpu: '0.5'
+        memory: '2400Mi'
+      limits:
+        cpu: '4'
+        memory: '8Gi'
+    postgres:
+      requests:
+        memory: '5Gi'
+      limits:
+        memory: '12Gi'
+sv:
+  participant:
+    resources:
+      requests:
+        memory: '12Gi'
+      limits:
+        memory: '18Gi'

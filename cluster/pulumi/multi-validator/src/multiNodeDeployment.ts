@@ -33,7 +33,7 @@ interface MultiNodeDeploymentArgs extends BaseMultiNodeArgs {
     ports: k8s.types.input.core.v1.ContainerPort[];
     livenessProbe: k8s.types.input.core.v1.Probe;
     readinessProbe: k8s.types.input.core.v1.Probe;
-    resources: k8s.types.input.core.v1.ResourceRequirements;
+    resources?: k8s.types.input.core.v1.ResourceRequirements;
   };
   serviceSpec: k8s.types.input.core.v1.ServiceSpec;
 }
