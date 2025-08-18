@@ -8,4 +8,6 @@ Failed to acknowledge clean timestamp.*closed stream
 
 The traffic balance request submission timed
 
+The sequencer client's healthy subscriptions count is under the configured BFT threshold
+
 # Make sure to have a trailing newline
