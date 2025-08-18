@@ -62,4 +62,11 @@ trait SequencerBftAdminConnection {
     })
   }
 
+  def listCurrentOutgoingPeerEndpoints()(implicit
+      tc: TraceContext
+  ): Future[Seq[(Option[SequencerId], P2PEndpoint.Id)]] =
+    listCurrentPeerEndpoints().map(_.collect {
+      case (seqId, Some(endpointId)) => (seqId, endpointId)
+    })
+
 }

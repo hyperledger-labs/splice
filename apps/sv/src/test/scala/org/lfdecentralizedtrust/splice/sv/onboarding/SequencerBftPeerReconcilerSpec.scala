@@ -88,7 +88,7 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       ),
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(Future.successful(Seq.empty))
 
     val result = reconciler.diffDsoRulesWithTopology().futureValue.loneElement
@@ -116,12 +116,12 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       ),
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), Some(sequencer1Host)),
-            (Some(sequencer2Id), Some(sequencer2Host)),
+            (Some(sequencer1Id), sequencer1Host),
+            (Some(sequencer2Id), sequencer2Host),
           )
         )
       )
@@ -152,12 +152,12 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       ),
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), Some(sequencer1Host)),
-            (Some(sequencer2Id), Some(sequencer2Host)),
+            (Some(sequencer1Id), sequencer1Host),
+            (Some(sequencer2Id), sequencer2Host),
           )
         )
       )
@@ -182,12 +182,12 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       )
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), Some(sequencer1Host)),
-            (Some(sequencer2Id), Some(sequencer2Host)),
+            (Some(sequencer1Id), sequencer1Host),
+            (Some(sequencer2Id), sequencer2Host),
           )
         )
       )
@@ -213,11 +213,11 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       )
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), Some(sequencer1Host))
+            (Some(sequencer1Id), sequencer1Host)
           )
         )
       )
@@ -247,11 +247,11 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       ),
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (Some(sequencer1Id), Some(sequencer1Host))
+            (Some(sequencer1Id), sequencer1Host)
           )
         )
       )
@@ -275,11 +275,11 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
       )
     )
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (None, Some(sequencer1Host))
+            (None, sequencer1Host)
           )
         )
       )
@@ -296,11 +296,11 @@ class SequencerBftPeerReconcilerSpec extends AnyFlatSpec with BaseTest {
 
     withScanSequencers()
 
-    when(sequencerAdminConnection.listCurrentPeerEndpoints())
+    when(sequencerAdminConnection.listCurrentOutgoingPeerEndpoints())
       .thenReturn(
         Future.successful(
           Seq(
-            (None, Some(sequencer1Host))
+            (None, sequencer1Host)
           )
         )
       )
