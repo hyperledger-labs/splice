@@ -5,3 +5,5 @@ Request failed for sequencer. Is the server running?
 SEQUENCER_SUBSCRIPTION_LOST
 
 Failed to acknowledge clean timestamp.*CANCELLED
+
+The sequencer client's healthy subscriptions count is under the configured BFT threshold
