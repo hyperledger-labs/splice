@@ -69,6 +69,7 @@ class ValidatorAutomationService(
     sequencerSubmissionAmplificationPatience: NonNegativeFiniteDuration,
     contactPoint: String,
     initialSynchronizerTime: Option[CantonTimestamp],
+    maxVettingDelay: NonNegativeFiniteDuration,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -199,6 +200,7 @@ class ValidatorAutomationService(
       participantAdminConnection,
       scanConnection,
       triggerContext,
+      maxVettingDelay,
     )
   )
 

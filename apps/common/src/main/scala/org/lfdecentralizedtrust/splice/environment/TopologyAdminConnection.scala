@@ -41,7 +41,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
-import com.digitalasset.canton.time.FetchTimeResponse
+import com.digitalasset.canton.time.{Clock, FetchTimeResponse}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.{
@@ -704,7 +704,16 @@ abstract class TopologyAdminConnection(
         RecreateOnAuthorizedStateChange.Recreate,
       forceChanges: ForceFlags = ForceFlags.none,
       waitForAuthorization: Boolean = true,
+      maxSubmissionDelay: Option[(Clock, NonNegativeFiniteDuration)] = None,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
+    val minSubmissionTimeO = maxSubmissionDelay.map { case (clock, maxSubmissionDelay) =>
+      val delay: NonNegativeFiniteDuration =
+        NonNegativeFiniteDuration.tryFromJavaDuration(
+          java.time.Duration
+            .ofNanos((math.random() * maxSubmissionDelay.unwrap.toNanos).toLong)
+        )
+      (clock, clock.now + delay.toInternal)
+    }
     withSpan("establish_topology_mapping") { implicit traceContext => _ =>
       logger.info(s"Ensuring that $description")
       retryProvider
@@ -723,17 +732,27 @@ abstract class TopologyAdminConnection(
                 .flatMap { _ =>
                   def proposeNewTopologyTransaction = {
                     val updatedMapping = update(mapping)
-                    proposeMapping(
-                      store,
-                      updatedMapping,
-                      serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
-                      isProposal = isProposal,
-                      forceChanges = forceChanges,
-                    ).map { signed =>
-                      logger.info(
-                        s"Submitted proposal ${signed.mapping} for $description, waiting until the proposal gets accepted"
-                      )
-                      signed.mapping
+                    val sleep: Future[Unit] =
+                      minSubmissionTimeO.fold(Future.unit) { case (clock, minSubmissionTime) =>
+                        logger.info(
+                          s"Waiting until $minSubmissionTime before submitting topology transaction"
+                        )
+                        // This is a noop if minSubmissionTime is in the past.
+                        clock.scheduleAt(_ => (), minSubmissionTime).onShutdown(())
+                      }
+                    sleep.flatMap { _ =>
+                      proposeMapping(
+                        store,
+                        updatedMapping,
+                        serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                        isProposal = isProposal,
+                        forceChanges = forceChanges,
+                      ).map { signed =>
+                        logger.info(
+                          s"Submitted proposal ${signed.mapping} for $description, waiting until the proposal gets accepted"
+                        )
+                        signed.mapping
+                      }
                     }
                   }
 

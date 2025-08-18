@@ -31,6 +31,7 @@ import {
   installLoopback,
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
+  networkWideConfig,
   participantBootstrapDumpSecretName,
   PersistenceConfig,
   sanitizedForPostgres,
@@ -508,6 +509,7 @@ function installSvApp(
     delegatelessAutomationExpectedTaskDuration: delegatelessAutomationExpectedTaskDuration,
     delegatelessAutomationExpiredRewardCouponBatchSize:
       delegatelessAutomationExpiredRewardCouponBatchSize,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: config.logging?.appsLogLevel,
     additionalEnvVars,
   } as ChartValues;

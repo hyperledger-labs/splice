@@ -37,7 +37,7 @@ pulumiProjectConfig:
     # this for example lets you create the cloud sql instances without having deployments using them, and restoring them from other sources
     installDataOnly: false
     isExternalCluster: false
-    hasPublicDocs: false
+    hasPublicInfo: false
     # For long running production clusters this flag can be set to false to remove pulumi dependencies between our apps.
     # This allows for much faster updates going all at once
     # We don't want this enabled for the initial deployments in ciclusters as the logs would become a lot noisier
@@ -79,6 +79,8 @@ monitoring:
         expectedMaxBlocksPerSecond: 3.5
       loadTester:
         minRate: 0.95
+      mediators:
+        acknowledgementLagSeconds: 900
 multiValidator:
   postgresPvcSize: '100Gi'
   resources:
@@ -101,3 +103,10 @@ multiValidator:
         memory: '5Gi'
       limits:
         memory: '12Gi'
+sv:
+  participant:
+    resources:
+      requests:
+        memory: '12Gi'
+      limits:
+        memory: '18Gi'
