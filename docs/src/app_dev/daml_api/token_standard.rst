@@ -10,35 +10,22 @@ Wallet Integration with Token Standard Assets
 
 This page provides wallet developers with guidance on how to integrate with token standard assets.
 Such an integration works by sending the right read and write requests to the Ledger API of the validator node hosting the wallet user's party.
-There are three kinds of integration patterns:
+There are four kinds of integration patterns:
 
   * :ref:`token_standard_usage_reading_contracts`
   * :ref:`token_standard_usage_reading_tx_history`
   * :ref:`token_standard_usage_executing_factory_choice`
-  * :ref:`token_standard_usage_executing_factory_choice`
+  * :ref:`token_standard_usage_executing_nonfactory_choice`
 
-All of these integration patterns are demonstrated in the form of executable code as part of the experimental command-line interface for token standard assets.
+All of these integration patterns are demonstrated in the form of executable code as part of the `experimental command-line interface <https://github.com/hyperledger-labs/splice/tree/main/token-standard#cli>`_ for token standard assets.
 The sections below explaining the patterns below thus all start with a link to the code.
 They then provide additional context for an implementor.
 
-You can find the `ledger's OpenAPI definition <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1>`_.
-This is also accessible at ``http(s)://${YOUR_PARTICIPANT}/docs/openapi``.
+All interaction works via the JSON Ledger API (see its `OpenAPI definition here <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1>`_).
+This OpenAPI definition is also accessible at ``http(s)://${YOUR_PARTICIPANT}/docs/openapi``.
 We encourage developers to use OpenAPI code generation tools as opposed to manually writing HTTP requests.
 
 Check out the :ref:`Authentication section <app-auth>` for more information on how to authenticate the requests.
-
-.. _token_standard_usage_workflows:
-
-Token Standard Workflows
-------------------------
-
-There are three workflows enabled by the Token Standard.
-Refer to the CIP and source code listed here:
-
-  * `Portfolio View <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#wallet-client--portfolio-view>`_
-  * `Direct Peer-to-Peer / Free of Payment (FOP) Transfers <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#direct-peer-to-peer--free-of-payment-fop-transfer-workflow>`_
-  * `Delivery versus Payment (DVP) Transfer Workflows <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#delivery-versus-payment-dvp-transfer-workflows>`_
-
 
 
 .. _token_standard_usage_reading_contracts:
@@ -102,7 +89,7 @@ You can find an `example response for Holdings here <https://github.com/hyperled
 Reading and parsing transaction history involving Token Standard contracts
 --------------------------------------------------------------------------
 
-`Token Standard CLI's code to list transactions <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listHoldingTransactions.ts>`_
+Example code: `Token Standard CLI's code to list transactions <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/listHoldingTransactions.ts>`_
 
 The participant has an `endpoint to list all transactions <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L763>`_ involving the provided parties and interfaces.
 
@@ -133,7 +120,7 @@ To filter for a particular party and interface, it should include a ``filtersByP
 For example:
 
 * ``"$A_PARTY"`` could look like ``test::1220a0db3761b3fc919b55e7ff80ad740824336010bfde8829611c0e64477ab7bee5``.
-* ``"$AN_INTERFACE_ID"`` could be ``#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding``.
+* ``"$AN_INTERFACE_ID"`` could be ``#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding`` to read all ``Holding`` contracts of the specified party.
 
 To include other transaction nodes that don't directly involve the interfaces (e.g., non-interface-specific children nodes),
 a ``WildcardFilter`` can be included in the ``cumulative`` filter array:
@@ -157,8 +144,8 @@ and continue by passing the offset of the last transaction from the previous res
 Parsing the history
 ^^^^^^^^^^^^^^^^^^^
 
-You can find an example parser `here <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/txparse/parser.ts>`_.
-This handles transactions involving the ``Holding`` and ``TransferInstruction`` interfaces.
+Example code: `the parser here <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/txparse/parser.ts>`_.
+It extracts a user-readable wallet history by parsing transactions involving the ``Holding`` and ``TransferInstruction`` interfaces.
 
 The endpoint returns transaction trees as an array.
 The transactions are ordered as they occur in the ledger.
@@ -191,12 +178,13 @@ In each Token Standard exercise node, one can find:
 
 .. warning::
 
-    Meta key/values can be specified in several fields. For transfers, they should be merged in last-write-wins order of:
+    Meta key/values can be specified in several optional fields.
+    For transfers, the values from fields that are present should be merged in last-write-wins order of:
 
-    * event.choiceArgument?.transfer?.meta,
-    * event.choiceArgument?.extraArgs?.meta,
-    * event.choiceArgument?.meta,
-    * event.exerciseResult?.meta,
+    * event.choiceArgument.transfer.meta,
+    * event.choiceArgument.extraArgs.meta,
+    * event.choiceArgument.meta,
+    * event.exerciseResult.meta,
 
 
 .. _token_standard_usage_executing_factory_choice:
@@ -204,14 +192,14 @@ In each Token Standard exercise node, one can find:
 Executing a factory choice
 --------------------------
 
-`Token Standard CLI's code to create a transfer via TransferFactory <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/transfer.ts>`_
+Example code: `Token Standard CLI's code to create a transfer via TransferFactory <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/transfer.ts>`_
 
 To execute a choice via a Token Standard factory, first you need need to fetch the factory from the corresponding registry.
 
 .. note::
 
     The mapping from an instrument's `admin` party-id to the corresponding registry URL needs to be maintained currently by wallets themselves,
-    until a generic solution (likely based on CNS) is implemented.
+    until a generic solution (`likely based on CNS <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#off-ledger-api-discovery-and-access>`_) is implemented.
 
 The registry will return the relevant factory in the corresponding endpoint:
 
@@ -242,7 +230,7 @@ In both cases, you must include an ``ExerciseCommand`` in your payload with the 
 Executing a non-factory choice
 ------------------------------
 
-`Token Standard CLI's code to accept a transfer instruction <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/acceptTransferInstruction.ts>`_
+Example code: `Token Standard CLI's code to accept a transfer instruction <https://github.com/hyperledger-labs/splice/blob/main/token-standard/cli/src/commands/acceptTransferInstruction.ts>`_
 
 To execute a choice on a contract implementing a Token Standard interface for external parties,
 you must call the `prepare <https://github.com/digital-asset/canton/blob/f608ec2cbb7b3e9331b7cc564eb260916606d815/community/ledger/ledger-json-api/src/test/resources/json-api-docs/openapi.yaml#L1#L1553>`_
@@ -273,4 +261,4 @@ The response of these endpoints include two fields:
 .. warning::
 
   Note that ``AllocationRequest_Reject`` and ``AllocationRequest_Withdraw`` should be called with an empty choice context.
-  This is currently there as a potential future extension.
+  This ``ChoiceContext`` is present to allow for potential future extensions of the behavior of implementations of these choices.
