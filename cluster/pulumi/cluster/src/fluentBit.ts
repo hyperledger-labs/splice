@@ -37,6 +37,7 @@ export function installFluentBit(): void {
         '[Output]',
         '    Name stackdriver',
         '    Match kube.*',
+        '    Tag_Prefix  kube.var.log.containers.',
         // This ensures that non-JSON fields get parsed as textPayload
         '    text_payload_key message',
         // This ensures that the k8s labels added by the filter get propagated to the labels field in log explorer
