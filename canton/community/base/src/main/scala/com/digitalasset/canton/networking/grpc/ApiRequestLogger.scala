@@ -241,15 +241,6 @@ class ApiRequestLoggerBase(
       status
     }
 
-  protected def inferRequestTraceContext: TraceContext = {
-    val grpcTraceContext = TraceContextGrpc.fromGrpcContext
-    if (grpcTraceContext.traceId.isDefined) {
-      grpcTraceContext
-    } else {
-      TraceContext.withNewTraceContext("logger")(identity)
-    }
-  }
-
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   protected def traceContextOfMessage[A](message: Any): Option[TraceContext] = {
     import scala.language.reflectiveCalls

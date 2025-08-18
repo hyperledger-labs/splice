@@ -450,7 +450,7 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     for {
       transactionsForHash <- EitherT
         .right[TopologyManagerError](
-          store.findTransactionsAndProposalsByTxHash(effective, Set(transactionHash))
+          store.findLatestTransactionsAndProposalsByTxHash(Set(transactionHash))
         )
       existingTransaction <-
         EitherT.fromEither[FutureUnlessShutdown][
@@ -598,19 +598,29 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
     for {
       // find signing keys
       keys <- determineKeysToUse(transaction.transaction, signingKeys, forceFlags)
-      keyWithUsage = assignExpectedUsageToKeys(
-        transaction.mapping,
-        keys,
-        forSigning = true,
-      )
-      signatures <- keyWithUsage.toList.toNEF.parTraverse { case (key, usage) =>
-        crypto.privateCrypto
-          .sign(transaction.hash.hash, key, usage)
-          .leftMap(err =>
-            TopologyManagerError.InternalError.TopologySigningError(err): TopologyManagerError
+      keysWithNoExistingSignature = keys.diff(transaction.signatures.map(_.authorizingLongTermKey))
+      updatedSignedTransaction <- NonEmpty.from(keysWithNoExistingSignature) match {
+        case Some(keysWithNoExistingSignatureNE) =>
+          val keyWithUsage = assignExpectedUsageToKeys(
+            transaction.mapping,
+            keysWithNoExistingSignatureNE,
+            forSigning = true,
           )
+          keyWithUsage.toList.toNEF
+            .parTraverse { case (key, usage) =>
+              crypto.privateCrypto
+                .sign(transaction.hash.hash, key, usage)
+                .leftMap(err =>
+                  TopologyManagerError.InternalError.TopologySigningError(err): TopologyManagerError
+                )
+            }
+            .map(signatures => transaction.addSingleSignatures(signatures.fromNEF.toSet))
+
+        case None =>
+          logger.info("No keys available to this node can provide additional signatures.")
+          EitherT.rightT[FutureUnlessShutdown, TopologyManagerError](transaction)
       }
-    } yield transaction.addSingleSignatures(signatures.toSet)
+    } yield updatedSignedTransaction
 
   private def determineKeysToUse(
       transaction: GenericTopologyTransaction,
@@ -721,17 +731,28 @@ abstract class TopologyManager[+StoreID <: TopologyStoreId, +CryptoType <: BaseC
 
         transactionsInStore <- EitherT
           .liftF(
-            store.findTransactionsAndProposalsByTxHash(
-              EffectiveTime.MaxValue,
-              transactions.map(_.hash).toSet,
+            store.findLatestTransactionsAndProposalsByTxHash(
+              transactions.map(_.hash).toSet
             )
           )
         existingHashes = transactionsInStore
-          .map(tx => tx.hash -> tx.hashOfSignatures(managerVersion.serialization))
+          .map(tx => tx.hash -> tx)
           .toMap
-        (existingTransactions, newTransactionsOrAdditionalSignatures) = transactions.partition(tx =>
-          existingHashes.get(tx.hash).contains(tx.hashOfSignatures(managerVersion.serialization))
-        )
+        // find transactions that provide new signatures
+        (existingTransactions, newTransactionsOrAdditionalSignatures) = transactions.partition {
+          tx =>
+            existingHashes.get(tx.hash).exists { existingTx =>
+              val newFingerprints = tx.signatures.map(_.authorizingLongTermKey)
+              val existingFingerprints = existingTx.signatures.map(_.authorizingLongTermKey)
+
+              /*
+              Diff is done based on the fingerprint (signedBy) because signatures can be non-deterministic
+              (e.g. with EC-DSA) where the same key produces a different signature for the same hash.
+              This avoids ending up with several signatures for the same key.
+               */
+              newFingerprints.diff(existingFingerprints).isEmpty
+            }
+        }
         _ = logger.debug(
           s"Processing ${newTransactionsOrAdditionalSignatures.size}/${transactions.size} non-duplicate transactions"
         )

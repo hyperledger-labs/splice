@@ -304,7 +304,7 @@ private object MutableCacheBackedContractStoreRaceTests {
   )
 
   private def contract(idx: Long): ThinContract = {
-    val templateId = Identifier.assertFromString(s"somePackage:someModule:someEntity")
+    val templateId = Identifier.assertFromString("pkgId:module:entity")
     val packageName = Ref.PackageName.assertFromString("pkg-name")
     val contractArgument = Value.ValueInt64(idx)
     ThinContract(
@@ -349,7 +349,7 @@ private object MutableCacheBackedContractStoreRaceTests {
               version = contract.version,
             ),
             createTime = CreationTime.CreatedAt(Time.Timestamp.MinValue), // Not used,
-            cantonData = Bytes.Empty,
+            authenticationData = Bytes.Empty,
           ),
           offset,
         )
@@ -453,7 +453,7 @@ private object MutableCacheBackedContractStoreRaceTests {
                       version = contract.version,
                     ),
                     createTime = CreationTime.CreatedAt(Time.Timestamp.MinValue),
-                    cantonData = Bytes.Empty,
+                    authenticationData = Bytes.Empty,
                   )
                 )
               )

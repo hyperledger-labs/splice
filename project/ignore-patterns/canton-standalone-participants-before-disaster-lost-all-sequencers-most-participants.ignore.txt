@@ -6,4 +6,6 @@ SEQUENCER_SUBSCRIPTION_LOST
 
 Failed to acknowledge clean timestamp.*closed stream
 
+The sequencer client's healthy subscriptions count is under the configured BFT threshold
+
 # Make sure to have a trailing newline

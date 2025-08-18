@@ -9,7 +9,147 @@ schedule, i.e. if you add an entry effective at or after the first
 header, prepend the new date header that corresponds to the
 Wednesday after your change.
 
+## until 2025-08-13 (Exclusive)
+
+- **Breaking** In `com/digitalasset/canton/admin/participant/v30/party_management_service.proto` used by Online Party Replication,
+  the `GetAddPartyStatusResponse.Status` enum has been extended with a new value, `FullyReplicatedAcs` shifting the
+  Protobuf ordinals for some existing status enum values.
+
+- **Breaking** Transactions with transient events for which there was an intersection between submitters
+  and querying parties were previously exposed as transactions with empty events in AcsDelta shape. Those transactions
+  will no longer be exposed at all in the AcsDelta shape. As before, they will still be exposed in the LedgerEffects
+  shape.
+
+- **Breaking** Participant divulgence (i.e. if there is a party divulgence, and none of the stakeholders of the divulged contracts
+  are hosted on the participant) is no longer performed in Active Contracts Service and AcsDelta transaction shapes.
+
+## until 2025-08-06 (Exclusive)
+
+- **Breaking** Online Party Replication protocol messages in `com.digitalasset.canton.participant.protocol.v30.party_replication.proto`
+  modified:
+
+  Under `PartyReplicationSourceParticipantMessage`, `SourceParticipantIsReady` removed and `data_or_status`
+  proto ordinals changed.
+
+  Under `PartyReplicationTargetParticipantMessage`, `Initialize` added, `SendAcsSnapshotUpTo` renamed to `SendAcsUpTo`,
+  and `instruction` proto ordinals changed.
+
+- ListConnectedSynchronizersResult.synchronizerId renamed to physicalSynchronizerId
+
+- Add non-standard configuration for `canton.participants.<participant-id>.features.snapshot-dir`. This determines the
+  directory for storing snapshotting data.
+
+- Created and exercised events in AcsDelta transactions now include a flag indicating
+  whether this event would be part of the respective ACS_DELTA shaped stream, and should therefore be considered
+  when tracking contract activeness on the client-side. This way clients with LedgerEffects subscriptions are enabled
+  to track contract lifecycle. The Java bindings and the JSON api messages have been extended accordingly.
+
+- Default postgres version is now 17 (instead of 14)
+- Default Java version to run the tests is 21 (instead of 17).
+  Compilation target is still 17 to continue running on JRE 17.
+
+## until 2025-07-30 (Exclusive)
+
+- Message `Synchronizer` in `com.digitalasset.canton.topology.admin.v30.common.proto` moved from `StoreId` to top level
+- **Breaking** The configuration for the admin-token based authorization has changed.
+
+  Previously, the setting of the admin token string was possible through Ledger API or Admin API configuration like so:
+
+  ```
+  -C canton.participants.<participant-id>.ledger-api.admin-token="<your-token>"
+  or
+  -C canton.participants.<participant-id>.admin-api.admin-token="<your-token>"
+  ```
+
+  Now, it is set through
+
+  ```
+  -C canton.participants.<participant-id>.ledger-api.admin-token-config.fixed-admin-token="<your-token>"
+  or
+  -C canton.participants.<participant-id>.admin-api.admin-token-config.fixed-admin-token="<your-token>"
+  ```
+
+  Other parameters of the admin token can also be set through the `AdminTokenConfig` configuration case class as seen below:
+
+  ```
+  final case class AdminTokenConfig(
+    fixedAdminToken: Option[String] = None,
+    adminTokenDuration: PositiveFiniteDuration = AdminTokenConfig.DefaultAdminTokenDuration,
+    actAsAnyPartyClaim: Boolean = true,
+    adminClaim: Boolean = true,
+  )
+  ```
+
+  The `fixedAdminToken` as `adminToken` did before, defines a token that is valid throughout the entire canton process
+  lifespan. It is only meant for testing purposes and should not be used in production.
+
+  Other admin-tokens will be generated and rotated periodically for internal usage (e.g. in the console).
+  They are invisible from the outside. Each admin-token of these is valid for the defined `adminTokenDuration`.
+  The half of the token duration is used as the rotation interval, after which a new admin-token is generated
+  (if needed) and used. The default value for the token duration is 5 minutes.
+
+  Setting the `actAsAnyPartyClaim` to `true` allows usage of the admin-token to authorize acting-as and reading-as
+  any party in the participant. Similarly, setting the `adminClaim` to `true` allows usage of the admin-token to
+  authorize any admin level operation in the participant. As setting these parameters to `true` is consistent with
+  the past system behavior, it is the default value for now. We are planning to change them both to `false` in the
+  3.4 release to increase default system security. When that happens, the admin-token by default will only be strong
+  enough to issue pings.
+- Previously, ledger API queries using filters allowed interface or template identifiers to be defined in either
+  `package-name` or `package-id` format within the event format (specifically, via the `package_id` field in the `Identifier`
+  message of `InterfaceFilter` and `TemplateFilter` in `CumulativeFilter`).
+  However, the `package-id` format is now deprecated and will be removed in future releases. A warning message will be
+  logged if it is used, as the system internally converts it to the corresponding `package-name` format and resolves
+  the query by `package-name` and not by `package-id`.
+
+## until 2025-07-23 (Exclusive)
+- OTLP trace export configuration has been extended with several new parameters allowing connection to OTLP servers,
+  which require more elaborate set-up:
+    - `trustCollectionPath` should point to a valid CA certificate file. When selected a TLS connection
+      is created instead of an open-text one.
+    - `additionalHeaders` allows specifying key-value pairs that are added to the HTTP2 headers on all trace exporting
+      calls to the OTLP server.
+    - `timeout` sets the maximum time to wait for the collector to process an exported batch of spans.
+      If unset, defaults to 10s.
+    - `connectTimeout` sets the maximum time to wait for new connections to be established. If unset, defaults to 10s.
+- Bugfix: Corrected HTTP method for the JSON Ledger API endpoint `interactive-submission/preferred-packages` from GET to POST.
+- GetConnectedSynchronizers command now can be accessed either with ReadAs or Admin or IDP admin permissions. As a
+  result, the proto command also now has an identityProviderId field.
+
+## until 2025-07-16 (Exclusive)
+- **Breaking** The `ledger_api.parties.allocate` console command expect the SynchronizerId as an `Option[SynchhronizerId]` instead of a `String`.
+- **Breaking** The `synchronizers.id_of` console command returns now the `SynchronizerId` instead of a `PhysicalSynchronizerId`. Another command `synchronizers.physical_id_of` has been added to return the `PhysicalSynchronizerId`.
+
+- The package dependency resolver, which is used in various topology state checks and transaction processing is improved as follows:
+    - The underlying cache is now configurable via `canton.parameters.general.caching.package-dependency-cache`.
+      By default, the cache is size-bounded at 10000 entries and a 15-minutes expiry-after-access eviction policy.
+    - The parallelism of the DB package fetch loader used in the package dependency cache
+      is bounded by the `canton.parameters.general.batching.parallelism` config parameter, which defaults to 8.
+- **Breaking** Renamed mediator scan to mediator inspection for both the commands and the admin API service. Renamed the inspection service gRPC of the participant into ParticipantInspectionService to differentiate from the mediator one.
+
+## Until 2025-07-09 (Exclusive)
+- Sequencer API endpoint `SequencerService.SubscribeV2` has been renamed to `SequencerService.Subscribe`.
+- The limit in the config option `canton.sequencers.sequencer.parameters.sequencer-api-limits` has been renamed accordingly:
+  `"com.digitalasset.canton.sequencer.api.v30.SequencerService/Subscribe" : 1000`
+
+
+
+## Until 2025-07-09 (Exclusive)
+
+- Added new limits for the number of open streams. This allows to limit the number of
+  open streams on the API
+  ```
+  canton.sequencers.sequencer.parameters.sequencer-api-limits = {
+    "com.digitalasset.canton.sequencer.api.v30.SequencerService/DownloadTopologyStateForInit" : 10,
+    "com.digitalasset.canton.sequencer.api.v30.SequencerService/SubscribeV2" : 1000,
+  }
+  ```
+- Authorization of the calls made by the IDP Admins has been tightened. It is no longer possible for them to grant
+  rights to parties which are in other IDPs or in no IDP. This effectively enforces keeping the IDP Admins within
+  their respective IDP boxes. Participant Admins can still grant the rights that cross the IDP box boundaries e.g.
+  A User in IDP A can be given right to a party IDP B.
+
 ## Until 2025-07-02 (Exclusive)
+
 - Adds new gRPC endpoint `GetHighestOffsetByTimestamp` (and console command `find_highest_offset_by_timestamp`) that
   for a given timestamp, finds the highest ledger offset among all events that have record time <= timestamp. This is a
   backward-compatible change, because it's an addition only. It's useful for party replication / major upgrade.

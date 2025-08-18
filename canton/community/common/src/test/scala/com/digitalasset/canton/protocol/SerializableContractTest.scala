@@ -25,6 +25,9 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
 
   private val templateId = ExampleTransactionFactory.templateId
 
+  def fromFatContract(inst: LfFatContractInst): Either[String, SerializableContract] =
+    ContractInstance.toSerializableContract(inst)
+
   "SerializableContractInstance" should {
 
     forEvery(Seq(AuthenticatedContractIdVersionV10, AuthenticatedContractIdVersionV11)) {
@@ -51,13 +54,14 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
             ),
           )
 
-          val sci = ExampleTransactionFactory.asSerializable(
+          val ci = ExampleTransactionFactory.asContractInstance(
             contractId,
             ExampleTransactionFactory.contractInstance(Seq(contractId)),
             metadata,
-            CantonTimestamp.now(),
+            CreationTime.CreatedAt(CantonTimestamp.now().toLf),
             someContractSalt,
           )
+          val sci = SerializableContract.fromLfFatContractInst(ci.inst).value
           SerializableContract.fromProtoVersioned(
             sci.toProtoVersioned(testedProtocolVersion)
           ) shouldEqual Right(sci)
@@ -70,8 +74,8 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
 
     val createdAt = LfTimestamp.Epoch
     val contractSalt = TestSalt.generateSalt(0)
-    val driverMetadata =
-      DriverContractMetadata(contractSalt).toLfBytes(AuthenticatedContractIdVersionV11)
+    val authenticationData =
+      ContractAuthenticationDataV1(contractSalt)(AuthenticatedContractIdVersionV11)
 
     val contractIdDiscriminator = ExampleTransactionFactory.lfHash(0)
     val contractIdSuffix =
@@ -99,14 +103,12 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
       FatContractInstance.fromCreateNode(
         createNode,
         CreationTime.CreatedAt(createdAt),
-        driverMetadata,
+        authenticationData.toLfBytes,
       )
 
     "provided a valid disclosed contract" should {
       "succeed" in {
-        val actual = SerializableContract
-          .fromFatContract(disclosedContract)
-          .value
+        val actual = fromFatContract(disclosedContract).value
 
         actual shouldBe SerializableContract(
           contractId = authenticatedContractId,
@@ -124,38 +126,32 @@ class SerializableContractTest extends AnyWordSpec with BaseTest {
             .value,
           metadata = ContractMetadata.tryCreate(Set(alice), Set(alice), None),
           ledgerCreateTime = CreationTime.CreatedAt(createdAt),
-          contractSalt = contractSalt,
+          authenticationData = authenticationData,
         )
       }
     }
 
     "provided a disclosed contract with unknown contract id format" should {
       "fail" in {
-        SerializableContract
-          .fromFatContract(
-            FatContractInstance.fromCreateNode(
-              createNode.mapCid(_ => invalidFormatContractId),
-              CreationTime.CreatedAt(createdAt),
-              driverMetadata,
-            )
+        fromFatContract(
+          FatContractInstance.fromCreateNode(
+            createNode.mapCid(_ => invalidFormatContractId),
+            CreationTime.CreatedAt(createdAt),
+            authenticationData.toLfBytes,
           )
-          .left
-          .value shouldBe s"Invalid disclosed contract id: malformed contract id '${invalidFormatContractId.toString}'. Suffix 00 is not a supported contract-id prefix"
+        ).left.value shouldBe s"Invalid disclosed contract id: malformed contract id '${invalidFormatContractId.toString}'. Suffix 00 is not a supported contract-id prefix"
       }
     }
 
-    "provided a disclosed contract with missing driver contract metadata" should {
+    "provided a disclosed contract with missing contract authentication data" should {
       "fail" in {
-        SerializableContract
-          .fromFatContract(
-            FatContractInstance.fromCreateNode(
-              createNode,
-              CreationTime.CreatedAt(createdAt),
-              cantonData = Bytes.Empty,
-            )
+        fromFatContract(
+          FatContractInstance.fromCreateNode(
+            createNode,
+            CreationTime.CreatedAt(createdAt),
+            authenticationData = Bytes.Empty,
           )
-          .left
-          .value shouldBe "Missing driver contract metadata in provided disclosed contract"
+        ).left.value shouldBe "Missing authentication data in provided disclosed contract"
       }
     }
   }

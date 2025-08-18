@@ -637,7 +637,7 @@ object RetryProvider {
                           )) ||
                         // This can occur when we try to get the synchronizer time while still being disconnected from the synchronizer
                         statusCode == Status.Code.INVALID_ARGUMENT &&
-                        raw"Time tracker for synchronizer .* not found".r
+                        raw"Not connected to any synchronizer with id".r
                           .findFirstMatchIn(description)
                           .isDefined || // This can occur if the party has not yet been propagated to the ledger API server
                         statusCode == Status.Code.INVALID_ARGUMENT &&

@@ -264,7 +264,7 @@ def onboard_external_party(
                 signed_party_to_participant_transaction,
             ],
             store=common_pb2.StoreId(
-                synchronizer=common_pb2.StoreId.Synchronizer(
+                synchronizer=common_pb2.Synchronizer(
                     id=synchronizer_id,
                 )
             ),
@@ -272,7 +272,6 @@ def onboard_external_party(
     )
     topology_write_client.AddTransactions(add_transactions_request)
     # [Loaded all three transactions onto the participant node]
-
 
     # [Authorize hosting from the confirming node]
     topology_write_client.Authorize(
@@ -287,7 +286,7 @@ def onboard_external_party(
             # - as well as signatures from any other hosting participant
             must_fully_authorize=False,
             store=common_pb2.StoreId(
-                synchronizer=common_pb2.StoreId.Synchronizer(
+                synchronizer=common_pb2.Synchronizer(
                     id=synchronizer_id,
                 ),
             ),
@@ -321,7 +320,7 @@ def wait_to_observe_party_to_participant(
             topology_manager_read_service_pb2.ListPartyToParticipantRequest(
                 base_query=topology_manager_read_service_pb2.BaseQuery(
                     store=common_pb2.StoreId(
-                        synchronizer=common_pb2.StoreId.Synchronizer(
+                        synchronizer=common_pb2.Synchronizer(
                             id=synchronizer_id,
                         )
                     ),
@@ -360,7 +359,7 @@ def build_party_to_key_transaction(
         topology_manager_read_service_pb2.ListPartyToKeyMappingRequest(
             base_query=topology_manager_read_service_pb2.BaseQuery(
                 store=common_pb2.StoreId(
-                    synchronizer=common_pb2.StoreId.Synchronizer(id=synchronizer_id)
+                    synchronizer=common_pb2.Synchronizer(id=synchronizer_id)
                 ),
                 head_state=empty_pb2.Empty(),
             ),

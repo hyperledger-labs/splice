@@ -14,7 +14,13 @@ import com.daml.logging.entries.LoggingEntries
 import com.daml.nameof.NameOf.functionFullName
 import com.daml.tracing.Telemetry
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.auth.{AuthServiceWildcard, CantonAdminTokenAuthService}
+import com.digitalasset.canton.auth.{
+  AuthInterceptor,
+  AuthService,
+  AuthServiceWildcard,
+  CachedJwtVerifierLoader,
+  CantonAdminTokenAuthService,
+}
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -25,7 +31,6 @@ import com.digitalasset.canton.connection.v30.ApiInfoServiceGrpc
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.http.HttpApiServer
 import com.digitalasset.canton.interactive.InteractiveSubmissionEnricher
-import com.digitalasset.canton.ledger.api.auth.CachedJwtVerifierLoader
 import com.digitalasset.canton.ledger.api.health.HealthChecks
 import com.digitalasset.canton.ledger.api.util.TimeProvider
 import com.digitalasset.canton.ledger.api.{
@@ -47,7 +52,7 @@ import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.protocol.ContractAuthenticator
 import com.digitalasset.canton.platform.apiserver.execution.CommandProgressTracker
 import com.digitalasset.canton.platform.apiserver.ratelimiting.{
-  RateLimitingInterceptor,
+  RateLimitingInterceptorFactory,
   ThreadpoolCheck,
 }
 import com.digitalasset.canton.platform.apiserver.services.admin.Utils
@@ -196,21 +201,29 @@ class StartableStoppableLedgerApiServer(
       LoggingContextWithTrace(loggerFactory, telemetry)
 
     val indexServiceConfig = config.serverConfig.indexService
-    val authServices = new CantonAdminTokenAuthService(Some(config.adminToken)) +:
-      (
-        if (config.serverConfig.authServices.isEmpty)
-          List(AuthServiceWildcard)
-        else
+    val authServices =
+      if (config.serverConfig.authServices.isEmpty)
+        List(AuthServiceWildcard)
+      else
+        Seq[AuthService](
+          new CantonAdminTokenAuthService(
+            config.adminTokenDispenser,
+            config.adminParty,
+            config.adminTokenConfig,
+          )
+        ) ++
           config.serverConfig.authServices.map(
             _.create(
               config.serverConfig.jwtTimestampLeeway,
               loggerFactory,
             )
           )
-      )
 
     val jwtVerifierLoader =
-      new CachedJwtVerifierLoader(metrics = config.metrics, loggerFactory = loggerFactory)
+      new CachedJwtVerifierLoader(
+        metrics = Some(config.metrics.identityProviderConfigStore.verifierCache),
+        loggerFactory = loggerFactory,
+      )
 
     val apiInfoService = new GrpcApiInfoService(CantonGrpcUtil.ApiName.LedgerApi)
       with BindableService {
@@ -337,7 +350,7 @@ class StartableStoppableLedgerApiServer(
             ),
       )
 
-      _ <- ApiServiceOwner(
+      (_, authInterceptor) <- ApiServiceOwner(
         indexService = indexService,
         transactionSubmissionTracker = inMemoryState.transactionSubmissionTracker,
         reassignmentSubmissionTracker = inMemoryState.reassignmentSubmissionTracker,
@@ -385,22 +398,20 @@ class StartableStoppableLedgerApiServer(
         engineLoggingConfig = config.cantonParameterConfig.engine.submissionPhaseLogging,
         telemetry = telemetry,
         loggerFactory = loggerFactory,
-        authenticateSerializableContract = contractAuthenticator.authenticateSerializable,
-        authenticateFatContractInstance = contractAuthenticator.authenticateFat,
+        authenticateFatContractInstance = contractAuthenticator.authenticate,
         dynParamGetter = config.syncService.dynamicSynchronizerParameterGetter,
         interactiveSubmissionServiceConfig = config.serverConfig.interactiveSubmissionService,
         interactiveSubmissionEnricher = interactiveSubmissionEnricher,
         keepAlive = config.serverConfig.keepAliveServer,
         packagePreferenceBackend = packagePreferenceBackend,
       )
-      _ <- startHttpApiIfEnabled(timedSyncService)
+      _ <- startHttpApiIfEnabled(timedSyncService, authInterceptor)
       _ <- config.serverConfig.userManagementService.additionalAdminUserId
         .fold(ResourceOwner.unit) { rawUserId =>
           ResourceOwner.forFuture { () =>
             createExtraAdminUser(rawUserId, userManagementStore)
           }
         }
-
     } yield ()
   }
 
@@ -470,7 +481,7 @@ class StartableStoppableLedgerApiServer(
       .newServerInterceptor(),
   ) ::: config.serverConfig.rateLimit
     .map(rateLimit =>
-      RateLimitingInterceptor(
+      RateLimitingInterceptorFactory.create(
         loggerFactory = loggerFactory,
         metrics = config.metrics,
         config = rateLimit,
@@ -504,7 +515,10 @@ class StartableStoppableLedgerApiServer(
     topologyAwarePackageSelection = config.serverConfig.topologyAwarePackageSelection.enabled,
   )
 
-  private def startHttpApiIfEnabled(packageSyncService: PackageSyncService): ResourceOwner[Unit] =
+  private def startHttpApiIfEnabled(
+      packageSyncService: PackageSyncService,
+      authInterceptor: AuthInterceptor,
+  ): ResourceOwner[Unit] =
     config.jsonApiConfig
       .fold(ResourceOwner.unit) { jsonApiConfig =>
         for {
@@ -526,6 +540,7 @@ class StartableStoppableLedgerApiServer(
             channel,
             packageSyncService,
             loggerFactory,
+            authInterceptor,
           )(
             config.jsonApiMetrics
           ).afterReleased(noTracingLogger.info("JSON-API HTTP Server is released"))

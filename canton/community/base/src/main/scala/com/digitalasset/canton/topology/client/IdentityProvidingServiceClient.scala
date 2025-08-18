@@ -17,10 +17,10 @@ import com.digitalasset.canton.crypto.{
   SigningKeyUsage,
   SigningPublicKey,
 }
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.data.{CantonTimestamp, SynchronizerSuccessor}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.{
   DynamicSequencingParametersWithValidity,
   DynamicSynchronizerParameters,
@@ -169,8 +169,9 @@ trait TopologyClientApi[+T] { this: HasFutureSupervision =>
   def awaitSnapshotUSSupervised(description: => String, warnAfter: Duration = 30.seconds)(
       timestamp: CantonTimestamp
   )(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[T] = supervisedUS(description, warnAfter)(awaitSnapshot(timestamp))
+      loggingContext: ErrorLoggingContext
+  ): FutureUnlessShutdown[T] =
+    supervisedUS(description, warnAfter)(awaitSnapshot(timestamp)(loggingContext.traceContext))
 
   /** Returns the topology information at a certain point in time
     *
@@ -276,14 +277,6 @@ trait PartyTopologySnapshotClient {
       parties: Set[LfPartyId],
       check: ParticipantAttributes => Boolean = _ => true,
   )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, Set[LfPartyId], Unit]
-
-  /** Returns the consortium thresholds (how many votes from different participants that host the
-    * consortium party are required for the confirmation to become valid). For normal parties
-    * returns 1.
-    */
-  def consortiumThresholds(parties: Set[LfPartyId])(implicit
-      traceContext: TraceContext
-  ): FutureUnlessShutdown[Map[LfPartyId, PositiveInt]]
 
   /** Returns true if there is at least one participant that satisfies the predicate */
   def isHostedByAtLeastOneParticipantF(
@@ -656,7 +649,7 @@ trait SynchronizerUpgradeClient {
     */
   def isSynchronizerUpgradeOngoing()(implicit
       traceContext: TraceContext
-  ): FutureUnlessShutdown[Option[(PhysicalSynchronizerId, CantonTimestamp)]]
+  ): FutureUnlessShutdown[Option[(SynchronizerSuccessor, EffectiveTime)]]
 
   /** Returns the known sequencer connection details for the successor synchronizer as published by
     * the sequencers.
@@ -980,11 +973,6 @@ private[client] trait PartyTopologySnapshotLoader
       parties: Seq[LfPartyId]
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[LfPartyId, PartyInfo]] =
     loadAndMapPartyInfos(parties, identity)
-
-  final override def consortiumThresholds(
-      parties: Set[LfPartyId]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Map[LfPartyId, PositiveInt]] =
-    loadAndMapPartyInfos(parties.toSeq, _.threshold)
 
   final override def canNotSubmit(
       participant: ParticipantId,

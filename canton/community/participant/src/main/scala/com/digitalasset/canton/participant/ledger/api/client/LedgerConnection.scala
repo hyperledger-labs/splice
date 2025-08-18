@@ -7,12 +7,13 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.v2.transaction_filter.CumulativeFilter.IdentifierFilter
 import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
+  EventFormat,
   Filters,
   TemplateFilter,
-  TransactionFilter,
 }
 import com.daml.ledger.api.v2.value.Identifier
 import com.daml.ledger.javaapi
+import com.digitalasset.canton.auth.CantonAdminTokenDispenser
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.ledger.api.refinements.ApiTypes.UserId
 import com.digitalasset.canton.ledger.client.LedgerClient
@@ -36,7 +37,7 @@ object LedgerConnection {
       commandClientConfiguration: CommandClientConfiguration,
       tracerProvider: TracerProvider,
       loggerFactory: NamedLoggerFactory,
-      token: Option[String] = None,
+      tokenDispenser: Option[CantonAdminTokenDispenser] = None,
   )(implicit
       ec: ExecutionContextExecutor,
       executionSequencerFactory: ExecutionSequencerFactory,
@@ -44,7 +45,7 @@ object LedgerConnection {
     val clientConfig = LedgerClientConfiguration(
       userId = UserId.unwrap(userId),
       commandClient = commandClientConfiguration,
-      token = token,
+      token = () => tokenDispenser.map(_.getCurrentToken.secret),
     )
     val clientChannelConfig = LedgerClientChannelConfiguration(
       sslContext = config.tlsConfig.map(x => ClientChannelBuilder.sslContext(x)),
@@ -63,11 +64,9 @@ object LedgerConnection {
     LedgerClient.withoutToken(builder.build(), clientConfig, loggerFactory)
   }
 
-  // TODO(#26401) return eventFormat
-  @deprecated("Use eventFormat instead", since = "3.4.0")
-  def transactionFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
-    TransactionFilter(
-      filter.map {
+  def eventFormatByParty(filter: Map[PartyId, Seq[Identifier]]): EventFormat =
+    EventFormat(
+      filtersByParty = filter.map {
         case (p, Nil) => p.toProtoPrimitive -> Filters.defaultInstance
         case (p, ts) =>
           p.toProtoPrimitive -> Filters(
@@ -76,7 +75,8 @@ object LedgerConnection {
             )
           )
       },
-      None,
+      filtersForAnyParty = None,
+      verbose = false,
     )
 
   def mapTemplateIds(id: javaapi.data.Identifier): Identifier =

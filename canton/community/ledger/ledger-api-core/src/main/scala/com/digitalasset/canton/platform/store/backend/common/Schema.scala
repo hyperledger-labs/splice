@@ -106,8 +106,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "flat_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.flat_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -134,12 +134,13 @@ private[backend] object AppendOnlySchema {
         "create_key_value_compression" -> fieldStrategy.smallintOptional(_ =>
           _.create_key_value_compression
         ),
-        "driver_metadata" -> fieldStrategy.bytea(_ => _.driver_metadata),
+        "authentication_data" -> fieldStrategy.bytea(_ => _.authentication_data),
         "synchronizer_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.synchronizerId.unsafe.internalize(dbDto.synchronizer_id)
         ),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
         "record_time" -> fieldStrategy.bigint(_ => _.record_time),
+        "external_transaction_hash" -> fieldStrategy.byteaOptional(_ => _.external_transaction_hash),
       )
 
     val exerciseFields: Vector[(String, Field[DbDto.EventExercise, _, _])] =
@@ -168,8 +169,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "tree_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.tree_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -189,6 +190,7 @@ private[backend] object AppendOnlySchema {
         ),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
         "record_time" -> fieldStrategy.bigint(_ => _.record_time),
+        "external_transaction_hash" -> fieldStrategy.byteaOptional(_ => _.external_transaction_hash),
       )
 
     val consumingExerciseFields: Vector[(String, Field[DbDto.EventExercise, _, _])] =
@@ -219,8 +221,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "flat_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.flat_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -253,8 +255,8 @@ private[backend] object AppendOnlySchema {
         "template_id" -> fieldStrategy.int(stringInterning =>
           dbDto => stringInterning.templateId.unsafe.internalize(dbDto.template_id)
         ),
-        "package_name" -> fieldStrategy.int(stringInterning =>
-          dbDto => stringInterning.packageName.unsafe.internalize(dbDto.package_name)
+        "package_id" -> fieldStrategy.int(stringInterning =>
+          dbDto => stringInterning.packageId.unsafe.internalize(dbDto.package_id)
         ),
         "flat_event_witnesses" -> fieldStrategy.intArray(stringInterning =>
           _.flat_event_witnesses.map(stringInterning.party.unsafe.internalize)
@@ -286,7 +288,7 @@ private[backend] object AppendOnlySchema {
           _.create_key_value_compression
         ),
         "ledger_effective_time" -> fieldStrategy.bigint(_ => _.ledger_effective_time),
-        "driver_metadata" -> fieldStrategy.bytea(_ => _.driver_metadata),
+        "authentication_data" -> fieldStrategy.bytea(_ => _.authentication_data),
         "trace_context" -> fieldStrategy.bytea(_ => _.trace_context),
         "record_time" -> fieldStrategy.bigint(_ => _.record_time),
       )

@@ -7,7 +7,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{ProcessingTimeout, SessionSigningKeysConfig}
+import com.digitalasset.canton.config.{CacheConfig, ProcessingTimeout, SessionSigningKeysConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.EncryptionAlgorithmSpec.RsaOaepSha256
 import com.digitalasset.canton.crypto.HashAlgorithm.Sha256
@@ -59,6 +59,7 @@ class SyncCryptoSignerWithSessionKeys(
     member: Member,
     signPrivateApiWithLongTermKeys: SigningPrivateOps,
     sessionSigningKeysConfig: SessionSigningKeysConfig,
+    publicKeyConversionCacheConfig: CacheConfig,
     futureSupervisor: FutureSupervisor,
     override val timeouts: ProcessingTimeout,
     override val loggerFactory: NamedLoggerFactory,
@@ -71,19 +72,21 @@ class SyncCryptoSignerWithSessionKeys(
     * signing key (generated in software). Except for the signing scheme, when signing with session
     * keys is enabled, all other schemes are not needed. Therefore, we use fixed schemes (i.e.
     * placeholders) for the other crypto parameters.
-    *
-    * //TODO(#23731): Split up pure crypto into smaller modules and only use the signing module here
     */
   private lazy val signPublicApiSoftwareBased: SynchronizerCryptoPureApi = {
     val pureCryptoForSessionKeys = new JcePureCrypto(
       defaultSymmetricKeyScheme = Aes128Gcm, // not used
-      defaultSigningAlgorithmSpec = sessionSigningKeysConfig.signingAlgorithmSpec,
-      supportedSigningAlgorithmSpecs =
+      signingAlgorithmSpecs = CryptoScheme(
+        sessionSigningKeysConfig.signingAlgorithmSpec,
         NonEmpty.mk(Set, sessionSigningKeysConfig.signingAlgorithmSpec),
-      defaultEncryptionAlgorithmSpec = RsaOaepSha256, // not used
-      supportedEncryptionAlgorithmSpecs = NonEmpty.mk(Set, RsaOaepSha256), // not used
+      ),
+      encryptionAlgorithmSpecs =
+        CryptoScheme(RsaOaepSha256, NonEmpty.mk(Set, RsaOaepSha256)), // not used
       defaultHashAlgorithm = Sha256, // not used
       defaultPbkdfScheme = PbkdfScheme.Argon2idMode1, // not used
+      publicKeyConversionCacheConfig,
+      // this `JcePureCrypto` object only holds private key conversions spawned from sign calls
+      privateKeyConversionCacheTtl = Some(sessionSigningKeysConfig.keyEvictionPeriod.underlying),
       loggerFactory = loggerFactory,
     )
 
@@ -133,7 +136,6 @@ class SyncCryptoSignerWithSessionKeys(
   @VisibleForTesting
   private[crypto] val sessionKeysSigningCache: Cache[Fingerprint, SessionKeyAndDelegation] =
     Scaffeine()
-      // TODO(#24566): Use scheduler instead of expireAfter
       .expireAfter[Fingerprint, SessionKeyAndDelegation](
         create = (_, _) => sessionKeyEvictionPeriod.get(),
         update = (_, _, d) => d,
@@ -233,7 +235,6 @@ class SyncCryptoSignerWithSessionKeys(
      */
     val margin = cutOffDuration.asJava.dividedBy(2) // cuttoff/2
     val validityStart =
-      // TODO(#25524): Add unit test to check that this IllegalArgumentException is correctly thrown
       Either
         .catchOnly[IllegalArgumentException](
           topologySnapshot.timestamp.minus(margin)

@@ -78,11 +78,7 @@ trait RepairTestUtil {
       .value
       ._2
 
-    RepairContract(
-      synchronizerId,
-      contract,
-      ReassignmentCounter.Genesis,
-    )
+    RepairContract(synchronizerId, contract.inst, ReassignmentCounter.Genesis)
   }
 
   protected def createContractInstance(

@@ -3,14 +3,8 @@
 
 package com.digitalasset.canton.ledger.localstore
 
-import com.digitalasset.daml.lf.data.Ref
-import com.digitalasset.daml.lf.data.Ref.{LedgerString, Party}
-import com.digitalasset.canton.ledger.api.{
-  IdentityProviderConfig,
-  IdentityProviderId,
-  JwksUrl,
-  ObjectMeta,
-}
+import com.daml.jwt.JwksUrl
+import com.digitalasset.canton.ledger.api.{IdentityProviderConfig, IdentityProviderId, ObjectMeta}
 import com.digitalasset.canton.ledger.localstore.api.PartyRecordStore.{
   PartyNotFound,
   PartyRecordExistsFatal,

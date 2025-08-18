@@ -413,6 +413,7 @@ object UpdateHistoryTestBase {
       /*signatories = */ created.getSignatories,
       /*observers = */ created.getObservers,
       /*createdAt = */ created.getCreatedAt,
+      /*acsDelta = */ false, // Not preserved
     )
   }
 
@@ -442,6 +443,7 @@ object UpdateHistoryTestBase {
       ),
       /*exerciseResult = */ exercised.getExerciseResult,
       /*implementedInterfaces = */ exercised.getImplementedInterfaces,
+      /*acsDelta = */ false, // Not preserved
     )
   }
 

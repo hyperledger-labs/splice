@@ -6,7 +6,8 @@ package com.digitalasset.canton.participant.protocol.reassignment
 import cats.data.*
 import cats.syntax.functor.*
 import cats.syntax.traverse.*
-import com.digitalasset.canton.data.{FullUnassignmentTree, ReassignmentRef}
+import com.digitalasset.canton.LfPartyId
+import com.digitalasset.canton.data.{FullUnassignmentTree, ReassignmentRef, UnassignmentData}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.participant.protocol.conflictdetection.ActivenessResult
 import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentProcessingSteps.*
@@ -42,6 +43,7 @@ private[reassignment] class UnassignmentValidation(
   ): EitherT[FutureUnlessShutdown, ReassignmentProcessorError, UnassignmentValidationResult] = {
     val fullTree = parsedRequest.fullViewTree
     val sourceTopology = Source(parsedRequest.snapshot.ipsSnapshot)
+    val isReassigningParticipant = fullTree.isReassigningParticipant(participantId)
 
     for {
       commonValidationResult <- EitherT.right(
@@ -59,29 +61,29 @@ private[reassignment] class UnassignmentValidation(
           EitherT.right(FutureUnlessShutdown.pure(ReassigningParticipantValidationResult(Nil)))
       }
 
-      hostedStakeholders <- EitherT.right(
-        sourceTopology.unwrap
-          .hostedOn(fullTree.stakeholders.all, participantId)
-          .map(_.keySet)
+      hostedConfirmingReassigningParties <- EitherT.right(
+        if (isReassigningParticipant)
+          sourceTopology.unwrap.canConfirm(
+            participantId,
+            parsedRequest.fullViewTree.confirmingParties,
+          )
+        else
+          FutureUnlessShutdown.pure(Set.empty[LfPartyId])
       )
 
       assignmentExclusivity <- targetTopology.traverse { targetTopology =>
         ProcessingSteps
           .getAssignmentExclusivity(targetTopology, fullTree.targetTimeProof.timestamp)
-          .leftMap(
-            ReassignmentParametersError(
-              fullTree.targetSynchronizer.unwrap.logical,
-              _,
-            ): ReassignmentProcessorError
+          .leftMap[ReassignmentProcessorError](
+            ReassignmentParametersError(fullTree.targetSynchronizer.unwrap, _)
           )
       }
 
     } yield UnassignmentValidationResult(
-      fullTree = fullTree,
-      reassignmentId = parsedRequest.reassignmentId,
-      hostedStakeholders = hostedStakeholders,
+      unassignmentData = UnassignmentData(fullTree, parsedRequest.requestTimestamp),
+      rootHash = parsedRequest.rootHash,
+      hostedConfirmingReassigningParties = hostedConfirmingReassigningParties,
       assignmentExclusivity = assignmentExclusivity,
-      unassignmentTs = parsedRequest.requestTimestamp,
       commonValidationResult = commonValidationResult,
       reassigningParticipantValidationResult = reassigningParticipantValidationResult,
     )
@@ -95,13 +97,14 @@ private[reassignment] class UnassignmentValidation(
   ): FutureUnlessShutdown[UnassignmentValidationResult.CommonValidationResult] = {
     val fullTree = parsedRequest.fullViewTree
     val sourceTopologySnapshot = Source(parsedRequest.snapshot.ipsSnapshot)
-    val metadataResultET = ReassignmentValidation.checkMetadata(contractAuthenticator, fullTree)
+    val authenticationResultET =
+      ReassignmentValidation.checkMetadata(contractAuthenticator, fullTree)
 
     for {
       activenessResult <- activenessF
       authenticationErrorO <- AuthenticationValidator.verifyViewSignature(parsedRequest)
 
-      // The metadata is validated in the `metadataResultET`, this is why we can use it here.
+      // The contract instance is validated in the `authenticationResultET`, this is why we can use it here.
       expectedStakeholders = fullTree.contracts.stakeholders
 
       submitterCheckResult <-
@@ -119,7 +122,7 @@ private[reassignment] class UnassignmentValidation(
     } yield UnassignmentValidationResult.CommonValidationResult(
       activenessResult = activenessResult,
       participantSignatureVerificationResult = authenticationErrorO,
-      contractAuthenticationResultF = metadataResultET,
+      contractAuthenticationResultF = authenticationResultET,
       submitterCheckResult = submitterCheckResult,
     )
   }

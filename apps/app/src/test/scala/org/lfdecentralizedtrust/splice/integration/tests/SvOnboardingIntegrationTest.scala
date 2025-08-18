@@ -133,7 +133,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties
         .allocate(
           name,
-          synchronizerId = decentralizedSynchronizerId.toProtoPrimitive,
+          synchronizerId = Some(decentralizedSynchronizerId),
         )
         .party
 

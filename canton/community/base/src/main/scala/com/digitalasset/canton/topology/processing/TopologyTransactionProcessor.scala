@@ -30,7 +30,10 @@ import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor.
 import com.digitalasset.canton.topology.store.TopologyStore.Change
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction.GenericSignedTopologyTransaction
-import com.digitalasset.canton.topology.transaction.ValidatingTopologyMappingChecks
+import com.digitalasset.canton.topology.transaction.{
+  SynchronizerUpgradeAnnouncement,
+  ValidatingTopologyMappingChecks,
+}
 import com.digitalasset.canton.topology.{
   PhysicalSynchronizerId,
   TopologyManagerError,
@@ -58,7 +61,7 @@ class TopologyTransactionProcessor(
     pureCrypto: SynchronizerCryptoPureApi,
     store: TopologyStore[TopologyStoreId.SynchronizerStore],
     acsCommitmentScheduleEffectiveTime: Traced[EffectiveTime] => Unit,
-    terminateProcessing: TerminateProcessing,
+    val terminateProcessing: TerminateProcessing,
     futureSupervisor: FutureSupervisor,
     exitOnFatalFailures: Boolean,
     timeouts: ProcessingTimeout,
@@ -480,6 +483,21 @@ class TopologyTransactionProcessor(
       validTransactions = validated.collect {
         case tx if tx.rejectionReason.isEmpty && !tx.transaction.isProposal => tx.transaction
       }
+
+      /*
+      As part of terminate processing, the record order publisher is informed of the successor.
+      Doing that before the listener are informed ensures that any subsequent sequencer message will not be handled
+      before the record order publisher gets pinged.
+       */
+      validUpgradeAnnouncements = validTransactions
+        .mapFilter(_.selectMapping[SynchronizerUpgradeAnnouncement])
+        .map(_.mapping)
+
+      // TODO(#26580) Handle cancellation
+      _ = validUpgradeAnnouncements.foreach(announcement =>
+        terminateProcessing.notifyUpgradeAnnouncement(announcement.successor)
+      )
+
       _ <- synchronizeWithClosing("notify-topology-transaction-observers")(
         MonadUtil.sequentialTraverse(listeners.get()) { listenerGroup =>
           logger.debug(

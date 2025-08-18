@@ -1,0 +1,122 @@
+// Copyright (c) 2025 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.digitalasset.canton.auth
+
+import com.auth0.jwk.{JwkException, UrlJwkProvider}
+import com.auth0.jwt.algorithms.Algorithm
+import com.daml.jwt.{
+  ECDSAVerifier,
+  Error as JwtError,
+  JwksUrl,
+  JwtException,
+  JwtTimestampLeeway,
+  JwtVerifier,
+  RSA256Verifier,
+}
+import com.digitalasset.canton.auth.CachedJwtVerifierLoader.CacheKey
+import com.digitalasset.canton.caching.ScaffeineCache
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.metrics.CacheMetrics
+import com.github.blemale.scaffeine.Scaffeine
+import scalaz.{-\/, \/}
+
+import java.security.interfaces.{ECPublicKey, RSAPublicKey}
+import java.util.concurrent.TimeUnit
+import scala.concurrent.Future
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
+/** A JWK verifier loader, where the public keys are automatically fetched from the given JWKS URL.
+  * The keys are then transformed into JWK Verifier
+  *
+  * The verifiers are kept in cache, in order to prevent having to do a remote network access for
+  * each token validation.
+  *
+  * The cache is limited both in size and time. A size limit protects against infinitely growing
+  * memory consumption. A time limit is a safety catch for the case where a public key is used to
+  * sign a token without an expiration time and then is revoked.
+  *
+  * @param cacheMaxSize
+  *   Maximum number of public keys to keep in the cache.
+  * @param cacheExpirationTime
+  *   Maximum time to keep public keys in the cache.
+  * @param connectionTimeout
+  *   Timeout for connecting to the JWKS URL.
+  * @param readTimeout
+  *   Timeout for reading from the JWKS URL.
+  */
+class CachedJwtVerifierLoader(
+    // Large enough such that malicious users can't cycle through all keys from reasonably sized JWKS,
+    // forcing cache eviction and thus introducing additional latency.
+    cacheMaxSize: Long = 1000,
+    cacheExpiration: FiniteDuration = 10.hours,
+    connectionTimeout: Long = 10,
+    connectionTimeoutUnit: TimeUnit = TimeUnit.SECONDS,
+    readTimeout: Long = 10,
+    readTimeoutUnit: TimeUnit = TimeUnit.SECONDS,
+    jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
+    metrics: Option[CacheMetrics] = None,
+    override protected val loggerFactory: NamedLoggerFactory,
+) extends JwtVerifierLoader
+    with NamedLogging {
+
+  private val cache: ScaffeineCache.TunnelledAsyncLoadingCache[Future, CacheKey, JwtVerifier] =
+    ScaffeineCache.buildAsync[Future, CacheKey, JwtVerifier](
+      Scaffeine()
+        .expireAfterWrite(cacheExpiration)
+        .maximumSize(cacheMaxSize),
+      loader = getVerifier,
+      metrics = metrics,
+    )(logger, "cache")
+
+  override def loadJwtVerifier(jwksUrl: JwksUrl, keyId: Option[String]): Future[JwtVerifier] =
+    cache.get(CacheKey(jwksUrl, keyId))
+
+  private def jwkProvider(jwksUrl: JwksUrl) =
+    new UrlJwkProvider(
+      jwksUrl.toURL,
+      Integer.valueOf(
+        connectionTimeoutUnit.toMillis(connectionTimeout).toInt
+      ),
+      Integer.valueOf(readTimeoutUnit.toMillis(readTimeout).toInt),
+    )
+
+  private def getVerifier(
+      key: CacheKey
+  ): Future[JwtVerifier] =
+    fromDisjunction(getVerifierImpl(key))
+
+  @SuppressWarnings(
+    Array("org.wartremover.warts.Null")
+  )
+  private[this] def getVerifierImpl(cacheKey: CacheKey): JwtError \/ JwtVerifier =
+    try {
+      val jwk = jwkProvider(cacheKey.jwksUrl).get(cacheKey.keyId.orNull)
+      val publicKey = jwk.getPublicKey
+      publicKey match {
+        case rsa: RSAPublicKey => RSA256Verifier(rsa, jwtTimestampLeeway)
+        case ec: ECPublicKey if ec.getParams.getCurve.getField.getFieldSize == 256 =>
+          ECDSAVerifier(Algorithm.ECDSA256(ec, null), jwtTimestampLeeway)
+        case ec: ECPublicKey if ec.getParams.getCurve.getField.getFieldSize == 521 =>
+          ECDSAVerifier(Algorithm.ECDSA512(ec, null), jwtTimestampLeeway)
+        case key =>
+          -\/(JwtError(Symbol("getVerifier"), s"Unsupported public key format ${key.getFormat}"))
+      }
+    } catch {
+      case e: JwkException => -\/(JwtError(Symbol("getVerifier"), e.toString))
+      case _: Throwable =>
+        -\/(JwtError(Symbol("getVerifier"), s"Unknown error while getting jwk from http"))
+    }
+
+  private def fromDisjunction[T](e: \/[JwtError, T]): Future[T] =
+    e.fold(err => Future.failed(JwtException(err)), Future.successful)
+
+}
+
+object CachedJwtVerifierLoader {
+
+  final case class CacheKey(
+      jwksUrl: JwksUrl,
+      keyId: Option[String],
+  )
+}

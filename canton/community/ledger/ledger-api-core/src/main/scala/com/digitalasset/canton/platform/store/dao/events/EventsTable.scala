@@ -39,6 +39,7 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
   RawParticipantAuthorization,
 }
 import com.digitalasset.canton.platform.store.utils.EventOps.TreeEventOps
+import com.google.protobuf.ByteString
 
 import scala.annotation.nowarn
 
@@ -62,12 +63,10 @@ object EventsTable {
         val events = entries.iterator.map(_.event).toVector
         transactionShape match {
           case AcsDelta =>
-            val nonTransient = TransactionConversion.removeTransient(events)
-            // Allows emitting AcsDelta transactions with no events for providing completion evidence for submitter-witnesses.
-            Option.when(nonTransient.nonEmpty || first.commandId.nonEmpty)(
+            Option.when(events.nonEmpty)(
               toApiTransaction(
                 first = first,
-                events = nonTransient,
+                events = events,
                 traceContext = extractTraceContext(entries),
               )
             )
@@ -98,6 +97,7 @@ object EventsTable {
         synchronizerId = first.synchronizerId,
         traceContext = traceContext,
         recordTime = Some(TimestampConversion.fromLf(first.recordTime)),
+        externalTransactionHash = first.externalTransactionHash.map(ByteString.copyFrom),
       )
 
     def toGetTransactionsResponse(

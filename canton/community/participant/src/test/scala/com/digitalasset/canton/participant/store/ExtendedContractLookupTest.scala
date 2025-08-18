@@ -3,29 +3,19 @@
 
 package com.digitalasset.canton.participant.store
 
-import cats.syntax.either.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.participant.protocol.ContractAuthenticator
+import com.digitalasset.canton.participant.protocol.DummyContractAuthenticator
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.ExampleTransactionFactory.packageName
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{BaseTest, FailOnShutdown, LfPartyId}
+import com.digitalasset.daml.lf.transaction.CreationTime
 import com.digitalasset.daml.lf.value.Value.{ValueText, ValueUnit}
 import org.scalatest.wordspec.AsyncWordSpec
 
 class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOnShutdown {
 
   import com.digitalasset.canton.protocol.ExampleTransactionFactory.suffixedId
-
-  private object dummyAuthenticator extends ContractAuthenticator {
-    override def authenticateSerializable(contract: SerializableContract): Either[String, Unit] =
-      Either.unit
-    override def authenticateFat(contract: LfFatContractInst): Either[String, Unit] = Either.unit
-    override def verifyMetadata(
-        contract: SerializableContract,
-        metadata: ContractMetadata,
-    ): Either[String, Unit] = Either.unit
-  }
 
   private val coid00: LfContractId = suffixedId(0, 0)
   private val coid01: LfContractId = suffixedId(0, 1)
@@ -59,26 +49,26 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
         overrideContractId = Some(coid01),
         signatories = metadata2.signatories,
         stakeholders = metadata2.stakeholders,
-        createdAt = let0.underlying,
+        createdAt = CreationTime.CreatedAt(let0.toLf),
       ),
       coid20 -> ExampleContractFactory.build(
         overrideContractId = Some(coid20),
         signatories = metadata2.signatories,
         stakeholders = metadata2.stakeholders,
-        createdAt = let1.underlying,
+        createdAt = CreationTime.CreatedAt(let1.toLf),
       ),
       coid21 -> ExampleContractFactory.build(
         overrideContractId = Some(coid21),
         signatories = metadata2.signatories,
         stakeholders = metadata2.stakeholders,
-        createdAt = let0.underlying,
+        createdAt = CreationTime.CreatedAt(let0.toLf),
       ),
     )
 
     val extendedStore = new ExtendedContractLookup(
       overwrites,
       Map(key00 -> Some(coid00), key1 -> None),
-      dummyAuthenticator,
+      DummyContractAuthenticator,
     )
 
     "not make up contracts" in {
@@ -113,7 +103,7 @@ class ExtendedContractLookupTest extends AsyncWordSpec with BaseTest with FailOn
         new ExtendedContractLookup(
           Map(coid10 -> contract),
           Map.empty,
-          dummyAuthenticator,
+          DummyContractAuthenticator,
         )
       )
     }

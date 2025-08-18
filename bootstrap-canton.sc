@@ -107,7 +107,7 @@ Files.write(
 println(s"Collecting admin tokens...")
 val adminTokensData = ListBuffer[(String, String)]()
 participants.local.foreach(participant => {
-  val adminToken = participant.underlying.map(_.adminToken.secret).getOrElse("")
+  val adminToken = participant.underlying.map(_.adminTokenDispenser.getCurrentToken.secret).getOrElse("")
   val port = participant.config.ledgerApi.internalPort.get.unwrap
   adminTokensData.append(s"$port" -> adminToken)
 })

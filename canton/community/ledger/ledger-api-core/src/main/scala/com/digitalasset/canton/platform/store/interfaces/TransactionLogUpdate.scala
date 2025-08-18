@@ -4,6 +4,7 @@
 package com.digitalasset.canton.platform.store.interfaces
 
 import com.daml.ledger.api.v2.command_completion_service.CompletionStreamResponse
+import com.digitalasset.canton.crypto.Hash as CantonHash
 import com.digitalasset.canton.data.Offset
 import com.digitalasset.canton.ledger.api.TransactionShape
 import com.digitalasset.canton.ledger.api.TransactionShape.{AcsDelta, LedgerEffects}
@@ -56,6 +57,7 @@ object TransactionLogUpdate {
       completionStreamResponse: Option[CompletionStreamResponse],
       synchronizerId: String,
       recordTime: Timestamp,
+      externalTransactionHash: Option[CantonHash],
   )(implicit override val traceContext: TraceContext)
       extends TransactionLogUpdate
 
@@ -109,6 +111,7 @@ object TransactionLogUpdate {
     def witnesses(transactionShape: TransactionShape): Set[Party]
     def submitters: Set[Party]
     def templateId: Identifier
+    def packageName: PackageName
     def contractId: ContractId
   }
 
@@ -134,7 +137,7 @@ object TransactionLogUpdate {
       createKeyHash: Option[Hash],
       createKey: Option[GlobalKey],
       createKeyMaintainers: Option[Set[Party]],
-      driverMetadata: Bytes,
+      authenticationData: Bytes,
   ) extends Event {
     def witnesses(transactionShape: TransactionShape): Set[Party] =
       transactionShape match {

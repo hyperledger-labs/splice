@@ -22,8 +22,6 @@ import scala.concurrent.ExecutionContext
   * crucial because a malicious counter participant could potentially use a downgraded scheme. For
   * other methods, such as key generation, or signing by this (honest) participant, we rely on the
   * synchronizer handshake to ensure that only supported schemes within the synchronizer are used.
-  *
-  * TODO(#25260): Refactor SynchronizerCryptoPrivateApi
   */
 final class SynchronizerCryptoPrivateApi(
     override val staticSynchronizerParameters: StaticSynchronizerParameters,
@@ -53,7 +51,11 @@ final class SynchronizerCryptoPrivateApi(
       res <- privateCrypto.decrypt(encrypted)(deserialize)
     } yield res
 
-  override def defaultEncryptionKeySpec: EncryptionKeySpec = privateCrypto.defaultEncryptionKeySpec
+  override def encryptionAlgorithmSpecs: CryptoScheme[EncryptionAlgorithmSpec] =
+    privateCrypto.encryptionAlgorithmSpecs
+
+  override def encryptionKeySpecs: CryptoScheme[EncryptionKeySpec] =
+    privateCrypto.encryptionKeySpecs
 
   override def generateEncryptionKey(
       keySpec: EncryptionKeySpec,
@@ -67,10 +69,10 @@ final class SynchronizerCryptoPrivateApi(
 
   override protected def initialHealthState: ComponentHealthState = getInitialHealthState
 
-  override def defaultSigningAlgorithmSpec: SigningAlgorithmSpec =
-    privateCrypto.defaultSigningAlgorithmSpec
+  override def signingAlgorithmSpecs: CryptoScheme[SigningAlgorithmSpec] =
+    privateCrypto.signingAlgorithmSpecs
 
-  override def defaultSigningKeySpec: SigningKeySpec = privateCrypto.defaultSigningKeySpec
+  override def signingKeySpecs: CryptoScheme[SigningKeySpec] = privateCrypto.signingKeySpecs
 
   override def signBytes(
       bytes: ByteString,

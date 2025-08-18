@@ -20,16 +20,17 @@ import com.digitalasset.canton.health.{
   CloseableHealthComponent,
   ComponentHealthState,
 }
-import com.digitalasset.canton.ledger.participant.state.{SubmitterInfo, TransactionMeta}
+import com.digitalasset.canton.ledger.participant.state.{
+  AcsChange,
+  ContractStakeholdersAndReassignmentCounter,
+  SubmitterInfo,
+  TransactionMeta,
+}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageService
-import com.digitalasset.canton.participant.event.{
-  AcsChange,
-  ContractStakeholdersAndReassignmentCounter,
-  RecordTime,
-}
+import com.digitalasset.canton.participant.event.RecordTime
 import com.digitalasset.canton.participant.metrics.ConnectedSynchronizerMetrics
 import com.digitalasset.canton.participant.protocol.*
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.SubmissionDuringShutdown
@@ -327,12 +328,9 @@ class ConnectedSynchronizer(
         f: FutureUnlessShutdown[A]
     ): EitherT[FutureUnlessShutdown, ConnectedSynchronizerInitializationError, A] = EitherT.right(f)
 
-    def withMetadataSeq(cids: Seq[LfContractId]): FutureUnlessShutdown[Seq[SerializableContract]] =
+    def withMetadataSeq(cids: Seq[LfContractId]): FutureUnlessShutdown[Seq[ContractInstance]] =
       participantNodePersistentState.value.contractStore
         .lookupManyExistingUncached(cids)
-        .map(
-          _.map(_.serializable)
-        ) // TODO(#26348) - use fat contract downstream
         .valueOr { missingContractId =>
           ErrorUtil.internalError(
             new IllegalStateException(
@@ -361,7 +359,7 @@ class ConnectedSynchronizer(
           activations = storedActivatedContracts
             .map(c =>
               c.contractId -> ContractStakeholdersAndReassignmentCounter(
-                c.metadata.stakeholders,
+                c.stakeholders,
                 change.activations(c.contractId).reassignmentCounter,
               )
             )
@@ -370,7 +368,7 @@ class ConnectedSynchronizer(
             .map(c =>
               c.contractId ->
                 ContractStakeholdersAndReassignmentCounter(
-                  c.metadata.stakeholders,
+                  c.stakeholders,
                   change.deactivations(c.contractId).reassignmentCounter,
                 )
             )
@@ -530,7 +528,7 @@ class ConnectedSynchronizer(
         clock,
         logger,
         parameters.delayLoggingThreshold,
-        metrics.sequencerClient.handler.delay,
+        metrics.sequencerClient.handler.sequencingTimeMetrics,
       )
 
       def firstUnpersistedEventScF: FutureUnlessShutdown[SequencerCounter] =
@@ -570,8 +568,7 @@ class ConnectedSynchronizer(
       // Initialize, replay and process stored events, then subscribe to new events
       (for {
         _ <- initialize(initializationTraceContext)
-        firstUnpersistedEventSc <- EitherT
-          .liftF(firstUnpersistedEventScF)
+        firstUnpersistedEventSc <- EitherT.liftF(firstUnpersistedEventScF)
 
         monitor = new ConnectedSynchronizer.EventProcessingMonitor(
           ephemeral.startingPoints,
@@ -638,6 +635,11 @@ class ConnectedSynchronizer(
             )(initializationTraceContext)
           )
 
+        // Notify the listeners to the upcoming upgrade, if any
+        _ = ephemeral.recordOrderPublisher.getSynchronizerSuccessor.foreach(
+          topologyProcessor.terminateProcessing.notifyUpgradeAnnouncement
+        )
+
         // wait for initial topology transactions to be sequenced and received before we start computing pending
         // topology transactions to push for IDM approval
         _ <- waitForParticipantToBeInTopology(initializationTraceContext)
@@ -686,10 +688,10 @@ class ConnectedSynchronizer(
                 Target(psid),
                 Target(staticSynchronizerParameters),
                 reassignmentCoordination,
-                data.contracts.stakeholders.all,
-                data.unassignmentRequest.submitterMetadata,
+                data.contractsBatch.stakeholders.all,
+                data.submitterMetadata,
                 participantId,
-                data.unassignmentRequest.targetTimeProof.timestamp,
+                data.targetTimestamp,
               )
             )
             eitherF.leftMap(err => data.reassignmentId -> err).value
@@ -771,7 +773,7 @@ class ConnectedSynchronizer(
       transactionMeta: TransactionMeta,
       keyResolver: LfKeyResolver,
       transaction: WellFormedTransaction[WithoutSuffixes],
-      disclosedContracts: Map[LfContractId, SerializableContract],
+      disclosedContracts: Map[LfContractId, ContractInstance],
       topologySnapshot: TopologySnapshot,
   )(implicit
       traceContext: TraceContext

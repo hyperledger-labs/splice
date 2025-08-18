@@ -13,6 +13,7 @@ import com.digitalasset.canton.data.{
   ReassignmentSubmitterMetadata,
 }
 import com.digitalasset.canton.ledger.participant.state.{
+  AcsChangeFactory,
   CompletionInfo,
   Reassignment,
   ReassignmentInfo,
@@ -26,13 +27,7 @@ import com.digitalasset.canton.participant.protocol.reassignment.ReassignmentPro
   ReassignmentProcessorError,
 }
 import com.digitalasset.canton.participant.protocol.validation.AuthenticationError
-import com.digitalasset.canton.protocol.{
-  CantonContractIdVersion,
-  DriverContractMetadata,
-  LfNodeCreate,
-  ReassignmentId,
-  RootHash,
-}
+import com.digitalasset.canton.protocol.{LfNodeCreate, ReassignmentId, RootHash}
 import com.digitalasset.canton.topology.{ParticipantId, PhysicalSynchronizerId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ReassignmentTag.{Source, Target}
@@ -45,8 +40,8 @@ final case class AssignmentValidationResult(
     submitterMetadata: ReassignmentSubmitterMetadata,
     reassignmentId: ReassignmentId,
     sourcePSId: Source[PhysicalSynchronizerId],
+    hostedConfirmingReassigningParties: Set[LfPartyId],
     isReassigningParticipant: Boolean,
-    hostedStakeholders: Set[LfPartyId],
     commonValidationResult: CommonValidationResult,
     reassigningParticipantValidationResult: ReassigningParticipantValidationResult,
 ) extends ReassignmentValidationResult {
@@ -79,35 +74,28 @@ final case class AssignmentValidationResult(
       recordTime: CantonTimestamp,
   )(implicit
       traceContext: TraceContext
-  ): Either[ReassignmentProcessorError, SequencedUpdate] = {
-    val reassignment =
-      Reassignment.Batch(contracts.contracts.zipWithIndex.map { case (reassign, idx) =>
-        val contract = reassign.contract
-        val contractInst = contract.contractInstance.unversioned
-        val createNode = LfNodeCreate(
-          coid = contract.contractId,
-          templateId = contractInst.template,
-          packageName = contractInst.packageName,
-          arg = contractInst.arg,
-          signatories = contract.metadata.signatories,
-          stakeholders = contract.metadata.stakeholders,
-          keyOpt = contract.metadata.maybeKeyWithMaintainers,
-          version = contract.contractInstance.version,
-        )
-        val contractIdVersion =
-          CantonContractIdVersion.tryCantonContractIdVersion(contract.contractId)
-        val driverContractMetadata =
-          DriverContractMetadata(contract.contractSalt).toLfBytes(contractIdVersion)
-
-        Reassignment.Assign(
-          ledgerEffectiveTime = contract.ledgerCreateTime.time,
-          createNode = createNode,
-          contractMetadata = driverContractMetadata,
-          reassignmentCounter = reassign.counter.unwrap,
-          nodeId = idx,
-        )
-      })
-
+  ): Either[ReassignmentProcessorError, AcsChangeFactory => SequencedUpdate] = {
+    val reassignment = contracts.contracts.zipWithIndex.map { case (reassign, idx) =>
+      val contract = reassign.contract
+      val contractInst = contract.inst
+      val createNode = LfNodeCreate(
+        coid = contract.contractId,
+        templateId = contractInst.templateId,
+        packageName = contractInst.packageName,
+        arg = contractInst.createArg,
+        signatories = contract.metadata.signatories,
+        stakeholders = contract.metadata.stakeholders,
+        keyOpt = contract.metadata.maybeKeyWithMaintainers,
+        version = contractInst.version,
+      )
+      Reassignment.Assign(
+        ledgerEffectiveTime = contract.inst.createdAt.time,
+        createNode = createNode,
+        contractAuthenticationData = contract.inst.authenticationData,
+        reassignmentCounter = reassign.counter.unwrap,
+        nodeId = idx,
+      )
+    }
     for {
       updateId <-
         rootHash.asLedgerTransactionId.leftMap[ReassignmentProcessorError](
@@ -124,21 +112,23 @@ final case class AssignmentValidationResult(
             submissionId = submitterMetadata.submissionId,
           )
         )
-    } yield Update.SequencedReassignmentAccepted(
-      optCompletionInfo = completionInfo,
-      workflowId = submitterMetadata.workflowId,
-      updateId = updateId,
-      reassignmentInfo = ReassignmentInfo(
-        sourceSynchronizer = sourcePSId.map(_.logical),
-        targetSynchronizer = targetSynchronizer,
-        submitter = Option(submitterMetadata.submitter),
-        reassignmentId = reassignmentId,
-        isReassigningParticipant = isReassigningParticipant,
-      ),
-      reassignment = reassignment,
-      recordTime = recordTime,
-      synchronizerId = targetSynchronizer.unwrap,
-    )
+    } yield (acsChangeFactory: AcsChangeFactory) =>
+      Update.SequencedReassignmentAccepted(
+        optCompletionInfo = completionInfo,
+        workflowId = submitterMetadata.workflowId,
+        updateId = updateId,
+        reassignmentInfo = ReassignmentInfo(
+          sourceSynchronizer = sourcePSId.map(_.logical),
+          targetSynchronizer = targetSynchronizer,
+          submitter = Option(submitterMetadata.submitter),
+          reassignmentId = reassignmentId,
+          isReassigningParticipant = isReassigningParticipant,
+        ),
+        reassignment = Reassignment.Batch(reassignment),
+        recordTime = recordTime,
+        synchronizerId = targetSynchronizer.unwrap,
+        acsChangeFactory = acsChangeFactory,
+      )
   }
 }
 

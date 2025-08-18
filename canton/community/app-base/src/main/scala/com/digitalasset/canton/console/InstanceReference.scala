@@ -44,7 +44,7 @@ import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.admin.Se
   OrderingTopology,
   PeerNetworkStatus,
 }
-import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.GrpcNetworking.P2PEndpoint
+import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.bindings.p2p.grpc.P2PGrpcNetworking.P2PEndpoint
 import com.digitalasset.canton.synchronizer.sequencer.block.bftordering.core.BftBlockOrdererConfig
 import com.digitalasset.canton.synchronizer.sequencer.config.{
   RemoteSequencerConfig,
@@ -555,6 +555,12 @@ abstract class ParticipantReference(
   private lazy val repair_ =
     new ParticipantRepairAdministration(consoleEnvironment, this, loggerFactory)
 
+  private lazy val commitments_ =
+    new CommitmentsAdministrationGroup(this, consoleEnvironment, loggerFactory)
+  @Help.Summary("Commands to inspect and extract bilateral commitments", FeatureFlag.Preview)
+  @Help.Group("Commitments")
+  def commitments: CommitmentsAdministrationGroup = commitments_
+
   @Help.Summary("Commands to repair the participant contract state", FeatureFlag.Repair)
   @Help.Group("Repair")
   def repair: ParticipantRepairAdministration = repair_
@@ -565,20 +571,20 @@ abstract class ParticipantReference(
     * synchronizer store.
     */
   override protected def waitPackagesVetted(timeout: NonNegativeDuration): Unit = {
-    val connected = synchronizers.list_connected().map(_.synchronizerId).toSet
+    val connected = synchronizers.list_connected().map(_.physicalSynchronizerId).toSet
     // for every participant
     consoleEnvironment.participants.all
       .filter(p => p.health.is_running() && p.health.initialized())
       .foreach { participant =>
         // for every synchronizer this participant is connected to as well
         participant.synchronizers.list_connected().foreach {
-          case item if connected.contains(item.synchronizerId) =>
+          case item if connected.contains(item.physicalSynchronizerId) =>
             ConsoleMacros.utils.retry_until_true(timeout)(
               {
                 // ensure that vetted packages on the synchronizer match the ones in the authorized store
                 val onSynchronizer = participant.topology.vetted_packages
                   .list(
-                    store = item.synchronizerId.logical,
+                    store = item.synchronizerId,
                     filterParticipant = id.filterString,
                     timeQuery = TimeQuery.HeadState,
                   )
@@ -597,12 +603,12 @@ abstract class ParticipantReference(
                 val ret = onParticipantAuthorizedStore == onSynchronizer
                 if (!ret) {
                   logger.debug(
-                    show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.synchronizerId}: vetted -- onSynchronizer is ${onParticipantAuthorizedStore -- onSynchronizer} while onSynchronizer -- vetted is ${onSynchronizer -- onParticipantAuthorizedStore}"
+                    show"Still waiting for package vetting updates to be observed by Participant ${participant.name} on ${item.physicalSynchronizerId}: vetted -- onSynchronizer is ${onParticipantAuthorizedStore -- onSynchronizer} while onSynchronizer -- vetted is ${onSynchronizer -- onParticipantAuthorizedStore}"
                   )
                 }
                 ret
               },
-              show"Participant ${participant.name} has not observed all vetting txs of $id on synchronizer ${item.synchronizerId} within the given timeout.",
+              show"Participant ${participant.name} has not observed all vetting txs of $id on synchronizer ${item.physicalSynchronizerId} within the given timeout.",
             )
           case _ =>
         }
@@ -738,7 +744,7 @@ class LocalParticipantReference(
     new LocalCommitmentsAdministrationGroup(this, consoleEnvironment, loggerFactory)
   @Help.Summary("Commands to inspect and extract bilateral commitments", FeatureFlag.Preview)
   @Help.Group("Commitments")
-  def commitments: LocalCommitmentsAdministrationGroup = commitments_
+  override def commitments: LocalCommitmentsAdministrationGroup = commitments_
 
   override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[?, ?, Result]
@@ -1247,6 +1253,17 @@ abstract class SequencerReference(
         runner.adminCommand(SequencerBftAdminCommands.SetPerformanceMetricsEnabled(false))
       }
 
+    @Help.Summary("Commands to prune the sequencer's BFT Orderer", FeatureFlag.Preview)
+    @Help.Group("BFT Orderer Pruning")
+    def pruning: SequencerBftPruningAdministrationGroup = pruning_
+
+    private lazy val pruning_ =
+      new SequencerBftPruningAdministrationGroup(
+        runner,
+        consoleEnvironment,
+        loggerFactory,
+      )
+
     private def toInternal(endpoint: BftBlockOrdererConfig.EndpointId): P2PEndpoint.Id =
       P2PEndpoint.Id(endpoint.address, endpoint.port, endpoint.tls)
   }
@@ -1383,8 +1400,11 @@ abstract class MediatorReference(val consoleEnvironment: ConsoleEnvironment, nam
   @Help.Group("Testing")
   def pruning: MediatorPruningAdministrationGroup = pruning_
 
-  private lazy val scan_ = new MediatorScanGroup(runner, consoleEnvironment, name, loggerFactory)
-  def scan: MediatorScanGroup = scan_
+  private lazy val inspection_ =
+    new MediatorInspectionGroup(runner, consoleEnvironment, name, loggerFactory)
+
+  @Help.Summary("Inspection functionality for the mediator")
+  def inspection: MediatorInspectionGroup = inspection_
 }
 
 class LocalMediatorReference(consoleEnvironment: ConsoleEnvironment, val name: String)

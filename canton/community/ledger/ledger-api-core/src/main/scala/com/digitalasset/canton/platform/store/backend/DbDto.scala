@@ -23,7 +23,7 @@ object DbDto {
       node_id: Int,
       contract_id: Array[Byte],
       template_id: String,
-      package_name: String,
+      package_id: String,
       flat_event_witnesses: Set[String],
       tree_event_witnesses: Set[String],
       create_argument: Array[Byte],
@@ -35,10 +35,11 @@ object DbDto {
       create_argument_compression: Option[Int],
       create_key_value_compression: Option[Int],
       event_sequential_id: Long,
-      driver_metadata: Array[Byte],
+      authentication_data: Array[Byte],
       synchronizer_id: String,
       trace_context: Array[Byte],
       record_time: Long,
+      external_transaction_hash: Option[Array[Byte]],
   ) extends DbDto
 
   final case class EventExercise(
@@ -53,7 +54,7 @@ object DbDto {
       node_id: Int,
       contract_id: Array[Byte],
       template_id: String,
-      package_name: String,
+      package_id: String,
       flat_event_witnesses: Set[
         String
       ], // only for consuming, for non-consuming exercise this field is omitted
@@ -71,6 +72,7 @@ object DbDto {
       synchronizer_id: String,
       trace_context: Array[Byte],
       record_time: Long,
+      external_transaction_hash: Option[Array[Byte]],
   ) extends DbDto
 
   final case class EventAssign(
@@ -82,7 +84,7 @@ object DbDto {
       node_id: Int,
       contract_id: Array[Byte],
       template_id: String,
-      package_name: String,
+      package_id: String,
       flat_event_witnesses: Set[String],
       create_argument: Array[Byte],
       create_signatories: Set[String],
@@ -94,7 +96,7 @@ object DbDto {
       create_key_value_compression: Option[Int],
       event_sequential_id: Long,
       ledger_effective_time: Long,
-      driver_metadata: Array[Byte],
+      authentication_data: Array[Byte],
       source_synchronizer_id: String,
       target_synchronizer_id: String,
       reassignment_id: String,
@@ -112,7 +114,7 @@ object DbDto {
       node_id: Int,
       contract_id: Array[Byte],
       template_id: String,
-      package_name: String,
+      package_id: String,
       flat_event_witnesses: Set[String],
       event_sequential_id: Long,
       source_synchronizer_id: String,

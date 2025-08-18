@@ -38,6 +38,7 @@ import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.daml.lf.crypto.Hash
 import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{FullIdentifier, NameTypeConRef}
 import com.digitalasset.daml.lf.data.Time.Timestamp
 import com.google.common.annotations.VisibleForTesting
 
@@ -252,7 +253,7 @@ object ContractStorageBackend {
 
   final case class RawCreatedContract(
       templateId: String,
-      packageName: String,
+      packageId: String,
       flatEventWitnesses: Set[Party],
       createArgument: Array[Byte],
       createArgumentCompression: Option[Int],
@@ -261,7 +262,7 @@ object ContractStorageBackend {
       createKey: Option[Array[Byte]],
       createKeyCompression: Option[Int],
       keyMaintainers: Option[Set[Party]],
-      driverMetadata: Array[Byte],
+      authenticationData: Array[Byte],
   ) extends RawContractState
 
   final case class RawArchivedContract(
@@ -301,7 +302,7 @@ trait EventStorageBackend {
 
   def fetchAssignEventIdsForStakeholder(
       stakeholderO: Option[Party],
-      templateId: Option[Identifier],
+      templateId: Option[NameTypeConRef],
       startExclusive: Long,
       endInclusive: Long,
       limit: Int,
@@ -309,7 +310,7 @@ trait EventStorageBackend {
 
   def fetchUnassignEventIdsForStakeholder(
       stakeholderO: Option[Party],
-      templateId: Option[Identifier],
+      templateId: Option[NameTypeConRef],
       startExclusive: Long,
       endInclusive: Long,
       limit: Int,
@@ -414,11 +415,12 @@ object EventStorageBackend {
       synchronizerId: String,
       traceContext: Option[Array[Byte]],
       recordTime: Timestamp,
+      externalTransactionHash: Option[Array[Byte]],
       event: E,
   )
 
   sealed trait RawEvent {
-    def templateId: Identifier
+    def templateId: FullIdentifier
     def witnessParties: Set[String]
   }
   // TODO(#23504) rename to RawAcsDeltaEvent?
@@ -433,9 +435,9 @@ object EventStorageBackend {
       offset: Long,
       nodeId: Int,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       witnessParties: Set[String],
+      flatEventWitnesses: Set[String],
       signatories: Set[String],
       observers: Set[String],
       createArgument: Array[Byte],
@@ -445,7 +447,7 @@ object EventStorageBackend {
       createKeyValueCompression: Option[Int],
       ledgerEffectiveTime: Timestamp,
       createKeyHash: Option[Hash],
-      driverMetadata: Array[Byte],
+      authenticationData: Array[Byte],
   ) extends RawFlatEvent
       with RawTreeEvent
 
@@ -454,8 +456,7 @@ object EventStorageBackend {
       offset: Long,
       nodeId: Int,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       witnessParties: Set[String],
   ) extends RawFlatEvent
 
@@ -464,8 +465,7 @@ object EventStorageBackend {
       offset: Long,
       nodeId: Int,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       exerciseConsuming: Boolean,
       exerciseChoice: String,
       exerciseArgument: Array[Byte],
@@ -475,6 +475,7 @@ object EventStorageBackend {
       exerciseActors: Seq[String],
       exerciseLastDescendantNodeId: Int,
       witnessParties: Set[String],
+      flatEventWitnesses: Set[String],
   ) extends RawTreeEvent
 
   final case class RawActiveContract(
@@ -492,8 +493,7 @@ object EventStorageBackend {
       submitter: Option[String],
       reassignmentCounter: Long,
       contractId: ContractId,
-      templateId: Identifier,
-      packageName: PackageName,
+      templateId: FullIdentifier,
       witnessParties: Set[String],
       assignmentExclusivity: Option[Timestamp],
       nodeId: Int,
@@ -507,7 +507,7 @@ object EventStorageBackend {
       reassignmentCounter: Long,
       rawCreatedEvent: RawCreatedEvent,
   ) extends RawReassignmentEvent {
-    override def templateId: Identifier = rawCreatedEvent.templateId
+    override def templateId: FullIdentifier = rawCreatedEvent.templateId
     override def witnessParties: Set[String] = rawCreatedEvent.witnessParties
   }
 

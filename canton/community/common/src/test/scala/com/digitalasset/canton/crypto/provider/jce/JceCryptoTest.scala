@@ -3,8 +3,9 @@
 
 package com.digitalasset.canton.crypto.provider.jce
 
-import com.digitalasset.canton.config.CryptoConfig
+import com.digitalasset.canton.config
 import com.digitalasset.canton.config.CryptoProvider.Jce
+import com.digitalasset.canton.config.{CachingConfigs, CryptoConfig, PositiveFiniteDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.CryptoTestHelper.TestMessage
 import com.digitalasset.canton.crypto.SigningKeySpec.EcSecp256k1
@@ -14,6 +15,7 @@ import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.tracing.NoReportingTracerProvider
 import com.google.protobuf.ByteString
+import monocle.macros.syntax.lens.*
 import org.scalatest.wordspec.AsyncWordSpec
 
 class JceCryptoTest
@@ -24,19 +26,28 @@ class JceCryptoTest
     with PasswordBasedEncryptionTest
     with RandomTest
     with PublicKeyValidationTest
+    with PrivateKeyValidationTest
     with CryptoKeyFormatMigrationTest {
 
   "JceCrypto" can {
+
+    // use a short duration to verify that a Java key is removed from the cache promptly
+    lazy val javaKeyCacheDuration = PositiveFiniteDuration.ofSeconds(4)
 
     def jceCrypto(): FutureUnlessShutdown[Crypto] =
       Crypto
         .create(
           CryptoConfig(provider = Jce),
+          CachingConfigs.defaultSessionEncryptionKeyCacheConfig
+            .focus(_.senderCache.expireAfterTimeout)
+            .replace(javaKeyCacheDuration),
+          CachingConfigs.defaultPublicKeyConversionCache.copy(expireAfterAccess =
+            config.NonNegativeFiniteDuration(javaKeyCacheDuration.underlying)
+          ),
           new MemoryStorage(loggerFactory, timeouts),
           CryptoPrivateStoreFactory.withoutKms(wallClock, parallelExecutionContext),
           CommunityKmsFactory, // Does not matter for the test as we do not use KMS
           testedReleaseProtocolVersion,
-          nonStandardConfig = false,
           futureSupervisor,
           wallClock,
           executionContext,
@@ -128,6 +139,14 @@ class JceCryptoTest
     )
 
     behave like publicKeyValidationProvider(
+      Jce.signingKeys.supported,
+      Jce.encryptionKeys.supported,
+      Jce.supportedCryptoKeyFormats,
+      jceCrypto().failOnShutdown,
+      javaKeyCacheDuration,
+    )
+
+    behave like privateKeyValidationProvider(
       Jce.signingKeys.supported,
       Jce.encryptionKeys.supported,
       Jce.supportedCryptoKeyFormats,

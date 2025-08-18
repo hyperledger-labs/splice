@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.crypto
 
-import cats.Monad
 import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.flatMap.*
@@ -13,7 +12,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.concurrent.{FutureSupervisor, HasFutureSupervision}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.config.{CryptoConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{CacheConfig, CryptoConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.SyncCryptoError.{KeyNotAvailable, SyncCryptoEncryptionError}
 import com.digitalasset.canton.crypto.signer.SyncCryptoSigner
 import com.digitalasset.canton.crypto.verifier.SyncCryptoVerifier
@@ -52,8 +51,6 @@ import scala.concurrent.duration.*
   * resolve the right keys to use for signing / decryption based on synchronizer and timestamp. This
   * API is intended only for participants and covers all usages of protocol signing keys, thus,
   * session keys will be used if they are enabled.
-  *
-  * TODO(#23810): Reuse SyncCryptoApiParticipantProvider for all nodes and not only participants
   */
 class SyncCryptoApiParticipantProvider(
     val member: Member,
@@ -61,6 +58,7 @@ class SyncCryptoApiParticipantProvider(
     val crypto: Crypto,
     cryptoConfig: CryptoConfig,
     verificationParallelismLimit: PositiveInt,
+    publicKeyConversionCacheConfig: CacheConfig,
     timeouts: ProcessingTimeout,
     futureSupervisor: FutureSupervisor,
     loggerFactory: NamedLoggerFactory,
@@ -97,6 +95,7 @@ class SyncCryptoApiParticipantProvider(
       SynchronizerCrypto(crypto, staticSynchronizerParameters),
       cryptoConfig,
       verificationParallelismLimit,
+      publicKeyConversionCacheConfig,
       timeouts,
       futureSupervisor,
       loggerFactory.append("synchronizerId", synchronizerId.toString),
@@ -159,8 +158,10 @@ trait SyncCryptoClient[+T <: SyncCryptoApi] extends TopologyClientApi[T] {
 
   def awaitIpsSnapshot(description: => String, warnAfter: Duration = 10.seconds)(
       timestamp: CantonTimestamp
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[TopologySnapshot] =
-    supervisedUS(description, warnAfter)(awaitIpsSnapshotInternal(timestamp))
+  )(implicit loggingContext: ErrorLoggingContext): FutureUnlessShutdown[TopologySnapshot] =
+    supervisedUS(description, warnAfter)(
+      awaitIpsSnapshotInternal(timestamp)(loggingContext.traceContext)
+    )
 
 }
 
@@ -182,58 +183,21 @@ object SyncCryptoClient {
   )(implicit
       executionContext: ExecutionContext,
       loggingContext: ErrorLoggingContext,
-  ): FutureUnlessShutdown[SyncCryptoApi] =
-    getSnapshotForTimestampInternal[FutureUnlessShutdown](
-      client,
-      desiredTimestamp,
-      previousTimestampO,
-      warnIfApproximate,
-    )(
-      (timestamp, traceContext) => client.snapshot(timestamp)(traceContext),
-      (description, timestamp, traceContext) =>
-        client.awaitSnapshotUSSupervised(description)(timestamp)(traceContext),
-      (snapshot, traceContext) =>
-        snapshot
-          .findDynamicSynchronizerParametersOrDefault(
-            protocolVersion = protocolVersion,
-            warnOnUsingDefault = false,
-          )(traceContext),
-    )
-
-  // Base version of getSnapshotForTimestamp abstracting over the effect type to allow for
-  // a `Future` and `FutureUnlessShutdown` version. Once we migrate all usages to the US version, this abstraction
-  // should not be needed anymore
-  private def getSnapshotForTimestampInternal[F[_]](
-      client: SyncCryptoClient[SyncCryptoApi],
-      desiredTimestamp: CantonTimestamp,
-      previousTimestampO: Option[CantonTimestamp],
-      warnIfApproximate: Boolean,
-  )(
-      getSnapshot: (CantonTimestamp, TraceContext) => F[SyncCryptoApi],
-      awaitSnapshotSupervised: (String, CantonTimestamp, TraceContext) => F[SyncCryptoApi],
-      dynamicSynchronizerParameters: (
-          TopologySnapshot,
-          TraceContext,
-      ) => F[DynamicSynchronizerParameters],
-  )(implicit
-      loggingContext: ErrorLoggingContext,
-      monad: Monad[F],
-  ): F[SyncCryptoApi] = {
+  ): FutureUnlessShutdown[SyncCryptoApi] = {
     val traceContext: TraceContext = loggingContext.traceContext
 
     def lookupDynamicSynchronizerParameters(
         timestamp: CantonTimestamp
-    ): F[DynamicSynchronizerParameters] =
+    ): FutureUnlessShutdown[DynamicSynchronizerParameters] =
       for {
-        snapshot <- awaitSnapshotSupervised(
-          s"searching for topology change delay at $timestamp for desired timestamp $desiredTimestamp and known until ${client.topologyKnownUntilTimestamp}",
-          timestamp,
-          loggingContext.traceContext,
-        )
-        synchronizerParams <- dynamicSynchronizerParameters(
-          snapshot.ipsSnapshot,
-          loggingContext.traceContext,
-        )
+        snapshot <- client.awaitSnapshotUSSupervised(
+          s"searching for topology change delay at $timestamp for desired timestamp $desiredTimestamp and known until ${client.topologyKnownUntilTimestamp}"
+        )(timestamp)
+        synchronizerParams <-
+          snapshot.ipsSnapshot.findDynamicSynchronizerParametersOrDefault(
+            protocolVersion = protocolVersion,
+            warnOnUsingDefault = false,
+          )(traceContext)
       } yield synchronizerParams
 
     computeTimestampForValidation(
@@ -242,42 +206,39 @@ object SyncCryptoClient {
       client.topologyKnownUntilTimestamp,
       client.approximateTimestamp,
       warnIfApproximate,
-    )(
-      lookupDynamicSynchronizerParameters
-    ).flatMap { timestamp =>
+    )(lookupDynamicSynchronizerParameters).flatMap { timestamp =>
       if (timestamp <= client.topologyKnownUntilTimestamp) {
         loggingContext.debug(
           s"Getting topology snapshot at $timestamp; desired=$desiredTimestamp, known until ${client.topologyKnownUntilTimestamp}; previous $previousTimestampO"
         )
-        getSnapshot(timestamp, traceContext)
+        client.snapshot(timestamp)(traceContext)
       } else {
         loggingContext.debug(
           s"Waiting for topology snapshot at $timestamp; desired=$desiredTimestamp, known until ${client.topologyKnownUntilTimestamp}; previous $previousTimestampO"
         )
-        awaitSnapshotSupervised(
-          s"requesting topology snapshot at $timestamp; desired=$desiredTimestamp, previousO=$previousTimestampO, known until=${client.topologyKnownUntilTimestamp}",
-          timestamp,
-          traceContext,
-        )
+        client.awaitSnapshotUSSupervised(
+          s"requesting topology snapshot at $timestamp; desired=$desiredTimestamp, previousO=$previousTimestampO, known until=${client.topologyKnownUntilTimestamp}"
+        )(timestamp)
       }
     }
   }
 
-  private def computeTimestampForValidation[F[_]](
+  private def computeTimestampForValidation(
       desiredTimestamp: CantonTimestamp,
       previousTimestampO: Option[CantonTimestamp],
       topologyKnownUntilTimestamp: CantonTimestamp,
       currentApproximateTimestamp: CantonTimestamp,
       warnIfApproximate: Boolean,
   )(
-      synchronizerParamsLookup: CantonTimestamp => F[DynamicSynchronizerParameters]
+      synchronizerParamsLookup: CantonTimestamp => FutureUnlessShutdown[
+        DynamicSynchronizerParameters
+      ]
   )(implicit
       loggingContext: ErrorLoggingContext,
-      // executionContext: ExecutionContext,
-      monad: Monad[F],
-  ): F[CantonTimestamp] =
+      executionContext: ExecutionContext,
+  ): FutureUnlessShutdown[CantonTimestamp] =
     if (desiredTimestamp <= topologyKnownUntilTimestamp) {
-      monad.pure(desiredTimestamp)
+      FutureUnlessShutdown.pure(desiredTimestamp)
     } else {
       previousTimestampO match {
         case None =>
@@ -285,10 +246,10 @@ object SyncCryptoClient {
             if (warnIfApproximate) Level.WARN else Level.INFO,
             s"Using approximate topology snapshot at $currentApproximateTimestamp for desired timestamp $desiredTimestamp",
           )
-          monad.pure(currentApproximateTimestamp)
+          FutureUnlessShutdown.pure(currentApproximateTimestamp)
         case Some(previousTimestamp) =>
           if (desiredTimestamp <= previousTimestamp.immediateSuccessor)
-            monad.pure(desiredTimestamp)
+            FutureUnlessShutdown.pure(desiredTimestamp)
           else {
             import scala.Ordered.orderingToOrdered
             synchronizerParamsLookup(previousTimestamp).map { previousSynchronizerParams =>
@@ -409,6 +370,7 @@ object SynchronizerCryptoClient {
       staticSynchronizerParameters: StaticSynchronizerParameters,
       synchronizerCrypto: SynchronizerCrypto,
       verificationParallelismLimit: PositiveInt,
+      publicKeyConversionCacheConfig: CacheConfig,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
@@ -431,6 +393,7 @@ object SynchronizerCryptoClient {
         staticSynchronizerParameters,
         synchronizerCrypto.pureCrypto,
         verificationParallelismLimit,
+        publicKeyConversionCacheConfig,
         loggerFactory,
       ),
       timeouts,
@@ -450,6 +413,7 @@ object SynchronizerCryptoClient {
       synchronizerCrypto: SynchronizerCrypto,
       cryptoConfig: CryptoConfig,
       verificationParallelismLimit: PositiveInt,
+      publicKeyConversionCacheConfig: CacheConfig,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
@@ -462,6 +426,7 @@ object SynchronizerCryptoClient {
       member,
       synchronizerCrypto,
       cryptoConfig,
+      publicKeyConversionCacheConfig,
       futureSupervisor,
       timeouts,
       loggerFactory,
@@ -477,6 +442,7 @@ object SynchronizerCryptoClient {
         staticSynchronizerParameters,
         synchronizerCrypto.pureCrypto,
         verificationParallelismLimit,
+        publicKeyConversionCacheConfig,
         loggerFactory,
       ),
       timeouts,

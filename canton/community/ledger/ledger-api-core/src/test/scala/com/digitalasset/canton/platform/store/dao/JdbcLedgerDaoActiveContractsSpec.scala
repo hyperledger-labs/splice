@@ -11,7 +11,8 @@ import com.digitalasset.canton.platform.store.dao.EventProjectionProperties.{
   Projection,
   UseOriginalViewPackageId,
 }
-import com.digitalasset.daml.lf.data.Ref.{Identifier, Party}
+import com.digitalasset.daml.lf.data.Ref
+import com.digitalasset.daml.lf.data.Ref.{Identifier, IdentifierConverter, Party}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.{Sink, Source}
 import org.scalatest.*
@@ -125,11 +126,14 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
         ledgerDao.updateReader
           .getActiveContracts(
             activeAt = ledgerEnd.map(_.lastOffset),
-            filter =
-              TemplatePartiesFilter(Map(otherTemplateId -> Some(Set(party1))), Some(Set.empty)),
+            filter = TemplatePartiesFilter(
+              Map(otherTemplateIdFull.toNameTypeConRef -> Some(Set(party1))),
+              Some(Set.empty),
+            ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
-              witnessTemplateProjections = Map(Some(party1) -> Map(otherTemplateId -> Projection())),
+              witnessTemplateProjections =
+                Map(Some(party1) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection())),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
       )
@@ -161,15 +165,15 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                otherTemplateId -> Some(Set(party1, party2))
+                otherTemplateIdFull.toNameTypeConRef -> Some(Set(party1, party2))
               ),
               Some(Set.empty),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(otherTemplateId -> Projection()),
-                Some(party2) -> Map(otherTemplateId -> Projection()),
+                Some(party1) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
+                Some(party2) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -209,15 +213,15 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                otherTemplateId2 -> None
+                otherTemplateId2Full.toNameTypeConRef -> None
               ),
               Some(Set.empty),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(otherTemplateId2 -> Projection()),
-                Some(party2) -> Map(otherTemplateId2 -> Projection()),
+                Some(party1) -> Map(otherTemplateId2Full.toNameTypeConRef -> Projection()),
+                Some(party2) -> Map(otherTemplateId2Full.toNameTypeConRef -> Projection()),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -257,16 +261,16 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                someTemplateId -> Some(Set(party1)),
-                otherTemplateId -> Some(Set(party2)),
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1)),
+                otherTemplateIdFull.toNameTypeConRef -> Some(Set(party2)),
               ),
               Some(Set.empty),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(otherTemplateId -> Projection()),
-                Some(party2) -> Map(otherTemplateId -> Projection()),
+                Some(party1) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
+                Some(party2) -> Map(otherTemplateIdFull.toNameTypeConRef -> Projection()),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -306,17 +310,13 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                otherTemplateId3 -> None,
-                otherTemplateId4 -> None,
+                otherTemplateId3Full.toNameTypeConRef -> None,
+                otherTemplateId4Full.toNameTypeConRef -> None,
               ),
               Some(Set.empty),
             ),
             eventProjectionProperties = EventProjectionProperties(
-              verbose = false,
-              witnessTemplateProjections = Map(
-                None -> Map(otherTemplateId3 -> Projection()),
-                None -> Map(otherTemplateId4 -> Projection()),
-              ),
+              verbose = false
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
       )
@@ -355,14 +355,14 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                someTemplateId -> Some(Set(party1))
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1))
               ),
               Some(Set(party2)),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(someTemplateId -> Projection())
+                Some(party1) -> Map(someTemplateIdFull.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -402,14 +402,14 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               relation = Map(
-                otherTemplateId5 -> None
+                otherTemplateId5Full.toNameTypeConRef -> None
               ),
               templateWildcardParties = Some(Set(party2)),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(otherTemplateId5 -> Projection())
+                Some(party1) -> Map(otherTemplateId5Full.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -436,6 +436,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
     // affect the results
     val unknownParty = Party.assertFromString(UUID.randomUUID.toString)
     val unknownTemplate = Identifier.assertFromString("pkg:Mod:Template")
+    val unknownTemplateFull =
+      unknownTemplate.toFullIdentifier(Ref.PackageName.assertFromString("pkg-name"))
 
     for {
       _ <- store(
@@ -455,14 +457,14 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                someTemplateId -> Some(Set(party1))
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1))
               ),
               Some(Set(party2)),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(someTemplateId -> Projection())
+                Some(party1) -> Map(someTemplateIdFull.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -473,14 +475,14 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                someTemplateId -> Some(Set(party1))
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1))
               ),
               Some(Set(party2, unknownParty)),
             ),
             eventProjectionProperties = EventProjectionProperties(
               verbose = true,
               witnessTemplateProjections = Map(
-                Some(party1) -> Map(someTemplateId -> Projection())
+                Some(party1) -> Map(someTemplateIdFull.toNameTypeConRef -> Projection())
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
           )
@@ -491,8 +493,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                someTemplateId -> Some(Set(party1)),
-                unknownTemplate -> Some(Set(party1)),
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1)),
+                unknownTemplateFull.toNameTypeConRef -> Some(Set(party1)),
               ),
               Some(Set(party2)),
             ),
@@ -500,8 +502,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(party1) -> Map(
-                  someTemplateId -> Projection(),
-                  unknownTemplate -> Projection(),
+                  someTemplateIdFull.toNameTypeConRef -> Projection(),
+                  unknownTemplateFull.toNameTypeConRef -> Projection(),
                 )
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
@@ -513,8 +515,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               relation = Map(
-                someTemplateId -> Some(Set(party1)),
-                unknownTemplate -> None,
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1)),
+                unknownTemplateFull.toNameTypeConRef -> None,
               ),
               templateWildcardParties = Some(Set(party2)),
             ),
@@ -522,10 +524,10 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(party1) -> Map(
-                  someTemplateId -> Projection()
+                  someTemplateIdFull.toNameTypeConRef -> Projection()
                 ),
                 None -> Map(
-                  unknownTemplate -> Projection()
+                  unknownTemplateFull.toNameTypeConRef -> Projection()
                 ),
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
@@ -537,8 +539,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                someTemplateId -> Some(Set(party1)),
-                unknownTemplate -> Some(Set(party1)),
+                someTemplateIdFull.toNameTypeConRef -> Some(Set(party1)),
+                unknownTemplateFull.toNameTypeConRef -> Some(Set(party1)),
               ),
               Some(Set(party2, unknownParty)),
             ),
@@ -546,8 +548,8 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(party1) -> Map(
-                  someTemplateId -> Projection(),
-                  unknownTemplate -> Projection(),
+                  someTemplateIdFull.toNameTypeConRef -> Projection(),
+                  unknownTemplateFull.toNameTypeConRef -> Projection(),
                 )
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
@@ -559,7 +561,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
             activeAt = ledgerEnd.map(_.lastOffset),
             filter = TemplatePartiesFilter(
               Map(
-                unknownTemplate -> Some(Set(unknownParty))
+                unknownTemplateFull.toNameTypeConRef -> Some(Set(unknownParty))
               ),
               Some(Set.empty),
             ),
@@ -567,7 +569,7 @@ private[dao] trait JdbcLedgerDaoActiveContractsSpec
               verbose = true,
               witnessTemplateProjections = Map(
                 Some(unknownParty) -> Map(
-                  unknownTemplate -> Projection()
+                  unknownTemplateFull.toNameTypeConRef -> Projection()
                 )
               ),
             )(interfaceViewPackageUpgrade = UseOriginalViewPackageId),
