@@ -25,7 +25,7 @@ All interaction works via the JSON Ledger API (see its `OpenAPI definition here 
 This OpenAPI definition is also accessible at ``http(s)://${YOUR_PARTICIPANT}/docs/openapi``.
 We encourage developers to use OpenAPI code generation tools as opposed to manually writing HTTP requests.
 
-Check out the :ref:`Authentication section <app-auth>` for more information on how to authenticate the requests.
+Check out the `Authentication docs <https://docs.digitalasset.com/operate/3.3/howtos/secure/apis/jwt.html>`_ for more information on how to authenticate the requests.
 
 
 .. _token_standard_usage_reading_contracts:
