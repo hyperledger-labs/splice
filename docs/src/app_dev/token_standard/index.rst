@@ -3,12 +3,27 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
+.. _token_standard_openapi:
+
+Token Standard APIs
+###################
+
+Overview
+========
+
+.. TODO(#651): inline and adapt the text from the CIP-0056.md file here, so that it is visible in the docs
+
+* See the `text of the CIP-0056 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md>`__
+  for an overview of the APIs that are part of the Canton Network Token Standard.
+* See the `README in its source-code <https://github.com/hyperledger-labs/splice/tree/main/token-standard#readme>`__ for background on how to use the APIs.
+
+
 .. _token_standard_usage:
 
-Wallet Integration with Token Standard Assets
+Wallet integration with Token Standard Assets
 =============================================
 
-This page provides wallet developers with guidance on how to integrate with token standard assets.
+This section provides wallet developers with guidance on how to integrate with token standard assets.
 Such an integration works by sending the right read and write requests to the Ledger API of the validator node hosting the wallet user's party.
 There are four kinds of integration patterns:
 
@@ -262,3 +277,68 @@ The response of these endpoints include two fields:
 
   Note that ``AllocationRequest_Reject`` and ``AllocationRequest_Withdraw`` should be called with an empty choice context.
   This ``ChoiceContext`` is present to allow for potential future extensions of the behavior of implementations of these choices.
+
+
+API References
+==============
+
+Refer to `CIP-0056 <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#details>`_ for more context on the APIs.
+
+Token Metadata
+--------------
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference <../api/splice-api-token-metadata-v1/index>
+    OpenAPI reference <./openapi/token_metadata>
+
+Holding
+-------
+
+This allows implementation of a `Portfolio View <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#wallet-client--portfolio-view>`_.
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference <../api/splice-api-token-holding-v1/index>
+
+Transfer Instruction
+--------------------
+
+This allows implementation of `Direct Peer-to-Peer / Free of Payment (FOP) Transfers <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#direct-peer-to-peer--free-of-payment-fop-transfer-workflow>`_.
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference <../api/splice-api-token-transfer-instruction-v1/index>
+    OpenAPI reference <./openapi/transfer_instruction>
+
+Allocation
+----------
+
+This allows implementation of `Delivery versus Payment (DVP) Transfer Workflows <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0056/cip-0056.md#delivery-versus-payment-dvp-transfer-workflows>`_,
+jointly with the Allocation Instruction and Allocation Request APIs below.
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference <../api/splice-api-token-allocation-v1/index>
+    OpenAPI reference <./openapi/allocation>
+
+Allocation Instruction
+----------------------
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference <../api/splice-api-token-allocation-instruction-v1/index>
+    OpenAPI reference <./openapi/allocation_instruction>
+
+Allocation Instruction
+----------------------
+
+  .. toctree::
+    :maxdepth: 1
+
+    Daml reference <../api/splice-api-token-allocation-request-v1/index>
