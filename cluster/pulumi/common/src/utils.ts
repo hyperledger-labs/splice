@@ -51,6 +51,7 @@ export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
 }
 
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
+export const GCP_REGION = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
 export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 

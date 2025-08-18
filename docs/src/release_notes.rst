@@ -11,6 +11,22 @@ Release Notes
 Upcoming
 --------
 
+- Vagrant (new)
+
+  - Add Vagrantfile as a convenient way to spin up a local development
+    environment for Splice. See `README.vagrant.md
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+    and `Vagrantfile
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+    details.
+
+- Docs
+
+  - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
+
+0.4.11
+------
+
 - SV and Validator apps
 
   - Add a randomized delay to broadcasting of package vetting changes used on Daml upgrades. This ensures that
