@@ -11,16 +11,16 @@ chart:
   # Override for testing labels
   version: 0.1.1
   appVersion: 0.1.0
+set:
+  persistence:
+    host: mock-pg-host
+    schema: participant
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    targetAudience: "mock_audience"
 tests:
   - it: "sets labels as expected"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       # Explicit migration ID for testing
       metrics:
         enabled: true
@@ -73,13 +73,6 @@ tests:
           path: spec.template.metadata.annotations
   - it: "deploys as expected with some AWS KMS config"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       # More interesting options
       kms:
         # All of these are mock values; we translate to Canton config directly
@@ -121,13 +114,6 @@ tests:
                 key: accessKeyId
   - it: "handles multiline additionalEnvVars values"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       additionalEnvVars:
         - name: CUSTOM
           value: |
@@ -151,13 +137,6 @@ tests:
             value: "multi\nline\nenvironment\nvariable\n"
   - it: "extraVolumes are differentiated correctly"
     set:
-      # Things we need just to pass the schema
-      persistence:
-        host: mock-pg-host
-        schema: participant
-      auth:
-        jwksUrl: "https://mock.com/.well-known/jwks.json"
-        targetAudience: "mock_audience"
       extraVolumes:
         - name: secret-volume
           secret:
@@ -174,7 +153,7 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].name
           value: participant
-      # multi-line env var
+      # range of extraVolumes with correct refs
       - equal:
           path: spec.template.spec.volumes
           value:
