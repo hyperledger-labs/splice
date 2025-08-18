@@ -45,6 +45,7 @@ import {
   svCometBftGovernanceKeySecret,
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
+  networkWideConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   configForSv,
@@ -320,6 +321,7 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice: initialAmuletPrice,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
   };
@@ -432,6 +434,7 @@ async function installSvAndValidator(
       ids.concat([validatorWalletUserName])
     ),
     ...spliceInstanceNames,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

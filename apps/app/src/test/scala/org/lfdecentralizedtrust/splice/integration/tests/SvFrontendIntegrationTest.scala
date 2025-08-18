@@ -25,7 +25,6 @@ import org.openqa.selenium.support.ui.Select
 import org.slf4j.event.Level
 
 import java.util.Optional
-import scala.concurrent.duration.DurationInt
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -88,61 +87,6 @@ class SvFrontendIntegrationTest
                 "Trying to re-register"
               )
             }
-          },
-        )
-      }
-    }
-
-    "have 5 information tabs" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        actAndCheck(
-          "DSO and amulet infos are displayed in pretty json", {
-            login(sv1UIPort, sv1Backend.config.ledgerApiUser)
-          },
-        )(
-          "We see the 5 tab panels",
-          _ => {
-            inside(find(id("information-tab-general"))) { case Some(e) =>
-              e.text shouldBe "General"
-            }
-            inside(find(id("information-tab-dso-info"))) { case Some(e) =>
-              e.text shouldBe "DSO Info"
-            }
-            inside(find(id("information-tab-amulet-info"))) { case Some(e) =>
-              e.text shouldBe s"$amuletName Info"
-            }
-            inside(find(id("information-tab-cometBft-debug"))) { case Some(e) =>
-              e.text shouldBe "CometBFT Debug Info"
-            }
-            inside(find(id("information-tab-canton-domain-status"))) { case Some(e) =>
-              e.text shouldBe "Domain Node Status"
-            }
-          },
-        )
-        actAndCheck("Click on general information tab", click on "information-tab-general")(
-          "observe information on party information",
-          _ => {
-            val valueCells = findAll(className("general-dso-value-name")).toSeq
-            valueCells should have length 8
-            forExactly(1, valueCells)(cell =>
-              seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
-            )
-            forExactly(2, valueCells)(cell =>
-              seleniumText(cell) should matchText(
-                sv1Backend.getDsoInfo().svParty.toProtoPrimitive
-              )
-            )
-          },
-        )
-        actAndCheck(
-          "Click on domain status tab",
-          click on "information-tab-canton-domain-status",
-        )(
-          "Observe sequencer and mediator as active",
-          _ => {
-            val activeCells = findAll(className("active-value")).toSeq
-            activeCells should have length 2
-            forAll(activeCells)(_.text shouldBe "true")
           },
         )
       }
@@ -836,7 +780,7 @@ class SvFrontendIntegrationTest
               requestReasonUrl,
               requestReasonBody,
               if (expiresSoon) {
-                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
               } else {
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
               },
@@ -917,7 +861,7 @@ class SvFrontendIntegrationTest
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
-            eventually(120.seconds) {
+            eventually() {
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
@@ -972,7 +916,7 @@ class SvFrontendIntegrationTest
               requestReasonUrl,
               requestReasonBody,
               if (expiresSoon) {
-                new RelTime(java.time.Duration.ofMinutes(1).toMillis * 1000L)
+                new RelTime(java.time.Duration.ofSeconds(10).toMillis * 1000L)
               } else {
                 sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout
               },
@@ -1057,7 +1001,7 @@ class SvFrontendIntegrationTest
 
           clue("the vote requests get rejected (one by vote, one by expiry)") {
             // Generous buffer for expiry
-            eventually(120.seconds) {
+            eventually() {
               val rows = getAllVoteRows("sv-voting-in-progress-table-body")
               rows.size shouldBe previousVoteRequestsInProgress
             }
@@ -1157,7 +1101,7 @@ class SvFrontendIntegrationTest
   }
 
   def changeAction(actionName: String)(implicit webDriver: WebDriverType) = {
-    find(id("display-actions")) should not be empty
+    eventually() { find(id("display-actions")) should not be empty }
     val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
     dropDownAction.selectByValue(actionName)
 

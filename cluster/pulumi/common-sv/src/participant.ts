@@ -19,6 +19,7 @@ import {
 import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
 import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
+import { svsConfig } from './config';
 import { SingleSvConfiguration } from './singleSvConfig';
 
 export interface SvParticipant {
@@ -92,14 +93,7 @@ export function installSvParticipant(
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
-      resources: {
-        limits: {
-          memory: '18Gi',
-        },
-        requests: {
-          memory: '12Gi',
-        },
-      },
+      resources: svsConfig?.participant.resources,
     },
     version,
     {

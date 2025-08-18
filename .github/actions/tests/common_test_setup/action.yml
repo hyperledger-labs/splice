@@ -69,6 +69,8 @@ runs:
         should_save: ${{ inputs.save_nix_cache }}
         should_save_gcp: ${{ inputs.save_nix_cache_to_gcp }}
         oss_only: ${{ inputs.oss_only }}
+        upload_workload_identity_provider: ${{ inputs.upload_workload_identity_provider }}
+        upload_service_account: ${{ inputs.upload_service_account }}
 
     - name: Set up SBT
       if: inputs.with_sbt == 'true'

@@ -3,13 +3,11 @@
 
 import dayjs from 'dayjs';
 import { useAppForm } from '../../hooks/form';
-import { CommonFormData } from './CreateProposalform';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useDsoInfos } from '../../contexts/SvContext';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   validateEffectiveDate,
   validateExpiration,
@@ -20,13 +18,15 @@ import {
   validateWeight,
 } from './formValidators';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { CommonProposalFormData } from '../../utils/types';
 
 interface ExtraFormField {
   sv: string;
   weight: string;
 }
 
-type UpdateSvRewardWeightFormData = CommonFormData & ExtraFormField;
+type UpdateSvRewardWeightFormData = CommonProposalFormData & ExtraFormField;
 
 interface UpdateSvRewardWeightFormProps {
   onSubmit: (
@@ -37,7 +37,6 @@ interface UpdateSvRewardWeightFormProps {
 
 export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> = props => {
   const { onSubmit } = props;
-  const [effectivityType, setEffectivityType] = useState('custom');
   const dsoInfosQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfosQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
@@ -59,7 +58,10 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
   const defaultValues: UpdateSvRewardWeightFormData = {
     action: createProposalAction?.name || '',
     expiryDate: initialExpiration.format(dateTimeFormatISO),
-    effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    effectiveDate: {
+      type: 'custom',
+      effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+    },
     url: '',
     summary: '',
     sv: '',
@@ -84,12 +86,11 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
       console.log('submit sv reward weight form data: ', value, 'with action:', action);
       onSubmit(value, action);
     },
-
     validators: {
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
           expiration: value.expiryDate,
-          effectiveDate: value.effectiveDate,
+          effectiveDate: value.effectiveDate.effectiveDate,
         });
       },
     },
@@ -123,59 +124,18 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
         )}
       </form.AppField>
 
-      <form.Field
+      <form.AppField
         name="effectiveDate"
         validators={{
           onChange: ({ value }) => validateEffectiveDate(value),
           onBlur: ({ value }) => validateEffectiveDate(value),
         }}
-        children={_ => {
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="h5" gutterBottom>
-                Vote Proposal Effectivity
-              </Typography>
-
-              <RadioGroup
-                value={effectivityType}
-                onChange={e => setEffectivityType(e.target.value)}
-              >
-                <FormControlLabel
-                  value="custom"
-                  control={<Radio />}
-                  label={<Typography>Custom</Typography>}
-                />
-
-                {effectivityType === 'custom' && (
-                  <form.AppField name="effectiveDate">
-                    {field => (
-                      <field.DateField
-                        description="Select the date and time the proposal will take effect"
-                        minDate={dayjs(form.getFieldValue('expiryDate'))}
-                        id="update-sv-reward-weight-effective-date"
-                      />
-                    )}
-                  </form.AppField>
-                )}
-
-                <FormControlLabel
-                  value="threshold"
-                  control={<Radio />}
-                  label={
-                    <Box>
-                      <Typography>Make effective at threshold</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        This will allow the vote proposal to take effect immediately when 2/3 vote
-                        in favor
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mt: 2 }}
-                />
-              </RadioGroup>
-            </Box>
-          );
-        }}
+        children={_ => (
+          <EffectiveDateField
+            initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+            id="update-sv-reward-weight-effective-date"
+          />
+        )}
       />
 
       <form.AppField
@@ -224,17 +184,8 @@ export const UpdateSvRewardWeightForm: React.FC<UpdateSvRewardWeightFormProps> =
         {field => <field.TextField title="Weight" id="update-sv-reward-weight-weight" />}
       </form.AppField>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {form.state.errors.map((error, index) => (
-          <Alert severity="error" key={index}>
-            <Typography key={index} variant="h6" color="error">
-              {error}
-            </Typography>
-          </Alert>
-        ))}
-      </Box>
-
       <form.AppForm>
+        <form.FormErrors />
         <form.FormControls />
       </form.AppForm>
     </FormLayout>

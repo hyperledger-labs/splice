@@ -145,6 +145,7 @@ export function installCantonComponents(
           svConfig.onboardingName,
           migrationInfo.version,
           imagePullServiceAccountName,
+          disableProtection,
           opts
         );
     return {

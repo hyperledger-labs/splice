@@ -31,6 +31,7 @@
         "common-sv",
         "common-validator",
         "canton-network",
+        "cluster",
         "gcp",
         "gcp-project",
         "infra",

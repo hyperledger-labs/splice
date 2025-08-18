@@ -5,6 +5,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
 import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
+import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
 import { commandScriptPath } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
@@ -246,103 +247,6 @@ function configureCometBFTGatewayService(
   );
 }
 
-function configurePublicGatewayService(
-  ingressNs: k8s.core.v1.Namespace,
-  ingressIp: pulumi.Output<string>,
-  istiod: k8s.helm.v3.Release
-) {
-  new k8s.apiextensions.CustomResource(`public-request-authentication`, {
-    apiVersion: 'security.istio.io/v1',
-    kind: 'RequestAuthentication',
-    metadata: {
-      name: 'public-request-authentication',
-      namespace: ingressNs.metadata.name,
-    },
-    spec: {
-      selector: {
-        matchLabels: {
-          istio: 'ingress-public',
-        },
-      },
-      jwtRules: [
-        {
-          issuer: 'https://canton-network-ci.example.com',
-          // Find details on the keys here https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#heading=h.h81kh9iplwtp
-          jwks: '{"keys": [{"kty":"RSA","n":"rX_TFg7BFsaQ4st9NrPiN4gc_sZmhifgEczn6CCedKKOTYouO7ik9KTg0eTfQN2qSU-2L4KYX4KbK2T3e6CYsWDB6UjZYdhEtfj_X_QyIQ8hBVKGoNpL6WJFvzALPR5ILokzp9kDy0oV9-SqC91lS-ai2sHED14uS4NVfw9xk9toZG1stOm4JmfzOyAB3ksBrTfefKaIyKguINOJi2lGCqK9hnWbGJM2OHFmzEle4djrJub9qRCEkHBejPWmHrdN1zB2FZlWVA_Ze8tqBf5K9xx1cIn0cTWETEIWPhLu8pk_hFan1YmMOiBpjsOlg2e6f_m0dvhBSkqqieVFQBka6iocfLGWJFRBHTwgFw9-PIMTtb0l42uIGzKTo1XrvwMSqy4rff028ZLkbxu6OmFHCm4gRR6wlXF4ha6pTkS-vjFVdn2pL09-6jLD7CbNf5Di8RwvdO3puSp_ZExGb8UapgjW3sonlXiMxz1VAYTOYb4YIRSWGKafyBrNB5MGVuqgvK_ZjBzBvax6wSAU6ldcuHiGfS786FH2QwA47Smo2ewPfKpO2ePOmkvNpleT817BStbFtZD8K9y7Pf0QiX1Hk4DA7N_oQp3hrgW7U9Dy0hIh2OflMnFFEdN51fV-89tdIAKTd1rn3NwTqRcTDH1-GvmLfZTWH2-ZOgjizWFPsqE","e":"AQAB","ext":true,"kid":"eb3d58621c3c7fc606386139a","alg":"RS256","use":"sig"}]}',
-        },
-      ],
-    },
-  });
-  new k8s.apiextensions.CustomResource(`public-request-authorization`, {
-    apiVersion: 'security.istio.io/v1beta1',
-    kind: 'AuthorizationPolicy',
-    metadata: {
-      name: 'public-request-authorization',
-      namespace: ingressNs.metadata.name,
-    },
-    spec: {
-      selector: {
-        matchLabels: {
-          istio: 'ingress-public',
-        },
-      },
-      action: 'ALLOW',
-      rules: (
-        [
-          {
-            from: [
-              {
-                source: {
-                  requestPrincipals: ['https://canton-network-ci.example.com/canton-network-ci'],
-                },
-              },
-            ],
-          },
-          {
-            to: [
-              {
-                // Paths that do not require authentication at Istio.
-                operation: {
-                  paths: [
-                    '/grafana/api/serviceaccounts',
-                    '/grafana/api/serviceaccounts/*',
-                    '/grafana/api/alertmanager/grafana/api/v2/silences',
-                  ],
-                },
-              },
-            ],
-          },
-        ] as unknown[]
-      ).concat(
-        spliceConfig.pulumiProjectConfig.hasPublicDocs
-          ? [
-              {
-                to: [
-                  {
-                    operation: {
-                      hosts: [
-                        ...new Set([getDnsNames().cantonDnsName, getDnsNames().daDnsName]),
-                      ].map(host => `docs.${host}`),
-                    },
-                  },
-                ],
-              },
-            ]
-          : []
-      ),
-    },
-  });
-  return configureGatewayService(
-    ingressNs,
-    ingressIp,
-    pulumi.output(['0.0.0.0/0']),
-    pulumi.output(['0.0.0.0/0']),
-    [],
-    istiod,
-    '-public'
-  );
-}
-
 const istioApiVersion = 'security.istio.io/v1beta1';
 
 function istioAccessPolicies(
@@ -502,8 +406,7 @@ function configureGatewayService(
 function configureGateway(
   ingressNs: ExactNamespace,
   gwSvc: k8s.helm.v3.Release,
-  cometBftSvc: k8s.helm.v3.Release,
-  publicGwSvc: k8s.helm.v3.Release
+  cometBftSvc: k8s.helm.v3.Release
 ): k8s.apiextensions.CustomResource[] {
   const hosts = [
     getDnsNames().cantonDnsName,
@@ -604,63 +507,11 @@ function configureGateway(
       dependsOn: [cometBftSvc],
     }
   );
-
-  const clusterHostname = CLUSTER_HOSTNAME;
-  const publicHosts = [`public.${clusterHostname}`].concat(
-    spliceConfig.pulumiProjectConfig.hasPublicDocs ? [`docs.${clusterHostname}`] : []
-  );
-  const publicGw = new k8s.apiextensions.CustomResource(
-    'cn-public-http-gateway',
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'Gateway',
-      metadata: {
-        name: 'cn-public-http-gateway',
-        namespace: ingressNs.ns.metadata.name,
-      },
-      spec: {
-        selector: {
-          app: 'istio-ingress-public',
-          istio: 'ingress-public',
-        },
-        servers: [
-          {
-            hosts: publicHosts,
-            port: {
-              name: 'http',
-              number: 80,
-              protocol: 'HTTP',
-            },
-            tls: {
-              httpsRedirect: true,
-            },
-          },
-          {
-            hosts: publicHosts,
-            port: {
-              name: 'https',
-              number: 443,
-              protocol: 'HTTPS',
-            },
-            tls: {
-              mode: 'SIMPLE',
-              credentialName: `cn-${clusterBasename}net-tls`,
-            },
-          },
-        ],
-      },
-    },
-    {
-      dependsOn: [publicGwSvc],
-    }
-  );
-
-  return [httpGw, appsGw, publicGw];
+  return [httpGw, appsGw];
 }
 
 function configureDocsAndReleases(
   enableGcsProxy: boolean,
-  publicDocs: boolean,
   dependsOn: pulumi.Resource[]
 ): k8s.apiextensions.CustomResource[] {
   const gcsProxyPath: {
@@ -690,62 +541,22 @@ function configureDocsAndReleases(
         },
       ]
     : [];
-  const nonPublic = new k8s.apiextensions.CustomResource(
-    'cluster-docs-releases',
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'VirtualService',
-      metadata: {
-        name: 'cluster-docs-releases',
-        namespace: 'cluster-ingress',
-      },
-      spec: {
-        hosts: [getDnsNames().cantonDnsName].concat(
-          CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [getDnsNames().daDnsName] : []
-        ),
-        gateways: ['cn-http-gateway'],
-        http: gcsProxyPath.concat([
-          {
-            match: [
-              {
-                port: 443,
-              },
-            ],
-            route: [
-              {
-                destination: {
-                  port: {
-                    number: 80,
-                  },
-                  host: 'docs.docs.svc.cluster.local',
-                },
-              },
-            ],
-          },
-        ]),
-      },
-    },
-    { dependsOn }
-  );
-
-  const ret = [nonPublic];
-
-  if (publicDocs) {
-    const publicVS = new k8s.apiextensions.CustomResource(
-      'cluster-docs-public',
+  return [
+    new k8s.apiextensions.CustomResource(
+      'cluster-docs-releases',
       {
         apiVersion: 'networking.istio.io/v1alpha3',
         kind: 'VirtualService',
         metadata: {
-          name: 'cluster-docs-public',
+          name: 'cluster-docs-releases',
           namespace: 'cluster-ingress',
         },
         spec: {
-          hosts: [`docs.${getDnsNames().cantonDnsName}`].concat(
-            CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [`docs.${getDnsNames().daDnsName}`] : []
+          hosts: [getDnsNames().cantonDnsName].concat(
+            CLUSTER_HOSTNAME == getDnsNames().daDnsName ? [getDnsNames().daDnsName] : []
           ),
-          gateways: ['cn-public-http-gateway'],
-          http: [
+          gateways: ['cn-http-gateway'],
+          http: gcsProxyPath.concat([
             {
               match: [
                 {
@@ -763,22 +574,65 @@ function configureDocsAndReleases(
                 },
               ],
             },
-          ],
+          ]),
         },
       },
       { dependsOn }
-    );
-    ret.push(publicVS);
-  }
+    ),
+  ];
+}
 
-  return ret;
+function configurePublicInfo(ingressNs: k8s.core.v1.Namespace): k8s.apiextensions.CustomResource[] {
+  return spliceConfig.pulumiProjectConfig.hasPublicInfo
+    ? [
+        new k8s.apiextensions.CustomResource('allow-sv-info', {
+          apiVersion: 'security.istio.io/v1beta1',
+          kind: 'AuthorizationPolicy',
+          metadata: {
+            name: 'allow-sv-info',
+            namespace: ingressNs.metadata.name,
+          },
+          spec: {
+            selector: {
+              matchLabels: {
+                istio: 'ingress',
+              },
+            },
+            action: 'ALLOW',
+            rules: [
+              {
+                to: [
+                  {
+                    operation: {
+                      hosts: [
+                        // We could also have done `info.sv*.whatever` here but enumerating what we expect seems slightly more secure
+                        ...new Set(
+                          [
+                            ...Array.from({ length: dsoSize }, (_, index) => `sv-${index + 1}`),
+                            ...(DeploySvRunbook ? ['sv'] : []),
+                          ]
+                            .map(sv => [
+                              `info.${sv}.${getDnsNames().cantonDnsName}`,
+                              `info.${sv}.${getDnsNames().daDnsName}`,
+                            ])
+                            .flat()
+                        ),
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ]
+    : [];
 }
 
 export function configureIstio(
   ingressNs: ExactNamespace,
   ingressIp: pulumi.Output<string>,
-  cometBftIngressIp: pulumi.Output<string>,
-  publicIngressIp: pulumi.Output<string>
+  cometBftIngressIp: pulumi.Output<string>
 ): pulumi.Resource[] {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
@@ -790,14 +644,10 @@ export function configureIstio(
   const istiod = configureIstiod(ingressNs.ns, base);
   const gwSvc = configureInternalGatewayService(ingressNs.ns, ingressIp, istiod);
   const cometBftSvc = configureCometBFTGatewayService(ingressNs.ns, cometBftIngressIp, istiod);
-  const publicGwSvc = configurePublicGatewayService(ingressNs.ns, publicIngressIp, istiod);
-  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc, publicGwSvc);
-  const docsAndReleases = configureDocsAndReleases(
-    true,
-    spliceConfig.pulumiProjectConfig.hasPublicDocs,
-    gateways
-  );
-  return gateways.concat(docsAndReleases);
+  const gateways = configureGateway(ingressNs, gwSvc, cometBftSvc);
+  const docsAndReleases = configureDocsAndReleases(true, gateways);
+  const publicInfo = configurePublicInfo(ingressNs.ns);
+  return [...gateways, ...docsAndReleases, ...publicInfo];
 }
 
 export function istioMonitoring(

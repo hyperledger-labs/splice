@@ -7,6 +7,8 @@ import {
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 
+import { ghaConfig } from './config';
+
 export function installController(): k8s.helm.v3.Release {
   const controllerNamespace = new Namespace('gha-runner-controller', {
     metadata: {
@@ -16,7 +18,7 @@ export function installController(): k8s.helm.v3.Release {
 
   return new k8s.helm.v3.Release('gha-runner-scale-set-controller', {
     chart: 'oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller',
-    version: '0.11.0',
+    version: ghaConfig.runnerScaleSetVersion,
     namespace: controllerNamespace.metadata.name,
     values: {
       ...infraAffinityAndTolerations,

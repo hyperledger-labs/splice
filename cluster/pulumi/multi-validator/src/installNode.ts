@@ -45,7 +45,7 @@ export async function installNode(): Promise<void> {
         participant: { address: participant.service.metadata.name },
         postgres: { ...postgresConf, db: `cantonnet_v` },
       },
-      { dependsOn: [postgres] }
+      { dependsOn: [postgres, participant] }
     );
   }
 }

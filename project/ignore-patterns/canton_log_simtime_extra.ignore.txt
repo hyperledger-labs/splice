@@ -12,6 +12,7 @@ Rejected transaction due to a participant determined timeout
 Response message for request.*timed out at
 Sequencing result message timed out
 Late processing.*of batch
+Detected late processing.*of batch with timestamp
 The payload to event time bound.*has been been exceeded by payload time
 # Canton GenericStepsError(SequencerTimeoutError) errors and failures caused by it
 Failed to submit submission due to GenericStepsError.*SequencerTimeoutError

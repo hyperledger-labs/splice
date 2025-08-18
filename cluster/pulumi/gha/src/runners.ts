@@ -123,6 +123,20 @@ const runnerSpecs = [
   },
 ];
 
+const localnetHostAliases = [
+  {
+    ip: '127.0.0.1',
+    hostnames: [
+      // Used by the localnet tests
+      'ans.localhost',
+      'canton.localhost',
+      'scan.localhost',
+      'sv.localhost',
+      'wallet.localhost',
+    ],
+  },
+];
+
 function installDockerRunnerScaleSet(
   name: string,
   runnersNamespace: Namespace,
@@ -153,6 +167,7 @@ function installDockerRunnerScaleSet(
         },
         template: {
           spec: {
+            hostAliases: localnetHostAliases,
             initContainers: [
               {
                 name: 'init-dind-externals',
@@ -396,6 +411,7 @@ function installK8sRunnerScaleSet(
       data: {
         'pod.yaml': yaml.dump({
           spec: {
+            hostAliases: localnetHostAliases,
             volumes: [
               {
                 name: 'cache',

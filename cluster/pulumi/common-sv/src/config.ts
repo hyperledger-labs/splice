@@ -9,8 +9,9 @@ import {
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
-  SvIdKey,
+  K8sResourceSchema,
   SvCometBftGovernanceKey,
+  SvIdKey,
   ValidatorTopupConfig,
 } from '@lfdecentralizedtrust/splice-pulumi-common';
 import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
@@ -88,9 +89,13 @@ export interface SvConfig extends StaticSvConfig, SingleSvConfiguration {
 export const SvConfigSchema = z.object({
   sv: z
     .object({
+      participant: z.object({
+        resources: K8sResourceSchema,
+      }),
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
+          protected: z.boolean().optional(),
         })
         .optional(),
       scan: z
