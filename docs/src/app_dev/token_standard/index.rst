@@ -335,8 +335,8 @@ Allocation Instruction
     Daml reference <../api/splice-api-token-allocation-instruction-v1/index>
     OpenAPI reference <./openapi/allocation_instruction>
 
-Allocation Instruction
-----------------------
+Allocation Request
+------------------
 
   .. toctree::
     :maxdepth: 1
