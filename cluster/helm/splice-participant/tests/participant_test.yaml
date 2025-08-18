@@ -86,6 +86,9 @@ tests:
         type: awwws
         region: mock_region
         extraCantonKey: mock_value
+        mapCantonKey:
+          firstMapEntry: first_map_value
+          secondMapEntry: second_map_value
       additionalEnvVars:
         - name: AWWWS_ACCESS_KEY_ID
           valueFrom:
@@ -106,7 +109,7 @@ tests:
           content:
             # We don't really care about the name of the env var but helm unittest wants it
             name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
-            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    region = mock_region\n    type = awwws\n  }\n}        \n"
+            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    map-canton-key = {\n      first-map-entry = first_map_value\n      second-map-entry = second_map_value\n    }\n    region = mock_region\n    type = awwws\n  }\n}        \n"
       # Secret configured via Helm with valueFrom
       - contains:
           path: spec.template.spec.containers[0].env
@@ -146,3 +149,39 @@ tests:
           content:
             name: CUSTOM
             value: "multi\nline\nenvironment\nvariable\n"
+  - it: "extraVolumes are differentiated correctly"
+    set:
+      # Things we need just to pass the schema
+      persistence:
+        host: mock-pg-host
+        schema: participant
+      auth:
+        jwksUrl: "https://mock.com/.well-known/jwks.json"
+        targetAudience: "mock_audience"
+      extraVolumes:
+        - name: secret-volume
+          secret:
+            secretName: secret_name
+        - name: pvc-volume
+          persistentVolumeClaim:
+            claimName: claim_name
+        - name: empty-dir-volume
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      # Sanity check
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: participant
+      # multi-line env var
+      - equal:
+          path: spec.template.spec.volumes
+          value:
+            - name: secret-volume
+              secret:
+                secretName: secret_name
+            - name: pvc-volume
+              persistentVolumeClaim:
+                claimName: claim_name
+            - name: empty-dir-volume
