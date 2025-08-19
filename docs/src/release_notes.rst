@@ -20,6 +20,10 @@ Upcoming
     <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
     details.
 
+- Docs
+
+  - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
+
 0.4.11
 ------
 

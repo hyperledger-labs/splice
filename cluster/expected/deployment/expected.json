@@ -792,7 +792,7 @@
         "stack": "organization/multi-validator/multi-validator.mock",
         "updateTemplate": {
           "spec": {
-            "parallel": 10
+            "parallel": 5
           }
         },
         "useLocalStackOnly": true,

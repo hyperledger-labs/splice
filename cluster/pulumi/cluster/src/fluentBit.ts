@@ -37,6 +37,7 @@ export function installFluentBit(): void {
         '[Output]',
         '    Name stackdriver',
         '    Match kube.*',
+        '    Tag_Prefix  kube.var.log.containers.',
         // This ensures that non-JSON fields get parsed as textPayload
         '    text_payload_key message',
         // This ensures that the k8s labels added by the filter get propagated to the labels field in log explorer
@@ -45,6 +46,7 @@ export function installFluentBit(): void {
         // Mandatory parameters, doesn't look like we have a way to exclude the location sadly even though it isn't very useful for us.
         `    k8s_cluster_name ${CLUSTER_NAME}`,
         `    k8s_cluster_location  ${GCP_REGION}`,
+        `    severity_key level`,
       ].join('\n'),
       filters: [
         // First parse just in containerd format to extra time stamps and friends
@@ -54,6 +56,12 @@ export function installFluentBit(): void {
         '    Key_Name     log',
         '    Reserve_Data True',
         '    Parser       containerd',
+        // First parse just in containerd format to extra time stamps and friends
+        '[FILTER]',
+        '    Name         lua',
+        '    Match        kube.*',
+        '    script  /fluent-bit/scripts/k8s_filters.lua',
+        '    call    truncate',
         // Rename log to message as this is what stack driver expects
         '[FILTER]',
         '    Name        modify',
@@ -65,11 +73,13 @@ export function installFluentBit(): void {
         '    Match        kube.*',
         '    Key_Name     message',
         '    Reserve_Data True',
+        '    Parser       fluentbit',
         '    Parser       glog',
         '    Parser       json_iso8601',
         // Enrich with k8s metadata
         '[FILTER]',
         '    Name             kubernetes',
+        '    Buffer_Size      1Mb',
         '    Match            kube.*',
         '    Kube_URL         https://kubernetes.default.svc:443',
         '    Kube_CA_File     /var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
@@ -82,7 +92,7 @@ export function installFluentBit(): void {
         '[FILTER]',
         '    Name    lua',
         '    Match   kube.*',
-        '    script  /fluent-bit/scripts/k8s_labels.lua',
+        '    script  /fluent-bit/scripts/k8s_filters.lua',
         '    call    tweak_k8s_labels',
       ].join('\n'),
       customParsers: [
@@ -99,21 +109,40 @@ export function installFluentBit(): void {
         '    Format      regex',
         "    # We skip the glog timestamp as it doesn't have year (in most cases) and time zone information.",
         '    # Instead, we rely on the containerd timestamp, which is available for every log line.',
-        '    Regex       ^(?<severity>\\w)\\d{4}?\\d{4} [^\\s]*\\s+(?<pid>\\d+)\\s+(?<source_file>[^ \\]]+)\\:(?<source_line>\\d+)\\]\\s(?<message>.*)$',
+        '    Regex       ^(?<level>\\w)\\d{4}?\\d{4} [^\\s]*\\s+(?<pid>\\d+)\\s+(?<source_file>[^ \\]]+)\\:(?<source_line>\\d+)\\]\\s(?<message>.*)$',
+        // yes fluentbit really does not have a parser for its log format
+        '[PARSER]',
+        '    Name        fluentbit',
+        '    Format      regex',
+        '    Regex  ^\\[(?<time>[^\\]]+)\\][ ]*\\[[ ]*(?<level>[^\\]]+)\\][ ]*\\[(?<plugin>[^\\]]+)\\] (?<message>.*)',
+        '    Time_Key time',
+        '    Time_Format %Y/%m/%d %H:%M:%S',
         '[PARSER]',
         '    Name        json_iso8601',
         '    Format json',
+        '    Time_Key @timestamp',
         '    Time_Format %Y-%m-%dT%H:%M:%S.%L%z',
+        // Allow missing second fraction,
+        '    Time_Strict off',
       ].join('\n'),
     },
     luaScripts: {
-      'k8s_labels.lua': [
+      'k8s_filters.lua': [
         'function tweak_k8s_labels(tag, timestamp, record)',
         '  if record.kubernetes and record.kubernetes.labels then',
         '    record.k8s_labels = { ["app.kubernetes.io/name"] = record.kubernetes.labels["app.kubernetes.io/name"], ["app.kubernetes.io/version"] = record.kubernetes.labels["app.kubernetes.io/version"], ["migration_id"] = record.kubernetes.labels["migration_id"] }',
         '    record.kubernetes = nil',
         '  end',
         // 2 means we tweaked the record but not the timestamp
+        '  return 2, timestamp, record',
+        'end',
+        // GCP does not like log messages more than 250k so we truncate to 200k here which seems to match what the builtin
+        // parser does. Note that just like the upstream parser this does also break json parsing.
+        'function truncate(tag, timestamp, record)',
+        '  local max_length = 200000',
+        '  if record.msg and string.len(record.msg) > max_length then',
+        '    record.message = string.sub(record.message, 1, max_length)',
+        '  end',
         '  return 2, timestamp, record',
         'end',
       ].join('\n'),

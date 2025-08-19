@@ -46,6 +46,7 @@ export const DateField: React.FC<DateFieldProps> = props => {
               variant: 'outlined',
               id: `${id}-field`,
               helperText: field.state.meta.errors?.[0],
+              onBlur: field.handleBlur,
               inputProps: {
                 'data-testid': `${id}-field`,
               },

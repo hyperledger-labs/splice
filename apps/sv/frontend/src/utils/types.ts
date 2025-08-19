@@ -139,3 +139,18 @@ export type ProposalVote = {
       reason: VoteReason;
     }
 );
+
+export interface CommonProposalFormData {
+  action: string;
+  expiryDate: string;
+  effectiveDate: Effectivity;
+  url: string;
+  summary: string;
+}
+
+export type EffectivityType = 'custom' | 'threshold';
+
+export interface Effectivity {
+  type: EffectivityType;
+  effectiveDate: string | undefined;
+}

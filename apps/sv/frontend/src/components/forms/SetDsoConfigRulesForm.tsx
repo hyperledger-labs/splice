@@ -4,10 +4,9 @@
 import dayjs from 'dayjs';
 import { ConfigFieldState } from '../form-components/ConfigField';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { ConfigChange } from '../../utils/types';
+import { CommonProposalFormData, ConfigChange } from '../../utils/types';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
 import { useDsoInfos } from '../../contexts/SvContext';
-import { useMemo, useState } from 'react';
 import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
 import { useAppForm } from '../../hooks/form';
 import {
@@ -17,21 +16,15 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, FormControlLabel, Radio, RadioGroup, Typography } from '@mui/material';
+import { Alert, Box, Typography } from '@mui/material';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
+import { EffectiveDateField } from '../form-components/EffectiveDateField';
+import { useMemo } from 'react';
 
 type ConfigFormData = Record<string, ConfigFieldState>;
 
-interface CommonFormData {
-  action: string;
-  expiryDate: string;
-  effectiveDate: string;
-  url: string;
-  summary: string;
-}
-
 type SetDsoConfigCompleteFormData = {
-  common: CommonFormData;
+  common: CommonProposalFormData;
   config: ConfigFormData;
 };
 
@@ -60,7 +53,6 @@ export interface SetDsoConfigRulesFormProps {
 }
 
 export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => {
-  const [effectivityType, setEffectivityType] = useState('custom');
   const dsoInfoQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
@@ -71,7 +63,10 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
         common: {
           action: createProposalAction?.name || '',
           expiryDate: initialExpiration.format(dateTimeFormatISO),
-          effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+          effectiveDate: {
+            type: 'custom',
+            effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+          },
           url: '',
           summary: '',
         },
@@ -86,7 +81,10 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
       common: {
         action: createProposalAction?.name || '',
         expiryDate: initialExpiration.format(dateTimeFormatISO),
-        effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+        effectiveDate: {
+          type: 'custom',
+          effectiveDate: initialEffectiveDate.format(dateTimeFormatISO),
+        },
         url: '',
         summary: '',
       },
@@ -106,7 +104,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
       onChange: ({ value }) => {
         return validateExpiryEffectiveDate({
           expiration: value.common.expiryDate,
-          effectiveDate: value.common.effectiveDate,
+          effectiveDate: value.common.effectiveDate.effectiveDate,
         });
       },
     },
@@ -139,59 +137,18 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
         )}
       </form.AppField>
 
-      <form.Field
+      <form.AppField
         name="common.effectiveDate"
         validators={{
           onChange: ({ value }) => validateEffectiveDate(value),
           onBlur: ({ value }) => validateEffectiveDate(value),
         }}
-        children={_ => {
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Typography variant="h5" gutterBottom>
-                Vote Proposal Effectivity
-              </Typography>
-
-              <RadioGroup
-                value={effectivityType}
-                onChange={e => setEffectivityType(e.target.value)}
-              >
-                <FormControlLabel
-                  value="custom"
-                  control={<Radio />}
-                  label={<Typography>Custom</Typography>}
-                />
-
-                {effectivityType === 'custom' && (
-                  <form.AppField name="common.effectiveDate">
-                    {field => (
-                      <field.DateField
-                        description="Select the date and time the proposal will take effect"
-                        minDate={dayjs(form.getFieldValue('common.expiryDate'))}
-                        id="set-dso-config-rules-effective-date"
-                      />
-                    )}
-                  </form.AppField>
-                )}
-
-                <FormControlLabel
-                  value="threshold"
-                  control={<Radio />}
-                  label={
-                    <Box>
-                      <Typography>Make effective at threshold</Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        This will allow the vote proposal to take effect immediately when 2/3 vote
-                        in favor
-                      </Typography>
-                    </Box>
-                  }
-                  sx={{ mt: 2 }}
-                />
-              </RadioGroup>
-            </Box>
-          );
-        }}
+        children={_ => (
+          <EffectiveDateField
+            initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
+            id="set-dso-config-rules-effective-date"
+          />
+        )}
       />
 
       <form.AppField
