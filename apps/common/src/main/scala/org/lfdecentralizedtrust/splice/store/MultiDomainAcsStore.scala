@@ -29,7 +29,6 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   PackageQualifiedName,
-  QualifiedName,
   TemplateJsonDecoder,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -365,20 +364,10 @@ object MultiDomainAcsStore {
         TemplateFilter[?, ?, R],
       ],
       interfaceFilters: Map[
-        PackageQualifiedName,
+        Identifier, // interfaces are not (currently) upgradeable, so we match by package-id
         InterfaceFilter[?, ?, ?, IR],
       ],
   ) extends ContractFilter[R, IR] {
-
-    private val interfaceFiltersWithoutPackageNames = filtersWithoutPackageNames(interfaceFilters)
-
-    // TODO(#829) Drop this once the ledger API exposes package names on the read path.
-    private def filtersWithoutPackageNames[F](
-        filters: Map[PackageQualifiedName, F]
-    ): Map[QualifiedName, F] =
-      filters.view.map { case (name, filter) =>
-        name.qualifiedName -> filter
-      }.toMap
 
     override val ingestionFilter =
       IngestionFilter(
@@ -391,11 +380,11 @@ object MultiDomainAcsStore {
         .get(PackageQualifiedName.fromEvent(ev))
         .exists(_.evPredicate(ev))
       lazy val interfaceViews = ev.getInterfaceViews.asScala.filter { case (identifier, _) =>
-        interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier)).exists(_.evPredicate(ev))
+        interfaceFilters.get(identifier).exists(_.evPredicate(ev))
       }
       lazy val interfaceToFailureMap = ev.getFailedInterfaceViews.asScala.filter {
         case (identifier, _) =>
-          interfaceFiltersWithoutPackageNames.contains(QualifiedName(identifier))
+          interfaceFilters.contains(identifier)
       }
       if (interfaceToFailureMap.nonEmpty) {
         elc.error(
@@ -414,7 +403,7 @@ object MultiDomainAcsStore {
       templateFilters.contains(
         packageIdQualifiedName
       ) || exercisedEvent.getImplementedInterfaces.asScala.exists(interfaceId =>
-        interfaceFiltersWithoutPackageNames.contains(QualifiedName(interfaceId))
+        interfaceFilters.contains(interfaceId)
       )
     }
 
@@ -441,7 +430,7 @@ object MultiDomainAcsStore {
       )
       val interfaceRowDatas = for {
         (identifier, _) <- ev.getInterfaceViews.asScala
-        interfaceFilter <- interfaceFiltersWithoutPackageNames.get(QualifiedName(identifier))
+        interfaceFilter <- interfaceFilters.get(identifier)
         result <- interfaceFilter.matchingContractToRow(ev)
       } yield result
 
@@ -502,11 +491,11 @@ object MultiDomainAcsStore {
   )(p: Contract[ICid, View] => Boolean)(
       encode: EncodeInterfaceToRow[ICid, View, IR]
   ): (
-      PackageQualifiedName,
+      Identifier,
       InterfaceFilter[ICid, Marker, View, IR],
   ) =
     (
-      PackageQualifiedName.getFromResources(interfaceCompanion.getTemplateIdWithPackageId),
+      interfaceCompanion.getTemplateIdWithPackageId,
       InterfaceFilter(
         interfaceCompanion.TEMPLATE_ID_WITH_PACKAGE_ID,
         ev => {
