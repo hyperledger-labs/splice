@@ -71,7 +71,7 @@ createExternalPartySetupProposal
   : AmuletApp -> AmuletUser -> Party -> Script (ContractId ExternalPartySetupProposal, ExternalPartySetupProposal)
 createExternalPartySetupProposal app validator user = do
   now <- getTime
-  let preapprovalExpiresAt = now `addRelTime` days 1
+  let preapprovalExpiresAt = now `addRelTime` days 100
 
   -- This would be submitted by the validator hosting the external party
   -- As part of the creation of the proposal, the validator also pays for the creation of the
@@ -88,6 +88,7 @@ createExternalPartySetupProposal app validator user = do
       validator = validator.primaryParty
       preapprovalExpiresAt
       expectedDso = Some app.dso
+      optCreatedAt = Some now
 
   Some proposal <- queryContractId app.dso proposalCid
   pure (proposalCid, proposal)

@@ -3,6 +3,7 @@
 
 module Splice.AmuletConfig where
 
+import DA.Optional (fromOptional)
 import DA.Time
 
 import Splice.Fees
@@ -45,11 +46,20 @@ data AmuletConfig unit = AmuletConfig with
       -- that should be used for command submissions.
     transferPreapprovalFee : Optional Decimal -- ^ Fee for keeping a transfer pre-approval around.
     featuredAppActivityMarkerAmount : Optional Decimal -- ^ $-amount used for the conversion from FeaturedAppActivityMarker -> AppRewardCoupon
+    transferPreapprovalBaseDuration : Optional RelTime -- ^ Base duration of a transfer pre-approval granted for free on creation and renewal.
   deriving (Eq, Show)
 
--- $1/year specified as a daily rate
+-- | $1/year specified as a daily rate
 defaultTransferPreapprovalFee : Decimal
 defaultTransferPreapprovalFee = 0.00274
+
+defaultTransferPreapprovalBaseDuration : RelTime
+defaultTransferPreapprovalBaseDuration = days 90
+
+-- | Retrieve the base transfer pre-approval duration from the config.
+getTransferPreapprovalBaseDuration : AmuletConfig unit -> RelTime
+getTransferPreapprovalBaseDuration config =
+  fromOptional defaultTransferPreapprovalBaseDuration config.transferPreapprovalBaseDuration
 
 -- Check constraints on config params on which the implementation of the choices rely.
 validAmuletConfig : AmuletConfig unit -> Bool
@@ -120,6 +130,7 @@ instance Patchable (AmuletConfig USD) where
     packageConfig = patch new.packageConfig base.packageConfig current.packageConfig
     transferPreapprovalFee = patch new.transferPreapprovalFee base.transferPreapprovalFee current.transferPreapprovalFee
     featuredAppActivityMarkerAmount = patch new.featuredAppActivityMarkerAmount base.featuredAppActivityMarkerAmount current.featuredAppActivityMarkerAmount
+    transferPreapprovalBaseDuration = patch new.transferPreapprovalBaseDuration base.transferPreapprovalBaseDuration current.transferPreapprovalBaseDuration
 
 instance Patchable (TransferConfig USD) where
   patch new base current = TransferConfig with

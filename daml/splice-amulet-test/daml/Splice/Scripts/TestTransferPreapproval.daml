@@ -82,28 +82,43 @@ testTransferPreapprovalRenewal = script do
       inputs = [InputAmulet providerAmuletCid]
       newExpiresAt = now
 
-  -- Provider can renew the pre-approval (before expiry)
+  -- Provider can renew the pre-approval without inputs for a short duration (before expiry)
   let newExpiresAt = now `addRelTime` (days 2)
   result <- submitMulti [aliceValidator.primaryParty] [app.dso] $
     exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
-      inputs = [InputAmulet providerAmuletCid]
+      inputs = []
       newExpiresAt
   Some renewedPreapproval <- queryContractId app.dso result.transferPreapprovalCid
   renewedPreapproval === transferPreapproval with
-    lastRenewedAt = now
+    lastRenewedAt = expiresAt
     expiresAt = newExpiresAt
 
+  -- Provider can renew the pre-approval for a long duration with inputs (before expiry)
+  now <- getTime
+  let newExpiresAt2 = now `addRelTime` (days 1000)
+  result <- submitMulti [aliceValidator.primaryParty] [app.dso] $
+    exerciseCmd result.transferPreapprovalCid TransferPreapproval_Renew with
+      context = providerTransferContext
+      inputs = [InputAmulet providerAmuletCid]
+      newExpiresAt = newExpiresAt2
+  Some renewedPreapproval <- queryContractId app.dso result.transferPreapprovalCid
+  renewedPreapproval === transferPreapproval with
+    lastRenewedAt = newExpiresAt
+    expiresAt = newExpiresAt2
+
   -- Move forward in time to expire pre-approval
-  passTime (days 2)
+  passTime (days 1002)
 
   -- Renewal fails if the pre-approval has expired
+  now <- getTime
   providerAmuletCid2 <- tap app aliceValidator 10.0
+  let newExpiresAt3 = now `addRelTime` (days 1000)
   submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $
-    exerciseCmd transferPreapprovalCid TransferPreapproval_Renew with
+    exerciseCmd result.transferPreapprovalCid TransferPreapproval_Renew with
       context = providerTransferContext
       inputs = [InputAmulet providerAmuletCid2]
-      newExpiresAt = now
+      newExpiresAt = newExpiresAt3
 
 
 testTransferPreapprovalCancelExpire : Script ()
