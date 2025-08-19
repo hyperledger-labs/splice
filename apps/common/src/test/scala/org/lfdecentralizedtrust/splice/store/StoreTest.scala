@@ -94,7 +94,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def getPackageName(identifier: Identifier) = {
     PackageQualifiedName
-      .findFromResources(identifier)
+      .lookupFromResources(identifier)
       .map(_.packageName)
       // should only be necessary for upgrade/malicious identifiers
       .orElse(
