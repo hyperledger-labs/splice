@@ -16,7 +16,6 @@ jobs:
 
   static_tests:
     uses: ./.github/workflows/build.static_tests.yml
-    # FIXME: uncomment this
-    # if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
+    if: github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name
     with:
       self_hosted: false

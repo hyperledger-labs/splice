@@ -63,8 +63,7 @@ runs:
 
         echo "Latest nix cache:"
 
-        # FIXME: uncomment:
-        # wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" -O cache.tar.gz || true
+        wget -q "https://storage.googleapis.com/splice-nix-cache-public/${cache_key}.tar.gz" -O cache.tar.gz || true
         if [ ! -f "${cache_key}.tar.gz" ]; then
           echo "Cache not found, fetching latest instead"
           latest=$(curl https://storage.googleapis.com/storage/v1/b/splice-nix-cache-public/o | jq -r '.items | sort_by(.updated) | .[-1].name')
