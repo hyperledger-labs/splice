@@ -9,7 +9,7 @@ import {
   installSpliceRunbookHelmChart,
   installPostgresPasswordSecret,
   InstalledHelmChart,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { multiValidatorConfig } from './config';
 

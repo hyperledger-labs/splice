@@ -1,6 +1,5 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import { Resource } from '@pulumi/pulumi';
 import {
   ApprovedSvIdentity,
   Auth0Client,
@@ -11,17 +10,18 @@ import {
   sequencerPruningConfig,
   svOnboardingPollingInterval,
   svValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { dsoSize } from 'splice-pulumi-common-sv';
-import { readBackupConfig } from 'splice-pulumi-common-validator/src/backup';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { readBackupConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/backup';
 import {
   mustInstallSplitwell,
   mustInstallValidator1,
   splitwellOnboarding,
   standaloneValidatorOnboarding,
   validator1Onboarding,
-} from 'splice-pulumi-common-validator/src/validators';
-import { SplitPostgresInstances } from 'splice-pulumi-common/src/config/configs';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator/src/validators';
+import { SplitPostgresInstances } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configs';
+import { Resource } from '@pulumi/pulumi';
 
 import { activeVersion } from '../../common';
 import { installChaosMesh } from './chaosMesh';

@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
-import { GCP_PROJECT, config } from 'splice-pulumi-common';
+import { GCP_PROJECT, config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export function installNodePools(): void {
   const clusterName = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;

@@ -12,7 +12,7 @@ import {
   KmsConfig,
   loadYamlFromFile,
   SPLICE_ROOT,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export type ParticipantKmsHelmResources = {
   kms: KmsConfig;

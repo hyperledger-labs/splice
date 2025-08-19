@@ -46,10 +46,17 @@ import {
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
   networkWideConfig,
-} from 'splice-pulumi-common';
-import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  configForSv,
+  svsConfig,
+  updateHistoryBackfillingValues,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import {
+  CloudPostgres,
+  SplicePostgres,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
 import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';

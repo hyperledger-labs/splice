@@ -4,7 +4,7 @@ import {
   config,
   ExpectedValidatorOnboarding,
   preApproveValidatorRunbook,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 export const mustInstallValidator1 = config.envFlag('SPLICE_DEPLOY_VALIDATOR1', true);
 

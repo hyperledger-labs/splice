@@ -3,13 +3,13 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { dsoSize } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/dsoConfig';
+import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
+import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
+import { commandScriptPath } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
 import { local } from '@pulumi/command';
-import { dsoSize } from 'splice-pulumi-common-sv/src/dsoConfig';
-import { cometBFTExternalPort } from 'splice-pulumi-common-sv/src/synchronizer/cometbftConfig';
-import { DeploySvRunbook } from 'splice-pulumi-common/src/config';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { PodMonitor, ServiceMonitor } from 'splice-pulumi-common/src/metrics';
-import { commandScriptPath } from 'splice-pulumi-common/src/utils';
 
 import {
   CLUSTER_HOSTNAME,
