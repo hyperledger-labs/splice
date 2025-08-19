@@ -158,7 +158,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
               {
                 name: 'null',
               },
-              ...(enableAlerts && enablePrometheusAlerts
+              ...(enableAlerts && enablePrometheusAlerts && slackAlertNotificationChannel
                 ? [
                     {
                       name: 'slack',
@@ -515,7 +515,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   createGrafanaDashboards(namespaceName);
   // enable the slack alerts only for "prod" clusters
   const slackAccessToken = enableAlerts ? slackToken() : 'None';
-  const slackNotificationChannel = enableAlerts ? slackAlertNotificationChannel : 'None';
+  const slackNotificationChannel = (enableAlerts && slackAlertNotificationChannel) || 'None';
   const slackHighPrioNotificationChannel =
     enableAlerts && slackHighPrioAlertNotificationChannel
       ? slackHighPrioAlertNotificationChannel

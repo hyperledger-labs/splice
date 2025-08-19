@@ -4,8 +4,7 @@ import { clusterProdLike, config } from '@lfdecentralizedtrust/splice-pulumi-com
 import { spliceEnvConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/envConfig';
 
 export const enableAlerts = clusterProdLike || config.envFlag('ENABLE_ALERTS_FOR_TESTING');
-export const slackAlertNotificationChannel =
-  config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL') || 'C064MTNQT88';
+export const slackAlertNotificationChannel = config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL');
 // empty or missing value for the high prio notification channel disables high prio notifications
 export const slackHighPrioAlertNotificationChannel =
   config.optionalEnv('SLACK_HIGH_PRIO_ALERT_NOTIFICATION_CHANNEL') || '';
