@@ -87,4 +87,8 @@ repos:
      - id: rstcheck
        name: Check sphinx format
        additional_dependencies: ['rstcheck[sphinx]']
-       args: [--report-level, WARNING]
+       args: [
+         --report-level, WARNING,
+         --ignore-directives, "openapi,todo",
+         --ignore-substitutions, "version_literal,chart_version_literal"
+       ]

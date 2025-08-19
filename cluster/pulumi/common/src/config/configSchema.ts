@@ -9,7 +9,7 @@ import { defaultActiveMigration, SynchronizerMigrationSchema } from './migration
 const PulumiProjectConfigSchema = z.object({
   installDataOnly: z.boolean(),
   isExternalCluster: z.boolean(),
-  hasPublicDocs: z.boolean(),
+  hasPublicInfo: z.boolean(),
   interAppsDependencies: z.boolean(),
   cloudSql: z.object({
     enabled: z.boolean(),
@@ -23,6 +23,9 @@ const PulumiProjectConfigSchema = z.object({
     protected: z.boolean(),
     tier: z.string(),
     enterprisePlus: z.boolean(),
+    // https://cloud.google.com/sql/docs/mysql/backup-recovery/backups#retained-backups
+    // controls the number of automated gcp sql backups to retain
+    backupsToRetain: z.number().optional(),
   }),
 });
 export type PulumiProjectConfig = z.infer<typeof PulumiProjectConfigSchema>;
@@ -39,3 +42,17 @@ export const ConfigSchema = z.object({
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
+
+const SingleResourceSchema = z
+  .object({
+    memory: z.string().optional(),
+    cpu: z.string().optional(),
+  })
+  .optional();
+
+export const K8sResourceSchema = z
+  .object({
+    limits: SingleResourceSchema,
+    requests: SingleResourceSchema,
+  })
+  .optional();

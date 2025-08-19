@@ -3,20 +3,19 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
-import * as semver from 'semver';
+import * as nodePath from 'path';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
 import { config, isDevNet, isMainNet } from './config';
 import { spliceConfig } from './config/config';
 import { spliceEnvConfig } from './config/envConfig';
-import { splitwellConfig } from './config/splitwellConfig';
 
 /// Environment variables
 export const HELM_CHART_TIMEOUT_SEC = Number(config.optionalEnv('HELM_CHART_TIMEOUT_SEC')) || 600;
 export const HELM_MAX_HISTORY_SIZE = Number(config.optionalEnv('HELM_MAX_HISTORY_SIZE')) || 0; // 0 => no limit
 
-export const MOCK_SPLICE_ROOT = config.optionalEnv('MOCK_SPLICE_ROOT');
+const MOCK_SPLICE_ROOT = config.optionalEnv('MOCK_SPLICE_ROOT');
 export const SPLICE_ROOT = config.requireEnv('SPLICE_ROOT', 'root directory of the repo');
 export const PULUMI_STACKS_DIR = config.requireEnv('PULUMI_STACKS_DIR');
 export const CLUSTER_BASENAME = config.requireEnv('GCP_CLUSTER_BASENAME');
@@ -52,6 +51,7 @@ export function getDnsNames(): { daDnsName: string; cantonDnsName: string } {
 }
 
 export const GCP_PROJECT = config.requireEnv('CLOUDSDK_CORE_PROJECT');
+export const GCP_REGION = config.requireEnv('CLOUDSDK_COMPUTE_REGION');
 export const GCP_ZONE = config.optionalEnv('CLOUDSDK_COMPUTE_ZONE');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 
@@ -60,8 +60,6 @@ export const ENABLE_COMETBFT_PRUNING = config.envFlag('ENABLE_COMETBFT_PRUNING',
 export const COMETBFT_RETAIN_BLOCKS = ENABLE_COMETBFT_PRUNING
   ? parseInt(config.requireEnv('COMETBFT_RETAIN_BLOCKS'))
   : 0;
-
-export type LogLevel = 'INFO' | 'DEBUG';
 
 export type ApprovedSvIdentity = {
   name: string;
@@ -183,20 +181,73 @@ export function fixedTokens(): boolean {
   return _fixedTokens;
 }
 
-export const clusterDirectory = isDevNet ? 'DevNet' : isMainNet ? 'MainNet' : 'TestNet';
+export const clusterNetwork = isDevNet ? 'dev' : isMainNet ? 'main' : 'test';
+
+function getClusterDirectory(): string {
+  const net = {
+    dev: 'DevNet',
+    main: 'MainNet',
+    test: 'TestNet',
+  }[clusterNetwork];
+
+  if (!net) {
+    throw new Error(`Unknown cluster network: ${clusterNetwork}`);
+  }
+
+  return net;
+}
+
+export const clusterDirectory = getClusterDirectory();
+
+function getPathToPrivateConfigFile(fileName: string): string | undefined {
+  const path = PRIVATE_CONFIGS_PATH;
+
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
+    throw new Error('isExternalCluster is true but PRIVATE_CONFIGS_PATH is not set');
+  }
+
+  if (!path) {
+    return undefined;
+  }
+
+  return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+function getPathToPublicConfigFile(fileName: string): string | undefined {
+  const path = PUBLIC_CONFIGS_PATH;
+
+  if (spliceConfig.pulumiProjectConfig.isExternalCluster && !path) {
+    throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
+  }
+
+  if (!path) {
+    return undefined;
+  }
+
+  return `${path}/configs/${clusterDirectory}/${fileName}`;
+}
+
+// only for use with command.local.Command pulumi objects
+export function commandScriptPath(relativeToSplice: string): string {
+  const relativeRoot = nodePath.relative(process.cwd(), MOCK_SPLICE_ROOT || SPLICE_ROOT);
+  return nodePath.join(relativeRoot, relativeToSplice);
+}
+
+export function externalIpRangesFile(): string | undefined {
+  if (!spliceConfig.pulumiProjectConfig.isExternalCluster) {
+    return undefined;
+  }
+
+  return getPathToPrivateConfigFile('allowed-ip-ranges.json');
+}
+
+export function approvedSvIdentitiesFile(): string | undefined {
+  return getPathToPublicConfigFile('approved-sv-id-values.yaml');
+}
 
 export function approvedSvIdentities(): ApprovedSvIdentity[] {
-  if (PUBLIC_CONFIGS_PATH) {
-    const svPublicConfigsClusterDirectory = `${PUBLIC_CONFIGS_PATH}/configs/${clusterDirectory}`;
-    return loadYamlFromFile(`${svPublicConfigsClusterDirectory}/approved-sv-id-values.yaml`)
-      .approvedSvIdentities;
-  } else {
-    if (spliceConfig.pulumiProjectConfig.isExternalCluster) {
-      throw new Error('isExternalCluster is true but PUBLIC_CONFIGS_PATH is not set');
-    }
-
-    return [];
-  }
+  const file = approvedSvIdentitiesFile();
+  return file ? loadYamlFromFile(file).approvedSvIdentities : [];
 }
 
 // Typically used for overriding chart values.
@@ -222,17 +273,3 @@ export function conditionalString(condition: boolean, value: string): string {
 }
 
 export const daContactPoint = 'sv-support@digitalasset.com';
-
-export const splitwellDarPaths = fs
-  .readdirSync(`${SPLICE_ROOT}/daml/dars`)
-  .filter(file => {
-    const match = file.match(/splitwell-(\d+\.\d+\.\d+)\.dar/);
-    if (match) {
-      const darVersion = match[1];
-      return splitwellConfig?.maxDarVersion
-        ? semver.gte(splitwellConfig.maxDarVersion, darVersion)
-        : true;
-    }
-    return false;
-  })
-  .map(file => `splice-node/dars/${file}`);

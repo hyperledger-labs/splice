@@ -16,7 +16,7 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
+              expr: max by (member) (delta(daml_sequencer_traffic_control_wasted_traffic_total{member=~"PAR::.*"$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER}[$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINSm]))
               instant: true
               intervalMs: 1000
               legendFormat: __auto

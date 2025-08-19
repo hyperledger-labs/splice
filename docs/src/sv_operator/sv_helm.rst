@@ -419,6 +419,63 @@ The snapshots are fetched from your onboarding sponsor which exposes its CometBF
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
+.. _helm-sv-bft-sequencer-connections:
+
+Configuring BFT Sequencer Connections
+-------------------------------------
+
+By default, SV participants use BFT sequencer connections to interact with the Global Synchronizer, i.e.,
+they maintain connections to a random subset of all sequencers (most of which typically operated by other SVs)
+and perform reads and writes in the same :term:`BFT` manner used by regular validators.
+In principle, this mode of operation is more robust than using a single connection to the sequencer operated by the SV itself.
+However, bugs in the BFT sequencer connection logic or severe instability of other SVs's sequencers can make it prudent to temporarily switch back to using a single sequencer connection.
+
+To do so, SV operators must:
+
+1. In ``validator-values.yaml``, add ``useSequencerConnectionsFromScan: false`` and set ``decentralizedSynchronizerUrl`` to your ``domain.sequencerPublicUrl`` value from ``sv-values.yaml``.
+
+2. In ``validator-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
+
+.. code-block:: yaml
+
+    additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION
+          value: "canton.validator-apps.validator_backend.disable-sv-validator-bft-sequencer-connection = true"
+
+3. In ``sv-values.yaml``, add the following or an equivalent :ref:`config override <configuration_ad_hoc>`:
+
+.. code-block:: yaml
+
+    additionalEnvVars:
+        - name: ADDITIONAL_CONFIG_NO_BFT_SEQUENCER_CONNECTION
+          value: "canton.sv-apps.sv.bft-sequencer-connection = false"
+
+The default behavior is restored by undoing above changes.
+
+To confirm the current configuration of your SV participant,
+open a :ref:`Canton console <console_access>` to it and execute ``participant.synchronizers.config("global")``.
+In case BFT sequencer connections are disabled, this should return a single sequencer connection in an output similar to the following:
+
+.. parsed-literal::
+
+    @ participant.synchronizers.config("global")
+    res1: Option[SynchronizerConnectionConfig] = Some(
+      value = SynchronizerConnectionConfig(
+        synchronizer = Synchronizer \'global\',
+        sequencerConnections = SequencerConnections(
+          connections = Sequencer \'DefaultSequencer\' -> GrpcSequencerConnection(sequencerAlias = Sequencer \'DefaultSequencer\', endpoints = http://global-domain-0-sequencer:5008),
+          sequencer trust threshold = 1,
+          submission request amplification = SubmissionRequestAmplification(factor = 1, patience = 10s)
+        ),
+        manualConnect = false,
+        timeTracker = SynchronizerTimeTrackerConfig(minObservationDuration = 30m)
+      )
+    )
+
+Alternatively, you can also search your participant logs for a ``DEBUG``-level entry such as
+``Connecting to synchronizer with config: SynchronizerConnectionConfig(...)``,
+which contains the same information.
+
 .. _helm-sv-postgres:
 
 Installing Postgres instances
@@ -591,6 +648,19 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
+Please modify the file ``splice-node/examples/sv-helm/info-values.yaml`` as follows:
+
+- Replace ``TARGET_CLUSTER`` with |splice_cluster|
+- Replace ``MD5_HASH_OF_ALLOWED_IP_RANGES`` with the MD5 hash of the ``allowed-ip-ranges.json`` file corresponding to the |splice_cluster| network.
+- Replace ``MD5_HASH_OF_APPROVED_SV_IDENTITIES`` with the MD5 hash of the ``approved-sv-id-values.yaml`` file corresponding to the |splice_cluster| network.
+- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace all instances of ``CHAIN_ID_SUFFIX`` with the chain ID suffix of the |splice_cluster| network.
+- Uncomment ``staging`` synchronizer and ``legacy`` synchronizer sections if you are using them.
+- Replace ``STAGING_SYNCHRONIZER_MIGRATION_ID`` with the migration ID of the staging synchronizer on your target cluster.
+- Replace ``STAGING_SYNCHRONIZER_VERSION`` with the version of the staging synchronizer on your target cluster.
+- Replace ``LEGACY_SYNCHRONIZER_MIGRATION_ID`` with the migration ID of the legacy synchronizer on your target cluster.
+- Replace ``LEGACY_SYNCHRONIZER_VERSION`` with the version of the legacy synchronizer on your target cluster.
+
 The `configs repo <https://github.com/global-synchronizer-foundation/configs>`_ contains recommended values for configuring your SV node. Store the paths to these YAML files in the following environment variables:
 
 1. ``SV_IDENTITIES_FILE``: The list of SV identities for your node to auto-approve as peer SVs. Locate and review the ``approved-sv-id-values.yaml`` file corresponding to the network to which you are connecting.
@@ -626,6 +696,12 @@ Install the SV node apps (replace ``helm install`` in these commands with ``helm
     helm install scan |helm_repo_prefix|/splice-scan -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/scan-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
     helm install validator |helm_repo_prefix|/splice-validator -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/validator-values.yaml -f splice-node/examples/sv-helm/sv-validator-values.yaml -f ${UI_CONFIG_VALUES_FILE} --wait
 
+Install the INFO app, which is used to provide information about the SV node and its configuration:
+
+.. parsed-literal::
+
+    helm install info |helm_repo_prefix|/splice-info -n sv --version ${CHART_VERSION} -f splice-node/examples/sv-helm/info-values.yaml
+
 
 
 Once everything is running, you should be able to inspect the state of the
@@ -641,6 +717,7 @@ namespace. A typical query might look as follows:
     global-domain-0-cometbft-c584c9468-9r2v5     2/2     Running   2 (14m ago)   14m
     global-domain-0-mediator-7bfb5f6b6d-ts5zp    2/2     Running   0             13m
     global-domain-0-sequencer-6c85d98bb6-887c7   2/2     Running   0             13m
+    info-9fb7bc859-27226                         2/2     Running   0             10m
     mediator-pg-0                                2/2     Running   0             14m
     participant-0-57579c64ff-wmzk5               2/2     Running   0             14m
     participant-pg-0                             2/2     Running   0             14m
@@ -724,6 +801,7 @@ Each SV is required to configure their cluster ingress to allow traffic from the
 * ``https://cns.sv.<YOUR_HOSTNAME>`` should be routed to service ``ans-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
 * ``https://sequencer-<MIGRATION_ID>.sv.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
+* ``https://info.sv.<YOUR_HOSTNAME>`` should be routed to service ``info`` in the ``sv`` namespace. This endpoint should be publicly accessible without any IP restrictions.
 
 .. warning::
 
@@ -824,16 +902,85 @@ And install it to your cluster:
     helm install istio-ingress istio/gateway -n cluster-ingress -f istio-gateway-values.yaml
 
 
-A reference Helm chart installing a gateway that uses this service is also provided.
-To install it, run the following (assuming the environment variable `YOUR_HOSTNAME` is set to your hostname):
+Create Istio Gateway resources in the `cluster-ingress` namespace. Save the following to a file named `gateways.yaml`,
+with the following modifications:
 
-.. parsed-literal::
+- Replace ``YOUR_HOSTNAME`` with the actual hostname of your SV node
+- The second gateway (cn-apps-gateway) exposes ports for three migration IDs (0, 1, and 2) for the CometBFT apps of the SV node.
+  If a higher migration ID is reached, expand that list using the same pattern.
 
-    helm install cluster-gateway |helm_repo_prefix|/splice-istio-gateway -n cluster-ingress --version ${CHART_VERSION} --set cluster.daHostname=${YOUR_HOSTNAME} --set cluster.cantonHostname=${YOUR_HOSTNAME}
+.. code-block:: yaml
 
-This gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
+    apiVersion: networking.istio.io/v1alpha3
+    kind: Gateway
+    metadata:
+      name: cn-http-gateway
+      namespace: cluster-ingress
+    spec:
+      selector:
+        app: istio-ingress
+        istio: ingress
+      servers:
+      - port:
+          number: 443
+          name: https
+          protocol: HTTPS
+        tls:
+          mode: SIMPLE
+          credentialName: cn-net-tls # name of the secret created above
+        hosts:
+        - "*.YOUR_HOSTNAME"
+        - "YOUR_HOSTNAME"
+      - port:
+          number: 80
+          name: http
+          protocol: HTTP
+        tls:
+          httpsRedirect: true
+        hosts:
+        - "*.YOUR_HOSTNAME"
+        - "YOUR_HOSTNAME"
+    ---
+    apiVersion: networking.istio.io/v1alpha3
+    kind: Gateway
+    metadata:
+      name: cn-apps-gateway
+      namespace: cluster-ingress
+    spec:
+      selector:
+        app: istio-ingress
+        istio: ingress
+      servers:
+      - port:
+          number: 26016
+          name: cometbft-0-1-6-gw
+          protocol: TCP
+        hosts:
+          # We cannot really distinguish TCP traffic by hostname, so configuring to "*" to be explicit about that
+          - "*"
+      - port:
+          number: 26116
+          name: cometbft-1-1-6-gw
+          protocol: TCP
+        hosts:
+          - "*"
+      - port:
+          number: 26216
+          name: cometbft-2-1-6-gw
+          protocol: TCP
+        hosts:
+          - "*"
+
+And apply them to your cluster:
+
+.. code-block:: bash
+
+    kubectl apply -f gateways.yaml -n cluster-ingress
+
+
+The http gateway terminates tls using the secret that you configured above, and exposes raw http traffic in its outbound port 443.
 Istio VirtualServices can now be created to route traffic from there to the required pods within the cluster.
-Another reference Helm chart is provided for that, which can be installed after
+A reference Helm chart is provided for that, which can be installed after
 
 1. replacing ``YOUR_HOSTNAME`` in ``splice-node/examples/sv-helm/sv-cluster-ingress-values.yaml`` and
 2. setting ``nameServiceDomain`` in the same file to ``"cns"``

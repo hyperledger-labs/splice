@@ -15,11 +15,8 @@ import org.lfdecentralizedtrust.splice.automation.AutomationServiceCompanion.{
   aTrigger,
 }
 import org.lfdecentralizedtrust.splice.automation.{
-  AmuletConfigReassignmentTrigger,
-  AssignTrigger,
   AutomationServiceCompanion,
   SpliceAppAutomationService,
-  TransferFollowTrigger,
 }
 import org.lfdecentralizedtrust.splice.config.{SpliceInstanceNamesConfig, UpgradesConfig}
 import org.lfdecentralizedtrust.splice.environment.*
@@ -227,6 +224,7 @@ class SvDsoAutomationService(
         participantAdminConnection,
         config.preparationTimeRecordTimeTolerance,
         config.mediatorDeduplicationTimeout,
+        config.topologyChangeDelayDuration,
       )
     )
 
@@ -296,13 +294,8 @@ class SvDsoAutomationService(
     if (config.automation.enableClosedRoundArchival)
       registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, dsoStore, connection))
 
-    if (config.automation.enableDsoDelegateReplacementTrigger) {
-      registerTrigger(new ElectionRequestTrigger(triggerContext, dsoStore, connection))
-    }
-
     registerTrigger(restartDsoDelegateBasedAutomationTrigger)
 
-    registerTrigger(new AssignTrigger(triggerContext, dsoStore, connection, store.key.dsoParty))
     registerTrigger(
       new AnsSubscriptionInitialPaymentTrigger(
         triggerContext,
@@ -316,6 +309,7 @@ class SvDsoAutomationService(
         participantAdminConnection,
         dsoStore,
         triggerContext,
+        config.maxVettingDelay,
       )
     )
 
@@ -349,15 +343,6 @@ class SvDsoAutomationService(
         triggerContext,
         dsoStore,
         connection,
-      )
-    )
-
-    registerTrigger(
-      new ExternalPartyAmuletRulesTrigger(
-        triggerContext,
-        dsoStore,
-        connection,
-        packageVersionSupport,
       )
     )
 
@@ -471,11 +456,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[ReceiveSvRewardCouponTrigger],
       aTrigger[ArchiveClosedMiningRoundsTrigger],
-      aTrigger[ElectionRequestTrigger],
       aTrigger[RestartDsoDelegateBasedAutomationTrigger],
-      aTrigger[AmuletConfigReassignmentTrigger],
-      aTrigger[AssignTrigger],
-      aTrigger[TransferFollowTrigger],
       aTrigger[AnsSubscriptionInitialPaymentTrigger],
       aTrigger[SvPackageVettingTrigger],
       aTrigger[SvOffboardingPartyToParticipantProposalTrigger],
@@ -499,7 +480,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[ReportValidatorLicenseMetricsExportTrigger],
       aTrigger[ReconcileDynamicSynchronizerParametersTrigger],
       aTrigger[TransferCommandCounterTrigger],
-      aTrigger[ExternalPartyAmuletRulesTrigger],
       aTrigger[SvBftSequencerPeerOffboardingTrigger],
       aTrigger[SvBftSequencerPeerOnboardingTrigger],
     )

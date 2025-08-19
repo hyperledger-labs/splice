@@ -81,6 +81,9 @@ $$(prefix)/docker-build: $$(prefix)/$(docker-build)
 .PHONY: $$(prefix)/docker-push
 $$(prefix)/docker-push: $$(prefix)/$(docker-push)
 
+.PHONY: $$(prefix)/docker-scan
+$$(prefix)/docker-scan: $$(prefix)/$(docker-scan)
+
 IMG_REF_EXISTS_ARG ?= ""
 
 .PHONY: $$(prefix)/docker-image-reference-exists
@@ -124,6 +127,9 @@ $(foreach image,$(images),$(eval $(call DEFINE_PHONY_RULES,$(image))))
 
 %/$(docker-push):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && docker-push $$(cat $(abspath $<))
+
+%/$(docker-scan):  %/$(docker-image-tag)
+	cd $(@D) && docker-scan $$(cat $(abspath $<))
 
 %/$(docker-copy-release-to-ghcr):  %/$(docker-image-tag) %/$(docker-build)
 	cd $(@D)/.. && copy_release_to_ghcr $$(cat $(abspath $<))

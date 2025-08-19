@@ -1,6 +1,11 @@
 # Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# ******   Deprecated   ******
+# This file is deprecated and will be removed in a future release.
+# Please see instructions for installing gateways manually in the validator & SV docs.
+# ****************************
+
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
@@ -42,16 +47,9 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: istio-ingress
-    istio: ingress
+    app: istio-ingress-cometbft
+    istio: ingress-cometbft
   servers:
-  - port:
-      number: 5108
-      name: grpc-swd-pub
-      protocol: GRPC
-    hosts:
-    - "{{ (.Values.cluster).cantonHostname }}"
-    - "{{ (.Values.cluster).daHostname }}"
   {{- $domains := untilStep 0 (int .Values.cometbftPorts.domains) 1 -}}
   {{- $synchronizerNodes := untilStep 0 (int .Values.cometbftPorts.nodes) 1 -}}
   {{- range $index, $domain := $domains }}

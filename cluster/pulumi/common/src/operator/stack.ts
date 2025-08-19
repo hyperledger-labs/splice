@@ -3,8 +3,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
-import { Secret } from '@pulumi/kubernetes/core/v1';
-import { Resource } from '@pulumi/pulumi';
+import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import {
   CLUSTER_BASENAME,
   config,
@@ -13,7 +12,7 @@ import {
 } from 'splice-pulumi-common';
 
 import { spliceEnvConfig } from '../config/envConfig';
-import { operatorDeploymentConfig, PulumiOperatorGracePeriod } from './config';
+import { PulumiOperatorGracePeriod } from './config';
 import { GitFluxRef } from './flux-source';
 
 export type EnvRefs = { [key: string]: unknown };
@@ -82,154 +81,9 @@ export function createStackCR(
   envRefs: EnvRefs,
   gcpSecret: k8s.core.v1.Secret,
   extraEnvs: { [key: string]: string } = {},
-  dependsOn: pulumi.Resource[] = []
-): pulumi.CustomResource {
-  if (operatorDeploymentConfig.useOperatorV2) {
-    return createStackCRV2(
-      name,
-      namespaceName,
-      ref,
-      projectName,
-      envRefs,
-      extraEnvs,
-      gcpSecret,
-      supportsResetOnSameCommit,
-      dependsOn
-    );
-  } else {
-    return createStackCRV1(
-      name,
-      projectName,
-      supportsResetOnSameCommit,
-      ref,
-      envRefs,
-      extraEnvs,
-      namespaceName,
-      dependsOn
-    );
-  }
-}
-
-/*https://github.com/pulumi/pulumi-kubernetes-operator/blob/master/docs/stacks.md*/
-export function createStackCRV1(
-  name: string,
-  projectName: string,
-  supportsResetOnSameCommit: boolean,
-  ref: GitFluxRef,
-  envRefs: EnvRefs,
-  extraEnvs: { [key: string]: string } = {},
-  namespaceName: string = 'operator',
-  dependsOn: pulumi.Resource[] = []
-): pulumi.CustomResource {
-  const privateConfigs = ref.config.privateConfigsDir
-    ? {
-        PRIVATE_CONFIGS_PATH: {
-          type: 'Literal',
-          literal: {
-            value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.privateConfigsDir}`,
-          },
-        },
-      }
-    : {};
-  const publicConfigs = ref.config.publicConfigsDir
-    ? {
-        PUBLIC_CONFIGS_PATH: {
-          type: 'Literal',
-          literal: {
-            value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.publicConfigsDir}`,
-          },
-        },
-      }
-    : {};
-  return new k8s.apiextensions.CustomResource(
-    name,
-    {
-      apiVersion: 'pulumi.com/v1',
-      kind: 'Stack',
-      metadata: { name: name, namespace: namespaceName },
-      spec: {
-        ...{
-          stack: `organization/${projectName}/${name}.${CLUSTER_BASENAME}`,
-          backend: config.requireEnv('PULUMI_BACKEND_URL'),
-          envRefs: {
-            ...envRefs,
-            SPLICE_ROOT: {
-              type: 'Literal',
-              literal: {
-                value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.spliceRoot}`,
-              },
-            },
-            DEPLOYMENT_DIR: {
-              type: 'Literal',
-              literal: {
-                value: `/tmp/pulumi-working/operator/${name}/workspace/${ref.config.deploymentDir}`,
-              },
-            },
-            ...privateConfigs,
-            ...publicConfigs,
-            GCP_CLUSTER_BASENAME: {
-              type: 'Literal',
-              literal: {
-                value: CLUSTER_BASENAME,
-              },
-            },
-            ...Object.keys(extraEnvs).reduce<{
-              [key: string]: unknown;
-            }>((acc, key) => {
-              acc[key] = {
-                type: 'Literal',
-                literal: {
-                  value: extraEnvs[key],
-                },
-              };
-              return acc;
-            }, {}),
-          },
-          fluxSource: {
-            sourceRef: {
-              apiVersion: ref.resource.apiVersion,
-              kind: ref.resource.kind,
-              name: ref.resource.metadata.name,
-            },
-            dir: `${ref.config.pulumiBaseDir}/${projectName}`,
-          },
-          // Do not resync the stack when the commit hash matches the last one
-          continueResyncOnCommitMatch: false,
-          destroyOnFinalize: false,
-          // Enforce that the stack already exists
-          useLocalStackOnly: true,
-          // retry if the stack is locked by another operation
-          retryOnUpdateConflict: true,
-        },
-        ...(supportsResetOnSameCommit
-          ? {
-              continueResyncOnCommitMatch: true,
-              resyncFrequencySeconds: 300,
-              // TODO(#924): consider scaling down the operator instead
-              refresh: true,
-            }
-          : {}),
-      },
-    },
-    {
-      dependsOn: dependsOn,
-    }
-  );
-}
-
-function createStackCRV2(
-  name: string,
-  namespaceName: string,
-  ref: GitFluxRef,
-  projectName: string,
-  envRefs: EnvRefs,
-  extraEnvs: {
-    [p: string]: string;
-  },
-  gcpSecret: Secret,
-  supportsResetOnSameCommit: boolean,
-  dependsOn: Resource[]
-) {
+  dependsOn: pulumi.Resource[] = [],
+  parallelism: number = 64
+): CustomResource {
   const sa = new k8s.core.v1.ServiceAccount(`${name}-sa`, {
     metadata: {
       name: `${name}-sa`,
@@ -355,7 +209,12 @@ function createStackCRV2(
           useLocalStackOnly: true,
           // retry if the stack is locked by another operation
           retryOnUpdateConflict: true,
-          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
+          updateTemplate: {
+            spec: {
+              parallel: parallelism,
+            },
+          },
+          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.2.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
             metadata: {
               name: `${name.replaceAll('.', '-')}`,

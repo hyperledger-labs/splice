@@ -149,3 +149,11 @@ In the [daml](https://github.com/digital-asset/daml/) repository:
 4. Wait for release to be published.
 
 Once the release is published, update `CantonDependencies.scala`.
+
+## Bumping base docker images
+
+All docker images that we use as base layers are pinned by SHA.
+To update their versions, edit the respective Dockerfiles with the new version to use and its SHA. Note to always use the
+SHA of the multi-arch manifest (docker then resolves that to the correct architecture at build time). A good source of
+official SHAs for images from docker.io is: https://github.com/docker-library/repo-info.
+To inspect a manifest locally, you can run e.g. `docker buildx imagetools inspect nginx:stable`.

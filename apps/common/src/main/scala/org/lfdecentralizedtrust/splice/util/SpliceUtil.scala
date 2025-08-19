@@ -126,36 +126,50 @@ object SpliceUtil {
         ]
       ],
       priority: CommandPriority = CommandPriority.Low,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    retryProvider.retry(
-      RetryFor.InitializingClientCalls,
-      "createValidatorRight",
-      "createValidatorRight",
-      lookupValidatorRightByParty(user).flatMap {
-        case QueryResult(offset, None) =>
-          connection
-            .submit(
-              actAs = Seq(validator, user),
-              readAs = Seq.empty,
-              createValidatorRightCommand(dso, validator, user),
-              priority = priority,
-            )
-            .withDedup(
-              commandId = SpliceLedgerConnection
-                .CommandId(
-                  "org.lfdecentralizedtrust.splice.validator.createValidatorRight",
-                  Seq(user),
-                ),
-              deduplicationOffset = offset,
-            )
-            .withSynchronizerId(synchronizerId)
-            .yieldUnit()
-        case QueryResult(_, Some(_)) =>
-          logger.info(s"ValidatorRight for $user already exists, skipping")
-          Future.unit
-      },
-      logger,
-    )
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+    for {
+      // ValidatorRight does not have the dso party as a stakeholder.
+      // However, it is used in a context where the DSO is a witness when collecting validator rewards.
+      // Downgrades of `ValidatorRight` are not supported if the DSO has not vetted the version it was
+      // created in as of Canton 3.3 so we explicitly force package id that the DSO has also vetted
+      // through package preferences.
+      pkgPreferences <- connection.getSupportedPackageVersion(
+        synchronizerId,
+        Seq(("splice-amulet", Seq(dso, validator, user))),
+        CantonTimestamp.now(),
+      )
+      _ <- retryProvider.retry(
+        RetryFor.InitializingClientCalls,
+        "createValidatorRight",
+        "createValidatorRight",
+        lookupValidatorRightByParty(user).flatMap {
+          case QueryResult(offset, None) =>
+            connection
+              .submit(
+                actAs = Seq(validator, user),
+                readAs = Seq.empty,
+                createValidatorRightCommand(dso, validator, user),
+                priority = priority,
+              )
+              .withDedup(
+                commandId = SpliceLedgerConnection
+                  .CommandId(
+                    "org.lfdecentralizedtrust.splice.validator.createValidatorRight",
+                    Seq(user),
+                  ),
+                deduplicationOffset = offset,
+              )
+              .withPreferredPackage(pkgPreferences.map(_.packageId))
+              .withSynchronizerId(synchronizerId)
+              .yieldUnit()
+          case QueryResult(_, Some(_)) =>
+            logger.info(s"ValidatorRight for $user already exists, skipping")
+            Future.unit
+        },
+        logger,
+      )
+    } yield ()
+  }
 
   val defaultInitialTickDuration = NonNegativeFiniteDuration.ofMinutes(10)
 
@@ -246,7 +260,6 @@ object SpliceUtil {
   private val dummyReadVsWriteScalingFactor = 4
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
-  // TODO(#925) get rid of this method
   def defaultAmuletConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
@@ -298,7 +311,7 @@ object SpliceUtil {
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingRequestTimeout
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
-    new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout
+    new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout (deprecated)
     new SynchronizerNodeConfigLimits(
       new CometBftConfigLimits(
         maxNumCometBftNodes, // maxNumCometBftNodes

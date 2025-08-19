@@ -3,6 +3,21 @@
 
 package org.lfdecentralizedtrust.splice.sv.config
 
+import com.digitalasset.canton.SynchronizerAlias
+import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeLong,
+  NonNegativeNumeric,
+  PositiveInt,
+  PositiveNumeric,
+}
+import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
+import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
+import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
+import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.daml.lf.data.Ref.PackageVersion
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.lfdecentralizedtrust.splice.auth.AuthConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice
 import org.lfdecentralizedtrust.splice.config.{
@@ -16,22 +31,9 @@ import org.lfdecentralizedtrust.splice.config.{
   SpliceInstanceNamesConfig,
   SpliceParametersConfig,
 }
+import org.lfdecentralizedtrust.splice.environment.{DarResource, DarResources}
 import org.lfdecentralizedtrust.splice.sv.SvAppClientConfig
 import org.lfdecentralizedtrust.splice.util.SpliceUtil
-import com.digitalasset.canton.SynchronizerAlias
-import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{
-  NonNegativeLong,
-  NonNegativeNumeric,
-  PositiveInt,
-  PositiveNumeric,
-}
-import com.digitalasset.canton.synchronizer.config.SynchronizerParametersConfig
-import com.digitalasset.canton.synchronizer.mediator.RemoteMediatorConfig
-import com.digitalasset.canton.synchronizer.sequencer.config.RemoteSequencerConfig
-import com.digitalasset.canton.sequencing.SubmissionRequestAmplification
-import com.digitalasset.canton.topology.PartyId
-import org.apache.pekko.http.scaladsl.model.Uri
 
 import java.nio.file.Path
 
@@ -94,6 +96,7 @@ object SvOnboardingConfig {
       initialTransferPreapprovalFee: Option[BigDecimal] = None,
       initialFeaturedAppActivityMarkerAmount: Option[BigDecimal] = None,
       voteCooldownTime: Option[NonNegativeFiniteDuration] = None,
+      initialRound: Long = 0L,
   ) extends SvOnboardingConfig
 
   case class JoinWithKey(
@@ -124,6 +127,45 @@ object SvOnboardingConfig {
   }
 
   object InitialPackageConfig {
+
+    def apply(
+        amuletVersion: String,
+        amuletNameServiceVersion: String,
+        dsoGovernanceVersion: String,
+        validatorLifecycleVersion: String,
+        walletVersion: String,
+        walletPaymentsVersion: String,
+    ): InitialPackageConfig = {
+      def assertPackageVersion(version: String, resource: DarResource): Unit = {
+        assert(
+          PackageVersion.assertFromString(version) >= resource.metadata.version,
+          s"${resource.metadata.name} must have version at least ${resource.metadata.version}",
+        )
+      }
+
+      assertPackageVersion(amuletVersion, DarResources.amulet.minimumInitialization)
+      assertPackageVersion(
+        amuletNameServiceVersion,
+        DarResources.amuletNameService.minimumInitialization,
+      )
+      assertPackageVersion(dsoGovernanceVersion, DarResources.dsoGovernance.minimumInitialization)
+      assertPackageVersion(
+        validatorLifecycleVersion,
+        DarResources.validatorLifecycle.minimumInitialization,
+      )
+      assertPackageVersion(walletVersion, DarResources.wallet.minimumInitialization)
+      assertPackageVersion(walletPaymentsVersion, DarResources.walletPayments.minimumInitialization)
+
+      new InitialPackageConfig(
+        amuletVersion,
+        amuletNameServiceVersion,
+        dsoGovernanceVersion,
+        validatorLifecycleVersion,
+        walletVersion,
+        walletPaymentsVersion,
+      )
+    }
+
     val defaultInitialPackageConfig: InitialPackageConfig = {
       val fromResources = SpliceUtil.readPackageConfig()
       InitialPackageConfig(
@@ -135,6 +177,19 @@ object SvOnboardingConfig {
         walletPaymentsVersion = fromResources.walletPayments,
       )
     }
+
+    val minimumInitialPackageConfig: InitialPackageConfig = InitialPackageConfig(
+      amuletVersion = DarResources.amulet.minimumInitialization.metadata.version.toString,
+      amuletNameServiceVersion =
+        DarResources.amuletNameService.minimumInitialization.metadata.version.toString,
+      dsoGovernanceVersion =
+        DarResources.dsoGovernance.minimumInitialization.metadata.version.toString,
+      validatorLifecycleVersion =
+        DarResources.validatorLifecycle.minimumInitialization.metadata.version.toString,
+      walletVersion = DarResources.wallet.minimumInitialization.metadata.version.toString,
+      walletPaymentsVersion =
+        DarResources.walletPayments.minimumInitialization.metadata.version.toString,
+    )
   }
 
   // TODO(DACH-NY/canton-network-internal#498) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
@@ -236,7 +291,7 @@ case class SvAppBackendConfig(
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
+      NonNegativeFiniteDuration.ofMinutes(2),
     parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = true,
     ingestUpdateHistoryFromParticipantBegin: Boolean = true,
@@ -250,9 +305,10 @@ case class SvAppBackendConfig(
     // can always set it to an empty string.
     contactPoint: String,
     spliceInstanceNames: SpliceInstanceNamesConfig,
-    // The rate at which acknowledgements are produced, we allow reducing this for tests with aggressive pruning intervals.
+    // If the node does not receive an event for that amount of time, it will request a time proof
+    // so it can produce a more recent acknowledgement.
     timeTrackerMinObservationDuration: NonNegativeFiniteDuration =
-      NonNegativeFiniteDuration.ofMinutes(1),
+      NonNegativeFiniteDuration.ofMinutes(30),
     // Identifier for all Canton nodes controlled by this application
     cantonIdentifierConfig: Option[SvCantonIdentifierConfig] = None,
     legacyMigrationId: Option[Long] = None,
@@ -261,10 +317,22 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofHours(24),
     // Defaults to 48h as it must be at least 2x preparationTimeRecordtimeTolerance
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(48),
-    delegatelessAutomation: Boolean = true,
-    expectedTaskDuration: Long = 5000, // milliseconds
-    expiredRewardCouponBatchSize: Int = 100,
+    topologyChangeDelayDuration: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMillis(250),
+    delegatelessAutomationExpectedTaskDuration: Long = 5000, // milliseconds
+    delegatelessAutomationExpiredRewardCouponBatchSize: Int = 100,
     bftSequencerConnection: Boolean = true,
+    // Skip synchronizer initialization and synchronizer config reconciliation.
+    // Can be safely set to true for an SV that has completed onboarding unless you
+    // 1. try to reset one of your sequencers or mediators
+    // 2. change sequencer URLs that need to get published externally.
+    skipSynchronizerInitialization: Boolean = false,
+    // The maximum delay before submitting a package vetting
+    // change. The actual delay will be chosen randomly (uniformly
+    // distributed between 0 and the maximum delay) to ensure that not
+    // all validators submit the transaction at the same time
+    // overloading the network.
+    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
 ) extends SpliceBackendConfig {
   override val nodeTypeName: String = "SV"
 

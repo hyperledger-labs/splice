@@ -115,6 +115,7 @@ export const VoteRequestDetails: React.FC = () => {
 
   return (
     <ProposalDetailsContent
+      currentSvPartyId={svPartyId}
       contractId={ccid as ContractId<VoteRequest>}
       proposalDetails={proposalDetails}
       votingInformation={votingInformation}

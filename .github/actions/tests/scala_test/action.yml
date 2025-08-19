@@ -104,6 +104,9 @@ runs:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
         oss_only: ${{ inputs.oss_only }}
+        # The docs job saves the oss nix cache, here we save the non-oss one, but only in one runner to reduce contention
+        # TODO(#1296): When this runner stops using non-oss, move this to one that does
+        save_nix_cache: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'canton-enterprise' }}
 
     - name: Wait for postgres
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -140,7 +143,7 @@ runs:
       id: setup_sbt
       uses: ./.github/actions/sbt/setup_sbt
       with:
-        cache_version: 4
+        cache_version: 5
 
     - name: Set Daml package versions
       uses: ./.github/actions/nix/run_bash_command_in_nix
@@ -198,6 +201,21 @@ runs:
         sysctl fs.inotify
         echo "Setting max_user_watches..."
         echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+
+    # Make sure the directory "$HOME/.docker" has the right permissions (this
+    # is needed when the runner mounts file to inside the folder and created
+    # .docker with root permissions)
+    # See https://github.com/hyperledger-labs/splice/blob/f11ef2ba697be68cad218decd09a9fd9d4e41444/cluster/pulumi/gha/src/runners.ts#L196
+    - name: Make sure .docker directory is owned by the current user
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      shell: bash
+      run: |
+        [[ -d "$HOME/.docker" ]] && sudo chown "$(id -u):$(id -g)" "$HOME/.docker"
+
+    # Install QEMU to support building multi-arch images
+    - name: Set up QEMU
+      if: ${{ fromJson(inputs.with_docker_images) }}
+      uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 #v3.6.0
 
     - name: Build Docker images
       if: ${{ fromJson(inputs.with_docker_images) }}
@@ -270,10 +288,10 @@ runs:
       if: ${{ !cancelled() }}
       uses: ./.github/actions/sbt/post_sbt
       with:
-        cache_version: 4
+        cache_version: 5
         setup_sbt_cache_hits: ${{ steps.setup_sbt.outputs.cache_hits }}
         # Save caches only from one runner, to reduce conflicts on the save
-        save_caches: ${{ inputs.runner-index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
+        save_caches: ${{ inputs.runner_index == 0 && inputs.test_suite_name == 'wall-clock-time' }}
 
     - name: Upload logs
       # We upload the logs on not success so that we also capture them for cancelled runs

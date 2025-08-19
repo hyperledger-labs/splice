@@ -52,6 +52,10 @@ runs:
         cmd: |
             # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
+            # just set tmpdir to a place where we can write and execute, to fix protoc execution issue: https://github.com/DACH-NY/cn-test-failures/issues/5129
+            mkdir -p "${HOME}/tmp"
+            ABS_TMP_DIR="${HOME}/tmp"
+            export SBT_OPTS="${SBT_OPTS} -Djava.io.tmpdir=${ABS_TMP_DIR}"
 
             run_sbt() {
               export ${{ inputs.extra_env_vars }}

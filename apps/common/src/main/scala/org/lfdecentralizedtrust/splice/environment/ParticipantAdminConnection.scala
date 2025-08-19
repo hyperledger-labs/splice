@@ -4,7 +4,6 @@
 package org.lfdecentralizedtrust.splice.environment
 
 import cats.data.EitherT
-import cats.syntax.either.*
 import cats.implicits.catsSyntaxOptionId
 import com.digitalasset.canton.SynchronizerAlias
 import com.digitalasset.canton.admin.api.client.commands.{
@@ -18,8 +17,8 @@ import com.digitalasset.canton.admin.api.client.data.{
   ParticipantStatus,
   PruningSchedule,
 }
-import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.admin.participant.v30.PruningServiceGrpc.PruningServiceStub
+import com.digitalasset.canton.admin.participant.v30.{ExportAcsOldResponse, PruningServiceGrpc}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, PositiveDurationSeconds}
 import com.digitalasset.canton.discard.Implicits.DiscardOps
@@ -39,7 +38,6 @@ import com.digitalasset.canton.topology.transaction.{
   PartyToParticipant,
   SignedTopologyTransaction,
   TopologyChangeOp,
-  TopologyMapping,
 }
 import com.digitalasset.canton.topology.{NodeIdentity, ParticipantId, PartyId, SynchronizerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -56,12 +54,10 @@ import org.lfdecentralizedtrust.splice.environment.ParticipantAdminConnection.{
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.{
   RecreateOnAuthorizedStateChange,
   TopologyResult,
-  TopologyTransactionType,
 }
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
-import scala.reflect.ClassTag
 
 /** Connection to the subset of the Canton admin API that we rely
   * on in our own applications.
@@ -97,7 +93,7 @@ class ParticipantAdminConnection(
 
   override type Status = ParticipantStatus
 
-  override protected def getStatusRequest: GrpcAdminCommand[_, _, NodeStatus[ParticipantStatus]] =
+  override protected def getStatusRequest: GrpcAdminCommand[?, ?, NodeStatus[ParticipantStatus]] =
     ParticipantAdminCommands.Health.ParticipantStatusCommand()
 
   def listConnectedDomains()(implicit
@@ -187,7 +183,7 @@ class ParticipantAdminConnection(
           .ReconnectSynchronizer(alias, retry = false)
       ).map(isConnected =>
         if (!isConnected) {
-          val msg = s"failed to connect to ${alias}"
+          val msg = s"failed to connect to $alias"
           throw Status.Code.FAILED_PRECONDITION.toStatus.withDescription(msg).asRuntimeException()
         }
       ),
@@ -476,7 +472,7 @@ class ParticipantAdminConnection(
         proposeInitialPartyToParticipant(
           store,
           partyId,
-          participantId,
+          Seq(participantId),
         ).map(_ => ()),
         logger,
       )
@@ -484,16 +480,8 @@ class ParticipantAdminConnection(
 
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
     getParticipantId()
-  def proposeInitialPartyToParticipant(
-      store: TopologyStoreId,
-      partyId: PartyId,
-      participantId: ParticipantId,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[SignedTopologyTransaction[TopologyChangeOp, PartyToParticipant]] = {
-    proposeInitialPartyToParticipant(store, partyId, Seq(participantId))
-  }
-  def proposeInitialPartyToParticipant(
+
+  private def proposeInitialPartyToParticipant(
       store: TopologyStoreId,
       partyId: PartyId,
       participants: Seq[ParticipantId],
@@ -570,18 +558,23 @@ class ParticipantAdminConnection(
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
       show"Party $party is authorized on $newParticipant",
-      EitherT(
-        getPartyToParticipant(synchronizerId, party)
-          .map(result =>
-            Either
-              .cond(
-                result.mapping.participants
-                  .exists(hosting => hosting.participantId == newParticipant),
-                result,
-                result,
-              )
+      topologyTransactionType =>
+        EitherT(
+          getPartyToParticipant(
+            synchronizerId = synchronizerId,
+            partyId = party,
+            topologyTransactionType = topologyTransactionType,
           )
-      ),
+            .map(result =>
+              Either
+                .cond(
+                  result.mapping.participants
+                    .exists(hosting => hosting.participantId == newParticipant),
+                  result,
+                  result,
+                )
+            )
+        ),
       previous => {
         val newHostingParticipants = previous.participants.appended(
           HostingParticipant(
@@ -604,7 +597,7 @@ class ParticipantAdminConnection(
     )
   }
 
-  // the participantChange participant sequence must be ordering, if not canton will consider topology proposals with different ordering as fully different proposals and will not aggregate signatures
+  // the participantChange participant sequence must be ordered, if not canton will consider topology proposals with different ordering as fully different proposals and will not aggregate signatures
   private def ensurePartyToParticipantProposal(
       description: String,
       synchronizerId: SynchronizerId,
@@ -613,74 +606,24 @@ class ParticipantAdminConnection(
         HostingParticipant
       ], // participantChange must be idempotent
   )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipant]] = {
-    def findPartyToParticipant(topologyTransactionType: TopologyTransactionType) = EitherT {
-      topologyTransactionType match {
-        case transactionType @ (TopologyTransactionType.ProposalSignedByOwnKey |
-            TopologyTransactionType.AllProposals) =>
-          listPartyToParticipant(
-            store = TopologyStoreId.Synchronizer(synchronizerId).some,
-            filterParty = party.filterString,
-            proposals = transactionType,
-            operation = None,
-          ).flatMap { proposals =>
-            val proposalsWithRightSignature = transactionType match {
-              case TopologyTransactionType.ProposalSignedByOwnKey =>
-                for {
-                  participantId <- getParticipantId()
-                  delegations <- listNamespaceDelegation(participantId.namespace, None).map(
-                    _.map(_.mapping.target.fingerprint)
-                  )
-                } yield {
-                  val validSigningKeys = delegations :+ participantId.fingerprint
-                  proposals.filter { proposal =>
-                    proposal.base.signedBy
-                      .intersect(validSigningKeys)
-                      .nonEmpty
-                  }
-                }
-              case _ => Future.successful(proposals)
-            }
-            proposalsWithRightSignature.map {
-              _.find(proposal => {
-                val newHostingParticipants = participantChange(
-                  proposal.mapping.participants
-                )
-                proposal.mapping.participantIds ==
-                  newHostingParticipants.map(
-                    _.participantId
-                  ) && proposal.mapping.threshold == Thresholds.partyToParticipantThreshold(
-                    newHostingParticipants
-                  )
-              })
-                .getOrElse(
-                  throw Status.NOT_FOUND
-                    .withDescription(
-                      s"No party to participant proposal for party $party on domain $synchronizerId"
-                    )
-                    .asRuntimeException()
-                )
-                .asRight
-            }
-          }
-        case TopologyTransactionType.AuthorizedState =>
-          getPartyToParticipant(synchronizerId, party).map(result => {
-            val newHostingParticipants = participantChange(
-              result.mapping.participants
-            )
-            Either.cond(
-              result.mapping.participantIds ==
-                newHostingParticipants.map(_.participantId),
-              result,
-              result,
-            )
-          })
-      }
-    }
-
-    ensureTopologyProposal[PartyToParticipant](
+    ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
       description,
-      queryType => findPartyToParticipant(queryType),
+      queryType =>
+        EitherT(
+          getPartyToParticipant(synchronizerId, party, None, queryType)
+            .map { result =>
+              val newHostingParticipants = participantChange(result.mapping.participants)
+              Either.cond(
+                result.mapping.participants == newHostingParticipants && result.mapping.threshold == Thresholds
+                  .partyToParticipantThreshold(
+                    newHostingParticipants
+                  ),
+                result,
+                result,
+              )
+            }
+        ),
       previous => {
         val newHostingParticipants = participantChange(previous.participants)
         Right(
@@ -692,6 +635,8 @@ class ParticipantAdminConnection(
         )
       },
       RetryFor.WaitingOnInitDependency,
+      isProposal = true,
+      waitForAuthorization = false,
     )
   }
 
@@ -712,14 +657,21 @@ class ParticipantAdminConnection(
     ensureTopologyMapping[PartyToParticipant](
       TopologyStoreId.Synchronizer(synchronizerId),
       s"Participant $participantId is promoted to have Submission permission for party $party",
-      EitherT(getPartyToParticipant(synchronizerId, party).map(result => {
-        Either.cond(
-          result.mapping.participants
-            .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
-          result,
-          result,
-        )
-      })),
+      topologyTransactionType =>
+        EitherT(
+          getPartyToParticipant(
+            synchronizerId,
+            party,
+            topologyTransactionType = topologyTransactionType,
+          ).map(result => {
+            Either.cond(
+              result.mapping.participants
+                .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
+              result,
+              result,
+            )
+          })
+        ),
       previous => {
         Either.cond(
           previous.participants.exists(_.participantId == participantId), {
@@ -763,43 +715,11 @@ class ParticipantAdminConnection(
       "participant_pruning_schedule",
       s"Pruning schedule is set to ($cron, $maxDuration, $retention)",
       getPruningSchedule().map(scheduleO =>
-        scheduleO.exists(_ == PruningSchedule(cron, maxDuration, retention))
+        scheduleO.contains(PruningSchedule(cron, maxDuration, retention))
       ),
       setPruningSchedule(cron, maxDuration, retention),
       logger,
     )
-
-  /** Version of [[ensureTopologyMapping]] that also handles proposals:
-    * - a new topology transaction is created as a proposal
-    * - checks the proposals as well to see if the check holds
-    */
-  private def ensureTopologyProposal[M <: TopologyMapping: ClassTag](
-      store: TopologyStoreId,
-      description: String,
-      check: TopologyTransactionType => EitherT[Future, TopologyResult[M], TopologyResult[M]],
-      update: M => Either[String, M],
-      retryFor: RetryFor,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
-    ensureTopologyMapping(
-      store,
-      s"proposal $description",
-      check(TopologyTransactionType.AuthorizedState)
-        .leftFlatMap { authorizedState =>
-          EitherT(
-            check(TopologyTransactionType.ProposalSignedByOwnKey)
-              .leftMap(_ => authorizedState)
-              .value
-              .recover {
-                case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.NOT_FOUND =>
-                  Left(authorizedState)
-              }
-          )
-        },
-      update,
-      retryFor,
-      isProposal = true,
-    )
-  }
 
 }
 
@@ -860,7 +780,9 @@ object ParticipantAdminConnection {
     @com.google.common.annotations.VisibleForTesting
     private[splice] def Const(participantId: ParticipantId): HasParticipantId =
       new HasParticipantId {
-        override def getParticipantId()(implicit traceContext: TraceContext) =
+        override def getParticipantId()(implicit
+            traceContext: TraceContext
+        ): Future[ParticipantId] =
           Future successful participantId
       }
 

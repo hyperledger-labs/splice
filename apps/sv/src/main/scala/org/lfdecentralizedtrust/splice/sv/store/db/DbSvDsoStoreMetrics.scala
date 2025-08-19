@@ -24,7 +24,20 @@ class DbSvDsoStoreMetrics(metricsFactory: LabeledMetricsFactory) extends AutoClo
       -1L,
     )(MetricsContext.Empty)
 
+  val latestIssuingMiningRound: Gauge[Long] =
+    metricsFactory.gauge(
+      MetricInfo(
+        name = prefix :+ "latest-issuing-mining-round",
+        summary = "Latest issuing mining round",
+        description =
+          "The number of the latest issuing mining round (not necessarily active yet) ingested by the store.",
+        qualification = Latency,
+      ),
+      -1L,
+    )(MetricsContext.Empty)
+
   override def close() = {
     latestOpenMiningRound.close()
+    latestIssuingMiningRound.close()
   }
 }

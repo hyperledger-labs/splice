@@ -4,18 +4,7 @@
 import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 import { ArrowBack } from '@mui/icons-material';
-import {
-  Box,
-  Button,
-  Chip,
-  Divider,
-  Link,
-  Paper,
-  Tab,
-  Tabs,
-  TextField,
-  Typography,
-} from '@mui/material';
+import { Box, Button, Chip, Divider, Link, Paper, Tab, Tabs, Typography } from '@mui/material';
 import React, { useState } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -29,10 +18,12 @@ import {
   ProposalVotingInformation,
   VoteStatus,
 } from '../../utils/types';
+import { ProposalVoteForm } from './ProposalVoteForm';
 
 dayjs.extend(relativeTime);
 
 export interface ProposalDetailsContentProps {
+  currentSvPartyId: string;
   contractId: ContractId<VoteRequest>;
   proposalDetails: ProposalDetails;
   votingInformation: ProposalVotingInformation;
@@ -44,15 +35,18 @@ type VoteTab = Extract<VoteStatus, 'accepted' | 'rejected' | 'no-vote'> | 'all';
 const now = () => dayjs();
 
 export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = props => {
-  const { proposalDetails, votingInformation, votes } = props;
+  const { contractId, proposalDetails, votingInformation, votes, currentSvPartyId } = props;
 
   const hasExpired = dayjs(votingInformation.votingCloses).isBefore(now());
   const isEffective =
     votingInformation.voteTakesEffect && dayjs(votingInformation.voteTakesEffect).isBefore(now());
-  const isClosed = hasExpired || isEffective || votingInformation.status === 'Rejected';
+  const isClosed =
+    !proposalDetails.isVoteRequest ||
+    hasExpired ||
+    isEffective ||
+    votingInformation.status === 'Rejected';
 
   const [voteTabValue, setVoteTabValue] = useState<VoteTab>('all');
-  const [reason, setReason] = useState('');
 
   const handleVoteTabChange = (_event: React.SyntheticEvent, newValue: VoteTab) => {
     setVoteTabValue(newValue);
@@ -114,11 +108,6 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
         </Box>
 
         <Paper sx={{ bgcolor: 'background.paper', p: 6 }}>
-          {/* Proposal Details Section */}
-          {/* <Typography variant="h6" component="h2" gutterBottom sx={{ mb: 3 }}> */}
-          {/*   Proposal Details */}
-          {/* </Typography> */}
-
           <Box sx={{ display: 'flex', flexDirection: 'column' }}>
             <DetailItem
               label="Action"
@@ -321,44 +310,11 @@ export const ProposalDetailsContent: React.FC<ProposalDetailsContentProps> = pro
           <Divider sx={{ my: 4 }} />
 
           {proposalDetails.isVoteRequest && !isClosed && (
-            <>
-              {/* Your Vote Section */}
-              <Typography variant="h6" component="h2" gutterBottom>
-                Your Vote
-              </Typography>
-
-              <Box
-                sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}
-                data-testid="proposal-details-your-vote-section"
-              >
-                <TextField
-                  label="Your Reason"
-                  multiline
-                  rows={4}
-                  value={reason}
-                  onChange={e => setReason(e.target.value)}
-                  inputProps={{ 'data-testid': 'proposal-details-your-vote-input' }}
-                />
-                <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 2 }}>
-                  <Button
-                    variant="contained"
-                    color="success"
-                    sx={{ minWidth: 100 }}
-                    data-testid="proposal-details-your-vote-accept"
-                  >
-                    Accept
-                  </Button>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    sx={{ minWidth: 100 }}
-                    data-testid="proposal-details-your-vote-reject"
-                  >
-                    Reject
-                  </Button>
-                </Box>
-              </Box>
-            </>
+            <ProposalVoteForm
+              voteRequestContractId={contractId}
+              currentSvPartyId={currentSvPartyId}
+              votes={votes}
+            />
           )}
         </Paper>
       </Box>
@@ -584,9 +540,9 @@ const UpdateSvRewardWeightSection = ({
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
           Member
         </Typography>
-        <Typography sx={{ mb: 1 }} variant="body1">
+        <Box sx={{ mb: 1 }}>
           <PartyId partyId={svToUpdate} id="proposal-details-member-party-id" />
-        </Typography>
+        </Box>
 
         <DetailItem
           label="Weight"
@@ -638,9 +594,9 @@ const ConfigValuesChanges = ({ changes }: ConfigRulesChangesProps) => {
             <Typography
               variant="body1"
               sx={{ minWidth: 200 }}
-              data-testid="config-change-field-name"
+              data-testid="config-change-field-label"
             >
-              {change.fieldName}
+              {change.label}
             </Typography>
 
             <Box

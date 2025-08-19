@@ -155,11 +155,13 @@ class CachingScanStore(
       store.getAmuletConfigForRound,
     ).get(round)
 
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
+  override def lookupRoundOfLatestData()(implicit
+      tc: TraceContext
+  ): Future[Option[(Long, Instant)]] =
     getCache(
       "roundOfLatestData",
       cacheConfig.roundOfLatestData,
-      (_: Unit) => store.getRoundOfLatestData(),
+      (_: Unit) => store.lookupRoundOfLatestData(),
     ).get(())
 
   override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit

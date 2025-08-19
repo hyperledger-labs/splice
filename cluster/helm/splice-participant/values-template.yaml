@@ -34,6 +34,7 @@ persistence:
   secretName: "postgres-secrets"
   databaseName: cantonnet_participant
   port: 5432
+  enablePgInitContainer: true
 # k8s affinity for all deployed pods (optional)
 # affinity:
 
@@ -42,3 +43,5 @@ persistence:
 
 # k8s tolerations for all deployed pods (optional)
 # tolerations:
+
+extraInitContainers: []

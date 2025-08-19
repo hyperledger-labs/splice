@@ -14,7 +14,6 @@ import {
   isDevNet,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 
 import { gcpDnsProject } from './config';
 
@@ -29,7 +28,7 @@ function clusterDnsEntries(
   dnsName: string,
   managedZone: string,
   ingressIp: gcp.compute.Address,
-  publicIngressIp: gcp.compute.Address
+  cometbftIngressIp: gcp.compute.Address
 ): gcp.dns.RecordSet[] {
   const opts: pulumi.CustomResourceOptions = {
     // for safety we leave dns cleanup to be done manually in prod clusters
@@ -60,36 +59,15 @@ function clusterDnsEntries(
       },
       opts
     ),
-    new gcp.dns.RecordSet(
-      dnsName + '-public',
-      {
-        name: `public.${dnsName}.`,
-        ttl: 60,
-        type: 'A',
-        project: gcpDnsProject,
-        managedZone: managedZone,
-        rrdatas: [publicIngressIp.address],
-      },
-      opts
-    ),
-  ].concat(
-    spliceConfig.pulumiProjectConfig.hasPublicDocs
-      ? [
-          new gcp.dns.RecordSet(
-            dnsName + '-public-docs',
-            {
-              name: `docs.${dnsName}.`,
-              ttl: 60,
-              type: 'A',
-              project: gcpDnsProject,
-              managedZone: managedZone,
-              rrdatas: [publicIngressIp.address],
-            },
-            opts
-          ),
-        ]
-      : []
-  );
+    new gcp.dns.RecordSet(dnsName + '-cometbft', {
+      name: `cometbft.${dnsName}.`,
+      ttl: 60,
+      type: 'A',
+      project: gcpDnsProject,
+      managedZone: managedZone,
+      rrdatas: [cometbftIngressIp.address],
+    }),
+  ];
 }
 
 function certManager(certManagerNamespaceName: string): certmanager.CertManager {
@@ -304,7 +282,7 @@ function natGateway(
 
 class CantonNetwork extends pulumi.ComponentResource {
   ingressIp: gcp.compute.Address;
-  publicIngressIp: gcp.compute.Address;
+  cometbftIngressIp: gcp.compute.Address;
   egressIp: gcp.compute.Address;
   ingressNs: ExactNamespace;
   dnsNames: string[];
@@ -318,7 +296,10 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const ingressIp = ipAddress(`cn-${clusterName}net-ip`);
 
-    const publicIngressIp = ipAddress(`cn-${clusterName}net-pub-ip`);
+    // We couldn't get istio source IP filtering to work for TCP traffic, so we route (cometbft)
+    // tcp traffic through a separate LoadBalancer service that filters by source IP. Since we need
+    // only the SVs to be allowed, we do not hit the limit on number of IPs for this one.
+    const cometbftIngressIp = ipAddress(`cn-${clusterName}net-cometbft-ip`);
 
     const egressIp = ipAddress(`cn-${clusterName}-out`);
 
@@ -331,10 +312,15 @@ class CantonNetwork extends pulumi.ComponentResource {
       cantonDnsName,
       'canton-global',
       ingressIp,
-      publicIngressIp
+      cometbftIngressIp
     );
 
-    const daDnsEntries = clusterDnsEntries(daDnsName, 'prod-networks', ingressIp, publicIngressIp);
+    const daDnsEntries = clusterDnsEntries(
+      daDnsName,
+      'prod-networks',
+      ingressIp,
+      cometbftIngressIp
+    );
     this.dnsNames = [cantonDnsName, daDnsName];
 
     clusterCertificate(clusterName, this.dnsNames, ingressNs.ns, certManagerDeployment, [
@@ -345,7 +331,7 @@ class CantonNetwork extends pulumi.ComponentResource {
     natGateway(clusterName, egressIp, { parent: this });
 
     this.ingressIp = ingressIp;
-    this.publicIngressIp = publicIngressIp;
+    this.cometbftIngressIp = cometbftIngressIp;
     this.egressIp = egressIp;
     this.ingressNs = ingressNs;
 

@@ -13,6 +13,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 }
 import org.lfdecentralizedtrust.splice.util.AssignedContract
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 
 class CloseVoteRequestTrigger(
@@ -42,10 +43,6 @@ class CloseVoteRequestTrigger(
     for {
       dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       amuletRulesId = amuletRules.contractId
       res <- for {
         outcome <- svTaskContext.connection
@@ -57,13 +54,12 @@ class CloseVoteRequestTrigger(
                 new DsoRules_CloseVoteRequest(
                   voteRequestCid,
                   java.util.Optional.of(amuletRulesId),
-                  controllerArgument,
+                  Optional.of(controller),
                 )
               )
             ),
           )
           .noDedup
-          .withPreferredPackage(preferredPackageIds)
           .yieldResult()
       } yield Some(outcome)
     } yield {

@@ -1,9 +1,7 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
 import org.lfdecentralizedtrust.splice.codegen.java.splice
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
 import org.lfdecentralizedtrust.splice.integration.tests.AppUpgradeIntegrationTest.*
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
@@ -29,6 +27,8 @@ import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import monocle.macros.syntax.lens.*
 import org.lfdecentralizedtrust.splice.console.ParticipantClientReference
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
@@ -252,14 +252,11 @@ class AppUpgradeIntegrationTest
             java.util.Optional.empty(),
             java.util.Optional.empty(),
           )
-          // TODO(#925): adaptation to this test required
           val upgradeAction = new ARC_AmuletRules(
-            new CRARC_AddFutureAmuletConfigSchedule(
-              new AmuletRules_AddFutureAmuletConfigSchedule(
-                new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-                  scheduledTime,
-                  newAmuletConfig,
-                )
+            new CRARC_SetConfig(
+              new AmuletRules_SetConfig(
+                newAmuletConfig,
+                amuletConfig,
               )
             )
           )
@@ -295,11 +292,9 @@ class AppUpgradeIntegrationTest
             "observing AmuletRules with upgraded config",
             _ => {
               val newAmuletRules = sv1Client.getDsoInfo().amuletRules
-              val configs =
-                newAmuletRules.payload.configSchedule.futureValues.asScala.toList.map(_._2)
-              forExactly(1, configs) { config =>
-                config.packageConfig.amulet should endWith(".123")
-              }
+              val config =
+                newAmuletRules.payload.configSchedule.initialValue
+              config.packageConfig.amulet should endWith(".123")
             },
           )
 
@@ -316,12 +311,10 @@ class AppUpgradeIntegrationTest
           // Vote on a dummy change on amulet rules to ensure it is archived and recreated
           // which indicates the new choice is being used.
           val dummyUpgradeAction = new ARC_AmuletRules(
-            new CRARC_AddFutureAmuletConfigSchedule(
-              new AmuletRules_AddFutureAmuletConfigSchedule(
-                new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-                  Instant.now().plus(1, ChronoUnit.HOURS),
-                  newAmuletConfig,
-                )
+            new CRARC_SetConfig(
+              new AmuletRules_SetConfig(
+                newAmuletConfig,
+                amuletConfig,
               )
             )
           )

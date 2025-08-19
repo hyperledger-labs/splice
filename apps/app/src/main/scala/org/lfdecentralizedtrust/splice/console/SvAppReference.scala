@@ -26,6 +26,7 @@ import org.lfdecentralizedtrust.splice.sv.admin.api.client.commands.{
 }
 import org.lfdecentralizedtrust.splice.sv.automation.{
   DsoDelegateBasedAutomationService,
+  SvSvAutomationService,
   SvDsoAutomationService,
 }
 import org.lfdecentralizedtrust.splice.sv.config.SvAppBackendConfig
@@ -323,6 +324,13 @@ class SvAppBackendReference(
     appState.dsoAutomation
   }
 
+  @Help.Summary(
+    "Returns the current SV automation."
+  )
+  def svAutomation: SvSvAutomationService = {
+    appState.svAutomation
+  }
+
   @Help.Summary("Return SV app config")
   def config: SvAppBackendConfig =
     consoleEnvironment.environment.config.svsByString(name)
@@ -364,18 +372,6 @@ class SvAppBackendReference(
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListOpenMiningRounds
-      )
-    }
-  }
-
-  @Help.Summary("Create an election request (via admin API)")
-  def createElectionRequest(
-      requester: String,
-      ranking: Vector[String],
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.CreateElectionRequest(requester, ranking)
       )
     }
   }

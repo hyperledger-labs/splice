@@ -172,6 +172,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "canton-network-sa",
         "stack": "organization/canton-network/canton-network.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -501,6 +506,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "infra-sa",
         "stack": "organization/infra/infra.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -780,6 +790,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "multi-validator-sa",
         "stack": "organization/multi-validator/multi-validator.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 10
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -1474,6 +1489,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "splitwell-sa",
         "stack": "organization/splitwell/splitwell.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -1753,6 +1773,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-1.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -2032,6 +2057,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-2.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -2323,6 +2353,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-3.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -2614,6 +2649,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-1-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-1-migration-4.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -2895,6 +2935,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-1-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-1.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -3176,6 +3221,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-2-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-2.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -3469,6 +3519,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-3-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-3.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -3762,6 +3817,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-canton.sv-migration-4-sa",
         "stack": "organization/sv-canton/sv-canton.sv-migration-4.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -4043,6 +4103,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "sv-runbook-sa",
         "stack": "organization/sv-runbook/sv-runbook.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -4324,6 +4389,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "validator-runbook-sa",
         "stack": "organization/validator-runbook/validator-runbook.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {
@@ -4603,6 +4673,11 @@
         "retryOnUpdateConflict": true,
         "serviceAccountName": "validator1-sa",
         "stack": "organization/validator1/validator1.mock",
+        "updateTemplate": {
+          "spec": {
+            "parallel": 64
+          }
+        },
         "useLocalStackOnly": true,
         "workspaceTemplate": {
           "metadata": {

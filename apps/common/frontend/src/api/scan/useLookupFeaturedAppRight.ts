@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { LookupFeaturedAppRightResponse } from 'scan-openapi';
+import { LookupFeaturedAppRightResponse } from '@lfdecentralizedtrust/scan-openapi';
 
 import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet/';
 

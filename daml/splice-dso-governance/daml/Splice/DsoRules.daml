@@ -51,19 +51,16 @@ import Splice.CometBft()
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once 2/3 of all SV'ss confirmations* are visible to the DSO delegate it executes them.
+--    Once 2/3 of all SV's confirmations* are visible to the DSO delegate it executes them.
 --
 -- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
 -- Process 2 is an optimization of Process 1 for the case where no disagreement to the
--- action is expected. It avoids the extra round-trip and the complications of having
--- the DSO delegate to reliably initiate the vote when it is time to execute an automated action
--- that requires confirmation.
+-- action is expected.
 --
 -- We expect honest SV nodes to only create confirmations for actions
 -- whose preconditions are met. We also rely on the execution of these actions to be
--- idempotent, as more than the required number of confirmations can be created and the DSO delegate could
--- thus in principle execute the corresponding action multiple times.
+-- idempotent, as more than the required number of confirmations can be created.
 --
 -- Note also that having these two processes also aids in distinguishing between manually initiated
 -- ad-hoc votes and the regular confirmations that need to happen during standard DSO.
@@ -142,10 +139,10 @@ data OffboardedSvInfo = OffboardedSvInfo with
 
 data DsoSummary = DsoSummary with
     dsoDelegate : Party
+      -- ^ __Deprecated__ in favor of delegateless automation.
     numSvs : Int
     requiredNumVotes : Int
-      -- ^ The number of votes required for considering a confirmation, a request for a vote, or
-      -- a DSO delegate election definitive.
+      -- ^ The number of votes required for considering a confirmation, or a request for a vote
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -328,7 +325,7 @@ template ElectionRequest with
     signatory dso
 
 
--- | A confirmation for the DSO delegate to take action as part of standard DSO.
+-- | A confirmation for the SVs to take action as part of standard DSO.
 -- Used for executing automated actions in a shortened process.
 -- See the comments on `ActionRequiringConfirmation` for details.
 template Confirmation with
@@ -337,7 +334,6 @@ template Confirmation with
     action : ActionRequiringConfirmation
     expiresAt : Time
   where
-    -- As for 'ElectionRequest' we only make the DSO party a signatory.
     signatory dso
 
     choice Confirmation_Expire : Confirmation_ExpireResult
@@ -419,6 +415,7 @@ data DsoRulesConfig = DsoRulesConfig with
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing an SV confirmation
     voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote` s
     dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DSO delegate to complete an action it should take care of
+      -- ^ __Deprecated__ in favor of delegateless automation.
     synchronizerNodeConfigLimits : SynchronizerNodeConfigLimits  -- ^ Limits to enforce on the svs' `SynchronizerNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
@@ -443,18 +440,17 @@ data TrafficState = TrafficState with
 
 template DsoRules with
     dso : Party
-    epoch : Int        -- ^ The number of DSO delegates that have already been elected.
+    epoch : Int
     svs : Map.Map Party SvInfo
     offboardedSvs : Map.Map Party OffboardedSvInfo
     dsoDelegate : Party
+      -- ^ __Deprecated__ in favor of delegateless automation.
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
   where
     ensure
-      dsoDelegate `Map.member` svs &&
-        unique (map (.name) (Map.values svs)) &&
-        config.numUnclaimedRewardsThreshold > 0
+      config.numUnclaimedRewardsThreshold > 0
 
     -- NOTE: the svs are not direct signatories as that would not give us the right fault-tolerance wrt
     -- validating choices on this contract. Instead, the svs are indirect signatories by being
@@ -488,7 +484,7 @@ template DsoRules with
             -- NOTE: this immediate deletion will lead to the SV apps of the remaining svs
             -- revoking that sv's rights in the CometBFT network and the topology state.
             let newSvs = Map.delete sv svs
-            -- We optimize for prompt removal of a sv if the vote said so. We can thus not wait for a DSO delegate-election
+            -- We optimize for prompt removal of a sv if the vote said so.
             -- and instead just choose the sv with the lexicographically smallest name.
             let (newDsoDelegate, newEpoch)
                   | sv == dsoDelegate = (head (Map.keys newSvs), epoch + 1)
@@ -596,7 +592,7 @@ template DsoRules with
 
 
     -- Automation DSO delegate election
-    ------------------------------
+    -----------------------------------
 
     -- __Deprecated__ in favor of delegateless automation.
     nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
@@ -606,41 +602,19 @@ template DsoRules with
         ranking : [Party]
       controller requester
       do
-        require "Requester is an SV" (requester `Map.member` svs)
-        require "All svs are ranked exactly once" (sort ranking == sort (Map.keys svs))
-        electionRequestCid <- create ElectionRequest with
-          ..
-        return DsoRules_RequestElectionResult with ..
+        deprecatedChoice "splice-dso-governance" "0.1.17" "DsoRules_RequestElection"
 
     -- __Deprecated__ in favor of delegateless automation.
-    -- TODO(#607): make the choice abort once all SVs have switched to delegateless automation
     choice DsoRules_ElectDsoDelegate : DsoRules_ElectDsoDelegateResult
       with
         actor : Party
         requestCids : [ContractId ElectionRequest]
       controller actor
       do
-        let summary = summarizeDso this
-        -- fetch, check, and archive all requests
-        reqs <- forA requestCids $ \requestCid -> do
-          req <- fetchAndArchive (ForDso with dso) requestCid
-          require "Request is for this epoch" (req.epoch == epoch)
-          require "Requester is an SV" (req.requester `Map.member` svs)
-          pure req
-        let numVotes = length reqs
-            numVoters = numVotes
-            -- as there might be more votes being taken into consideration
-            numVotesForMajority = (summary.requiredNumVotes + 1) / 2
-        require "Requests are from different svs" (unique $ map (.requester) reqs)
-        require "There are enough requests" (numVotes >= summary.requiredNumVotes)
-        let rankings = [ (req.requester, req.ranking) | req <- reqs ]
-            newDsoDelegate = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
-        let newDsoRules = DsoRules with epoch = epoch + 1, dsoDelegate = newDsoDelegate, ..
-        newDsoRules <- create newDsoRules
-        return DsoRules_ElectDsoDelegateResult with ..
+        deprecatedChoice "splice-dso-governance" "0.1.17" "DsoRules_ElectDsoDelegate"
+
 
     -- __Deprecated__ in favor of delegateless automation.
-    -- TODO(#607): make the choice abort once all SVs have switched to delegateless automation,
     -- and checking that there are not too many outdated requests on long-term networks.
     nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : DsoRules_ArchiveOutdatedElectionRequestResult
       with
@@ -648,10 +622,7 @@ template DsoRules with
         sv : Optional Party
       controller sv
       do
-        _ <- getAndValidateSvParty this sv
-        request <- fetchAndArchive (ForDso with dso) requestCid
-        require "Election request is outdated" (request.epoch < epoch)
-        return DsoRules_ArchiveOutdatedElectionRequestResult
+        deprecatedChoice "splice-dso-governance" "0.1.17" "DsoRules_ArchiveOutdatedElectionRequest"
 
 
     -- Executing actions with confirmation
@@ -1118,8 +1089,8 @@ template DsoRules with
         return DsoRules_ExpireSvOnboardingConfirmedResult with ..
 
 
-    -- Amulet management driven directly by the DSO delegate
-    -------------------------------------------------------
+    -- Amulet management driven directly by the DSO delegates
+    ---------------------------------------------------------
 
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with
@@ -1146,8 +1117,8 @@ template DsoRules with
           expireSum = result.expireSum
 
 
-    -- Round management driven directly by the DSO delegate
-    ------------------------------------------------------
+    -- Round management driven directly by the DSO delegates
+    --------------------------------------------------------
 
     nonconsuming choice DsoRules_AdvanceOpenMiningRounds : DsoRules_AdvanceOpenMiningRoundsResult
       with
@@ -1167,8 +1138,8 @@ template DsoRules with
           openRound = result.openRoundCid
 
 
-    -- ANS entry and payment management driven directly by the DSO delegate
-    -----------------------------------------------
+    -- ANS entry and payment management driven directly by the DSO delegates
+    ------------------------------------------------------------------------
 
     nonconsuming choice DsoRules_CollectEntryRenewalPayment : DsoRules_CollectEntryRenewalPaymentResult
       with
@@ -1219,8 +1190,8 @@ template DsoRules with
         pure DsoRules_TerminateSubscriptionResult
 
 
-    -- Reward management driven directly by the DSO delegate
-    -------------------------------------------------------
+    -- Reward management driven directly by the DSO delegates
+    ---------------------------------------------------------
 
     nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
       with
@@ -1359,19 +1330,14 @@ template DsoRules with
          cid <- create $ maximumOn (\state -> state.state.lastRoundCollected) rewardStates
          pure $ DsoRules_MergeSvRewardStateResult cid
 
+    -- __Deprecated__ AmuletConfigSchedule futureValues is not used anymore.
     nonconsuming choice DsoRules_PruneAmuletConfigSchedule : DsoRules_PruneAmuletConfigScheduleResult
       with
         amuletRulesCid : ContractId AmuletRules
         sv : Optional Party
       controller sv
       do _ <- getAndValidateSvParty this sv
-         now <- getTime
-         amuletRules <- fetchAndArchive (ForDso dso) amuletRulesCid
-         case pruneAtLeastOne now amuletRules.configSchedule of
-           None -> abort ("Must have at least one scheduled config in futureValues with a timestamp <= " <> show now)
-           Some newSchedule -> do
-             newAmuletRules <- create amuletRules with configSchedule = newSchedule
-             pure $ DsoRules_PruneAmuletConfigScheduleResult newAmuletRules
+         deprecatedChoice "splice-dso-governance" "0.1.16" "DsoRules_PruneAmuletConfigSchedule"
 
     -- external party
     -----------------
@@ -1555,6 +1521,7 @@ executeActionRequiringConfirmation dso dsoRulesCid amuletRulesCid act = case act
       ANSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
   ExtActionRequiringConformation _dummyUnitField -> pure ()
 
+-- | __Deprecated__ in favor of delegateless automation.
 -- Functions implementing instant-runoff voting
 -----------------------------------------------
 
@@ -1565,58 +1532,6 @@ data VotingState a = VotingState with
       -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
       -- that would result from filtering the remaining rankings eagerly.
   deriving (Eq, Show)
-
-instantRunOffVoting : Ord a => Int -> Int -> [(a, [a])] -> a
-instantRunOffVoting requiredNumVotes remainingVotingRounds rankings0 =
-    determineWinner requiredNumVotes remainingVotingRounds st
-  where
-    -- Only consider candidates that confirmed their readiness by voting themselves,
-    -- as a prudent engineering measure. These candidates have very recently shown to
-    -- be able to submit transactions.
-    voters = Set.fromList $ map fst rankings0
-    rankings = map (filter (`Set.member` voters) . snd) rankings0
-    st = tallyVotes rankings (VotingState Map.empty Set.empty)
-
--- | Determine the winner of a preference voting election using Instant-RunOff voting
--- https://en.wikipedia.org/wiki/Instant-runoff_voting
-determineWinner : Ord a => Int -> Int -> VotingState a -> a
-determineWinner requiredNumVotes remainingVotingRounds st
-  | remainingVotingRounds <= 0 = winner
-  | requiredNumVotes <= numWinnerVotes = winner
-  | otherwise =
-      let (looser, _) = head candidates
-          updatedVotes = distributeVotes looser st
-      in  determineWinner requiredNumVotes (remainingVotingRounds - 1) updatedVotes
-  where
-    candidates = sortOn snd
-      [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList st.rankings ]
-    (winner, numWinnerVotes) = last candidates
-
-
-distributeVotes : forall a. Ord a => a -> VotingState a -> VotingState a
-distributeVotes looser st =
-  case Map.lookup looser st.rankings of
-    None -> error "deletion of non-existent candidate"
-    Some remainingRankings ->
-      tallyVotes remainingRankings VotingState with
-        rankings = st.rankings
-        loosers = Set.insert looser st.loosers
-
-tallyVotes : Ord a => [[a]] -> VotingState a -> VotingState a
-tallyVotes rankings votes = foldl tallyVote votes rankings
-
-tallyVote : forall a. Ord a => VotingState a -> [a] -> VotingState a
-tallyVote st [] = st
-tallyVote st (p :: ps)
-  -- loosers cannot become candidates again
-  | p `Set.member` st.loosers = tallyVote st ps
-  | otherwise = VotingState with
-      rankings = Map.alter tally p st.rankings
-      loosers = st.loosers
-  where
-    tally : Optional [[a]] -> Optional [[a]]
-    tally None = Some [ps]
-    tally (Some rankings) = Some (ps :: rankings)
 
 
 -- Wellformedness checks

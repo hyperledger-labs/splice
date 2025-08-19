@@ -1,0 +1,126 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: "init containers"
+templates:
+  - participant.yaml
+set:
+  # Things we need just to pass the schema
+  persistence:
+    host: mock-pg-host
+    schema: participant
+  auth:
+    jwksUrl: "https://mock.com/.well-known/jwks.json"
+    targetAudience: "mock_audience"
+tests:
+  - it: "has only the pg-init container by default"
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 1
+      - isSubset:
+          path: spec.template.spec.initContainers[0]
+          content:
+            name: pg-init
+            image: postgres:14
+            env:
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    key: postgresPassword
+                    name: postgres-secrets
+  - it: "has no init containers when enablePgInitContainer=false and extraInitContainers is not defined"
+    set:
+      persistence:
+        enablePgInitContainer: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notExists:
+          path: spec.template.spec.initContainers
+  - it: "has only the extraInitContainers when enablePgInitContainer=false"
+    set:
+      persistence:
+        enablePgInitContainer: false
+      extraInitContainers:
+        - name: potato-init
+          image: potato-image:latest
+          env:
+            - name: POTATO_ENV_VAR
+              value: potato-value
+        - name: tomato-init
+          image: tomato-image:latest
+          env:
+            - name: TOMATO_ENV_VAR
+              value: tomato-value
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers
+          value:
+            - name: potato-init
+              image: potato-image:latest
+              env:
+                - name: POTATO_ENV_VAR
+                  value: potato-value
+            - name: tomato-init
+              image: tomato-image:latest
+              env:
+                - name: TOMATO_ENV_VAR
+                  value: tomato-value
+  - it: "has both the extraInitContainers and pg-init container when enablePgInitContainer=true"
+    set:
+      persistence:
+        enablePgInitContainer: true
+      extraInitContainers:
+        - name: potato-init
+          image: potato-image:latest
+          env:
+            - name: POTATO_ENV_VAR
+              value: potato-value
+        - name: tomato-init
+          image: tomato-image:latest
+          env:
+            - name: TOMATO_ENV_VAR
+              value: tomato-value
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.initContainers
+          count: 3
+      - isSubset:
+          path: spec.template.spec.initContainers[0]
+          content:
+            name: pg-init
+            image: postgres:14
+            env:
+              - name: PGPASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    key: postgresPassword
+                    name: postgres-secrets
+      - equal:
+          path: spec.template.spec.initContainers[1]
+          value:
+            name: potato-init
+            image: potato-image:latest
+            env:
+              - name: POTATO_ENV_VAR
+                value: potato-value
+      - equal:
+          path: spec.template.spec.initContainers[2]
+          value:
+            name: tomato-init
+            image: tomato-image:latest
+            env:
+              - name: TOMATO_ENV_VAR
+                value: tomato-value

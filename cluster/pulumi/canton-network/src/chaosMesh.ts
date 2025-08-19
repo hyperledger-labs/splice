@@ -153,9 +153,6 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
       },
       values: {
         controllerManager: {
-          leaderElection: {
-            enabled: false,
-          },
           ...infraAffinityAndTolerations,
         },
         chaosDaemon: {

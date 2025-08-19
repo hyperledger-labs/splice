@@ -6,7 +6,7 @@ let
   damlCompilerSources = builtins.fromJSON (builtins.readFile ./daml-compiler-sources.json);
 
   # No macOS support for firefox
-  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 util-linux ];
+  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ firefox iproute2 rust-parallel util-linux ];
 
 in pkgs.mkShell {
   PULUMI_SKIP_UPDATE_CHECK = 1;
@@ -66,6 +66,7 @@ in pkgs.mkShell {
                                              doCheck = false;
                                              doInstallCheck = false;
                                      }))
+    python3Packages.dockerfile-parse
     python3Packages.flask
     python3Packages.GitPython
     python3Packages.gql
@@ -114,6 +115,7 @@ in pkgs.mkShell {
   DAML_COMPILER_VERSION = "${damlCompilerSources.version}";
   SDK_VERSION = "${sources.tooling_sdk_version}";
   COMETBFT_RELEASE_VERSION = "${cometbftDriverSources.version}";
+  COMETBFT_IMAGE_SHA256 = "${cometbftDriverSources.image_sha256}";
   COMETBFT_DRIVER = if use_enterprise then "${pkgs.cometbft_driver}" else "";
   PULUMI_HOME = "${pkgs.pulumi-bin}";
   IS_ENTERPRISE = if use_enterprise then "true" else "false";

@@ -5,12 +5,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as ip from 'ip';
-import {
-  InstalledHelmChart,
-  installPostgresPasswordSecret,
-  MOCK_SPLICE_ROOT,
-  SPLICE_ROOT,
-} from 'splice-pulumi-common';
+import { InstalledHelmChart, installPostgresPasswordSecret } from 'splice-pulumi-common';
 import { config } from 'splice-pulumi-common/src/config';
 import {
   Postgres,
@@ -19,7 +14,11 @@ import {
   privateNetwork,
   protectCloudSql,
 } from 'splice-pulumi-common/src/postgres';
-import { ExactNamespace, CLUSTER_BASENAME } from 'splice-pulumi-common/src/utils';
+import {
+  ExactNamespace,
+  CLUSTER_BASENAME,
+  commandScriptPath,
+} from 'splice-pulumi-common/src/utils';
 
 interface ScanBigQueryConfig {
   dataset: string;
@@ -346,22 +345,21 @@ function createPublicationAndReplicationSlots(
 ) {
   const dbName = scanAppDatabaseName(postgres);
   const schemaName = dbName;
-  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/canton-network/bigquery-cloudsql.sh`;
-  const scriptArgs = pulumi.interpolate`\
-      --private-network-project="${privateNetwork.project}" \
-      --compute-region="${cloudsdkComputeRegion()}" \
-      --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \
-      --tables-to-replicate-length="${tablesToReplicate.length}" \
-      --db-name="${dbName}" \
-      --schema-name="${schemaName}" \
-      --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}" \
-      --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \
-      --postgres-user-name="${postgres.user.name}" \
-      --publication-name="${publicationName}" \
-      --replication-slot-name="${replicationSlotName}" \
-      --replicator-user-name="${replicatorUserName}" \
-      --postgres-instance-name="${postgres.databaseInstance.name}" \
+  const path = commandScriptPath('cluster/pulumi/canton-network/bigquery-cloudsql.sh');
+  const scriptArgs = pulumi.interpolate`\\
+      --private-network-project="${privateNetwork.project}" \\
+      --compute-region="${cloudsdkComputeRegion()}" \\
+      --service-account-email="${postgres.databaseInstance.serviceAccountEmailAddress}" \\
+      --tables-to-replicate-length="${tablesToReplicate.length}" \\
+      --db-name="${dbName}" \\
+      --schema-name="${schemaName}" \\
+      --tables-to-replicate-list="${tablesToReplicate.map(n => `'${n}'`).join(', ')}" \\
+      --tables-to-replicate-joined="${tablesToReplicate.join(', ')}" \\
+      --postgres-user-name="${postgres.user.name}" \\
+      --publication-name="${publicationName}" \\
+      --replication-slot-name="${replicationSlotName}" \\
+      --replicator-user-name="${replicatorUserName}" \\
+      --postgres-instance-name="${postgres.databaseInstance.name}" \\
       --scan-app-database-name="${scanAppDatabaseName(postgres)}"`;
   return new command.local.Command(
     `${postgres.namespace.logicalName}-${replicatorUserName}-pub-replicate-slots`,

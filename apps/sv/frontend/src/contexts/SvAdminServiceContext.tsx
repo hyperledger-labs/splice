@@ -1,6 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
-import * as openapi from 'sv-openapi';
+import * as openapi from '@lfdecentralizedtrust/sv-openapi';
 import { useUserState } from '@lfdecentralizedtrust/splice-common-frontend';
 import {
   BaseApiMiddleware,
@@ -11,9 +11,7 @@ import React, { useContext, useMemo } from 'react';
 import {
   CastVoteRequest,
   createConfiguration,
-  CreateElectionRequest,
   CreateVoteRequest,
-  GetElectionRequestResponse,
   ListAmuletPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
@@ -30,7 +28,7 @@ import {
   ResponseContext,
   ServerConfiguration,
   UpdateAmuletPriceVoteRequest,
-} from 'sv-openapi';
+} from '@lfdecentralizedtrust/sv-openapi';
 
 import { RelTime } from '@daml.js/daml-stdlib-DA-Time-Types-1.0.0/lib/DA/Time/Types/module';
 import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
@@ -43,8 +41,6 @@ export interface SvAdminProps {
 
 export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
-  getElectionRequest: () => Promise<GetElectionRequestResponse>;
-  createElectionRequest: (requester: string, ranking: string[]) => Promise<void>;
   createVoteRequest: (
     requester: string,
     action: ActionRequiringConfirmation,
@@ -106,16 +102,6 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
     return {
       isAuthorized: async (): Promise<void> => {
         return await svAdminClient.isAuthorized();
-      },
-      getElectionRequest: async (): Promise<GetElectionRequestResponse> => {
-        return await svAdminClient.getElectionRequest();
-      },
-      createElectionRequest: async (requester, ranking: string[]): Promise<void> => {
-        const request: CreateElectionRequest = {
-          requester,
-          ranking,
-        };
-        return await svAdminClient.createElectionRequest(request);
       },
       createVoteRequest: async (
         requester,

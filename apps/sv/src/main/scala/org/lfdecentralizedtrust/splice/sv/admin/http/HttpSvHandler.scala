@@ -25,6 +25,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.validatoronboarding.V
 import org.lfdecentralizedtrust.splice.config.Thresholds
 import org.lfdecentralizedtrust.splice.environment.*
 import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyResult
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import org.lfdecentralizedtrust.splice.http.HttpVotesHandler
 import org.lfdecentralizedtrust.splice.http.v0.{definitions, sv as v0}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.QueryResult
@@ -60,6 +61,7 @@ class HttpSvHandler(
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
     isBftSequencer: Boolean,
+    initialRound: String,
 )(implicit
     ec: ExecutionContext,
     protected val tracer: Tracer,
@@ -359,6 +361,7 @@ class HttpSvHandler(
         amuletRules = amuletRules.toContractWithState.toHttp,
         dsoRules = dsoRules.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
+        initialRound = Some(initialRound),
       )
     }
   }
@@ -559,6 +562,7 @@ class HttpSvHandler(
           .listSequencerSynchronizerState(
             decentralizedSynchronizer,
             store.TimeQuery.Range(None, None),
+            AuthorizedState,
           )
           .map { result =>
             result
@@ -574,7 +578,7 @@ class HttpSvHandler(
                 case _ => None
               } match {
               case Some(activeMapping) =>
-                activeMapping.base.sequenced
+                activeMapping.base.validFrom
               case None =>
                 throw Status.NOT_FOUND
                   .withDescription(
