@@ -19,21 +19,3 @@ jobs:
     uses: ./.github/workflows/build.yml
     if: github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name
     secrets: inherit
-
-  test:
-    runs-on: self-hosted-docker-tiny
-    container:
-      image: us-central1-docker.pkg.dev/da-cn-shared/ghcr/digital-asset/decentralized-canton-sync-dev/docker/splice-test-ci:0.3.12
-    steps:
-      - name: echo runner
-        shell: bash
-        run: |
-          echo "is self hosted: ${{ startsWith(runner.name, 'self-hosted') }}"
-
-  test2:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: echo runner
-        shell: bash
-        run: |
-          echo "is self hosted: ${{ startsWith(runner.name, 'self-hosted') }}"
