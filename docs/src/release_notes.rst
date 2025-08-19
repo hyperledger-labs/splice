@@ -23,6 +23,7 @@ Upcoming
 - Docs
 
   - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
+  - Add how-to docs for :ref:`Token Standard usage <token_standard>`.
 
 0.4.11
 ------
