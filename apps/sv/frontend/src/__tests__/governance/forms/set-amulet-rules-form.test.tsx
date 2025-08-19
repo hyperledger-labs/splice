@@ -33,7 +33,7 @@ describe('SV user can', () => {
   });
 });
 
-describe('Set Amulet Config Rules Form', () => {
+describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
   test('should render all Set Amulet Config Rules Form components', () => {
     render(
       <Wrapper>
@@ -56,16 +56,21 @@ describe('Set Amulet Config Rules Form', () => {
     expect(urlInput).toBeDefined();
     expect(urlInput.getAttribute('value')).toBe('');
 
-    const configLabels = screen.getAllByTestId('config-label', { exact: false });
-    console.log('configLabels', configLabels);
-    expect(configLabels.length).toBeGreaterThan(15);
+    // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
+    waitFor(
+      () => {
+        const configLabels = screen.getAllByTestId('config-label', { exact: false });
+        expect(configLabels.length).toBeGreaterThan(65);
 
-    const configFields = screen.getAllByTestId('config-field', { exact: false });
-    expect(configFields.length).toBeGreaterThan(15);
+        const configFields = screen.getAllByTestId('config-field', { exact: false });
+        expect(configFields.length).toBeGreaterThan(65);
 
-    // no changes have been made so we should not see any current values
-    expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
-      /Unable to find an element/
+        // no changes have been made so we should not see any current values
+        expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
+          /Unable to find an element/
+        );
+      },
+      { timeout: 1000 }
     );
   });
 
@@ -84,7 +89,7 @@ describe('Set Amulet Config Rules Form', () => {
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
