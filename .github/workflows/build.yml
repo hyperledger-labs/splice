@@ -80,7 +80,6 @@ jobs:
     secrets: inherit
     with:
       commit_sha: ${{ inputs.commit_sha }}
-      self_hosted: true
 
   deployment_test:
     uses: ./.github/workflows/build.deployment_test.yml

@@ -23,7 +23,6 @@
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
     - [Testing App Upgrades](#testing-app-upgrades)
   - [Deployment Tests](#deployment-tests)
-- [CI Without Approval](#ci-without-approval)
 
 # Testing in Splice
 
@@ -416,18 +415,3 @@ Our pulumi checks are based on checked in `expected` files that need to be updat
 
 Please run `make cluster/pulumi/update-expected` whenever you intend to change Pulumi deployment scripts in a way that alters deployed state.
 Compare the diff of the resulting `expected` files to confirm that the changes are as intended.
-
-
-# CI Without Approval
-
-A subset of tests will run on PRs from forks without a moderator's approval, thus allowing for a quicker feedback loop for developers.
-At the time of writing (Aug'25), this includes all static tests. It is advised to confirm that these pass before asking for a full
-CI approval on Splice.
-
-Advantages:
-- Allows running tests without contacting a Splice maintainer for approval
-
-Limitations:
-- Only a subset of tests is supported
-- Not all caches are available yet for such runs, so runtimes are longer than on approved CI runs in Splice
-- A full CI is still required on a PR against Splice before merging to Splice

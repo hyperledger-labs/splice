@@ -11,6 +11,15 @@ Release Notes
 Upcoming
 --------
 
+- Vagrant (new)
+
+  - Add Vagrantfile as a convenient way to spin up a local development
+    environment for Splice. See `README.vagrant.md
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+    and `Vagrantfile
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+    details.
+
 - Docs
 
   - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
@@ -19,20 +28,6 @@ Upcoming
 - Cometbft
 
   - Doubled the default mempool size and deduplication cache size as they get exceeded on prod networks occasionally.
-
-- Splice Development
-
-  - Vagrant (new)
-
-    - Add Vagrantfile as a convenient way to spin up a local development
-      environment for Splice. See `README.vagrant.md
-      <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
-      and `Vagrantfile
-      <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
-      details.
-
-  - A subset of the tests now run on PRs from forks without approval from a maintainer
-    (see `TESTING.md <https://github.com/hyperledger-labs/splice/blob/0.4.12/TESTING.md>` for details)
 
 0.4.11
 ------
