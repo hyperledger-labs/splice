@@ -135,7 +135,7 @@ export async function installNode(
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
 
   if (svsConfig?.scan?.externalRateLimits) {
-    installRateLimits(xns.ns, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
   }
 
   installSpliceRunbookHelmChartByNamespaceName(

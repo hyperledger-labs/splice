@@ -10,7 +10,7 @@ interface Limits {
 }
 
 export interface RateLimitEnvoyFilterArgs {
-  namespace: pulumi.Input<string>;
+  namespace: string;
 
   appLabel: pulumi.Input<string>;
 
@@ -45,7 +45,7 @@ export class RateLimitEnvoyFilter extends pulumi.ComponentResource {
     args: RateLimitEnvoyFilterArgs,
     opts?: pulumi.ComponentResourceOptions
   ) {
-    super('pkg:component:RateLimitEnvoyFilter', name, args, opts);
+    super('splice:RateLimit', `splice-${args.namespace}-${name}`, args, opts);
 
     const rateLimitActions: unknown[] =
       args.rateLimits?.map(rateLimit => {
@@ -87,7 +87,7 @@ proxyStatsMatcher:
 `.trim();
 
     this.envoyFilter = new k8s.apiextensions.CustomResource(
-      name,
+      `${args.namespace}-${name}`,
       {
         apiVersion: 'networking.istio.io/v1alpha3',
         kind: 'EnvoyFilter',

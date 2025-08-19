@@ -584,7 +584,7 @@ function installScan(
   };
 
   if (svsConfig?.scan?.externalRateLimits) {
-    installRateLimits(xns.ns, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
   }
 
   const scan = installSpliceHelmChart(xns, 'scan', 'splice-scan', scanValues, activeVersion, {
