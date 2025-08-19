@@ -80,14 +80,14 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
     CO_CreateExternalPartySetupProposal externalParty preapprovalExpiresAt -> do
       -- creates ExternalPartySetupProposal for externally hosted parties
       resultE <- catchAll $ handleCreateExternalPartySetupProposal executionContext externalParty preapprovalExpiresAt
-      handleResult COO_CreateExternalPartySetupProposal resultE
+      handleResultMultiChange COO_CreateExternalPartySetupProposal resultE
     CO_AcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt -> do
       -- creates TransferPreapproval via the wallet
       resultE <- catchAll $ handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt
-      handleResult COO_AcceptTransferPreapprovalProposal resultE
+      handleResultMultiChange COO_AcceptTransferPreapprovalProposal resultE
     CO_RenewTransferPreapproval previousApprovalCid newExpiresAt -> do
       resultE <- catchAll $ handleRenewTransferPreapproval previousApprovalCid newExpiresAt
-      handleResult COO_RenewTransferPreapproval resultE
+      handleResultMultiChange COO_RenewTransferPreapproval resultE
     CO_TransferPreapprovalSend transferPreapprovalCid providerFeaturedAppRightCid amount description -> do
       -- The designated app provider for pre-approved transfers is the host of the receiver's party and
       -- not sender's wallet provider. So, the `featuredAppRight` in this context needs to be replaced
@@ -111,6 +111,12 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
       Right (result, change) -> do
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) change
         executeAmuletOperationRec executionContext inputAmulets (resultConstructor result :: prevResults) remainingOperations
+
+    handleResultMultiChange : (r -> AmuletOperationOutcome) -> Either InvalidTransferReason (r, [TransferInput]) -> Update [AmuletOperationOutcome]
+    handleResultMultiChange resultConstructor = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right (result, newInputs) -> do
+        executeAmuletOperationRec executionContext newInputs (resultConstructor result :: prevResults) remainingOperations
 
     handleResultMergeInputs : Either InvalidTransferReason (TransferResult) -> Update [AmuletOperationOutcome]
     handleResultMergeInputs = \case
@@ -217,7 +223,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         expectedDso = Some executionContext.dso
       pure (result.purchasedTraffic, result.senderChangeAmulet)
 
-    handleCreateExternalPartySetupProposal : ExecutionContext -> Party -> Time -> Update (ContractId ExternalPartySetupProposal, Optional (ContractId Amulet))
+    handleCreateExternalPartySetupProposal : ExecutionContext -> Party -> Time -> Update (ContractId ExternalPartySetupProposal, [TransferInput])
     handleCreateExternalPartySetupProposal executionContext externalParty preapprovalExpiresAt = do
       require "Only a validator can create a proposal to host an external party" (executionContext.endUser == executionContext.validator)
       AmuletRules_CreateExternalPartySetupProposalResult{..} <- exercise context.amuletRules AmuletRules_CreateExternalPartySetupProposal with
@@ -228,24 +234,30 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         preapprovalExpiresAt
         expectedDso = Some executionContext.dso
         optCreatedAt = None
-      pure (proposalCid, transferResult.senderChangeAmulet)
+      pure (proposalCid, inputsFromPreapprovalOperation amuletPaid transferResult)
 
-    handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval, Optional (ContractId Amulet))
+    handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval, [TransferInput])
     handleAcceptTransferPreapprovalProposal preapprovalProposalCid expiresAt = do
       require "Only a validator can accept a proposal to create a transfer preapproval" (executionContext.endUser == executionContext.validator)
       TransferPreapprovalProposal_AcceptResult{..} <- exercise preapprovalProposalCid TransferPreapprovalProposal_Accept with
         context = executionContext.paymentContext
         inputs
         expiresAt
-      pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
+      pure (transferPreapprovalCid, inputsFromPreapprovalOperation amuletPaid transferResult)
 
-    handleRenewTransferPreapproval : ContractId TransferPreapproval -> Time -> Update (ContractId TransferPreapproval, Optional (ContractId Amulet))
+    handleRenewTransferPreapproval : ContractId TransferPreapproval -> Time -> Update (ContractId TransferPreapproval, [TransferInput])
     handleRenewTransferPreapproval previousApprovalCid newExpiresAt = do
       TransferPreapproval_RenewResult{..} <- exercise previousApprovalCid TransferPreapproval_Renew with
         context = executionContext.paymentContext
         inputs
         newExpiresAt
-      pure (transferPreapprovalCid, transferResult.senderChangeAmulet)
+      pure (transferPreapprovalCid, inputsFromPreapprovalOperation amuletPaid transferResult)
+
+    inputsFromPreapprovalOperation : Decimal -> TransferResult -> [TransferInput]
+    inputsFromPreapprovalOperation amuletPaid transferResult =
+      if amuletPaid <= 0.0
+        then inputs
+        else optional [] (\amulet -> [InputAmulet amulet]) transferResult.senderChangeAmulet
 
 executeAmuletOperationRec _executionContext _inputs prevResults [] = do
   return prevResults

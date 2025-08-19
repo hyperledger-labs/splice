@@ -588,10 +588,16 @@ testTransferPreapproval = script do
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [aliceValidator.primaryParty, app.dso] $
     exerciseCmd install WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet amulet]
-      operations = [CO_CreateExternalPartySetupProposal alice.primaryParty (now `addRelTime` duration)]
+      operations =
+        -- create a short duration preapproval first to check batching logic handling unconsumed coin inputs
+        [ CO_CreateExternalPartySetupProposal alice.primaryParty (now `addRelTime` days 90)
+        , CO_CreateExternalPartySetupProposal alice.primaryParty (now `addRelTime` duration)
+        ]
       context
 
-  let [COO_CreateExternalPartySetupProposal proposalCid] = outcomes
+  debug ("outcomes", outcomes)
+  let [ COO_CreateExternalPartySetupProposal _shortLivedProposalCid,
+        COO_CreateExternalPartySetupProposal proposalCid ] = outcomes
   Some proposal <- queryContractId aliceValidator.primaryParty proposalCid
   let preapprovalExpiresAt = (now `addRelTime` duration)
   proposal === ExternalPartySetupProposal with

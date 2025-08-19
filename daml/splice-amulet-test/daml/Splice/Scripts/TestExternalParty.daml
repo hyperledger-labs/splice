@@ -7,7 +7,6 @@ import Daml.Script
 import DA.Time
 import DA.Assert
 
-import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Scripts.Util
 
