@@ -417,12 +417,12 @@ Our pulumi checks are based on checked in `expected` files that need to be updat
 Please run `make cluster/pulumi/update-expected` whenever you intend to change Pulumi deployment scripts in a way that alters deployed state.
 Compare the diff of the resulting `expected` files to confirm that the changes are as intended.
 
+
 # CI Without Approval
 
-A subset of tests can be run on forks without a moderator's approval, thus allowing for a quicker feedback loop for developers.
-At the time of writing (Aug'25), this includes all static tests. In order to run those without approval, open a PR in your fork
-*against a base branch also in your fork* (all workfflows for PRs against branches in the main Splice repo require approval).
-It is advised to confirm that these pass before asking for a full CI approval on Splice.
+A subset of tests will run on PRs from forks without a moderator's approval, thus allowing for a quicker feedback loop for developers.
+At the time of writing (Aug'25), this includes all static tests. It is advised to confirm that these pass before asking for a full
+CI approval on Splice.
 
 Advantages:
 - Allows running tests without contacting a Splice maintainer for approval

@@ -85,11 +85,7 @@ object DarLockChecker {
   ): Unit = {
     val lastReleaseNumber = File("LATEST_RELEASE").contentAsString.strip
     val lastReleaseDarLock =
-      Try(s"git show refs/remotes/origin/release-line-$lastReleaseNumber:daml/dars.lock".!!)
-        .getOrElse(
-          // When running in forks, origin might not have the release line, so we download the file explicitly from github
-          s"curl -sSLf https://raw.githubusercontent.com/hyperledger-labs/splice/release-line-$lastReleaseNumber/daml/dars.lock".!!
-        )
+      s"git show refs/remotes/origin/release-line-$lastReleaseNumber:daml/dars.lock".!!
     val lastReleaseDars = parseDarsLock(lastReleaseDarLock)
     val mismatches = actual.flatMap { case (pkg, currentHash) =>
       lastReleaseDars

@@ -16,8 +16,7 @@ jobs:
 
   static_tests:
     uses: ./.github/workflows/build.static_tests.yml
-    if: |
-      (github.event.pull_request.head.repo.full_name != github.event.pull_request.base.repo.full_name) ||
-      (github.event.pull_request.base.repo.full_name != 'hyperledger-labs/splice')
     with:
       self_hosted: false
+
+# This file should be deleted before merging!! For testing only
