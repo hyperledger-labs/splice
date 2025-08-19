@@ -25,6 +25,10 @@ Upcoming
   - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
   - Add how-to docs for :ref:`Token Standard usage <token_standard>`.
 
+- Cometbft
+
+  - Doubled the default mempool size and deduplication cache size as they get exceeded on prod networks occasionally.
+
 0.4.11
 ------
 
