@@ -894,15 +894,6 @@ class AcsSnapshotStoreTest
         dummyDomain,
         "acs-snapshot-store-test",
         recordTime.toInstant,
-        packageName = DarResources
-          .lookupPackageId(create.identifier.getPackageId)
-          .getOrElse(
-            throw new IllegalArgumentException(
-              s"No package found for template ${create.identifier}"
-            )
-          )
-          .metadata
-          .name,
       )
     )
     updateHistory.ingestionSink
