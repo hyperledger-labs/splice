@@ -101,7 +101,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   }
 
-  "Non-delegate SVs can onboard new validators" in { implicit env =>
+  "SVs can onboard new validators" in { implicit env =>
     initDso()
     val sv = sv4Backend // not a delegate
     val svParty = sv.getDsoInfo().svParty

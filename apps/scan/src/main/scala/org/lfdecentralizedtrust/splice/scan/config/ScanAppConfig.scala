@@ -39,7 +39,10 @@ case class ScanAppBackendConfig(
     enableForcedAcsSnapshots: Boolean = false,
     // TODO(DACH-NY/canton-network-node#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
-    parameters: SpliceParametersConfig = SpliceParametersConfig(batching = BatchingConfig()),
+    parameters: SpliceParametersConfig = SpliceParametersConfig(
+      batching = BatchingConfig(),
+      customTimeouts = ScanAppBackendConfig.DefaultCustomTimeouts,
+    ),
     spliceInstanceNames: SpliceInstanceNamesConfig,
     updateHistoryBackfillEnabled: Boolean = true,
     updateHistoryBackfillBatchSize: Int = 100,
@@ -55,6 +58,14 @@ case class ScanAppBackendConfig(
   override val nodeTypeName: String = "scan"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
+}
+
+object ScanAppBackendConfig {
+
+  val DefaultCustomTimeouts: Map[String, NonNegativeFiniteDuration] = Map(
+    "getAcsSnapshot" -> NonNegativeFiniteDuration.ofMinutes(1L)
+  )
+
 }
 
 final case class ScanCacheConfig(

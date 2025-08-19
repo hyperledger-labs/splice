@@ -9,6 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "oauth2-mock-server": "^7.1.1"
+    "oauth2-mock-server": "^7.2.1"
   }
 }

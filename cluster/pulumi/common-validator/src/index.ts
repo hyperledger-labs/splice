@@ -5,3 +5,5 @@ export * from './validator';
 export * from './validators';
 export * from './backup';
 export * from './sweep';
+export * from './config';
+export * from './splitwellDars';

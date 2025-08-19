@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1972,
+  "id": 3402,
   "links": [],
   "panels": [
     {
@@ -83,8 +83,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -115,11 +114,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -128,7 +128,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}",
+          "expr": "min by (namespace, job) (daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -145,7 +145,7 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "delta(daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}[5m]) / 5",
+          "expr": "max by (namespace, job) (delta(daml_sequencer_block_delay{namespace=~\"$namespace\", component=\"sequencer\",job=~\"global-domain-$migration-sequencer\"}[5m])) / 5",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -208,8 +208,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -240,11 +239,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -253,7 +253,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"}",
+          "expr": "min by (namespace)(daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -315,8 +315,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -347,11 +346,12 @@
           "sortDesc": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -360,7 +360,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\",job=~\"global-domain-$migration-mediator\"}",
+          "expr": "min by (namespace, job)(daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\",job=~\"global-domain-$migration-mediator\"})",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -380,340 +380,6 @@
         "w": 24,
         "x": 0,
         "y": 20
-      },
-      "id": 9,
-      "panels": [],
-      "title": "Canton",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "The most recent acknowledgement the sequencer has seen from that member. Acknowledgements are only sent when the member also receives an event addressed to them so a node that never receives anything can lag behind. Sequencers only receive topology transactions which are rare so we filter them out.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "dateTimeAsIso"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 21
-      },
-      "id": 12,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "sortBy": "Last *",
-          "sortDesc": false
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "asc"
-        }
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "daml_sequencer_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",member!~\"SEQ::.*\",member=~\"$member\"} / 1000",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "{{namespace}} M$migration {{member}}",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        }
-      ],
-      "title": "Most recent acknowledgement",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "The difference most recent acknowledgement the sequencer has seen from that member and the maximum across all members. Acknowledgements are only sent when the member also receives an event addressed to them so a node that never receives anything can lag behind. Sequencers only receive topology transactions which are rare so we filter them out.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 11,
-        "x": 0,
-        "y": 31
-      },
-      "id": 13,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "sortBy": "Last *",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "(max without (member) (daml_sequencer_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\"}) - ignoring (member) group_right daml_sequencer_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",member!~\"SEQ::.*\",member=~\"$member\"}) / 1000000",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "{{namespace}} M$migration {{member}}",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        }
-      ],
-      "title": "Acknowledgement lag",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "The increase in acknowledgement time in acknowledgements over the last 10min for a given member. This should usually be around 1. If a node was down, they should show > 1. If the value is < 1 the node might never catch up. Acknowledgements are only sent when the member also receives an event addressed to them so a node that never receives anything can lag behind. Sequencers only receive topology transactions which are rare so we filter them out.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "none"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 13,
-        "x": 11,
-        "y": 31
-      },
-      "id": 14,
-      "options": {
-        "legend": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "sortBy": "Last *",
-          "sortDesc": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "disableTextWrap": false,
-          "editorMode": "code",
-          "expr": "delta(daml_sequencer_block_acknowledgments_micros{namespace=~\"$namespace\", job=~\"global-domain-$migration-sequencer\",member!~\"SEQ::.*\",member=~\"$member\"}[10m]) / (1000000 * 60 * 10)",
-          "fullMetaSearch": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "{{namespace}} M$migration {{member}}",
-          "range": true,
-          "refId": "A",
-          "useBackend": false
-        }
-      ],
-      "title": "Acknowledgement catchup speed",
-      "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 41
       },
       "id": 10,
       "panels": [],
@@ -770,8 +436,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -787,7 +452,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 21
       },
       "id": 11,
       "options": {
@@ -798,11 +463,12 @@
           "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -877,8 +543,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -894,7 +559,7 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 49
+        "y": 28
       },
       "id": 7,
       "options": {
@@ -905,11 +570,12 @@
           "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -984,8 +650,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1001,7 +666,7 @@
         "h": 6,
         "w": 24,
         "x": 0,
-        "y": 56
+        "y": 35
       },
       "id": 6,
       "options": {
@@ -1012,11 +677,12 @@
           "showLegend": false
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1058,6 +724,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1103,7 +770,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 62
+        "y": 41
       },
       "id": 8,
       "options": {
@@ -1114,10 +781,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1156,6 +825,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1201,7 +871,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 62
+        "y": 41
       },
       "id": 4,
       "options": {
@@ -1212,10 +882,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1254,6 +926,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1299,7 +972,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 70
+        "y": 49
       },
       "id": 5,
       "options": {
@@ -1310,10 +983,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "single",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1365,7 +1040,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 70
+        "y": 49
       },
       "id": 15,
       "options": {
@@ -1383,7 +1058,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "11.1.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1423,6 +1098,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1468,7 +1144,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 57
       },
       "id": 17,
       "options": {
@@ -1479,11 +1155,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.1.0",
+      "pluginVersion": "12.0.2",
       "targets": [
         {
           "datasource": {
@@ -1509,7 +1186,7 @@
   ],
   "preload": false,
   "refresh": "30s",
-  "schemaVersion": 40,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": [
@@ -1576,34 +1253,6 @@
         "regex": "/global-domain-(?<value>\\d)-sequencer/g",
         "sort": 1,
         "type": "query"
-      },
-      {
-        "allValue": ".*",
-        "current": {
-          "text": [
-            "PAR::Global-Synchronizer-Foundation::1220ba8e4660..."
-          ],
-          "value": [
-            "PAR::Global-Synchronizer-Foundation::1220ba8e4660..."
-          ]
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "definition": "label_values(daml_sequencer_block_acknowledgments_micros,member)",
-        "includeAll": true,
-        "multi": true,
-        "name": "member",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(daml_sequencer_block_acknowledgments_micros,member)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
       }
     ]
   },
@@ -1615,6 +1264,5 @@
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96d9",
-  "version": 1,
-  "weekStart": ""
+  "version": 4
 }

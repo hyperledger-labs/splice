@@ -12,9 +12,10 @@ import { JSONObject } from './JsonType';
 interface JsonEditorProps {
   data: JSONObject;
   onChange: (updatedJson: JSONObject) => void;
+  disabledKeys?: string[];
 }
 
-export const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
+export const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange, disabledKeys }) => {
   const handleValueChange = (key: string, rawInputValue: string) => {
     const value = rawInputValue === '' ? null : rawInputValue;
     const keys = key.split('.');
@@ -53,6 +54,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
               data-testid={nestedKey + '-value'}
               style={{ textAlign: 'right' }}
               onChange={e => handleValueChange(nestedKey, e.target.value)}
+              disabled={disabledKeys?.includes(nestedKey)}
             />
           }
         </TableCell>

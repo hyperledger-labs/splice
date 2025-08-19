@@ -215,6 +215,7 @@ abstract class WalletSweepIntegrationTest
       ex.getStatus.getCode shouldBe Status.Code.INVALID_ARGUMENT
       ex.getStatus.getDescription() should include("No transfer preapproval for receiver")
     }
+    aliceValidatorWalletClient.selfGrantFeaturedAppRight()
     actAndCheck(
       "Alice creates transfer preapproval", {
         aliceValidatorWalletClient.tap(

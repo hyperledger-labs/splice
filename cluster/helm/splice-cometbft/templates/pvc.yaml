@@ -7,6 +7,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: {{ include "prefix" (list .Values "cometbft-data") }}
   namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
   labels:
     {{- include "splice-util-lib.default-labels" (set . "app" $.Values.node.identifier) | nindent 4 }}
 spec:

@@ -15,7 +15,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   )(implicit webDriver: WebDriverType, env: SpliceTestConsoleEnvironment): Unit = {
 
     def tap(): Unit = {
-      click on "tap-amount-field"
+      eventuallyClickOn(id("tap-amount-field"))
       numberField("tap-amount-field").underlying.clear()
       numberField("tap-amount-field").underlying.sendKeys(tapQuantity.toString())
       click on "tap-button"
@@ -102,7 +102,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       )
     } catch {
       case e: Throwable =>
-        throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
+        fail(s"Could not parse the string '$str' as a amulet amount", e)
     }
   }
 

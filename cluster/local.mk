@@ -16,6 +16,9 @@ docker-build: $(foreach image,$(images),cluster/images/$(image)/$(docker-build))
 .PHONY: docker-push
 docker-push: $(foreach image,$(images),cluster/images/$(image)/$(docker-push))
 
+.PHONY: docker-scan
+docker-scan: $(foreach image,$(images),cluster/images/$(image)/$(docker-scan))
+
 .PHONY: docker-image-reference-exists
 docker-image-reference-exists: $(foreach image,$(images),cluster/images/$(image)/docker-image-reference-exists)
 

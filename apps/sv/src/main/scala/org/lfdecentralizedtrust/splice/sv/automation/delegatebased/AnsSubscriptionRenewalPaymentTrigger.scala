@@ -5,7 +5,6 @@ package org.lfdecentralizedtrust.splice.sv.automation.delegatebased
 
 import org.apache.pekko.stream.Materializer
 import cats.implicits.catsSyntaxApplicativeId
-import com.digitalasset.canton.data.CantonTimestamp
 import org.lfdecentralizedtrust.splice.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
@@ -24,6 +23,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 
 class AnsSubscriptionRenewalPaymentTrigger(
@@ -77,7 +77,6 @@ class AnsSubscriptionRenewalPaymentTrigger(
                     entry,
                     transferContext,
                     controller,
-                    now,
                   )
                 case None =>
                   if (now.toInstant.isBefore(payment.payload.thisPaymentDueAt)) {
@@ -112,14 +111,9 @@ class AnsSubscriptionRenewalPaymentTrigger(
       entry: AssignedContract[AnsEntry.ContractId, AnsEntry],
       transferContext: AppTransferContext,
       controller: String,
-      time: CantonTimestamp,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     dsoRules <- dsoStore.getDsoRules()
     ansRules <- dsoStore.getAnsRules()
-    (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-      controller,
-      time,
-    )
     cmd = dsoRules.exercise(
       _.exerciseDsoRules_CollectEntryRenewalPayment(
         ansContextCId,
@@ -129,7 +123,7 @@ class AnsSubscriptionRenewalPaymentTrigger(
           transferContext,
           ansRules.contractId,
         ),
-        controllerArgument,
+        Optional.of(controller),
       )
     )
     taskOutcome <- connection
@@ -139,7 +133,6 @@ class AnsSubscriptionRenewalPaymentTrigger(
         update = cmd,
       )
       .noDedup
-      .withPreferredPackage(preferredPackageIds)
       .yieldUnit()
       .map { _ =>
         TaskSuccess(s"renewed ans entry ${entry.payload.name} by collecting payment $paymentCid")

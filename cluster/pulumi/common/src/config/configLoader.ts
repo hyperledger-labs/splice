@@ -6,17 +6,23 @@ import { merge } from 'lodash';
 
 import { spliceEnvConfig } from './envConfig';
 
-function loadClusterYamlConfig() {
-  const clusterBaseConfig = readAndParseYaml(
+function loadClusterYamlConfig(): unknown {
+  const baseConfig = readAndParseYaml(
     `${spliceEnvConfig.context.splicePath}/cluster/deployment/config.yaml`
   );
+  // Load an additional common overrides config if it exists;
+  // if the file is identical to the base config for some reason, loading it will not change anything.
+  const commonOverridesConfigPath = `${spliceEnvConfig.context.clusterPath()}/../config.yaml`;
+  const commonOverridesConfig = fs.existsSync(commonOverridesConfigPath)
+    ? readAndParseYaml(commonOverridesConfigPath)
+    : {};
   const clusterOverridesConfig = readAndParseYaml(
     `${spliceEnvConfig.context.clusterPath()}/config.yaml`
   );
-  return merge({}, clusterBaseConfig, clusterOverridesConfig);
+  return merge({}, baseConfig, commonOverridesConfig, clusterOverridesConfig);
 }
 
-function readAndParseYaml(filePath: string): unknown {
+export function readAndParseYaml(filePath: string): unknown {
   try {
     const fileContents = fs.readFileSync(filePath, 'utf8');
     return yaml.load(fileContents);
@@ -26,4 +32,9 @@ function readAndParseYaml(filePath: string): unknown {
   }
 }
 
-export const clusterYamlConfig = loadClusterYamlConfig();
+export const clusterYamlConfig: unknown = loadClusterYamlConfig();
+
+export function clusterSubConfig(key: string): unknown {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (clusterYamlConfig as any)[key] || {};
+}

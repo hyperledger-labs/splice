@@ -14,6 +14,8 @@ import {
   numInstances,
   numNodesPerInstance,
   loadTesterConfig,
+  installLoopback,
+  parsedVersion,
 } from 'splice-pulumi-common';
 
 export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
@@ -24,19 +26,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
 
     const clusterHostname = `${CLUSTER_HOSTNAME}`;
 
-    // install loopback so the test can hit the wallet/validator API via its public DNS name
-    const loopback = installSpliceHelmChart(
-      xns,
-      'loopback',
-      'splice-cluster-loopback-gateway',
-      {
-        cluster: {
-          hostname: CLUSTER_HOSTNAME,
-        },
-      },
-      activeVersion,
-      { dependsOn: [xns.ns] }
-    );
+    const loopback = installLoopback(xns);
 
     const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
     const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
@@ -96,8 +86,8 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           },
         }),
       },
-      activeVersion,
-      { dependsOn: imagePullDeps.concat(dependencies).concat([loopback]) }
+      loadTesterConfig.chartVersion ? parsedVersion(loadTesterConfig.chartVersion) : activeVersion,
+      { dependsOn: imagePullDeps.concat(dependencies).concat(loopback) }
     );
   } else {
     console.log('K6 load test is disabled for this cluster. Skipping...');

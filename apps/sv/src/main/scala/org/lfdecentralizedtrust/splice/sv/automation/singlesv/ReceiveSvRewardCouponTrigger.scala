@@ -31,6 +31,7 @@ import com.digitalasset.canton.util.MonadUtil
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.PackageConfig
+import org.lfdecentralizedtrust.splice.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -116,11 +117,11 @@ class ReceiveSvRewardCouponTrigger(
     for {
       dsoRules <- store.getDsoRules()
       vettedPackages <- MonadUtil.sequentialTraverse(participantIds) { pId =>
-        participantAdminConnection.listVettedPackages(pId, dsoRules.domain)
+        participantAdminConnection.listVettedPackages(pId, dsoRules.domain, AuthorizedState)
       }
     } yield {
       val vettedPackagesPackageIds =
-        vettedPackages.flatMap(_.flatMap(_.item.packages.map(_.packageId)))
+        vettedPackages.flatMap(_.flatMap(_.mapping.packages.map(_.packageId)))
       approvedVettedPackages.diff(vettedPackagesPackageIds).isEmpty
     }
   }
@@ -140,8 +141,9 @@ class ReceiveSvRewardCouponTrigger(
       firstOpenNotClaimed <- OptionT.fromOption[Future](
         openRounds.toSeq
           .filter(round =>
-            round.payload.opensAt <= context.clock.now.toInstant
-              && lastReceivedForOpt.forall(_ < round.payload.round.number)
+            round.payload.opensAt <= context.clock.now.toInstant && lastReceivedForOpt.forall(
+              _ < round.payload.round.number
+            )
           )
           .minByOption(_.payload.opensAt)
       )

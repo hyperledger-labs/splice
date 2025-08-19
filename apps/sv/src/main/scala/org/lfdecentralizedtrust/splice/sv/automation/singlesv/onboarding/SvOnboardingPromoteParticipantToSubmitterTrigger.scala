@@ -112,7 +112,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       dsoHostingParticipants <- participantAdminConnection.listPartyToParticipant(
         store = TopologyStoreId.Synchronizer(dsoRules.domain).some,
         filterParty = dsoParty.filterString,
-        proposals = AuthorizedState,
+        topologyTransactionType = AuthorizedState,
         timeQuery = TimeQuery.Range(None, None),
       )
       svParticipants <- getSvParticipants(dsoRules)

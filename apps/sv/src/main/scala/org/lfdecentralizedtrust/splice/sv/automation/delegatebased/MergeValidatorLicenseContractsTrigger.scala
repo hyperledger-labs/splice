@@ -18,6 +18,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -46,7 +47,7 @@ class MergeValidatorLicenseContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validator = validatorLicense.payload.validator
     for {
-      pruneAmuletConfigScheduleFeatureSupport <- svTaskContext.packageVersionSupport
+      supportsMergeDuplicatedValidatorLicense <- svTaskContext.packageVersionSupport
         .supportsMergeDuplicatedValidatorLicense(
           dsoGovernanceParties = Seq(
             store.key.svParty,
@@ -58,7 +59,7 @@ class MergeValidatorLicenseContractsTrigger(
           context.clock.now.minus(context.config.clockSkewAutomationDelay.asJava),
         )
       validatorLicenses <-
-        if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        if (supportsMergeDuplicatedValidatorLicense.supported) {
           store.listValidatorLicensePerValidator(
             validator,
             MAX_VALIDATOR_LICENSE_CONTRACTS,
@@ -76,7 +77,7 @@ class MergeValidatorLicenseContractsTrigger(
             validatorLicenses,
             controller,
           )
-        } else if (pruneAmuletConfigScheduleFeatureSupport.supported) {
+        } else if (supportsMergeDuplicatedValidatorLicense.supported) {
           Future.successful(
             TaskSuccess(s"Only one Validator License contract for $validator, nothing to merge.")
           )
@@ -97,19 +98,14 @@ class MergeValidatorLicenseContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      (controllerArgument, preferredPackageIds) <- getDelegateLessFeatureSupportArguments(
-        controller,
-        context.clock.now,
-      )
       arg = new DsoRules_MergeValidatorLicense(
         validatorLicenses.map(_.contractId).asJava,
-        controllerArgument,
+        Optional.of(controller),
       )
       cmd = dsoRules.exercise(_.exerciseDsoRules_MergeValidatorLicense(arg))
       _ <- svTaskContext.connection
         .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
-        .withPreferredPackage(preferredPackageIds)
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${validatorLicenses.length} ValidatorLicense contracts for $validator"

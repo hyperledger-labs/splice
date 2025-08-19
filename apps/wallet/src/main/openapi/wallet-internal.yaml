@@ -717,6 +717,42 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
+  /v0/wallet/token-standard/allocation-requests/{contract_id}/reject:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "rejectAllocationRequest"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The AllocationRequest has been rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceExecutionMetadata"
+        "404":
+          description: |
+            The AllocationRequest or the submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A reject for the AllocationRequest is currently being processed, which may or may not succeed.
+            Retry submitting the request with exponential back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/feature-support:
     get:
       tags: [ wallet ]
@@ -798,6 +834,43 @@ paths:
                 $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/allocations/{contract_id}/withdraw:
+    post:
+      tags: [ wallet ]
+      x-jvm-package: wallet
+      operationId: "withdrawAmuletAllocation"
+      parameters:
+        - in: path
+          name: contract_id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The AmuletAllocation has been withdrawn
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AmuletAllocationWithdrawResult"
+        "404":
+          description: |
+            The allocation or the submitter’s wallet could not be found.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "429":
+          description:
+            A withdraw for the allocation is currently being processed, which may or may not succeed.
+            Retry submitting the request with exponential back-off.
+          content:
+            application/json:
+              schema:
+                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 
 components:
   schemas:
@@ -1511,3 +1584,28 @@ components:
       properties:
         contract:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    AmuletAllocationWithdrawResult:
+      type: object
+      required:
+        - sender_holding_cids
+        - meta
+      properties:
+        sender_holding_cids:
+          type: array
+          items:
+            type: string
+        meta:
+          type: object
+          additionalProperties:
+            type: string
+
+    ChoiceExecutionMetadata:
+      type: object
+      required:
+        - meta
+      properties:
+        meta:
+          type: object
+          additionalProperties:
+            type: string

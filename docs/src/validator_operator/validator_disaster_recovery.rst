@@ -62,7 +62,6 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 
 .. _validator_reonboard:
 
-
 Re-onboard a validator and recover balances of all users it hosts
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -81,6 +80,13 @@ depending on which setup you chose.
 Once the new validator is up and running, you should be able to login as the administrator
 and see its balance. Other users hosted on the validator would need to re-onboard, but their
 coin balance and CNS entries should be recovered.
+
+.. warning:: This process preserves all party IDs and all contracts shared
+             with the DSO party.  This means that you *must* keep
+             the same validator party hint and you do not need a new
+             onboarding secret. If you get any errors about needing a
+             new onboarding secret, double check your configuration
+             instead of requesting a new secret.
 
 Kubernetes Deployment
 ^^^^^^^^^^^^^^^^^^^^^
@@ -140,6 +146,35 @@ To do so, you can set the ``parties-to-migrate`` :ref:`configuration option <con
 A migration will be attempted for each party that you pass to this option.
 The initialization of the validator app will be interrupted on the first failed migration attempt.
 
+If you still observe issues, in particular you observe
+``ACS_COMMITMENT_MISMATCH`` warnings in your participant logs,
+something has likely gone wrong while importing the active contracts
+of at least one of the parties hosted on your node. To address this, you can usually:
+
+1. First make sure all parties are on a consistent node. The most
+   common case is that either the parties are still on the old node
+   with the old participant id or they have been migrated to the new
+   node. You can check by opening a :ref:`Canton console
+   <console_access>` to any participant on the network (i.e., you can also ask another validator or SV operator for this information) and running the
+   following query where <namespace> is the part after the ``::`` in
+   your participant id.
+
+   .. code::
+
+      val syncId = participant.synchronizers.list_connected().head.synchronizerId
+      participant.topology.party_to_participant_mappings.list(syncId, filterNamespace = <namespace>)
+
+   If all parties are on the same node, proceed with the next step. If some are on the old node and some are on the new node, migrate the ones on the old node to the new node through (adjust the parameters as required for your parties):
+
+   .. code::
+
+      participant.topology.party_to_participant_mappings.propose(<party-id>, Seq((<participant-id>, <participant-permission>)), store = syncId)
+
+2. If your parties are still on the original node that you took identity dumps from, you can use your existing dump.
+   If your parties have been migrated already, take a new dump from the node. If your node is in a state where you cannot take a fresh dump, use the old dump but edit the ``id``
+   field in your identity dump to the participant id of the new node.
+   You can now take down the broken node on which you tried to restore and try the restore procedure again with your adjusted dump on a fresh node with a different ``<new_participant_id>``.
+
 .. _validator_recover_external_party:
 
 Recover the Coin balance of an external party
@@ -153,7 +188,10 @@ hosting it becomes unusable for whatever reason.
              recovery **must** be a **completely new validator**. An existing validator
              may brick completely due to some limitations around party
              migrations and there is no way to recover from that at
-             this point. This limitation is expected to be lifted in
+             this point. Recovering a validator from an identity backup does not classify
+             as a completely new validator here. You must setup it with a completely new identity
+             and a completely clean database.
+             This limitation is expected to be lifted in
              the future.
 
 First, setup a new validator following the standard :ref:`standard validator deployment docs <validator_operator>`.
@@ -203,7 +241,7 @@ it on multiple nodes, you will need to adjust this.
 We'll need the topology transaction and the definitions defined here later again. Either keep your Canton console open or save them.
 
 The topology transaction hash needs to be signed externally following the
-`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding#external-party-onboarding-transactions>`_.
+`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding.html#external-party-onboarding-transactions>`_.
 
 After you signed it externally, you need to construct the signed
 topology transaction, sign it additionally through the participant and
@@ -234,7 +272,7 @@ We can now check that the topology transaction got correctly applied and get the
 .. code::
 
     // The detailed output will slightly vary. Make sure that you see the new participant id though.
-    sv1Participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
+    participant.topology.party_to_participant_mappings.list(synchronizerId, filterParty = partyId.filterString)
       res36: Seq[topology.ListPartyToParticipantResult] = Vector(
         ListPartyToParticipantResult(
           context = BaseResult(

@@ -104,7 +104,7 @@ class SponsorDsoPartyHosting(
         .listPartyToParticipant(
           TopologyStoreId.Synchronizer(synchronizerId).some,
           filterParty = dsoParty.filterString,
-          proposals = AllProposals,
+          topologyTransactionType = AllProposals,
         )
         .flatMap { proposals =>
           partyToParticipantAcceptedState

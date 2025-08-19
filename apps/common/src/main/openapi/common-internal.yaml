@@ -262,6 +262,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ContractWithState"
+        initial_round:
+          description: |
+            Initial round from which the network bootstraps
+          type: string
 
     BatchListVotesByVoteRequestsRequest:
       type: object
@@ -366,10 +370,7 @@ components:
     FeatureSupportResponse:
       type: object
       required:
-        - new_governance_flow
-        - delegateless_automation
+        - my_feature
       properties:
-        new_governance_flow:
-          type: boolean
-        delegateless_automation:
+        my_feature:
           type: boolean

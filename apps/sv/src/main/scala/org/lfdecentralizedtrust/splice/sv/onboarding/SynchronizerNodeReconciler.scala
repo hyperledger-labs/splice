@@ -10,12 +10,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.decentralizedsync
   SequencerConfig,
   SynchronizerNodeConfig,
 }
-import org.lfdecentralizedtrust.splice.environment.{
-  PackageVersionSupport,
-  RetryFor,
-  RetryProvider,
-  SpliceLedgerConnection,
-}
+import org.lfdecentralizedtrust.splice.environment.{RetryFor, RetryProvider, SpliceLedgerConnection}
 import org.lfdecentralizedtrust.splice.sv.SynchronizerNode
 import org.lfdecentralizedtrust.splice.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import org.lfdecentralizedtrust.splice.sv.store.SvDsoStore
@@ -41,7 +36,6 @@ class SynchronizerNodeReconciler(
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
-    packageVersionSupport: PackageVersionSupport,
 ) {
 
   private val svParty = dsoStore.key.svParty
@@ -85,22 +79,12 @@ class SynchronizerNodeReconciler(
         case SynchronizerNodeState.Onboarding =>
           false
       }
-      legacySequencerConfigFeatureSupport <- packageVersionSupport.supportsLegacySequencerConfig(
-        Seq(
-          dsoParty,
-          svParty,
-        ),
-        clock.now,
-      )
-
       updatedSequencerConfigUpdate =
-        if (legacySequencerConfigFeatureSupport.supported)
-          updateLegacySequencerConfig(
-            existingLegacySequencerConfig,
-            existingSequencerConfig,
-            legacyMigrationId,
-          )
-        else Left(())
+        updateLegacySequencerConfig(
+          existingLegacySequencerConfig,
+          existingSequencerConfig,
+          legacyMigrationId,
+        )
       _ = ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
         existingSequencerConfig,
         localSequencerConfig,
@@ -129,7 +113,6 @@ class SynchronizerNodeReconciler(
             )
             connection
               .submit(Seq(svParty), Seq(dsoParty), cmd)
-              .withPreferredPackage(legacySequencerConfigFeatureSupport.packageIds)
               .noDedup
               .yieldResult()
           }

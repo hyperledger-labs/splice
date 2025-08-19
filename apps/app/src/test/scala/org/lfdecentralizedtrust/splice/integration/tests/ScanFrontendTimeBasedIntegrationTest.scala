@@ -1,12 +1,15 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.JsonObject
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.{
   AmuletRules,
-  AmuletRules_AddFutureAmuletConfigSchedule,
+  AmuletRules_SetConfig,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.config.ConfigTransforms.{
   ConfigurableApp,
   updateAutomationConfig,
@@ -15,9 +18,6 @@ import org.lfdecentralizedtrust.splice.environment.PackageIdResolver.HasAmuletRu
 import org.lfdecentralizedtrust.splice.integration.EnvironmentDefinition
 import org.lfdecentralizedtrust.splice.util.*
 import org.lfdecentralizedtrust.splice.validator.automation.ReceiveFaucetCouponTrigger
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.PartyId
-import io.circe.JsonObject
 import org.openqa.selenium.By
 import spray.json.DefaultJsonProtocol.StringJsonFormat
 
@@ -27,7 +27,6 @@ import scala.jdk.CollectionConverters.*
 
 class ScanFrontendTimeBasedIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("scan-ui")
-    with FrontendLoginUtil
     with AmuletConfigUtil
     with WalletTestUtil
     with WalletFrontendTestUtil
@@ -543,25 +542,24 @@ class ScanFrontendTimeBasedIntegrationTest
       val dsoInfo = sv1Backend.getDsoInfo()
       val amuletRules = dsoInfo.amuletRules
 
-      val newMaxNumInputs =
-        amuletRules.payload.configSchedule.initialValue.transferConfig.maxNumInputs.toInt + 1
+      val baseAmuletConfig = amuletRules.payload.configSchedule.initialValue
+
+      val newMaxNumInputs = baseAmuletConfig.transferConfig.maxNumInputs.toInt + 1
+      val newAmuletConfig = mkUpdatedAmuletConfig(
+        amuletRules.contract,
+        NonNegativeFiniteDuration.tryFromDuration(
+          scala.concurrent.duration.Duration.fromNanos(
+            baseAmuletConfig.tickDuration.microseconds * 1000
+          )
+        ),
+        newMaxNumInputs,
+      )
+
       val mockVoteAction = new ARC_AmuletRules(
-        new CRARC_AddFutureAmuletConfigSchedule(
-          new AmuletRules_AddFutureAmuletConfigSchedule(
-            new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-              getLedgerTime.toInstant.plusSeconds(
-                defaultTickDuration.minusSeconds(1).duration.toSeconds
-              ),
-              mkUpdatedAmuletConfig(
-                amuletRules.contract,
-                NonNegativeFiniteDuration.tryFromDuration(
-                  scala.concurrent.duration.Duration.fromNanos(
-                    amuletRules.payload.configSchedule.initialValue.tickDuration.microseconds * 1000
-                  )
-                ),
-                newMaxNumInputs,
-              ),
-            )
+        new CRARC_SetConfig(
+          new AmuletRules_SetConfig(
+            newAmuletConfig,
+            baseAmuletConfig,
           )
         )
       )

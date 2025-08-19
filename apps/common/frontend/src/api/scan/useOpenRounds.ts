@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
+import { GetOpenAndIssuingMiningRoundsRequest } from '@lfdecentralizedtrust/scan-openapi';
 
 import { OpenMiningRound } from '@daml.js/splice-amulet/lib/Splice/Round';
 

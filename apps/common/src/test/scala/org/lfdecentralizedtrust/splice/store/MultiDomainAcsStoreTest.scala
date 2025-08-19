@@ -1452,6 +1452,65 @@ abstract class MultiDomainAcsStoreTest[
       }
     }
 
+    "ingest and return interface views with their contract's state" in {
+      implicit val store = mkStore()
+      val owner = providerParty(1)
+      val contract1 = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
+      val view1 = holdingView(owner, BigDecimal(10), dsoParty, "AMT")
+      val contract2 = amulet(
+        owner,
+        BigDecimal(20),
+        2L,
+        BigDecimal(0.00002),
+        dso = dsoParty,
+      )
+      val view2 = holdingView(owner, BigDecimal(20), dsoParty, "AMT")
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          contract1,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> view1.toValue
+          ),
+        )
+        _ <- d2.create(
+          contract2,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> view2.toValue
+          ),
+        )
+        result1 <- store.findInterfaceViewByContractId(
+          holdingv1.Holding.INTERFACE
+        )(contract1.contractId.toInterface(holdingv1.Holding.INTERFACE))
+        result2 <- store.findInterfaceViewByContractId(
+          holdingv1.Holding.INTERFACE
+        )(contract2.contractId.toInterface(holdingv1.Holding.INTERFACE))
+      } yield {
+        result1.value.contract should be(
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract1.contractId.contractId),
+            view1,
+            contract1.createdEventBlob,
+            contract1.createdAt,
+          )
+        )
+        result1.value.state.fold(_ should be(d1), fail("should be assigned"))
+
+        result2.value.contract should be(
+          Contract(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID,
+            new holdingv1.Holding.ContractId(contract2.contractId.contractId),
+            view2,
+            contract2.createdEventBlob,
+            contract2.createdAt,
+          )
+        )
+        result2.value.state.fold(_ should be(d2), fail("should be assigned"))
+      }
+    }
+
   }
 }
 

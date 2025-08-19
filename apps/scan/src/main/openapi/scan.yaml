@@ -2284,8 +2284,7 @@ components:
       properties:
         update_id:
           description: |
-            The id of the update. This is not comparable to other updates; it's
-            meant for correlating with server logs.
+            The id of the update.
           type: string
         migration_id:
           description: |
@@ -2349,8 +2348,7 @@ components:
       properties:
         update_id:
           description: |
-            The id of the update. This is not comparable to other updates; it's
-            meant for correlating with server logs.
+            The id of the update.
           type: string
         migration_id:
           description: |

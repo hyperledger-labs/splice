@@ -19,7 +19,8 @@ import {
 import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
 import { Postgres } from 'splice-pulumi-common/src/postgres';
 
-import { clusterSvsConfiguration } from './clusterSvConfig';
+import { svsConfig } from './config';
+import { SingleSvConfiguration } from './singleSvConfig';
 
 export interface SvParticipant {
   readonly asDependencies: pulumi.Resource[];
@@ -28,11 +29,11 @@ export interface SvParticipant {
 
 export function installSvParticipant(
   xns: ExactNamespace,
+  svConfig: SingleSvConfiguration,
   migrationId: DomainMigrationIndex,
   auth0Config: Auth0Config,
   isActive: boolean,
   db: Postgres,
-  logLevel: string,
   version: CnChartVersion,
   onboardingName: string,
   participantAdminUserNameFrom?: k8s.types.input.core.v1.EnvVarSource,
@@ -50,10 +51,8 @@ export function installSvParticipant(
     ),
   };
 
-  const clusterConfiguration = clusterSvsConfiguration[xns.logicalName]?.participant;
-
-  const { kmsValues, kmsDependencies } = clusterConfiguration?.kms
-    ? getParticipantKmsHelmResources(xns, clusterConfiguration.kms, migrationId)
+  const { kmsValues, kmsDependencies } = svConfig.participant?.kms
+    ? getParticipantKmsHelmResources(xns, svConfig.participant.kms, migrationId)
     : { kmsValues: {}, kmsDependencies: [] };
 
   const participantValuesWithOverwrites: ChartValues = {
@@ -80,7 +79,10 @@ export function installSvParticipant(
     'splice-participant',
     {
       ...participantValuesWithOverwrites,
-      logLevel,
+      additionalEnvVars: (participantValuesWithOverwrites.additionalEnvVars || []).concat(
+        svConfig.participant?.additionalEnvVars || []
+      ),
+      logLevel: svConfig.logging?.cantonLogLevel,
       participantAdminUserNameFrom,
       metrics: {
         enable: true,
@@ -91,6 +93,7 @@ export function installSvParticipant(
       additionalJvmOptions: jmxOptions(),
       enablePostgresMetrics: true,
       serviceAccountName: imagePullServiceAccountName,
+      resources: svsConfig?.participant.resources,
     },
     version,
     {

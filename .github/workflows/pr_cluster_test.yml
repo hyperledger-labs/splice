@@ -11,7 +11,7 @@ permissions:
 jobs:
 
   get_head:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.get_head.outputs.sha }}
       repo: ${{ steps.get_head.outputs.repo }}
@@ -22,7 +22,15 @@ jobs:
           set -euo pipefail
           query='query pullRequestDetails { repository(name: \"${{ github.event.repository.name }}\", owner: \"${{ github.repository_owner }}\") { pullRequest(number: ${{ github.event.issue.number }}) { headRef { target { oid } } } } }'
           result=$(curl -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -X POST -d " { \"query\": \"$query\" } " https://api.github.com/graphql)
+          if ! echo "$result" | jq empty > /dev/null 2>&1; then
+            echo "GitHub API did not return valid JSON. Response: $result"
+            exit 1
+          fi
           sha=$(echo "$result" | jq -r '.data.repository.pullRequest.headRef.target.oid')
+          if [ "$sha" == "null" ] || [ -z "$sha" ]; then
+            echo "Failed to fetch SHA from API. Full response: $result"
+            exit 1
+          fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
   trigger_cluster_test_basic:
@@ -35,7 +43,7 @@ jobs:
       sha: ${{ needs.get_head.outputs.sha }}
 
   result:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     needs:
       - trigger_cluster_test_basic
       - get_head
@@ -68,7 +76,7 @@ jobs:
       sha: ${{ needs.get_head.outputs.sha }}
 
   result_hdm:
-    runs-on: self-hosted-docker-tiny
+    runs-on: ubuntu-24.04
     needs:
       - trigger_cluster_test_hdm
       - get_head

@@ -24,6 +24,12 @@ canton.participants.participant_$index = {
         identity.type = manual
     }
 
+    sequencer-client {
+      acknowledgement-interval = 10m
+      # Use a higher number of in flight batches to increase throughput
+      maximum-in-flight-event-batches = 50
+    }
+
     monitoring.grpc-health-server {
         address = "0.0.0.0"
         port = $health_port

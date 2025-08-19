@@ -14,15 +14,14 @@ import {
   CLUSTER_NAME,
   clusterProdLike,
   COMETBFT_RETAIN_BLOCKS,
+  commandScriptPath,
   ENABLE_COMETBFT_PRUNING,
   GCP_PROJECT,
   GrafanaKeys,
   HELM_MAX_HISTORY_SIZE,
   isMainNet,
   loadTesterConfig,
-  MOCK_SPLICE_ROOT,
   ObservabilityReleaseName,
-  publicPrometheusRemoteWrite,
   SPLICE_ROOT,
 } from 'splice-pulumi-common';
 import { infraAffinityAndTolerations } from 'splice-pulumi-common';
@@ -82,50 +81,7 @@ function istioVirtualService(
   );
 }
 
-function istioPublicVirtualService(
-  ns: k8s.core.v1.Namespace,
-  name: string,
-  serviceName: string,
-  servicePort: number,
-  urlPrefix: string,
-  rewriteUri?: string
-) {
-  return new k8s.apiextensions.CustomResource(
-    `${name}-virtual-service`,
-    {
-      apiVersion: 'networking.istio.io/v1alpha3',
-      kind: 'VirtualService',
-      metadata: {
-        name: name,
-        namespace: ns.metadata.name,
-      },
-      spec: {
-        hosts: [`public.${CLUSTER_HOSTNAME}`],
-        gateways: ['cluster-ingress/cn-public-http-gateway'],
-        http: [
-          {
-            match: [{ uri: { prefix: urlPrefix }, port: 443 }],
-            rewrite: rewriteUri ? { uri: rewriteUri } : undefined,
-            route: [
-              {
-                destination: {
-                  host: pulumi.interpolate`${serviceName}.${ns.metadata.name}.svc.cluster.local`,
-                  port: {
-                    number: servicePort,
-                  },
-                },
-              },
-            ],
-          },
-        ],
-      },
-    },
-    { deleteBeforeReplace: true }
-  );
-}
-
 const grafanaExternalUrl = `https://grafana.${CLUSTER_HOSTNAME}`;
-const grafanaPublicUrl = `https://public.${CLUSTER_HOSTNAME}/grafana`;
 const alertManagerExternalUrl = `https://alertmanager.${CLUSTER_HOSTNAME}`;
 const prometheusExternalUrl = `https://prometheus.${CLUSTER_HOSTNAME}`;
 const shouldIgnoreNoDataOrDataSourceError = clusterIsResetPeriodically;
@@ -542,8 +498,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     }
   );
 
-  const root = MOCK_SPLICE_ROOT || SPLICE_ROOT;
-  const path = `${root}/cluster/pulumi/infra/prometheus-crd-update.sh`;
+  const path = commandScriptPath('cluster/pulumi/infra/prometheus-crd-update.sh');
   new local.Command(
     `update-prometheus-crd-${prometheusStackCrdVersion}`,
     {
@@ -553,19 +508,6 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
   );
 
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
-  if (publicPrometheusRemoteWrite) {
-    istioPublicVirtualService(
-      namespace,
-      'prometheus-remote-write',
-      'prometheus-prometheus',
-      9090,
-      '/api/v1/write'
-    );
-  }
-  // TODO(DACH-NY/canton-network-internal#360): Consider removing this also from non-MainNet clusters
-  const grafanaPublicVirtualService = isMainNet
-    ? undefined
-    : istioPublicVirtualService(namespace, 'grafana-public', 'grafana', 80, '/grafana/', '/');
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   istioVirtualService(namespace, 'alertmanager', 'prometheus-alertmanager', 9093);
   // In the observability cluster, we install a version of the dashboards with a filter
@@ -589,12 +531,8 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): pulum
     supportTeamEmailAddress
   );
   createGrafanaAlerting(namespaceName);
-  if (grafanaPublicVirtualService) {
-    createGrafanaServiceAccount(
-      namespaceName,
-      adminPassword,
-      dependsOn.concat([prometheusStack, grafanaPublicVirtualService])
-    );
+  if (!isMainNet) {
+    createGrafanaServiceAccount(namespaceName, adminPassword, dependsOn.concat([prometheusStack]));
   }
   createGrafanaEnvoyFilter(namespaceName, [prometheusStack]);
 
@@ -670,7 +608,7 @@ function createGrafanaServiceAccount(
 ) {
   const grafanaProvider = new grafana.Provider('grafana', {
     auth: adminPassword.apply(pwd => `cn-admin:${pwd}`),
-    url: grafanaPublicUrl,
+    url: grafanaExternalUrl,
   });
 
   const serviceAccountResource = new grafana.ServiceAccount(
@@ -785,14 +723,22 @@ function createGrafanaAlerting(namespace: Input<string>) {
               )
               .replaceAll('$ENABLE_COMETBFT_PRUNING', (!ENABLE_COMETBFT_PRUNING).toString())
               .replaceAll('$COMETBFT_RETAIN_BLOCKS', String(Number(COMETBFT_RETAIN_BLOCKS) * 1.05)),
-            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml'),
+            'automation_alerts.yaml': readGrafanaAlertingFile('automation_alerts.yaml').replaceAll(
+              '$CONTENTION_THRESHOLD_PERCENTAGE_PER_NAMESPACE',
+              monitoringConfig.alerting.alerts.delegatelessContention.thresholdPerNamespace.toString()
+            ),
             'sv-status-report_alerts.yaml': readGrafanaAlertingFile('sv-status-report_alerts.yaml'),
             ...(enableMiningRoundAlert
               ? {
                   'mining-rounds_alerts.yaml': readGrafanaAlertingFile('mining-rounds_alerts.yaml'),
                 }
               : {}),
-            'acknowledgement_alerts.yaml': readGrafanaAlertingFile('acknowledgement_alerts.yaml'),
+            'acknowledgement_alerts.yaml': readGrafanaAlertingFile(
+              'acknowledgement_alerts.yaml'
+            ).replace(
+              '$MEDIATOR_ACKNOWLEDGEMENT_LAG_SECONDS',
+              monitoringConfig.alerting.alerts.mediators.acknowledgementLagSeconds.toString()
+            ),
             'extra_k8s_alerts.yaml': readGrafanaAlertingFile('extra_k8s_alerts.yaml'),
             'traffic_alerts.yaml': readGrafanaAlertingFile('traffic_alerts.yaml')
               .replaceAll(
@@ -802,6 +748,12 @@ function createGrafanaAlerting(namespace: Input<string>) {
               .replaceAll(
                 '$WASTED_TRAFFIC_ALERT_TIME_RANGE_MINS',
                 monitoringConfig.alerting.alerts.trafficWaste.overMinutes.toString()
+              )
+              .replaceAll(
+                '$WASTED_TRAFFIC_ALERT_EXTRA_MEMBER_FILTER',
+                monitoringConfig.alerting.alerts.svNames
+                  .map(p => `,member!~"PAR::${p}::.*"`)
+                  .join('')
               ),
             'deleted_alerts.yaml': readGrafanaAlertingFile('deleted.yaml'),
             'templates.yaml': substituteSlackNotificationTemplate(

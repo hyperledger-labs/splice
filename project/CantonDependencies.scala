@@ -30,7 +30,7 @@ object CantonDependencies {
   lazy val auth0_jwks = "com.auth0" % "jwks-rsa" % "0.21.2"
   lazy val awaitility = "org.awaitility" % "awaitility" % "4.2.0"
   lazy val grpc_version = "1.67.1"
-  lazy val logback_version = "1.4.5"
+  lazy val logback_version = "1.5.3"
   lazy val slf4j_version = "2.0.6"
   lazy val log4j_version = "2.17.0"
   lazy val ammonite_version = "3.0.1"

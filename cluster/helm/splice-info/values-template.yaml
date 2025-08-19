@@ -1,0 +1,46 @@
+# Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+nginxImage: nginx:latest  # Replace `:latest` with `@sha256:digest` of a chosen image for security reasons
+contentType: "application/json"
+
+# runtimeDetails:  # Optional, exposes the runtime configuration under path /runtime/
+#   scanUrl: https://scan.sv.global.canton.network.xxx  # Scan URL to fetch the runtime configuration
+
+# deploymentDetails:  # Optional, exposes static configuration under path /
+#   network: "dev"
+#   configDigest:
+#     allowedIpRanges:
+#       type: "md5"
+#       value: "AAA"
+#     approvedSvIdentities:
+#       type: "sha256"
+#       value: "BBB"
+#   sv:
+#     version: "0.3.3"  # Optional, the default is set to the Chart version
+#   synchronizer:
+#     active:
+#       chainIdSuffix: "id0"
+#       migrationId: 4
+#       version: "0.3.3"  # Optional, the default is set to the Chart version
+#     staging:
+#       chainIdSuffix: "id1"
+#       migrationId: 5
+#       version: "0.3.4"
+#     legacy: null
+
+# istioVirtualService:  # Optional, configures Istio VirtualService for routing
+#   host: "info.example.com"
+#   gateway: "istio-gateway-example"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: "0"
+    memory: 32Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

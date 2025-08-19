@@ -3,18 +3,20 @@
 
 package org.lfdecentralizedtrust.splice.integration.tests
 
+import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.daml.lf.data.Ref.PackageVersion
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.admin.grpc.TopologyStoreId
+import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{
   AmuletConfig,
   PackageConfig,
 }
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletrules.AmuletRules_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_SetConfig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.Amulet
 import org.lfdecentralizedtrust.splice.codegen.java.splice.splitwell.balanceupdatetype
 import org.lfdecentralizedtrust.splice.codegen.java.splice.wallet.payment as walletCodegen
@@ -40,7 +42,7 @@ import org.scalatest.time.{Minute, Span}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration.DurationInt
 
 @org.lfdecentralizedtrust.splice.util.scalatesttags.NoDamlCompatibilityCheck
 class BootstrapPackageConfigIntegrationTest
@@ -62,15 +64,10 @@ class BootstrapPackageConfigIntegrationTest
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
-  // These versions are from the release 0.1.17
-  private val initialPackageConfig = InitialPackageConfig(
-    amuletVersion = "0.1.4",
-    amuletNameServiceVersion = "0.1.4",
-    dsoGovernanceVersion = "0.1.6",
-    validatorLifecycleVersion = "0.1.1",
-    walletVersion = "0.1.4",
-    walletPaymentsVersion = "0.1.4",
-  )
+  // Factored out so we can reuse it in the test
+  val initialAmulet = DarResources.amulet_0_1_9
+
+  private val initialPackageConfig = InitialPackageConfig.minimumInitialPackageConfig
 
   override def environmentDefinition: SpliceEnvironmentDefinition =
     EnvironmentDefinition
@@ -151,11 +148,6 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    assertThrowsAndLogsCommandFailures(
-      sv1ScanBackend.getExternalPartyAmuletRules(),
-      _.errorMessage should include("Not Found"),
-    )
-
     clue("Upload all splitwell versions") {
       // This simulates an app vetting newer versions of their own DARs depending on newer splice-amulet versions
       // before the SVs do so. Topology aware package selection will then force the old splice-amulet and old splitwell versions
@@ -172,6 +164,20 @@ class BootstrapPackageConfigIntegrationTest
 
     val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
 
+    clue("Bob's validator right has the right package id") {
+      // ValidatorRight is special as it does not have the DSO as a signatory but is involved in workflows that include the DSO
+      // so we need to make sure it uses a package id also vetted by the DSO and not the newer one that is pulled in by the splitwell DAR above.
+      val bobValidatorRight =
+        bobValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
+          .active_contracts_of_party(
+            bobUserParty,
+            filterTemplates = Seq(TemplateId("#splice-amulet", "Splice.Amulet", "ValidatorRight")),
+          )
+          .loneElement
+          .getCreatedEvent
+      bobValidatorRight.getTemplateId.packageId shouldBe initialAmulet.packageId
+    }
+
     aliceWalletClient.tap(50)
 
     clue("Splitwell can complete payment request on old DAR versions") {
@@ -185,7 +191,9 @@ class BootstrapPackageConfigIntegrationTest
 
     // 20s picked empirically to be far enough in the future that the voting can go through before that date.
     // it must also leave enough time for the dars to be uploaded and vetting to happen to prevent command failures
-    val scheduledTime = Instant.now().plus(20, ChronoUnit.SECONDS)
+    val expiration = new RelTime(19_000_000)
+    val scheduledTime =
+      Instant.now().plus(expiration.microseconds, ChronoUnit.MICROS).plus(1, ChronoUnit.SECONDS)
     sv2PackageVettingTrigger.pause().futureValue
     sv2ValidatorPackageVettingTrigger.pause().futureValue
 
@@ -213,17 +221,15 @@ class BootstrapPackageConfigIntegrationTest
       )
 
       val upgradeAction = new ARC_AmuletRules(
-        new CRARC_AddFutureAmuletConfigSchedule(
-          new AmuletRules_AddFutureAmuletConfigSchedule(
-            new org.lfdecentralizedtrust.splice.codegen.java.da.types.Tuple2(
-              scheduledTime,
-              newAmuletConfig,
-            )
+        new CRARC_SetConfig(
+          new AmuletRules_SetConfig(
+            newAmuletConfig,
+            amuletConfig,
           )
         )
       )
 
-      actAndCheck(
+      actAndCheck(timeUntilSuccess = 30.seconds)(
         "Voting on a AmuletRules config change for upgraded packages", {
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
@@ -233,8 +239,8 @@ class BootstrapPackageConfigIntegrationTest
                 upgradeAction,
                 "url",
                 "description",
-                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-                None,
+                expiration,
+                Some(scheduledTime),
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -256,12 +262,9 @@ class BootstrapPackageConfigIntegrationTest
         "observing AmuletRules with upgraded config",
         _ => {
           val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
-          val configs =
-            newAmuletRules.payload.configSchedule.futureValues.asScala.toList.map(_._2)
-          forExactly(1, configs) { config =>
-            config.packageConfig.amulet shouldBe DarResources.amulet.bootstrap.metadata.version
-              .toString()
-          }
+
+          newAmuletRules.payload.configSchedule.initialValue.packageConfig.amulet shouldBe DarResources.amulet.bootstrap.metadata.version
+            .toString()
         },
       )
 
@@ -298,8 +301,12 @@ class BootstrapPackageConfigIntegrationTest
       alicesTapsWithPackageId(initialAmuletPackageId)
     }
 
-    val amuletCreateTime =
+    def amuletRulesCreateTimestamp = {
       CantonTimestamp.tryFromInstant(sv2ScanBackend.getAmuletRules().contract.createdAt)
+    }
+
+    val amuletCreateTimeWhenVettingResumed =
+      amuletRulesCreateTimestamp
     sv2PackageVettingTrigger.resume()
     sv2ValidatorPackageVettingTrigger.resume()
 
@@ -307,13 +314,13 @@ class BootstrapPackageConfigIntegrationTest
       eventually() {
         vettingIsUpdatedForTheNewConfig(
           sv2Backend.participantClient,
-          // it depends if the amulet rules contract was pruned or not by the time vetting ran
           Some(
             vettingScheduledTime
           ),
-          Some(
-            amuletCreateTime
-          ),
+          Some(amuletCreateTimeWhenVettingResumed),
+          // it depends if the amulet rules contract was pruned or not by the time vetting ran
+          // there's a chance that amulet rules changed after vetting resumed (eg: pruning)
+          Some(amuletRulesCreateTimestamp),
         )
       }
     }
@@ -336,7 +343,8 @@ class BootstrapPackageConfigIntegrationTest
   private def vettingIsUpdatedForTheNewConfig(
       participantClient: ParticipantClientReference,
       scheduledTimeO: Option[CantonTimestamp],
-      alternativeScheduledTime: Option[CantonTimestamp] = None,
+      scheduledTime1: Option[CantonTimestamp] = None,
+      scheduledTime2: Option[CantonTimestamp] = None,
   )(implicit env: SpliceTestConsoleEnvironment): Unit = {
     val vettingTopologyState = participantClient.topology.vetted_packages.list(
       store = Some(
@@ -361,9 +369,10 @@ class BootstrapPackageConfigIntegrationTest
       val newAmuletVettedPackage = vettingState.packages
         .find(_.packageId == expectedVettedVersion.packageId)
         .value
-      newAmuletVettedPackage.validFromInclusive should (equal(scheduledTimeO) or equal(
-        alternativeScheduledTime
-      ))
+
+      newAmuletVettedPackage.validFromInclusive should (
+        equal(scheduledTimeO) or equal(scheduledTime1) or equal(scheduledTime2)
+      )
     }
   }
 

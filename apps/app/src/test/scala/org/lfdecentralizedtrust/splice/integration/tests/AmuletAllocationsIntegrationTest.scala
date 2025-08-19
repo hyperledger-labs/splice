@@ -1,12 +1,8 @@
 package org.lfdecentralizedtrust.splice.integration.tests
 
-import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
-import com.daml.ledger.javaapi.data.CreatedEvent
 import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletallocation.AmuletAllocation
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.allocationv1.{
   AllocationSpecification,
   SettlementInfo,
@@ -74,22 +70,9 @@ class AmuletAllocationsIntegrationTest
           succeed
         }
 
-        // TODO (#1106): use whatever endpoint was introduced to check
-        val allocation =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.acs
-            .of_party(
-              party = sender,
-              filterTemplates = Seq(AmuletAllocation.TEMPLATE_ID).map(TemplateId.fromJavaIdentifier),
-            )
-            .loneElement
+        val allocation = aliceWalletClient.listAmuletAllocations().loneElement
 
-        val specification = Contract
-          .fromCreatedEvent(AmuletAllocation.COMPANION)(
-            CreatedEvent.fromProto(toJavaProto(allocation.event))
-          )
-          .getOrElse(fail(s"Failed to parse allocation contract: $allocation"))
-          .payload
-          .allocation
+        val specification = allocation.payload.allocation
 
         specification should be(
           wantedAllocation(CantonTimestamp.assertFromInstant(specification.settlement.requestedAt))
