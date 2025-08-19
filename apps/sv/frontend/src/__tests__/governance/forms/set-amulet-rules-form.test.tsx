@@ -8,7 +8,7 @@ import { SvConfigProvider } from '../../../utils';
 import App from '../../../App';
 import { svPartyId } from '../../mocks/constants';
 import { Wrapper } from '../../helpers';
-import { SetDsoConfigRulesForm } from '../../../components/forms/SetDsoConfigRulesForm';
+import { SetAmuletConfigRulesForm } from '../../../components/forms/SetAmuletConfigRulesForm';
 import dayjs from 'dayjs';
 import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 
@@ -33,37 +33,44 @@ describe('SV user can', () => {
   });
 });
 
-describe('Set DSO Config Rules Form', () => {
-  test('should render all Set DSO Config Rules Form components', () => {
+describe('Set Amulet Config Rules Form', { timeout: 5000 }, () => {
+  test('should render all Set Amulet Config Rules Form components', () => {
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
       </Wrapper>
     );
 
-    expect(screen.getByTestId('set-dso-config-rules-form')).toBeDefined();
+    expect(screen.getByTestId('set-amulet-config-rules-form')).toBeDefined();
     expect(screen.getByText('Action')).toBeDefined();
 
-    const actionInput = screen.getByTestId('set-dso-config-rules-action');
+    const actionInput = screen.getByTestId('set-amulet-config-rules-action');
     expect(actionInput).toBeDefined();
-    expect(actionInput.getAttribute('value')).toBe('Set Dso Rules Configuration');
+    expect(actionInput.getAttribute('value')).toBe('Set Amulet Rules Configuration');
 
-    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
     expect(summaryInput).toBeDefined();
     expect(summaryInput.getAttribute('value')).toBeNull();
 
-    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
     expect(urlInput).toBeDefined();
     expect(urlInput.getAttribute('value')).toBe('');
 
-    const configLabels = screen.getAllByTestId('config-label', { exact: false });
-    expect(configLabels.length).toBeGreaterThan(15);
+    // Amulet Rules has a lot of fields to process so this can get flakey if not given enough time
+    waitFor(
+      () => {
+        const configLabels = screen.getAllByTestId('config-label', { exact: false });
+        expect(configLabels.length).toBeGreaterThan(65);
 
-    const configFields = screen.getAllByTestId('config-field', { exact: false });
-    expect(configFields.length).toBeGreaterThan(15);
+        const configFields = screen.getAllByTestId('config-field', { exact: false });
+        expect(configFields.length).toBeGreaterThan(65);
 
-    expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
-      /Unable to find an element/
+        // no changes have been made so we should not see any current values
+        expect(() => screen.getAllByTestId('config-current-value', { exact: false })).toThrowError(
+          /Unable to find an element/
+        );
+      },
+      { timeout: 1000 }
     );
   });
 
@@ -72,17 +79,17 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
       </Wrapper>
     );
 
-    const actionInput = screen.getByTestId('set-dso-config-rules-action');
+    const actionInput = screen.getByTestId('set-amulet-config-rules-action');
     const submitButton = screen.getByTestId('submit-button');
     expect(submitButton).toBeDefined();
 
     await user.click(submitButton);
     expect(submitButton.getAttribute('disabled')).toBeDefined();
-    expect(async () => await user.click(submitButton)).rejects.toThrowError(
+    await expect(async () => await user.click(submitButton)).rejects.toThrowError(
       /Unable to perform pointer interaction/
     );
 
@@ -90,11 +97,11 @@ describe('Set DSO Config Rules Form', () => {
     screen.getByText('Invalid URL');
 
     // completing the form should reenable the submit button
-    const summaryInput = screen.getByTestId('set-dso-config-rules-summary');
+    const summaryInput = screen.getByTestId('set-amulet-config-rules-summary');
     expect(summaryInput).toBeDefined();
     user.type(summaryInput, 'Summary of the proposal');
 
-    const urlInput = screen.getByTestId('set-dso-config-rules-url');
+    const urlInput = screen.getByTestId('set-amulet-config-rules-url');
     expect(urlInput).toBeDefined();
     user.type(urlInput, 'https://example.com');
 
@@ -107,11 +114,11 @@ describe('Set DSO Config Rules Form', () => {
     const user = userEvent.setup();
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
       </Wrapper>
     );
 
-    const expiryDateInput = screen.getByTestId('set-dso-config-rules-expiry-date-field');
+    const expiryDateInput = screen.getByTestId('set-amulet-config-rules-expiry-date-field');
     expect(expiryDateInput).toBeDefined();
 
     const thePast = dayjs().subtract(1, 'day').format(dateTimeFormatISO);
@@ -135,12 +142,12 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
       </Wrapper>
     );
 
-    const expiryDateInput = screen.getByTestId('set-dso-config-rules-expiry-date-field');
-    const effectiveDateInput = screen.getByTestId('set-dso-config-rules-effective-date-field');
+    const expiryDateInput = screen.getByTestId('set-amulet-config-rules-expiry-date-field');
+    const effectiveDateInput = screen.getByTestId('set-amulet-config-rules-effective-date-field');
 
     const expiryDate = dayjs().add(1, 'week');
     const effectiveDate = expiryDate.subtract(1, 'day');
@@ -168,7 +175,7 @@ describe('Set DSO Config Rules Form', () => {
 
     render(
       <Wrapper>
-        <SetDsoConfigRulesForm onSubmit={() => Promise.resolve()} />
+        <SetAmuletConfigRulesForm onSubmit={() => Promise.resolve()} />
       </Wrapper>
     );
 
@@ -176,13 +183,13 @@ describe('Set DSO Config Rules Form', () => {
       /Unable to find an element/
     );
 
-    const c1Input = screen.getByTestId('config-field-numUnclaimedRewardsThreshold');
+    const c1Input = screen.getByTestId('config-field-transferPreapprovalFee');
     expect(c1Input).toBeDefined();
     await user.type(c1Input, '99');
 
-    const c2Input = screen.getByTestId('config-field-voteCooldownTime');
+    const c2Input = screen.getByTestId('config-field-transferConfigTransferFeeInitialRate');
     expect(c2Input).toBeDefined();
-    await user.type(c2Input, '9999');
+    await user.type(c2Input, '9.99');
 
     const changes = screen.getAllByTestId('config-current-value', { exact: false });
     expect(changes.length).toBe(2);
