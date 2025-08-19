@@ -336,9 +336,9 @@ function _prompt_to_confirm() {
 
 function _get_logging_components() {
     if env-bool SELF_HOSTED_FLUENT_BIT; then
-        echo "SYSTEM,API_SERVER,CONTROLLER_MANAGER,SCHEDULER"
+        echo "SYSTEM"
     else
-        echo "SYSTEM,API_SERVER,CONTROLLER_MANAGER,SCHEDULER,WORKLOAD"
+        echo "SYSTEM,WORKLOAD"
     fi
 }
 
