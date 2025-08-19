@@ -1444,7 +1444,6 @@ template TransferPreapproval
     provider : Party -- ^ The app provider that manages the pre-approval for the receiver. Equal to the receiver for self-managed pre-approvals.
     validFrom : Time -- ^ This timestamp marks the start of the period for which fees were paid for the pre-approval. Preserved across renewals.
     lastRenewedAt : Time -- ^ The expiry of the pre-approval before its last extension, or the time when it was created. Used for tracking purposes only.
-    -- FIXME: consider passing in a `renewedAt` timestamp on renewal to avoid the slightly weird semantics here
     expiresAt : Time -- ^ Provider selected timestamp defining the lifetime of the contract. Can be extended by renewing the contract.
   where
     signatory receiver, provider, dso
@@ -1504,15 +1503,9 @@ template TransferPreapproval
         (amuletPaid, transferResult, meta) <-
           payForTransferPreapproval dso provider context inputs expiresAt newExpiresAt
         transferPreapprovalCid <- create this with
-          -- Last renewed at is only used for tracking purposes, so we assume that the
-          -- extension of the duration happens close enough to the current time so that
-          -- we can use the new expiration time as the last renewed time.
-          -- Thereby avoiding a dependency on `getTime`, which does not work well for external parties.
           lastRenewedAt = expiresAt
           expiresAt = newExpiresAt
         return TransferPreapproval_RenewResult with meta = Some meta, ..
-
-    -- FIXME(QUESTION): should we also provide a simpler renewal choice that does not require a `PaymentTransferContext`?
 
     -- Used by the DSO party to archive expired contracts
     choice TransferPreapproval_Expire : TransferPreapproval_ExpireResult
