@@ -27,13 +27,13 @@ inputs:
     required: false
     default: "false"
   upload_workload_identity_provider:
-    description: "The workload identity provider to use for uploading the cache"
+    description: 'The workload identity provider to use for uploading the cache'
     required: false
-    default: ""
+    default: ''
   upload_service_account:
-    description: "The service account to use for uploading the cache"
+    description: 'The service account to use for uploading the cache'
     required: false
-    default: ""
+    default: ''
 
 outputs:
   sbt_cache_hits:
@@ -43,6 +43,7 @@ outputs:
 runs:
   using: "composite"
   steps:
+
     - name: Validate input
       if: inputs.oss_only != 'true' && (inputs.artifactory_password == '' || inputs.artifactory_user == '')
       shell: bash
@@ -59,8 +60,8 @@ runs:
       shell: bash
       run: ./.github/actions/scripts/common_setup.sh
 
-    - name: Set up Nix (Self hosted)
-      uses: ./.github/actions/nix/setup_nix
+    - name: Set up Nix
+      uses: ./.github/actions/nix/setup_self_hosted_nix
       with:
         artifactory_user: ${{ inputs.artifactory_user }}
         artifactory_password: ${{ inputs.artifactory_password }}
