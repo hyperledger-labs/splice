@@ -49,14 +49,19 @@ data AmuletConfig unit = AmuletConfig with
     transferPreapprovalBaseDuration : Optional RelTime -- ^ Base duration of a transfer pre-approval granted for free on creation and renewal.
   deriving (Eq, Show)
 
--- $1/year specified as a daily rate
+-- | $1/year specified as a daily rate
 defaultTransferPreapprovalFee : Decimal
 defaultTransferPreapprovalFee = 0.00274
 
--- | Retrieve the base transfer pre-approval duration from the config, defaulting to 90 days if not specified.
+-- | 1/4 year as the setup and renewal transactions cost 1/4 year of traffic fees compared to a CC transfer.
+-- FIXME: validate this number, it is likely higher as the full AmuletRules is used as an argument.
+defaultTransferPreapprovalBaseDuration : RelTime
+defaultTransferPreapprovalBaseDuration = days 90
+
+-- | Retrieve the base transfer pre-approval duration from the config.
 getTransferPreapprovalBaseDuration : AmuletConfig unit -> RelTime
 getTransferPreapprovalBaseDuration config =
-    fromOptional (days 90) config.transferPreapprovalBaseDuration
+  fromOptional defaultTransferPreapprovalBaseDuration config.transferPreapprovalBaseDuration
 
 -- Check constraints on config params on which the implementation of the choices rely.
 validAmuletConfig : AmuletConfig unit -> Bool

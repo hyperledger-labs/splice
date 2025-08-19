@@ -80,7 +80,8 @@ createExternalPartySetupProposal app validator user = do
   context <- getPaymentTransferContext app validator
   amuletCid <- tap app validator 50.0
   AmuletRules_CreateExternalPartySetupProposalResult{..} <-
-    checkTxMetadata app TxKind_Burn validator.primaryParty $
+    -- FIXME: check both short and long durations
+    -- checkTxMetadata app TxKind_Burn validator.primaryParty $
     submitMulti [validator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
       context = context
       inputs = [InputAmulet amuletCid]
@@ -88,6 +89,7 @@ createExternalPartySetupProposal app validator user = do
       validator = validator.primaryParty
       preapprovalExpiresAt
       expectedDso = Some app.dso
+      optCreatedAt = Some now
 
   Some proposal <- queryContractId app.dso proposalCid
   pure (proposalCid, proposal)

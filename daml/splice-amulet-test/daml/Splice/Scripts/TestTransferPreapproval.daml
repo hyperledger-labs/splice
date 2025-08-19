@@ -91,7 +91,7 @@ testTransferPreapprovalRenewal = script do
       newExpiresAt
   Some renewedPreapproval <- queryContractId app.dso result.transferPreapprovalCid
   renewedPreapproval === transferPreapproval with
-    lastRenewedAt = now
+    lastRenewedAt = expiresAt
     expiresAt = newExpiresAt
 
   -- Move forward in time to expire pre-approval

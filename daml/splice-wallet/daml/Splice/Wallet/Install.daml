@@ -227,6 +227,7 @@ executeAmuletOperationRec executionContext inputs prevResults (operation::remain
         validator = executionContext.validator
         preapprovalExpiresAt
         expectedDso = Some executionContext.dso
+        optCreatedAt = None
       pure (proposalCid, transferResult.senderChangeAmulet)
 
     handleAcceptTransferPreapprovalProposal : ContractId TransferPreapprovalProposal -> Time -> Update (ContractId TransferPreapproval, Optional (ContractId Amulet))
