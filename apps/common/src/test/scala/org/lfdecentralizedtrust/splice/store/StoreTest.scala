@@ -611,7 +611,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     externalpartyamuletrulesCodegen.TransferCommandCounter.ContractId,
     externalpartyamuletrulesCodegen.TransferCommandCounter,
   ] = {
-    val templateId = externalpartyamuletrulesCodegen.TransferCommandCounter.TEMPLATE_ID
+    val templateId =
+      externalpartyamuletrulesCodegen.TransferCommandCounter.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new externalpartyamuletrulesCodegen.TransferCommandCounter(
       dsoParty.toProtoPrimitive,
       sender.toProtoPrimitive,
