@@ -1510,8 +1510,8 @@ abstract class MultiDomainAcsStoreTest[
     }
 
     "prevent against ingestion of same (moduleName, entityName) with different package name" in {
-      implicit val store = mkStore(
-        filter = MultiDomainAcsStore.SimpleContractFilter(
+      val filter =
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
           dsoParty,
           templateFilters = Map(
             mkFilter(Amulet.COMPANION)(_.payload.dso == dsoParty.toProtoPrimitive) { contract =>
@@ -1520,7 +1520,7 @@ abstract class MultiDomainAcsStoreTest[
           ),
           interfaceFilters = Map.empty,
         )
-      )
+      implicit val store = mkStore(filter = filter)
       val owner = providerParty(1)
       val goodContract = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
       val badContract =
@@ -1531,6 +1531,9 @@ abstract class MultiDomainAcsStoreTest[
             goodContract.identifier.getEntityName,
           )
         )
+
+      filter.contains(toCreatedEvent(goodContract)) should be(true)
+      filter.contains(toCreatedEvent(badContract)) should be(false)
 
       for {
         _ <- initWithAcs()
