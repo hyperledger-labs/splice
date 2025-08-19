@@ -1550,8 +1550,8 @@ abstract class MultiDomainAcsStoreTest[
     }
 
     "prevent against ingestion of same (moduleName, entityName) with different package name - interfaces" in {
-      implicit val store = mkStore(
-        filter = MultiDomainAcsStore.SimpleContractFilter(
+      val filter =
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
           dsoParty,
           templateFilters = Map.empty,
           interfaceFilters = Map(
@@ -1560,12 +1560,38 @@ abstract class MultiDomainAcsStoreTest[
             }
           ),
         )
+      implicit val store = mkStore(
+        filter = filter
       )
       val owner = providerParty(1)
       val goodContract = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
       val goodView = holdingView(owner, BigDecimal(10), dsoParty, "AMT")
+      val goodImplementedInterfaces = Map(
+        holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
+      )
       val badContract = dummyHolding(owner, BigDecimal(20), dsoParty)
       val badView = holdingView(owner, BigDecimal(20), dsoParty, "AMT")
+      val badImplementedInterfaces = Map(
+        new Identifier(
+          maliciousPackageId,
+          holdingv1.Holding.INTERFACE_ID.getModuleName,
+          holdingv1.Holding.INTERFACE_ID.getEntityName,
+        ) -> badView.toValue
+      )
+
+      filter.contains(
+        toCreatedEvent(
+          goodContract,
+          implementedInterfaces = goodImplementedInterfaces,
+        )
+      ) should be(true)
+
+      filter.contains(
+        toCreatedEvent(
+          badContract,
+          implementedInterfaces = badImplementedInterfaces,
+        )
+      ) should be(false)
 
       for {
         _ <- initWithAcs()
