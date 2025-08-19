@@ -47,7 +47,7 @@ export const MigrationInfoSchema = z
     releaseReference: GitReferenceSchema.optional(),
     sequencer: z
       .object({
-        enableBftSequencer: z.boolean().default(false),
+        enableBftSequencer: z.boolean().default(true),
       })
       .default({}),
   })
