@@ -3,7 +3,7 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-.. _token_standard_openapi:
+.. _token_standard:
 
 Token Standard APIs
 ###################
@@ -218,8 +218,8 @@ To execute a choice via a Token Standard factory, first you need need to fetch t
 
 The registry will return the relevant factory in the corresponding endpoint:
 
-* `TransferFactory </app_dev/token_standard_openapi/index.html#post--registry-transfer-instruction-v1-transfer-factory>`_
-* `AllocationFactory </app_dev/token_standard_openapi/index.html#post--registry-allocation-instruction-v1-allocation-factory>`_
+* `TransferFactory </app_dev/token_standard/openapi/transfer_instruction.html#post--registry-transfer-instruction-v1-transfer-factory>`_
+* `AllocationFactory </app_dev/token_standard/openapi/allocation_instruction.html#post--registry-allocation-instruction-v1-allocation-factory>`_
 
 The response's payload will include three relevant fields:
 * ``factoryId``: the contract id of the factory
@@ -262,11 +262,11 @@ In both cases, you must include an ``ExerciseCommand`` in your payload with the 
 
 Where a ``context`` is required as part of the ``choiceArgument``, it can be fetched from the corresponding registry:
 
-* `To accept a TransferInstruction </app_dev/token_standard_openapi/index.html#post--registry-transfer-instruction-v1-transferInstructionId-choice-contexts-accept>`_
-* `To reject a TransferInstruction </app_dev/token_standard_openapi/index.html#post--registry-transfer-instruction-v1-transferInstructionId-choice-contexts-reject>`_
-* `To withdraw a TransferInstruction </app_dev/token_standard_openapi/index.html#post--registry-transfer-instruction-v1-transferInstructionId-choice-contexts-withdraw>`_
-* `To withdraw an Allocation </app_dev/token_standard_openapi/index.html#post--registry-allocations-v1-allocationId-choice-contexts-withdraw>`_
-* `To cancel an Allocation </app_dev/token_standard_openapi/index.html#post--registry-allocations-v1-allocationId-choice-contexts-cancel>`_
+* `To accept a TransferInstruction </app_dev/token_standard/openapi/transfer_instruction.html#post--registry-transfer-instruction-v1-transferInstructionId-choice-contexts-accept>`_
+* `To reject a TransferInstruction </app_dev/token_standard/openapi/transfer_instruction.html#post--registry-transfer-instruction-v1-transferInstructionId-choice-contexts-reject>`_
+* `To withdraw a TransferInstruction </app_dev/token_standard/openapi/transfer_instruction.html#post--registry-transfer-instruction-v1-transferInstructionId-choice-contexts-withdraw>`_
+* `To withdraw an Allocation </app_dev/token_standard/openapi/allocation.html#post--registry-allocations-v1-allocationId-choice-contexts-withdraw>`_
+* `To cancel an Allocation </app_dev/token_standard/openapi/allocation.html#post--registry-allocations-v1-allocationId-choice-contexts-cancel>`_
 
 The response of these endpoints include two fields:
 

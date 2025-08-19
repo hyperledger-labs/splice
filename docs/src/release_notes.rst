@@ -20,6 +20,10 @@ Upcoming
     <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
     details.
 
+- Docs
+
+  - Add how-to docs for :ref:`Token Standard usage <token_standard>`.
+
 0.4.11
 ------
 

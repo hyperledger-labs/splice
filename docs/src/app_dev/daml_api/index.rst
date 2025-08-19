@@ -21,7 +21,7 @@ using the APIs below as inspiration.
 Canton Network Token Standard APIs (CIP-0056)
 ---------------------------------------------
 
-Refer to the :ref:`Token Standard documentation section <token_standard_openapi>`.
+Refer to the :ref:`Token Standard documentation section <token_standard>`.
 
 
 Featured App Activity Markers API (CIP-0047)
