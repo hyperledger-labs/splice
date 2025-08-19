@@ -26,9 +26,9 @@ testAmuletBurn = do
 
   -- bootstrap user and service provider party
   validator1 <- setupValidator app "validator1"
-  provider1 <- setupUser app "provider1" validator1
-  provider2 <- setupUser app "provider2" validator1
-  user <- setupUser app "user" validator1
+  provider1 <- setupUser app "provider1"
+  provider2 <- setupUser app "provider2"
+  user <- setupUser app "user"
 
   advanceToIssuanceWithPrice app 0.005
 

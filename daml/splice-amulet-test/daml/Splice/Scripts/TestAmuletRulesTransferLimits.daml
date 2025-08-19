@@ -79,7 +79,7 @@ testTransferExceedsMaxLockHolders = do
     [(_, amuletRules)] <- query @AmuletRules app.dso
     now <- getTime
     let config = getValueAsOf now amuletRules.configSchedule
-    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) bobValidator.primaryParty
+    bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i)
     amulet <- tap app alice 100.0
     context <- getPaymentTransferContext app alice
     now <- getTime

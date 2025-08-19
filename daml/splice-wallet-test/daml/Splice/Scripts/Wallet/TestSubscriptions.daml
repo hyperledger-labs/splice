@@ -32,9 +32,9 @@ testSetup = script do
   runAmuletDepositBots app
 
   validator <- setupValidator app "validator1"
-  alice <- setupUser app "alice" validator
-  pizzeria <- setupUser app "pizzeria" validator
-  provider <- setupUser app "la_famiglia" validator
+  alice <- setupUser app "alice"
+  pizzeria <- setupUser app "pizzeria"
+  provider <- setupUser app "la_famiglia"
 
   tap app alice 42.0
 
@@ -136,9 +136,9 @@ testUSDSubscription = script do
   runAmuletDepositBots app
 
   validator <- setupValidator app "validator1"
-  alice <- setupUser app "alice" validator
-  pizzeria <- setupUser app "pizzeria" validator
-  provider <- setupUser app "la_famiglia" validator
+  alice <- setupUser app "alice"
+  pizzeria <- setupUser app "pizzeria"
+  provider <- setupUser app "la_famiglia"
 
   featureApp app provider
   validatorUserId <- validateUserId "validator1"

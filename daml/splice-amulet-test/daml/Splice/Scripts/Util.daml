@@ -133,8 +133,8 @@ setupUserWithoutValidatorRight app name = do
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]
   return (AmuletUser userId user)
 
-setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
-setupUser app name validator = do
+setupUser : AmuletApp -> Text -> Script AmuletUser
+setupUser app name = do
   user <- setupUserWithoutValidatorRight app name
   tap app user 1.0
   return user
@@ -142,7 +142,7 @@ setupUser app name validator = do
 setupSelfHostedUser: AmuletApp -> Text -> Script (AmuletUser, AmuletUser)
 setupSelfHostedUser app name = do
   validator <- setupValidator' app (name <> "_validator")
-  user <- setupUser app name validator.primaryParty
+  user <- setupUser app name
   return (user, validator)
 
 data DefaultAppWithUsers = DefaultAppWithUsers with
@@ -163,7 +163,7 @@ setupDefaultAppWithUsers = do
   app <- setupApp
   (alice, aliceValidator) <- setupSelfHostedUser app "alice"
   (bob, bobValidator) <- setupSelfHostedUser app "bob"
-  charlie <- setupUser app "charlie" bobValidator.primaryParty
+  charlie <- setupUser app "charlie"
   (provider1, provider1Validator) <- setupSelfHostedUser app "provider1"
   (provider2, provider2Validator) <- setupSelfHostedUser app "provider2"
   return DefaultAppWithUsers with ..

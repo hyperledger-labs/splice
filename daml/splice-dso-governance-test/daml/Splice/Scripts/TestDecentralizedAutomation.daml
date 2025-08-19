@@ -33,9 +33,7 @@ testUnclaimedRewardsMerging : Script ()
 testUnclaimedRewardsMerging = do
   (app, _, (sv1, _, _, _)) <- initDevNet
 
-  -- onboard a validator
-  validator1 <- setupValidator app "validator1"
-  provider1 <- setupUser app "provider1" validator1
+  provider1 <- setupUser app "provider1"
 
   forA_ [1..6] do \_ -> generateUnclaimedReward app provider1
 
@@ -151,7 +149,7 @@ testDecentralizedAns : Script ()
 testDecentralizedAns = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNet
 
-  alice <- setupUser app "alice" app.dso
+  alice <- setupUser app "alice"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
   [(ansRulesCid, _)] <- query @AnsRules dso
@@ -284,7 +282,7 @@ terminatedSubscriptionCanBeCleanedUp : Script ()
 terminatedSubscriptionCanBeCleanedUp = script do
   (app, dso, (sv1, _, _, _)) <- initDevNet
 
-  alice <- setupUser app "alice" app.dso
+  alice <- setupUser app "alice"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
   [(ansRulesCid, _)] <- query @AnsRules dso
@@ -338,7 +336,7 @@ testTransferPreapprovalSend : Script ()
 testTransferPreapprovalSend = do
   (app, dso, (sv1, sv2, sv3, _)) <- initDevNet
   validator <- setupValidator app "validator"
-  alice <- setupUser app "alice" validator
+  alice <- setupUser app "alice"
   externalParty <- allocateParty "externalParty"
   (externalPartyAmuletRulesCid, _) <- getExternalPartyAmuletRules app
   now <- getTime
