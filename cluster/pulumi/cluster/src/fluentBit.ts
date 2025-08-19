@@ -56,17 +56,17 @@ export function installFluentBit(): void {
         '    Key_Name     log',
         '    Reserve_Data True',
         '    Parser       containerd',
+        // Rename log to message as this is what stack driver expects
+        '[FILTER]',
+        '    Name        modify',
+        '    Match       *',
+        '    Hard_rename log message',
         // First parse just in containerd format to extra time stamps and friends
         '[FILTER]',
         '    Name         lua',
         '    Match        kube.*',
         '    script  /fluent-bit/scripts/k8s_filters.lua',
         '    call    truncate',
-        // Rename log to message as this is what stack driver expects
-        '[FILTER]',
-        '    Name        modify',
-        '    Match       *',
-        '    Hard_rename log message',
         // Try to parse as glog and json, that matches what the default gc configuration does"
         '[FILTER]',
         '    Name         parser',
@@ -140,7 +140,7 @@ export function installFluentBit(): void {
         // parser does. Note that just like the upstream parser this does also break json parsing.
         'function truncate(tag, timestamp, record)',
         '  local max_length = 200000',
-        '  if record.msg and string.len(record.msg) > max_length then',
+        '  if record.message and string.len(record.message) > max_length then',
         '    record.message = string.sub(record.message, 1, max_length)',
         '  end',
         '  return 2, timestamp, record',
