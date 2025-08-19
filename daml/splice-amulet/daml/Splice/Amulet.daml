@@ -334,7 +334,6 @@ template ValidatorRewardCoupon
         void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
         return ValidatorRewardCoupon_DsoExpireResult with ..
 
-
     choice ValidatorRewardCoupon_ArchiveAsValidator : ValidatorRewardCoupon_ArchiveAsValidatorResult
       -- ^ This choice was used by validators to archive the burn receipt upon claiming its corresponding issuance.
       with

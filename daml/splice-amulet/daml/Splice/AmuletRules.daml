@@ -25,7 +25,7 @@ import Splice.Api.Token.MetadataV1 as Api.Token.MetadataV1
 import Splice.Api.Token.HoldingV1 qualified as Api.Token.HoldingV1
 import Splice.Amulet
 import Splice.Amulet.TokenApiUtils
-import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee)
+import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig, defaultTransferPreapprovalFee, getTransferPreapprovalBaseDuration)
 import qualified Splice.AmuletConfig as Unit
 import Splice.Schedule
 import Splice.Expiry
@@ -1486,24 +1486,53 @@ template TransferPreapproval
         newExpiresAt : Time
       controller provider
       do
-         now <- getTime
-         require "Contract is not expired" (expiresAt > now)
-         require "newExpiresAt is after expiresAt" (newExpiresAt > expiresAt)
-         let extension = newExpiresAt `subTime` expiresAt
-         amuletRules <- fetchPublicReferenceData (ForDso dso) context.amuletRules (AmuletRules_Fetch dso)
-         let configUsd = getValueAsOf now amuletRules.configSchedule
-         (amuletPaid, _) <- computeTransferPreapprovalFee extension configUsd context.context dso
-         (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "renew TransferPreapproval"
-         transferPreapprovalCid <- create this with
-           lastRenewedAt = now
-           expiresAt = newExpiresAt
-         return TransferPreapproval_RenewResult with meta = Some meta, ..
+        assertWithinDeadline "TransferPreapproval.expiresAt" expiresAt
+        require "newExpiresAt is after expiresAt" (newExpiresAt > expiresAt)
+        amuletRules <- fetchChecked (ForDso dso) context.amuletRules
+        configUsd <- getValueAsOfLedgerTime amuletRules.configSchedule
+        let extension = newExpiresAt `subTime` expiresAt
+        let paidExtension = extension - getTransferPreapprovalBaseDuration configUsd
+        (amuletPaid, transferResult, meta) <-
+          if paidExtension <= aunit
+            then do
+              openMiningRound <- fetchChecked (ForDso dso) context.context.openMiningRound
+              pure
+                ( 0.0
+                , TransferResult with
+                    round = openMiningRound.round
+                    summary = TransferSummary with
+                      inputAmuletAmount = 0.0
+                      balanceChanges = Map.empty
+                      inputAppRewardAmount = 0.0
+                      inputValidatorRewardAmount = 0.0
+                      inputUnclaimedActivityRecordAmount = None
+                      inputValidatorFaucetAmount = None
+                      inputSvRewardAmount = 0.0
+                      holdingFees = 0.0
+                      outputFees = []
+                      senderChangeFee = 0.0
+                      senderChangeAmount = 0.0
+                      amuletPrice = openMiningRound.amuletPrice
+                    createdAmulets = []
+                    senderChangeAmulet = None
+                    meta = None
+                , emptyMetadata)
+            else do
+              (amuletPaid, _) <- computeTransferPreapprovalFee paidExtension configUsd context.context dso
+              (transferResult, meta) <- splitAndBurn provider amuletPaid inputs context.context dso "renew TransferPreapproval"
+              pure (amuletPaid, transferResult, meta)
+        transferPreapprovalCid <- create this with
+          lastRenewedAt = expiresAt
+          expiresAt = newExpiresAt
+        return TransferPreapproval_RenewResult with meta = Some meta, ..
+
+    -- FIXME(QUESTION): should we also provide a simple setup choice?
 
     -- Used by the DSO party to archive expired contracts
     choice TransferPreapproval_Expire : TransferPreapproval_ExpireResult
       controller dso
-      do now <- getTime
-         require "Contract has expired" (now >= expiresAt)
+      do
+         assertDeadlineExceeded "TransferPreapproval.expiresAt" expiresAt
          pure TransferPreapproval_ExpireResult
 
     -- Cancel the contract as the receiver or provider
