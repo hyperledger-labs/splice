@@ -123,7 +123,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*offset = */ 32,
                   /*nodeId = */ 52,
                   /*templateId*/ id1,
-                  /*packageName*/ dummyPackageName,
+                  /*packageName*/ getPackageName(id1),
                   /*interfaceId*/ Some(id1).toJava,
                   /*contractId*/ contractId,
                   /*choice*/ "someChoice",

@@ -350,7 +350,7 @@ class AcsSnapshotStoreTest
             None,
             PageLimit.tryCreate(10),
             Seq.empty,
-            Seq(PackageQualifiedName(t1.identifier)),
+            Seq(PackageQualifiedName.getFromResources(t1.identifier)),
           )
           resultTemplate2 <- store.queryAcsSnapshot(
             DefaultMigrationId,
@@ -358,7 +358,7 @@ class AcsSnapshotStoreTest
             None,
             PageLimit.tryCreate(10),
             Seq.empty,
-            Seq(PackageQualifiedName(t2.identifier)),
+            Seq(PackageQualifiedName.getFromResources(t2.identifier)),
           )
         } yield {
           resultTemplate1.createdEventsInPage.map(_.event.getContractId) should be(
@@ -403,7 +403,7 @@ class AcsSnapshotStoreTest
             None,
             PageLimit.tryCreate(10),
             Seq(providerParty(1)),
-            Seq(PackageQualifiedName(ok.identifier)),
+            Seq(PackageQualifiedName.getFromResources(ok.identifier)),
           )
         } yield {
           result.createdEventsInPage.map(_.event.getContractId) should be(
@@ -500,7 +500,11 @@ class AcsSnapshotStoreTest
             None,
             Vector.empty,
             Seq(providerParty(1)),
-            Seq(PackageQualifiedName(roundCodegen.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID)),
+            Seq(
+              PackageQualifiedName.getFromResources(
+                roundCodegen.OpenMiningRound.TEMPLATE_ID_WITH_PACKAGE_ID
+              )
+            ),
           )
         } yield {
           result should be(ok.map(_.contractId.contractId))

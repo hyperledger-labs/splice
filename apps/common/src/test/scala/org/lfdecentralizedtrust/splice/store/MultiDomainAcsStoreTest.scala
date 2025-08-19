@@ -40,8 +40,6 @@ abstract class MultiDomainAcsStoreTest[
 
   import MultiDomainAcsStore.*
 
-  private val upgradedPackageId = "upgradedpackageid"
-
   private var transferCounter = 0
   protected def nextReassignmentId: String = {
     val id = "%08d".format(transferCounter)
@@ -168,7 +166,7 @@ abstract class MultiDomainAcsStoreTest[
     val coupon = appRewardCoupon(i, dsoParty, contractId = validContractId(i))
     coupon.copy(
       identifier = new Identifier(
-        upgradedPackageId,
+        upgradedAppRewardCouponPackageId,
         coupon.identifier.getModuleName,
         coupon.identifier.getEntityName,
       )
@@ -830,7 +828,7 @@ abstract class MultiDomainAcsStoreTest[
           c.contract.identifier.getPackageId shouldBe AppRewardCoupon.TEMPLATE_ID_WITH_PACKAGE_ID.getPackageId
         }
         _ = forExactly(2, results) { c =>
-          c.contract.identifier.getPackageId shouldBe upgradedPackageId
+          c.contract.identifier.getPackageId shouldBe upgradedAppRewardCouponPackageId
         }
       } yield succeed
     }
@@ -1508,6 +1506,46 @@ abstract class MultiDomainAcsStoreTest[
           )
         )
         result2.value.state.fold(_ should be(d2), fail("should be assigned"))
+      }
+    }
+
+    "prevent against ingestion of same (moduleName, entityName) with different package name" in {
+      implicit val store = mkStore(
+        filter = MultiDomainAcsStore.SimpleContractFilter(
+          dsoParty,
+          templateFilters = Map(
+            mkFilter(Amulet.COMPANION)(_.payload.dso == dsoParty.toProtoPrimitive) { contract =>
+              GenericAcsRowData(contract)
+            }
+          ),
+          interfaceFilters = Map.empty,
+        )
+      )
+      val owner = providerParty(1)
+      val goodContract = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
+      val badContract =
+        amulet(owner, BigDecimal(20), 2L, BigDecimal(0.00002), dso = dsoParty).copy(identifier =
+          new Identifier(
+            maliciousPackageId,
+            goodContract.identifier.getModuleName,
+            goodContract.identifier.getEntityName,
+          )
+        )
+
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          goodContract
+        )
+        _ <- d1.create(
+          badContract
+        )
+        resultAmulet <- store.listContracts(Amulet.COMPANION)
+      } yield {
+        resultAmulet.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId
+        )
       }
     }
 
