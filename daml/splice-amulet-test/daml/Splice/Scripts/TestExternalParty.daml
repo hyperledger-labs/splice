@@ -7,7 +7,6 @@ import Daml.Script
 import DA.Time
 import DA.Assert
 
-import Splice.Amulet (ValidatorRight)
 import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Scripts.Util
@@ -31,9 +30,6 @@ testExternalPartySetup = script do
     validFrom = now
     lastRenewedAt = now
     expiresAt = proposal.preapprovalExpiresAt
-  -- check validator right was granted
-  [(rightCid, _)] <- queryFilter @ValidatorRight aliceValidator.primaryParty (\r -> r.user == externalUser.primaryParty)
-  rightCid === validatorRightCid
 
   pure ()
 

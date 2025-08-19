@@ -68,8 +68,8 @@ test_designExample= do
   runNextIssuance app
   runAmuletDepositBots app
 
-  alice <- setupUser app "alice" app.dso
-  arbiter <- setupUser app "arbiter" app.dso
+  alice <- setupUser app "alice"
+  arbiter <- setupUser app "arbiter"
   featureApp app arbiter
 
   -- retrieve the config

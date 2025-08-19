@@ -762,7 +762,6 @@ data TransferContextSummary = TransferContextSummary with
     config : TransferConfig Amulet
     openRound : OpenMiningRound
     issuingMiningRounds : Map Round IssuingMiningRound
-    validatorRights : Map Party (ContractId ValidatorRight)
   deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with
@@ -806,23 +805,11 @@ summarizeAndValidateContext context dso tf = do
     assertDeadlineExceeded ("issuingRound[" <> show round.number <> "].opensAt") issuingRound.opensAt
     pure (round, issuingRound)
 
-  -- pre-resolve validator rights
-  validatorRights <- forA (Map.toList context.validatorRights) $ \(user, rightCid) -> do
-      requireMatchingContract rightCid (ValidatorRight with dso; validator = tf.sender; user)
-      pure (user, rightCid)
-
   return TransferContextSummary with
     config = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
     featuredAppProvider
     openRound = openRound
     issuingMiningRounds = Map.fromList issuingMiningRounds
-    validatorRights = Map.fromList validatorRights
-
-getValidatorRight : TransferContextSummary -> Party -> Update (ContractId ValidatorRight)
-getValidatorRight csum user =
-  case Map.lookup user csum.validatorRights of
-    None -> abort $ "TransferContext did contain validator right for user: " <> show user
-    Some rightCid -> pure rightCid
 
 getIssuingMiningRound : TransferContextSummary -> Round -> Update IssuingMiningRound
 getIssuingMiningRound csum round = do
@@ -884,12 +871,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
 
     summarizeAndConsumeInput _round s (InputValidatorRewardCoupon couponCid) = do
       -- we must and do use the validator right to archive the coupon of the user
-      coupon <- fetchButArchiveLater (ForDso with dso) couponCid
-      do
-        rightCid <- getValidatorRight csum coupon.user
-        exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
-          validator = sender
-          rightCid
+      coupon <- fetchAndArchive forOwner couponCid
       -- compute balance change
       miningRound <- getIssuingMiningRound csum coupon.round
       return TransferInputsSummary with
@@ -1207,7 +1189,7 @@ data TransferContext = TransferContext
   with
     openMiningRound : ContractId OpenMiningRound
     issuingMiningRounds : Map Round (ContractId IssuingMiningRound)
-    validatorRights : Map Party (ContractId ValidatorRight) -- ^ Map from user to ValidatorRight contract.
+    validatorRights : Map Party (ContractId ValidatorRight) -- ^ Deprecated since users collect their rewards directly. Set to the empty map.
     featuredAppRight : Optional (ContractId FeaturedAppRight) -- ^ Optional proof that the provider is a featured app provider.
   deriving (Show, Eq)
 
@@ -1390,10 +1372,6 @@ template ExternalPartySetupProposal
       controller user
       do
         assertWithinDeadline "ExternalPartySetupProposal.preapprovalExpiresAt" preapprovalExpiresAt
-        validatorRightCid <- create ValidatorRight with
-           dso
-           validator
-           user
         transferPreapprovalCid <- create TransferPreapproval with
           receiver = user
           provider = validator
@@ -1401,7 +1379,9 @@ template ExternalPartySetupProposal
           validFrom = createdAt
           lastRenewedAt = createdAt
           expiresAt = preapprovalExpiresAt
-        return ExternalPartySetupProposal_AcceptResult with ..
+        return ExternalPartySetupProposal_AcceptResult with
+          validatorRightCid = coerceContractId self -- Use self as dummy contract-id, as we must set a value.
+          transferPreapprovalCid
 
     -- users can always reject the proposal
     choice ExternalPartySetupProposal_Reject : ExternalPartySetupProposal_RejectResult
@@ -1420,6 +1400,8 @@ template ExternalPartySetupProposal
 data ExternalPartySetupProposal_AcceptResult = ExternalPartySetupProposal_AcceptResult
   with
     validatorRightCid : ContractId ValidatorRight
+    -- ^ Deprecated. This was the ValidatorRight contract-id, but now contains a dummy contract-id,
+    -- as no ValidatorRight is created for the user.
     transferPreapprovalCid : ContractId TransferPreapproval
   deriving (Show, Eq)
 

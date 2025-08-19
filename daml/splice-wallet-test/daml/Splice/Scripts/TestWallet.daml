@@ -908,9 +908,9 @@ testInsufficientFundsBatchSubscriptions = script do
   runAmuletDepositBots app
 
   validator <- setupValidator app "validator1"
-  alice <- setupUser app "alice" validator
-  pizzeria <- setupUser app "pizzeria" validator
-  provider <- setupUser app "la_famiglia" validator
+  alice <- setupUser app "alice"
+  pizzeria <- setupUser app "pizzeria"
+  provider <- setupUser app "la_famiglia"
 
   install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty

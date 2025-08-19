@@ -79,7 +79,7 @@ data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBenefic
 
 data UnclaimedActivityRecord_ArchiveAsBeneficiaryResult = UnclaimedActivityRecord_ArchiveAsBeneficiaryResult
 
-data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with 
+data UnclaimedActivityRecord_DsoExpireResult = UnclaimedActivityRecord_DsoExpireResult with
   unclaimedRewardCid : ContractId UnclaimedReward
 
 -- | A amulet, which can be locked and whose amount expires over time.
@@ -191,7 +191,9 @@ template LockedAmulet
 -- Contracts to implement reward issuance
 -- ======================================
 
--- | The right to claim amulet issuances for a user's burns as their validator.
+-- | Deprecated, since users collect their own validator rewards.
+--
+-- It was used to represent the right to claim amulet issuances for a user's burns as their validator.
 template ValidatorRight with
     dso : Party
     user : Party
@@ -206,8 +208,6 @@ template ValidatorRight with
     choice ValidatorRight_ArchiveAsUser : ValidatorRight_ArchiveAsUserResult
       controller user
       do return ValidatorRight_ArchiveAsUserResult
-
-    -- TODO(M3-90): cancellation, withdrawal
 
 
 -- | The right for an application provider to earn featured app rewards.
@@ -336,14 +336,12 @@ template ValidatorRewardCoupon
 
 
     choice ValidatorRewardCoupon_ArchiveAsValidator : ValidatorRewardCoupon_ArchiveAsValidatorResult
-      -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
+      -- ^ This choice was used by validators to archive the burn receipt upon claiming its corresponding issuance.
       with
         validator : Party
         rightCid : ContractId ValidatorRight
       controller dso, validator
-      do
-        requireMatchingContract rightCid (ValidatorRight with dso; validator, user)
-        return ValidatorRewardCoupon_ArchiveAsValidatorResult
+      do fail "ValidatorRewardCoupon_ArchiveAsValidator: disabled, as users collect their rewards directly"
 
 
 -- | A coupon for a beneficiary to receive part of the SV issuance for a specific SV node and round.
@@ -390,29 +388,29 @@ template UnclaimedReward with
 
     signatory dso
 
--- | A record of activity that can be minted by the beneficiary. 
--- Note that these do not come out of the per-round issuance but are instead created by burning 
--- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate 
+-- | A record of activity that can be minted by the beneficiary.
+-- Note that these do not come out of the per-round issuance but are instead created by burning
+-- UnclaimedRewardCoupon as defined through a vote by the SVs. That's also why expiry is a separate
 -- time-based expiry instead of being tied to a round like the other activity records.
 template UnclaimedActivityRecord
   with
     dso : Party
     beneficiary : Party -- ^ The owner of the `Amulet` to be minted.
     amount : Decimal -- ^ The amount of `Amulet` to be minted.
-    reason : Text -- ^ A reason to mint the `Amulet`. 
-    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract. 
-  where 
+    reason : Text -- ^ A reason to mint the `Amulet`.
+    expiresAt : Time -- ^ Selected timestamp defining the lifetime of the contract.
+  where
     signatory dso
     observer beneficiary
     ensure amount > 0.0
 
     choice UnclaimedActivityRecord_DsoExpire : UnclaimedActivityRecord_DsoExpireResult
       controller dso
-      do 
+      do
         assertDeadlineExceeded "UnclaimedActivityRecord.expiresAt" expiresAt
         unclaimedRewardCid <- create UnclaimedReward with dso; amount
         pure UnclaimedActivityRecord_DsoExpireResult with unclaimedRewardCid
-  
+
 
 requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
 requireAmuletExpiredForAllOpenRounds roundCid amulet = do
@@ -439,10 +437,8 @@ instance HasCheckedFetch AppRewardCoupon ForOwner where
 instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
 
--- This instance is slightly dangerous, as it could lead to a missed check of the validator.
--- We accept this, as at least the DSO party check is done, and the remainder is careful coding.
-instance HasCheckedFetch ValidatorRewardCoupon ForDso where
-  contractGroupId ValidatorRewardCoupon {..} = ForDso with dso
+instance HasCheckedFetch ValidatorRewardCoupon ForOwner where
+  contractGroupId ValidatorRewardCoupon {..} = ForOwner with dso; owner = user
 
 instance HasCheckedFetch UnclaimedReward ForDso where
   contractGroupId UnclaimedReward {..} = ForDso with dso
