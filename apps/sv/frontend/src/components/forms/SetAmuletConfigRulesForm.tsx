@@ -1,12 +1,14 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-import dayjs from 'dayjs';
-import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
-import { CommonProposalFormData, ConfigFormData } from '../../utils/types';
+import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { createProposalActions, getInitialExpiration } from '../../utils/governance';
+import { CommonProposalFormData, ConfigFormData } from '../../utils/types';
+import dayjs from 'dayjs';
 import { useDsoInfos } from '../../contexts/SvContext';
-import { buildDsoConfigChanges } from '../../utils/buildDsoConfigChanges';
+import { useMemo } from 'react';
+import { dateTimeFormatISO } from '@lfdecentralizedtrust/splice-common-frontend-utils';
+import { buildAmuletConfigChanges } from '../../utils/buildAmuletConfigChanges';
 import { useAppForm } from '../../hooks/form';
 import {
   validateEffectiveDate,
@@ -15,31 +17,29 @@ import {
   validateUrl,
 } from './formValidators';
 import { FormLayout } from './FormLayout';
-import { Alert, Box, Typography } from '@mui/material';
-import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { EffectiveDateField } from '../form-components/EffectiveDateField';
-import { useMemo } from 'react';
+import { Alert, Box, Typography } from '@mui/material';
 
-type SetDsoConfigCompleteFormData = {
+type SetAmuletConfigCompleteFormData = {
   common: CommonProposalFormData;
   config: ConfigFormData;
 };
 
-const createProposalAction = createProposalActions.find(a => a.value === 'SRARC_SetConfig');
+const createProposalAction = createProposalActions.find(a => a.value === 'CRARC_SetConfig');
 
-export interface SetDsoConfigRulesFormProps {
+export interface SetAmuletConfigRulesFormProps {
   onSubmit: (
-    data: SetDsoConfigCompleteFormData,
+    data: SetAmuletConfigCompleteFormData,
     action: ActionRequiringConfirmation
   ) => Promise<void>;
 }
 
-export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => {
+export const SetAmuletConfigRulesForm: React.FC<SetAmuletConfigRulesFormProps> = _ => {
   const dsoInfoQuery = useDsoInfos();
   const initialExpiration = getInitialExpiration(dsoInfoQuery.data);
   const initialEffectiveDate = dayjs(initialExpiration).add(1, 'day');
 
-  const defaultValues = useMemo((): SetDsoConfigCompleteFormData => {
+  const defaultValues = useMemo((): SetAmuletConfigCompleteFormData => {
     if (!dsoInfoQuery.data) {
       return {
         common: {
@@ -56,8 +56,8 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
       };
     }
 
-    const dsoConfig = dsoInfoQuery.data.dsoRules.payload.config;
-    const dsoConfigChanges = buildDsoConfigChanges(dsoConfig, dsoConfig, true);
+    const amuletConfig = dsoInfoQuery.data?.amuletRules.payload.configSchedule.initialValue;
+    const amuletConfigChanges = buildAmuletConfigChanges(amuletConfig, amuletConfig, true);
 
     return {
       common: {
@@ -70,7 +70,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
         url: '',
         summary: '',
       },
-      config: dsoConfigChanges.reduce((acc, field) => {
+      config: amuletConfigChanges.reduce((acc, field) => {
         acc[field.fieldName] = { fieldName: field.fieldName, value: field.currentValue };
         return acc;
       }, {} as ConfigFormData),
@@ -92,18 +92,18 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
     },
   });
 
-  const maybeConfig = dsoInfoQuery.data?.dsoRules.payload.config;
+  const maybeConfig = dsoInfoQuery.data?.amuletRules.payload.configSchedule.initialValue;
   const dsoConfig = maybeConfig ? maybeConfig : null;
   // passing the config twice here because we initially have no changes
-  const dsoConfigChanges = buildDsoConfigChanges(dsoConfig, dsoConfig, true);
+  const amuletConfigChanges = buildAmuletConfigChanges(dsoConfig, dsoConfig, true);
 
   return (
-    <FormLayout form={form} id="set-dso-config-rules-form">
+    <FormLayout form={form} id="set-amulet-config-rules-form">
       <form.AppField name="common.action">
         {field => (
           <field.TextField
             title="Action"
-            id="set-dso-config-rules-action"
+            id="set-amulet-config-rules-action"
             muiTextFieldProps={{ disabled: true }}
           />
         )}
@@ -114,7 +114,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
           <field.DateField
             title="Vote Proposal Expiration"
             description="This is the last day voters can vote on this proposal"
-            id="set-dso-config-rules-expiry-date"
+            id="set-amulet-config-rules-expiry-date"
           />
         )}
       </form.AppField>
@@ -128,7 +128,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
         children={_ => (
           <EffectiveDateField
             initialEffectiveDate={initialEffectiveDate.format(dateTimeFormatISO)}
-            id="set-dso-config-rules-effective-date"
+            id="set-amulet-config-rules-effective-date"
           />
         )}
       />
@@ -140,7 +140,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
           onChange: ({ value }) => validateSummary(value),
         }}
       >
-        {field => <field.TextArea title="Proposal Summary" id="set-dso-config-rules-summary" />}
+        {field => <field.TextArea title="Proposal Summary" id="set-amulet-config-rules-summary" />}
       </form.AppField>
 
       <form.AppField
@@ -150,7 +150,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
           onChange: ({ value }) => validateUrl(value),
         }}
       >
-        {field => <field.TextField title="URL" id="set-dso-config-rules-url" />}
+        {field => <field.TextField title="URL" id="set-amulet-config-rules-url" />}
       </form.AppField>
 
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -158,7 +158,7 @@ export const SetDsoConfigRulesForm: React.FC<SetDsoConfigRulesFormProps> = _ => 
           Configuration
         </Typography>
 
-        {dsoConfigChanges.map((change, index) => (
+        {amuletConfigChanges.map((change, index) => (
           <form.AppField name={`config.${change.fieldName}`} key={index}>
             {field => <field.ConfigField configChange={change} key={index} />}
           </form.AppField>
