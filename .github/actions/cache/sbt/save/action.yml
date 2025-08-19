@@ -19,7 +19,6 @@ runs:
           /github/home/.ivy2/cache
           /github/home/.sbt
         key: sbt-${{ inputs.cache_version }} job=${{ github.job }} dependencies=${{ hashFiles('project/Dependencies.scala', 'project/CantonDependencies.scala') }}-${{ hashFiles('project/BuildCommon.scala', 'project/build.properties', 'project/Houserules.scala', 'project/plugins.sbt', 'build.sbt') }}
-        enableCrossOsArchive: true
     - name: Not storing SBT cache
       if: ${{ fromJson(inputs.load_cache_hit) }}
       shell: bash
