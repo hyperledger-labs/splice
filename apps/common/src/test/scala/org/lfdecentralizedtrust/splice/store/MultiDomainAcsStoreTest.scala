@@ -1509,7 +1509,7 @@ abstract class MultiDomainAcsStoreTest[
       }
     }
 
-    "prevent against ingestion of same (moduleName, entityName) with different package name" in {
+    "prevent against ingestion of same (moduleName, entityName) with different package name - templates" in {
       val filter =
         MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
           dsoParty,
@@ -1547,6 +1547,77 @@ abstract class MultiDomainAcsStoreTest[
         resultAmulet <- store.listContracts(Amulet.COMPANION)
       } yield {
         resultAmulet.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId
+        )
+      }
+    }
+
+    "prevent against ingestion of same (moduleName, entityName) with different package name - interfaces" in {
+      val filter =
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
+          dsoParty,
+          templateFilters = Map.empty,
+          interfaceFilters = Map(
+            mkFilterInterface(holdingv1.Holding.INTERFACE)(_ => true) { contract =>
+              GenericInterfaceRowData(contract.identifier, contract.payload)
+            }
+          ),
+        )
+      implicit val store = mkStore(
+        filter = filter
+      )
+      val owner = providerParty(1)
+      val goodContract = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
+      val goodView = holdingView(owner, BigDecimal(10), dsoParty, "AMT")
+      val goodImplementedInterfaces = Map(
+        holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
+      )
+      val badContract = dummyHolding(owner, BigDecimal(20), dsoParty)
+      val badView = holdingView(owner, BigDecimal(20), dsoParty, "AMT")
+      val badImplementedInterfaces = Map(
+        new Identifier(
+          maliciousPackageId,
+          holdingv1.Holding.INTERFACE_ID.getModuleName,
+          holdingv1.Holding.INTERFACE_ID.getEntityName,
+        ) -> badView.toValue
+      )
+
+      filter.contains(
+        toCreatedEvent(
+          goodContract,
+          implementedInterfaces = goodImplementedInterfaces,
+        )
+      ) should be(true)
+
+      filter.contains(
+        toCreatedEvent(
+          badContract,
+          implementedInterfaces = badImplementedInterfaces,
+        )
+      ) should be(false)
+
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          goodContract,
+          implementedInterfaces = Map(
+            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
+          ),
+        )
+        _ <- d1.create(
+          badContract,
+          implementedInterfaces = Map(
+            new Identifier(
+              maliciousPackageId,
+              holdingv1.Holding.INTERFACE_ID.getModuleName,
+              holdingv1.Holding.INTERFACE_ID.getEntityName,
+            ) -> badView.toValue
+          ),
+        )
+        result <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+      } yield {
+        result.map(_.contractId.contractId) should contain theSameElementsAs Seq(
           goodContract.contractId.contractId
         )
       }
