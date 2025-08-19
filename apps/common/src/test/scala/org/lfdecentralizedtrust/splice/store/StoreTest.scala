@@ -428,7 +428,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def validatorLivenessActivityRecord(validator: PartyId, round: Long = 1L) = {
     contract(
-      identifier = validatorLicenseCodegen.ValidatorLivenessActivityRecord.TEMPLATE_ID,
+      identifier =
+        validatorLicenseCodegen.ValidatorLivenessActivityRecord.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId =
         new validatorLicenseCodegen.ValidatorLivenessActivityRecord.ContractId(nextCid()),
       payload = new validatorLicenseCodegen.ValidatorLivenessActivityRecord(
@@ -588,7 +589,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
   ] = {
-    val templateId = amuletrulesCodegen.TransferPreapproval.TEMPLATE_ID
+    val templateId = amuletrulesCodegen.TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new amuletrulesCodegen.TransferPreapproval(
       dsoParty.toProtoPrimitive,
       receiver.toProtoPrimitive,
