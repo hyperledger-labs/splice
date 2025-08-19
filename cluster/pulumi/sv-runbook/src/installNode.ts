@@ -51,6 +51,7 @@ import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-p
 import { spliceConfig } from 'splice-pulumi-common/src/config/config';
 import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
 
+import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
@@ -132,6 +133,11 @@ export async function installNode(
   );
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
+
+  if (svsConfig?.scan?.externalRateLimits) {
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+  }
+
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
@@ -154,9 +160,7 @@ export async function installNode(
       },
       rateLimit: {
         scan: {
-          acs: {
-            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
-          },
+          enable: false,
         },
       },
     },
