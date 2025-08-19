@@ -7,6 +7,7 @@ import Daml.Script
 import DA.Time
 import DA.Assert
 
+import Splice.Amulet.TokenApiUtils
 import Splice.AmuletRules
 import Splice.Scripts.Util
 
@@ -70,7 +71,7 @@ createExternalPartySetupProposal
   : AmuletApp -> AmuletUser -> Party -> Script (ContractId ExternalPartySetupProposal, ExternalPartySetupProposal)
 createExternalPartySetupProposal app validator user = do
   now <- getTime
-  let preapprovalExpiresAt = now `addRelTime` days 1
+  let preapprovalExpiresAt = now `addRelTime` days 100
 
   -- This would be submitted by the validator hosting the external party
   -- As part of the creation of the proposal, the validator also pays for the creation of the
@@ -79,8 +80,7 @@ createExternalPartySetupProposal app validator user = do
   context <- getPaymentTransferContext app validator
   amuletCid <- tap app validator 50.0
   AmuletRules_CreateExternalPartySetupProposalResult{..} <-
-    -- FIXME: check both short and long durations
-    -- checkTxMetadata app TxKind_Burn validator.primaryParty $
+    checkTxMetadata app TxKind_Burn validator.primaryParty $
     submitMulti [validator.primaryParty] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_CreateExternalPartySetupProposal with
       context = context
       inputs = [InputAmulet amuletCid]
