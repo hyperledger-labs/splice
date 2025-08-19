@@ -179,7 +179,7 @@ jobs:
       runs_on: self-hosted-k8s-x-large
       test_names_file: 'test-full-class-names-frontend.log'
       start_canton_options: -w
-      parallelism: 5
+      parallelism: 3
       test_name: frontend-wall-clock-time
       is_frontend_test: true
       commit_sha: ${{ inputs.commit_sha }}

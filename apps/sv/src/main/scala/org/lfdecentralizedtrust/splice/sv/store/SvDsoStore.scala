@@ -224,12 +224,12 @@ trait SvDsoStore
       tc: TraceContext
   ): Future[AppRewardCouponsSum]
 
-  def listAppRewardCouponsGroupedByCounterparty(
+  def listAppRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[splice.amulet.AppRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.AppRewardCoupon.ContractId]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
@@ -246,12 +246,12 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[BigDecimal]
 
-  def listValidatorRewardCouponsGroupedByCounterparty(
+  def listValidatorRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.ValidatorRewardCoupon.ContractId]]]
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
@@ -285,22 +285,22 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
-  def listValidatorFaucetCouponsGroupedByCounterparty(
+  def listValidatorFaucetCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundCounterpartyBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
+    Seq[SvDsoStore.RoundBatch[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]
   ]
 
-  def listValidatorLivenessActivityRecordsGroupedByCounterparty(
+  def listValidatorLivenessActivityRecordsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[SvDsoStore.RoundCounterpartyBatch[
+    Seq[SvDsoStore.RoundBatch[
       splice.validatorlicense.ValidatorLivenessActivityRecord.ContractId
     ]]
   ]
@@ -332,12 +332,12 @@ trait SvDsoStore
       synchronizerId: SynchronizerId,
   )(implicit tc: TraceContext): Future[Long]
 
-  def listSvRewardCouponsGroupedByCounterparty(
+  def listSvRewardCouponsGroupedByRound(
       domain: SynchronizerId,
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvDsoStore.RoundCounterpartyBatch[splice.amulet.SvRewardCoupon.ContractId]]]
+  ): Future[Seq[SvDsoStore.RoundBatch[splice.amulet.SvRewardCoupon.ContractId]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
@@ -348,15 +348,19 @@ trait SvDsoStore
     ]]
   ]
 
-  final def getExpiredRewards(
+  /** Returns at most expired coupon batches per round and coupon type.
+    * It will return one entry per closed round that has expired coupon and per type of coupon.
+    * It will return a maximum of `totalCouponsLimit` per coupon type
+    */
+  final def getExpiredCouponsInBatchesPerRoundAndCouponType(
       domain: SynchronizerId,
       enableExpireValidatorFaucet: Boolean,
       totalCouponsLimit: Limit = PageLimit.tryCreate(100),
   )(implicit
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = {
-    def filterRoundCounterpartyBatch[T](
-        batches: Seq[SvDsoStore.RoundCounterpartyBatch[T]],
+    def associateRoundContractWithBatch[T](
+        batches: Seq[SvDsoStore.RoundBatch[T]],
         roundMap: Map[
           java.lang.Long,
           Contract[splice.round.ClosedMiningRound.ContractId, splice.round.ClosedMiningRound],
@@ -368,27 +372,27 @@ trait SvDsoStore
         roundMap.get(batch.roundNumber).map(closedRound => (closedRound, batch.batch)).toList
       }
     for {
-      appRewardGroups <- listAppRewardCouponsGroupedByCounterparty(
+      appRewardGroups <- listAppRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
-      validatorRewardGroups <- listValidatorRewardCouponsGroupedByCounterparty(
+      validatorRewardGroups <- listValidatorRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
       validatorFaucetGroups <-
         if (enableExpireValidatorFaucet)
-          listValidatorFaucetCouponsGroupedByCounterparty(
+          listValidatorFaucetCouponsGroupedByRound(
             domain,
             totalCouponsLimit = totalCouponsLimit,
           )
         else Future.successful(Seq.empty)
       validatorLivenessActivityRecordGroups <-
-        listValidatorLivenessActivityRecordsGroupedByCounterparty(
+        listValidatorLivenessActivityRecordsGroupedByRound(
           domain,
           totalCouponsLimit = totalCouponsLimit,
         )
-      svRewardCouponGroups <- listSvRewardCouponsGroupedByCounterparty(
+      svRewardCouponGroups <- listSvRewardCouponsGroupedByRound(
         domain,
         totalCouponsLimit = totalCouponsLimit,
       )
@@ -398,7 +402,7 @@ trait SvDsoStore
           .toSet
       closedRounds <- listClosedRounds(roundNumbers, domain, totalCouponsLimit)
       closedRoundMap = closedRounds.map(r => r.payload.round.number -> r).toMap
-    } yield filterRoundCounterpartyBatch(appRewardGroups, closedRoundMap).map {
+    } yield associateRoundContractWithBatch(appRewardGroups, closedRoundMap).map {
       case (closedRound, batch) =>
         ExpiredRewardCouponsBatch(
           closedRoundCid = closedRound.contractId,
@@ -410,7 +414,7 @@ trait SvDsoStore
           validatorLivenessActivityRecords = Seq.empty,
         )
     } ++
-      filterRoundCounterpartyBatch(validatorRewardGroups, closedRoundMap).map {
+      associateRoundContractWithBatch(validatorRewardGroups, closedRoundMap).map {
         case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
@@ -421,7 +425,7 @@ trait SvDsoStore
             validatorFaucets = Seq.empty,
             validatorLivenessActivityRecords = Seq.empty,
           )
-      } ++ filterRoundCounterpartyBatch(validatorFaucetGroups, closedRoundMap).map {
+      } ++ associateRoundContractWithBatch(validatorFaucetGroups, closedRoundMap).map {
         case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
@@ -432,8 +436,8 @@ trait SvDsoStore
             validatorFaucets = batch,
             validatorLivenessActivityRecords = Seq.empty,
           )
-      } ++ filterRoundCounterpartyBatch(validatorLivenessActivityRecordGroups, closedRoundMap).map {
-        case (closedRound, batch) =>
+      } ++ associateRoundContractWithBatch(validatorLivenessActivityRecordGroups, closedRoundMap)
+        .map { case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
             closedRoundNumber = closedRound.payload.round.number,
@@ -443,7 +447,7 @@ trait SvDsoStore
             validatorFaucets = Seq.empty,
             validatorLivenessActivityRecords = batch,
           )
-      } ++ filterRoundCounterpartyBatch(svRewardCouponGroups, closedRoundMap).map {
+        } ++ associateRoundContractWithBatch(svRewardCouponGroups, closedRoundMap).map {
         case (closedRound, batch) =>
           ExpiredRewardCouponsBatch(
             closedRoundCid = closedRound.contractId,
@@ -1324,8 +1328,7 @@ object SvDsoStore {
       prettyOfClass(param("state", _.state), param("context", _.context))
   }
 
-  case class RoundCounterpartyBatch[+T](
-      counterparty: PartyId,
+  case class RoundBatch[+T](
       roundNumber: Long,
       batch: Seq[T],
   )

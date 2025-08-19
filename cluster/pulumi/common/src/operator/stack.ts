@@ -3,13 +3,13 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as semver from 'semver';
-import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import {
   CLUSTER_BASENAME,
   config,
   infraAffinityAndTolerations,
   isMainNet,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 
 import { spliceEnvConfig } from '../config/envConfig';
 import { PulumiOperatorGracePeriod } from './config';
@@ -214,7 +214,7 @@ export function createStackCR(
               parallel: parallelism,
             },
           },
-          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.1.0/docs/stacks.md#stackspecworkspacetemplatespec
+          // https://github.com/pulumi/pulumi-kubernetes-operator/blob/v2.2.0/docs/stacks.md#stackspecworkspacetemplatespec
           workspaceTemplate: {
             metadata: {
               name: `${name.replaceAll('.', '-')}`,

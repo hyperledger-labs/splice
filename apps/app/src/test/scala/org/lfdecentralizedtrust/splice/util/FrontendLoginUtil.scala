@@ -4,7 +4,9 @@ import org.lfdecentralizedtrust.splice.integration.tests.{FrontendTestCommon, Sp
 import com.digitalasset.canton.topology.PartyId
 import org.lfdecentralizedtrust.splice.util.Auth0Util.WithAuth0Support
 import org.openqa.selenium.WebDriver
+import org.openqa.selenium.support.ui.ExpectedConditions
 
+import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
@@ -25,15 +27,25 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
       webDriver: WebDriver
   ) = {
     eventually() {
-      val url = if (port == 80) { s"http://$hostname" }
-      else { s"http://$hostname:$port" }
+      val url = if (port == 80) {
+        s"http://$hostname"
+      } else {
+        s"http://$hostname:$port"
+      }
       currentUrl should startWith(url)
     }
-    // We reuse frontends across tests so we might need to log out first.
-    eventually() { find(id("logout-button")).foreach(click on _) }
-    click on "user-id-field"
+    eventually(timeUntilSuccess = 5.seconds) {
+      if (find(id("logout-button")).isDefined) {
+        eventuallyClickOn(id("logout-button"))
+      }
+      silentClue("Waiting for login page to be ready") {
+        waitForCondition(id("user-id-field"), timeUntilSuccess = Some(1.seconds)) {
+          ExpectedConditions.elementToBeClickable(_)
+        }
+      }
+    }
     textField("user-id-field").value = ledgerApiUser
-    click on "login-button"
+    eventuallyClickOn(id("login-button"))
   }
 
   protected def browseToWallet(port: Int, ledgerApiUser: String)(implicit webDriver: WebDriver) = {
@@ -104,7 +116,11 @@ trait FrontendLoginUtil extends WithAuth0Support { self: FrontendTestCommon =>
         val userPartyId = if (onboardThroughWalletUI) {
           actAndCheck("onboard user", click on "onboard-button")(
             "user is onboarded",
-            _ => seleniumText(find(id("logged-in-user"))),
+            _ => {
+              val userId = seleniumText(find(id("logged-in-user")))
+              userId should not be empty
+              userId
+            },
           )._2
         } else {
           seleniumText(find(id("logged-in-user")))

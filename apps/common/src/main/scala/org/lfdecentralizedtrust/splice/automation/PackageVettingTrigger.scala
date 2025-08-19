@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.automation
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import org.lfdecentralizedtrust.splice.environment.{PackageIdResolver, ParticipantAdminConnection}
@@ -11,8 +12,10 @@ import org.lfdecentralizedtrust.splice.util.{AmuletConfigSchedule, PackageVettin
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
-abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
-    extends PollingTrigger
+abstract class PackageVettingTrigger(
+    packages: Set[PackageIdResolver.Package],
+    maxVettingDelay: NonNegativeFiniteDuration,
+) extends PollingTrigger
     with PackageIdResolver.HasAmuletRules
     with PackageVetting.HasVoteRequests {
 
@@ -46,6 +49,7 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
           domainId,
           amuletRules,
           AmuletConfigSchedule.getAcceptedEffectiveVoteRequests(dsoRules, voteRequests),
+          Some((context.pollingClock, maxVettingDelay)),
         )
       )
     } yield false

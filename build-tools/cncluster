@@ -334,6 +334,14 @@ function _prompt_to_confirm() {
    USER_PROMPT_CONFIRMED=1
 }
 
+function _get_logging_components() {
+    if env-bool SELF_HOSTED_FLUENT_BIT; then
+        echo "SYSTEM"
+    else
+        echo "SYSTEM,WORKLOAD"
+    fi
+}
+
 ###
 
 subcommand_whitelist[activate]='Ensure cncluster is correctly authenticated to administer the cluster.'
@@ -678,6 +686,7 @@ function subcmd_create() {
                --min-nodes 0 \
                --max-nodes "${GCP_CLUSTER_MAX_NODES}" \
                --logging-variant="${GCP_CLUSTER_LOGGING_VARIANT}" \
+               --logging="$(_get_logging_components)" \
                "${location_arg[@]}"
 
         #### Set maintenance window
@@ -788,6 +797,12 @@ function subcmd_cluster_update_access() {
     gcloud container clusters update "${GCP_CLUSTER_NAME}" \
            --enable-master-authorized-networks \
            --master-authorized-networks "${K8S_CONTROL_PLANE_NETS}"
+}
+
+subcommand_whitelist[cluster_update_logging]='Update cluster logging config.'
+
+function subcmd_cluster_update_logging() {
+    gcloud container clusters update "${GCP_CLUSTER_NAME}" --logging="$(_get_logging_components)"
 }
 
 maintenance_windows=(
@@ -1999,7 +2014,7 @@ function _create_grafana_silence() {
     _info "Adding silence with the following: $startsAt, $endsAt, $createdBy, $comment"
 
     curl -sSL --fail-with-body \
-        "https://public.${GCP_CLUSTER_HOSTNAME}/grafana/api/alertmanager/grafana/api/v2/silences" \
+        "https://grafana.${GCP_CLUSTER_HOSTNAME}/api/alertmanager/grafana/api/v2/silences" \
         -H 'content-type: application/json' \
         --request POST \
         -H "x-non-jwt-auth: Bearer ${token}" \
@@ -2011,7 +2026,6 @@ function _create_grafana_silence() {
             \"matchers\":$matchers
             }" || _warning "Failed to silence alerts (see comment in the cncluster code)"
     # If the above fails with a 401 Unauthorized:
-    # - Confirm that the observability namespace has a label: istio-injection=enabled
     # - Restart the grafana pod so that the sidecar is injected (the pod should have 5 containers including the istio-proxy sidecar):
     #   `kubectl delete pod -n observability -l 'app.kubernetes.io/name=grafana'`
     # - Delete the grafana-authorization-header-filter EnvoyFilter if one exists:

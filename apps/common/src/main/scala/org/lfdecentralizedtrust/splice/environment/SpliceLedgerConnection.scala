@@ -38,6 +38,7 @@ import com.digitalasset.daml.lf.data.Ref
 import com.google.protobuf.field_mask.FieldMask
 import io.grpc.{Status, StatusRuntimeException}
 import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.pattern.{CircuitBreaker, CircuitBreakerOpenException}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.{Done, NotUsed}
@@ -737,6 +738,7 @@ class SpliceLedgerConnection(
     contractDowngradeErrorCallbacks: AtomicReference[Seq[() => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: Long => Future[Unit],
+    commandCircuitBreaker: CircuitBreaker,
 )(implicit as: ActorSystem, ec: ExecutionContextExecutor)
     extends BaseLedgerConnection(
       client,
@@ -1004,20 +1006,31 @@ class SpliceLedgerConnection(
 
           def clientSubmit[W, U](waitFor: WF[W])(getOffsetAndResult: W => (Long, U)): Future[U] =
             callCallbacksOnCompletionAndWaitForOffset(
-              client.submitAndWait(
-                synchronizerId =
-                  disclosedContracts.overwriteDomain(synchronizerId).toProtoPrimitive,
-                userId = userId,
-                commandId = commandId,
-                deduplicationConfig = deduplicationConfig,
-                actAs = actAs.map(_.toProtoPrimitive),
-                readAs = readAs.map(_.toProtoPrimitive),
-                commands = commands,
-                disclosedContracts = disclosedContracts,
-                waitFor = waitFor,
-                deadline = deadline,
-                preferredPackageIds = preferredPackageIds,
-              )
+              commandCircuitBreaker
+                .withCircuitBreaker(
+                  client.submitAndWait(
+                    synchronizerId =
+                      disclosedContracts.overwriteDomain(synchronizerId).toProtoPrimitive,
+                    userId = userId,
+                    commandId = commandId,
+                    deduplicationConfig = deduplicationConfig,
+                    actAs = actAs.map(_.toProtoPrimitive),
+                    readAs = readAs.map(_.toProtoPrimitive),
+                    commands = commands,
+                    disclosedContracts = disclosedContracts,
+                    waitFor = waitFor,
+                    deadline = deadline,
+                    preferredPackageIds = preferredPackageIds,
+                  )
+                )
+                .recover { case ex: CircuitBreakerOpenException =>
+                  // Expose a bit more info and turn it into our standard exceptions
+                  throw Status.ABORTED
+                    .withDescription(
+                      s"Command submission aborted by circuit breaker due to too many successive failures, next attempt in ${ex.remainingDuration.toSeconds}s"
+                    )
+                    .asRuntimeException
+                }
             )(getOffsetAndResult)
 
           @annotation.tailrec

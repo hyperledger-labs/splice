@@ -13,7 +13,7 @@ import {
   ServerConfiguration,
   RequestContext,
   ResponseContext,
-} from 'validator-openapi';
+} from '@lfdecentralizedtrust/validator-openapi';
 
 const ValidatorContext = React.createContext<ValidatorClient | undefined>(undefined);
 

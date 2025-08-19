@@ -1,7 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import _ from 'lodash';
 import {
   Auth0Client,
   BackupConfig,
@@ -39,13 +38,15 @@ import {
   InstalledHelmChart,
   ansDomainPrefix,
   failOnAppVersionMismatch,
-} from 'splice-pulumi-common';
+  networkWideConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   installParticipant,
   ValidatorNodeConfig,
   ValidatorNodeConfigSchema,
-} from 'splice-pulumi-common-validator';
-import { SplicePostgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { SplicePostgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import _ from 'lodash';
 
 import { clusterSubConfig } from '../../common/src/config/configLoader';
 import {
@@ -271,6 +272,7 @@ async function installValidator(validatorConfig: ValidatorConfig): Promise<Insta
     db: { volumeSize: clusterSmallDisk ? '240Gi' : undefined },
     enablePostgresMetrics: true,
     ...spliceInstanceNames,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
   };
 
   const validatorValuesWithOnboardingOverride = onboardingSecret

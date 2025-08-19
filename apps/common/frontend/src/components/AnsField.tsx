@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { UseQueryResult } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
-import { AnsEntry } from 'scan-openapi';
+import { AnsEntry } from '@lfdecentralizedtrust/scan-openapi';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
 

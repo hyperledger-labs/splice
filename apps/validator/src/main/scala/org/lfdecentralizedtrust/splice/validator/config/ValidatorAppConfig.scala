@@ -197,6 +197,12 @@ case class ValidatorAppBackendConfig(
     txLogBackfillEnabled: Boolean = true,
     txLogBackfillBatchSize: Int = 100,
     disableSvValidatorBftSequencerConnection: Boolean = false,
+    // The maximum delay before submitting a package vetting
+    // change. The actual delay will be chosen randomly (uniformly
+    // distributed between 0 and the maximum delay) to ensure that not
+    // all validators submit the transaction at the same time
+    // overloading the network.
+    maxVettingDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(1),
 ) extends SpliceBackendConfig // TODO(DACH-NY/canton-network-node#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

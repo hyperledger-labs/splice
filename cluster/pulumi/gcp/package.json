@@ -6,7 +6,7 @@
     "@kubernetes/client-node": "^0.18.1",
     "@types/auth0": "^3.3.2",
     "auth0": "^3.4.0",
-    "splice-pulumi-common": "1.0.0"
+    "@lfdecentralizedtrust/splice-pulumi-common": "1.0.0"
   },
   "scripts": {
     "fix": "npm run format:fix && npm run lint:fix",

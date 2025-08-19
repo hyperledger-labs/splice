@@ -3,7 +3,7 @@
 import { Contract } from '@lfdecentralizedtrust/splice-common-frontend-utils';
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
+import { GetOpenAndIssuingMiningRoundsRequest } from '@lfdecentralizedtrust/scan-openapi';
 
 import { OpenMiningRound } from '@daml.js/splice-amulet/lib/Splice/Round';
 

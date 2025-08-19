@@ -1,5 +1,5 @@
 {
-    "name": "canton-network-pulumi-deployment",
+    "name": "@lfdecentralizedtrust/canton-network-pulumi-deployment",
     "version": "1.0.0",
     "main": "src/index.ts",
     "devDependencies": {
@@ -31,6 +31,7 @@
         "common-sv",
         "common-validator",
         "canton-network",
+        "cluster",
         "gcp",
         "gcp-project",
         "infra",

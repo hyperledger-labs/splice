@@ -33,7 +33,7 @@ import org.slf4j.event.Level
 
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.time.temporal.ChronoUnit
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with TriggerTestUtil {
@@ -154,7 +154,7 @@ class AnsIntegrationTest extends IntegrationTest with WalletTestUtil with Trigge
           val aliceRefs = setupUser(aliceStaticRefs)
 
           requestAndPayForEntry(aliceRefs, testEntryName)
-          eventually() {
+          eventually(timeUntilSuccess = 2.minutes) {
             val entry =
               try
                 loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(

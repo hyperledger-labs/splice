@@ -21,6 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import org.lfdecentralizedtrust.splice.store.PageLimit
 
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
@@ -43,15 +44,15 @@ class ExpireRewardCouponsTrigger(
       tc: TraceContext
   ): Future[Seq[ExpiredRewardCouponsBatch]] = for {
     dsoRules <- store.getDsoRules()
-    numSvs = dsoRules.payload.svs.size()
     batches <- store
-      .getExpiredRewards(
+      .getExpiredCouponsInBatchesPerRoundAndCouponType(
         dsoRules.domain,
         context.config.enableExpireValidatorFaucet,
+        PageLimit.tryCreate(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize),
       )
-      .map(seq =>
-        Random.shuffle(seq).take(svTaskContext.delegatelessAutomationExpiredRewardCouponBatchSize)
-      )
+      // We select at most parallelism batches per round as  processing more than that would most likely just hit contention
+      // If any work was done the trigger will run again anyway so it's safer to just requery the stores
+      .map(seq => Random.shuffle(seq).take(context.config.parallelism))
   } yield batches
 
   override protected def isStaleTask(expiredRewardsTask: ExpiredRewardCouponsBatch)(implicit
@@ -186,6 +187,6 @@ class ExpireRewardCouponsTrigger(
             .yieldResult()
         )
       )
-    } yield expiredRewardsTask.validatorCoupons.size + expiredRewardsTask.appCoupons.size + expiredRewardsTask.validatorFaucets.size + expiredRewardsTask.svRewardCoupons.size
+    } yield expiredRewardsTask.validatorCoupons.size + expiredRewardsTask.appCoupons.size + expiredRewardsTask.validatorFaucets.size + expiredRewardsTask.svRewardCoupons.size + expiredRewardsTask.validatorLivenessActivityRecords.size
   }
 }

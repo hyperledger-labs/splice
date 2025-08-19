@@ -350,6 +350,10 @@ spec:
             - name: ADDITIONAL_CONFIG_SYNCHRONIZER_INITIALIZATION
               value: canton.sv-apps.sv.skip-synchronizer-initialization = true
             {{- end }}
+            {{- with .Values.maxVettingDelay }}
+            - name: ADDITIONAL_CONFIG_MAX_VETTING_DELAY
+              value: canton.sv-apps.sv.max-vetting-delay = "{{ . }}"
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

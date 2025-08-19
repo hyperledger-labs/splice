@@ -6,7 +6,7 @@ groups:
     interval: 1m
     rules:
       - uid: ae74w21qca2o0e
-        title: Mining Rounds Not Advancing
+        title: Open Mining Rounds Not Advancing
         condition: No new round
         data:
           - refId: Round number diff
@@ -70,6 +70,75 @@ groups:
           runbook_url: ""
           summary: "The open mining rounds have not advanced in the last 30m"
           description: 'None of our SV apps have seen the open mining round advancing in the last 30m. Either all of our SVs or a high enough number of SVs to break BFT guarantees are failing'
+          severity: critical
+        labels:
+          priority: high
+        isPaused: false
+      - uid: ae74w21qca2o0d
+        title: Issuing Rounds Not Advancing
+        condition: No new round
+        data:
+          - refId: Round number diff
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              disableTextWrap: false
+              editorMode: builder
+              expr: max(max(max_over_time(splice_sv_dso_store_latest_issuing_mining_round[30m])) by (namespace) - min(min_over_time(splice_sv_dso_store_latest_issuing_mining_round[30m])) by (namespace))
+              fullMetaSearch: false
+              includeNullMetadata: true
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: Round number diff
+              useBackend: false
+          - refId: No new round
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+                  unloadEvaluator:
+                    params:
+                      - 0.9
+                    type: gt
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: Round number diff
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: No new round
+              type: threshold
+        dashboardUid: ed94a332-4fa7-47f8-982b-fc997381175b
+        panelId: 1
+        noDataState: $NODATA
+        execErrState: OK
+        for: 1m
+        annotations:
+          __dashboardUid__: ed94a332-4fa7-47f8-982b-fc997381175b
+          __panelId__: "2"
+          runbook_url: ""
+          summary: "The issuing mining rounds have not advanced in the last 30m"
+          description: 'None of our SV apps have seen the issuing mining round advancing in the last 30m. Either all of our SVs or a high enough number of SVs to break BFT guarantees are failing'
           severity: critical
         labels:
           priority: high

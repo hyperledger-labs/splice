@@ -11,13 +11,52 @@ Release Notes
 Upcoming
 --------
 
+- Vagrant (new)
+
+  - Add Vagrantfile as a convenient way to spin up a local development
+    environment for Splice. See `README.vagrant.md
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/README.vagrant.md>`_
+    and `Vagrantfile
+    <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
+    details.
+
+- Docs
+
+  - Clarifications around the :ref:`validator disaster recovery <validator_dr>` process.
+  - Add how-to docs for :ref:`Token Standard usage <token_standard>`.
+
+- Cometbft
+
+  - Doubled the default mempool size and deduplication cache size as they get exceeded on prod networks occasionally.
+
+0.4.11
+------
+
+- SV and Validator apps
+
+  - Add a randomized delay to broadcasting of package vetting changes used on Daml upgrades. This ensures that
+    there is no load spike when all validators try to do so at the same time. This has no impact on behavior as
+    Daml upgrades are announced ahead of time and the broadcasting still happens before the switchover.
+
+  - The CometBFT PVC is now annotated with ``helm.sh/resource-policy: keep``, so that in the event of a (potentially accidental)
+    ``helm uninstall`` the CometBFT data is not deleted and the node can more easily be recovered.
+
+- Docs
+
+  - Mark the workflows in the ``splice-wallet-payments`` :ref:`package <reference_docs_splice_wallet_payments>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.
+  - Mark the :ref:`Splice Wallet transfer offers <validator-api-user-wallet-transfer-offers>` as **deprecated**, and recommend using the Canton Network Token Standard APIs instead.
+
+0.4.10
+------
+
 - SV Application
 
-  - Fully removes the automation and logic around DSO delegate elections.
+  - Fully remove the automation and logic around DSO delegate elections.
+  - UI enhancements.
 
 - Daml
 
-  - Deprecates Daml choices related to DSO delegate elections.
+  - Deprecate Daml choices related to DSO delegate elections.
   - Implements `CIP-0068 - Bootstrap network from non-zero round <https://github.com/global-synchronizer-foundation/cips/blob/main/cip-0068/cip-0068.md>`_
     Now the first SV can specify a non-zero initial round that can be used on network initialization or resets.
 
@@ -43,6 +82,12 @@ Upcoming
 - Docs
 
   - Add section on :ref:`disabling BFT sequencer connections for SV participants <helm-sv-bft-sequencer-connections>`.
+
+- Stability improvements
+
+  - Add circuit breaker functionality for ledger API command submissions in all splice apps;
+    causes splice apps to pause attempting new command submissions if the synchronizer is overloaded.
+  - Add rate-limiting to scan ``/acs/{party}`` endpoint.
 
 0.4.9
 -----

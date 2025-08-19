@@ -837,6 +837,7 @@ class ValidatorApp(
         config.sequencerRequestAmplificationPatience,
         config.contactPoint,
         initialSynchronizerTime,
+        config.maxVettingDelay,
         loggerFactory,
       )
       _ <- MonadUtil.sequentialTraverse_(config.appInstances.toList)({ case (name, instance) =>

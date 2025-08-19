@@ -1,7 +1,7 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 // ensure the config is loaded and the ENV is overriden
-import { config } from 'splice-pulumi-common';
+import { config } from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { clusterIsResetPeriodically, enableAlerts } from './alertings';
 import { configureAuth0 } from './auth0';
@@ -24,12 +24,7 @@ export const ingressIp = network.ingressIp.address;
 export const ingressNs = network.ingressNs.ns.metadata.name;
 export const egressIp = network.egressIp.address;
 
-const istio = configureIstio(
-  network.ingressNs,
-  ingressIp,
-  network.cometbftIngressIp.address,
-  network.publicIngressIp.address
-);
+const istio = configureIstio(network.ingressNs, ingressIp, network.cometbftIngressIp.address);
 
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = istio.concat([network]);

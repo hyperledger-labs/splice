@@ -1,8 +1,6 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as pulumi from '@pulumi/pulumi';
-import { Release } from '@pulumi/kubernetes/helm/v3';
-import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 import {
   ChartValues,
   CLUSTER_HOSTNAME,
@@ -19,7 +17,7 @@ import {
   sequencerTokenExpirationTime,
   SPLICE_ROOT,
   SpliceCustomResourceOptions,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 import {
   CometBftNodeConfigs,
   CometbftSynchronizerNode,
@@ -27,9 +25,11 @@ import {
   installCometBftNode,
   SingleSvConfiguration,
   StaticCometBftConfigWithNodeName,
-} from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { Postgres } from 'splice-pulumi-common/src/postgres';
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import { Postgres } from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
+import { Release } from '@pulumi/kubernetes/helm/v3';
+import { ComponentResource, Output, Resource } from '@pulumi/pulumi';
 
 abstract class InStackDecentralizedSynchronizerNode
   extends ComponentResource
@@ -189,6 +189,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
     onboardingName: string,
     version: CnChartVersion,
     imagePullServiceAccountName?: string,
+    disableProtection?: boolean,
     opts?: SpliceCustomResourceOptions
   ) {
     super(migrationId, xns, version);
@@ -204,6 +205,7 @@ export class InStackCometBftDecentralizedSynchronizerNode
       cometbft.enableStateSync,
       cometbft.enableTimeoutCommit,
       imagePullServiceAccountName,
+      disableProtection,
       {
         ...opts,
         parent: this,
