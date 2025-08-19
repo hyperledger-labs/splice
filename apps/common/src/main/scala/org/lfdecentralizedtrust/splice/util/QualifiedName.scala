@@ -15,7 +15,7 @@ final case class PackageQualifiedName(packageName: String, qualifiedName: Qualif
 }
 
 object PackageQualifiedName {
-  def findFromResources(identifier: Identifier): Option[PackageQualifiedName] = {
+  def lookupFromResources(identifier: Identifier): Option[PackageQualifiedName] = {
     DarResources
       .lookupPackageId(identifier.getPackageId)
       .map { resource =>
@@ -27,7 +27,7 @@ object PackageQualifiedName {
   }
 
   def getFromResources(identifier: Identifier): PackageQualifiedName = {
-    findFromResources(identifier)
+    lookupFromResources(identifier)
       .getOrElse(throw new IllegalArgumentException(s"No package found for template $identifier"))
   }
 
