@@ -31,7 +31,7 @@ Upcoming
       <https://github.com/hyperledger-labs/splice/blob/0.4.12/Vagrantfile>`_ for
       details.
 
-  - A subset of tests can now be run on forks without approval from a maintainer
+  - A subset of the tests now run on PRs from forks without approval from a maintainer
     (see `TESTING.md <https://github.com/hyperledger-labs/splice/blob/0.4.12/TESTING.md>` for details)
 
 0.4.11
