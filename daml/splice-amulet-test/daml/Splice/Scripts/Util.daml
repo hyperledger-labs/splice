@@ -136,9 +136,6 @@ setupUserWithoutValidatorRight app name = do
 setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
 setupUser app name validator = do
   user <- setupUserWithoutValidatorRight app name
-  -- Note: our test infrastructure uses ValidatorRights to track what users have been setup.
-  -- So we still record the validator right here even though they are deprecated.
-  recordValidatorOf app user.primaryParty validator
   tap app user 1.0
   return user
 
@@ -170,15 +167,6 @@ setupDefaultAppWithUsers = do
   (provider1, provider1Validator) <- setupSelfHostedUser app "provider1"
   (provider2, provider2Validator) <- setupSelfHostedUser app "provider2"
   return DefaultAppWithUsers with ..
-
--- dummy argument to avoid running this script by default.
--- Note: even though ValidatorRights are no longer used for collecting rewards our
--- test infrastructure uses them to track what users have been setup. In particular,
--- as part of 'runAmuletDepositBots'.
-getAllValidatorRights : AmuletApp -> Script [ValidatorRight]
-getAllValidatorRights _app = do
-  parties <- listKnownParties
-  map snd <$> query @ValidatorRight (map party parties)
 
 recordValidatorOf : AmuletApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
@@ -432,12 +420,9 @@ runAmuletDepositBots app = do
         issuingMiningRounds = Map.fromList [ (round.round, roundCid) | (roundCid, round) <- issuingRounds ]
         validatorRights = Map.empty
         featuredAppRight = None
-  -- iterate over all validator rights to use the right readAs values
-  -- TODO(M4-82): remove the need for reading as the validator
-  allValidatorRights <- getAllValidatorRights app
-  forA_ allValidatorRights $ \validatorRight -> do
-    -- get all burns for this user
-    let user = validatorRight.user
+  allParties <- listKnownParties
+  forA_ allParties $ \partyDetails -> do
+    let user = partyDetails.party
     appRewardCoupons <- queryFilter @AppRewardCoupon app.dso $ \c ->
       c.round `elem` issuingRoundNumbers && fromOptional c.provider c.beneficiary == user
 
@@ -455,9 +440,6 @@ runAmuletDepositBots app = do
 
     -- get all amulets of this user
     amulets <- getAmuletInputs user
-    -- Need readAs rights for the validator to see mining round state contracts
-    -- TODO(M4-82): remove the need for reading as the validator
-    let readAs = [validatorRight.validator]
     -- merge multiple of them into a single amulet to minimize the holding fees
     let transfer = Transfer with
           sender = user
@@ -473,7 +455,7 @@ runAmuletDepositBots app = do
           beneficiaries = None -- no beneficiaries for self-transfer
     -- merge multiple amulets or rewards and claim rewards even if there are no amulets yet
     when (length transfer.inputs > 1 || (length transfer.inputs == 1 && null amulets)) $ void $
-      submitExerciseAmuletRulesByKey app [user] readAs AmuletRules_Transfer with
+      submitExerciseAmuletRulesByKey app [user] [] AmuletRules_Transfer with
         transfer
         context = transferContext
         expectedDso = Some app.dso
@@ -496,12 +478,6 @@ getOpenIssuingRounds app = do
   now <- getTime
   miningRounds <- query @IssuingMiningRound app.dso
   return [ (cid, r) | (cid, r) <- miningRounds, r.opensAt <= now ]
-
--- | All validator rights for the given user.
-getValidatorRights : Party -> Script (Map.Map Party (ContractId ValidatorRight))
-getValidatorRights validator = do
-  rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
-  return $ Map.fromList [ (right.user, rightCid) | (rightCid, right) <- rights ]
 
 -- Primarily used by submitters to decide against which round they should try to transact.
 getLatestOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
