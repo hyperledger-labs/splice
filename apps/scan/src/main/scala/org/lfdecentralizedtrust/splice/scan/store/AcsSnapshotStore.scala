@@ -382,7 +382,7 @@ object AcsSnapshotStore {
 
   private val holdingsTemplates =
     Vector(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID, LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID).map(
-      PackageQualifiedName(_)
+      PackageQualifiedName.getFromResources
     )
 
   private def decodeHoldingContract(createdEvent: CreatedEvent): Either[
@@ -393,14 +393,14 @@ object AcsSnapshotStore {
       .withDescription(s"Failed to decode $createdEvent")
       .asRuntimeException()
     if (
-      PackageQualifiedName(createdEvent.getTemplateId) == PackageQualifiedName(
+      PackageQualifiedName.fromEvent(createdEvent) == PackageQualifiedName.getFromResources(
         Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
       )
     ) {
       Right(Contract.fromCreatedEvent(Amulet.COMPANION)(createdEvent).getOrElse(failedToDecode))
     } else {
       if (
-        PackageQualifiedName(createdEvent.getTemplateId) != PackageQualifiedName(
+        PackageQualifiedName.fromEvent(createdEvent) != PackageQualifiedName.getFromResources(
           LockedAmulet.TEMPLATE_ID_WITH_PACKAGE_ID
         )
       ) {
