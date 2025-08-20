@@ -8,8 +8,6 @@ import { cometBFTExternalPort } from '@lfdecentralizedtrust/splice-pulumi-common
 import { DeploySvRunbook } from '@lfdecentralizedtrust/splice-pulumi-common/src/config';
 import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
 import { PodMonitor, ServiceMonitor } from '@lfdecentralizedtrust/splice-pulumi-common/src/metrics';
-import { commandScriptPath } from '@lfdecentralizedtrust/splice-pulumi-common/src/utils';
-import { local } from '@pulumi/command';
 
 import {
   CLUSTER_HOSTNAME,
@@ -39,11 +37,6 @@ function configureIstioBase(
   ns: k8s.core.v1.Namespace,
   istioDNamespace: k8s.core.v1.Namespace
 ): k8s.helm.v3.Release {
-  const path = commandScriptPath('cluster/pulumi/infra/migrate-istio.sh');
-  const migration = new local.Command(`migrate-istio-crds`, {
-    create: path,
-  });
-
   return new k8s.helm.v3.Release(
     'istio-base',
     {
@@ -62,7 +55,7 @@ function configureIstioBase(
       maxHistory: HELM_MAX_HISTORY_SIZE,
     },
     {
-      dependsOn: [ns, migration],
+      dependsOn: [ns],
     }
   );
 }
