@@ -123,18 +123,20 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           svApps = config.svApps ++
             Seq(1, 2, 3, 4).map(sv =>
               InstanceName.tryCreate(s"sv${sv}Local") ->
-                config
-                  .svApps(InstanceName.tryCreate(s"sv$sv"))
-                  .copy(
-                    onboarding = Some(
-                      DomainMigration(
-                        name = getSvName(sv),
-                        dumpFilePath = Path.of(""),
-                      )
-                    ),
-                    domainMigrationId = 1L,
-                    legacyMigrationId = Some(0L),
-                  )
+                ConfigTransforms.withBftSequencer(
+                  config
+                    .svApps(InstanceName.tryCreate(s"sv$sv"))
+                    .copy(
+                      onboarding = Some(
+                        DomainMigration(
+                          name = getSvName(sv),
+                          dumpFilePath = Path.of(""),
+                        )
+                      ),
+                      domainMigrationId = 1L,
+                      legacyMigrationId = Some(0L),
+                    )
+                )
             ) + (
               InstanceName.tryCreate(s"sv1LocalOnboarded") ->
                 config
@@ -145,11 +147,16 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                     legacyMigrationId = None,
                   )
             ),
-          scanApps = config.scanApps + (
-            InstanceName.tryCreate("sv1ScanLocal") ->
-              config
-                .scanApps(InstanceName.tryCreate("sv1Scan"))
-                .copy(domainMigrationId = 1L)
+          scanApps = config.scanApps ++ Seq(1, 2, 3, 4).map(sv =>
+            InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
+              ConfigTransforms.withBftSequencer(
+                s"sv${sv}ScanLocal",
+                config
+                  .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
+                  .copy(domainMigrationId = 1L),
+                migrationId = 1L,
+                basePort = 27010,
+              )
           ),
           validatorApps = config.validatorApps + (
             InstanceName.tryCreate("sv1ValidatorLocal") ->
@@ -475,6 +482,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         "SECOND_EXTRA_PARTICIPANT_DB" -> s"participant_second_extra_${dbsSuffix}",
         "SECOND_EXTRA_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
       ),
+      enableBftSequencer = true,
     )() {
       aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
@@ -640,11 +648,16 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               ).futureValue
             }
 
-            withClueAndLog("starting sv2-4 upgraded nodes") {
+            withClueAndLog("starting sv1-4 upgraded nodes") {
               startAllSync(
+                sv1LocalBackend,
                 sv2LocalBackend,
                 sv3LocalBackend,
                 sv4LocalBackend,
+                sv1ScanLocalBackend,
+                sv2ScanLocalBackend,
+                sv3ScanLocalBackend,
+                sv4ScanLocalBackend,
               )
             }
 
@@ -654,7 +667,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               val triggersAfter =
                 (sv2LocalBackend.dsoAutomation.triggers[Trigger] ++ sv2LocalBackend.svAutomation
                   .triggers[Trigger]).map(_.getClass.getCanonicalName)
-              triggersAfter should contain theSameElementsAs triggersBefore.filter(t =>
+              triggersAfter.filter(t =>
+                !t.startsWith(
+                  "org.lfdecentralizedtrust.splice.sv.automation.singlesv.SvBftSequencerPeer"
+                )
+              ) should contain theSameElementsAs triggersBefore.filter(t =>
                 t != "org.lfdecentralizedtrust.splice.sv.migration.DecentralizedSynchronizerMigrationTrigger"
               )
             }
