@@ -544,6 +544,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
         "SECOND_EXTRA_PARTICIPANT_DB" -> s"participant_second_extra_${dbsSuffix}",
         "SECOND_EXTRA_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
       ),
+      enableBftSequencer = true,
     )() {
       aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
