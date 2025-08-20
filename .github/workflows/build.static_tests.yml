@@ -74,7 +74,7 @@ jobs:
       - name: Lint GHA
         uses: ./.github/actions/nix/run_bash_command_in_nix
         with:
-          cmd: actionlint
+          cmd: ./scripts/actionlint.sh
 
       - name: Check for strings that should not be used in Splice
         uses: ./.github/actions/nix/run_bash_command_in_nix
