@@ -126,7 +126,7 @@ Note that the following snippet requires installing `jq <https://jqlang.org/>`_ 
      grpcurl --max-time 10 "$url":443 grpc.health.v1.Health/Check
    done)
 
-Sequencers that are functional and have whitelisted your IP correctly will return ``status: SERVING`` in the ``grpcurl`` output.
+Sequencers that are functional and have whitelisted your IP correctly will return ``"status": "SERVING"`` in the ``grpcurl`` output.
 
 .. code-block:: bash
 
