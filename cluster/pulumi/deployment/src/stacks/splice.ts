@@ -69,7 +69,7 @@ export function installSpliceStacks(
       envRefs,
       gcpSecret,
       {},
-      [],
+      []
     );
   }
   if (DeployValidatorRunbook) {

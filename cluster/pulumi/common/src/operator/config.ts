@@ -6,7 +6,7 @@ import { merge } from 'lodash';
 import { z } from 'zod';
 
 export const StackConfigSchema = z.object({
-  parallelism: z.number().optional()
+  parallelism: z.number().optional(),
 });
 
 export const OperatorDeploymentConfigSchema = z.object({
@@ -14,13 +14,11 @@ export const OperatorDeploymentConfigSchema = z.object({
     reference: GitReferenceSchema,
   }),
   pulumiStacks: z.record(z.string(), StackConfigSchema).and(
-  z.object({
-    default: StackConfigSchema,
-  })
-)
+    z.object({
+      default: StackConfigSchema,
+    })
+  ),
 });
-
-
 
 export type Config = z.infer<typeof OperatorDeploymentConfigSchema>;
 export type StackConfig = z.infer<typeof StackConfigSchema>;

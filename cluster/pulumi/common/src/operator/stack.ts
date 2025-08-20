@@ -81,7 +81,7 @@ export function createStackCR(
   envRefs: EnvRefs,
   gcpSecret: k8s.core.v1.Secret,
   extraEnvs: { [key: string]: string } = {},
-  dependsOn: pulumi.Resource[] = [],
+  dependsOn: pulumi.Resource[] = []
 ): CustomResource {
   const sa = new k8s.core.v1.ServiceAccount(`${name}-sa`, {
     metadata: {
