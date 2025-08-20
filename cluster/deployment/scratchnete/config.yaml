@@ -25,7 +25,7 @@ synchronizerMigration:
       enableBftSequencer: true
     releaseReference:
       repoUrl: https://github.com/hyperledger-labs/splice
-      gitReference: nicuda/bft/long_running
+      gitReference: refs/heads/nicuda/bft/long_running
       pulumiBaseDir: "cluster/pulumi"
       pulumiStacksDir: "cluster/stacks/scratchnets"
       deploymentDir: "cluster/deployment"
@@ -35,7 +35,7 @@ synchronizerMigration:
 operatorDeployment:
   reference:
     repoUrl: https://github.com/hyperledger-labs/splice
-    gitReference: nicuda/bft/long_running
+    gitReference: refs/heads/nicuda/bft/long_running
     pulumiBaseDir: "cluster/pulumi"
     pulumiStacksDir: "cluster/stacks/scratchnets"
     deploymentDir: "cluster/deployment"
