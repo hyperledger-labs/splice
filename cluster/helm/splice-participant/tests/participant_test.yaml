@@ -82,6 +82,8 @@ tests:
         mapCantonKey:
           firstMapEntry: first_map_value
           secondMapEntry: second_map_value
+          recursiveMapEntry:
+            recursiveMap: recursive_value
       additionalEnvVars:
         - name: AWWWS_ACCESS_KEY_ID
           valueFrom:
@@ -102,7 +104,7 @@ tests:
           content:
             # We don't really care about the name of the env var but helm unittest wants it
             name: ADDITIONAL_CONFIG_SPLICE_PARTICIPANT_CRYPTO_PROVIDER_KMS
-            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    map-canton-key = {\n      first-map-entry = first_map_value\n      second-map-entry = second_map_value\n    }\n    region = mock_region\n    type = awwws\n  }\n}        \n"
+            value: "canton.participants.participant.crypto {\n  provider = kms\n  kms = {\n    extra-canton-key = mock_value\n    map-canton-key = {\n      first-map-entry = first_map_value\n      recursive-map-entry = {\n        recursive-map = recursive_value\n      }\n      second-map-entry = second_map_value\n    }\n    region = mock_region\n    type = awwws\n  }\n}        \n"
       # Secret configured via Helm with valueFrom
       - contains:
           path: spec.template.spec.containers[0].env

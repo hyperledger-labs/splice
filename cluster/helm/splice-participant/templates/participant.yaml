@@ -69,7 +69,7 @@ spec:
             canton.participants.participant.crypto {
               provider = kms
               kms = {
-                {{- include "splice-util-lib.render-nested-config" (dict "context" . "nestedConfig" .Values.kms) | trim | nindent 16 }}
+                {{- include "splice-util-lib.render-nested-config" .Values.kms | trim | nindent 16 }}
               }
             }
         {{- end }}
