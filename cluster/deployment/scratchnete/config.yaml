@@ -21,6 +21,8 @@ synchronizerMigration:
   active:
     id: 0
     version: 0.5.0-snapshot.20250819.703.0.v8339acc8
+    sequencer:
+      enableBftSequencer: true
     releaseReference:
       repoUrl: https://github.com/DACH-NY/canton-network-internal
       gitReference: nicuda/bft/long_running
