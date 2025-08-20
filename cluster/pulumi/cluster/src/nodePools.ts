@@ -53,7 +53,7 @@ export function installNodePools(): void {
     initialNodeCount: 1,
     autoscaling: {
       minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
-      maxNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
+      maxNodeCount: gkeClusterConfig.nodePools.infra.maxNodes,
     },
   });
 

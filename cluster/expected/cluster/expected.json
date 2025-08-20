@@ -33,7 +33,7 @@
     "id": "",
     "inputs": {
       "autoscaling": {
-        "maxNodeCount": 1,
+        "maxNodeCount": 3,
         "minNodeCount": 1
       },
       "cluster": "cn-mocknet",
