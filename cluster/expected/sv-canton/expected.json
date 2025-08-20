@@ -1223,6 +1223,16 @@
             "port": 5432,
             "postgresName": "sequencer-3-pg",
             "secretName": "sequencer-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "cpu": "6",
+              "memory": "4Gi"
+            },
+            "requests": {
+              "cpu": "2",
+              "memory": "3Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -1316,6 +1326,16 @@
             "port": 5432,
             "postgresName": "sequencer-4-pg",
             "secretName": "sequencer-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "cpu": "6",
+              "memory": "4Gi"
+            },
+            "requests": {
+              "cpu": "2",
+              "memory": "3Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-4",
@@ -3063,6 +3083,16 @@
             "port": 5432,
             "postgresName": "sequencer-3-pg",
             "secretName": "sequencer-3-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "cpu": "6",
+              "memory": "4Gi"
+            },
+            "requests": {
+              "cpu": "2",
+              "memory": "3Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-3",
@@ -3156,6 +3186,16 @@
             "port": 5432,
             "postgresName": "sequencer-4-pg",
             "secretName": "sequencer-4-pg-secrets"
+          },
+          "resources": {
+            "limits": {
+              "cpu": "6",
+              "memory": "4Gi"
+            },
+            "requests": {
+              "cpu": "2",
+              "memory": "3Gi"
+            }
           }
         },
         "serviceAccountName": "sv-canton-migration-4",

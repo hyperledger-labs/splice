@@ -91,7 +91,18 @@ export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceR
           },
         },
       }
-    : {};
+    : {
+        resources: {
+          limits: {
+            cpu: '6',
+            memory: '4Gi',
+          },
+          requests: {
+            cpu: '2',
+            memory: '3Gi',
+          },
+        },
+      };
 export const sequencerTokenExpirationTime: string | undefined = config.optionalEnv(
   'SEQUENCER_TOKEN_EXPIRATION_TIME'
 );
