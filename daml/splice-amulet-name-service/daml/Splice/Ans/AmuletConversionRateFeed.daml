@@ -1,0 +1,71 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Ans.AmuletConversionRateFeed where
+
+import DA.Assert
+import DA.Foldable
+import DA.Time
+import Splice.AmuletRules
+import Splice.Api.FeaturedAppRightV1 qualified as Api
+import Splice.Schedule
+import Splice.Types
+import Splice.Util
+
+data MarkerContext = MarkerContext
+  with
+    featuredAppRightCid : ContractId Api.FeaturedAppRight
+    beneficiaries : [Api.AppRewardBeneficiary]
+  deriving (Show, Eq)
+
+-- | Amulet conversion rate feed published by a given 'publisher'.
+-- Publisher must only create one feed per publisher.
+-- The feed can only be updated every 0.5 tickDuration as the SVs also only change the price on round boundaries
+-- and this avoids unnecessary load.
+template AmuletConversionRateFeed
+  with
+    publisher : Party
+    dso : Party
+    lastUpdatedAt : Optional Time
+    amuletConversionRate : Decimal -- ^ conversion rate in USD/Amulet
+  where
+    signatory publisher
+    observer dso
+
+    choice AmuletConversionRateFeed_ArchiveAsDso : ()
+      with
+        reason : Text
+      controller dso
+      do pure ()
+
+    choice AmuletConversionRateFeed_Update : ContractId AmuletConversionRateFeed
+      with
+        amuletConversionRate : Decimal
+        amuletRulesCid : ContractId AmuletRules
+        markerContextO : Optional MarkerContext
+      controller publisher
+      do now <- getTime
+         amuletRules <- fetchPublicReferenceData (ForDso dso) amuletRulesCid (AmuletRules_Fetch publisher)
+         let currentConfig = getValueAsOf now amuletRules.configSchedule
+         enforceCooldown ("Amulet conversion rate rate limit rate limit for " <> show publisher) (convertMicrosecondsToRelTime $ convertRelTimeToMicroseconds currentConfig.tickDuration / 2) lastUpdatedAt
+         forA_ markerContextO $ \markerContext -> do
+           _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
+           exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
+             with
+               beneficiaries = markerContext.beneficiaries
+         create this with
+           amuletConversionRate
+           lastUpdatedAt = Some now
+
+-- | Enforce that an action is not performed again before a cooldown period has passed.
+-- Duplicated from DsoRules as we do not want a dependency on that
+enforceCooldown : Text -> RelTime -> Optional Time -> Update ()
+enforceCooldown cooldownName cooldown lastActionTime = do
+  case lastActionTime of
+    Some lastTime -> do
+      let nextAllowedTime = lastTime `addRelTime` cooldown
+      assertDeadlineExceeded cooldownName nextAllowedTime
+    None -> pure () -- no last action time, so no enforcement needed
+
+instance HasCheckedFetch Api.FeaturedAppRightView ForOwner where
+  contractGroupId Api.FeaturedAppRightView{..} = ForOwner{dso,owner = provider}

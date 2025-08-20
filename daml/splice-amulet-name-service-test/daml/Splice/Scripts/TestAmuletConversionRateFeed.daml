@@ -1,0 +1,67 @@
+-- Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+-- SPDX-License-Identifier: Apache-2.0
+
+module Splice.Scripts.TestAmuletConversionRateFeed where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import Splice.Ans.AmuletConversionRateFeed
+import Splice.Api.FeaturedAppRightV1 qualified as Api
+import Splice.Scripts.Util
+import Splice.Util
+
+checkRate : Party -> ContractId AmuletConversionRateFeed -> Decimal -> Script ()
+checkRate p cid expectedRate = do
+  Some feed <- queryContractId p cid
+  require ("actual rate " <> show feed.amuletConversionRate <> " should be expected rate " <> show expectedRate) (feed.amuletConversionRate == expectedRate)
+
+-- Note: SVs can run automation that observes these contracts and then based on that exercises `DsoRules_UpdateAmuletPriceVote`.
+-- There is deliberately no on-ledger coupling that e.g. would fetch the conversion rate feed in the same transaction that updates the price as:
+-- 1. There is no reason to enforce this. SVs deliberately have free choice in the price they set.
+-- 2. On-ledger coupling is much less flexible when it comes to different policies, e.g., voting on the median of multiple feeds.
+-- However, the feeds are dso visible so anyone can verify through the scan update history that the vote from an SV matches a given feed.
+testAmuletConversionRateFeed : Script ()
+testAmuletConversionRateFeed = do
+  app <- setupApp
+  publisherUser <- setupValidator' app "publisher"
+  let publisher = publisherUser.primaryParty
+  featuredAppRightCid <- featureApp app publisherUser
+  cid <- submit publisher $ createCmd AmuletConversionRateFeed with
+    publisher
+    dso = app.dso
+    lastUpdatedAt = None
+    amuletConversionRate = 1.0
+
+  checkRate app.dso cid 1.0
+
+  (amuletRulesCid, _) <- getAmuletRules app
+
+  cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+    amuletConversionRate = 2.0
+    amuletRulesCid
+    markerContextO = None
+
+  checkRate app.dso cid 2.0
+
+  -- fails due to rate limit
+  submitMultiMustFail [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+    amuletConversionRate = 2.0
+    amuletRulesCid
+    markerContextO = None
+
+  passTime (minutes 10)
+
+  cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
+    amuletConversionRate = 4.0
+    amuletRulesCid
+    markerContextO = Some MarkerContext with
+      beneficiaries = [Api.AppRewardBeneficiary publisher 1.0]
+      featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+
+  checkRate app.dso cid 4.0
+
+  markers <- queryInterface @Api.FeaturedAppActivityMarker publisher
+  length markers === 1
+  pure ()
