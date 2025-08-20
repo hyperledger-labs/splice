@@ -156,5 +156,9 @@ infra:
       spec:
         key: value
         anotherKey: anotherValue
+cluster:
+  nodePools:
+    apps:
+      nodeType: n2-standard-16
 networkWide:
   maxVettingDelay: 1m
