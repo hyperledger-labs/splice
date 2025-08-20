@@ -70,9 +70,6 @@ export function installSpliceStacks(
       gcpSecret,
       {},
       [],
-      // reduce parallelism to ensure rolling updates as during startup the nodes use lots of memory, leading to memory pressure on the nodes
-      // and in some cases the pods get evicted
-      5
     );
   }
   if (DeployValidatorRunbook) {

@@ -36,6 +36,11 @@ pulumiProjectConfig:
   sv-runbook:
     cloudSql:
       enabled: false
+pulumiStacks:
+  default:
+    parallelism: 64
+  multi-validator:
+    parallelism: 10
 validator1:
   logging:
     level: DEBUG
