@@ -1601,23 +1601,94 @@ abstract class MultiDomainAcsStoreTest[
         _ <- assertList()
         _ <- d1.create(
           goodContract,
-          implementedInterfaces = Map(
-            holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
-          ),
+          implementedInterfaces = goodImplementedInterfaces,
         )
         _ <- d1.create(
           badContract,
-          implementedInterfaces = Map(
-            new Identifier(
-              maliciousPackageId,
-              holdingv1.Holding.INTERFACE_ID.getModuleName,
-              holdingv1.Holding.INTERFACE_ID.getEntityName,
-            ) -> badView.toValue
+          implementedInterfaces = badImplementedInterfaces,
+        )
+        resultHolding <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        resultAmulet <- store.listContracts(Amulet.COMPANION)
+      } yield {
+        resultHolding.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId
+        )
+        resultAmulet.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId
+        )
+      }
+    }
+
+    "prevent against ingestion of same (moduleName, entityName) with different package name - via interface fallback" in {
+      val filter =
+        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
+          dsoParty,
+          templateFilters = Map.empty,
+          interfaceFilters = Map(
+            mkFilterInterface(holdingv1.Holding.INTERFACE)(_ => true) { contract =>
+              GenericInterfaceRowData(contract.identifier, contract.payload)
+            }
           ),
         )
-        result <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+      implicit val store = mkStore(
+        filter = filter
+      )
+      val owner = providerParty(1)
+      val goodContract = amulet(owner, BigDecimal(10), 1L, BigDecimal(0.00001), dso = dsoParty)
+      val goodView = holdingView(owner, BigDecimal(10), dsoParty, "AMT")
+      val goodImplementedInterfaces = Map(
+        holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> goodView.toValue
+      )
+      // like Splice's Amulet, but with different packageid
+      // that still implements the Holding interface
+      val fakeAmuletContract =
+        amulet(owner, BigDecimal(20), 2L, BigDecimal(0.00002), dso = dsoParty).copy(identifier =
+          new Identifier(
+            maliciousPackageId,
+            goodContract.identifier.getModuleName,
+            goodContract.identifier.getEntityName,
+          )
+        )
+      val fakeAmuletView = holdingView(owner, BigDecimal(20), dsoParty, "AMT")
+      val fakeAmuletImplementedInterfaces = Map(
+        holdingv1.Holding.INTERFACE_ID_WITH_PACKAGE_ID -> fakeAmuletView.toValue
+      )
+
+      filter.contains(
+        toCreatedEvent(
+          goodContract,
+          implementedInterfaces = goodImplementedInterfaces,
+        )
+      ) should be(true)
+
+      filter.contains(
+        toCreatedEvent(
+          fakeAmuletContract,
+          implementedInterfaces = fakeAmuletImplementedInterfaces,
+        )
+      ) should be(true) // as a Holding, it is included. But it should not be included as an Amulet.
+
+      for {
+        _ <- initWithAcs()
+        _ <- assertList()
+        _ <- d1.create(
+          goodContract,
+          implementedInterfaces = goodImplementedInterfaces,
+        )
+        _ <- d1.create(
+          fakeAmuletContract,
+          implementedInterfaces = fakeAmuletImplementedInterfaces,
+        )
+        resultHolding <- store.listInterfaceViews(holdingv1.Holding.INTERFACE)
+        resultAmulet <- store.listContracts(Amulet.COMPANION)
       } yield {
-        result.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+        // fakeAmuletContract is a Holding
+        resultHolding.map(_.contractId.contractId) should contain theSameElementsAs Seq(
+          goodContract.contractId.contractId,
+          fakeAmuletContract.contractId.contractId,
+        )
+        // but it is not an Amulet
+        resultAmulet.map(_.contractId.contractId) should contain theSameElementsAs Seq(
           goodContract.contractId.contractId
         )
       }
