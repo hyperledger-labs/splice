@@ -9,6 +9,10 @@ on:
       self_hosted:
         type: boolean
         required: true
+      full_checkout:
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   static_tests:
@@ -22,7 +26,20 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          ref: ${{ inputs.commit_sha }}
+          ref: ${{ inputs.full_checkout && inputs.commit_sha || '' }}
+
+      - name: Partial checkout
+        if: inputs.full_checkout == false
+        shell: bash
+        run: |
+          echo "Selectively checking out code under review"
+          git fetch origin ${{ inputs.commit_sha }} --depth=1
+          git checkout ${{ inputs.commit_sha }} -- \
+            apps/ \
+            cluster/ \
+            daml/ \
+            docs/ \
+            token-standard/
 
       - name: Setup
         id: setup

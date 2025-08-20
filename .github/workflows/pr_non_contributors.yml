@@ -33,6 +33,7 @@ jobs:
     with:
       commit_sha: ${{ github.event.pull_request.head.sha }}
 
+  # Note: unapproved runs must not be granted access to secrets, and must not run on self-hosted runners
   no_approval_static_tests:
     name: Static Tests (No Approval Required)
     uses: ./.github/workflows/build.static_tests.yml
@@ -44,3 +45,5 @@ jobs:
     with:
       self_hosted: false
       commit_sha: ${{ github.event.pull_request.head.sha }}
+      # For extra security, we do not run full checkouts for unapproved PRs from forks
+      full_checkout: false
