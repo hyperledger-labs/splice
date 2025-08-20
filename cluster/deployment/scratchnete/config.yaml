@@ -24,21 +24,21 @@ synchronizerMigration:
     sequencer:
       enableBftSequencer: true
     releaseReference:
-      repoUrl: https://github.com/DACH-NY/canton-network-internal
+      repoUrl: https://github.com/hyperledger-labs/splice
       gitReference: nicuda/bft/long_running
-      pulumiBaseDir: "splice/cluster/pulumi"
+      pulumiBaseDir: "cluster/pulumi"
       pulumiStacksDir: "cluster/stacks/scratchnets"
       deploymentDir: "cluster/deployment"
-      spliceRoot: "splice"
+      spliceRoot: "."
       privateConfigsDir: "cluster/configs/configs-private"
       publicConfigsDir: "cluster/configs/configs"
 operatorDeployment:
   reference:
-    repoUrl: https://github.com/DACH-NY/canton-network-internal
+    repoUrl: https://github.com/hyperledger-labs/splice
     gitReference: nicuda/bft/long_running
-    pulumiBaseDir: "splice/cluster/pulumi"
+    pulumiBaseDir: "cluster/pulumi"
     pulumiStacksDir: "cluster/stacks/scratchnets"
     deploymentDir: "cluster/deployment"
-    spliceRoot: "splice"
+    spliceRoot: "."
     privateConfigsDir: "cluster/configs/configs-private"
     publicConfigsDir: "cluster/configs/configs"
