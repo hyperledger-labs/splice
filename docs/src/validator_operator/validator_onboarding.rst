@@ -89,10 +89,12 @@ Note that the following snippet requires installing `jq <https://jqlang.org/>`_.
 
 .. parsed-literal::
 
-   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans | .[].scans | .[] | .publicUrl' ); do
-     echo -n "$url: ";
-     curl -sSL --connect-timeout 5 --fail-with-body $url/api/scan/version | jq -r '.version';
-   done
+   (set -o pipefail
+   CURL='curl -fsS -m 5 --connect-timeout 5'
+   for url in $($CURL |gsf_scan_url|/api/scan/v0/scans | jq -r '.scans[].scans[].publicUrl'); do
+     echo -n "$url: "
+     $CURL "$url"/api/scan/version | jq -r '.version'
+   done)
 
 You should see output in the form shown below, where each line indicates one SV and the version it is on. If you see timeouts that SV has not yet added you to their allowlist,
 if you do not get any errors, then all SVs have added you. Note that the URLs and versions will vary over time so don't try to compare exactly.
@@ -118,12 +120,13 @@ Note that the following snippet requires installing `jq <https://jqlang.org/>`_ 
 
 .. parsed-literal::
 
-   for url in $(curl -sSL |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers | .[] | .sequencers.[].url | sub("https://"; "")' ); do
-     echo -n "$url: ";
-     grpcurl --max-time 10 $url:443 grpc.health.v1.Health/Check;
-   done
+   (set -o pipefail
+   for url in $(curl -fsS -m 5 --connect-timeout 5 |gsf_scan_url|/api/scan/v0/dso-sequencers | jq -r '.domainSequencers[].sequencers[].url | sub("https://"; "")'); do
+     echo -n "$url: "
+     grpcurl --max-time 10 "$url":443 grpc.health.v1.Health/Check
+   done)
 
-Sequencers that are functional and have whitelisted your IP correctly will return ``status: SERVING`` in the ``grpcurl`` output.
+Sequencers that are functional and have whitelisted your IP correctly will return ``"status": "SERVING"`` in the ``grpcurl`` output.
 
 .. code-block:: bash
 
