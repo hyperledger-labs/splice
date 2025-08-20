@@ -510,11 +510,15 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
               }
               // Also wait for scan to process the archive
-              val choiceContext =
-                sv1ScanBackend.getTransferInstructionRejectContext(instrAboutToExpire)
-              choiceContext.choiceContext.values.get(
-                "expire-lock"
-              ) shouldBe new metadatav1.anyvalue.AV_Bool(false)
+              clue("Scan processes locked amulet expiry") {
+                eventually() {
+                  val choiceContext =
+                    sv1ScanBackend.getTransferInstructionRejectContext(instrAboutToExpire)
+                  choiceContext.choiceContext.values.get(
+                    "expire-lock"
+                  ) shouldBe new metadatav1.anyvalue.AV_Bool(false)
+                }
+              }
             }
             actAndCheck(
               "Bob rejects instruction #4, whose backing amulet has already been archived", {
