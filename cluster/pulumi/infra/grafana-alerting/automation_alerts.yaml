@@ -231,7 +231,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
           runbook_url: ""
           severity: |-
-              {{- if (gt $values.runs.Value 2) -}}
+              {{- if and $values.runs (gt $values.runs.Value 2.0) -}}
               critical
               {{- else -}}
               warning
@@ -299,7 +299,7 @@ groups:
           description: The {{ index $labels "trigger_name" }} for the {{ index $labels "node_type" }} app in the {{ index $labels "namespace" }} namespace on migration id {{ index $labels "migration" }} experienced {{ index $values "runs" }} runs per second in the last 5 minutes.
           runbook_url: ""
           severity: |-
-              {{- if and $values.runs (gt $values.runs.Value 2) -}}
+              {{- if and $values.runs (gt $values.runs.Value 2.0) -}}
               critical
               {{- else -}}
               warning
