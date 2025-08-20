@@ -16,4 +16,27 @@ validator1:
 sv:
   scan:
     # TODO(#1164): Remove this once the import update backfilling is enabled by default
-    enableImportUpdatesBackfill : true
+    enableImportUpdatesBackfill: true
+synchronizerMigration:
+  active:
+    id: 0
+    version: 0.5.0-snapshot.20250819.703.0.v8339acc8
+    releaseReference:
+      repoUrl: https://github.com/DACH-NY/canton-network-internal
+      gitReference: nicuda/bft/long_running
+      pulumiBaseDir: "splice/cluster/pulumi"
+      pulumiStacksDir: "cluster/stacks/scratchnets"
+      deploymentDir: "cluster/deployment"
+      spliceRoot: "splice"
+      privateConfigsDir: "cluster/configs/configs-private"
+      publicConfigsDir: "cluster/configs/configs"
+operatorDeployment:
+  reference:
+    repoUrl: https://github.com/DACH-NY/canton-network-internal
+    gitReference: nicuda/bft/long_running
+    pulumiBaseDir: "splice/cluster/pulumi"
+    pulumiStacksDir: "cluster/stacks/scratchnets"
+    deploymentDir: "cluster/deployment"
+    spliceRoot: "splice"
+    privateConfigsDir: "cluster/configs/configs-private"
+    publicConfigsDir: "cluster/configs/configs"
