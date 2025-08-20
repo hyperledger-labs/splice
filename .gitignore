@@ -74,3 +74,7 @@ docs/src/deployment/observability/metrics_reference.rst
 
 # for helm unittest -d
 .debug
+
+# For Vagrant
+/.vagrant/
+/vagrant-nix-cache/

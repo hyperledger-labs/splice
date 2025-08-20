@@ -21,13 +21,36 @@ There are three ways to recover from disasters:
 
 #. Lastly, for network-wide failures, a more complex :ref:`Disaster recovery procedure <validator_network_dr>` is required.
 
+.. note :: A recovery of assets is **only** possible if at least **one** of the following holds:
+
+  - A recent :ref:`database backup <validator-database-backup>` is available, or:
+  - An up-to-date :ref:`identities backup <validator-identities-backup>` is available, or:
+  - The validator participant was using an :ref:`external KMS <validator-kms>` to manage its keys and the KMS still retains those keys.
+    (Note that recovering the validator from only KMS keys
+    - i.e., without an identities backup or database backup -
+    is an involved process that is not explicitly documented here.)
+
+  If neither of the above holds, it is not possible to recover the relevant participant secret keys to prove asset ownership.
 
 .. _validator_backup_restore:
 
 Restoring a validator from backups
 ++++++++++++++++++++++++++++++++++
 
-Assuming backups have been taken, the entire node can be restored from backups.
+The entire node can be restored from backups as long as **all** of the following hold:
+
+- A :ref:`database backup <validator-database-backup>` is available.
+- The database backup is less than 30 days old.
+  Due to sequencer pruning, a participant that is more than 30 days behind will be unable to catch up on the synchronizer
+  to become fully operational again.
+- If the backup was taken before the synchronizer underwent a :ref:`major upgrade <validator-upgrades>`,
+  then restoring the node from the backup will only be possible if synchronizer nodes on the old migration ID are still available.
+  If this is true, you must restore the node on the old migration ID first and can then move it through
+  the regular :ref:`migration process <validator-upgrades>` so it becomes fully operational on the new migration ID.
+
+If one of the above does not hold, it might still be possible to recover the node using the
+:ref:`re-onboarding <validator_reonboard>` procedure discussed below.
+
 The following steps can be taken to restore a node from backups:
 
 
@@ -61,7 +84,6 @@ If you are running a docker-compose deployment, you can restore the Postgres dat
 #. Start your validator as usual
 
 .. _validator_reonboard:
-
 
 Re-onboard a validator and recover balances of all users it hosts
 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -189,7 +211,10 @@ hosting it becomes unusable for whatever reason.
              recovery **must** be a **completely new validator**. An existing validator
              may brick completely due to some limitations around party
              migrations and there is no way to recover from that at
-             this point. This limitation is expected to be lifted in
+             this point. Recovering a validator from an identity backup does not classify
+             as a completely new validator here. You must setup it with a completely new identity
+             and a completely clean database.
+             This limitation is expected to be lifted in
              the future.
 
 First, setup a new validator following the standard :ref:`standard validator deployment docs <validator_operator>`.
@@ -239,7 +264,7 @@ it on multiple nodes, you will need to adjust this.
 We'll need the topology transaction and the definitions defined here later again. Either keep your Canton console open or save them.
 
 The topology transaction hash needs to be signed externally following the
-`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding#external-party-onboarding-transactions>`_.
+`documentation for external signing <https://docs.digitalasset.com/build/3.3/tutorials/app-dev/external_signing_onboarding.html#external-party-onboarding-transactions>`_.
 
 After you signed it externally, you need to construct the signed
 topology transaction, sign it additionally through the participant and

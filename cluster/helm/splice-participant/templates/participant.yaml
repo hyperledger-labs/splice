@@ -52,9 +52,9 @@ spec:
           value: {{ .Values.auth.targetAudience }}
         - name: CANTON_PARTICIPANT_POSTGRES_PASSWORD
           valueFrom:
-           secretKeyRef:
-             name: {{ .Values.persistence.secretName }}
-             key: postgresPassword
+            secretKeyRef:
+              name: {{ .Values.persistence.secretName }}
+              key: postgresPassword
         {{- if .Values.persistence.databaseName }}
         - name: CANTON_PARTICIPANT_POSTGRES_DB
           value: {{ .Values.persistence.databaseName }}
@@ -69,9 +69,7 @@ spec:
             canton.participants.participant.crypto {
               provider = kms
               kms = {
-                {{- range $key, $value := .Values.kms }}
-                {{ $key | kebabcase }} = {{ $value }}
-                {{- end }}
+                {{- include "splice-util-lib.render-nested-config" .Values.kms | trim | nindent 16 }}
               }
             }
         {{- end }}
@@ -171,6 +169,10 @@ spec:
           {{- if .secret }}
           secret:
             secretName: {{ .secret.secretName }}
+          {{- end }}
+          {{- if .persistentVolumeClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .persistentVolumeClaim.claimName }}
           {{- end }}
         {{- end }}
       {{- end }}

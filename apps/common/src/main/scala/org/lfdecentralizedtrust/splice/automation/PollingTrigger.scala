@@ -17,6 +17,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.ErrorKind.*
 import org.apache.pekko.Done
 
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise, blocking}
 import scala.util.{Failure, Success}
@@ -96,7 +97,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
 
   private val pollingLoopRef =
-    new AtomicReference[Option[Future[(PollingTriggerState, Boolean)]]](None)
+    new AtomicReference[Option[Future[(PollingTriggerState, Boolean, Instant)]]](None)
 
   private val retryable = RetryProvider.RetryableError(
     "pollingTriggerTask",
@@ -110,7 +111,15 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     context.retryProvider,
   )
 
-  override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)
+  override def isHealthy: Boolean = pollingLoopRef
+    .get()
+    .exists(_.value match {
+      case Some(Success((_, _, completionTime))) =>
+        completionTime
+          .plus(context.config.futureCompletionGracePeriod.asJava)
+          .isAfter(Instant.now())
+      case _ => true
+    })
 
   override def run(paused: Boolean): Unit = LoggerUtil.logOnThrow {
 
@@ -127,6 +136,8 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
         ): Unit = LoggerUtil.logOnThrow {
 
           def loopWithDelay(newState: PollingTriggerState) = {
+            // Like below,
+            // we use updateAndGet even if it can be reapplied during contention because we know there's no contention
             pollingLoopRef.updateAndGet(_.map(_.flatMap { state =>
               context.retryProvider
                 .scheduleAfterUnlessShutdown(
@@ -181,7 +192,9 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             // We use updateAndGet even if it can be reapplied during contention because we know there's no contention
             pollingLoopRef
               .updateAndGet { current =>
-                val workResult = performWork
+                val workResult = performWork.map { case (state, workDone) =>
+                  (state, workDone, Instant.now())
+                }
                 current match {
                   case Some(ref) =>
                     Some(
@@ -190,7 +203,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                   case None => Some(workResult)
                 }
               }
-              .foreach(_.foreach { case (state, workDone) =>
+              .foreach(_.foreach { case (state, workDone, _) =>
                 if (workDone && !context.retryProvider.isClosing) {
                   pollingLoop(state)
                 } else {

@@ -3,7 +3,6 @@
 import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as _ from 'lodash';
-import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 import {
   activeVersion,
   CLUSTER_BASENAME,
@@ -21,8 +20,9 @@ import {
   SpliceCustomResourceOptions,
   svCometBftKeysFromSecret,
   withAddedDependencies,
-} from 'splice-pulumi-common';
-import { CnChartVersion } from 'splice-pulumi-common/src/artifacts';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { CnChartVersion } from '@lfdecentralizedtrust/splice-pulumi-common/src/artifacts';
+import { jsonStringify, Output, Resource } from '@pulumi/pulumi';
 
 import { svsConfig } from '../config';
 import { SingleSvConfiguration } from '../singleSvConfig';
@@ -76,6 +76,7 @@ export function installCometBftNode(
   enableStateSync: boolean = !disableCometBftStateSync,
   enableTimeoutCommit: boolean = false,
   imagePullServiceAccountName?: string,
+  disableProtection?: boolean,
   opts?: SpliceCustomResourceOptions
 ): Cometbft {
   const cometBftValues = loadYamlFromFile(
@@ -195,6 +196,7 @@ export function installCometBftNode(
       ),
     ];
   }
+  const protectCometBft = svsConfig?.cometbft?.protected ?? false;
   const release = installSpliceHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -206,6 +208,7 @@ export function installCometBftNode(
       ...withAddedDependencies(opts, volumeDependecies.concat(keysSecret ? [keysSecret] : [])),
       aliases: [{ name: `global-domain-${migrationId}-cometbft`, parent: undefined }],
       ignoreChanges: ['name'],
+      protect: disableProtection ? false : protectCometBft,
     }
   );
   return { rpcServiceName: `${nodeConfig.identifier}-cometbft-rpc`, release };

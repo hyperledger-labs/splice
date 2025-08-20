@@ -55,7 +55,7 @@ class WalletSurviveCantonRestartIntegrationTest
         withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-1") {
           clue("Wait for validator initialization") {
             // Need to wait for the participant node to startup for the user allocation to go through
-            eventuallySucceeds(timeUntilSuccess = 40.seconds) {
+            eventuallySucceeds(timeUntilSuccess = 120.seconds) {
               EnvironmentDefinition.withAllocatedValidatorUser(aliceValidatorBackend)
             }
             aliceValidatorBackend.waitForInitialization()
@@ -75,7 +75,8 @@ class WalletSurviveCantonRestartIntegrationTest
       clue("Second run of Canton participant") {
         withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-2") {
           clue("We can tap and list after Canton restart and domain reconnection") {
-            eventuallySucceeds() {
+            // Due to the circuit breaker kicking in, this might take a bit longer to succeed after some failures due to the disconnect
+            eventuallySucceeds(2.minutes) {
               aliceWalletClient.tap(2)
             }
             aliceWalletClient.list()

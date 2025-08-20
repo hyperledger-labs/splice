@@ -390,7 +390,8 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
             partyId: PartyId,
             predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
-          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val filterIdentifier =
+            PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,
@@ -429,7 +430,8 @@ trait LedgerApiExtensions extends AppendedClues with Matchers {
         ](templateCompanion: javaapi.data.codegen.ContractCompanion[TC, TCid, T])(
             partyId: PartyId
         ): Seq[CreatedEvent] = {
-          val filterIdentifier = PackageQualifiedName(templateCompanion.getTemplateIdWithPackageId)
+          val filterIdentifier =
+            PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId)
           val templateId = TemplateId(
             s"#${filterIdentifier.packageName}",
             filterIdentifier.qualifiedName.moduleName,

@@ -14,7 +14,7 @@ import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.daml.lf.data.Bytes
 import com.google.rpc.status.Status
 import com.google.rpc.status.Status.toJavaProto
-import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.AppRewardCoupon
+import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{Amulet, AppRewardCoupon}
 import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
@@ -27,7 +27,6 @@ import java.util.Collections
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-
 import UpdateHistory.UpdateHistoryResponse
 
 class UpdateHistoryTest extends UpdateHistoryTestBase {
@@ -83,11 +82,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
             val party1 = mkPartyId("someParty").toProtoPrimitive
             val party2 = mkPartyId("someParty").toProtoPrimitive
             val contractId = nextCid()
-            val id1 = new com.daml.ledger.javaapi.data.Identifier(
-              "somePackageId1",
-              "someModuleName1",
-              "someEntityName1",
-            )
+            val id1 = Amulet.TEMPLATE_ID_WITH_PACKAGE_ID
             val someValue = new DamlRecord(
               new DamlRecord.Field("a", new Int64(42))
             )
@@ -123,7 +118,7 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
                   /*offset = */ 32,
                   /*nodeId = */ 52,
                   /*templateId*/ id1,
-                  /*packageName*/ dummyPackageName,
+                  /*packageName*/ getPackageName(id1),
                   /*interfaceId*/ Some(id1).toJava,
                   /*contractId*/ contractId,
                   /*choice*/ "someChoice",

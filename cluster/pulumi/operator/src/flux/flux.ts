@@ -1,7 +1,10 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
-import { HELM_MAX_HISTORY_SIZE, infraAffinityAndTolerations } from 'splice-pulumi-common';
+import {
+  HELM_MAX_HISTORY_SIZE,
+  infraAffinityAndTolerations,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { namespace } from '../namespace';
 

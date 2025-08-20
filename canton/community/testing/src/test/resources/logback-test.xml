@@ -19,7 +19,12 @@
   <appender name="FILE" class="ch.qos.logback.core.FileAppender">
     <file>${LOG_FILE_NAME:-log/canton_network_test.clog}</file>
     <append>${LOG_APPEND:-true}</append>
-    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder"/>
+    <encoder class="com.digitalasset.canton.logging.CantonJsonEncoder">
+      <fieldNames>
+        <version>[ignore]</version>
+        <levelValue>[ignore]</levelValue>
+      </fieldNames>
+    </encoder>
   </appender>
 
   <!-- Appender for KMS logs -->

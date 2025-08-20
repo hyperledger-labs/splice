@@ -13,9 +13,10 @@ import {
   SvCometBftGovernanceKey,
   SvIdKey,
   ValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { SweepConfig } from 'splice-pulumi-common-validator';
-import { clusterYamlConfig } from 'splice-pulumi-common/src/config/configLoader';
+  RateLimitSchema,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { SweepConfig } from '@lfdecentralizedtrust/splice-pulumi-common-validator';
+import { clusterYamlConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/configLoader';
 import { z } from 'zod';
 
 import { SingleSvConfiguration } from './singleSvConfig';
@@ -95,6 +96,7 @@ export const SvConfigSchema = z.object({
       cometbft: z
         .object({
           volumeSize: z.string().optional(),
+          protected: z.boolean().optional(),
         })
         .optional(),
       scan: z
@@ -109,6 +111,7 @@ export const SvConfigSchema = z.object({
                 .optional(),
             })
             .optional(),
+          externalRateLimits: RateLimitSchema,
         })
         .optional(),
       synchronizer: z

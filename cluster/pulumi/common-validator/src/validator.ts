@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { Secret } from '@pulumi/kubernetes/core/v1';
-import { Output } from '@pulumi/pulumi';
 import {
   activeVersion,
   Auth0Client,
@@ -24,14 +22,17 @@ import {
   installSpliceHelmChart,
   installValidatorOnboardingSecret,
   LogLevel,
+  networkWideConfig,
   participantBootstrapDumpSecretName,
   ParticipantPruningConfig,
   PersistenceConfig,
   spliceInstanceNames,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
-} from 'splice-pulumi-common';
-import { jmxOptions } from 'splice-pulumi-common/src/jmx';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import { jmxOptions } from '@lfdecentralizedtrust/splice-pulumi-common/src/jmx';
+import { Secret } from '@pulumi/kubernetes/core/v1';
+import { Output } from '@pulumi/pulumi';
 
 import { SweepConfig } from './sweep';
 
@@ -232,6 +233,7 @@ export async function installValidatorApp(
       nodeIdentifier: config.nodeIdentifier,
       participantPruningSchedule: config.participantPruningConfig,
       deduplicationDuration: config.deduplicationDuration,
+      maxVettingDelay: networkWideConfig?.maxVettingDelay,
       logLevel: config.logLevel,
       resources: baseConfig.svValidator
         ? {

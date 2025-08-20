@@ -309,6 +309,7 @@ class SvDsoAutomationService(
         participantAdminConnection,
         dsoStore,
         triggerContext,
+        config.maxVettingDelay,
       )
     )
 

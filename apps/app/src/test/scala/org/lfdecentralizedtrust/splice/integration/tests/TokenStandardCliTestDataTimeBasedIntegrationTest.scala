@@ -39,6 +39,7 @@ import org.apache.pekko.http.scaladsl.model.headers.RawHeader
 import org.apache.pekko.http.scaladsl.unmarshalling.Unmarshal
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.{
   holdingv1,
+  metadatav1,
   transferinstructionv1,
 }
 import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
@@ -507,6 +508,16 @@ class TokenStandardCliTestDataTimeBasedIntegrationTest
                 )
               ) { holdings =>
                 holdings.count { case (_, holding) => holding.lock.isPresent } shouldBe 1
+              }
+              // Also wait for scan to process the archive
+              clue("Scan processes locked amulet expiry") {
+                eventually() {
+                  val choiceContext =
+                    sv1ScanBackend.getTransferInstructionRejectContext(instrAboutToExpire)
+                  choiceContext.choiceContext.values.get(
+                    "expire-lock"
+                  ) shouldBe new metadatav1.anyvalue.AV_Bool(false)
+                }
               }
             }
             actAndCheck(

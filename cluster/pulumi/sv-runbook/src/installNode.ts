@@ -45,11 +45,20 @@ import {
   svCometBftGovernanceKeySecret,
   svCometBftGovernanceKeyFromSecret,
   failOnAppVersionMismatch,
-} from 'splice-pulumi-common';
-import { configForSv, svsConfig, updateHistoryBackfillingValues } from 'splice-pulumi-common-sv';
-import { spliceConfig } from 'splice-pulumi-common/src/config/config';
-import { CloudPostgres, SplicePostgres } from 'splice-pulumi-common/src/postgres';
+  networkWideConfig,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
+import {
+  configForSv,
+  svsConfig,
+  updateHistoryBackfillingValues,
+} from '@lfdecentralizedtrust/splice-pulumi-common-sv';
+import { spliceConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/config';
+import {
+  CloudPostgres,
+  SplicePostgres,
+} from '@lfdecentralizedtrust/splice-pulumi-common/src/postgres';
 
+import { installRateLimits } from '../../common/src/ratelimit/rateLimit';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installCanton } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
@@ -131,6 +140,11 @@ export async function installNode(
   );
 
   const ingressImagePullDeps = imagePullSecretByNamespaceName('cluster-ingress');
+
+  if (svsConfig?.scan?.externalRateLimits) {
+    installRateLimits(xns.logicalName, 'scan-app', 5012, svsConfig.scan.externalRateLimits);
+  }
+
   installSpliceRunbookHelmChartByNamespaceName(
     xns.logicalName,
     xns.logicalName,
@@ -153,9 +167,7 @@ export async function installNode(
       },
       rateLimit: {
         scan: {
-          acs: {
-            limit: svsConfig?.scan?.rateLimit?.acs?.limit,
-          },
+          enable: false,
         },
       },
     },
@@ -313,6 +325,7 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
     failOnAppVersionMismatch: failOnAppVersionMismatch,
     initialAmuletPrice: initialAmuletPrice,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
     logLevel: svConfig.logging?.appsLogLevel,
     additionalEnvVars: svAppAdditionalEnvVars,
   };
@@ -425,6 +438,7 @@ async function installSvAndValidator(
       ids.concat([validatorWalletUserName])
     ),
     ...spliceInstanceNames,
+    maxVettingDelay: networkWideConfig?.maxVettingDelay,
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

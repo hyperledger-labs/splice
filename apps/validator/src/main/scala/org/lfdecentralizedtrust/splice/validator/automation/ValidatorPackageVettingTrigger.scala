@@ -3,6 +3,7 @@
 
 package org.lfdecentralizedtrust.splice.validator.automation
 
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.SynchronizerId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -18,10 +19,11 @@ class ValidatorPackageVettingTrigger(
     override protected val participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
     override protected val context: TriggerContext,
+    maxVettingDelay: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages) {
+) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages, maxVettingDelay) {
 
   override def getSynchronizerId()(implicit tc: TraceContext): Future[SynchronizerId] =
     scanConnection.getAmuletRulesDomain()(tc)

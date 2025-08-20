@@ -63,7 +63,14 @@ want a different setup in terms of who should be the provider, you may
 need to build your own setup Daml contracts and create them through
 the ledger API instead of using the validator APIs.
 
+Note the :ref:`limit on the number of parties <party_scaling>` when
+setting up preapprovals with the provider set as the validator
+operator.
+
 The validator APIs always create a preapproval with an expiry date of 90 days in the future.
+
+
+.. _preapproval_renewal:
 
 Expiry and Renewal of Preapprovals
 ----------------------------------

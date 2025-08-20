@@ -7,7 +7,7 @@ import {
   HELM_MAX_HISTORY_SIZE,
   imagePullSecret,
   infraAffinityAndTolerations,
-} from 'splice-pulumi-common';
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
 import { PulumiOperatorGracePeriod } from '../../common/src/operator/config';
 import { namespace } from './namespace';
@@ -25,7 +25,7 @@ export const operator = new k8s.helm.v3.Release(
   {
     name: 'pulumi-kubernetes-operator',
     chart: 'oci://ghcr.io/pulumi/helm-charts/pulumi-kubernetes-operator',
-    version: '2.1.0',
+    version: '2.2.0',
     namespace: namespace.ns.metadata.name,
     values: {
       resources: {

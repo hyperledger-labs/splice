@@ -1,7 +1,9 @@
 // Copyright (c) 2024 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
-import { GCP_PROJECT, config } from 'splice-pulumi-common';
+import { GCP_PROJECT, config } from '@lfdecentralizedtrust/splice-pulumi-common';
+
+import { gkeClusterConfig } from './config';
 
 export function installNodePools(): void {
   const clusterName = `cn-${config.requireEnv('GCP_CLUSTER_BASENAME')}net`;
@@ -13,7 +15,7 @@ export function installNodePools(): void {
     name: 'cn-apps-pool',
     cluster,
     nodeConfig: {
-      machineType: config.requireEnv('GCP_CLUSTER_NODE_TYPE'),
+      machineType: gkeClusterConfig.nodePools.apps.nodeType,
       taints: [
         {
           effect: 'NO_SCHEDULE',
@@ -24,12 +26,11 @@ export function installNodePools(): void {
       labels: {
         cn_apps: 'true',
       },
-      loggingVariant: config.requireEnv('GCP_CLUSTER_LOGGING_VARIANT'),
     },
     initialNodeCount: 0,
     autoscaling: {
-      minNodeCount: parseInt(config.requireEnv('GCP_CLUSTER_MIN_NODES')),
-      maxNodeCount: parseInt(config.requireEnv('GCP_CLUSTER_MAX_NODES')),
+      minNodeCount: gkeClusterConfig.nodePools.apps.minNodes,
+      maxNodeCount: gkeClusterConfig.nodePools.apps.maxNodes,
     },
   });
 
@@ -37,7 +38,7 @@ export function installNodePools(): void {
     name: 'cn-infra-pool',
     cluster,
     nodeConfig: {
-      machineType: config.optionalEnv('INFRA_NODE_POOL_MACHINE_TYPE') || 'e2-standard-8',
+      machineType: gkeClusterConfig.nodePools.infra.nodeType,
       taints: [
         {
           effect: 'NO_SCHEDULE',
@@ -48,12 +49,11 @@ export function installNodePools(): void {
       labels: {
         cn_infra: 'true',
       },
-      loggingVariant: config.requireEnv('GCP_CLUSTER_LOGGING_VARIANT'),
     },
     initialNodeCount: 1,
     autoscaling: {
-      minNodeCount: 1,
-      maxNodeCount: 3,
+      minNodeCount: gkeClusterConfig.nodePools.infra.minNodes,
+      maxNodeCount: gkeClusterConfig.nodePools.infra.maxNodes,
     },
   });
 
@@ -69,7 +69,6 @@ export function installNodePools(): void {
           value: 'true',
         },
       ],
-      loggingVariant: config.requireEnv('GCP_CLUSTER_LOGGING_VARIANT'),
     },
     initialNodeCount: 1,
     autoscaling: {
