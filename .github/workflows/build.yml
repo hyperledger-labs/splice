@@ -81,7 +81,6 @@ jobs:
     with:
       commit_sha: ${{ inputs.commit_sha }}
       self_hosted: true
-      full_checkout: true
 
   deployment_test:
     uses: ./.github/workflows/build.deployment_test.yml

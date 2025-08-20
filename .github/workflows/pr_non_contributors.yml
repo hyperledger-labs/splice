@@ -45,5 +45,3 @@ jobs:
     with:
       self_hosted: false
       commit_sha: ${{ github.event.pull_request.head.sha }}
-      # For extra security, we do not run full checkouts for unapproved PRs from forks
-      full_checkout: false
