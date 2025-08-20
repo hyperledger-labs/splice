@@ -600,6 +600,10 @@ object MultiDomainAcsStore {
 
     def typeId(companion: C): Identifier
 
+    // This is safe because if we have a companion, the package exists in resources
+    def packageQualifiedName(companion: C) =
+      PackageQualifiedName.getFromResources(typeId(companion))
+
     def toContractId(companion: C, contractId: String): TCid
 
     protected def fromJson(

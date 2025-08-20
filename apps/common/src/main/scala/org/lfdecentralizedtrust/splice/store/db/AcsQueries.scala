@@ -18,7 +18,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   LegacyOffset,
-  QualifiedName,
+  PackageQualifiedName,
   TemplateJsonDecoder,
 }
 import slick.jdbc.{GetResult, PositionedResult, SetParameter}
@@ -60,7 +60,7 @@ trait AcsQueries extends AcsJdbcTypes {
           <<[Long],
           <<[ContractId[Any]],
           <<[String],
-          <<[QualifiedName],
+          <<[PackageQualifiedName],
           <<[Json],
           <<[Array[Byte]],
           <<[Timestamp],
@@ -316,7 +316,7 @@ object AcsQueries {
       eventNumber: Long,
       contractId: ContractId[Any],
       templateIdPackageId: String,
-      templateIdQualifiedName: QualifiedName,
+      packageQualifiedName: PackageQualifiedName,
       createArguments: Json,
       createdEventBlob: Array[Byte],
       createdAt: Timestamp,
@@ -326,12 +326,22 @@ object AcsQueries {
         companionClass: ContractCompanion[C, TCId, T],
         decoder: TemplateJsonDecoder,
     ): Contract[TCId, T] = {
+      // safety check: if the templates don't match,
+      // it means that we would be returning a contract of a different template
+      // note that the packageId not matching is expected due to upgrades, but the name will be stable
+      val expectedPackageQualifiedName = companionClass.packageQualifiedName(companion)
+      if (expectedPackageQualifiedName != packageQualifiedName) {
+        throw new IllegalStateException(
+          s"Contract $contractId has a different package qualified name than expected. Expected: $expectedPackageQualifiedName - Got: $packageQualifiedName"
+        )
+      }
+
       companionClass
         .fromJson(companion)(
           new Identifier(
             templateIdPackageId,
-            templateIdQualifiedName.moduleName,
-            templateIdQualifiedName.entityName,
+            packageQualifiedName.qualifiedName.moduleName,
+            packageQualifiedName.qualifiedName.entityName,
           ),
           contractId.contractId,
           createArguments,
@@ -353,6 +363,7 @@ object AcsQueries {
           ${qualifier}contract_id,
           ${qualifier}template_id_package_id,
           ${qualifier}template_id_qualified_name,
+          ${qualifier}package_name,
           ${qualifier}create_arguments,
           ${qualifier}created_event_blob,
           ${qualifier}created_at,

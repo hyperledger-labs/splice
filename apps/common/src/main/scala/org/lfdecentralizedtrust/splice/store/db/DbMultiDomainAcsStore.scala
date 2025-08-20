@@ -29,6 +29,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   LegacyOffset,
+  PackageQualifiedName,
   QualifiedName,
   TemplateJsonDecoder,
   Trees,
@@ -362,9 +363,9 @@ final class DbMultiDomainAcsStore[TXE](
       limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
     val templateIdMap = companions
-      .map(c => QualifiedName(c.getTemplateIdWithPackageId) -> c)
+      .map(c => PackageQualifiedName.getFromResources(c.getTemplateIdWithPackageId) -> c)
       .toMap
-    val templateIds = inClause(templateIdMap.keys)
+    val templateIds = inClause(templateIdMap.keys.map(_.qualifiedName)) // TODO: fix this
     for {
       result <- storage.query(
         selectFromAcsTableWithState(
@@ -385,7 +386,7 @@ final class DbMultiDomainAcsStore[TXE](
       )
     } yield result.map { row =>
       assignedContractFromRow(
-        templateIdMap(row.acsRow.templateIdQualifiedName)
+        templateIdMap(row.acsRow.packageQualifiedName)
       )(row)
     }
   }
@@ -1631,6 +1632,7 @@ final class DbMultiDomainAcsStore[TXE](
       val templateId = rowData.identifier
       val templateIdQualifiedName = QualifiedName(templateId)
       val templateIdPackageId = lengthLimited(rowData.identifier.getPackageId)
+      val packageName = createdEvent.getPackageName
       val createArguments = rowData.payload
       val createdAt = Timestamp.assertFromInstant(rowData.createdAt)
       val contractExpiresAt = rowData.contractExpiresAt
@@ -1649,12 +1651,12 @@ final class DbMultiDomainAcsStore[TXE](
 
       import storage.DbStorageConverters.setParameterByteArray
       (sql"""
-                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name,
+                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name, package_name,
                                            create_arguments, created_event_blob, created_at, contract_expires_at,
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$indexColumnNames)
-                values ($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
+                values ($acsStoreId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName, $packageName,
                         $createArguments, $createdEventBlob, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
