@@ -158,6 +158,9 @@ Sequencers that are functional and have whitelisted your IP correctly will retur
      "status": "SERVING"
    }
 
+The default configuration for both of these requires access to at least 2/3 of the SVs for each of scans and sequencers.
+You may, at your option and own risk, configure connection to a single trusted scan and sequencer as described under :ref:`validator helm chart configuration <helm-validator-install>`, at the cost of losing BFT integrity guarantees.
+
 Stay Connected
 --------------
 
