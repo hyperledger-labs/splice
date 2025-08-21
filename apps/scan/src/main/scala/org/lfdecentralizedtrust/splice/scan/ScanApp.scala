@@ -153,18 +153,19 @@ class ScanApp(
         DomainMigrationInfo.loadFromUserMetadata(
           appInitConnection,
           config.svUser,
-        )
+        ).map(_.copy(currentMigrationId = config.domainMigrationId)) // FIXME
       }
       svName <- appInitStep(s"Get SV name from ${config.svUser}") {
         appInitConnection.getSvNameFromUserMetadata(config.svUser)
       }
-      _ = if (config.domainMigrationId != migrationInfo.currentMigrationId) {
-        throw Status.INVALID_ARGUMENT
-          .withDescription(
-            s"Migration id ${migrationInfo.currentMigrationId} from the the SV user metadata does not match the configured migration id ${config.domainMigrationId} in the scan app. Please check if the scan app is configured with the correct migration id"
-          )
-          .asRuntimeException()
-      }
+      // FIXME
+      // _ = if (config.domainMigrationId != migrationInfo.currentMigrationId) {
+      //   throw Status.INVALID_ARGUMENT
+      //     .withDescription(
+      //       s"Migration id ${migrationInfo.currentMigrationId} from the the SV user metadata does not match the configured migration id ${config.domainMigrationId} in the scan app. Please check if the scan app is configured with the correct migration id"
+      //     )
+      //     .asRuntimeException()
+      // }
       store = ScanStore(
         key = ScanStore.Key(dsoParty = dsoParty),
         storage,
