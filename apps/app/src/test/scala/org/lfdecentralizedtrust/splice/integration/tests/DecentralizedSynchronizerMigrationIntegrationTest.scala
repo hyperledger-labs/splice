@@ -712,9 +712,14 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             withClueAndLog("starting sv2-4 upgraded nodes") {
               startAllSync(
+                sv1LocalBackend,
                 sv2LocalBackend,
                 sv3LocalBackend,
                 sv4LocalBackend,
+                sv1ScanLocalBackend,
+                sv2ScanLocalBackend,
+                sv3ScanLocalBackend,
+                sv4ScanLocalBackend,
               )
             }
 
