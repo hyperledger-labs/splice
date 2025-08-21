@@ -156,7 +156,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             InstanceName.tryCreate(s"sv${sv}ScanLocal") ->
               ConfigTransforms.withBftSequencer(s"sv${sv}ScanLocal", config
                 .scanApps(InstanceName.tryCreate(s"sv${sv}Scan"))
-                .copy(domainMigrationId = 1L), 1L)
+                .copy(domainMigrationId = 1L), migrationId = 1L, basePort = 27010)
           ),
           validatorApps = config.validatorApps + (
             InstanceName.tryCreate("sv1ValidatorLocal") ->
