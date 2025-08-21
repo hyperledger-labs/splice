@@ -28,7 +28,7 @@ sv:
 multiValidator:
   requiresOnboardingSecret: true
 loadTester:
-  enable: true
+  enable: false
   iterationsPerMinute: 40
   minRate: 0.6
 synchronizerMigration:
