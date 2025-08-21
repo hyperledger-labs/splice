@@ -530,7 +530,7 @@ object MultiDomainAcsStore {
                   com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
                     Some(
                       com.daml.ledger.api.v2.value.Identifier(
-                        packageId = interfaceId.packageName,
+                        packageId = s"#${interfaceId.packageName}",
                         moduleName = interfaceId.qualifiedName.moduleName,
                         entityName = interfaceId.qualifiedName.entityName,
                       )
