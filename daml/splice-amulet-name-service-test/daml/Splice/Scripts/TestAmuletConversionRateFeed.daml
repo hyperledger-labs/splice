@@ -21,7 +21,7 @@ checkRate p cid expectedRate = do
 -- There is deliberately no on-ledger coupling that e.g. would fetch the conversion rate feed in the same transaction that updates the price as:
 -- 1. There is no reason to enforce this. SVs deliberately have free choice in the price they set.
 -- 2. On-ledger coupling is much less flexible when it comes to different policies, e.g., voting on the median of multiple feeds.
--- However, the feeds are dso visible so anyone can verify through the scan update history that the vote from an SV matches a given feed.
+-- However, the feeds are dso visible so anyone can verify how the vote from an SV relate to a given feed.
 testAmuletConversionRateFeed : Script ()
 testAmuletConversionRateFeed = do
   app <- setupApp
