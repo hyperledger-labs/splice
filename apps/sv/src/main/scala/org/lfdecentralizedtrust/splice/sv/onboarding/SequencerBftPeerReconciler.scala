@@ -49,6 +49,7 @@ abstract class SequencerBftPeerReconciler(
         )
       dsoSequencersWithoutSelf = sequencers.filter(_ != sequencerId)
       sequencersFromScan <- getAllBftSequencers()
+      _ = logger.debug(s"Sequencers from scan: $sequencersFromScan")
       dsoSequencersWithScanInfo = dsoSequencersWithoutSelf.map { sequencerId =>
         sequencerId -> sequencersFromScan.find(scanSequencer =>
           scanSequencer.id == sequencerId && scanSequencer.migrationId == migrationId
