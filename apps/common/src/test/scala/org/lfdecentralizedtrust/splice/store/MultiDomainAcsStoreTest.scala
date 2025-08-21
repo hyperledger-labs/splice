@@ -837,51 +837,6 @@ abstract class MultiDomainAcsStoreTest[
       MultiDomainAcsStoreTest.generatedCoids.value.size should (be >= 900 and be <= 1000)
     }
 
-    "read assignment-mismatched contracts in a stable order" in {
-      import com.digitalasset.daml.lf.value.Value
-      import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.{
-        FeaturedAppRight,
-        AppRewardCoupon,
-      }
-      import MultiDomainAcsStore.ConstrainedTemplate
-
-      // the specific templates don't matter, we just need 2 of them
-      val sampleParticipantId = ParticipantId("foo")
-      val evenCompanion = FeaturedAppRight.COMPANION
-      val oddCompanion = AppRewardCoupon.COMPANION
-      def smallestContract(coid: Value.ContractId, ix: Int) =
-        if (ix % 2 == 0) featuredAppRight(dsoParty, coid.coid)
-        else appRewardCoupon(1, dsoParty, contractId = coid.coid)
-      val coids = MultiDomainAcsStoreTest.generatedCoids.value
-      val expectedOrder = reassignmentContractOrder(
-        coids,
-        sampleParticipantId,
-      )(_.coid)
-
-      val contractFilter = {
-        import MultiDomainAcsStore.mkFilter
-
-        MultiDomainAcsStore.SimpleContractFilter[GenericAcsRowData, GenericInterfaceRowData](
-          dsoParty,
-          templateFilters = Map(
-            mkFilter(evenCompanion)(_ => true)(GenericAcsRowData(_)),
-            mkFilter(oddCompanion)(_ => true)(GenericAcsRowData(_)),
-          ),
-          interfaceFilters = Map.empty,
-        )
-      }
-      implicit val store: Store = mkStore(0, Some(0), 0L, sampleParticipantId, contractFilter)
-      for {
-        _ <- initWithAcs(coids.zipWithIndex.map { case (coid, ix) =>
-          StoreTest.AcsImportEntry(smallestContract(coid, ix), dummyDomain, 0L)
-        })
-        contracts <- store.listAssignedContractsNotOnDomainN(
-          dummy2Domain,
-          Seq[ConstrainedTemplate](evenCompanion, oddCompanion),
-        )
-      } yield contracts.map(_.contractId.contractId) shouldBe expectedOrder.map(_.coid)
-    }
-
     "ingest and return interface views for 1 interface 2 implementors" in {
       implicit val store = mkStore()
       val aDifferentIssuer = providerParty(42)

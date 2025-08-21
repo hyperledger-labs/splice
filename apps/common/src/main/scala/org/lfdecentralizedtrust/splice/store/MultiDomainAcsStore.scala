@@ -175,22 +175,6 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
       traceContext: TraceContext,
   ): Future[Seq[Contract[TCid, T]]]
 
-  /** At most 1000 (`notOnDomainsTotalLimit`) contracts sorted by a hash of
-    * contract ID and participant ID.
-    *
-    * The idea is that different apps making the same migration on different
-    * participants will split the work better, while preserving determinism of a
-    * specific running app for fault-tolerance.  For the former to happen, the
-    * position of a contract on one list must have no correlation with that on
-    * another list; that is why the contract ID by itself cannot be used by
-    * itself as the source of the sort key.
-    */
-  def listAssignedContractsNotOnDomainN(
-      excludedDomain: SynchronizerId,
-      companions: Seq[ConstrainedTemplate],
-      limit: notOnDomainsTotalLimit.type = notOnDomainsTotalLimit,
-  )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]
-
   private[splice] def listExpiredFromPayloadExpiry[C, TCid <: ContractId[T], T <: Template](
       companion: C
   )(implicit

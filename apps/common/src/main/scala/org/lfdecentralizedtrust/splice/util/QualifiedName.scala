@@ -26,6 +26,7 @@ object PackageQualifiedName {
       }
   }
 
+  // TODO: replace more usages of this with java codegen one
   def getFromResources(identifier: Identifier): PackageQualifiedName = {
     lookupFromResources(identifier)
       .getOrElse(throw new IllegalArgumentException(s"No package found for template $identifier"))
@@ -35,6 +36,15 @@ object PackageQualifiedName {
     PackageQualifiedName(
       event.getPackageName,
       QualifiedName(event.getTemplateId.getModuleName, event.getTemplateId.getEntityName),
+    )
+  }
+
+  def fromJavaCodegenCompanion(
+      companion: com.daml.ledger.javaapi.data.codegen.ContractCompanion[?, ?, ?]
+  ): PackageQualifiedName = {
+    PackageQualifiedName(
+      companion.PACKAGE_NAME,
+      QualifiedName(companion.TEMPLATE_ID.getModuleName, companion.TEMPLATE_ID.getEntityName),
     )
   }
 }

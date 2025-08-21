@@ -164,7 +164,7 @@ class DbSplitwellStore(
               SplitwellTables.acsTableName,
               acsStoreId,
               domainMigrationId,
-              where = sql"""
+              additionalWhere = sql"""
               template_id_qualified_name = ${QualifiedName(
                   splitwellCodegen.Group.TEMPLATE_ID_WITH_PACKAGE_ID
                 )}
@@ -192,7 +192,7 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
+            additionalWhere = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.GroupInvite.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and group_owner = ${owner}
@@ -221,7 +221,7 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
+            additionalWhere = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.AcceptedGroupInvite.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and group_owner = ${owner}
@@ -250,7 +250,7 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
+            additionalWhere = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.BalanceUpdate.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and group_id = ${lengthLimited(key.id.unpack)}
@@ -322,7 +322,7 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
+            additionalWhere = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellInstall.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and install_user = ${user}
@@ -352,7 +352,7 @@ class DbSplitwellStore(
             SplitwellTables.acsTableName,
             acsStoreId,
             domainMigrationId,
-            where = sql"""
+            additionalWhere = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellRules.TEMPLATE_ID_WITH_PACKAGE_ID
               )} and assigned_domain is not null
