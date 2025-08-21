@@ -684,6 +684,147 @@ class UpdateHistoryTest extends UpdateHistoryTestBase {
           result5.map(_.update.update.updateId) shouldBe Seq("c2", "c3")
         }
       }
+
+      "return consistent data" in {
+        val store1 = mkStore(storeName = "store1")
+        val store2 = mkStore(storeName = "store2")
+        val party1 = mkPartyId("someParty1").toProtoPrimitive
+        val party2 = mkPartyId("someParty2").toProtoPrimitive
+        val contractId1 = nextCid()
+        val contractId2 = nextCid()
+        val id1 = new com.daml.ledger.javaapi.data.Identifier(
+          "somePackageId1",
+          "someModuleName1",
+          "someEntityName1",
+        )
+        val someValue = new DamlRecord(
+          new DamlRecord.Field("a", new Int64(42))
+        )
+        val effectiveAt = CantonTimestamp.MinValue.toInstant
+        val recordTime = CantonTimestamp.MinValue.toInstant
+        for {
+          _ <- initStore(store1)
+          _ <- initStore(store2)
+          // Store1 ingests all import updates in a single transaction
+          _ <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(
+                new CreatedEvent(
+                  /*witnessParties*/ Seq(party1).asJava,
+                  /*offset = */ 32,
+                  /*nodeId = */ 53,
+                  /*templateId*/ id1,
+                  /*packageName*/ "somePackageName",
+                  /*contractId*/ contractId1,
+                  /*arguments*/ someValue,
+                  /*createdEventBlob*/ Bytes.assertFromString("00abcd").toByteString,
+                  /*interfaceViews*/ new java.util.HashMap(Map(id1 -> someValue).asJava),
+                  /*failedInterfaceViews*/ new java.util.HashMap(
+                    Map(id1 -> toJavaProto(Status.of(1, "some message", Seq.empty))).asJava
+                  ),
+                  /*contractKey*/ Some[Value](someValue).toJava,
+                  /*signatories*/ Seq(party1).asJava,
+                  /*observers*/ Seq(party1, party2).asJava,
+                  /*createdAt*/ effectiveAt,
+                ),
+                new CreatedEvent(
+                  /*witnessParties*/ Seq(party1).asJava,
+                  /*offset = */ 33,
+                  /*nodeId = */ 54,
+                  /*templateId*/ id1,
+                  /*packageName*/ "somePackageName",
+                  /*contractId*/ contractId2,
+                  /*arguments*/ someValue,
+                  /*createdEventBlob*/ Bytes.assertFromString("00abcd").toByteString,
+                  /*interfaceViews*/ new java.util.HashMap(Map(id1 -> someValue).asJava),
+                  /*failedInterfaceViews*/ new java.util.HashMap(
+                    Map(id1 -> toJavaProto(Status.of(1, "some message", Seq.empty))).asJava
+                  ),
+                  /*contractKey*/ Some[Value](someValue).toJava,
+                  /*signatories*/ Seq(party2).asJava,
+                  /*observers*/ Seq(party1, party2).asJava,
+                  /*createdAt*/ effectiveAt,
+                ),
+              ),
+              synchronizerId = domain1,
+              effectiveAt = effectiveAt,
+              recordTime = recordTime,
+              workflowId = "WorkflowId1",
+              commandId = "CommandId1",
+            )
+          })(store1)
+          // Store2 ingests import updates in individual transactions, and uses different
+          // values for offsets, node IDs, and workflow IDs.
+          _ <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(
+                new CreatedEvent(
+                  /*witnessParties*/ Seq(party1).asJava,
+                  /*offset = */ 132,
+                  /*nodeId = */ 153,
+                  /*templateId*/ id1,
+                  /*packageName*/ "somePackageName",
+                  /*contractId*/ contractId1,
+                  /*arguments*/ someValue,
+                  /*createdEventBlob*/ Bytes.assertFromString("00abcd").toByteString,
+                  /*interfaceViews*/ new java.util.HashMap(Map(id1 -> someValue).asJava),
+                  /*failedInterfaceViews*/ new java.util.HashMap(
+                    Map(id1 -> toJavaProto(Status.of(1, "some message", Seq.empty))).asJava
+                  ),
+                  /*contractKey*/ Some[Value](someValue).toJava,
+                  /*signatories*/ Seq(party1).asJava,
+                  /*observers*/ Seq(party1, party2).asJava,
+                  /*createdAt*/ effectiveAt,
+                )
+              ),
+              synchronizerId = domain1,
+              effectiveAt = effectiveAt,
+              recordTime = recordTime,
+              workflowId = "WorkflowId2",
+              commandId = "CommandId2",
+            )
+          })(store2)
+          _ <- domain1.ingest(offset => {
+            mkTx(
+              offset = offset,
+              events = Seq(
+                new CreatedEvent(
+                  /*witnessParties*/ Seq(party1).asJava,
+                  /*offset = */ 133,
+                  /*nodeId = */ 154,
+                  /*templateId*/ id1,
+                  /*packageName*/ "somePackageName",
+                  /*contractId*/ contractId2,
+                  /*arguments*/ someValue,
+                  /*createdEventBlob*/ Bytes.assertFromString("00abcd").toByteString,
+                  /*interfaceViews*/ new java.util.HashMap(Map(id1 -> someValue).asJava),
+                  /*failedInterfaceViews*/ new java.util.HashMap(
+                    Map(id1 -> toJavaProto(Status.of(1, "some message", Seq.empty))).asJava
+                  ),
+                  /*contractKey*/ Some[Value](someValue).toJava,
+                  /*signatories*/ Seq(party2).asJava,
+                  /*observers*/ Seq(party1, party2).asJava,
+                  /*createdAt*/ effectiveAt,
+                )
+              ),
+              synchronizerId = domain1,
+              effectiveAt = effectiveAt,
+              recordTime = recordTime,
+              workflowId = "WorkflowId3",
+              commandId = "CommandId3",
+            )
+          })(store2)
+          updates1 <- store1.getImportUpdates(migration1, "", PageLimit.Max)
+          updates2 <- store2.getImportUpdates(migration1, "", PageLimit.Max)
+        } yield {
+          updates1 should have size 2
+          updates2 should have size 2
+          // getImportUpdates already normalizes data, no need to call `withoutLostData`
+          updates1 should contain theSameElementsInOrderAs updates2
+        }
+      }
     }
 
     "getHighestKnownMigrationId" should {
