@@ -235,6 +235,14 @@ class DomainMigrationInitializer(
         svAutomation,
         skipTrafficReconciliationTriggers = true,
       )
+      _ <- participantAdminConnection
+        .ensureDomainParameters(
+          decentralizedSynchronizerId,
+          // TODO(DACH-NY/canton-network-node#8761) hard code for now
+          _.tryUpdate(confirmationRequestsMaxRate =
+            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
+          ),
+        )
       _ <- new ParticipantUsersDataRestorer(
         svAutomation.connection,
         loggerFactory,
@@ -273,14 +281,6 @@ class DomainMigrationInitializer(
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
       )
-      _ <- participantAdminConnection
-        .ensureDomainParameters(
-          domainMigrationDump.nodeIdentities.synchronizerId,
-          // TODO(DACH-NY/canton-network-node#8761) hard code for now
-          _.tryUpdate(confirmationRequestsMaxRate =
-            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
-          ),
-        )
       _ = logger.info("resumed domain")
     } yield {}
   }
