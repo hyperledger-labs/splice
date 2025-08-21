@@ -368,9 +368,7 @@ class DbSplitwellStore(
             acsStoreId,
             domainMigrationId,
             splitwellCodegen.SplitwellRules.COMPANION,
-            where = sql"""
-               and assigned_domain = $synchronizerId
-              """,
+            where = sql"""assigned_domain = $synchronizerId""",
           ).headOption,
           "lookupSplitwellRules",
         )
