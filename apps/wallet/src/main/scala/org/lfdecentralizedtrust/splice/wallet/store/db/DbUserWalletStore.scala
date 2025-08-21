@@ -70,9 +70,7 @@ class DbUserWalletStore(
       // Any change in the store descriptor will lead to previously deployed applications
       // forgetting all persisted data once they upgrade to the new version.
       acsStoreDescriptor = StoreDescriptor(
-        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
-        // to version 2 descriptors.
-        version = 2,
+        version = 3,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
@@ -83,9 +81,7 @@ class DbUserWalletStore(
         ),
       ),
       txLogStoreDescriptor = StoreDescriptor(
-        // Note that the V005__no_end_user_name_in_user_wallet_store.sql DB migration converts from version 1 descriptors
-        // to version 2 descriptors.
-        version = 2,
+        version = 3,
         name = "DbUserWalletStore",
         party = key.endUserParty,
         participant = participantId,
