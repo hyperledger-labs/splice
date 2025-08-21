@@ -8,7 +8,7 @@ a virtual machine with Nix, direnv and a few other tools pre-installed.
 - [Vagrant](https://www.vagrantup.com/downloads)
 - [VirtualBox](https://www.virtualbox.org/wiki/Downloads)
 
-## Setup
+## Start
 
 ```shell
 vagrant up
@@ -21,6 +21,12 @@ vagrant ssh
 cd splice
 ```
 
+## Stop
+
+```shell
+vagrant halt
+```
+
 ## Clean up
 
 ```shell
@@ -29,6 +35,14 @@ vagrant destroy
 # Optionally, remove the Nix cache to free up space, this will make the next
 # `vagrant up` slower as it will need to re-download all Nix packages.
 rm -r vagrant-nix-cache
+```
+
+## Repopulating Nix cache without recreating the VM
+
+```shell
+vagrant halt
+rm -r vagrant-nix-cache
+vagrant up --provision
 ```
 
 ## Notes
