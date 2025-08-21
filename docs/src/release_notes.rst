@@ -37,7 +37,7 @@ Release Notes
 
 - Performance improvements
 
-  - Improve sequencer performance when processing events from CometBFT, this should allow the sequencer to catch-up after downtime much faster and also support a higher load without degradation.
+  - Improve sequencer performance when processing events from CometBFT, this should allow the sequencer to catch-up after downtime much faster.
 
 0.4.11
 ------
