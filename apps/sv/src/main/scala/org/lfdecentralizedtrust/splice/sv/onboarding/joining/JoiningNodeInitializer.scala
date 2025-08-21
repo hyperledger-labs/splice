@@ -61,6 +61,7 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.synchronizer.SynchronizerConnectionConfig
+import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
@@ -339,6 +340,7 @@ class JoiningNodeInitializer(
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
       skipTrafficReconciliationTriggers: Boolean = false,
+      unpauseSynchronizer: Boolean = false,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
@@ -360,6 +362,15 @@ class JoiningNodeInitializer(
       )
       // Register triggers once the DsoRules are visible and have been ingested
       _ = dsoAutomationService.registerPostOnboardingTriggers()
+      _ <- if (unpauseSynchronizer)
+        participantAdminConnection
+        .ensureDomainParameters(
+          decentralizedSynchronizer,
+          // TODO(DACH-NY/canton-network-node#8761) hard code for now
+          _.tryUpdate(confirmationRequestsMaxRate =
+            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
+          ),
+        ) else Future.unit
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
       // submission rights.

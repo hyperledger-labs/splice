@@ -54,7 +54,6 @@ import com.digitalasset.canton.admin.api.client.data.{NodeStatus, WaitingForInit
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicSynchronizerParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
@@ -234,15 +233,8 @@ class DomainMigrationInitializer(
         dsoAutomationService,
         svAutomation,
         skipTrafficReconciliationTriggers = true,
+        unpauseSynchronizer = true,
       )
-      _ <- participantAdminConnection
-        .ensureDomainParameters(
-          decentralizedSynchronizerId,
-          // TODO(DACH-NY/canton-network-node#8761) hard code for now
-          _.tryUpdate(confirmationRequestsMaxRate =
-            DynamicSynchronizerParameters.defaultConfirmationRequestsMaxRate
-          ),
-        )
       _ <- new ParticipantUsersDataRestorer(
         svAutomation.connection,
         loggerFactory,
