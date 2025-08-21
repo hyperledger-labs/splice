@@ -34,7 +34,7 @@ loadTester:
 synchronizerMigration:
   active:
     id: 0
-    version: 0.5.0-snapshot.20250819.703.0.v8339acc8
+    version: 0.5.0-snapshot.20250821.727.0.v2f8da96c
     sequencer:
       enableBftSequencer: true
     releaseReference:
