@@ -3,10 +3,10 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-.. _val_live_nomics:
+.. _val_live_tokenomics:
 
 Validator Liveness
 ===================
 
 In each round, each live validator records its liveness activity with a
-`ValidatorLivenessActivityRecord <https://docs.dev.sync.global/app_dev/api/splice-amulet/Splice-ValidatorLicense.html#type-splice-validatorlicense-validatorlivenessactivityrecord-17293>`__.
+:ref:`ValidatorLivenessActivityRecord <type-splice-validatorlicense-validatorlivenessactivityrecord-17293>`.

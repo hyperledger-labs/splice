@@ -3,23 +3,23 @@
 ..
    SPDX-License-Identifier: Apache-2.0
 
-.. _cc_xfer_splice_wallet_nomics:
+.. _cc_xfer_splice_wallet_tokenomics:
 
 A CC Transfer using the Splice Wallet UI
 ========================================
 
 A manual CC transfer using the UI of the Splice wallet (the wallet UI
-built into every validator) is an example of a :ref:`cc_xfer_nomics`.
+built into every validator) is an example of a :ref:`cc_xfer_tokenomics`.
 There are three types of manual transfers possible with the Splice
 wallet UI:
 
       -  *Amulet legacy transfer* offer where the receiver has to accept the transfer offer and then automation on the sender’s side completes the transfer. The ``provider`` party on the
-         `AppRewardCoupon <https://docs.dev.sync.global/app_dev/api/splice-amulet/Splice-Amulet.html#type-splice-amulet-apprewardcoupon-57229>`__
-         is the ``sender``. The ``sender`` is assigned to the `ValidatorRewardCoupon <https://docs.dev.sync.global/app_dev/api/splice-amulet/Splice-Amulet.html#type-splice-amulet-validatorrewardcoupon-76808>`__
+         :ref:`AppRewardCoupon <type-splice-amulet-apprewardcoupon-57229>`
+         is the ``sender``. The ``sender`` is assigned to the :ref:`ValidatorRewardCoupon <type-splice-amulet-validatorrewardcoupon-76808>`
          user field. These transfers are never featured.
 
       -  A two-step, *CN token standard based*
-         `Transfer <https://docs.dev.sync.global/app_dev/api/splice-api-token-transfer-instruction-v1/Splice-Api-Token-TransferInstructionV1.html#type-splice-api-token-transferinstructionv1-transfer-51973>`__
+         :ref:`Transfer <type-splice-api-token-transferinstructionv1-transfer-51973>`
          offer first locks the desired CC amount; on acceptance, it is
          unlocked and the transfer is completed. This does not rely on
          automation and works well for external parties. Note that there
@@ -39,21 +39,23 @@ wallet UI:
                an ``AppRewardCoupon`` and ``ValidatorRewardCoupon`` which accrue to
                the ``sender``. These transfers are not featured.
 
+         In both cases, the ``AppRewardCoupon`` reward is small because it results from usage fees.
+
       -  *One-step transfer* to a ``receiver`` that has preapproved incoming CC
          transfers set up via a
-         `TransferPreapproval <https://docs.dev.sync.global/app_dev/api/splice-amulet/Splice-AmuletRules.html#type-splice-amuletrules-transferpreapproval-36220>`__
+         :ref:`TransferPreapproval <type-splice-wallet-transferpreapproval-transferpreapprovalproposal-39002>`
          contract. The validator operator of the ``receiver`` is the ``provider``
          party on the
-         ``TransferPreapproval``
-         of the ``receiver``. The
+         ``TransferPreapproval``. The
          ``TransferPreapproval``
          contract is only visible to: the ``receiver``, the receiver's
-         validator operator party, and SuperValidators. These transfers can be featured
-         if the receiver's validator operator's party is a featured party,
-         and the ``provider`` party listed on the ``TransferPreapproval`` receives
-         the reward for this transfer. The legacy or token standard based
+         validator operator party, and SuperValidators.
+         The ``provider`` party must be featured for the transfer to be featured.
+         The legacy or token standard based
          one-step transfers work the same.
 
 When comparing the ``Amulet`` legacy and token standard two-step transfers,
 a difference is that the token standard transfer has additional coupons
 for the CC locking fees.
+
+
