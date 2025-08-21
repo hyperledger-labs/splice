@@ -26,7 +26,7 @@ template AmuletConversionRateFeed
   with
     publisher : Party
     dso : Party
-    lastUpdatedAt : Optional Time
+    nextUpdateAfter : Optional Time
     amuletConversionRate : Decimal -- ^ conversion rate in USD/Amulet
   where
     signatory publisher
@@ -43,11 +43,12 @@ template AmuletConversionRateFeed
         amuletConversionRate : Decimal
         amuletRulesCid : ContractId AmuletRules
         markerContextO : Optional MarkerContext
+        newNextUpdateAfter : Time -- ^ Must be set to at least now + 0.5 tickDuration
       controller publisher
-      do now <- getTime
-         amuletRules <- fetchPublicReferenceData (ForDso dso) amuletRulesCid (AmuletRules_Fetch publisher)
-         let currentConfig = getValueAsOf now amuletRules.configSchedule
-         enforceCooldown ("Amulet conversion rate rate limit rate limit for " <> show publisher) (convertMicrosecondsToRelTime $ convertRelTimeToMicroseconds currentConfig.tickDuration / 2) lastUpdatedAt
+      do amuletRules <- fetchPublicReferenceData (ForDso dso) amuletRulesCid (AmuletRules_Fetch publisher)
+         currentConfig <- getValueAsOfLedgerTime amuletRules.configSchedule
+         forA_ nextUpdateAfter $ assertDeadlineExceeded "nextUpdateAfter"
+         assertWithinDeadline "newNextUpdateAfter - 0.5 tickDuration" (newNextUpdateAfter `addRelTime` convertMicrosecondsToRelTime (- (convertRelTimeToMicroseconds currentConfig.tickDuration) / 2))
          forA_ markerContextO $ \markerContext -> do
            _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
            exercise markerContext.featuredAppRightCid Api.FeaturedAppRight_CreateActivityMarker
@@ -55,7 +56,7 @@ template AmuletConversionRateFeed
                beneficiaries = markerContext.beneficiaries
          create this with
            amuletConversionRate
-           lastUpdatedAt = Some now
+           nextUpdateAfter = Some newNextUpdateAfter
 
 -- | Enforce that an action is not performed again before a cooldown period has passed.
 -- Duplicated from DsoRules as we do not want a dependency on that
