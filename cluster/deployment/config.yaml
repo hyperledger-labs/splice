@@ -73,6 +73,13 @@ monitoring:
       trafficWaste:
         kilobytes: 1
         overMinutes: 5
+      confirmationRequests:
+        total:
+          rate: 10
+          overMinutes: 5
+        perMember:
+          rate: 0.5
+          overMinutes: 5
       cloudSql:
         maintenance: false
       cometbft:
