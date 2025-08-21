@@ -31,17 +31,20 @@ testAmuletConversionRateFeed = do
   cid <- submit publisher $ createCmd AmuletConversionRateFeed with
     publisher
     dso = app.dso
-    lastUpdatedAt = None
+    nextUpdateAfter = None
     amuletConversionRate = 1.0
 
   checkRate app.dso cid 1.0
 
   (amuletRulesCid, _) <- getAmuletRules app
 
+  now <- getTime
+
   cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 2.0
     amuletRulesCid
     markerContextO = None
+    newNextUpdateAfter = now `addRelTime` minutes 6
 
   checkRate app.dso cid 2.0
 
@@ -50,8 +53,11 @@ testAmuletConversionRateFeed = do
     amuletConversionRate = 2.0
     amuletRulesCid
     markerContextO = None
+    newNextUpdateAfter = now `addRelTime` minutes 10
 
   passTime (minutes 10)
+
+  now <- getTime
 
   cid <- submitMulti [publisher] [app.dso] $ exerciseCmd cid AmuletConversionRateFeed_Update with
     amuletConversionRate = 4.0
@@ -59,9 +65,11 @@ testAmuletConversionRateFeed = do
     markerContextO = Some MarkerContext with
       beneficiaries = [Api.AppRewardBeneficiary publisher 1.0]
       featuredAppRightCid = toInterfaceContractId featuredAppRightCid
+    newNextUpdateAfter = now `addRelTime` minutes 6
 
   checkRate app.dso cid 4.0
 
   markers <- queryInterface @Api.FeaturedAppActivityMarker publisher
   length markers === 1
+
   pure ()
