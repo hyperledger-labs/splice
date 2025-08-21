@@ -7,7 +7,7 @@ set -euo pipefail
 # --- Scenario configuration ---
 MAX_VUS=50
 MIN_VUS=0
-SCALE_DOWN_STEP=2 # How many VUs to remove when failures occur
+SCALE_DOWN_STEP=5 # How many VUs to remove when failures occur
 
 # --- Script State ---
 CURRENT_VUS=1
@@ -68,6 +68,10 @@ while true; do
       else
         echo "👌 No new failures. Already at max VUs ($MAX_VUS)."
       fi
+
+      # --- Wait for 5 minutes before the next check ---
+      echo "Sleeping for 5 minutes (300 seconds)..."
+      sleep 300
     elif [ "$DELTA" -gt "0" ]; then
       if [ "$CURRENT_VUS" -gt "$MIN_VUS" ]; then
         echo "🔥 New failures detected! Scaling down by ${SCALE_DOWN_STEP} VUs."
@@ -75,8 +79,14 @@ while true; do
         if [ "$NEW_VUS" -lt "$MIN_VUS" ]; then NEW_VUS=$MIN_VUS; fi
         k6 scale --vus="$NEW_VUS"
         CURRENT_VUS=$NEW_VUS
+
+        echo "Sleeping for 1 minute..."
+        sleep 60
       else
         echo "⚠️ New failures detected, but already at min VUs ($MIN_VUS)."
+
+        echo "Sleeping for 5 minutes (300 seconds)..."
+        sleep 300
       fi
     fi
 
@@ -84,9 +94,6 @@ while true; do
     PREVIOUS_FAILED_TRANSFERS=$CURRENT_FAILS
   fi
 
-  # --- Wait for 5 minutes before the next check ---
-  echo "Sleeping for 5 minutes (300 seconds)..."
-  sleep 300
 done
 
 wait "$K6_PID"
