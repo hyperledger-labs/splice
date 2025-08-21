@@ -55,6 +55,8 @@ template AmuletConversionRateFeed
       do amuletRules <- fetchPublicReferenceData (ForDso dso) amuletRulesCid (AmuletRules_Fetch publisher)
          currentConfig <- getValueAsOfLedgerTime amuletRules.configSchedule
          forA_ nextUpdateAfter $ assertDeadlineExceeded "nextUpdateAfter"
+         -- We use a rate limit of 0.5 ticks to avoid increasingly lagging behind rounds as your update will
+         -- always be slightly slower than the minimum rate limit.
          assertWithinDeadline "newNextUpdateAfter - 0.5 tickDuration" (newNextUpdateAfter `addRelTime` convertMicrosecondsToRelTime (- (convertRelTimeToMicroseconds currentConfig.tickDuration) / 2))
          forA_ markerContextO $ \markerContext -> do
            _ <- fetchCheckedInterface ForOwner{dso, owner = publisher} markerContext.featuredAppRightCid
