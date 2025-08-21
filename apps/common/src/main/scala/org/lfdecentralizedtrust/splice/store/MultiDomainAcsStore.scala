@@ -369,7 +369,7 @@ object MultiDomainAcsStore {
     override val ingestionFilter =
       IngestionFilter(
         primaryParty,
-        interfaceFilters.values.map(_.interfaceId).toSeq,
+        interfaceFilters.keys.toSeq,
       )
 
     override def contains(ev: CreatedEvent)(implicit elc: ErrorLoggingContext): Boolean = {
@@ -512,7 +512,7 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
-      includeInterfaces: Seq[Identifier],
+      includeInterfaces: Seq[PackageQualifiedName],
       includeCreatedEventBlob: Boolean = true,
   ) {
 
@@ -530,9 +530,9 @@ object MultiDomainAcsStore {
                   com.daml.ledger.api.v2.transaction_filter.InterfaceFilter(
                     Some(
                       com.daml.ledger.api.v2.value.Identifier(
-                        packageId = interfaceId.getPackageId,
-                        moduleName = interfaceId.getModuleName,
-                        entityName = interfaceId.getEntityName,
+                        packageId = interfaceId.packageName,
+                        moduleName = interfaceId.qualifiedName.moduleName,
+                        entityName = interfaceId.qualifiedName.entityName,
                       )
                     ),
                     includeInterfaceView = true,
