@@ -59,10 +59,9 @@ If you do not need preapprovals, this is sufficient.
 
 If you do need to create preapprovals, you must ensure that you do not
 create ``ValidatorRight`` contract with the ``validator`` party set to
-the validator operator. The best option for this is to build your own
-replacement Daml workflow for ``ExternalPartySetupProposal`` to gather
+the validator operator. The best option for this is to use ``#splice-wallet:Splice.Wallet.TransferPreapproval:TransferPreapprovalProposal`` to gather
 authorization from both the external party and the validator operator
-which then exercises ``AmuletRules_CreateTransferPreapproval`` but
+which creates the ``TransferPreapproval`` but
 does not create a ``ValidatorRight`` contract. As long as the
 ``provider`` on the resulting ``TransferPreapproval`` is the validator
 operator party, the renewal automation for transfer preapprovals in
