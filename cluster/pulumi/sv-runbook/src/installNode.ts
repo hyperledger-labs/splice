@@ -306,7 +306,11 @@ async function installSvAndValidator(
         : {}),
     },
     ...(useCantonBft
-      ? {}
+      ? {
+          cometBFT: {
+            enabled: false,
+          },
+        }
       : {
           cometBFT: {
             ...(valuesFromYamlFile.cometBFT || {}),
