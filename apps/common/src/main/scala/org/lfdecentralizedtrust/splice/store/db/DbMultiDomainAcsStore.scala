@@ -89,7 +89,6 @@ final class DbMultiDomainAcsStore[TXE](
     ],
     txLogConfig: TxLogStore.Config[TXE],
     domainMigrationInfo: DomainMigrationInfo,
-    @unused participantId: ParticipantId, // TODO: figure out what's up with this
     retryProvider: RetryProvider,
     /** Allows processing the summary in a store-specific manner, e.g., to produce metrics
       * on ingestion of certain contracts.
