@@ -5,7 +5,7 @@ on:
       - 'main'
 
 jobs:
-  trigger_ciupgrade:
+  notify_readme_changes:
     runs-on: ubuntu-24.04
     name: Notify on README changes
     steps:
