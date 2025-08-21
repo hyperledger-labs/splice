@@ -8,8 +8,9 @@
 Release Notes
 =============
 
-Upcoming
---------
+
+0.4.12
+------
 
 - Docs
 
@@ -33,6 +34,10 @@ Upcoming
 
   - A subset of the tests now run on PRs from forks without approval from a maintainer
     (see `TESTING.md <https://github.com/hyperledger-labs/splice/blob/0.4.12/TESTING.md>` for details)
+
+- Performance improvements
+
+  - Improve sequencer performance when processing events from CometBFT, this should allow the sequencer to catch-up after downtime much faster.
 
 0.4.11
 ------
