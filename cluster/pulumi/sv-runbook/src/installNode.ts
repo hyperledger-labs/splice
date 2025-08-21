@@ -432,8 +432,7 @@ async function installSvAndValidator(
     {
       dependsOn: imagePullDeps
         .concat(canton.participant.asDependencies)
-        .concat([svAppSecret, appsPg])
-        .concat(spliceConfig.pulumiProjectConfig.interAppsDependencies ? [sv] : []),
+        .concat([svAppSecret, appsPg]),
     }
   );
 
