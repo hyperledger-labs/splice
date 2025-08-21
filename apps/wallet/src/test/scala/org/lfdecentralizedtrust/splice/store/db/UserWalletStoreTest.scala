@@ -1334,7 +1334,7 @@ abstract class UserWalletStoreTest extends TransferInputStoreTest with HasExecut
   }
 
   protected def transferPreapprovalProposal(receiver: PartyId, provider: PartyId) = {
-    val templateId = preapprovalCodegen.TransferPreapprovalProposal.TEMPLATE_ID
+    val templateId = preapprovalCodegen.TransferPreapprovalProposal.TEMPLATE_ID_WITH_PACKAGE_ID
     val template =
       new TransferPreapprovalProposal(
         receiver.toProtoPrimitive,

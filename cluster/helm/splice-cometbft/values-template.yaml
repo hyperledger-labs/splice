@@ -97,8 +97,8 @@ enableAntiAffinity: true
 logLevel: debug
 mempool:
   # max number of transactions kept in the mempool
-  size: 1000
+  size: 2000
   # number of transactions to keep to deduplicate new transactions
-  deduplicationCacheSize: 100000
+  deduplicationCacheSize: 200000
   # max number of seconds that a transaction will be kept in the mempool without being included in a block before being discarded
   ttlSeconds: 300

@@ -228,3 +228,12 @@ app: {{ .app }}
 {{- end }}
 {{- end }}
 {{- end -}}
+{{- define "splice-util-lib.render-nested-config" }}
+{{- range $key, $value := . }}
+{{ $key | kebabcase }} = {{- if kindIs "map" $value }} {
+{{- include "splice-util-lib.render-nested-config" $value | trim | nindent 2 }}
+}
+{{- else }} {{ $value }}
+{{- end }}
+{{- end -}}
+{{- end -}}

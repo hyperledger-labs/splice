@@ -2,9 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, CLUSTER_NAME, conditionalString, config } from 'splice-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  CLUSTER_NAME,
+  conditionalString,
+  config,
+} from '@lfdecentralizedtrust/splice-pulumi-common';
 
-import { slackToken } from './alertings';
+import { slackAlertNotificationChannel, slackToken } from './alertings';
 import { monitoringConfig } from './config';
 
 const enableChaosMesh = config.envFlag('ENABLE_CHAOS_MESH');
@@ -15,20 +20,22 @@ function ensureTrailingNewline(s: string): string {
 
 export function getNotificationChannel(
   name: string = `${CLUSTER_BASENAME} Slack Alert Notification Channel`
-): gcp.monitoring.NotificationChannel {
-  const slackAlertNotificationChannel =
-    config.optionalEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME') ||
-    'team-canton-network-internal-alerts';
-  return new gcp.monitoring.NotificationChannel(slackAlertNotificationChannel, {
-    displayName: name,
-    type: 'slack',
-    labels: {
-      channel_name: `#${slackAlertNotificationChannel}`,
-    },
-    sensitiveLabels: {
-      authToken: slackToken(),
-    },
-  });
+): gcp.monitoring.NotificationChannel | undefined {
+  const channelSlackName =
+    slackAlertNotificationChannel &&
+    config.requireEnv('SLACK_ALERT_NOTIFICATION_CHANNEL_FULL_NAME');
+  return channelSlackName
+    ? new gcp.monitoring.NotificationChannel(channelSlackName, {
+        displayName: name,
+        type: 'slack',
+        labels: {
+          channel_name: `#${channelSlackName}`,
+        },
+        sensitiveLabels: {
+          authToken: slackToken(),
+        },
+      })
+    : undefined;
 }
 
 export function installGcpLoggingAlerts(

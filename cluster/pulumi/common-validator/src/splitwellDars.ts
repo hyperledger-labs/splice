@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import * as fs from 'fs';
 import * as semver from 'semver';
-import { SPLICE_ROOT } from 'splice-pulumi-common';
-import { splitwellConfig } from 'splice-pulumi-common/src/config/splitwellConfig';
+import { SPLICE_ROOT } from '@lfdecentralizedtrust/splice-pulumi-common';
+import { splitwellConfig } from '@lfdecentralizedtrust/splice-pulumi-common/src/config/splitwellConfig';
 
 export const splitwellDarPaths = fs
   .readdirSync(`${SPLICE_ROOT}/daml/dars`)

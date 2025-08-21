@@ -43,7 +43,13 @@ import org.lfdecentralizedtrust.splice.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdateOrOffsetCheckpoint,
 }
-import org.lfdecentralizedtrust.splice.util.EventId
+import org.lfdecentralizedtrust.splice.util.{
+  Contract,
+  EventId,
+  PackageQualifiedName,
+  SpliceUtil,
+  Trees,
+}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SynchronizerId}
@@ -53,6 +59,7 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.amulet.FeaturedAppRig
 import org.lfdecentralizedtrust.splice.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dso.svstate.{RewardState, SvRewardState}
 import org.lfdecentralizedtrust.splice.codegen.java.da.time.types.RelTime
+import org.lfdecentralizedtrust.splice.codegen.java.splice.api.token.test.dummyholding.DummyHolding
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
 import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.voterequestoutcome.VRO_Accepted
@@ -68,7 +75,6 @@ import org.lfdecentralizedtrust.splice.codegen.java.splice.dsorules.{
 import org.lfdecentralizedtrust.splice.history.{AmuletCreate, AppRewardCreate}
 import org.lfdecentralizedtrust.splice.store.MultiDomainAcsStore.HasIngestionSink
 import org.lfdecentralizedtrust.splice.store.db.TxLogRowData
-import org.lfdecentralizedtrust.splice.util.{Contract, SpliceUtil, Trees}
 import org.scalatest.wordspec.AsyncWordSpec
 import org.slf4j.event.Level
 
@@ -82,7 +88,29 @@ import scala.jdk.OptionConverters.*
 
 abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
-  protected val dummyPackageName = "dummyPackageName"
+  protected val upgradedAppRewardCouponPackageId = "upgradedpackageid"
+  protected val dummyHoldingPackageId = DummyHolding.TEMPLATE_ID.getPackageId
+  protected val maliciousPackageId = "maliciouspackageid"
+
+  protected def getPackageName(identifier: Identifier) = {
+    PackageQualifiedName
+      .lookupFromResources(identifier)
+      .map(_.packageName)
+      // should only be necessary for upgrade/malicious identifiers
+      .orElse(
+        Map(
+          upgradedAppRewardCouponPackageId -> amuletCodegen.AppRewardCoupon.PACKAGE_NAME,
+          dummyHoldingPackageId -> DummyHolding.PACKAGE_NAME, // not in DarResources
+          maliciousPackageId -> "malicious-package",
+        )
+          .get(identifier.getPackageId)
+      )
+      .getOrElse(
+        throw new IllegalArgumentException(
+          s"Identifier is not present in resources nor does it look like mock data: $identifier"
+        )
+      )
+  }
 
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
 
@@ -400,7 +428,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def validatorLivenessActivityRecord(validator: PartyId, round: Long = 1L) = {
     contract(
-      identifier = validatorLicenseCodegen.ValidatorLivenessActivityRecord.TEMPLATE_ID,
+      identifier =
+        validatorLicenseCodegen.ValidatorLivenessActivityRecord.TEMPLATE_ID_WITH_PACKAGE_ID,
       contractId =
         new validatorLicenseCodegen.ValidatorLivenessActivityRecord.ContractId(nextCid()),
       payload = new validatorLicenseCodegen.ValidatorLivenessActivityRecord(
@@ -560,7 +589,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     amuletrulesCodegen.TransferPreapproval.ContractId,
     amuletrulesCodegen.TransferPreapproval,
   ] = {
-    val templateId = amuletrulesCodegen.TransferPreapproval.TEMPLATE_ID
+    val templateId = amuletrulesCodegen.TransferPreapproval.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new amuletrulesCodegen.TransferPreapproval(
       dsoParty.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -583,7 +612,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     externalpartyamuletrulesCodegen.TransferCommandCounter.ContractId,
     externalpartyamuletrulesCodegen.TransferCommandCounter,
   ] = {
-    val templateId = externalpartyamuletrulesCodegen.TransferCommandCounter.TEMPLATE_ID
+    val templateId =
+      externalpartyamuletrulesCodegen.TransferCommandCounter.TEMPLATE_ID_WITH_PACKAGE_ID
     val template = new externalpartyamuletrulesCodegen.TransferCommandCounter(
       dsoParty.toProtoPrimitive,
       sender.toProtoPrimitive,
@@ -599,7 +629,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def toCreatedEvent(
       contract: Contract[?, ?],
       signatories: Seq[PartyId] = Seq.empty,
-      packageName: String = dummyPackageName,
       observers: Seq[PartyId] = Seq.empty,
       implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
       failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
@@ -609,7 +638,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       0,
       1,
       contract.identifier,
-      packageName,
+      getPackageName(contract.identifier),
       contract.contractId.contractId,
       contract.payload.toValue,
       contract.createdEventBlob,
@@ -631,7 +660,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       0,
       1,
       contract.identifier,
-      dummyPackageName,
+      getPackageName(contract.identifier),
       None.toJava,
       contract.contractId.contractId,
       "DummyChoiceName",
@@ -669,7 +698,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       0,
       1,
       templateId,
-      dummyPackageName,
+      getPackageName(templateId),
       interfaceId.toJava,
       contractId,
       choice,
@@ -845,7 +874,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId: SynchronizerId,
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
-      packageName: String = dummyPackageName,
       createdEventObservers: Seq[PartyId] = Seq.empty,
   ): TransactionTree = mkCreateTxWithInterfaces(
     offset,
@@ -857,7 +885,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     synchronizerId,
     workflowId,
     recordTime,
-    packageName,
     createdEventObservers,
   )
 
@@ -871,7 +898,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       synchronizerId: SynchronizerId,
       workflowId: String,
       recordTime: Instant = defaultEffectiveAt,
-      packageName: String = dummyPackageName,
       createdEventObservers: Seq[PartyId] = Seq.empty,
   ): TransactionTree = mkTx(
     offset,
@@ -879,7 +905,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       toCreatedEvent(
         contract,
         createdEventSignatories,
-        packageName,
         createdEventObservers,
         implementedInterfaces,
         failedInterfaces,
@@ -1027,7 +1052,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
         recordTime: Instant = defaultEffectiveAt,
-        packageName: String = dummyPackageName,
         createdEventObservers: Seq[PartyId] = Seq.empty,
         implementedInterfaces: Map[Identifier, DamlRecord] = Map.empty,
         failedInterfaces: Map[Identifier, com.google.rpc.Status] = Map.empty,
@@ -1040,7 +1064,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         domain,
         workflowId,
         recordTime,
-        packageName,
         createdEventObservers,
       )
 
@@ -1297,7 +1320,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       0,
       1,
       contract.identifier,
-      dummyPackageName,
+      getPackageName(contract.identifier),
       interfaceId.toJava,
       contract.contractId.contractId,
       choiceName,
