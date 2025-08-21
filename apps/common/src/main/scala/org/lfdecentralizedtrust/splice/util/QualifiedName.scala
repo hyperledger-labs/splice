@@ -26,7 +26,6 @@ object PackageQualifiedName {
       }
   }
 
-  // TODO: replace more usages of this with java codegen one
   def getFromResources(identifier: Identifier): PackageQualifiedName = {
     lookupFromResources(identifier)
       .getOrElse(throw new IllegalArgumentException(s"No package found for template $identifier"))

@@ -9,7 +9,10 @@ import com.daml.ledger.api.v2.transaction_filter.{
   CumulativeFilter,
   TransactionFilter as LapiTransactionFilter,
 }
-import org.lfdecentralizedtrust.splice.util.Contract.Companion.Template as TemplateCompanion
+import org.lfdecentralizedtrust.splice.util.Contract.Companion.{
+  Interface,
+  Template as TemplateCompanion,
+}
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.metrics.api.MetricsContext
@@ -29,6 +32,7 @@ import org.lfdecentralizedtrust.splice.util.{
   Contract,
   ContractWithState,
   PackageQualifiedName,
+  QualifiedName,
   TemplateJsonDecoder,
 }
 import org.lfdecentralizedtrust.splice.util.PrettyInstances.*
@@ -457,7 +461,7 @@ object MultiDomainAcsStore {
       TemplateFilter[TCid, T, R],
   ) =
     (
-      PackageQualifiedName.getFromResources(templateCompanion.getTemplateIdWithPackageId),
+      PackageQualifiedName.fromJavaCodegenCompanion(templateCompanion),
       TemplateFilter(
         ev => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev)
@@ -584,9 +588,7 @@ object MultiDomainAcsStore {
 
     def typeId(companion: C): Identifier
 
-    // This is safe because if we have a companion, the package exists in resources
-    def packageQualifiedName(companion: C) =
-      PackageQualifiedName.getFromResources(typeId(companion))
+    def packageQualifiedName(companion: C): PackageQualifiedName
 
     def toContractId(companion: C, contractId: String): TCid
 
@@ -609,6 +611,13 @@ object MultiDomainAcsStore {
 
       override def typeId(companion: Contract.Companion.Template[TCid, T]): Identifier =
         companion.getTemplateIdWithPackageId
+
+      override def packageQualifiedName(
+          companion: TemplateCompanion[TCid, T]
+      ): PackageQualifiedName = PackageQualifiedName(
+        companion.PACKAGE_NAME,
+        QualifiedName(companion.getTemplateIdWithPackageId),
+      )
 
       override def toContractId(companion: Companion.Template[TCid, T], contractId: String): TCid =
         companion.toContractId(new ContractId[T](contractId))
@@ -642,6 +651,13 @@ object MultiDomainAcsStore {
 
       override def typeId(companion: Contract.Companion.Interface[ICid, Marker, View]): Identifier =
         companion.getTemplateIdWithPackageId
+
+      override def packageQualifiedName(
+          companion: Interface[ICid, Marker, View]
+      ): PackageQualifiedName = PackageQualifiedName(
+        companion.PACKAGE_NAME,
+        QualifiedName(companion.getTemplateIdWithPackageId),
+      )
 
       override def toContractId(
           companion: Companion.Interface[ICid, Marker, View],

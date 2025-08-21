@@ -510,8 +510,8 @@ class ScanTimeBasedIntegrationTest
       migrationId,
       templates = Some(
         Vector(
-          PackageQualifiedName.getFromResources(Amulet.TEMPLATE_ID_WITH_PACKAGE_ID),
-          PackageQualifiedName.getFromResources(AnsEntry.TEMPLATE_ID_WITH_PACKAGE_ID),
+          PackageQualifiedName.fromJavaCodegenCompanion(Amulet.COMPANION),
+          PackageQualifiedName.fromJavaCodegenCompanion(AnsEntry.COMPANION),
         )
       ),
       partyIds = Some(Vector(aliceUserParty)),
