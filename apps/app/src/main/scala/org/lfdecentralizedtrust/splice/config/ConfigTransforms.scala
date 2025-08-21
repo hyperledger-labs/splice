@@ -690,11 +690,11 @@ object ConfigTransforms {
           )
         )
 
-  def withBftSequencer(name: String, config: ScanAppBackendConfig): ScanAppBackendConfig =
+  def withBftSequencer(name: String, config: ScanAppBackendConfig, migrationId: Long = 0): ScanAppBackendConfig =
         config.copy(
           bftSequencers = Seq(
             BftSequencerConfig(
-              0,
+              migrationId,
               config.sequencerAdminClient,
               s"http://localhost:${5010 + Integer.parseInt(name.stripPrefix("sv").take(1)) * 100}",
             )
