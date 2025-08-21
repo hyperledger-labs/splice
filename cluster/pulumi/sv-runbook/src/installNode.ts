@@ -167,7 +167,7 @@ export async function installNode(
       },
     },
     activeVersion,
-    { dependsOn: ingressImagePullDeps.concat([sv, validator]) }
+    { dependsOn: ingressImagePullDeps }
   );
 }
 
