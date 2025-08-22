@@ -40,6 +40,7 @@ jobs:
       - name: direct test
         shell: bash
         run: |
+          df -h
           mkdir test
           cd test
           curl https://storage.googleapis.com/splice-nix-cache-public/48461acabd81ff985f7de6e4a32efb29.tar.gz -o b.tar.gz
@@ -47,6 +48,7 @@ jobs:
       - name: test zstd
         shell: bash
         run: |
+          df -h
           cd test
           ls -l b.tar.gz
           echo "Extracting b.tar.gz"
@@ -61,6 +63,7 @@ jobs:
           mv a.tar.zst ../temp2/
           cd ..
           rm -rf test
+          df -h
           cd temp2
           echo "Extracting a.tar.zst"
           tar -I zstd -xf a.tar.zst
