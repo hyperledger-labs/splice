@@ -19,12 +19,18 @@ jobs:
         run: |
           cd test
           ls -l b.tar.gz
+          echo "Extracting b.tar.gz"
           tar -xzf b.tar.gz
+          echo "Done extracting b.tar.gz"
           rm b.tar.gz
+          echo "Creating a.tar.zst"
           tar -I zstd -cf a.tar.zst *
+          echo "Done creating a.tar.zst"
           ls -l a.tar.zst
           mkdir temp2
           mv a.tar.zst temp2/
           cd temp2
+          echo "Extracting a.tar.zst"
           tar -I zstd -xf a.tar.zst
+          echo "Done extracting a.tar.zst"
           ls -l
