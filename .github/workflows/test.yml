@@ -62,7 +62,7 @@ jobs:
           mkdir ../temp2
           mv a.tar.zst ../temp2/
           cd ..
-          rm -rf test
+          sudo rm -rf test
           df -h
           cd temp2
           echo "Extracting a.tar.zst"
