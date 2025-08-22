@@ -7,6 +7,36 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
+
+      - name: Get Egress IP Address
+        id: get_ip
+        run: |
+          # Use a service to get the public IP of the runner
+          EGRESS_IP=$(curl -s https://icanhazip.com)
+          echo "Egress IP: $EGRESS_IP"
+          # Set the IP as a step output
+          echo "ip=$EGRESS_IP" >> $GITHUB_OUTPUT
+
+      - name: Use Egress IP to Guess Region
+        if: steps.get_ip.outputs.ip != ''
+        id: get_location
+        run: |
+          IP_TO_CHECK="${{ steps.get_ip.outputs.ip }}"
+          echo "Checking IP: $IP_TO_CHECK"
+          # Use a service to get the location of the IP
+          # You can use a dedicated service or a cloud provider's public IP list
+          # Example with an external API (for demonstration)
+          # Note: This is an external API call and may be rate-limited
+          LOCATION_INFO=$(curl -s "https://ipinfo.io/$IP_TO_CHECK/json")
+          CITY=$(echo "$LOCATION_INFO" | jq -r '.city')
+          REGION=$(echo "$LOCATION_INFO" | jq -r '.region')
+          COUNTRY=$(echo "$LOCATION_INFO" | jq -r '.country')
+          ORG=$(echo "$LOCATION_INFO" | jq -r '.org')
+
+          echo "Location Info: $CITY, $REGION, $COUNTRY"
+          echo "Organization: $ORG"
+
+
       - name: direct test
         shell: bash
         run: |
