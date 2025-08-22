@@ -27,8 +27,10 @@ jobs:
           tar -I zstd -cf a.tar.zst *
           echo "Done creating a.tar.zst"
           ls -l a.tar.zst
-          mkdir temp2
-          mv a.tar.zst temp2/
+          mkdir ../temp2
+          mv a.tar.zst ../temp2/
+          cd ..
+          rm -rf test
           cd temp2
           echo "Extracting a.tar.zst"
           tar -I zstd -xf a.tar.zst
