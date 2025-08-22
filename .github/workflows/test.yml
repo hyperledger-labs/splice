@@ -7,15 +7,6 @@ jobs:
   test:
     runs-on: ubuntu-24.04
     steps:
-      - name: test via CDN
-        shell: bash
-        run: |
-          curl 34.111.229.14/48461acabd81ff985f7de6e4a32efb29.tar.gz -o a.tar.gz
-      - name: direct test
-        shell: bash
-        run: |
-          curl https://storage.googleapis.com/splice-nix-cache-public/48461acabd81ff985f7de6e4a32efb29.tar.gz -o b.tar.gz
-
       - name: Get Egress IP Address
         id: get_ip
         run: |
@@ -53,3 +44,13 @@ jobs:
               echo "The runner is likely in a West US region."
             fi
           fi
+
+      - name: direct test
+        shell: bash
+        run: |
+          curl https://storage.googleapis.com/splice-nix-cache-public/48461acabd81ff985f7de6e4a32efb29.tar.gz -o b.tar.gz
+
+      - name: test via CDN
+        shell: bash
+        run: |
+          curl 34.111.229.14/48461acabd81ff985f7de6e4a32efb29.tar.gz -o a.tar.gz
