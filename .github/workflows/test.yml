@@ -50,6 +50,12 @@ jobs:
         run: |
           curl https://storage.googleapis.com/splice-nix-cache-public/48461acabd81ff985f7de6e4a32efb29.tar.gz -o b.tar.gz
 
+      - name: direct test (wget)
+        shell: bash
+        run: |
+          wget https://storage.googleapis.com/splice-nix-cache-public/48461acabd81ff985f7de6e4a32efb29.tar.gz -o c.tar.gz
+
+
       - name: test via CDN
         shell: bash
         run: |
