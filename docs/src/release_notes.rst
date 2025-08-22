@@ -19,6 +19,30 @@ Upcoming
 
   - Expose ``/dso`` endpoint from scan proxy
 
+- Daml
+
+  .. TODO(#2241): add proper link and number
+
+  - Implement `CIP-XXX - CC Fee Removal <https://github.com/global-synchronizer-foundation/cips/pull/97/files>`__ with the following changes:
+
+     - Fix a bug in the validation of ``AmuletConfig`` that prevented
+       setting the CC transfer fees to zero.
+     - Fix a bug in the featured app rewards issuance for ``AmuletRules_Transfer``
+       that prevented featured app rewards to be issued when the CC usage fees are zero.
+
+     These Daml changes requires an upgrade to the following Daml versions:
+
+     ================== =======
+     name               version
+     ================== =======
+     amulet             0.1.14
+     amuletNameService  0.1.14
+     dsoGovernance      0.1.19
+     validatorLifecycle 0.1.5
+     wallet             0.1.14
+     walletPayments     0.1.14
+     ================== =======
+
 - Deployment
 
   - Participant
