@@ -1053,22 +1053,21 @@ summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs 
       amuletPrice = openRound.amuletPrice
 
 issueRewards : RewardsIssuanceConfig -> TransferContextSummary -> Party -> Party -> Optional [AppRewardBeneficiary] -> TransferSummary -> Update ()
-issueRewards config csum sender provider beneficiaries summary
-  | usageFees <= 0.0 = pure ()
-  | otherwise = do
-      when (config.issueValidatorRewards) $
-        void $ create ValidatorRewardCoupon with
-          dso = csum.openRound.dso
-          user = sender
-          amount = usageFees
-          round = csum.openRound.round
+issueRewards config csum sender provider beneficiaries summary = do
+    when (config.issueValidatorRewards && usageFees > 0.0) $
+      void $ create ValidatorRewardCoupon with
+        dso = csum.openRound.dso
+        user = sender
+        amount = usageFees
+        round = csum.openRound.round
 
-      if config.issueAppRewards
-        then do
-          let beneficiaries' = fromOptional [AppRewardBeneficiary provider 1.0] beneficiaries
-          validateAppRewardBeneficiaries beneficiaries'
-          let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) beneficiaries')
-              totalAmount = usageFees + extraAppReward
+    if config.issueAppRewards
+      then do
+        let beneficiaries' = fromOptional [AppRewardBeneficiary provider 1.0] beneficiaries
+        validateAppRewardBeneficiaries beneficiaries'
+        let groupedBeneficiaries = Map.fromListWithR (+) (map (\b -> (b.beneficiary, b.weight)) beneficiaries')
+            totalAmount = usageFees + extraAppReward
+        when (totalAmount > 0.0) $
           forA_ (Map.toList groupedBeneficiaries) $ \(beneficiary, weight) ->
             void $ create AppRewardCoupon with
               dso = csum.openRound.dso
@@ -1077,8 +1076,8 @@ issueRewards config csum sender provider beneficiaries summary
               featured
               amount = totalAmount * weight
               round = csum.openRound.round
-        else do
-          require "beneficiaries are unset if issueAppRewards is false" (optional True null beneficiaries)
+      else do
+        require "beneficiaries are unset if issueAppRewards is false" (optional True null beneficiaries)
   where
     usageFees = sum summary.outputFees
     featured = Some provider == csum.featuredAppProvider
