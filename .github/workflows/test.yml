@@ -17,6 +17,7 @@ jobs:
       - name: test zstd
         shell: bash
         run: |
+          cd test
           ls -l b.tar.gz
           tar -xzf b.tar.gz
           rm b.tar.gz
